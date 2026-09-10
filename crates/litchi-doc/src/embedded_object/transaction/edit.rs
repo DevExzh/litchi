@@ -49,7 +49,8 @@ impl Transaction {
         if bytes == self.source.source_bytes() {
             return Ok(self.source.clone());
         }
-        Snapshot::open(bytes, self.source.limits()).map_err(TransactionError::Invalid)
+        Snapshot::open_with_policy(bytes, self.source.limits(), self.source.protection_policy())
+            .map_err(TransactionError::Invalid)
     }
 
     /// Returns the current candidate inventory without publishing it.
@@ -372,7 +373,8 @@ impl Transaction {
         let snapshot = if patch.is_noop() {
             before
         } else {
-            Snapshot::open(after, before.limits()).map_err(TransactionError::Invalid)?
+            Snapshot::open_with_policy(after, before.limits(), before.protection_policy())
+                .map_err(TransactionError::Invalid)?
         };
         Ok(Commit::new(snapshot, patch))
     }

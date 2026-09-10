@@ -26,6 +26,7 @@ pub mod source;
 use crate::DateTime;
 use crate::package::Error as PackageError;
 use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::protection::ProtectionPolicy;
 use crate::parts::saved_selection::{
     FIB_INDEX_WSS, SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError,
     SavedSelectionTransaction,
@@ -322,6 +323,10 @@ pub enum Refusal {
     /// A changed DOC publication would leave retained binary signature
     /// metadata stale.
     SignedSource,
+    /// Document or range protection is active for this edit policy.
+    Protected,
+    /// Protection metadata is malformed or outside the supported grammar.
+    UnknownProtection,
     /// Opaque auxiliary-table bytes cannot be merged by the semantic
     /// three-way body plan without silently dropping one side.
     AuxiliaryThreeWayMergeUnsupported,
@@ -405,6 +410,12 @@ impl std::fmt::Display for Refusal {
             Self::SignedSource => {
                 formatter.write_str("changed DOC edits are refused for signed sources")
             },
+            Self::Protected => {
+                formatter.write_str("protected DOC sources require explicit edit authorization")
+            },
+            Self::UnknownProtection => formatter.write_str(
+                "DOC protection metadata is malformed or outside the supported grammar",
+            ),
             Self::AuxiliaryThreeWayMergeUnsupported => formatter.write_str(
                 "three-way body plans do not merge opaque auxiliary-table changes",
             ),
@@ -468,6 +479,17 @@ impl From<CompositionError> for Error {
 impl From<PatchError> for Error {
     fn from(error: PatchError) -> Self {
         Self::Durable(error)
+    }
+}
+
+fn map_protection_error(error: PackageError) -> Error {
+    match error {
+        PackageError::ProtectionDenied(
+            crate::parts::protection::EditProtection::Unknown
+            | crate::parts::protection::EditProtection::Unrecognized,
+        ) => Error::Refused(Refusal::UnknownProtection),
+        PackageError::ProtectionDenied(_) => Error::Refused(Refusal::Protected),
+        error => Error::Invalid(error),
     }
 }
 
@@ -549,6 +571,7 @@ pub struct Snapshot {
     fingerprint_cache: OnceLock<u64>,
     limits: Limits,
     transaction_limits: TransactionLimits,
+    protection_policy: ProtectionPolicy,
 }
 
 impl Clone for Snapshot {
@@ -564,6 +587,7 @@ impl Clone for Snapshot {
             fingerprint_cache,
             limits: self.limits,
             transaction_limits: self.transaction_limits,
+            protection_policy: self.protection_policy.clone(),
         }
     }
 }
@@ -590,14 +614,38 @@ impl Snapshot {
         limits: Limits,
         transaction_limits: TransactionLimits,
     ) -> Result<Self> {
+        Self::open_bounded_with_policy(
+            input,
+            limits,
+            transaction_limits,
+            ProtectionPolicy::default(),
+        )
+    }
+
+    /// Opens an owned DOC source with an explicit protected-edit policy.
+    ///
+    /// Protected sources remain readable and support exact no-op publication
+    /// under the default policy. Supplying
+    /// [`ProtectionPolicy::AllowProtected`] is an explicit capability that
+    /// authorizes changed publication.
+    pub fn open_bounded_with_policy(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        transaction_limits: TransactionLimits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let bytes = input.into();
         crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
             bytes.len(),
             crate::package::Limits::default(),
         )
         .map_err(Error::Invalid)?;
-        let (_strict_editor, mut ole) =
-            RevisionEditor::open_with_ole_file(bytes.clone(), limits).map_err(Error::Invalid)?;
+        let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
+            bytes.clone(),
+            limits,
+            protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
             .map_err(Error::Invalid)?;
         Ok(Self {
@@ -605,6 +653,7 @@ impl Snapshot {
             fingerprint_cache: OnceLock::new(),
             limits,
             transaction_limits,
+            protection_policy,
         })
     }
 
@@ -714,6 +763,7 @@ impl Snapshot {
             fingerprint_cache: OnceLock::new(),
             limits,
             transaction_limits,
+            protection_policy: ProtectionPolicy::default(),
         })
     }
 
@@ -1223,7 +1273,12 @@ impl Snapshot {
     }
 
     fn editor(&self) -> Result<RevisionEditor> {
-        RevisionEditor::open(self.source.as_ref().to_vec(), self.limits).map_err(Error::Invalid)
+        RevisionEditor::open_with_policy(
+            self.source.as_ref().to_vec(),
+            self.limits,
+            self.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)
     }
 
     fn lineage(&self) -> Lineage {
@@ -1287,6 +1342,9 @@ impl Edit {
             .editor
             .clone()
             .finish_unchecked()
+            .map_err(Error::Invalid)?;
+        self.editor
+            .authorize_rendered(&bytes)
             .map_err(Error::Invalid)?;
         if self.signed && bytes != self.source.bytes() {
             return Err(Error::Refused(Refusal::SignedSource));
@@ -1711,8 +1769,12 @@ impl Edit {
         let storage_id = options.storage_id;
         options.instruction = format!(" EMBED LITCHI_OBJECT _{storage_id} ");
         let bytes = self.finish_candidate()?;
-        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
-            .map_err(Error::Invalid)?;
+        let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         if snapshot
             .inventory()
             .map_err(Error::Invalid)?
@@ -1731,7 +1793,12 @@ impl Edit {
             .map_err(|error| Error::Invalid(error.into()))?
             .snapshot()
             .finish();
-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.editor = RevisionEditor::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         self.changes.push(Change::EmbeddedObject {
             storage_id,
             before: None,
@@ -1745,8 +1812,12 @@ impl Edit {
     /// reversible patch.
     pub fn remove_embedded_object(&mut self, storage_id: u32) -> Result<()> {
         let bytes = self.finish_candidate()?;
-        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
-            .map_err(Error::Invalid)?;
+        let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         if snapshot
             .inventory()
             .map_err(Error::Invalid)?
@@ -1768,7 +1839,12 @@ impl Edit {
             .map_err(|error| Error::Invalid(error.into()))?
             .snapshot()
             .finish();
-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.editor = RevisionEditor::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         self.changes.push(Change::EmbeddedObject {
             storage_id,
             before: Some(before),
@@ -1821,8 +1897,12 @@ impl Edit {
     /// complete candidate into this root transaction.
     pub fn set_embedded_display_as_icon(&mut self, storage_id: u32, enabled: bool) -> Result<()> {
         let bytes = self.finish_candidate()?;
-        let snapshot = crate::embedded_object::Snapshot::open(bytes, self.source.limits)
-            .map_err(Error::Invalid)?;
+        let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         let inventory = snapshot.inventory().map_err(Error::Invalid)?;
         let before = inventory
             .get(storage_id)
@@ -1842,7 +1922,12 @@ impl Edit {
             .map_err(|error| Error::Invalid(error.into()))?
             .snapshot()
             .finish();
-        self.editor = RevisionEditor::open(bytes, self.source.limits).map_err(Error::Invalid)?;
+        self.editor = RevisionEditor::open_with_policy(
+            bytes,
+            self.source.limits,
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)?;
         self.changes.push(Change::EmbeddedDisplay {
             storage_id,
             before,
@@ -1870,7 +1955,15 @@ impl Edit {
         let snapshot = if bytes == self.source.bytes() {
             self.source.clone()
         } else {
-            Snapshot::open_bounded(bytes, self.source.limits, self.source.transaction_limits)?
+            self.editor
+                .authorize_rendered(&bytes)
+                .map_err(map_protection_error)?;
+            Snapshot::open_bounded_with_policy(
+                bytes,
+                self.source.limits,
+                self.source.transaction_limits,
+                self.source.protection_policy.clone(),
+            )?
         };
         let patch = Patch::new(
             self.source,
@@ -1951,6 +2044,11 @@ impl Edit {
         let bytes = observe_phase(&mut observer, DiagnosticPhase::Finish, || {
             self.finish_candidate()
         })?;
+        if bytes != self.source.bytes() {
+            self.editor
+                .authorize_rendered(&bytes)
+                .map_err(map_protection_error)?;
+        }
         let snapshot = if bytes == self.source.bytes() {
             observe_phase(&mut observer, DiagnosticPhase::ExactNoOp, || {
                 Ok(self.source.clone())
@@ -1962,7 +2060,11 @@ impl Edit {
                 self.source.transaction_limits,
                 &mut observer,
                 &mut cfb_observer,
-            )?
+            )
+            .map(|mut snapshot| {
+                snapshot.protection_policy = self.source.protection_policy.clone();
+                snapshot
+            })?
         };
         let patch = observe_phase(&mut observer, DiagnosticPhase::Patch, || {
             Ok(Patch::new(
@@ -2167,23 +2269,21 @@ impl Patch {
     /// Returns [`Error::Conflict`] unless `source` has byte-for-byte equality
     /// with this patch's captured source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if same_source_allocation(&source.source, &self.before.source) {
-            return Ok(if self.is_noop() {
-                source.clone()
-            } else {
-                self.after.clone()
-            });
-        }
-        if source.fingerprint() != self.before.fingerprint()
-            || source.bytes() != self.before.bytes()
+        let same_allocation = same_source_allocation(&source.source, &self.before.source);
+        if !same_allocation
+            && (source.fingerprint() != self.before.fingerprint()
+                || source.bytes() != self.before.bytes())
         {
             return Err(Error::Conflict);
         }
-        Ok(if self.is_noop() {
-            source.clone()
-        } else {
-            self.after.clone()
-        })
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        source
+            .editor()?
+            .authorize_rendered(self.after.bytes())
+            .map_err(map_protection_error)?;
+        Ok(self.after.clone())
     }
 
     /// Exact inverse patch.
@@ -3498,8 +3598,12 @@ fn apply_durable_embedded_display(edit: &mut Edit, operation: &PatchOperation) -
 
 fn embedded_display_value(edit: &Edit, storage_id: u32) -> Result<bool> {
     let bytes = edit.finish_candidate()?;
-    let snapshot = crate::embedded_object::Snapshot::open(bytes, edit.source.limits)
-        .map_err(Error::Invalid)?;
+    let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+        bytes,
+        edit.source.limits,
+        edit.source.protection_policy.clone(),
+    )
+    .map_err(Error::Invalid)?;
     snapshot
         .inventory()
         .map_err(Error::Invalid)?
@@ -3626,8 +3730,12 @@ fn embedded_object_value(
     storage_id: u32,
 ) -> Result<Option<crate::embedded_object::WriteOptions>> {
     let bytes = edit.finish_candidate()?;
-    let snapshot = crate::embedded_object::Snapshot::open(bytes, edit.source.limits)
-        .map_err(Error::Invalid)?;
+    let snapshot = crate::embedded_object::Snapshot::open_with_policy(
+        bytes,
+        edit.source.limits,
+        edit.source.protection_policy.clone(),
+    )
+    .map_err(Error::Invalid)?;
     if snapshot
         .inventory()
         .map_err(Error::Invalid)?
@@ -4171,6 +4279,7 @@ mod tests {
         CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
         Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
     };
+    use crate::parts::fib::FileInformationBlock;
     use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
         CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
@@ -4199,7 +4308,64 @@ mod tests {
         writer
             .write_to(&mut output)
             .expect("fixture DOC must serialize");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
+    }
+
+    fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
+        let mut package = PackageEditor::open(bytes, Targets::default(), Limits::default())
+            .expect("fixture package should open");
+        let word_path = ["WordDocument".to_string()];
+        let word = package.stream(&word_path).expect("WordDocument");
+        let fib = FileInformationBlock::parse(word).expect("fixture FIB");
+        let table_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut word = word.to_vec();
+        let mut table = package
+            .stream(&table_path)
+            .expect("selected table stream")
+            .to_vec();
+        let (offset, length) = fib.get_table_pointer(31).expect("DOP pointer");
+        let offset = usize::try_from(offset).expect("DOP offset");
+        let length = usize::try_from(length).expect("DOP length");
+        let mut dop = crate::parts::document_properties::DocumentProperties::word97_writer_bytes(
+            false, false, false,
+        );
+        dop.resize(594, 0);
+        if length < dop.len() {
+            let insertion = offset + length;
+            let extra = dop.len() - length;
+            table.splice(insertion..insertion, std::iter::repeat_n(0, extra));
+            let count = fib.table_pointer_count().expect("FIB pointer count");
+            for index in 0..count {
+                let pointer = 154 + index * 8;
+                let current = usize::try_from(u32::from_le_bytes(
+                    word[pointer..pointer + 4]
+                        .try_into()
+                        .expect("FIB pointer offset"),
+                ))
+                .expect("FIB pointer offset");
+                if current >= insertion {
+                    let shifted = u32::try_from(current + extra).expect("shifted FIB pointer");
+                    word[pointer..pointer + 4].copy_from_slice(&shifted.to_le_bytes());
+                }
+            }
+        }
+        assert!(table.len() >= offset + dop.len());
+        table[offset..offset + dop.len()].copy_from_slice(&dop);
+        let pointer = 154 + 31 * 8;
+        word[pointer + 4..pointer + 8]
+            .copy_from_slice(&u32::try_from(dop.len()).expect("DOP length").to_le_bytes());
+        package
+            .put_stream(&word_path, word)
+            .expect("normalized WordDocument stream");
+        package
+            .put_stream(&table_path, table)
+            .expect("normalized table stream");
+        package.finish().expect("normalized fixture publication")
     }
 
     fn doc_with_opaque_stream(paragraphs: &[&str]) -> Vec<u8> {
@@ -4229,7 +4395,7 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("picture DOC");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
     }
 
     fn formatted_picture_receiver_doc() -> Vec<u8> {
@@ -4251,7 +4417,7 @@ mod tests {
         writer
             .write_to(&mut output)
             .expect("formatted receiver DOC");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
     }
 
     fn structured_doc() -> Vec<u8> {
@@ -4271,7 +4437,7 @@ mod tests {
         writer.set_odd_header("Header");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("structured DOC");
-        output.into_inner()
+        normalize_word2002_dop(output.into_inner())
     }
 
     fn embedded_doc() -> Vec<u8> {
@@ -4355,7 +4521,6 @@ mod tests {
         package.finish().expect("fixture package should finish")
     }
 
-    #[cfg(feature = "performance-diagnostics")]
     fn protected_dop_doc() -> Vec<u8> {
         let mut package =
             PackageEditor::open(doc(&["alpha"]), Targets::default(), Limits::default())
@@ -4395,6 +4560,30 @@ mod tests {
             .put_stream(&table_path, table)
             .expect("protected DOP should remain a valid package");
         package.finish().expect("fixture package should finish")
+    }
+
+    #[test]
+    fn protected_snapshot_reads_and_noops_by_default_but_changed_commit_is_denied() {
+        let bytes = protected_dop_doc();
+        let snapshot = Snapshot::open(bytes.clone(), Limits::default()).expect("protected open");
+        assert_eq!(snapshot.finish(), bytes);
+        let mut edit = snapshot.edit().expect("protected snapshot edit");
+        assert!(matches!(
+            edit.replace_paragraph(Position::new(0), "omega"),
+            Err(Error::Invalid(crate::package::Error::ProtectionDenied(_)))
+        ));
+        assert!(matches!(
+            edit.commit(),
+            Ok(commit) if !commit.changed()
+        ));
+
+        let noop = snapshot
+            .edit()
+            .expect("protected snapshot edit")
+            .commit()
+            .expect("protected no-op");
+        assert!(!noop.changed());
+        assert_eq!(noop.snapshot().finish(), bytes);
     }
 
     #[cfg(feature = "performance-diagnostics")]
@@ -4566,7 +4755,7 @@ mod tests {
 
     #[cfg(feature = "performance-diagnostics")]
     #[test]
-    fn profiled_open_native_dop_refusal_stays_strict_first() {
+    fn profiled_open_protected_dop_is_readable_and_balances_success_phases() {
         let bytes = protected_dop_doc();
         let ordinary =
             Snapshot::open(bytes.clone(), Limits::default()).map_err(|error| error.to_string());
@@ -4591,7 +4780,7 @@ mod tests {
             ]
         );
         assert_eq!(profiled, ordinary);
-        assert!(profiled.is_err());
+        assert!(profiled.is_ok());
         assert_eq!(
             events,
             vec![
@@ -4600,7 +4789,21 @@ mod tests {
                 },
                 DiagnosticEvent::Finished {
                     phase: DiagnosticPhase::StrictOwnerValidation,
-                    outcome: DiagnosticOutcome::Error,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::PublicReaderValidation,
+                    outcome: DiagnosticOutcome::Success,
+                },
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::SourceRetention,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::SourceRetention,
+                    outcome: DiagnosticOutcome::Success,
                 },
             ]
         );
@@ -5082,7 +5285,8 @@ mod tests {
             .expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("fixture DOC");
-        let snapshot = Snapshot::parse(&output.into_inner()).expect("snapshot");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let snapshot = Snapshot::parse(&bytes).expect("snapshot");
         assert_eq!(
             snapshot.paragraphs(Projection::Accepted).expect("accepted")[0].text(),
             "kept  new"
@@ -5563,7 +5767,8 @@ mod tests {
             .expect("floating shape");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("drawing DOC");
-        let drawing = Snapshot::parse(&output.into_inner()).expect("drawing snapshot");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let drawing = Snapshot::parse(&bytes).expect("drawing snapshot");
         let anchor = drawing
             .paragraphs(Projection::All)
             .expect("drawing paragraphs")
@@ -5596,7 +5801,8 @@ mod tests {
             .expect("revision paragraph");
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).expect("revision DOC");
-        let source = Snapshot::parse(&output.into_inner()).expect("revision snapshot");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let source = Snapshot::parse(&bytes).expect("revision snapshot");
         let position = source
             .revisions()
             .expect("revisions")
@@ -5814,7 +6020,8 @@ mod tests {
         writer
             .write_to(&mut output)
             .expect("mixed drawing donor DOC");
-        let shared = Snapshot::parse(&output.into_inner()).expect("mixed shared-store donor");
+        let bytes = normalize_word2002_dop(output.into_inner());
+        let shared = Snapshot::parse(&bytes).expect("mixed shared-store donor");
         for (position, floating) in [(Position::new(4), false), (Position::new(5), true)] {
             let empty = Snapshot::parse(&doc(&["placeholder"])).expect("empty receiver");
             let plan = empty

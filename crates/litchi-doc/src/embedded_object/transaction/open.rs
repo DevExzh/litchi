@@ -7,10 +7,20 @@ use super::super::codec::{
 };
 use super::super::model::Editor;
 use crate::package::{Error as PackageError, Result};
+use crate::parts::fib::FileInformationBlock;
+use crate::parts::protection::{ProtectionPolicy, classify};
 use litchi_ole_common::object::Editor as ObjectEditor;
 
 impl Editor {
     pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        Self::open_with_policy(bytes, limits, ProtectionPolicy::default())
+    }
+
+    pub fn open_with_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let (targets, object_pool_exists) = discover_targets(&bytes, limits)?;
         let package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_string()];
@@ -37,6 +47,8 @@ impl Editor {
             .stream(&table_path)
             .ok_or_else(|| corrupted("selected Table stream is missing"))?
             .to_vec();
+        let fib = FileInformationBlock::parse(&word)?;
+        let protection = classify(&fib, &table)?;
         let data_path = vec!["Data".to_string()];
         let data = package.stream(&data_path).unwrap_or(&[]).to_vec();
         let main_ccp = u32_at(&word, FIB_CCP_TEXT)?;
@@ -50,6 +62,8 @@ impl Editor {
             package,
             object_pool_exists,
             limits,
+            protection,
+            protection_policy,
             word_path,
             table_path,
             data_path,

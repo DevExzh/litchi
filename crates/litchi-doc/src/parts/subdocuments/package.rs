@@ -15,7 +15,8 @@ use super::transaction::{
 use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Patch as ObjectPatch, Targets};
+use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
+use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
 
 /// Immutable package bytes plus the contextual subdocument snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,7 +64,7 @@ impl Snapshot {
 pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
-    package_patch: ObjectPatch,
+    package_patch: PackagePatch,
 }
 
 impl Commit {
@@ -81,13 +82,13 @@ impl Commit {
 
     /// The source-checked whole-CFB patch, including `WordDocument` FIB edits.
     #[must_use]
-    pub fn package_patch(&self) -> &ObjectPatch {
+    pub fn package_patch(&self) -> &PackagePatch {
         &self.package_patch
     }
 
     /// Split the package snapshot and both reversible patches.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, ObjectPatch) {
+    pub fn into_parts(self) -> (Snapshot, Patch, PackagePatch) {
         (self.snapshot, self.patch, self.package_patch)
     }
 }
@@ -102,6 +103,8 @@ pub struct Editor {
     /// older table images because publication is append-only, so this value
     /// intentionally remains the detached candidate lineage.
     subdocuments: TransactionSnapshot,
+    protection: EditProtection,
+    protection_policy: ProtectionPolicy,
     changed: bool,
 }
 
@@ -111,8 +114,22 @@ impl Editor {
         Self::open_with_limits(bytes, Limits::default())
     }
 
+    /// Open a package with an explicit policy for changed protected content.
+    pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
+        Self::open_with_limits_and_policy(bytes, Limits::default(), policy)
+    }
+
     /// Open a DOC package with an explicit bounded OLE resource profile.
     pub fn open_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        Self::open_with_limits_and_policy(bytes, limits, ProtectionPolicy::default())
+    }
+
+    /// Open a package with both bounded resources and an explicit protection policy.
+    pub fn open_with_limits_and_policy(
+        bytes: Vec<u8>,
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
+    ) -> Result<Self> {
         let targets = Targets::new([]).map_err(PackageError::from)?;
         let package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_owned()];
@@ -129,6 +146,7 @@ impl Editor {
         let table = package
             .stream(&table_path)
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
+        let protection = classify(&fib, table)?;
         validation::package_fib(&fib, table)?;
         let subdocuments = TransactionSnapshot::parse(&fib, table)?.ok_or_else(|| {
             PackageError::InvalidFormat(
@@ -140,6 +158,8 @@ impl Editor {
             table_name: table_name.to_owned(),
             original: subdocuments.clone(),
             subdocuments,
+            protection,
+            protection_policy,
             changed: false,
         })
     }
@@ -187,19 +207,25 @@ impl Editor {
 
     /// Finish the edit and return rendered DOC bytes.
     pub fn finish(self) -> Result<Vec<u8>> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         self.package.finish().map_err(PackageError::from)
     }
 
     /// Commit the current package as a semantic snapshot plus reversible
     /// semantic and whole-CFB patches.
     pub fn commit(self) -> Result<Commit> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         let patch = Patch::new(self.original, self.subdocuments.clone());
         let object_commit = self.package.commit().map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
         Ok(Commit {
             snapshot: Snapshot::new(bytes, self.subdocuments),
             patch,
-            package_patch: object_commit.into_patch(),
+            package_patch: PackagePatch::new(object_commit.into_patch(), self.protection),
         })
     }
 
@@ -212,12 +238,15 @@ impl Editor {
                 .commit()
                 .map_err(PackageError::from)?
                 .into_patch();
+            let package_patch = PackagePatch::new(package_patch, self.protection);
             return Ok(Commit {
                 snapshot: self.snapshot()?,
                 patch,
                 package_patch,
             });
         }
+
+        self.protection_policy.authorize(self.protection)?;
 
         // Candidate rendering and reparsing happen on a clone. The source
         // editor is replaced only after both FIB pointers and both table
@@ -232,7 +261,7 @@ impl Editor {
             .commit()
             .map_err(PackageError::from)?;
         let bytes = object_commit.patch().after().to_vec();
-        let package_patch = object_commit.into_patch();
+        let package_patch = PackagePatch::new(object_commit.into_patch(), candidate.protection);
         let package_snapshot = Snapshot::new(bytes, candidate.subdocuments.clone());
         *self = candidate;
         Ok(Commit {

@@ -34,6 +34,7 @@
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::embedded_object::Limits;
+use litchi_doc::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
 use litchi_doc::writer::Writer;
 use litchi_doc::{Editor, Package, WriteOptions};
 use std::fs;
@@ -65,6 +66,16 @@ fn inert_picf(marker: u32) -> Vec<u8> {
 
 fn options(id: u32) -> WriteOptions {
     WriteOptions::new(id, object_cfb(&id.to_le_bytes()), inert_picf(id))
+}
+
+fn fixture_policy() -> ProtectionPolicy {
+    ProtectionPolicy::allow_protected(
+        ProtectionAuthorization::audited(
+            "doc-embedded-object-writer-tests",
+            "exercise object publication on producer fixtures with legacy protection metadata",
+        )
+        .unwrap(),
+    )
 }
 
 #[test]
@@ -138,21 +149,33 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
     let mut rejected = 0usize;
     for (ordinal, path) in fixtures.into_iter().enumerate() {
         let original = fs::read(&path).unwrap();
-        if let Ok(mut editor) = Editor::open(original.clone(), Limits::default()) {
+        if let Ok(mut editor) =
+            Editor::open_with_policy(original.clone(), Limits::default(), fixture_policy())
+        {
             let id = 2_000_000 + ordinal as u32;
             editor.add(options(id)).unwrap();
-            let output = editor.finish().unwrap();
-            let reopened = Editor::open(output.clone(), Limits::default()).unwrap();
-            assert!(
-                reopened
-                    .objects()
-                    .unwrap()
-                    .iter()
-                    .any(|value| value.storage_id == id)
-            );
-            let mut package = Package::from_reader(Cursor::new(output)).unwrap();
-            assert!(!package.document().unwrap().text().unwrap().is_empty());
-            supported += 1;
+            match editor.finish() {
+                Ok(output) => {
+                    let reopened = Editor::open(output.clone(), Limits::default()).unwrap();
+                    assert!(
+                        reopened
+                            .objects()
+                            .unwrap()
+                            .iter()
+                            .any(|value| value.storage_id == id)
+                    );
+                    let mut package = Package::from_reader(Cursor::new(output)).unwrap();
+                    assert!(!package.document().unwrap().text().unwrap().is_empty());
+                    supported += 1;
+                },
+                Err(_) => {
+                    // A source with structurally unknown protection may be
+                    // inspected and staged, but publication must remain
+                    // fail-closed under both default and explicit policies.
+                    assert_eq!(fs::read(&path).unwrap(), original);
+                    rejected += 1;
+                },
+            }
         } else {
             // Construction owns no external state and therefore cannot mutate the fixture.
             assert_eq!(fs::read(&path).unwrap(), original);

@@ -13,6 +13,9 @@ use litchi_ole_common::object::{Editor as ObjectEditor, Target};
 
 impl Editor {
     pub fn finish(self) -> Result<Vec<u8>> {
+        if self.changed {
+            self.protection_policy.authorize(self.protection)?;
+        }
         self.package.finish().map_err(PackageError::from)
     }
 

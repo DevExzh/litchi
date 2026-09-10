@@ -13,8 +13,7 @@ pub struct Transaction {
 
 impl Transaction {
     pub(super) fn new(source: Snapshot) -> Result<Self> {
-        let editor = RevisionEditor::open(source.bytes().to_vec(), source.limits())
-            .map_err(Error::Invalid)?;
+        let editor = source.editor().map_err(Error::Invalid)?;
         Ok(Self { source, editor })
     }
 
@@ -56,7 +55,12 @@ impl Transaction {
         if bytes == self.source.bytes() {
             return Ok(self.source.clone());
         }
-        Snapshot::open(bytes, self.source.limits()).map_err(Error::Invalid)
+        Snapshot::open_with_policy(
+            bytes,
+            self.source.limits(),
+            self.source.protection_policy.clone(),
+        )
+        .map_err(Error::Invalid)
     }
 
     /// Adds a revision mark to an existing main-story range.

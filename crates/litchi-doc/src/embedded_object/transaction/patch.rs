@@ -73,8 +73,15 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::open(self.after.as_ref().to_vec(), source.limits())
-            .map_err(TransactionError::Invalid)
+        source
+            .authorize_changed()
+            .map_err(TransactionError::Invalid)?;
+        Snapshot::open_with_policy(
+            self.after.as_ref().to_vec(),
+            source.limits(),
+            source.protection_policy(),
+        )
+        .map_err(TransactionError::Invalid)
     }
 
     /// Returns the exact inverse replacement.

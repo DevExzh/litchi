@@ -40,6 +40,8 @@ use litchi_ole_common::property_set::{
 };
 use std::io::Cursor;
 
+mod common;
+
 fn property_blob() -> Vec<u8> {
     let mut bytes = vec![0; 56];
     let put = |bytes: &mut [u8], offset: usize, value: u32| {
@@ -94,14 +96,31 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
     );
 
     let mut writer = OleWriter::new();
-    writer.create_stream(&["WordDocument"], b"word").unwrap();
+    const DOP_INDEX: usize = 31;
+    const POINTER_COUNT: usize = 136;
+    let pointer_end = 154 + POINTER_COUNT * 8;
+    let mut word = vec![0u8; pointer_end + 4];
+    word[0..2].copy_from_slice(&0xa5ecu16.to_le_bytes());
+    // FibBase.csw and cslw are fixed MS-DOC counts.
+    word[32..34].copy_from_slice(&0x000eu16.to_le_bytes());
+    word[62..64].copy_from_slice(&0x0016u16.to_le_bytes());
+    word[2..4].copy_from_slice(&0x00c1u16.to_le_bytes());
+    word[152..154].copy_from_slice(&(POINTER_COUNT as u16).to_le_bytes());
+    word[pointer_end..pointer_end + 2].copy_from_slice(&2u16.to_le_bytes());
+    word[pointer_end + 2..pointer_end + 4].copy_from_slice(&0x0101u16.to_le_bytes());
+    let table = vec![0u8; 500];
+    let dop_pointer = 154 + DOP_INDEX * 8;
+    word[dop_pointer..dop_pointer + 4].copy_from_slice(&0u32.to_le_bytes());
+    word[dop_pointer + 4..dop_pointer + 8].copy_from_slice(&500u32.to_le_bytes());
+    writer.create_stream(&["WordDocument"], &word).unwrap();
+    writer.create_stream(&["0Table"], &table).unwrap();
     writer
         .create_stream(&["\u{0005}DocumentSummaryInformation"], &stream)
         .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let bytes = output.into_inner();
+    let bytes = common::with_valid_word97_dop(output.into_inner());
     let mut package = litchi_doc::Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     let package_signature = package.vba_signature().unwrap().unwrap();
     assert_eq!(package_signature.info().signature(), [1, 2, 3]);

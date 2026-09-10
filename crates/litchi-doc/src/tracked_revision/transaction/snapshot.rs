@@ -3,6 +3,7 @@
 use super::super::{Limits, Revision, RevisionEditor};
 use super::{Result, Transaction};
 use crate::package::Result as PackageResult;
+use crate::parts::protection::{EditProtection, ProtectionPolicy};
 use std::sync::Arc;
 
 /// An immutable validated snapshot of a complete legacy DOC artifact.
@@ -15,16 +16,35 @@ use std::sync::Arc;
 pub struct Snapshot {
     source: Arc<[u8]>,
     limits: Limits,
+    pub(super) protection: EditProtection,
+    pub(super) protection_policy: ProtectionPolicy,
 }
 
 impl Snapshot {
     /// Opens and validates an owned DOC artifact with explicit resource limits.
     pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> PackageResult<Self> {
+        Self::open_with_policy(input, limits, ProtectionPolicy::default())
+    }
+
+    /// Opens a DOC artifact with an explicit protected-edit policy.
+    ///
+    /// The default [`Self::open`] path enforces protection when a transaction
+    /// publishes changed bytes. An explicit caller-granted
+    /// [`ProtectionPolicy::AllowProtected`] capability can be carried by this
+    /// snapshot for an intentional edit.
+    pub fn open_with_policy(
+        input: impl Into<Vec<u8>>,
+        limits: Limits,
+        protection_policy: ProtectionPolicy,
+    ) -> PackageResult<Self> {
         let bytes = input.into();
-        RevisionEditor::open(bytes.clone(), limits)?;
+        let editor =
+            RevisionEditor::open_with_policy(bytes.clone(), limits, protection_policy.clone())?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             limits,
+            protection: editor.protection_state(),
+            protection_policy,
         })
     }
 
@@ -86,8 +106,16 @@ impl Snapshot {
         self.limits
     }
 
-    fn editor(&self) -> PackageResult<RevisionEditor> {
-        RevisionEditor::open(self.source.as_ref().to_vec(), self.limits)
+    pub(super) const fn protection_state(&self) -> EditProtection {
+        self.protection
+    }
+
+    pub(super) fn editor(&self) -> PackageResult<RevisionEditor> {
+        RevisionEditor::open_with_policy(
+            self.source.as_ref().to_vec(),
+            self.limits,
+            self.protection_policy.clone(),
+        )
     }
 }
 
