@@ -8,9 +8,9 @@
 use crate::protobuf::decode_common;
 
 pub use litchi_iwa_archive::iwa::{
-    Archive, ArchiveInfo, ArchiveLimits, ArchiveObject, ArchiveReferenceOccurrence,
-    ArchiveReferencePolicy, ArchiveReferenceVisitor, FieldInfo, FieldObjectReferenceTransition,
-    FieldPath, FieldType, MessageInfo, ObjectReferenceTransition, RawMessage, UnknownFieldRule,
+    Archive, ArchiveLimits, ArchiveObject, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor, FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType,
+    MessageInfo, ObjectReferenceTransition, RawMessage, UnknownFieldRule,
 };
 
 // Keep the result name local to the migration host while retaining the exact

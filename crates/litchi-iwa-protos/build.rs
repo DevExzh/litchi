@@ -80,7 +80,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // provenance checks below are intentionally conditional on their presence.
     for path in [
         "../litchi-iwa/src/protobuf.rs",
-        "../litchi-iwa/src/numbers/table_extractor.rs",
         "../litchi-numbers-wire/src/table_data_list.rs",
         "../litchi-numbers/src/package/extractor.rs",
         "../litchi-iwa/src/pages/editor.rs",
@@ -6320,10 +6319,7 @@ fn enforce_numbers_table_data_list_provenance(
 
     let registry_path = Path::new("../litchi-iwa/src/protobuf.rs");
     let wire_owner_path = Path::new("../litchi-numbers-wire/src/table_data_list.rs");
-    let adapter_paths = [
-        Path::new("../litchi-numbers/src/package/extractor.rs"),
-        Path::new("../litchi-iwa/src/numbers/table_extractor.rs"),
-    ];
+    let adapter_paths = [Path::new("../litchi-numbers/src/package/extractor.rs")];
     let registry_table_data_list_markers = [
         format!(
             "{}u32 => decode_table_data_list,",
@@ -6387,7 +6383,7 @@ fn enforce_numbers_table_data_list_provenance(
     let adapter_sources = adapter_paths
         .iter()
         .filter(|path| path.is_file())
-        .map(|path| Ok((*path, fs::read_to_string(path)?)))
+        .map(|path| Ok(fs::read_to_string(path)?))
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
     let wire_owner_source = if wire_owner_path.is_file() {
         Some(fs::read_to_string(wire_owner_path)?)
@@ -6409,7 +6405,7 @@ fn enforce_numbers_table_data_list_provenance(
                 .all(|marker| source.matches(marker).count() == 1)
         })
     };
-    let adapters_scope_ok = adapter_sources.iter().all(|(_path, source)| {
+    let adapters_scope_ok = adapter_sources.iter().all(|source| {
         let legacy_filter_absent = legacy_root_filter_markers
             .iter()
             .chain(legacy_segment_filter_markers.iter())

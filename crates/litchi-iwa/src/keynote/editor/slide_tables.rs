@@ -3,13 +3,11 @@
 use std::collections::HashSet;
 
 use super::*;
-use crate::bundle::Bundle;
-use crate::numbers::table_extractor::TableDataExtractor;
-use crate::object_index::ObjectIndex;
 use crate::shapes::{DrawableGeometry, DrawablePoint, DrawableSize};
 use litchi_iwa_common::table::appearance::Appearance as TableAppearance;
 use litchi_iwa_common::table::cell::{BorderSide, Borders};
 use litchi_iwa_common::table::lock::State as TableLockState;
+use litchi_iwa_common::table::read::{Comment, TableRead};
 use litchi_numbers::cell::data_format::control::{Slider, Stepper};
 use litchi_numbers::cell::data_format::custom::Custom;
 use litchi_numbers::cell::data_format::date_time::DateTime;
@@ -33,7 +31,6 @@ use graph::{
     catalog_slide_context, require_table_model, slide_table_graph,
     slide_table_graph_from_catalog_context, table_template_from_catalog,
 };
-use litchi_iwa_common::comment::Comment;
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
@@ -105,22 +102,21 @@ pub struct KeynoteSlideTableInfo {
 #[derive(Debug, Clone)]
 pub struct KeynoteSlideTable {
     pub info: KeynoteSlideTableInfo,
-    semantic_table: litchi_numbers::Table,
-    comments: Box<[((usize, usize), Comment)]>,
+    table_read: TableRead,
     merges: Vec<Region>,
 }
 
 impl KeynoteSlideTable {
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&KeynoteTableCellValue> {
         let position = litchi_numbers::Position::try_from_usize(row, column).ok()?;
-        self.semantic_table.get(position)
+        self.table_read.get(position)
     }
 
     /// Iterate over materialized cells without exposing the backing map.
     pub fn iter_cells(
         &self,
     ) -> impl Iterator<Item = ((usize, usize), &KeynoteTableCellValue)> + '_ {
-        self.semantic_table.iter_cells().map(|cell| {
+        self.table_read.iter_cells().map(|cell| {
             (
                 (
                     cell.position().row() as usize,
@@ -133,27 +129,29 @@ impl KeynoteSlideTable {
 
     /// Return the number of materialized cells, including explicit empty cells.
     pub fn cell_count(&self) -> usize {
-        self.semantic_table.cell_count()
+        self.table_read.cell_count()
     }
 
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
-        self.comments
-            .binary_search_by_key(&(row, column), |(position, _comment)| *position)
-            .ok()
-            .map(|index| &self.comments[index].1)
+        let position = litchi_numbers::Position::try_from_usize(row, column).ok()?;
+        self.table_read.get_comment(position)
     }
 
     /// Iterate over cell comments without exposing the backing map.
     pub fn iter_comments(&self) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
-        self.comments
-            .iter()
-            .map(|(position, comment)| (*position, comment))
+        self.table_read.iter_comments().map(|cell_comment| {
+            let position = cell_comment.position();
+            (
+                (position.row() as usize, position.column() as usize),
+                cell_comment.comment(),
+            )
+        })
     }
 
     /// Return the number of materialized cell comments.
     pub fn comment_count(&self) -> usize {
-        self.comments.len()
+        self.table_read.comment_count()
     }
 
     /// Borrow native merged-cell rectangles in formula-store order.
@@ -166,6 +164,218 @@ impl KeynoteSlideTable {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RemovedKeynoteSlideTable {
     pub table: KeynoteSlideTableInfo,
+}
+
+fn focused_table_index(
+    tables: &[KeynoteSlideTableInfo],
+    slide_index: usize,
+    model_object_id: u64,
+) -> Result<usize> {
+    let mut table_index = None;
+    for (index, table) in tables.iter().enumerate() {
+        if table.model_object_id != model_object_id {
+            continue;
+        }
+        if table_index.replace(index).is_some() {
+            return Err(Error::ParseError(format!(
+                "Keynote object {model_object_id} has ambiguous table ownership on slide {slide_index}"
+            )));
+        }
+    }
+    table_index.ok_or_else(|| {
+        Error::ParseError(format!(
+            "Keynote table model {model_object_id} is not owned by slide {slide_index}"
+        ))
+    })
+}
+
+fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
+    let package_limits = editor.package().limits();
+    let archive_limits = litchi_iwa_archive::Limits::new(
+        package_limits.max_input_bytes(),
+        package_limits.max_entries(),
+        package_limits.max_entry_bytes(),
+        package_limits.max_total_bytes(),
+        package_limits.max_iwa_stream_bytes(),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("focused Keynote limits: {error}")))?
+    .with_archive_limits(package_limits.effective_archive_limits()?)
+    .map_err(|error| Error::InvalidFormat(format!("focused Keynote archive limits: {error}")))?;
+    let options =
+        litchi_keynote::ReadOptions::new(archive_limits, litchi_keynote::SemanticLimits::default());
+    if let Some(source) = editor.package().exact_source_owner() {
+        return litchi_keynote::Package::__from_shared_source_with_options(source, options)
+            .map_err(|error| {
+                Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
+            });
+    }
+
+    let bytes = editor.package().to_bytes()?;
+    litchi_keynote::Package::from_bytes_with_limits(&bytes, archive_limits).map_err(|error| {
+        Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
+    })
+}
+
+fn map_focused_keynote_cells_error(error: litchi_keynote::SlideTableCellsError) -> Error {
+    match error {
+        litchi_keynote::SlideTableCellsError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => map_focused_keynote_cells_limit(kind, observed, maximum),
+        litchi_keynote::SlideTableCellsError::Allocation { amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Keynote slide-table cell read",
+                amount,
+            })
+        },
+        error @ litchi_keynote::SlideTableCellsError::AmbiguousSelector
+        | error @ litchi_keynote::SlideTableCellsError::EmptySlideName
+        | error @ litchi_keynote::SlideTableCellsError::SlideNameNotFound
+        | error @ litchi_keynote::SlideTableCellsError::SlidePositionNotFound { .. }
+        | error @ litchi_keynote::SlideTableCellsError::TablePositionNotFound { .. } => {
+            Error::ParseError(error.to_string())
+        },
+        error @ (litchi_keynote::SlideTableCellsError::UnsupportedSource
+        | litchi_keynote::SlideTableCellsError::UnsupportedDependency
+        | litchi_keynote::SlideTableCellsError::UnsupportedTopology
+        | litchi_keynote::SlideTableCellsError::InvalidSource) => {
+            Error::InvalidFormat(format!("focused Keynote table cells: {error}"))
+        },
+        error => Error::InvalidFormat(format!("focused Keynote table cells: {error}")),
+    }
+}
+
+fn map_focused_keynote_cells_limit(
+    kind: litchi_keynote::SlideTableCellsLimitKind,
+    observed: u64,
+    maximum: u64,
+) -> Error {
+    let Some(kind) = map_keynote_wire_limit_kind(kind) else {
+        return Error::InvalidFormat(format!(
+            "focused Keynote table cells: {kind} limit exceeded: observed {observed}, maximum {maximum}"
+        ));
+    };
+    let (Ok(observed), Ok(maximum)) = (usize::try_from(observed), usize::try_from(maximum)) else {
+        return Error::InvalidFormat(
+            "focused Keynote table cells: limit values do not fit the host platform".to_owned(),
+        );
+    };
+    Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+        kind,
+        observed,
+        limit: maximum,
+    })
+}
+
+fn map_focused_keynote_merges_error(error: litchi_keynote::SlideTableMergesError) -> Error {
+    match error {
+        litchi_keynote::SlideTableMergesError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => map_focused_keynote_merges_limit(kind, observed, maximum),
+        litchi_keynote::SlideTableMergesError::Allocation { amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Keynote slide-table merge read",
+                amount,
+            })
+        },
+        error @ litchi_keynote::SlideTableMergesError::AmbiguousSelector
+        | error @ litchi_keynote::SlideTableMergesError::EmptySlideName
+        | error @ litchi_keynote::SlideTableMergesError::SlideNameNotFound
+        | error @ litchi_keynote::SlideTableMergesError::SlidePositionNotFound { .. }
+        | error @ litchi_keynote::SlideTableMergesError::TablePositionNotFound { .. } => {
+            Error::ParseError(error.to_string())
+        },
+        error @ (litchi_keynote::SlideTableMergesError::UnsupportedSource
+        | litchi_keynote::SlideTableMergesError::UnsupportedDependency
+        | litchi_keynote::SlideTableMergesError::UnsupportedTopology
+        | litchi_keynote::SlideTableMergesError::InvalidSource) => {
+            Error::InvalidFormat(format!("focused Keynote table merges: {error}"))
+        },
+        error => Error::InvalidFormat(format!("focused Keynote table merges: {error}")),
+    }
+}
+
+fn map_focused_keynote_merges_limit(
+    kind: litchi_keynote::SlideTableMergesLimitKind,
+    observed: u64,
+    maximum: u64,
+) -> Error {
+    let Some(kind) = map_keynote_wire_limit_kind(kind) else {
+        return Error::InvalidFormat(format!(
+            "focused Keynote table merges: {kind} limit exceeded: observed {observed}, maximum {maximum}"
+        ));
+    };
+    let (Ok(observed), Ok(maximum)) = (usize::try_from(observed), usize::try_from(maximum)) else {
+        return Error::InvalidFormat(
+            "focused Keynote table merges: limit values do not fit the host platform".to_owned(),
+        );
+    };
+    Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+        kind,
+        observed,
+        limit: maximum,
+    })
+}
+
+fn map_keynote_wire_limit_kind(
+    kind: impl IntoKeynoteWireLimitKind,
+) -> Option<litchi_iwa_common::LimitKind> {
+    kind.into_keynote_wire_limit_kind()
+}
+
+trait IntoKeynoteWireLimitKind {
+    fn into_keynote_wire_limit_kind(self) -> Option<litchi_iwa_common::LimitKind>;
+}
+
+impl IntoKeynoteWireLimitKind for litchi_keynote::SlideTableCellsLimitKind {
+    fn into_keynote_wire_limit_kind(self) -> Option<litchi_iwa_common::LimitKind> {
+        match self {
+            Self::InputBytes => Some(litchi_iwa_common::LimitKind::InputBytes),
+            Self::OutputBytes => Some(litchi_iwa_common::LimitKind::OutputBytes),
+            Self::WireFields => Some(litchi_iwa_common::LimitKind::Fields),
+            Self::WireNesting => Some(litchi_iwa_common::LimitKind::Nesting),
+            Self::WireWork => Some(litchi_iwa_common::LimitKind::RewriteWork),
+            Self::Entries
+            | Self::EntryBytes
+            | Self::TotalBytes
+            | Self::PayloadObjects
+            | Self::PayloadMessages
+            | Self::PayloadItems
+            | Self::References
+            | Self::Allocations
+            | Self::Retained
+            | Self::Scratch
+            | Self::Components => None,
+            _ => None,
+        }
+    }
+}
+
+impl IntoKeynoteWireLimitKind for litchi_keynote::SlideTableMergesLimitKind {
+    fn into_keynote_wire_limit_kind(self) -> Option<litchi_iwa_common::LimitKind> {
+        match self {
+            Self::InputBytes => Some(litchi_iwa_common::LimitKind::InputBytes),
+            Self::OutputBytes => Some(litchi_iwa_common::LimitKind::OutputBytes),
+            Self::WireFields => Some(litchi_iwa_common::LimitKind::Fields),
+            Self::WireNesting => Some(litchi_iwa_common::LimitKind::Nesting),
+            Self::WireWork => Some(litchi_iwa_common::LimitKind::RewriteWork),
+            Self::Entries
+            | Self::EntryBytes
+            | Self::TotalBytes
+            | Self::PayloadObjects
+            | Self::PayloadMessages
+            | Self::PayloadItems
+            | Self::References
+            | Self::Allocations
+            | Self::Retained
+            | Self::Scratch
+            | Self::Components => None,
+            _ => None,
+        }
+    }
 }
 
 /// Resolve the historical model identifier to the checked table position used
@@ -210,31 +420,26 @@ impl KeynoteEditor {
         slide_index: usize,
         model_object_id: u64,
     ) -> Result<KeynoteSlideTable> {
-        let info = require_table_model(self, slide_index, model_object_id)?;
-        let bytes = self.package().to_bytes()?;
-        let bundle = Bundle::from_bytes(&bytes)?;
-        let index = ObjectIndex::from_bundle(&bundle)?;
-        let object = index
-            .resolve_ref_id(&bundle, model_object_id)?
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("Keynote table model {model_object_id} is missing"))
-            })?;
-        let table = TableDataExtractor::new(&bundle, &index)
-            .extract_table_from_object(&object)?
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Keynote object {model_object_id} has no native table model"
-                ))
-            })?;
-        let (semantic_table, comments) = table.into_semantic_parts()?;
+        let tables = self.slide_tables(slide_index)?;
+        let table_index = focused_table_index(&tables, slide_index, model_object_id)?;
+        let info = tables[table_index].clone();
+        let focused = focused_table_package(self)?;
+        let table_read = focused
+            .slide_table_cells(
+                litchi_keynote::SlideSelector::index(slide_index),
+                litchi_keynote::TableSelector::index(table_index),
+            )
+            .map_err(map_focused_keynote_cells_error)?;
+        let merges = focused
+            .slide_table_merges(
+                litchi_keynote::SlideSelector::index(slide_index),
+                litchi_keynote::TableSelector::index(table_index),
+            )
+            .map_err(map_focused_keynote_merges_error)?;
         Ok(KeynoteSlideTable {
             info,
-            semantic_table,
-            comments,
-            merges: crate::numbers::editor::table_cell_merges_in_package(
-                self.package(),
-                model_object_id,
-            )?,
+            table_read,
+            merges,
         })
     }
 
@@ -3879,6 +4084,8 @@ impl KeynoteEditor {
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideTable> {
         let source = slide_table_graph(self, slide_index, drawable_object_id)?;
+        let object_catalog =
+            KeynoteObjectCatalog::build(self.package()).map_err(map_catalog_error)?;
         let mut object_ids = crate::numbers::editor::table_owned_object_ids_in_package(
             self.package(),
             source.info.model_object_id,
@@ -3900,6 +4107,14 @@ impl KeynoteEditor {
             source.slide_component_id,
             drawable_object_id,
         )?;
+        for &identifier in &object_ids {
+            let archive_name = object_catalog
+                .archive_name(identifier)
+                .map_err(map_catalog_error)?;
+            if let Some(component) = component_identifier_for_entry(&staged, archive_name)? {
+                remove_component_external_references_to_object(&mut staged, component, identifier)?;
+            }
+        }
         let formula_ids = crate::numbers::editor::remove_table_formula_graph_in_package(
             &mut staged,
             &object_ids,

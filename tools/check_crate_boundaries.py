@@ -13331,6 +13331,40 @@ NUMBERS_EXTRACTOR_NO_EAGER_FORMULA_SOURCE_PATTERNS = (
 IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE = Path(
     "crates/litchi-iwa/src/numbers/formula_renderer.rs"
 )
+# The complete host table reader is retired as one unit.  Keep these paths
+# explicit so a focused cell/value reader cannot accidentally be mistaken for
+# a restored monolithic implementation.
+RETIRED_IWA_NUMBERS_TABLE_READER_SOURCES = (
+    IWA_NUMBERS_TABLE_EXTRACTOR_SOURCE,
+    IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_RENDERER_SOURCE,
+    Path("crates/litchi-iwa/src/numbers/table.rs"),
+)
+RETIRED_IWA_NUMBERS_TABLE_READER_MODULE_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "mod.rs"
+RETIRED_IWA_NUMBERS_TABLE_READER_MODULES = frozenset(
+    {"formula_renderer", "table", "table_extractor"}
+)
+RETIRED_IWA_NUMBERS_TABLE_READER_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?(?P<module>formula_renderer|table_extractor|table)\b"
+    r"[ \t]*(?:;|\{)"
+)
+RETIRED_IWA_NUMBERS_TABLE_READER_REEXPORT = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+use[ \t]+"
+    r"(?:(?:r#)?(?:self|crate|super|numbers)[ \t]*::[ \t]*)*"
+    r"(?:r#)?(?P<module>formula_renderer|table_extractor|table)\b"
+)
+RETIRED_IWA_NUMBERS_TABLE_READER_IMPORT = re.compile(
+    r"(?ms)^[ \t]*(?:pub[ \t]+)?use\b[^;]*"
+    r"\b(?:r#)?(?:formula_renderer|table_extractor)\b[^;]*;"
+)
+RETIRED_IWA_NUMBERS_TABLE_READER_USE = re.compile(
+    r"\b(?:r#)?(?:crate|self|super|litchi_iwa|numbers)"
+    r"(?:[ \t\r\n]*::[ \t\r\n]*(?:r#)?[A-Za-z_][A-Za-z0-9_]*)*"
+    r"[ \t\r\n]*::[ \t\r\n]*(?:r#)?(?:formula_renderer|table_extractor)\b"
+)
+RETIRED_IWA_NUMBERS_TABLE_READER_TYPES = re.compile(
+    r"\b(?:TableDataExtractor|NumbersTable)\b"
+)
 IWA_NUMBERS_TABLE_EXTRACTOR_FORMULA_TABLE_REQUIRED_MARKERS = (
     "FormulaArchiveBytes",
     "charge_formula_wire",
@@ -45527,6 +45561,94 @@ def audit_iwa_numbers_table_extractor_no_eager_formula_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_numbers_table_reader_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retired host Numbers table reader from returning.
+
+    The complete table reader moved to the focused Pages/Keynote adapters and
+    the neutral ``TableRead`` model.  The three old host files and their
+    ``numbers/mod.rs`` exports are therefore an exact retirement surface.  A
+    focused Numbers extractor is deliberately outside this audit; its own
+    source ratchets continue to protect the remaining numeric projections.
+    """
+
+    violations: list[str] = []
+
+    for relative in RETIRED_IWA_NUMBERS_TABLE_READER_SOURCES:
+        if (root / relative).exists():
+            violations.append(
+                "retired litchi-iwa Numbers table reader source returned: "
+                f"{relative}"
+            )
+
+    module_path = root / RETIRED_IWA_NUMBERS_TABLE_READER_MODULE_SOURCE
+    if module_path.is_file():
+        module_source = _mask_rust_non_code(module_path.read_text(encoding="utf-8"))
+        for match in RETIRED_IWA_NUMBERS_TABLE_READER_MODULE.finditer(module_source):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table reader module "
+                f"{match.group('module')}: "
+                f"{RETIRED_IWA_NUMBERS_TABLE_READER_MODULE_SOURCE}:{line_number}"
+            )
+        for match in RETIRED_IWA_NUMBERS_TABLE_READER_REEXPORT.finditer(
+            module_source
+        ):
+            line_number = module_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Numbers table reader re-export "
+                f"{match.group('module')}: "
+                f"{RETIRED_IWA_NUMBERS_TABLE_READER_MODULE_SOURCE}:{line_number}"
+            )
+
+    host_root = root / "crates/litchi-iwa"
+    if host_root.is_dir():
+        for path in sorted(host_root.rglob("*.rs")):
+            if path == module_path:
+                # Module declarations and re-exports have their own exact
+                # checks above; avoid reporting their exported type twice.
+                continue
+            source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+            import_matches = list(
+                RETIRED_IWA_NUMBERS_TABLE_READER_IMPORT.finditer(source)
+            )
+            for match in import_matches:
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table reader import returned: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            qualified_source = source
+            for match in reversed(import_matches):
+                qualified_source = (
+                    qualified_source[: match.start()]
+                    + "".join(
+                        "\n" if character == "\n" else " "
+                        for character in match.group(0)
+                    )
+                    + qualified_source[match.end() :]
+                )
+            for match in RETIRED_IWA_NUMBERS_TABLE_READER_USE.finditer(
+                qualified_source
+            ):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table reader qualified path returned: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for match in RETIRED_IWA_NUMBERS_TABLE_READER_TYPES.finditer(
+                qualified_source
+            ):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers table reader type returned "
+                    f"{match.group(0)}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_numbers_wire_formula_render_ownership(
     root: Path = ROOT,
 ) -> list[str]:
@@ -69350,10 +69472,16 @@ NEUTRAL_TABLE_PUBLIC_MODULE = re.compile(
     r"(?m)^[ \t]*pub[ \t]+mod[ \t]+(?:r#)?"
     r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
 )
+NEUTRAL_TABLE_PAGES_SEMANTIC_TABLE_READ_IMPORT = re.compile(
+    r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table"
+    r"[ \t\r\n]*::[ \t\r\n]*read\b[^;]*\b(?:r#)?TableRead\b"
+)
 NEUTRAL_TABLE_PAGES_SEMANTIC_TABLE_FIELD = re.compile(
-    r"\bsemantic_table[ \t\r\n]*:[ \t\r\n]*"
-    r"litchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table"
-    r"[ \t\r\n]*::[ \t\r\n]*model[ \t\r\n]*::[ \t\r\n]*Table\b"
+    r"(?m)^[ \t]*(?:(?:pub(?:[ \t]*\([^()\r\n]*\))?)[ \t]+)?"
+    r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:litchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table"
+    r"[ \t\r\n]*::[ \t\r\n]*read[ \t\r\n]*::[ \t\r\n]*)?"
+    r"(?:r#)?TableRead\b"
 )
 
 # Merged-cell geometry is a neutral table concern.  Keep the checker focused
@@ -69939,9 +70067,14 @@ def audit_neutral_table_model_source_topology(root: Path = ROOT) -> list[str]:
     )
     if pages_semantic_path.is_file():
         pages_code = _mask_rust_non_code(pages_semantic_path.read_text(encoding="utf-8"))
+        if NEUTRAL_TABLE_PAGES_SEMANTIC_TABLE_READ_IMPORT.search(pages_code) is None:
+            violations.append(
+                "Pages semantic table must import common table::read::TableRead: "
+                "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
+            )
         if NEUTRAL_TABLE_PAGES_SEMANTIC_TABLE_FIELD.search(pages_code) is None:
             violations.append(
-                "Pages semantic table must store common table::model::Table: "
+                "Pages semantic table must store common table::read::TableRead: "
                 "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
             )
 
@@ -71290,6 +71423,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_extractor_no_eager_tile_source_topology()
         + audit_iwa_numbers_table_extractor_model_tile_source_topology()
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
+        + audit_iwa_numbers_table_reader_retirement_source_topology()
         + audit_iwa_numbers_wire_formula_render_ownership()
         + audit_iwa_numbers_wire_cell_value_ownership()
         + audit_iwa_numbers_wire_table_data_list_ownership()

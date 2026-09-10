@@ -268,7 +268,7 @@ mod tests {
                 .unwrap()
                 .get_comment(1, 1)
                 .unwrap()
-                .text,
+                .text(),
             "Updated review"
         );
 

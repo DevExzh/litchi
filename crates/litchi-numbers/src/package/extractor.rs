@@ -6533,9 +6533,10 @@ fn decode_legacy_table_candidate<T>(
 mod tests {
     use super::{
         CellBudget, CellTables, Error, FormulaArchiveBytes, FormulaReferenceBudget,
-        FormulaReferenceMaps, FormulaRenderer, MAX_FORMULA_CATEGORY_DEPTH, MAX_FORMULA_WIRE_BYTES,
-        MAX_FORMULA_WORK, MAX_PAYLOAD_WORK, ProjectionBudget, Table, TableDataExtractor,
-        TileRowVisitor, collect_formula_category_payload, decode_legacy_table_candidate,
+        FormulaReferenceMaps, FormulaRenderer, MAX_ADDRESSABLE_CELLS, MAX_FORMULA_CATEGORY_DEPTH,
+        MAX_FORMULA_WIRE_BYTES, MAX_FORMULA_WORK, MAX_PAYLOAD_WORK, MAX_TABLE_COLUMNS,
+        MAX_TABLE_ROWS, ProjectionBudget, Table, TableDataExtractor, TileRowVisitor,
+        checked_table_dimensions, collect_formula_category_payload, decode_legacy_table_candidate,
         formula_table_name, has_legacy_table_model_wire_shape, map_cell_value_decode_error,
         map_table_cell_decode_limit_with_offsets,
         map_table_cell_decode_limit_with_reference_offset, preflight_formula_category_payload,
@@ -6728,6 +6729,84 @@ mod tests {
         let duplicate = sparse_model_wire(&["first", "last"], Some((1, 1)), &[]);
         assert!(super::sparse_table_model_compatibility_shape(&duplicate));
         Ok(())
+    }
+
+    #[test]
+    fn table_dimensions_are_checked_before_loading_sidecars() -> super::Result<()> {
+        // The boundary helper is intentionally exercised through the model
+        // projection entry point.  Passing impossible sidecar identifiers and
+        // a closure that must never run makes the ordering observable: an
+        // oversized model is rejected before any archive lookup or table
+        // allocation is attempted.
+        with_list_extractor(Vec::new(), false, |extractor| {
+            assert_eq!(checked_table_dimensions(0, 0)?, (0, 0));
+            assert_eq!(
+                checked_table_dimensions(MAX_TABLE_ROWS as u32, 1)?,
+                (MAX_TABLE_ROWS, 1)
+            );
+            assert_eq!(
+                checked_table_dimensions(1, MAX_TABLE_COLUMNS as u32)?,
+                (1, MAX_TABLE_COLUMNS)
+            );
+
+            let reject = |rows: u32, columns: u32| {
+                extractor.parse_table_model_parts(
+                    "unreachable",
+                    rows,
+                    columns,
+                    u64::MAX,
+                    u64::MAX,
+                    None,
+                    None,
+                    None,
+                    false,
+                    None,
+                    |_extractor, _cell_tables, _budget, _table| {
+                        panic!("sidecar loading must not follow invalid dimensions")
+                    },
+                )
+            };
+
+            let rows = u32::try_from(MAX_TABLE_ROWS + 1).expect("row limit fits in u32");
+            let error = reject(rows, 1).expect_err("row limit must be enforced");
+            assert!(matches!(
+                error,
+                Error::Common(litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::TableRows,
+                    observed,
+                    limit,
+                }) if observed == MAX_TABLE_ROWS + 1 && limit == MAX_TABLE_ROWS
+            ));
+
+            let columns = u32::try_from(MAX_TABLE_COLUMNS + 1).expect("column limit fits in u32");
+            let error = reject(1, columns).expect_err("column limit must be enforced");
+            assert!(matches!(
+                error,
+                Error::Common(litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::TableColumns,
+                    observed,
+                    limit,
+                }) if observed == MAX_TABLE_COLUMNS + 1 && limit == MAX_TABLE_COLUMNS
+            ));
+
+            let rows = MAX_ADDRESSABLE_CELLS / MAX_TABLE_COLUMNS + 1;
+            assert!(
+                rows <= MAX_TABLE_ROWS,
+                "cell-limit probe must fit row limit"
+            );
+            let columns = MAX_TABLE_COLUMNS;
+            let error = reject(rows as u32, columns as u32)
+                .expect_err("addressable-cell limit must be enforced");
+            assert!(matches!(
+                error,
+                Error::Common(litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::TableCells,
+                    observed,
+                    limit,
+                }) if observed == rows * columns && limit == MAX_ADDRESSABLE_CELLS
+            ));
+            Ok(())
+        })
     }
 
     #[test]
@@ -9230,6 +9309,36 @@ mod tests {
         )
         .expect_err("missing postfix operands must fail");
         assert!(matches!(error, Error::ParseError(_)));
+        assert_eq!(budget.output_text_bytes, output_before);
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_renderer_rejects_function_argument_underflow_atomically() -> super::Result<()>
+    {
+        let mut function = formula_node(AstNodeType::FunctionNode);
+        function.ast_function_node_index = Some(999);
+        function.ast_function_node_num_args = Some(1);
+        let source = formula(vec![function]).encode_to_vec();
+        let mut budget = ProjectionBudget::new(SemanticLimits::default());
+        let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
+        let output_before = budget.output_text_bytes;
+        let error = TableDataExtractor::extract_formula_string(
+            &raw,
+            0,
+            0,
+            10,
+            10,
+            &FormulaReferenceMaps::default(),
+            &mut budget,
+        )
+        .expect_err("function with fewer stack values than declared arguments must fail");
+        assert!(matches!(
+            error,
+            Error::ParseError(message)
+                if message
+                    == "Malformed Numbers formula: function requires 1 arguments but only 0 are available"
+        ));
         assert_eq!(budget.output_text_bytes, output_before);
         Ok(())
     }

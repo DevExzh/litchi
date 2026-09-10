@@ -11547,3 +11547,61 @@ table-only formula references. Category formatting measures its output before
 retention, including subnormal floating-point labels longer than 300 bytes.
 The shared tile fuzz target completed 1,000 AddressSanitizer runs without a
 failure; its temporary build and corpus were cleaned afterward.
+
+## 2026-09-10 Remove the host full-table decoder
+
+The two remaining production callers of `TableDataExtractor`, Pages table
+readback and Keynote slide-table readback, now delegate to focused packages.
+The host extractor, its test renderer, and `NumbersTable` implementation are
+deleted rather than moved or retained as aliases. The boundary checker guards
+against restoring these modules, exports, and imports, while preserving the
+independent focused Numbers checks. Obsolete protobuf build provenance paths
+are removed.
+
+Focused Numbers regressions retain the native cell-value and table-data-list
+controls, comment expectations, exact source round trips, and formula budget
+refusal. Common table-model tests own the former in-memory adapter behavior.
+Host native tests now verify selector forwarding and semantic results; after
+delegation they are not independent decoder differential tests. The Pages
+cross-table formula assertion remains an independent native golden value.
+
+Host read-result comments deliberately retire raw archive identity fields in
+favor of common resolved semantic comments. Comment mutation APIs and native
+source preservation are retained. Legacy selectors still exist only in the
+migration host; focused callers use semantic table selectors and typed cell
+positions. This removes the duplicated reader, not the remaining host editor
+and mutation dependencies.
+
+During retirement verification, scratch copies of the saved Pages cross-table
+control and Keynote table-read control were opened, saved, closed, and reopened
+in the native applications. Pages retained the 13.5 cross-table result and
+commented 5.5 cell; Keynote retained Unicode text, 12.5, TRUE, the commented
+13.5 result, and the visible B4:C5 merge. Repository fixtures were not replaced.
+
+Compatibility review retains the former 1,048,576 materialized-cell ceiling
+and separates cell spans from archive metadata-item/reference counts, while
+keeping aggregate decoding work bounded. Direct focused regressions also
+cover dimension refusal before sidecar loading and function argument underflow.
+
+Strict Keynote readback exposed missing package metadata maintenance when the
+host formula writer inserted or removed dependency tiles. The writer now
+maintains the component object registry and uses canonical allocation that
+respects the package identifier watermark; focused ownership validation is
+not relaxed to accept inconsistent output. Keynote table removal also clears
+stale external references to the removed cloned table graph.
+
+Keynote rich-text readback now checks the two supported storage message kinds
+as one canonical union. Objects carrying both kinds are rejected regardless
+of message order, matching Pages' strict ambiguity handling.
+
+The extractor's retirement also removes its unused owned object-index lookup
+adapters from production. Index helpers still used to verify existing graph
+and batch-resolution invariants are restricted to tests; the remaining
+document and chart readers retain their borrowed index operations.
+
+Generated Numbers formula add/remove tests now account for the corrected
+monotonic identifier watermark: deleting the temporary dependency tile removes
+its UUID binding but does not reuse its allocated identifier. The tests require
+the expected watermark advance, restoration of the original registry, and
+whole-package byte equality after normalizing only that watermark in a test
+copy. Unrelated bytes remain protected.

@@ -392,7 +392,7 @@ pub enum SlideTableCellsError {
     Allocation { amount: usize },
 }
 
-const MAX_MATERIALIZED_CELLS: usize = 1_000_000;
+const MAX_MATERIALIZED_CELLS: usize = 1 << 20;
 const MAX_SIDECAR_ENTRIES: usize = 1_000_000;
 const RICH_TEXT_PAYLOAD_MESSAGE_KIND: u32 = 6_218;
 const RICH_TEXT_STORAGE_MESSAGE_KINDS: [u32; 2] = [2_001, 2_022];
@@ -527,14 +527,7 @@ impl TableCellReadBudget for ReadBudget<'_> {
     }
 
     fn check_materialized_cells(&mut self, observed: usize) -> Result<(), Self::Error> {
-        let maximum = MAX_MATERIALIZED_CELLS.min(self.package.semantic_limits().max_references());
-        if observed > maximum {
-            return Err(limit_error(
-                SlideTableCellsLimitKind::PayloadItems,
-                observed,
-                maximum,
-            ));
-        }
+        check_materialized_cell_limit(observed)?;
         let additional = observed.saturating_sub(self.materialized_cells);
         self.budget.work(additional).map_err(map_core_error)?;
         self.materialized_cells = observed;
@@ -560,6 +553,17 @@ impl TableCellReadBudget for ReadBudget<'_> {
     fn map_issue(&mut self, issue: wire_cells::TableCellIssue) -> Self::Error {
         map_table_cell_issue(issue)
     }
+}
+
+fn check_materialized_cell_limit(observed: usize) -> Result<(), SlideTableCellsError> {
+    if observed > MAX_MATERIALIZED_CELLS {
+        return Err(limit_error(
+            SlideTableCellsLimitKind::PayloadItems,
+            observed,
+            MAX_MATERIALIZED_CELLS,
+        ));
+    }
+    Ok(())
 }
 
 impl SidecarReadBudget for ReadBudget<'_> {
@@ -1354,6 +1358,22 @@ impl<'package, 'budget, 'names> KeynoteCellSidecarResolver<'package, 'budget, 'n
         payload.ok_or(SlideTableCellsError::InvalidSource)
     }
 
+    fn canonical_message_kinds<'source>(
+        messages: NativeMessages<'source>,
+        kinds: &[u32; 2],
+    ) -> Result<&'source [u8], SlideTableCellsError> {
+        let mut payload = None;
+        for message in messages {
+            if !kinds.contains(&message.kind) {
+                continue;
+            }
+            if payload.replace(message.data).is_some() {
+                return Err(SlideTableCellsError::InvalidSource);
+            }
+        }
+        payload.ok_or(SlideTableCellsError::InvalidSource)
+    }
+
     fn resolve_object_payload(
         &mut self,
         reference: SidecarReference,
@@ -1468,15 +1488,15 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
         )?;
         let storage_reference =
             SidecarReference::new(storage_identifier).ok_or(SlideTableCellsError::InvalidSource)?;
+        let messages = resolve_messages(
+            self.budget.package,
+            storage_reference.identifier(),
+            &mut self.budget.budget,
+        )
+        .map_err(map_core_error)?
+        .ok_or(SlideTableCellsError::InvalidSource)?;
         let storage_payload =
-            self.resolve_object_payload(storage_reference, RICH_TEXT_STORAGE_MESSAGE_KINDS[0]);
-        let storage_payload = match storage_payload {
-            Ok(payload) => payload,
-            Err(SlideTableCellsError::InvalidSource) => {
-                self.resolve_object_payload(storage_reference, RICH_TEXT_STORAGE_MESSAGE_KINDS[1])?
-            },
-            Err(error) => return Err(error),
-        };
+            Self::canonical_message_kinds(messages, &RICH_TEXT_STORAGE_MESSAGE_KINDS)?;
         self.budget
             .budget
             .work(storage_payload.len())
@@ -1946,6 +1966,34 @@ mod tests {
     }
 
     #[test]
+    fn materialized_cell_ceiling_is_inclusive_and_cumulative() {
+        let source =
+            include_bytes!("../../../../test-data/iwork/keynote/slide-table-read-native.key");
+        let package = Package::from_bytes(source).expect("native Keynote table fixture");
+        let mut budget = ReadBudget::new(&package).expect("focused read budget");
+        let first = MAX_MATERIALIZED_CELLS - 257;
+        let second = 257;
+        let total = first.checked_add(second).expect("test count fits usize");
+        assert_eq!(total, MAX_MATERIALIZED_CELLS);
+        TableCellReadBudget::check_materialized_cells(&mut budget, first)
+            .expect("first bounded batch");
+        TableCellReadBudget::check_materialized_cells(&mut budget, total)
+            .expect("legacy ceiling is inclusive");
+        assert_eq!(budget.materialized_cells, MAX_MATERIALIZED_CELLS);
+
+        let error = TableCellReadBudget::check_materialized_cells(&mut budget, total + 1)
+            .expect_err("the next cumulative cell must be refused");
+        assert_eq!(
+            error,
+            SlideTableCellsError::LimitExceeded {
+                kind: SlideTableCellsLimitKind::PayloadItems,
+                observed: usize_as_u64(MAX_MATERIALIZED_CELLS + 1),
+                maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
+            }
+        );
+    }
+
+    #[test]
     fn unknown_formula_owner_is_refused_instead_of_getting_a_synthetic_prefix() {
         let resolver = FormulaNameResolver {
             table_names: vec!["Table 1".into()],
@@ -2017,6 +2065,42 @@ mod tests {
             preflight_rich_text_payload(&source, WireLimits::default()),
             Err(SlideTableCellsError::InvalidSource)
         ));
+    }
+
+    #[test]
+    fn rich_text_storage_rejects_cross_kind_duplicates_in_either_order() {
+        for messages in [
+            [
+                RawMessage {
+                    type_: RICH_TEXT_STORAGE_MESSAGE_KINDS[0],
+                    data: vec![1],
+                },
+                RawMessage {
+                    type_: RICH_TEXT_STORAGE_MESSAGE_KINDS[1],
+                    data: vec![2],
+                },
+            ],
+            [
+                RawMessage {
+                    type_: RICH_TEXT_STORAGE_MESSAGE_KINDS[1],
+                    data: vec![1],
+                },
+                RawMessage {
+                    type_: RICH_TEXT_STORAGE_MESSAGE_KINDS[0],
+                    data: vec![2],
+                },
+            ],
+        ] {
+            assert!(matches!(
+                KeynoteCellSidecarResolver::canonical_message_kinds(
+                    NativeMessages {
+                        messages: &messages
+                    },
+                    &RICH_TEXT_STORAGE_MESSAGE_KINDS,
+                ),
+                Err(SlideTableCellsError::InvalidSource)
+            ));
+        }
     }
 
     #[test]

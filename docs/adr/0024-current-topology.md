@@ -4538,3 +4538,19 @@ resolution, cumulative limits, and public format-specific errors. These
 focused APIs add no dependency on the migration host. The host full-table
 callers remain until their complete compatibility and mutation surfaces can
 be retired; the monolithic crate is not yet removed.
+
+## 2026-09-10 Host table-reader retirement
+
+The host Numbers `table_extractor`, `formula_renderer`, and `table` modules
+are deleted. Pages and Keynote host table-read entrypoints resolve their
+legacy model selectors through the existing format catalog, then delegate
+to focused semantic cell and merge readers with effective package limits.
+Their result storage is the neutral common `TableRead`; no replacement host
+extractor or raw-identity bridge is introduced.
+
+Read-result comments now use resolved text, timestamps, authors, and replies
+instead of the obsolete host raw-ID comment representation. Existing comment
+mutation APIs remain separate migration debt. The Pages adapter currently copies
+package source bytes; both adapters perform separate cell and merge scans.
+A shared source and combined read API can remove these temporary costs. Format mutation
+and other host modules remain, so the monolith deletion gate is still open.

@@ -32,9 +32,6 @@ pub(crate) mod cell;
 pub mod creation;
 pub mod editor;
 pub(crate) mod formula;
-mod formula_renderer;
-pub mod table;
-pub mod table_extractor;
 
 pub(crate) use litchi_numbers::table::dimension::{
     Dimension as NumbersTableDimension, Points as NumbersTablePoints,
@@ -98,9 +95,6 @@ pub use formula::{
 pub use litchi_numbers::cell::{
     APPLE_EPOCH_UNIX_OFFSET_SECONDS, FiniteF64, FiniteF64Error, Type, Update, Value,
 };
-pub use table::NumbersTable;
-pub use table_extractor::TableDataExtractor;
-
 #[cfg(test)]
 pub(crate) trait SemanticTableCellAssertions {
     fn get_cell(&self, row: usize, column: usize) -> Option<&litchi_numbers::cell::Value>;

@@ -1343,6 +1343,74 @@ mod tests {
         FormulaBinaryOperator, FormulaCellReference, FormulaExpression, SemanticTableCellAssertions,
     };
 
+    fn assert_formula_clear_preserves_package_except_watermark(
+        baseline_bytes: &[u8],
+        after_bytes: &[u8],
+    ) {
+        let baseline = IWorkPackage::from_bytes(baseline_bytes).unwrap();
+        let mut after = IWorkPackage::from_bytes(after_bytes).unwrap();
+        let baseline_names = baseline
+            .iwa_entry_names()
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        let after_names = after
+            .iwa_entry_names()
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        assert_eq!(after_names, baseline_names);
+
+        let baseline_watermark = crate::package_metadata::package_last_object_identifier(&baseline)
+            .unwrap()
+            .expect("generated package metadata watermark");
+        let after_watermark = crate::package_metadata::package_last_object_identifier(&after)
+            .unwrap()
+            .expect("formula package metadata watermark");
+        assert_eq!(
+            after_watermark,
+            baseline_watermark
+                .checked_add(1)
+                .expect("formula tile watermark does not overflow")
+        );
+
+        let calculation_component = crate::package_metadata::component_identifier_for_entry(
+            &baseline,
+            CALCULATION_ARCHIVE_ENTRY,
+        )
+        .unwrap()
+        .expect("calculation component metadata");
+        let baseline_registry =
+            crate::package_metadata::component_uuid_identifiers(&baseline, calculation_component)
+                .unwrap()
+                .expect("calculation component UUID registry");
+        let after_registry =
+            crate::package_metadata::component_uuid_identifiers(&after, calculation_component)
+                .unwrap()
+                .expect("calculation component UUID registry after formula clear");
+        assert_eq!(after_registry, baseline_registry);
+        assert!(!after_registry.contains(&after_watermark));
+
+        let metadata = |package: &IWorkPackage| {
+            let archive = package.archive(PACKAGE_METADATA_ARCHIVE_ENTRY).unwrap();
+            let message = archive
+                .objects
+                .iter()
+                .flat_map(|object| &object.messages)
+                .find(|message| message.type_ == NumbersMessageType::PackageMetadata.value())
+                .expect("package metadata message");
+            tsp::PackageMetadata::decode(message.data.as_slice()).unwrap()
+        };
+        let baseline_metadata = metadata(&baseline);
+        let after_metadata = metadata(&after);
+        assert_eq!(after_metadata.last_object_identifier, after_watermark);
+        let mut normalized_after_metadata = after_metadata;
+        normalized_after_metadata.last_object_identifier = baseline_metadata.last_object_identifier;
+        assert_eq!(normalized_after_metadata, baseline_metadata);
+
+        crate::package_metadata::set_package_last_object_identifier(&mut after, baseline_watermark)
+            .unwrap();
+        assert_eq!(after.to_bytes().unwrap(), baseline_bytes);
+    }
+
     #[test]
     fn generated_theme_exposes_distinct_canonical_list_presets() {
         let package = NumbersDocumentBuilder::new().build_package().unwrap();
@@ -1650,7 +1718,10 @@ mod tests {
 
         crate::numbers::editor::set_cell_fixture(&mut editor, table_id, 0, 2, CellValue::Empty)
             .unwrap();
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert_formula_clear_preserves_package_except_watermark(
+            &baseline,
+            &editor.to_bytes().unwrap(),
+        );
     }
 
     #[test]
@@ -1714,7 +1785,10 @@ mod tests {
             CellValue::Empty,
         )
         .unwrap();
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
+        assert_formula_clear_preserves_package_except_watermark(
+            &baseline,
+            &editor.to_bytes().unwrap(),
+        );
     }
 
     #[test]

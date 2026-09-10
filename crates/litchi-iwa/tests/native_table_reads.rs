@@ -1,4 +1,4 @@
-//! Native focused table values and comments compared with the migration host.
+//! Native semantic values and legacy-selector delegation into focused readers.
 
 use std::error::Error;
 
@@ -43,7 +43,7 @@ fn cells(read: &TableRead) -> Vec<((usize, usize), Value)> {
 }
 
 #[test]
-fn native_pages_full_table_reads_match_host_and_preserve_source() -> TestResult {
+fn native_pages_selector_adapter_preserves_semantics_and_source() -> TestResult {
     let focused = litchi_pages::Package::from_bytes(PAGES)?;
     let host = PagesEditor::from_bytes(PAGES)?;
     let catalog = host.tables()?;
@@ -64,10 +64,10 @@ fn native_pages_full_table_reads_match_host_and_preserve_source() -> TestResult 
             let actual = read
                 .get_comment(CellPosition::try_from_usize(position.0, position.1)?)
                 .expect("every native comment survives focused readback");
-            assert_eq!(actual.text(), comment.text);
+            assert_eq!(actual, comment);
             assert_eq!(
                 actual.timestamp().map(|v| v.as_f64()),
-                comment.creation_date_seconds
+                comment.timestamp().map(|value| value.as_f64())
             );
         }
     }
@@ -95,7 +95,7 @@ fn native_pages_full_table_reads_match_host_and_preserve_source() -> TestResult 
 }
 
 #[test]
-fn native_keynote_full_table_reads_match_host_and_preserve_merge() -> TestResult {
+fn native_keynote_selector_adapter_preserves_semantics_and_merge() -> TestResult {
     let focused = litchi_keynote::Package::from_bytes(KEYNOTE)?;
     let host = KeynoteEditor::from_bytes(KEYNOTE)?;
     let catalog = host.slide_tables(0)?;
@@ -119,7 +119,7 @@ fn native_keynote_full_table_reads_match_host_and_preserve_merge() -> TestResult
     assert_eq!(comment.text(), "Focused Keynote table read — Café 北京");
     assert_eq!(
         comment.text(),
-        legacy.get_comment(1, 3).expect("host comment").text
+        legacy.get_comment(1, 3).expect("host comment").text()
     );
     assert_eq!(
         comment.author().and_then(|author| author.display_name()),
