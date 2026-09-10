@@ -16,6 +16,7 @@ struct Resource {
 pub struct Builder {
     definition: Definition,
     limits: crate::Limits,
+    package_kind: crate::ChartPackageKind,
     styles_xml: Option<String>,
     resources: Vec<Resource>,
 }
@@ -26,6 +27,7 @@ impl Builder {
         Self {
             definition: Definition::new(ChartClass::line()),
             limits: crate::Limits::default(),
+            package_kind: crate::ChartPackageKind::Chart,
             styles_xml: None,
             resources: Vec::new(),
         }
@@ -51,6 +53,13 @@ impl Builder {
     #[must_use]
     pub fn with_limits(mut self, limits: crate::Limits) -> Self {
         self.limits = limits;
+        self
+    }
+
+    /// Preserve or author the selected ODF chart package kind.
+    #[must_use]
+    pub fn with_package_kind(mut self, package_kind: crate::ChartPackageKind) -> Self {
+        self.package_kind = package_kind;
         self
     }
 
@@ -95,6 +104,7 @@ impl Builder {
             self.styles_xml.as_deref(),
             &self.resources,
             self.limits,
+            self.package_kind,
         )
     }
 }
@@ -110,6 +120,7 @@ fn package_content(
     styles_xml: Option<&str>,
     resources: &[Resource],
     limits: crate::Limits,
+    package_kind: crate::ChartPackageKind,
 ) -> Result<Vec<u8>> {
     let compact_limits = compact_xml::Limits::new(limits.max_content_bytes(), limits.max_depth())
         .map_err(Error::from)?;
@@ -120,7 +131,7 @@ fn package_content(
         crate::codec::validate_styles(styles, limits)?;
     }
     let mut writer = PackageWriter::new_bounded(limits.max_package_bytes());
-    writer.set_mimetype(crate::package::MIMETYPE)?;
+    writer.set_mimetype(package_kind.mime_type())?;
     writer.add_file("content.xml", content_xml.as_bytes())?;
     if let Some(styles) = styles_xml {
         writer.add_file("styles.xml", styles.as_bytes())?;
@@ -170,7 +181,14 @@ mod tests {
         let content = crate::serialize_content(&Definition::new(ChartClass::line())).unwrap();
         let noncompact = content.replacen("><", ">\n<", 1);
         assert!(matches!(
-            package_content(&noncompact, None, &[], crate::Limits::default()).unwrap_err(),
+            package_content(
+                &noncompact,
+                None,
+                &[],
+                crate::Limits::default(),
+                crate::ChartPackageKind::Chart,
+            )
+            .unwrap_err(),
             Error::XmlCompactness {
                 kind: CompactnessKind::FormattingWhitespace,
                 ..

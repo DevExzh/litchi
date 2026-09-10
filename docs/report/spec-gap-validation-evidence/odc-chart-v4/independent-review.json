@@ -1,0 +1,13 @@
+{
+  "reviewer": "xls_payload_v3_review_b",
+  "verdict": "CLEAR for scoped V3 blockers and structural-child ownership",
+  "candidate": "/var/tmp/litchi-odc-chart-validation-v4-20260910",
+  "base": "42be13576f97958c81526d9b239351c72d179fa8",
+  "focused_tests_passed": 12,
+  "external_probes": [
+    "changed symbol-image href with typed attribute transfers exact target bytes",
+    "unknown child with typed attribute transfers exact target bytes",
+    "structural patch inverse restores exact source"
+  ],
+  "remaining_scoped_blockers": []
+}
