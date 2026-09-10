@@ -1,7 +1,10 @@
 //! Concise family entry points.
 
 use litchi_core::{Error, Metadata, Result};
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::{Arc, OnceLock},
+};
 
 pub use crate::authoring::Builder;
 
@@ -9,6 +12,7 @@ pub use crate::authoring::Builder;
 #[derive(Clone)]
 pub struct Database {
     pub(crate) package: crate::package::Snapshot,
+    pub(crate) settings: Arc<OnceLock<crate::DatabaseSettings>>,
 }
 
 impl Database {
@@ -18,7 +22,7 @@ impl Database {
     ///
     /// Returns an error if the file cannot be read or is not a valid package.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Snapshot::open(path).map(|package| Self { package })
+        crate::package::Snapshot::open(path).map(Self::from_package)
     }
 
     /// Opens a database package from in-memory bytes.
@@ -27,7 +31,7 @@ impl Database {
     ///
     /// Returns an error if the bytes are not a valid package.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
+        crate::package::Snapshot::from_bytes(bytes).map(Self::from_package)
     }
 
     /// Opens a password-encrypted database package from a file path.
@@ -40,7 +44,7 @@ impl Database {
     /// Returns an error if the file cannot be read, the password is incorrect,
     /// or the decrypted package is invalid.
     pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::open_with_password(path, password).map(|package| Self { package })
+        crate::package::Snapshot::open_with_password(path, password).map(Self::from_package)
     }
 
     /// Opens a password-encrypted database package from in-memory bytes.
@@ -49,8 +53,14 @@ impl Database {
     ///
     /// Returns an error for an incorrect password or invalid decrypted package.
     pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes_with_password(bytes, password)
-            .map(|package| Self { package })
+        crate::package::Snapshot::from_bytes_with_password(bytes, password).map(Self::from_package)
+    }
+
+    fn from_package(package: crate::package::Snapshot) -> Self {
+        Self {
+            package,
+            settings: Arc::new(OnceLock::new()),
+        }
     }
 
     /// Returns the `content.xml` document.
@@ -104,9 +114,40 @@ impl Database {
     /// # Errors
     ///
     /// Returns an error when the content part is structurally invalid or
-    /// exceeds `limits`.
+    /// exceeds the mandatory catalog limits. Optional settings limits are
+    /// checked when [`crate::Catalog::settings`] is first requested.
     pub fn catalog_with(&self, limits: crate::Limits) -> Result<crate::Catalog<'_>> {
-        crate::Catalog::parse(self.content_xml(), limits)
+        let settings_cache = if limits == crate::Limits::default() {
+            self.settings.clone()
+        } else {
+            Arc::new(OnceLock::new())
+        };
+        crate::Catalog::parse_with_settings(self.content_xml(), limits, settings_cache)
+    }
+
+    /// Reads bounded inert login, driver, application, and table-filter
+    /// settings from the data source.  The returned values are metadata only;
+    /// no driver or credential is resolved. A successful projection is cached
+    /// on this immutable snapshot and returned by reference on later reads;
+    /// failed projections are not cached. Sources that omit the normative
+    /// connection-data owner, its single connection target, or a required
+    /// settings child remain readable as preservation-only snapshots, but do
+    /// not produce a typed projection. Unknown producer markup is retained;
+    /// it never substitutes for a normative `oneOrMore` child.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the optional settings XML is malformed or
+    /// exceeds its finite limits.
+    pub fn settings(&self) -> Result<&crate::DatabaseSettings> {
+        if let Some(settings) = self.settings.get() {
+            return Ok(settings);
+        }
+        let settings = self.catalog()?.settings()?.clone();
+        let _ = self.settings.set(settings);
+        self.settings.get().ok_or_else(|| {
+            Error::InvalidFormat("ODB settings projection was not materialized".into())
+        })
     }
 
     /// Inventories opaque direct producer-extension subtrees without
@@ -353,6 +394,7 @@ impl Database {
 )]
 mod tests {
     use super::{Builder, Database};
+    use crate::model::{parse_count, parse_test_lock, reset_parse_count};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
@@ -361,5 +403,47 @@ mod tests {
         assert!(document.content_xml().contains("<office:database"));
         assert!(!document.as_bytes().is_empty());
         assert!(document.catalog().unwrap().tables().is_empty());
+    }
+
+    #[test]
+    fn settings_reads_materialize_lazily_and_reuse_success() {
+        let _lock = parse_test_lock().lock().unwrap();
+        reset_parse_count();
+        let document = Database::from_bytes(Builder::new().build().unwrap()).unwrap();
+        assert_eq!(parse_count(), 0);
+        let catalog = document.catalog().unwrap();
+        assert!(catalog.tables().is_empty());
+        assert_eq!(parse_count(), 0);
+
+        let first = catalog.settings().unwrap();
+        assert_eq!(parse_count(), 1);
+        let second = document.settings().unwrap();
+        assert!(std::ptr::eq(first, second));
+        assert_eq!(parse_count(), 1);
+    }
+
+    #[test]
+    fn custom_catalog_limits_do_not_reuse_default_settings_cache() {
+        let _lock = parse_test_lock().lock().unwrap();
+        reset_parse_count();
+        let document = Database::from_bytes(
+            Builder::new()
+                .content_xml(
+                    r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:database><db:data-source><db:connection-data><db:connection-resource xlink:href="" xlink:type="simple"/><db:login db:user-name="alice"/></db:connection-data></db:data-source></office:database></office:body></office:document-content>"#,
+                )
+                .build()
+                .unwrap(),
+        )
+        .unwrap();
+        document.settings().unwrap();
+        assert_eq!(parse_count(), 1);
+
+        let catalog = document
+            .catalog_with(crate::Limits::default().with_max_attribute_bytes(0))
+            .unwrap();
+        assert!(catalog.settings().is_err());
+        assert_eq!(parse_count(), 2);
+        assert!(document.settings().is_ok());
+        assert_eq!(parse_count(), 2);
     }
 }

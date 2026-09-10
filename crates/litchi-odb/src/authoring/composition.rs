@@ -135,6 +135,7 @@ impl Patch {
                 directories.into_iter().collect(),
                 excluded_paths.into_iter().collect(),
             )?,
+            settings: Arc::new(std::sync::OnceLock::new()),
         };
         target.catalog()?;
         Ok(Self {
@@ -215,6 +216,7 @@ fn effect_keys(changes: &[Change]) -> Vec<String> {
             },
             ChangeKind::Query => format!("query/{}", change.target()),
             ChangeKind::Connection => "connection".to_string(),
+            ChangeKind::Settings => "settings".to_string(),
             ChangeKind::Component => format!("component/{}", change.target()),
             ChangeKind::ProducerExtension => {
                 format!("producer-extension/{}", change.target())
