@@ -1,0 +1,77 @@
+[
+  {
+    "name": "test",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-odg",
+      "-p",
+      "litchi-odf-common",
+      "-p",
+      "litchi-odt",
+      "--all-features",
+      "--locked",
+      "--offline",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 69.70308089256287,
+    "log_sha256": "f3ec136c46e7d1f4aae90a65ef5d41fbcc57c83c554b7cbe39ce6e788d124c16"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-odg",
+      "-p",
+      "litchi-odf-common",
+      "-p",
+      "litchi-odt",
+      "--all-targets",
+      "--all-features",
+      "--locked",
+      "--offline",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 22.00924777984619,
+    "log_sha256": "d5d0e3b2ecc536b3c23ae1dd908ab14a0fc765199f1f1cb1a8b1f5c9f411cf3e"
+  },
+  {
+    "name": "rustdoc",
+    "command": [
+      "taskset",
+      "-c",
+      "8-31",
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-odg",
+      "-p",
+      "litchi-odf-common",
+      "-p",
+      "litchi-odt",
+      "--all-features",
+      "--no-deps",
+      "--locked",
+      "--offline"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 6.649280071258545,
+    "log_sha256": "b86d0a6896806b76e3f27e967c571723bb2ee095f0cdff5ffd079fd891df2d92"
+  }
+]

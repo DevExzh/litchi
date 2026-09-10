@@ -2,6 +2,11 @@
 
 use crate::model::{
     FormControl,
+    auxiliary::{Contour, ContourKind, GluePoint, ImageMap, ImageMapArea, ImageMapAreaShape},
+    enhanced::{
+        DrawingAttribute, DrawingAttributeNamespace, EnhancedGeometry, EnhancedGeometryChild,
+        EnhancedGeometryChildKind,
+    },
     group::Group,
     layer::Layer,
     page::Page,
@@ -10,6 +15,7 @@ use crate::model::{
     style::Style,
     style_resource::{StyleResource, StyleResourceKind},
 };
+use crate::transition::Transition;
 use litchi_core::{
     BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error, History,
     HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch, PatchLimits, PatchOperation,
@@ -22,6 +28,7 @@ use litchi_odf_common::{
     },
     drawing::Frame,
     media,
+    package::{is_linked_href, resolve_package_path},
 };
 use quick_xml::{
     XmlVersion,
@@ -42,7 +49,9 @@ pub(crate) const TEMPLATE_MIMETYPE: &str = "application/vnd.oasis.opendocument.g
 const BODY_MARKER: &str = "<office:drawing";
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+const DR3D: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const SVG: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 const STYLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const FORM: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:form:1.0";
@@ -51,6 +60,7 @@ const SCRIPT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:script:1.0";
 const XML_EVENTS: &[u8] = b"http://www.w3.org/2001/xml-events";
 const XLINK: &[u8] = b"http://www.w3.org/1999/xlink";
 const PRESENTATION: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
+const SMIL: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_DEPTH: usize = 256;
 const MAX_PAGES: usize = 16_384;
@@ -62,16 +72,20 @@ const MAX_GROUP_EDITS: usize = 4_096;
 const MAX_SHAPES: usize = 1_000_000;
 const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
+const MAX_TRANSITION_XML_BYTES: usize = 8 * 1024 * 1024;
 const DURABLE_FORMAT: &str = "litchi.odg";
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NamespaceKind {
     Office,
     Draw,
+    Dr3d,
     Svg,
     Text,
+    Table,
     Form,
     Style,
+    Presentation,
     Other,
 }
 
@@ -447,6 +461,8 @@ impl Snapshot {
                 || archive.has_file("META-INF/macrosignatures.xml"),
         };
         let parsed = parse_content(package.content_xml())?;
+        let page_transitions =
+            parse_page_transitions(package.content_xml(), package.styles_xml(), &parsed.pages)?;
         let layers = package
             .styles_xml()
             .map(parse_declared_layers)
@@ -488,11 +504,15 @@ impl Snapshot {
                 .then_with(|| left.name().cmp(right.name()))
         });
         style_resources.dedup();
+        let mut pages = parsed.pages;
+        for (page, transition) in pages.iter_mut().zip(page_transitions) {
+            page.set_transition(transition);
+        }
         Ok(Self(Arc::new(State {
             package,
             mimetype,
             security,
-            pages: parsed.pages,
+            pages,
             form_controls: parsed.form_controls,
             styles,
             style_resources,
@@ -712,6 +732,7 @@ impl Snapshot {
         Transaction {
             source: self.clone(),
             content: self.content_xml().to_string(),
+            styles: self.styles_xml().map(str::to_owned),
             content_splices: Some(Vec::new()),
             changes: Vec::new(),
             resource_edits: Vec::new(),
@@ -800,6 +821,8 @@ impl Snapshot {
     /// Returns an error for invalid selectors, noncompact referenced fragments, unreadable
     /// resources, or unresolved source dependencies.
     pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> Result<ShapeTransfer> {
+        let source_namespaces = transfer_source_namespaces(self)?;
+        let mut transfer_budget = TransferBudget::default();
         let parsed = parse_content(self.content_xml())?;
         let selected_page = parsed.pages.get(page).ok_or_else(|| {
             Error::InvalidFormat("ODG transfer page selector is out of bounds".into())
@@ -810,12 +833,11 @@ impl Snapshot {
         let span = parsed.shape_spans[page][shape]
             .as_ref()
             .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is missing".into()))?;
-        let xml = self
+        let raw_xml = self
             .content_xml()
             .get(span.clone())
-            .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is invalid".into()))?
-            .to_owned();
-        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+            .ok_or_else(|| Error::InvalidFormat("ODG transfer shape span is invalid".into()))?;
+        transfer_budget.charge(raw_xml.len(), "ODG transfer XML")?;
         let dependency_shapes = selected_page
             .shapes()
             .iter()
@@ -851,10 +873,10 @@ impl Snapshot {
             .collect::<Vec<_>>();
         controls.sort_unstable();
         controls.dedup();
-        let mut style_definitions = BTreeMap::new();
+        let mut style_sources = BTreeMap::new();
         let mut required_style_resources = BTreeSet::new();
         while let Some(style_name) = required_styles.pop() {
-            if style_definitions.contains_key(&style_name) {
+            if style_sources.contains_key(&style_name) {
                 continue;
             }
             let definition = find_style_definition(self, &style_name)?.ok_or_else(|| {
@@ -862,7 +884,7 @@ impl Snapshot {
                     "ODG transfer source has unresolved style '{style_name}'"
                 ))
             })?;
-            compact_xml::validate(definition.xml.as_bytes()).map_err(Error::from)?;
+            transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
             if let Some(parent) = style_parent_name(&definition.xml)? {
                 required_styles.push(parent);
             }
@@ -874,32 +896,17 @@ impl Snapshot {
                     required_style_resources.insert((kind, value.clone()));
                 }
             }
-            style_definitions.insert(
-                style_name.clone(),
-                TransferStyle {
-                    name: style_name,
-                    family: definition.style.family().to_owned(),
-                    parent: definition.style.parent().map(str::to_owned),
-                    xml: definition.xml,
-                },
-            );
+            style_sources.insert(style_name, definition);
         }
-        let styles = style_definitions.keys().cloned().collect::<Vec<_>>();
-        let mut style_resources = BTreeMap::new();
+        let mut style_resource_sources = BTreeMap::new();
         for (kind, value) in required_style_resources {
             let definition = find_style_resource(self, kind, &value)?.ok_or_else(|| {
                 Error::Unsupported(format!(
                     "ODG transfer source has unresolved named style resource '{value}'"
                 ))
             })?;
-            compact_xml::validate(definition.xml.as_bytes()).map_err(Error::from)?;
-            style_resources.insert(
-                (kind, value),
-                TransferStyleResource {
-                    resource: definition.resource,
-                    xml: definition.xml,
-                },
-            );
+            transfer_budget.charge(definition.xml.len(), "ODG transfer XML")?;
+            style_resource_sources.insert((kind, value), definition);
         }
         for control in &controls {
             if !self
@@ -912,41 +919,147 @@ impl Snapshot {
                 )));
             }
         }
-        let dependency_xml = std::iter::once(xml.as_str())
+        let mut control_sources = Vec::new();
+        for identifier in &controls {
+            let position = parsed
+                .form_controls
+                .iter()
+                .position(|control| control.id() == identifier)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer form control is missing".into())
+                })?;
+            let control_span = parsed.form_control_spans[position]
+                .as_ref()
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer form-control span is missing".into())
+                })?;
+            let raw_control_xml =
+                self.content_xml()
+                    .get(control_span.clone())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("ODG transfer form-control span is invalid".into())
+                    })?;
+            transfer_budget.charge(raw_control_xml.len(), "ODG transfer XML")?;
+            control_sources.push((parsed.form_controls[position].clone(), control_span.clone()));
+        }
+
+        // Namespace closure can add producer declarations to each detached
+        // fragment.  Charge those bytes for the complete set before any
+        // closure string is allocated, so a rejected aggregate cannot leave
+        // several large detached strings behind.
+        let mut charge_namespace_closure = |fragment: &str| -> Result<()> {
+            let added = transfer_namespace_closure_bytes(fragment, &source_namespaces)?;
+            transfer_budget.charge(added, "ODG transfer namespace closure")?;
+            Ok(())
+        };
+        charge_namespace_closure(raw_xml)?;
+        for definition in style_sources.values() {
+            charge_namespace_closure(&definition.xml)?;
+        }
+        for definition in style_resource_sources.values() {
+            charge_namespace_closure(&definition.xml)?;
+        }
+        for (_control, span) in &control_sources {
+            let fragment = self.content_xml().get(span.clone()).ok_or_else(|| {
+                Error::InvalidFormat("ODG transfer form-control span is invalid".into())
+            })?;
+            charge_namespace_closure(fragment)?;
+        }
+
+        // Every source XML span is charged before any detached transfer string
+        // is cloned or namespace-closed.  This keeps a rejected aggregate from
+        // allocating one large fragment at a time before discovering the cap.
+        let xml = close_transfer_fragment_namespaces(raw_xml, &source_namespaces)?;
+        validate_transfer_fragment_namespaces(&xml)?;
+        compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
+        let styles = style_sources.keys().cloned().collect::<Vec<_>>();
+        let mut style_definitions = BTreeMap::new();
+        for (style_name, definition) in style_sources {
+            let definition_xml =
+                close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
+            validate_transfer_fragment_namespaces(&definition_xml)?;
+            compact_xml::validate(definition_xml.as_bytes()).map_err(Error::from)?;
+            style_definitions.insert(
+                style_name.clone(),
+                TransferStyle {
+                    name: style_name,
+                    family: definition.style.family().to_owned(),
+                    parent: definition.style.parent().map(str::to_owned),
+                    xml: definition_xml,
+                },
+            );
+        }
+        let mut style_resources = BTreeMap::new();
+        for (key, definition) in style_resource_sources {
+            let resource_xml =
+                close_transfer_fragment_namespaces(&definition.xml, &source_namespaces)?;
+            validate_transfer_fragment_namespaces(&resource_xml)?;
+            compact_xml::validate(resource_xml.as_bytes()).map_err(Error::from)?;
+            style_resources.insert(
+                key,
+                TransferStyleResource {
+                    resource: definition.resource,
+                    xml: resource_xml,
+                },
+            );
+        }
+        let transfer_fragments = std::iter::once(xml.as_str())
             .chain(style_definitions.values().map(|style| style.xml.as_str()))
             .chain(
                 style_resources
                     .values()
                     .map(|resource| resource.xml.as_str()),
             )
-            .collect::<String>();
-        let mut resources = Vec::new();
-        let mut resource_bytes = 0usize;
-        for (resource_index, resource) in self
-            .resources()
-            .iter()
-            .enumerate()
-            .filter(|(_index, resource)| transfer_xml_references(&dependency_xml, resource.href()))
-        {
-            if resources
+            .collect::<Vec<_>>();
+        let mut resource_indices = Vec::new();
+        for (resource_index, resource) in self.resources().iter().enumerate() {
+            if !transfer_fragments
                 .iter()
-                .any(|existing: &TransferResource| existing.path == resource.path())
+                .any(|fragment| transfer_xml_references(fragment, resource.href()))
             {
                 continue;
             }
-            if resources.len() >= MAX_TRANSFER_RESOURCES {
+            if resource_indices
+                .iter()
+                .any(|index: &usize| self.resources()[*index].path() == resource.path())
+            {
+                continue;
+            }
+            if resource_indices.len() >= MAX_TRANSFER_RESOURCES {
                 return invalid("ODG transfer resource count exceeds the limit");
             }
+            resource_indices.push(resource_index);
+        }
+        let archive = self.0.package.package();
+        let archive_view = archive.package()?;
+        for resource_index in &resource_indices {
+            let resource = &self.resources()[*resource_index];
+            let size = archive_view
+                .member_materialized_size(resource.path())?
+                .ok_or_else(|| {
+                    Error::Unsupported(format!(
+                        "ODG transfer resource '{}' is missing",
+                        resource.path()
+                    ))
+                })?;
+            if size > MAX_OUTPUT_BYTES as u64 {
+                return invalid("ODG transfer resources exceed the byte limit");
+            }
+            let size = usize::try_from(size).map_err(|_| {
+                Error::InvalidFormat("ODG transfer resource size overflows usize".into())
+            })?;
+            transfer_budget.charge(size, "ODG transfer closure")?;
+        }
+        let mut resources = Vec::new();
+        for resource_index in resource_indices {
+            let resource = &self.resources()[resource_index];
             let bytes = self.resource_bytes(resource_index)?.ok_or_else(|| {
                 Error::Unsupported(format!(
                     "ODG transfer resource '{}' is missing",
                     resource.path()
                 ))
             })?;
-            resource_bytes = resource_bytes.checked_add(bytes.len()).ok_or_else(|| {
-                Error::InvalidFormat("ODG transfer resource size overflow".to_string())
-            })?;
-            if resource_bytes > MAX_OUTPUT_BYTES {
+            if bytes.len() > MAX_OUTPUT_BYTES {
                 return invalid("ODG transfer resources exceed the byte limit");
             }
             resources.push(TransferResource {
@@ -956,26 +1069,18 @@ impl Snapshot {
                 bytes: Some(bytes),
             });
         }
-        let control_definitions = controls
-            .iter()
-            .map(|identifier| {
-                let position = parsed
-                    .form_controls
-                    .iter()
-                    .position(|control| control.id() == identifier)
-                    .ok_or_else(|| {
-                        Error::InvalidFormat("ODG transfer form control is missing".into())
-                    })?;
-                let control_span =
-                    parsed.form_control_spans[position]
-                        .as_ref()
-                        .ok_or_else(|| {
-                            Error::InvalidFormat("ODG transfer form-control span is missing".into())
-                        })?;
-                let control_xml = self.content_xml()[control_span.clone()].to_owned();
+        let control_definitions = control_sources
+            .into_iter()
+            .map(|(control, control_span)| {
+                let raw_control_xml = self.content_xml().get(control_span).ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer form-control span is invalid".into())
+                })?;
+                let control_xml =
+                    close_transfer_fragment_namespaces(raw_control_xml, &source_namespaces)?;
+                validate_transfer_fragment_namespaces(&control_xml)?;
                 compact_xml::validate(control_xml.as_bytes()).map_err(Error::from)?;
                 Ok(TransferControl {
-                    control: parsed.form_controls[position].clone(),
+                    control,
                     xml: control_xml,
                 })
             })
@@ -1008,6 +1113,7 @@ impl Snapshot {
 pub struct Transaction {
     source: Snapshot,
     content: String,
+    styles: Option<String>,
     content_splices: Option<Vec<ContentSplice>>,
     changes: Vec<Change>,
     resource_edits: Vec<ResourceEdit>,
@@ -1056,7 +1162,7 @@ impl Transaction {
     }
 
     fn replace_content_value(&mut self, span: &Range<usize>, replacement: &str) -> Result<()> {
-        let escaped = quick_xml::escape::escape(replacement).into_owned();
+        let escaped = escaped_xml_string(replacement, MAX_OUTPUT_BYTES, "ODG edited content")?;
         let next = replace_xml_value(&self.content, span, replacement)?;
         if let Some(splices) = &mut self.content_splices {
             stage_content_splice(
@@ -1309,6 +1415,127 @@ impl Transaction {
             before: before_owned,
             after,
         }));
+        Ok(())
+    }
+
+    /// Sets or clears inert transition metadata on the page's drawing-page style.
+    ///
+    /// Existing style ownership is respected: automatic styles are edited in
+    /// content.xml, while a named style owned by styles.xml is edited in that
+    /// part. Unknown style attributes, child elements, namespace choices, and
+    /// surrounding producer bytes remain intact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing page/style owner, an ambiguous style,
+    /// malformed XML, or a bounded value violation.
+    pub fn set_page_transition(
+        &mut self,
+        page: usize,
+        transition: Option<Transition>,
+    ) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let style_name = selected.style_name().ok_or_else(|| {
+            Error::Unsupported("ODG page transition requires an existing draw:style-name".into())
+        })?;
+        let current = parse_page_transitions(&self.content, self.styles.as_deref(), &parsed.pages)?
+            .get(page)
+            .cloned()
+            .flatten();
+        let desired = transition.filter(|value| !value.is_empty());
+        if current == desired {
+            return Ok(());
+        }
+        let shared = parsed
+            .pages
+            .iter()
+            .filter(|candidate| candidate.style_name() == Some(style_name))
+            .count();
+        if shared > 1 {
+            return Err(Error::Unsupported(
+                "ODG page transition style is shared by multiple pages".into(),
+            ));
+        }
+        let in_content = parse_style_definitions(&self.content)?
+            .iter()
+            .filter(|definition| {
+                definition.style.name() == style_name && definition.style.family() == "drawing-page"
+            })
+            .count();
+        if in_content > 1 {
+            return invalid("ODG page transition style is ambiguous");
+        }
+        validate_transition_budget(desired.as_ref())?;
+        validate_transition_sound_reference(self, desired.as_ref())?;
+        validate_transition_xml_ids(self, current.as_ref(), desired.as_ref(), in_content == 1)?;
+        if desired.is_none() && current.is_some() {
+            let parent = if in_content == 1 {
+                parse_style_definitions(&self.content)?
+                    .into_iter()
+                    .find(|definition| {
+                        definition.style.name() == style_name
+                            && definition.style.family() == "drawing-page"
+                    })
+                    .and_then(|definition| definition.style.parent().map(str::to_owned))
+            } else {
+                self.styles
+                    .as_deref()
+                    .map(parse_style_definitions)
+                    .transpose()?
+                    .and_then(|definitions| {
+                        definitions
+                            .into_iter()
+                            .find(|definition| {
+                                definition.style.name() == style_name
+                                    && definition.style.family() == "drawing-page"
+                            })
+                            .and_then(|definition| definition.style.parent().map(str::to_owned))
+                    })
+            };
+            if parent.is_some() {
+                return Err(Error::Unsupported(
+                    "ODG inherited page transition cannot be cleared without changing its parent style".into(),
+                ));
+            }
+        }
+        if in_content == 1 {
+            self.content = edit_transition_style_xml(&self.content, style_name, desired.as_ref())?;
+            self.invalidate_content_splices();
+        } else if let Some(styles) = &mut self.styles {
+            // styles.xml is handed to PackageWriter as a replacement when it
+            // changes.  Keep the same gate used by the package rebuild path
+            // here, before editing, so a noncompact producer file is refused
+            // atomically instead of being changed and failing publication
+            // later.
+            compact_xml::validate(styles.as_bytes()).map_err(Error::from)?;
+            let matches = parse_style_definitions(styles)?
+                .iter()
+                .filter(|definition| {
+                    definition.style.name() == style_name
+                        && definition.style.family() == "drawing-page"
+                })
+                .count();
+            if matches != 1 {
+                return Err(Error::Unsupported(
+                    "ODG page transition style is not uniquely owned".into(),
+                ));
+            }
+            *styles = edit_transition_style_xml(styles, style_name, desired.as_ref())?;
+        } else {
+            return Err(Error::Unsupported(
+                "ODG page transition style is not declared".into(),
+            ));
+        }
+        self.changes
+            .push(Change::PageTransition(Box::new(PageTransitionChange {
+                page,
+                before: current,
+                after: desired,
+            })));
         Ok(())
     }
 
@@ -1571,6 +1798,11 @@ impl Transaction {
             .get(page)
             .and_then(|value| value.shapes().get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?;
+        if selected.kind().is_three_dimensional() {
+            return Err(Error::Unsupported(
+                "ODG dr3d transforms are inert and cannot be edited through draw:transform".into(),
+            ));
+        }
         if selected.transform() == Some(after.as_str()) {
             return Ok(());
         }
@@ -1598,6 +1830,12 @@ impl Transaction {
         let target_points = points.into();
         validate_advanced_geometry_value(&target_view_box, "ODG polygon view box")?;
         validate_advanced_geometry_value(&target_points, "ODG polygon points")?;
+        if !is_integer_list(&target_view_box, 4) {
+            return invalid("ODG polygon view box is not four integers");
+        }
+        if !is_points(&target_points) {
+            return invalid("ODG polygon points are not an ODF point list");
+        }
         let parsed = parse_content(&self.content)?;
         let selected = parsed
             .pages
@@ -1859,18 +2097,47 @@ impl Transaction {
         {
             return invalid("ODG inserted page name is already present");
         }
-        let at = if position == parsed.pages.len() {
-            parsed.drawing_insert_position
+        let mut page = page;
+        let transition = page.transition().filter(|value| !value.is_empty()).cloned();
+        let generated_style = if let Some(transition) = transition.as_ref() {
+            validate_transition_budget(Some(transition))?;
+            validate_transition_sound_reference(self, Some(transition))?;
+            validate_transition_xml_ids(self, None, Some(transition), true)?;
+            let name = unique_page_transition_style_name(
+                &self.content,
+                self.styles.as_deref(),
+                &parsed.pages,
+            )?;
+            page.set_style_name(Some(name.clone()));
+            Some((
+                name.clone(),
+                serialize_detached_page_style(&name, transition)?,
+            ))
         } else {
-            parsed.page_spans[position]
+            None
+        };
+        let styled_content = if let Some((_name, style_xml)) = generated_style.as_ref() {
+            insert_automatic_style(&self.content, style_xml)?
+        } else {
+            self.content.clone()
+        };
+        let styled_parsed = parse_content(&styled_content)?;
+        let at = if position == styled_parsed.pages.len() {
+            styled_parsed.drawing_insert_position
+        } else {
+            styled_parsed.page_spans[position]
                 .as_ref()
                 .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))?
                 .start
         };
         let xml = serialize_page(&page)?;
-        let content = insert_child_xml(&self.content, at, &xml)?;
+        let content = insert_child_xml(&styled_content, at, &xml)?;
         self.invalidate_content_splices();
         self.content = content;
+        if let Some((name, _style_xml)) = generated_style {
+            self.changes
+                .push(Change::Structure(StructureChange::StyleInserted { name }));
+        }
         self.changes
             .push(Change::Structure(StructureChange::PageInserted {
                 position,
@@ -1926,12 +2193,24 @@ impl Transaction {
     ///
     /// # Errors
     ///
-    /// Returns an error for invalid selectors, undeclared layers, or limits.
+    /// Returns an error for invalid selectors, undeclared layers, inert-only
+    /// shape kinds, or limits.
     #[allow(
         clippy::needless_pass_by_value,
         reason = "detached shape values transfer ownership into the transaction"
     )]
     pub fn insert_shape(&mut self, page: usize, position: usize, shape: Shape) -> Result<()> {
+        if shape.kind().is_three_dimensional() {
+            return Err(Error::Unsupported(
+                "ODG 3D shapes are inert read-only owners".into(),
+            ));
+        }
+        if shape.source_backed() {
+            return Err(Error::Unsupported(
+                "ODG parsed shapes require prepare_shape_transfer for source-preserving insertion"
+                    .into(),
+            ));
+        }
         let parsed = parse_content(&self.content)?;
         let selected_page = parsed
             .pages
@@ -2325,6 +2604,7 @@ impl Transaction {
         transfer: &ShapeTransfer,
     ) -> Result<()> {
         ShapeTransfer::validate_destination(&self.content, page)?;
+        transfer.validate_aggregate()?;
         let mut transfer_xml = transfer.xml.clone();
         let mut resource_remaps = BTreeMap::new();
         for resource in &transfer.resources {
@@ -2390,7 +2670,14 @@ impl Transaction {
             }
             resource_xml = ensure_transfer_namespaces(
                 &resource_xml,
-                &[("draw", DRAW), ("svg", SVG), ("xlink", XLINK)],
+                &[
+                    ("draw", DRAW),
+                    ("svg", SVG),
+                    ("xlink", XLINK),
+                    ("dr3d", DR3D),
+                    ("table", TABLE),
+                    ("smil", SMIL),
+                ],
             )?;
             let content = insert_automatic_style(&self.content, &resource_xml)?;
             self.invalidate_content_splices();
@@ -2486,7 +2773,15 @@ impl Transaction {
             }
             style_xml = ensure_transfer_namespaces(
                 &style_xml,
-                &[("style", STYLE), ("draw", DRAW), ("svg", SVG), ("fo", FO)],
+                &[
+                    ("style", STYLE),
+                    ("draw", DRAW),
+                    ("svg", SVG),
+                    ("fo", FO),
+                    ("presentation", PRESENTATION),
+                    ("smil", SMIL),
+                    ("xlink", XLINK),
+                ],
             )?;
             let content = insert_automatic_style(&self.content, &style_xml)?;
             self.invalidate_content_splices();
@@ -2576,6 +2871,9 @@ impl Transaction {
                 ("fo", FO),
                 ("xlink", XLINK),
                 ("presentation", PRESENTATION),
+                ("dr3d", DR3D),
+                ("table", TABLE),
+                ("smil", SMIL),
             ],
         )?;
         let initial = parse_content(&self.content)?;
@@ -2999,18 +3297,43 @@ impl Transaction {
         {
             return invalid("ODG transferred form-control identifier is already present");
         }
+        if xml.len() > MAX_OUTPUT_BYTES {
+            return invalid("ODG transferred form-control exceeds the output limit");
+        }
         let content = if let Some(at) = parsed.forms_insert_position {
-            let form_xml = format!(
-                "<form:form xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" form:name=\"Litchi\">{xml}</form:form>",
+            let prefix = format!(
+                "<form:form xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" form:name=\"Litchi\">",
                 std::str::from_utf8(FORM).unwrap_or_default()
             );
+            let suffix = "</form:form>";
+            let capacity = prefix
+                .len()
+                .checked_add(xml.len())
+                .and_then(|size| size.checked_add(suffix.len()))
+                .ok_or_else(|| Error::InvalidFormat("ODG transferred form size overflow".into()))?;
+            let mut form_xml =
+                precharge_xml_capacity(prefix, capacity, "ODG transferred form-control")?;
+            form_xml.push_str(xml);
+            form_xml.push_str(suffix);
             insert_child_xml(&self.content, at, &form_xml)?
         } else {
-            let forms_xml = format!(
-                "<office:forms xmlns:office=\"{}\" xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><form:form form:name=\"Litchi\">{xml}</form:form></office:forms>",
+            let prefix = format!(
+                "<office:forms xmlns:office=\"{}\" xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><form:form form:name=\"Litchi\">",
                 std::str::from_utf8(OFFICE).unwrap_or_default(),
                 std::str::from_utf8(FORM).unwrap_or_default()
             );
+            let suffix = "</form:form></office:forms>";
+            let capacity = prefix
+                .len()
+                .checked_add(xml.len())
+                .and_then(|size| size.checked_add(suffix.len()))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transferred forms size overflow".into())
+                })?;
+            let mut forms_xml =
+                precharge_xml_capacity(prefix, capacity, "ODG transferred form-controls")?;
+            forms_xml.push_str(xml);
+            forms_xml.push_str(suffix);
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
@@ -3029,12 +3352,15 @@ impl Transaction {
     ///
     /// Returns an error when source policy, rebuilding, parsing, or typed readback fails.
     pub fn commit(self) -> Result<Commit> {
-        if self.content == self.source.content_xml() && self.resource_edits.is_empty() {
+        if self.content == self.source.content_xml()
+            && self.styles == self.source.styles_xml().map(str::to_owned)
+            && self.resource_edits.is_empty()
+        {
             return Ok(Commit::unchanged(self.source));
         }
         enforce_security_policy(&self.source, self.security_policy)?;
         enforce_active_content_policy(&self.source, self.active_content_policy)?;
-        let target_active_content = scan_active_content(&self.content, self.source.styles_xml())?;
+        let target_active_content = scan_active_content(&self.content, self.styles.as_deref())?;
         if self.active_content_policy == ActiveContentWritePolicy::Refuse
             && target_active_content.is_present()
         {
@@ -3051,6 +3377,16 @@ impl Transaction {
                 bytes: edit.after_bytes.as_deref(),
             })
             .collect::<Vec<_>>();
+        // An untouched styles.xml must remain an archive copy.  Passing it as
+        // replacement would make PackageWriter revalidate producer
+        // formatting that was never edited, and would reject otherwise valid
+        // packages with noncompact styles.xml.  A changed styles.xml is still
+        // published through the normal compact replacement path.
+        let published_styles = if self.styles.as_deref() == self.source.styles_xml() {
+            None
+        } else {
+            self.styles.as_deref()
+        };
         let requires_package_projection;
         let rebuilt = if let Some(splices) = &self.content_splices {
             requires_package_projection = self.source.security().is_signed()
@@ -3059,6 +3395,7 @@ impl Transaction {
             rebuild_spliced(
                 &self.source,
                 publication,
+                published_styles,
                 &replacements,
                 self.security_policy,
             )?
@@ -3069,6 +3406,7 @@ impl Transaction {
             rebuild(
                 &self.source,
                 &self.content,
+                published_styles,
                 &replacements,
                 self.security_policy,
             )?
@@ -3080,6 +3418,9 @@ impl Transaction {
         };
         if snapshot.content_xml() != self.content {
             return invalid("ODG package edit failed exact content readback");
+        }
+        if snapshot.styles_xml() != self.styles.as_deref() {
+            return invalid("ODG package edit failed exact styles readback");
         }
         for edit in &self.resource_edits {
             let archive = snapshot.0.package.package().package()?;
@@ -3127,6 +3468,7 @@ pub enum Change {
     Path(PathChange),
     PageName(PageNameChange),
     PageStyle(PageStyleChange),
+    PageTransition(Box<PageTransitionChange>),
     Structure(StructureChange),
 }
 
@@ -3177,6 +3519,34 @@ impl PageStyleChange {
     #[must_use]
     pub fn after(&self) -> &str {
         &self.after
+    }
+}
+
+/// One reversible inert drawing-page transition change.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PageTransitionChange {
+    page: usize,
+    before: Option<Transition>,
+    after: Option<Transition>,
+}
+
+impl PageTransitionChange {
+    /// The zero-based source-order page position.
+    #[must_use]
+    pub const fn page(&self) -> usize {
+        self.page
+    }
+
+    /// Transition metadata expected before application.
+    #[must_use]
+    pub const fn before(&self) -> Option<&Transition> {
+        self.before.as_ref()
+    }
+
+    /// Transition metadata produced after application.
+    #[must_use]
+    pub const fn after(&self) -> Option<&Transition> {
+        self.after.as_ref()
     }
 }
 
@@ -3639,6 +4009,7 @@ impl Patch {
             | Change::Path(_)
             | Change::PageName(_)
             | Change::PageStyle(_)
+            | Change::PageTransition(_)
             | Change::Structure(_) => None,
         })
     }
@@ -3656,6 +4027,7 @@ impl Patch {
             | Change::Path(_)
             | Change::PageName(_)
             | Change::PageStyle(_)
+            | Change::PageTransition(_)
             | Change::Structure(_) => None,
         })
     }
@@ -3668,6 +4040,25 @@ impl Patch {
             Change::ControlReference(_)
             | Change::Text(_)
             | Change::Name(_)
+            | Change::Geometry(_)
+            | Change::Style(_)
+            | Change::Path(_)
+            | Change::PageName(_)
+            | Change::PageStyle(_)
+            | Change::PageTransition(_)
+            | Change::Structure(_) => None,
+        })
+    }
+
+    /// The semantic page transition change, when present.
+    #[must_use]
+    pub fn page_transition_change(&self) -> Option<&PageTransitionChange> {
+        self.changes.iter().find_map(|change| match change {
+            Change::PageTransition(value) => Some(value.as_ref()),
+            Change::ControlReference(_)
+            | Change::Text(_)
+            | Change::Name(_)
+            | Change::Layer(_)
             | Change::Geometry(_)
             | Change::Style(_)
             | Change::Path(_)
@@ -3839,7 +4230,45 @@ pub struct ShapeTransfer {
     resources: Vec<TransferResource>,
 }
 
+#[derive(Default)]
+struct TransferBudget {
+    bytes: usize,
+}
+
+impl TransferBudget {
+    fn charge(&mut self, bytes: usize, owner: &str) -> Result<()> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or_else(|| Error::InvalidFormat(format!("{owner} size overflow")))?;
+        if self.bytes > MAX_OUTPUT_BYTES {
+            return invalid(format!("{owner} aggregate exceeds the output limit"));
+        }
+        Ok(())
+    }
+}
+
 impl ShapeTransfer {
+    fn validate_aggregate(&self) -> Result<()> {
+        let mut budget = TransferBudget::default();
+        budget.charge(self.xml.len(), "ODG transfer XML")?;
+        for style in &self.style_definitions {
+            budget.charge(style.xml.len(), "ODG transfer XML")?;
+        }
+        for resource in &self.style_resources {
+            budget.charge(resource.xml.len(), "ODG transfer XML")?;
+        }
+        for control in &self.control_definitions {
+            budget.charge(control.xml.len(), "ODG transfer XML")?;
+        }
+        for resource in &self.resources {
+            if let Some(bytes) = &resource.bytes {
+                budget.charge(bytes.len(), "ODG transfer resources")?;
+            }
+        }
+        Ok(())
+    }
+
     /// Root shape semantics retained by the transfer.
     #[must_use]
     pub const fn shape(&self) -> &Shape {
@@ -4192,6 +4621,12 @@ fn change_operation(
             serde_json::Value::String(value.before.clone()),
             serde_json::Value::String(value.after.clone()),
         ),
+        Change::PageTransition(value) => (
+            "page.transition.set",
+            format!("page/{}", value.page),
+            transition_value(value.before.as_ref()),
+            transition_value(value.after.as_ref()),
+        ),
         Change::Structure(_) => {
             return invalid("structural ODG change requires package replacement projection");
         },
@@ -4205,6 +4640,137 @@ fn change_operation(
         before,
         after,
     )
+}
+
+fn transition_value(value: Option<&Transition>) -> serde_json::Value {
+    let Some(value) = value else {
+        return serde_json::Value::Null;
+    };
+    let mut object = serde_json::Map::new();
+    let fields = [
+        ("transition_type", value.transition_type()),
+        ("style", value.style()),
+        ("speed", value.speed()),
+        ("smil_type", value.smil_type()),
+        ("smil_subtype", value.smil_subtype()),
+        ("direction", value.direction()),
+        ("fade_color", value.fade_color()),
+        ("duration", value.duration()),
+    ];
+    for (name, field) in fields {
+        if let Some(field) = field {
+            object.insert(name.to_owned(), serde_json::Value::String(field.to_owned()));
+        }
+    }
+    if let Some(sound) = value.sound() {
+        let mut sound_object = serde_json::Map::new();
+        sound_object.insert(
+            "href".to_owned(),
+            serde_json::Value::String(sound.href().to_owned()),
+        );
+        if let Some(play_full) = sound.play_full() {
+            sound_object.insert("play_full".to_owned(), serde_json::Value::Bool(play_full));
+        }
+        if sound.actuate_on_request() {
+            sound_object.insert(
+                "actuate_on_request".to_owned(),
+                serde_json::Value::Bool(true),
+            );
+        }
+        if let Some(show) = sound.show() {
+            sound_object.insert(
+                "show".to_owned(),
+                serde_json::Value::String(show.to_owned()),
+            );
+        }
+        if let Some(xml_id) = sound.xml_id() {
+            sound_object.insert(
+                "xml_id".to_owned(),
+                serde_json::Value::String(xml_id.to_owned()),
+            );
+        }
+        object.insert("sound".to_owned(), serde_json::Value::Object(sound_object));
+    }
+    serde_json::Value::Object(object)
+}
+
+fn transition_from_value(value: &serde_json::Value) -> Result<Option<Transition>> {
+    let Some(object) = value.as_object() else {
+        if value.is_null() {
+            return Ok(None);
+        }
+        return invalid("ODG durable page transition value is not an object");
+    };
+    let mut transition = Transition::new();
+    transition.set_transition_type(transition_string(object, "transition_type")?)?;
+    transition.set_style(transition_string(object, "style")?)?;
+    transition.set_speed(transition_string(object, "speed")?)?;
+    transition.set_smil_type(transition_string(object, "smil_type")?)?;
+    transition.set_smil_subtype(transition_string(object, "smil_subtype")?)?;
+    transition.set_direction(transition_string(object, "direction")?)?;
+    transition.set_fade_color(transition_string(object, "fade_color")?)?;
+    transition.set_duration(transition_string(object, "duration")?)?;
+    if let Some(value) = object.get("sound") {
+        if !value.is_null() {
+            let sound = value.as_object().ok_or_else(|| {
+                Error::InvalidFormat("ODG durable transition sound is not an object".into())
+            })?;
+            let href = required_transition_string(sound, "href")?;
+            let sound = crate::transition::Sound::new(href)?
+                .with_play_full(transition_bool(sound, "play_full")?)
+                .with_actuate_on_request(
+                    transition_bool(sound, "actuate_on_request")?.unwrap_or(false),
+                )
+                .with_show(transition_string(sound, "show")?)?
+                .with_xml_id(transition_string(sound, "xml_id")?)?;
+            transition.set_sound(Some(sound));
+        }
+    }
+    Ok((!transition.is_empty()).then_some(transition))
+}
+
+fn transition_string(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<Option<String>> {
+    let Some(value) = object.get(key) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    value
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            Error::InvalidFormat(format!("ODG durable transition {key} is not a string"))
+        })
+        .map(Some)
+}
+
+fn required_transition_string(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<String> {
+    transition_string(object, key)?.ok_or_else(|| {
+        Error::InvalidFormat(format!("ODG durable transition sound {key} is missing"))
+    })
+}
+
+fn transition_bool(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<Option<bool>> {
+    let Some(value) = object.get(key) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    value
+        .as_bool()
+        .ok_or_else(|| Error::InvalidFormat(format!("ODG durable transition {key} is not boolean")))
+        .map(Some)
 }
 
 fn string_value(operation: &PatchOperation) -> Result<&str> {
@@ -4312,6 +4878,12 @@ fn apply_durable_patch(
                 edit.set_page_style_name(
                     parse_page_target(&operation.target)?,
                     string_value(operation)?,
+                )?;
+            },
+            "page.transition.set" => {
+                edit.set_page_transition(
+                    parse_page_target(&operation.target)?,
+                    transition_from_value(&operation.value)?,
                 )?;
             },
             "shape.geometry.set" => {
@@ -4444,6 +5016,7 @@ fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
             "package.replace"
                 | "page.name.set"
                 | "page.style.set"
+                | "page.transition.set"
                 | "shape.geometry.set"
                 | "shape.control.set"
                 | "shape.layer.set"
@@ -4484,6 +5057,10 @@ fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
             "page.name.set" | "page.style.set" => {
                 parse_page_target(&operation.target)?;
                 string_value(operation)?;
+            },
+            "page.transition.set" => {
+                parse_page_target(&operation.target)?;
+                transition_from_value(&operation.value)?;
             },
             _ => {
                 parse_shape_target(&operation.target)?;
@@ -4553,6 +5130,7 @@ struct ActiveShape {
     page: usize,
     shape: usize,
     start: usize,
+    kind: ShapeKind,
 }
 
 struct ActiveFormControl {
@@ -4766,10 +5344,18 @@ impl Scanner {
                 return invalid("ODG form-control identifier is duplicated");
             }
             let control = self.form_controls.len();
+            let element_name = std::str::from_utf8(local).map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG form-control element name: {error}"))
+            })?;
+            let element_name = clone_bounded_string(
+                element_name,
+                MAX_TEXT_BYTES,
+                "ODG form-control element name",
+            )?;
             self.form_controls.push(FormControl::parsed(
                 identifier,
                 attribute(reader, element, FORM, b"name")?,
-                String::from_utf8_lossy(local).into_owned(),
+                element_name,
                 arbitrary_attributes(
                     reader,
                     element,
@@ -4832,6 +5418,7 @@ impl Scanner {
                 attribute(reader, element, XML, b"id")?,
                 attribute(reader, element, DRAW, b"style-name")?,
                 attribute(reader, element, DRAW, b"master-page-name")?,
+                None,
             ));
             self.text_spans.push(Vec::new());
             self.control_spans.push(Vec::new());
@@ -4866,6 +5453,52 @@ impl Scanner {
             let page = self.current_page().ok_or_else(|| {
                 Error::InvalidFormat("ODG drawing shape is outside draw:page".to_string())
             })?;
+            let direct_parent = self
+                .active_shapes
+                .last()
+                .filter(|parent| parent.depth.checked_add(1) == Some(self.depth));
+            if kind == ShapeKind::ThreeDimensionalScene {
+                if let Some(parent) = direct_parent {
+                    return invalid(if parent.kind == ShapeKind::ThreeDimensionalScene {
+                        "ODG dr3d:scene cannot be nested in another scene"
+                    } else {
+                        "ODG dr3d:scene has an invalid parent"
+                    });
+                }
+            } else if kind.is_three_dimensional()
+                && !direct_parent
+                    .is_some_and(|parent| parent.kind == ShapeKind::ThreeDimensionalScene)
+            {
+                return invalid("ODG 3D drawing objects require a dr3d:scene parent");
+            } else if self
+                .active_shapes
+                .last()
+                .is_some_and(|parent| parent.kind == ShapeKind::ThreeDimensionalScene)
+                && !kind.is_three_dimensional()
+            {
+                return invalid("ODG dr3d:scene contains a non-3D drawing object");
+            }
+            if kind.is_three_dimensional() {
+                validate_three_dimensional_attributes(reader, element, kind)?;
+            }
+            if kind == ShapeKind::ThreeDimensionalLight {
+                let direction =
+                    required_attribute(reader, element, DR3D, b"direction", "dr3d:light")?;
+                if !is_vector3d(&direction) {
+                    return invalid("ODG dr3d:light direction is not a vector3D");
+                }
+            }
+            if matches!(
+                kind,
+                ShapeKind::ThreeDimensionalExtrude | ShapeKind::ThreeDimensionalRotate
+            ) {
+                let view_box =
+                    required_attribute(reader, element, SVG, b"viewBox", "dr3d path shape")?;
+                let _path_data = required_attribute(reader, element, SVG, b"d", "dr3d path shape")?;
+                if !is_integer_list(&view_box, 4) {
+                    return invalid("ODG 3D path shape viewBox is not four integers");
+                }
+            }
             if self.shape_count >= MAX_SHAPES {
                 return invalid("ODG shape count exceeds the limit");
             }
@@ -4890,6 +5523,13 @@ impl Scanner {
                 attribute(reader, element, SVG, b"x2")?,
                 attribute(reader, element, SVG, b"y2")?,
             ];
+            validate_shape_lexical_attributes(
+                kind,
+                &geometry,
+                &line_geometry,
+                attribute(reader, element, SVG, b"viewBox")?.as_deref(),
+                attribute(reader, element, DRAW, b"points")?.as_deref(),
+            )?;
             let shape = self.pages[page].shapes().len();
             self.pages[page].push_shape(Shape::parsed(
                 ShapeProperties {
@@ -4959,6 +5599,7 @@ impl Scanner {
                     page,
                     shape,
                     start: tag_start,
+                    kind,
                 });
             }
             return Ok(());
@@ -5205,6 +5846,7 @@ impl Scanner {
 }
 
 fn parse_content(xml: &str) -> Result<Parsed> {
+    validate_raw_xml_events(xml, "ODG content.xml event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut scanner = Scanner::new();
@@ -5214,9 +5856,9 @@ fn parse_content(xml: &str) -> Result<Parsed> {
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid ODG content.xml: {error}")))?;
         let namespace = classify(&resolved_namespace);
-        let event = borrowed_event.into_owned();
+        validate_borrowed_xml_event(&borrowed_event, "ODG content.xml event")?;
         let end = position(&reader)?;
-        match event {
+        match borrowed_event {
             Event::Start(element) => scanner.start(
                 &reader,
                 namespace,
@@ -5255,13 +5897,1682 @@ fn parse_content(xml: &str) -> Result<Parsed> {
                 scanner.text(None, &value)?;
             },
             Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODG content.xml"),
-            Event::Eof => return scanner.finish(),
+            Event::Eof => {
+                let mut parsed = scanner.finish()?;
+                parse_enhanced_geometry(xml, &mut parsed)?;
+                parse_shape_auxiliary_children(xml, &mut parsed)?;
+                return Ok(parsed);
+            },
             Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
         }
     }
 }
 
+/// Admit one borrowed quick-xml event before any parser path can call
+/// `into_owned` or retain one of its fields. The reader normally exposes
+/// borrowed slices, but `Event::into_owned` clones every variant, including
+/// comments, processing instructions, and oversized start-tag attributes that
+/// this family ignores. Checking the raw event and each raw attribute here
+/// keeps those ignored inputs bounded just like semantic fields.
+fn validate_borrowed_xml_event(event: &Event<'_>, owner: &str) -> Result<()> {
+    match event {
+        Event::Start(element) | Event::Empty(element) => {
+            validate_raw_xml_value(element.as_ref(), owner)?;
+            for raw_attribute in element.attributes() {
+                let attribute = raw_attribute.map_err(|error| {
+                    Error::InvalidFormat(format!("invalid {owner} attribute: {error}"))
+                })?;
+                validate_raw_xml_value(attribute.key.as_ref(), owner)?;
+                validate_raw_xml_value(attribute.value.as_ref(), owner)?;
+            }
+        },
+        Event::End(element) => validate_raw_xml_value(element.as_ref(), owner)?,
+        Event::Text(text) | Event::Comment(text) | Event::DocType(text) => {
+            validate_raw_xml_value(text.as_ref(), owner)?;
+        },
+        Event::CData(text) => validate_raw_xml_value(text.as_ref(), owner)?,
+        Event::Decl(declaration) => validate_raw_xml_value(declaration.as_ref(), owner)?,
+        Event::PI(instruction) => validate_raw_xml_value(instruction.as_ref(), owner)?,
+        Event::GeneralRef(reference) => validate_raw_xml_value(reference.as_ref(), owner)?,
+        Event::Eof => {},
+    }
+    Ok(())
+}
+
+/// Admit every raw event before handing the same XML to `NsReader`.
+///
+/// `NsReader::read_event` updates its namespace stack while reading a start
+/// tag, and `read_resolved_event` can clone an unknown prefix while resolving
+/// the element name. The raw reader has neither behaviour: it only borrows
+/// the event from the source. Running this admission pass first therefore
+/// makes the per-event byte limit apply before namespace bookkeeping can own a
+/// prefix or declaration value.
+fn validate_raw_xml_events(xml: &str, owner: &str) -> Result<()> {
+    validate_xml_source_size(xml, owner)?;
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::InvalidFormat(format!("invalid {owner}: {error}")))?;
+        validate_borrowed_xml_event(&event, owner)?;
+        match event {
+            Event::Start(_) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat(format!("{owner} depth overflow")))?;
+                if depth > MAX_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "{owner} nesting exceeds the limit"
+                    )));
+                }
+            },
+            Event::Empty(_) => {
+                let virtual_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidFormat(format!("{owner} depth overflow")))?;
+                if virtual_depth > MAX_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "{owner} nesting exceeds the limit"
+                    )));
+                }
+            },
+            Event::End(_) => {
+                depth = depth.saturating_sub(1);
+            },
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+            Event::Eof => break,
+        }
+    }
+    Ok(())
+}
+
+struct ActiveEnhancedGeometry {
+    page: usize,
+    shape: usize,
+    depth: usize,
+    attributes: Vec<DrawingAttribute>,
+    children: Vec<EnhancedGeometryChild>,
+}
+
+struct ActiveAuxiliaryShape {
+    page: usize,
+    shape: usize,
+    depth: usize,
+    kind: ShapeKind,
+    frame_auxiliary_phase: u8,
+    frame_event_listeners_seen: bool,
+    frame_title_seen: bool,
+    frame_description_seen: bool,
+    image_map_seen: bool,
+    contour_seen: bool,
+    three_d_child_phase: u8,
+}
+
+fn parse_enhanced_geometry(xml: &str, parsed: &mut Parsed) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG enhanced-geometry event")?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    let mut next_page = 0usize;
+    let mut current_page = None;
+    let mut current_page_depth = None;
+    let mut shape_positions = vec![0usize; parsed.pages.len()];
+    let mut active_shapes = Vec::new();
+    let mut active_geometry = None;
+    let mut active_empty_child_depth = None;
+    let mut attribute_count = 0usize;
+    loop {
+        let (resolved_namespace, borrowed_event) =
+            reader.read_resolved_event().map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG enhanced-geometry XML: {error}"))
+            })?;
+        let namespace = classify(&resolved_namespace);
+        validate_borrowed_xml_event(&borrowed_event, "ODG enhanced-geometry event")?;
+        match borrowed_event {
+            Event::Start(element) => {
+                depth = checked_xml_depth(depth)?;
+                if active_empty_child_depth.is_some() {
+                    return invalid("ODG enhanced-geometry equation or handle has child elements");
+                }
+                let local = element.local_name();
+                if namespace == NamespaceKind::Draw && local.as_ref() == b"page" {
+                    if current_page.is_some() || next_page >= parsed.pages.len() {
+                        return invalid("ODG enhanced-geometry page scope is invalid");
+                    }
+                    current_page = Some(next_page);
+                    current_page_depth = Some(depth);
+                    next_page = next_page.saturating_add(1);
+                } else if let Some(kind) = shape_kind(namespace, local.as_ref()) {
+                    let page = current_page.ok_or_else(|| {
+                        Error::InvalidFormat("ODG enhanced shape is outside draw:page".into())
+                    })?;
+                    let shape = shape_positions[page];
+                    shape_positions[page] = shape.saturating_add(1);
+                    if shape >= parsed.pages[page].shapes().len() {
+                        return invalid("ODG enhanced shape source order is invalid");
+                    }
+                    active_shapes.push(ActiveAuxiliaryShape {
+                        page,
+                        shape,
+                        depth,
+                        kind,
+                        frame_auxiliary_phase: 0,
+                        frame_event_listeners_seen: false,
+                        frame_title_seen: false,
+                        frame_description_seen: false,
+                        image_map_seen: false,
+                        contour_seen: false,
+                        three_d_child_phase: 0,
+                    });
+                } else if namespace == NamespaceKind::Draw
+                    && local.as_ref() == b"enhanced-geometry"
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.kind == ShapeKind::Custom && shape.depth.saturating_add(1) == depth
+                    })
+                {
+                    if active_geometry.is_some() {
+                        return invalid("ODG custom shape has duplicate enhanced geometry");
+                    }
+                    let shape = active_shapes.last().ok_or_else(|| {
+                        Error::InvalidFormat("ODG enhanced geometry has no owner".into())
+                    })?;
+                    if parsed.pages[shape.page].shapes()[shape.shape]
+                        .enhanced_geometry()
+                        .is_some()
+                    {
+                        return invalid("ODG custom shape has duplicate enhanced geometry");
+                    }
+                    let attributes = drawing_attributes(&reader, &element, &mut attribute_count)?;
+                    validate_enhanced_geometry_attributes(&attributes)?;
+                    active_geometry = Some(ActiveEnhancedGeometry {
+                        page: shape.page,
+                        shape: shape.shape,
+                        depth,
+                        attributes,
+                        children: Vec::new(),
+                    });
+                } else if let Some(kind) = enhanced_child_kind(namespace, local.as_ref())
+                    && active_geometry
+                        .as_ref()
+                        .is_some_and(|geometry| geometry.depth.saturating_add(1) == depth)
+                {
+                    let attributes = drawing_attributes(&reader, &element, &mut attribute_count)?;
+                    validate_enhanced_child_attributes(&attributes)?;
+                    if let Some(geometry) = active_geometry.as_mut() {
+                        geometry
+                            .children
+                            .push(EnhancedGeometryChild::parsed(kind, attributes));
+                    }
+                    active_empty_child_depth = Some(depth);
+                }
+            },
+            Event::Empty(element) => {
+                if active_empty_child_depth.is_some() {
+                    return invalid("ODG enhanced-geometry equation or handle has child elements");
+                }
+                let virtual_depth = checked_xml_depth(depth)?;
+                let local = element.local_name();
+                if namespace == NamespaceKind::Draw && local.as_ref() == b"page" {
+                    if next_page >= parsed.pages.len() {
+                        return invalid("ODG enhanced-geometry page scope is invalid");
+                    }
+                    next_page = next_page.saturating_add(1);
+                } else if let Some(kind) = shape_kind(namespace, local.as_ref()) {
+                    let page = current_page.ok_or_else(|| {
+                        Error::InvalidFormat("ODG enhanced shape is outside draw:page".into())
+                    })?;
+                    let shape = shape_positions[page];
+                    shape_positions[page] = shape.saturating_add(1);
+                    if shape >= parsed.pages[page].shapes().len() {
+                        return invalid("ODG enhanced shape source order is invalid");
+                    }
+                    let _ = kind;
+                } else if namespace == NamespaceKind::Draw
+                    && local.as_ref() == b"enhanced-geometry"
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.kind == ShapeKind::Custom
+                            && shape.depth.saturating_add(1) == virtual_depth
+                    })
+                {
+                    let shape = active_shapes.last().ok_or_else(|| {
+                        Error::InvalidFormat("ODG enhanced geometry has no owner".into())
+                    })?;
+                    if parsed.pages[shape.page].shapes()[shape.shape]
+                        .enhanced_geometry()
+                        .is_some()
+                    {
+                        return invalid("ODG custom shape has duplicate enhanced geometry");
+                    }
+                    let geometry = EnhancedGeometry::parsed(
+                        {
+                            let attributes =
+                                drawing_attributes(&reader, &element, &mut attribute_count)?;
+                            validate_enhanced_geometry_attributes(&attributes)?;
+                            attributes
+                        },
+                        Vec::new(),
+                    )?;
+                    parsed.pages[shape.page]
+                        .shape_mut(shape.shape)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("ODG enhanced shape is missing".into())
+                        })?
+                        .set_enhanced_geometry(geometry);
+                } else if let Some(kind) = enhanced_child_kind(namespace, local.as_ref())
+                    && active_geometry
+                        .as_ref()
+                        .is_some_and(|geometry| geometry.depth.saturating_add(1) == virtual_depth)
+                {
+                    let attributes = drawing_attributes(&reader, &element, &mut attribute_count)?;
+                    validate_enhanced_child_attributes(&attributes)?;
+                    if let Some(geometry) = active_geometry.as_mut() {
+                        geometry
+                            .children
+                            .push(EnhancedGeometryChild::parsed(kind, attributes));
+                    }
+                }
+            },
+            Event::End(element) => {
+                let local = element.local_name();
+                if active_empty_child_depth == Some(depth) {
+                    active_empty_child_depth = None;
+                }
+                if namespace == NamespaceKind::Draw
+                    && local.as_ref() == b"enhanced-geometry"
+                    && active_geometry
+                        .as_ref()
+                        .is_some_and(|geometry| geometry.depth == depth)
+                {
+                    let geometry = active_geometry.take().ok_or_else(|| {
+                        Error::InvalidFormat("ODG enhanced geometry source is missing".into())
+                    })?;
+                    let parsed_geometry =
+                        EnhancedGeometry::parsed(geometry.attributes, geometry.children)?;
+                    parsed.pages[geometry.page]
+                        .shape_mut(geometry.shape)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("ODG enhanced shape is missing".into())
+                        })?
+                        .set_enhanced_geometry(parsed_geometry);
+                }
+                if shape_kind(namespace, local.as_ref()).is_some()
+                    && active_shapes
+                        .last()
+                        .is_some_and(|shape| shape.depth == depth)
+                {
+                    active_shapes.pop();
+                }
+                if namespace == NamespaceKind::Draw
+                    && local.as_ref() == b"page"
+                    && current_page_depth == Some(depth)
+                {
+                    current_page = None;
+                    current_page_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODG enhanced XML depth underflow".into())
+                })?;
+            },
+            Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODG enhanced geometry"),
+            Event::Eof => break,
+            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
+            Event::GeneralRef(_) => {
+                if active_empty_child_depth.is_some() {
+                    return invalid(
+                        "ODG enhanced-geometry equation or handle must have empty content",
+                    );
+                }
+            },
+            Event::CData(text) => {
+                if active_empty_child_depth.is_some()
+                    && !text
+                        .as_ref()
+                        .iter()
+                        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                {
+                    return invalid(
+                        "ODG enhanced-geometry equation or handle must have empty content",
+                    );
+                }
+            },
+            Event::Text(text) => {
+                if active_empty_child_depth.is_some()
+                    && !text
+                        .as_ref()
+                        .iter()
+                        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                {
+                    return invalid(
+                        "ODG enhanced-geometry equation or handle must have empty content",
+                    );
+                }
+            },
+        }
+    }
+    if depth != 0
+        || current_page.is_some()
+        || !active_shapes.is_empty()
+        || active_geometry.is_some()
+        || active_empty_child_depth.is_some()
+    {
+        return invalid("ODG enhanced-geometry XML is incomplete");
+    }
+    Ok(())
+}
+
+struct ActiveAuxiliaryImage {
+    depth: usize,
+}
+
+struct ActiveAuxiliaryMap {
+    page: usize,
+    shape: usize,
+    depth: usize,
+    start: usize,
+    areas: Vec<ImageMapArea>,
+    bytes: usize,
+}
+
+struct ActiveAuxiliaryArea {
+    depth: usize,
+    start: usize,
+    area: ImageMapArea,
+}
+
+fn parse_shape_auxiliary_children(xml: &str, parsed: &mut Parsed) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG drawing-child event")?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    let mut next_page = 0usize;
+    let mut current_page = None;
+    let mut current_page_depth = None;
+    let mut shape_positions = vec![0usize; parsed.pages.len()];
+    let mut active_shapes: Vec<ActiveAuxiliaryShape> = Vec::new();
+    let mut active_image = None;
+    let mut active_map = None;
+    let mut active_area = None;
+    loop {
+        let start = position(&reader)?;
+        let (resolved_namespace, borrowed_event) =
+            reader.read_resolved_event().map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG drawing-child XML: {error}"))
+            })?;
+        let namespace = classify(&resolved_namespace);
+        validate_borrowed_xml_event(&borrowed_event, "ODG drawing-child event")?;
+        let end = position(&reader)?;
+        match borrowed_event {
+            Event::Start(element) => {
+                depth = checked_xml_depth(depth)?;
+                let local = element.local_name();
+                if namespace == NamespaceKind::Draw && local.as_ref() == b"page" {
+                    if current_page.is_some() || next_page >= parsed.pages.len() {
+                        return invalid("ODG drawing-child page scope is invalid");
+                    }
+                    current_page = Some(next_page);
+                    current_page_depth = Some(depth);
+                    next_page = next_page.saturating_add(1);
+                } else if let Some(kind) = shape_kind(namespace, local.as_ref()) {
+                    let page = current_page.ok_or_else(|| {
+                        Error::InvalidFormat("ODG drawing shape is outside draw:page".into())
+                    })?;
+                    update_auxiliary_shape_parent_order(&mut active_shapes, depth, kind)?;
+                    let shape = next_auxiliary_shape(&mut shape_positions, parsed, page)?;
+                    active_shapes.push(ActiveAuxiliaryShape {
+                        page,
+                        shape,
+                        depth,
+                        kind,
+                        frame_auxiliary_phase: 0,
+                        frame_event_listeners_seen: false,
+                        frame_title_seen: false,
+                        frame_description_seen: false,
+                        image_map_seen: false,
+                        contour_seen: false,
+                        three_d_child_phase: 0,
+                    });
+                } else if is_frame_payload(namespace, local.as_ref())
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.kind == ShapeKind::Frame && shape.depth.saturating_add(1) == depth
+                    })
+                {
+                    let frame = active_shapes.last_mut().ok_or_else(|| {
+                        Error::InvalidFormat("ODG frame payload has no frame owner".into())
+                    })?;
+                    if frame.frame_auxiliary_phase != 0 {
+                        return invalid("ODG draw:frame payload is out of order");
+                    }
+                } else if namespace == NamespaceKind::Draw
+                    && local.as_ref() == b"image"
+                    && active_shapes
+                        .last()
+                        .is_some_and(|shape| shape.depth.saturating_add(1) == depth)
+                {
+                    if let Some(shape) = active_shapes.last_mut().filter(|shape| {
+                        shape.kind == ShapeKind::Frame && shape.depth.saturating_add(1) == depth
+                    }) && shape.frame_auxiliary_phase != 0
+                    {
+                        return invalid("ODG draw:image is out of draw:frame order");
+                    }
+                    if active_image.is_some() {
+                        return invalid("ODG draw:image owner is duplicated");
+                    }
+                    let shape = active_shapes.last().ok_or_else(|| {
+                        Error::InvalidFormat("ODG draw:image has no drawing owner".into())
+                    })?;
+                    if shape.kind != ShapeKind::Frame {
+                        return invalid("ODG draw:image must be owned by draw:frame");
+                    }
+                    active_image = Some(ActiveAuxiliaryImage { depth });
+                } else if namespace == NamespaceKind::Draw && local.as_ref() == b"image-map" {
+                    {
+                        let shape = active_shapes
+                            .last_mut()
+                            .filter(|shape| {
+                                shape.kind == ShapeKind::Frame
+                                    && shape.depth.saturating_add(1) == depth
+                            })
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODG draw:image-map must be a direct draw:frame child".into(),
+                                )
+                            })?;
+                        if shape.image_map_seen || shape.frame_auxiliary_phase > 2 {
+                            return invalid("ODG draw:image-map is duplicated or out of order");
+                        }
+                        shape.image_map_seen = true;
+                        shape.frame_auxiliary_phase = 3;
+                    }
+                    let (page, shape) =
+                        auxiliary_image_owner(&active_shapes, depth).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODG draw:image-map must be a direct draw:frame child".into(),
+                            )
+                        })?;
+                    if active_map.is_some() {
+                        return invalid("ODG draw:image-map owner is duplicated");
+                    }
+                    active_map = Some(ActiveAuxiliaryMap {
+                        page,
+                        shape,
+                        depth,
+                        start,
+                        areas: Vec::new(),
+                        bytes: 0,
+                    });
+                } else if area_kind(namespace, local.as_ref()).is_some() {
+                    let map = active_map
+                        .as_ref()
+                        .filter(|map| map.depth.saturating_add(1) == depth)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("ODG image-map area has no map owner".into())
+                        })?;
+                    if map.areas.len() >= 65_536 {
+                        return invalid("ODG image-map area count exceeds the limit");
+                    }
+                    let area = parse_image_map_area(&reader, &element, start..end, xml)?;
+                    active_area = Some(ActiveAuxiliaryArea { depth, start, area });
+                } else if namespace == NamespaceKind::Office
+                    && local.as_ref() == b"event-listeners"
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.kind == ShapeKind::Frame && shape.depth.saturating_add(1) == depth
+                    })
+                {
+                    let frame = active_shapes.last_mut().ok_or_else(|| {
+                        Error::InvalidFormat("ODG frame event-listeners has no owner".into())
+                    })?;
+                    if frame.frame_event_listeners_seen || frame.frame_auxiliary_phase != 0 {
+                        return invalid("ODG draw:frame event-listeners are out of order");
+                    }
+                    frame.frame_event_listeners_seen = true;
+                    frame.frame_auxiliary_phase = 1;
+                } else if namespace == NamespaceKind::Svg
+                    && matches!(local.as_ref(), b"title" | b"desc")
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.depth.saturating_add(1) == depth
+                            && matches!(
+                                shape.kind,
+                                ShapeKind::Frame | ShapeKind::ThreeDimensionalScene
+                            )
+                    })
+                {
+                    let shape = active_shapes.last_mut().ok_or_else(|| {
+                        Error::InvalidFormat("ODG accessibility element has no owner".into())
+                    })?;
+                    if shape.kind == ShapeKind::Frame {
+                        if local.as_ref() == b"title" {
+                            if shape.frame_title_seen || shape.frame_auxiliary_phase > 3 {
+                                return invalid("ODG draw:frame title is out of order");
+                            }
+                            shape.frame_title_seen = true;
+                            shape.frame_auxiliary_phase = 4;
+                        } else {
+                            if shape.frame_description_seen
+                                || !shape.frame_title_seen && shape.frame_auxiliary_phase > 4
+                            {
+                                return invalid("ODG draw:frame description is out of order");
+                            }
+                            shape.frame_description_seen = true;
+                            shape.frame_auxiliary_phase = 5;
+                        }
+                    } else if shape.three_d_child_phase != 0
+                        || (local.as_ref() == b"title" && shape.frame_title_seen)
+                        || (local.as_ref() == b"desc" && shape.frame_description_seen)
+                        || (local.as_ref() == b"desc" && !shape.frame_title_seen)
+                    {
+                        return invalid("ODG dr3d:scene accessibility is out of order");
+                    } else if local.as_ref() == b"title" {
+                        shape.frame_title_seen = true;
+                    } else {
+                        shape.frame_description_seen = true;
+                    }
+                }
+                // RNG empty content also permits paired XML tags. Consume the
+                // closing tag without allowing child elements or text content.
+                if namespace == NamespaceKind::Draw
+                    && matches!(local.as_ref(), b"contour-polygon" | b"contour-path")
+                {
+                    {
+                        let shape = active_shapes
+                            .last_mut()
+                            .filter(|shape| {
+                                shape.kind == ShapeKind::Frame
+                                    && shape.depth.saturating_add(1) == depth
+                            })
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODG contour must be a direct draw:frame child".into(),
+                                )
+                            })?;
+                        if shape.contour_seen {
+                            return invalid("ODG draw:frame has duplicate contours");
+                        }
+                        shape.contour_seen = true;
+                        if shape.frame_auxiliary_phase > 5 {
+                            return invalid("ODG draw:frame contour is out of order");
+                        }
+                        shape.frame_auxiliary_phase = 6;
+                    }
+                    let (page, shape_index) = auxiliary_image_owner(&active_shapes, depth)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("ODG contour has no image owner".into())
+                        })?;
+                    let end = empty_auxiliary_end(&mut reader)?;
+                    let contour = parse_contour(&reader, &element, start..end, xml)?;
+                    let owner = parsed.pages[page].shape_mut(shape_index).ok_or_else(|| {
+                        Error::InvalidFormat("ODG contour shape is missing".into())
+                    })?;
+                    if owner.contours().len() >= 65_536 {
+                        return invalid("ODG contour count exceeds the limit");
+                    }
+                    owner.push_contour(contour);
+                    depth -= 1;
+                }
+                if namespace == NamespaceKind::Draw && local.as_ref() == b"glue-point" {
+                    if let Some(shape) = active_shapes.last_mut().filter(|shape| {
+                        shape.kind == ShapeKind::Frame && shape.depth.saturating_add(1) == depth
+                    }) {
+                        if shape.frame_auxiliary_phase > 1 {
+                            return invalid("ODG draw:glue-point is out of draw:frame order");
+                        }
+                        shape.frame_auxiliary_phase = 2;
+                    }
+                    let (page_index, shape_index, shape_kind) = {
+                        let shape = active_shapes
+                            .last()
+                            .filter(|shape| shape.depth.saturating_add(1) == depth)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODG glue point has no direct shape owner".into(),
+                                )
+                            })?;
+                        (shape.page, shape.shape, shape.kind)
+                    };
+                    if !allows_glue_point(shape_kind) {
+                        return invalid("ODG glue-point owner does not permit glue points");
+                    }
+                    if shape_kind == ShapeKind::ThreeDimensionalScene {
+                        let scene = active_shapes.last_mut().ok_or_else(|| {
+                            Error::InvalidFormat("ODG scene glue-point owner disappeared".into())
+                        })?;
+                        if scene.three_d_child_phase >= 3 {
+                            return invalid("ODG dr3d:scene glue-point is out of order");
+                        }
+                        scene.three_d_child_phase = 3;
+                    }
+                    let end = empty_auxiliary_end(&mut reader)?;
+                    let glue_point = parse_glue_point(&reader, &element, start..end, xml)?;
+                    let owner =
+                        parsed.pages[page_index]
+                            .shape_mut(shape_index)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat("ODG glue-point shape is missing".into())
+                            })?;
+                    if owner.glue_points().len() >= 65_536 {
+                        return invalid("ODG glue-point count exceeds the limit");
+                    }
+                    owner.push_glue_point(glue_point);
+                    depth -= 1;
+                }
+            },
+            Event::Empty(element) => {
+                let virtual_depth = checked_xml_depth(depth)?;
+                let local = element.local_name();
+                if namespace == NamespaceKind::Draw && local.as_ref() == b"page" {
+                    if next_page >= parsed.pages.len() {
+                        return invalid("ODG drawing-child page scope is invalid");
+                    }
+                    next_page = next_page.saturating_add(1);
+                } else if let Some(kind) = shape_kind(namespace, local.as_ref()) {
+                    let page = current_page.ok_or_else(|| {
+                        Error::InvalidFormat("ODG drawing shape is outside draw:page".into())
+                    })?;
+                    update_auxiliary_shape_parent_order(&mut active_shapes, virtual_depth, kind)?;
+                    let shape = next_auxiliary_shape(&mut shape_positions, parsed, page)?;
+                    if active_image.is_some() || active_map.is_some() || active_area.is_some() {
+                        return invalid("ODG nested drawing owner is misplaced");
+                    }
+                    let _ = kind;
+                    let _ = shape;
+                } else if is_frame_payload(namespace, local.as_ref())
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.kind == ShapeKind::Frame
+                            && shape.depth.saturating_add(1) == virtual_depth
+                    })
+                {
+                    let frame = active_shapes.last().ok_or_else(|| {
+                        Error::InvalidFormat("ODG frame payload has no frame owner".into())
+                    })?;
+                    if frame.frame_auxiliary_phase != 0 {
+                        return invalid("ODG draw:frame payload is out of order");
+                    }
+                } else if namespace == NamespaceKind::Draw
+                    && local.as_ref() == b"image"
+                    && active_shapes
+                        .last()
+                        .is_some_and(|shape| shape.depth.saturating_add(1) == virtual_depth)
+                {
+                    if let Some(shape) = active_shapes.last().filter(|shape| {
+                        shape.kind == ShapeKind::Frame
+                            && shape.depth.saturating_add(1) == virtual_depth
+                    }) && shape.frame_auxiliary_phase != 0
+                    {
+                        return invalid("ODG draw:image is out of draw:frame order");
+                    }
+                    if active_image.is_some() {
+                        return invalid("ODG draw:image owner is duplicated");
+                    }
+                    let shape = active_shapes.last().ok_or_else(|| {
+                        Error::InvalidFormat("ODG draw:image has no drawing owner".into())
+                    })?;
+                    if shape.kind != ShapeKind::Frame {
+                        return invalid("ODG draw:image must be owned by draw:frame");
+                    }
+                    let _ = shape;
+                } else if namespace == NamespaceKind::Draw && local.as_ref() == b"image-map" {
+                    {
+                        let shape = active_shapes
+                            .last_mut()
+                            .filter(|shape| {
+                                shape.kind == ShapeKind::Frame
+                                    && shape.depth.saturating_add(1) == virtual_depth
+                            })
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODG draw:image-map must be a direct draw:frame child".into(),
+                                )
+                            })?;
+                        if shape.image_map_seen || shape.frame_auxiliary_phase > 2 {
+                            return invalid("ODG draw:image-map is duplicated or out of order");
+                        }
+                        shape.image_map_seen = true;
+                        shape.frame_auxiliary_phase = 3;
+                    }
+                    let (page, shape) = auxiliary_image_owner(&active_shapes, virtual_depth)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODG draw:image-map must be a direct draw:frame child".into(),
+                            )
+                        })?;
+                    let map = ImageMap::parsed(
+                        Vec::new(),
+                        source_fragment(xml, start..end, "ODG image-map")?,
+                    )?;
+                    attach_image_map(parsed, page, shape, map)?;
+                } else if let Some(kind) = area_kind(namespace, local.as_ref()) {
+                    let map = active_map
+                        .as_mut()
+                        .filter(|map| map.depth.saturating_add(1) == virtual_depth)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("ODG image-map area has no map owner".into())
+                        })?;
+                    if map.areas.len() >= 65_536 {
+                        return invalid("ODG image-map area count exceeds the limit");
+                    }
+                    charge_source_span(xml, start..end, &mut map.bytes, "ODG image-map area")?;
+                    let area = parse_image_map_area(&reader, &element, start..end, xml)?;
+                    map.areas.push(area);
+                    let _ = kind;
+                } else if namespace == NamespaceKind::Office
+                    && local.as_ref() == b"event-listeners"
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.kind == ShapeKind::Frame
+                            && shape.depth.saturating_add(1) == virtual_depth
+                    })
+                {
+                    let frame = active_shapes.last_mut().ok_or_else(|| {
+                        Error::InvalidFormat("ODG frame event-listeners has no owner".into())
+                    })?;
+                    if frame.frame_event_listeners_seen || frame.frame_auxiliary_phase != 0 {
+                        return invalid("ODG draw:frame event-listeners are out of order");
+                    }
+                    frame.frame_event_listeners_seen = true;
+                    frame.frame_auxiliary_phase = 1;
+                } else if namespace == NamespaceKind::Svg
+                    && matches!(local.as_ref(), b"title" | b"desc")
+                    && active_shapes.last().is_some_and(|shape| {
+                        shape.depth.saturating_add(1) == virtual_depth
+                            && matches!(
+                                shape.kind,
+                                ShapeKind::Frame | ShapeKind::ThreeDimensionalScene
+                            )
+                    })
+                {
+                    let shape = active_shapes.last_mut().ok_or_else(|| {
+                        Error::InvalidFormat("ODG accessibility element has no owner".into())
+                    })?;
+                    if shape.kind == ShapeKind::Frame {
+                        if local.as_ref() == b"title" {
+                            if shape.frame_title_seen || shape.frame_auxiliary_phase > 3 {
+                                return invalid("ODG draw:frame title is out of order");
+                            }
+                            shape.frame_title_seen = true;
+                            shape.frame_auxiliary_phase = 4;
+                        } else {
+                            if shape.frame_description_seen
+                                || !shape.frame_title_seen && shape.frame_auxiliary_phase > 4
+                            {
+                                return invalid("ODG draw:frame description is out of order");
+                            }
+                            shape.frame_description_seen = true;
+                            shape.frame_auxiliary_phase = 5;
+                        }
+                    } else if shape.three_d_child_phase != 0
+                        || (local.as_ref() == b"title" && shape.frame_title_seen)
+                        || (local.as_ref() == b"desc" && shape.frame_description_seen)
+                        || (local.as_ref() == b"desc" && !shape.frame_title_seen)
+                    {
+                        return invalid("ODG dr3d:scene accessibility is out of order");
+                    } else if local.as_ref() == b"title" {
+                        shape.frame_title_seen = true;
+                    } else {
+                        shape.frame_description_seen = true;
+                    }
+                } else if namespace == NamespaceKind::Draw
+                    && matches!(local.as_ref(), b"contour-polygon" | b"contour-path")
+                {
+                    {
+                        let shape = active_shapes
+                            .last_mut()
+                            .filter(|shape| {
+                                shape.kind == ShapeKind::Frame
+                                    && shape.depth.saturating_add(1) == virtual_depth
+                            })
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODG contour must be a direct draw:frame child".into(),
+                                )
+                            })?;
+                        if shape.contour_seen {
+                            return invalid("ODG draw:frame has duplicate contours");
+                        }
+                        shape.contour_seen = true;
+                        if shape.frame_auxiliary_phase > 5 {
+                            return invalid("ODG draw:frame contour is out of order");
+                        }
+                        shape.frame_auxiliary_phase = 6;
+                    }
+                    let (page, shape_index) = auxiliary_image_owner(&active_shapes, virtual_depth)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "ODG contour must be a direct draw:frame child".into(),
+                            )
+                        })?;
+                    let contour = parse_contour(&reader, &element, start..end, xml)?;
+                    let shape = parsed.pages[page].shape_mut(shape_index).ok_or_else(|| {
+                        Error::InvalidFormat("ODG contour shape is missing".into())
+                    })?;
+                    if shape.contours().len() >= 65_536 {
+                        return invalid("ODG contour count exceeds the limit");
+                    }
+                    shape.push_contour(contour);
+                } else if namespace == NamespaceKind::Draw && local.as_ref() == b"glue-point" {
+                    if let Some(shape) = active_shapes.last_mut().filter(|shape| {
+                        shape.kind == ShapeKind::Frame
+                            && shape.depth.saturating_add(1) == virtual_depth
+                    }) {
+                        if shape.frame_auxiliary_phase > 1 {
+                            return invalid("ODG draw:glue-point is out of draw:frame order");
+                        }
+                        shape.frame_auxiliary_phase = 2;
+                    }
+                    let (page_index, shape_index, shape_kind) = {
+                        let shape = active_shapes
+                            .last()
+                            .filter(|shape| shape.depth.saturating_add(1) == virtual_depth)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODG glue point has no direct shape owner".into(),
+                                )
+                            })?;
+                        (shape.page, shape.shape, shape.kind)
+                    };
+                    if !allows_glue_point(shape_kind) {
+                        return invalid("ODG glue-point owner does not permit glue points");
+                    }
+                    if shape_kind == ShapeKind::ThreeDimensionalScene {
+                        let scene = active_shapes.last_mut().ok_or_else(|| {
+                            Error::InvalidFormat("ODG scene glue-point owner disappeared".into())
+                        })?;
+                        if scene.three_d_child_phase >= 3 {
+                            return invalid("ODG dr3d:scene glue-point is out of order");
+                        }
+                        scene.three_d_child_phase = 3;
+                    }
+                    let glue_point = parse_glue_point(&reader, &element, start..end, xml)?;
+                    let owner =
+                        parsed.pages[page_index]
+                            .shape_mut(shape_index)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat("ODG glue-point shape is missing".into())
+                            })?;
+                    if owner.glue_points().len() >= 65_536 {
+                        return invalid("ODG glue-point count exceeds the limit");
+                    }
+                    owner.push_glue_point(glue_point);
+                }
+            },
+            Event::End(element) => {
+                let local = element.local_name();
+                if active_area.as_ref().is_some_and(|area| {
+                    area.depth == depth && area_kind(namespace, local.as_ref()).is_some()
+                }) {
+                    let area = active_area.take().ok_or_else(|| {
+                        Error::InvalidFormat("ODG image-map area source is missing".into())
+                    })?;
+                    let map = active_map.as_mut().ok_or_else(|| {
+                        Error::InvalidFormat("ODG image-map area has no map owner".into())
+                    })?;
+                    charge_source_span(xml, area.start..end, &mut map.bytes, "ODG image-map area")?;
+                    let source_xml = source_fragment(xml, area.start..end, "ODG image-map area")?;
+                    let mut value = area.area;
+                    value = ImageMapArea::parsed(
+                        value.shape().clone(),
+                        value.href().map(str::to_owned),
+                        value.target_frame_name().map(str::to_owned),
+                        value.show().map(str::to_owned),
+                        value.no_href(),
+                        value.name().map(str::to_owned),
+                        source_xml,
+                    )?;
+                    map.areas.push(value);
+                }
+                if active_map
+                    .as_ref()
+                    .is_some_and(|map| map.depth == depth && local.as_ref() == b"image-map")
+                {
+                    let mut map = active_map.take().ok_or_else(|| {
+                        Error::InvalidFormat("ODG image-map source is missing".into())
+                    })?;
+                    charge_source_span(xml, map.start..end, &mut map.bytes, "ODG image-map")?;
+                    let image_map = ImageMap::parsed(
+                        map.areas,
+                        source_fragment(xml, map.start..end, "ODG image-map")?,
+                    )?;
+                    attach_image_map(parsed, map.page, map.shape, image_map)?;
+                }
+                if active_image
+                    .as_ref()
+                    .is_some_and(|image| image.depth == depth && local.as_ref() == b"image")
+                {
+                    active_image = None;
+                }
+                if shape_kind(namespace, local.as_ref()).is_some()
+                    && active_shapes
+                        .last()
+                        .is_some_and(|shape| shape.depth == depth)
+                {
+                    active_shapes.pop();
+                }
+                if namespace == NamespaceKind::Draw
+                    && local.as_ref() == b"page"
+                    && current_page_depth == Some(depth)
+                {
+                    current_page = None;
+                    current_page_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODG drawing-child XML depth underflow".into())
+                })?;
+            },
+            Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODG drawing-child XML"),
+            Event::Eof => break,
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+        }
+    }
+    if depth != 0
+        || current_page.is_some()
+        || !active_shapes.is_empty()
+        || active_image.is_some()
+        || active_map.is_some()
+        || active_area.is_some()
+    {
+        return invalid("ODG drawing-child XML is incomplete");
+    }
+    Ok(())
+}
+
+fn next_auxiliary_shape(
+    shape_positions: &mut [usize],
+    parsed: &Parsed,
+    page: usize,
+) -> Result<usize> {
+    let shape = *shape_positions
+        .get(page)
+        .ok_or_else(|| Error::InvalidFormat("ODG drawing-child page is missing".into()))?;
+    let next = shape
+        .checked_add(1)
+        .ok_or_else(|| Error::InvalidFormat("ODG drawing-child shape count overflow".into()))?;
+    shape_positions[page] = next;
+    if shape >= parsed.pages[page].shapes().len() {
+        return invalid("ODG drawing-child shape source order is invalid");
+    }
+    Ok(shape)
+}
+
+fn empty_auxiliary_end(reader: &mut NsReader<&[u8]>) -> Result<usize> {
+    loop {
+        let event = reader.read_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG empty drawing child: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG empty drawing child event")?;
+        match event {
+            Event::End(_) => return position(reader),
+            Event::Comment(_) | Event::PI(_) => {},
+            Event::Text(text)
+                if text
+                    .as_ref()
+                    .iter()
+                    .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n')) => {},
+            _ => return invalid("ODG contour or glue-point must have empty content"),
+        }
+    }
+}
+
+fn auxiliary_image_owner(
+    active_shapes: &[ActiveAuxiliaryShape],
+    depth: usize,
+) -> Option<(usize, usize)> {
+    active_shapes
+        .last()
+        .filter(|shape| shape.depth.saturating_add(1) == depth && shape.kind == ShapeKind::Frame)
+        .map(|shape| (shape.page, shape.shape))
+}
+
+fn is_frame_payload(namespace: NamespaceKind, local: &[u8]) -> bool {
+    matches!(
+        (namespace, local),
+        (NamespaceKind::Draw, b"text-box")
+            | (NamespaceKind::Draw, b"object")
+            | (NamespaceKind::Draw, b"object-ole")
+            | (NamespaceKind::Draw, b"applet")
+            | (NamespaceKind::Draw, b"floating-frame")
+            | (NamespaceKind::Draw, b"plugin")
+            | (NamespaceKind::Table, b"table")
+    )
+}
+
+fn update_auxiliary_shape_parent_order(
+    active_shapes: &mut [ActiveAuxiliaryShape],
+    depth: usize,
+    kind: ShapeKind,
+) -> Result<()> {
+    if active_shapes
+        .iter()
+        .rev()
+        .any(|shape| shape.kind == ShapeKind::Frame && depth > shape.depth.saturating_add(1))
+    {
+        return invalid("ODG draw:frame payload cannot contain drawing shapes");
+    }
+    let Some(parent) = active_shapes
+        .iter_mut()
+        .rev()
+        .find(|shape| shape.depth.saturating_add(1) == depth)
+    else {
+        return Ok(());
+    };
+    if parent.kind == ShapeKind::Frame {
+        return invalid("ODG draw:frame contains a shape outside its payload grammar");
+    }
+    if parent.kind != ShapeKind::ThreeDimensionalScene {
+        return Ok(());
+    }
+    if kind == ShapeKind::ThreeDimensionalScene {
+        return invalid("ODG dr3d:scene cannot be nested in another scene");
+    }
+    if !kind.is_three_dimensional() {
+        return invalid("ODG dr3d:scene contains a non-3D drawing object");
+    }
+    if kind == ShapeKind::ThreeDimensionalLight {
+        if parent.three_d_child_phase >= 2 {
+            return invalid("ODG dr3d:scene light is out of order");
+        }
+        parent.three_d_child_phase = 1;
+    } else {
+        if parent.three_d_child_phase >= 3 {
+            return invalid("ODG dr3d:scene shape is out of order");
+        }
+        parent.three_d_child_phase = 2;
+    }
+    Ok(())
+}
+
+const fn allows_glue_point(kind: ShapeKind) -> bool {
+    !kind.is_three_dimensional() || matches!(kind, ShapeKind::ThreeDimensionalScene)
+}
+
+fn attach_image_map(parsed: &mut Parsed, page: usize, shape: usize, map: ImageMap) -> Result<()> {
+    let owner = parsed.pages[page]
+        .shape_mut(shape)
+        .ok_or_else(|| Error::InvalidFormat("ODG image-map shape is missing".into()))?;
+    if !owner.set_image_map(map) {
+        return invalid("ODG drawing shape has duplicate image maps");
+    }
+    Ok(())
+}
+
+fn area_kind(namespace: NamespaceKind, local: &[u8]) -> Option<u8> {
+    if namespace != NamespaceKind::Draw {
+        return None;
+    }
+    match local {
+        b"area-rectangle" => Some(0),
+        b"area-circle" => Some(1),
+        b"area-polygon" => Some(2),
+        _ => None,
+    }
+}
+
+fn parse_image_map_area(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    span: Range<usize>,
+    xml: &str,
+) -> Result<ImageMapArea> {
+    let local = element.local_name();
+    let shape = match local.as_ref() {
+        b"area-rectangle" => ImageMapAreaShape::Rectangle {
+            x: required_attribute(reader, element, SVG, b"x", "image-map area")?,
+            y: required_attribute(reader, element, SVG, b"y", "image-map area")?,
+            width: required_attribute(reader, element, SVG, b"width", "image-map area")?,
+            height: required_attribute(reader, element, SVG, b"height", "image-map area")?,
+        },
+        b"area-circle" => ImageMapAreaShape::Circle {
+            cx: required_attribute(reader, element, SVG, b"cx", "image-map area")?,
+            cy: required_attribute(reader, element, SVG, b"cy", "image-map area")?,
+            r: required_attribute(reader, element, SVG, b"r", "image-map area")?,
+        },
+        b"area-polygon" => ImageMapAreaShape::Polygon {
+            x: required_attribute(reader, element, SVG, b"x", "image-map area")?,
+            y: required_attribute(reader, element, SVG, b"y", "image-map area")?,
+            width: required_attribute(reader, element, SVG, b"width", "image-map area")?,
+            height: required_attribute(reader, element, SVG, b"height", "image-map area")?,
+            view_box: required_attribute(reader, element, SVG, b"viewBox", "image-map area")?,
+            points: required_attribute(reader, element, DRAW, b"points", "image-map area")?,
+        },
+        _ => return invalid("ODG image-map area kind is unsupported"),
+    };
+    if let ImageMapAreaShape::Polygon {
+        view_box, points, ..
+    } = &shape
+        && (!is_integer_list(view_box, 4) || !is_points(points))
+    {
+        return invalid("ODG image-map polygon geometry is invalid");
+    }
+    let geometry_valid = match &shape {
+        ImageMapAreaShape::Rectangle {
+            x,
+            y,
+            width,
+            height,
+        }
+        | ImageMapAreaShape::Polygon {
+            x,
+            y,
+            width,
+            height,
+            ..
+        } => [x, y, width, height]
+            .iter()
+            .all(|value| is_odf_length(value)),
+        ImageMapAreaShape::Circle { cx, cy, r } => {
+            [cx, cy, r].iter().all(|value| is_odf_length(value))
+        },
+    };
+    if !geometry_valid {
+        return invalid("ODG image-map geometry is not an ODF length");
+    }
+    let link_type = attribute(reader, element, XLINK, b"type")?;
+    let href = attribute(reader, element, XLINK, b"href")?;
+    if href.is_some() {
+        if link_type.as_deref() != Some("simple") {
+            return invalid("ODG image-map xlink:type must be 'simple' when xlink:href is present");
+        }
+    } else if let Some(link_type) = link_type {
+        if link_type != "simple" {
+            return invalid("ODG image-map xlink:type must be 'simple'");
+        }
+        return invalid("ODG image-map xlink:type requires xlink:href");
+    }
+    let show = attribute(reader, element, XLINK, b"show")?;
+    if show
+        .as_deref()
+        .is_some_and(|value| !matches!(value, "new" | "replace"))
+    {
+        return invalid("ODG image-map xlink:show is invalid");
+    }
+    let no_href = attribute(reader, element, DRAW, b"nohref")?;
+    let no_href = match no_href.as_deref() {
+        None => false,
+        Some("nohref") => true,
+        Some(_) => return invalid("ODG image-map draw:nohref is invalid"),
+    };
+    ImageMapArea::parsed(
+        shape,
+        href,
+        attribute(reader, element, OFFICE, b"target-frame-name")?,
+        show,
+        no_href,
+        attribute(reader, element, OFFICE, b"name")?,
+        source_fragment(xml, span, "ODG image-map area")?,
+    )
+}
+
+fn parse_contour(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    span: Range<usize>,
+    xml: &str,
+) -> Result<Contour> {
+    let local = element.local_name();
+    let kind = match local.as_ref() {
+        b"contour-polygon" => ContourKind::Polygon,
+        b"contour-path" => ContourKind::Path,
+        _ => return invalid("ODG contour kind is unsupported"),
+    };
+    let recreate_on_edit =
+        required_attribute(reader, element, DRAW, b"recreate-on-edit", "contour")?;
+    if !matches!(recreate_on_edit.as_str(), "true" | "false") {
+        return invalid("ODG contour draw:recreate-on-edit is invalid");
+    }
+    match kind {
+        ContourKind::Polygon => {
+            let view_box = required_attribute(reader, element, SVG, b"viewBox", "contour polygon")?;
+            let points = required_attribute(reader, element, DRAW, b"points", "contour polygon")?;
+            if !is_integer_list(&view_box, 4) || !is_points(&points) {
+                return invalid("ODG contour polygon geometry is invalid");
+            }
+        },
+        ContourKind::Path => {
+            let view_box = required_attribute(reader, element, SVG, b"viewBox", "contour path")?;
+            required_attribute(reader, element, SVG, b"d", "contour path")?;
+            if !is_integer_list(&view_box, 4) {
+                return invalid("ODG contour path viewBox is not four integers");
+            }
+        },
+    }
+    for (name, value) in [
+        (
+            b"width".as_slice(),
+            attribute(reader, element, SVG, b"width")?,
+        ),
+        (
+            b"height".as_slice(),
+            attribute(reader, element, SVG, b"height")?,
+        ),
+    ] {
+        if let Some(value) = value
+            && !is_odf_length(&value)
+        {
+            return invalid(format!("ODG contour {name:?} is not an ODF length"));
+        }
+    }
+    let mut attribute_count = 0usize;
+    Contour::parsed(
+        kind,
+        drawing_attributes(reader, element, &mut attribute_count)?,
+        source_fragment(xml, span, "ODG contour")?,
+    )
+}
+
+fn parse_glue_point(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    span: Range<usize>,
+    xml: &str,
+) -> Result<GluePoint> {
+    let align = attribute(reader, element, DRAW, b"align")?;
+    if align.as_deref().is_some_and(|value| {
+        !matches!(
+            value,
+            "top-left"
+                | "top"
+                | "top-right"
+                | "left"
+                | "center"
+                | "right"
+                | "bottom-left"
+                | "bottom-right"
+        )
+    }) {
+        return invalid("ODG glue-point draw:align is invalid");
+    }
+    let escape_direction =
+        required_attribute(reader, element, DRAW, b"escape-direction", "glue-point")?;
+    if !matches!(
+        escape_direction.as_str(),
+        "auto" | "left" | "right" | "up" | "down" | "horizontal" | "vertical"
+    ) {
+        return invalid("ODG glue-point escape direction is invalid");
+    }
+    let id = required_attribute(reader, element, DRAW, b"id", "glue-point")?;
+    let integer = id.strip_prefix('+').unwrap_or(&id);
+    if integer.is_empty() || !integer.bytes().all(|byte| byte.is_ascii_digit()) {
+        return invalid("ODG glue-point draw:id is not a non-negative integer");
+    }
+    let x = required_attribute(reader, element, SVG, b"x", "glue-point")?;
+    let y = required_attribute(reader, element, SVG, b"y", "glue-point")?;
+    if !is_odf_distance_or_percent(&x) || !is_odf_distance_or_percent(&y) {
+        return invalid("ODG glue-point coordinates are not distances or percentages");
+    }
+    GluePoint::parsed(
+        id,
+        x,
+        y,
+        align,
+        escape_direction,
+        source_fragment(xml, span, "ODG glue-point")?,
+    )
+}
+
+fn charge_source_span(xml: &str, span: Range<usize>, total: &mut usize, owner: &str) -> Result<()> {
+    let source = xml.get(span).ok_or_else(|| {
+        Error::InvalidFormat(format!("{owner} source span is outside the source XML"))
+    })?;
+    let charged = total
+        .checked_add(source.len())
+        .ok_or_else(|| Error::InvalidFormat(format!("{owner} source size overflow")))?;
+    if charged > 8 * 1024 * 1024 {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} aggregate exceeds the byte limit"
+        )));
+    }
+    *total = charged;
+    Ok(())
+}
+
+fn source_fragment(xml: &str, span: Range<usize>, owner: &str) -> Result<String> {
+    let source = xml.get(span).ok_or_else(|| {
+        Error::InvalidFormat(format!("{owner} source span is outside the source XML"))
+    })?;
+    if source.len() > 8 * 1024 * 1024 {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} source exceeds the byte limit"
+        )));
+    }
+    let mut fragment = String::new();
+    fragment
+        .try_reserve_exact(source.len())
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG source fragment",
+            source: allocation_error,
+        })?;
+    fragment.push_str(source);
+    Ok(fragment)
+}
+
+fn clone_xml_span(xml: &str, span: Range<usize>, resource: &'static str) -> Result<String> {
+    let source = xml
+        .get(span)
+        .ok_or_else(|| Error::InvalidFormat(format!("{resource} source span is invalid")))?;
+    clone_bounded_string(source, MAX_OUTPUT_BYTES, resource)
+}
+
+fn enhanced_child_kind(
+    namespace: NamespaceKind,
+    local: &[u8],
+) -> Option<EnhancedGeometryChildKind> {
+    (namespace == NamespaceKind::Draw).then_some(match local {
+        b"equation" => EnhancedGeometryChildKind::Equation,
+        b"handle" => EnhancedGeometryChildKind::Handle,
+        _ => return None,
+    })
+}
+
+fn drawing_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    count: &mut usize,
+) -> Result<Vec<DrawingAttribute>> {
+    let mut attributes = Vec::new();
+    for raw in element.attributes() {
+        let attribute = raw.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG enhanced-geometry attribute: {error}"))
+        })?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let namespace = match classify(&namespace) {
+            NamespaceKind::Draw => DrawingAttributeNamespace::Drawing,
+            NamespaceKind::Svg => DrawingAttributeNamespace::Svg,
+            NamespaceKind::Dr3d => DrawingAttributeNamespace::Dr3d,
+            NamespaceKind::Other
+            | NamespaceKind::Office
+            | NamespaceKind::Text
+            | NamespaceKind::Table
+            | NamespaceKind::Form
+            | NamespaceKind::Style
+            | NamespaceKind::Presentation => continue,
+        };
+        let local = std::str::from_utf8(local.as_ref()).map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG attribute name: {error}"))
+        })?;
+        let local = clone_bounded_string(local, MAX_TEXT_BYTES, "ODG attribute name")?;
+        validate_raw_xml_value(attribute.value.as_ref(), "ODG enhanced-geometry attribute")?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG attribute value: {error}"))
+            })?;
+        validate_decoded_xml_value(value.as_ref(), "ODG enhanced-geometry attribute")?;
+        let value = own_bounded_cow(value, MAX_TEXT_BYTES, "ODG enhanced-geometry attribute")?;
+        let attribute = DrawingAttribute::parsed(namespace, local, value)?;
+        if attributes.iter().any(|existing: &DrawingAttribute| {
+            existing.namespace() == attribute.namespace()
+                && existing.local_name() == attribute.local_name()
+        }) {
+            return invalid("ODG enhanced-geometry attribute is duplicated");
+        }
+        *count = count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("ODG enhanced-geometry attribute count overflow".into())
+        })?;
+        if *count > MAX_SHAPES {
+            return invalid("ODG enhanced-geometry attribute count exceeds the limit");
+        }
+        attributes.push(attribute);
+    }
+    Ok(attributes)
+}
+
+fn validate_enhanced_geometry_attributes(attributes: &[DrawingAttribute]) -> Result<()> {
+    for attribute in attributes {
+        let value = attribute.value();
+        match (attribute.namespace(), attribute.local_name()) {
+            (DrawingAttributeNamespace::Svg, "viewBox") if !is_integer_list(value, 4) => {
+                return invalid("ODG enhanced-geometry svg:viewBox is not four integers");
+            },
+            (DrawingAttributeNamespace::Drawing, name)
+                if matches!(
+                    name,
+                    "mirror-vertical"
+                        | "mirror-horizontal"
+                        | "extrusion-allowed"
+                        | "text-path-allowed"
+                        | "concentric-gradient-fill-allowed"
+                        | "extrusion"
+                        | "extrusion-light-face"
+                        | "extrusion-first-light-harsh"
+                        | "extrusion-second-light-harsh"
+                        | "extrusion-metal"
+                        | "extrusion-color"
+                        | "text-path"
+                        | "text-path-same-letter-heights"
+                ) && !matches!(value, "true" | "false") =>
+            {
+                return invalid("ODG enhanced-geometry Boolean attribute is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, name)
+                if matches!(
+                    name,
+                    "extrusion-brightness"
+                        | "extrusion-diffusion"
+                        | "extrusion-first-light-level"
+                        | "extrusion-second-light-level"
+                        | "extrusion-shininess"
+                ) && !is_odf_percent_in_range(value) =>
+            {
+                return invalid("ODG enhanced-geometry percentage attribute is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-specularity")
+                if !is_odf_nonnegative_percent(value) =>
+            {
+                return invalid("ODG enhanced-geometry specularity is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-depth")
+                if !is_length_double_list(value) =>
+            {
+                return invalid("ODG enhanced-geometry extrusion depth is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-first-light-direction")
+            | (DrawingAttributeNamespace::Drawing, "extrusion-second-light-direction")
+                if !is_vector3d(value) =>
+            {
+                return invalid("ODG enhanced-geometry light direction is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-rotation-center")
+                if !is_vector3d(value) =>
+            {
+                return invalid("ODG enhanced-geometry rotation center is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-viewpoint") if !is_point3d(value) => {
+                return invalid("ODG enhanced-geometry viewpoint is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-number-of-line-segments")
+                if !is_odf_integer(value) =>
+            {
+                return invalid("ODG enhanced-geometry line-segment count is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-metal-type")
+                if !is_namespaced_token(value) =>
+            {
+                return invalid("ODG enhanced-geometry metal type is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-rotation-angle")
+                if !is_token_list(value, 2) =>
+            {
+                return invalid("ODG enhanced-geometry rotation angle is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-skew")
+                if !is_double_token_pair(value) =>
+            {
+                return invalid("ODG enhanced-geometry skew is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "extrusion-origin")
+                if !is_extrusion_origin(value) =>
+            {
+                return invalid("ODG enhanced-geometry origin is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "glue-point-type")
+                if !matches!(value, "none" | "segments" | "rectangle") =>
+            {
+                return invalid("ODG enhanced-geometry glue-point type is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "text-path-mode")
+                if !matches!(value, "normal" | "path" | "shape") =>
+            {
+                return invalid("ODG enhanced-geometry text-path mode is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "text-path-scale")
+                if !matches!(value, "path" | "shape") =>
+            {
+                return invalid("ODG enhanced-geometry text-path scale is invalid");
+            },
+            (DrawingAttributeNamespace::Drawing, "path-stretchpoint-x")
+            | (DrawingAttributeNamespace::Drawing, "path-stretchpoint-y")
+                if !is_odf_double(value) =>
+            {
+                return invalid("ODG enhanced-geometry stretch point is invalid");
+            },
+            (DrawingAttributeNamespace::Dr3d, "projection")
+                if !matches!(value, "parallel" | "perspective") =>
+            {
+                return invalid("ODG enhanced-geometry projection is invalid");
+            },
+            (DrawingAttributeNamespace::Dr3d, "shade-mode")
+                if !matches!(value, "flat" | "phong" | "gouraud" | "draft") =>
+            {
+                return invalid("ODG enhanced-geometry shade mode is invalid");
+            },
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+fn validate_enhanced_child_attributes(attributes: &[DrawingAttribute]) -> Result<()> {
+    for attribute in attributes {
+        if attribute.namespace() == DrawingAttributeNamespace::Drawing
+            && matches!(
+                attribute.local_name(),
+                "handle-mirror-horizontal" | "handle-mirror-vertical" | "handle-switched"
+            )
+            && !matches!(attribute.value(), "true" | "false")
+        {
+            return invalid("ODG enhanced-geometry handle Boolean attribute is invalid");
+        }
+    }
+    Ok(())
+}
+
+fn is_odf_double(value: &str) -> bool {
+    matches!(value, "INF" | "-INF" | "NaN") || value.parse::<f64>().is_ok()
+}
+
+fn is_odf_percent_in_range(value: &str) -> bool {
+    is_odf_percent(value)
+}
+
+fn is_odf_nonnegative_percent(value: &str) -> bool {
+    is_odf_percent(value)
+        && value
+            .strip_suffix('%')
+            .and_then(|number| number.parse::<f64>().ok())
+            .is_some_and(|number| number.is_finite() && number >= 0.0)
+}
+
+fn is_namespaced_token(value: &str) -> bool {
+    let Some((prefix, local)) = value.split_once(':') else {
+        return false;
+    };
+    !prefix.is_empty()
+        && !local.is_empty()
+        && prefix.chars().all(is_ncname_char)
+        && prefix.chars().next().is_some_and(is_ncname_start)
+        && local.chars().all(is_ncname_char)
+        && local.chars().next().is_some_and(is_ncname_start)
+}
+
+fn is_ncname_start(character: char) -> bool {
+    matches!(
+        character,
+        'A'..='Z'
+            | '_'
+            | 'a'..='z'
+            | '\u{00c0}'..='\u{00d6}'
+            | '\u{00d8}'..='\u{00f6}'
+            | '\u{00f8}'..='\u{02ff}'
+            | '\u{0370}'..='\u{037d}'
+            | '\u{037f}'..='\u{1fff}'
+            | '\u{200c}'..='\u{200d}'
+            | '\u{2070}'..='\u{218f}'
+            | '\u{2c00}'..='\u{2fef}'
+            | '\u{3001}'..='\u{d7ff}'
+            | '\u{f900}'..='\u{fdcf}'
+            | '\u{fdf0}'..='\u{fffd}'
+            | '\u{10000}'..='\u{effff}'
+    )
+}
+
+fn is_ncname_char(character: char) -> bool {
+    is_ncname_start(character)
+        || matches!(
+            character,
+            '-' | '.' | '0'..='9' | '\u{00b7}' | '\u{0300}'..='\u{036f}' | '\u{203f}'..='\u{2040}'
+        )
+}
+
+fn is_token_list(value: &str, expected: usize) -> bool {
+    let values = value.split_ascii_whitespace().collect::<Vec<_>>();
+    values.len() == expected && values.iter().all(|value| !value.is_empty())
+}
+
+fn is_double_token_pair(value: &str) -> bool {
+    let mut values = value.split_ascii_whitespace();
+    values.next().is_some_and(is_odf_double)
+        && values.next().is_some_and(|_| true)
+        && values.next().is_none()
+}
+
+fn is_extrusion_origin(value: &str) -> bool {
+    let values = value.split_ascii_whitespace().collect::<Vec<_>>();
+    values.len() == 2
+        && values.iter().all(|value| {
+            value
+                .parse::<f64>()
+                .is_ok_and(|number| number.is_finite() && (-0.5..=0.5).contains(&number))
+        })
+}
+
+fn is_length_double_list(value: &str) -> bool {
+    let mut values = value.split_ascii_whitespace();
+    values.next().is_some_and(is_odf_length)
+        && values.next().is_some_and(is_odf_double)
+        && values.next().is_none()
+}
+
+fn is_point3d(value: &str) -> bool {
+    let Some(inner) = value
+        .strip_prefix('(')
+        .and_then(|value| value.strip_suffix(')'))
+    else {
+        return false;
+    };
+    let mut values = inner.split_ascii_whitespace();
+    (0..3).all(|_| {
+        values.next().is_some_and(|value| {
+            ["cm", "mm", "in", "pt", "pc"]
+                .iter()
+                .any(|unit| value.strip_suffix(unit).is_some_and(is_odf_decimal))
+        })
+    }) && values.next().is_none()
+}
+
 fn parse_declared_layers(xml: &str) -> Result<Vec<Layer>> {
+    validate_raw_xml_events(xml, "ODG styles.xml event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -5271,6 +7582,7 @@ fn parse_declared_layers(xml: &str) -> Result<Vec<Layer>> {
         let (resolved_namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid ODG styles.xml: {error}")))?;
+        validate_borrowed_xml_event(&event, "ODG styles.xml event")?;
         let namespace = classify(&resolved_namespace);
         match event {
             Event::Start(element) => {
@@ -5364,12 +7676,14 @@ fn scan_active_content(content: &str, styles: Option<&str>) -> Result<ActiveCont
 }
 
 fn scan_active_xml(xml: &str, status: &mut ActiveContentStatus) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG active-content event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     loop {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG active-content inventory XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG active-content event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let local_name = element.local_name();
@@ -5459,6 +7773,7 @@ struct ActiveStyleResource {
 }
 
 fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
+    validate_raw_xml_events(xml, "ODG style-resource event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -5469,6 +7784,7 @@ fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG named style-resource XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG style-resource event")?;
         let namespace = classify(&resolved_namespace);
         let end = position(&reader)?;
         match event {
@@ -5516,7 +7832,7 @@ fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
                             name,
                             arbitrary_attributes(&reader, &element, &[(DRAW, b"name".as_slice())])?,
                         ),
-                        xml: xml[start..end].to_owned(),
+                        xml: clone_xml_span(xml, start..end, "ODG style-resource XML")?,
                         span: start..end,
                     });
                 }
@@ -5533,7 +7849,11 @@ fn parse_style_resources(xml: &str) -> Result<Vec<ParsedStyleResource>> {
                     })?;
                     definitions.push(ParsedStyleResource {
                         resource: completed_resource.resource,
-                        xml: xml[completed_resource.start..end].to_owned(),
+                        xml: clone_xml_span(
+                            xml,
+                            completed_resource.start..end,
+                            "ODG style-resource XML",
+                        )?,
                         span: completed_resource.start..end,
                     });
                 }
@@ -5667,6 +7987,7 @@ struct ActiveStyleDefinition {
 }
 
 fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
+    validate_raw_xml_events(xml, "ODG style-definition event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -5677,6 +7998,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG style catalog XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG style event")?;
         let namespace = classify(&resolved_namespace);
         let active_namespace = resolved_bound(&resolved_namespace, SCRIPT)
             || resolved_bound(&resolved_namespace, XML_EVENTS);
@@ -5708,7 +8030,9 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                     && let Some(value) = &mut active
                     && value.depth.checked_add(1) == Some(depth)
                 {
-                    let owner = String::from_utf8_lossy(local.as_ref());
+                    let owner = std::str::from_utf8(local.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODG style property name: {error}"))
+                    })?;
                     for (name, property) in arbitrary_attributes(&reader, &element, &[])? {
                         if value
                             .properties
@@ -5734,7 +8058,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                     let parent = attribute(&reader, &element, STYLE, b"parent-style-name")?;
                     definitions.push(ParsedStyleDefinition {
                         style: Style::parsed(name, family, parent, BTreeMap::new()),
-                        xml: xml[start..end].to_owned(),
+                        xml: clone_xml_span(xml, start..end, "ODG style XML")?,
                         span: start..end,
                     });
                 } else if namespace == NamespaceKind::Style
@@ -5742,7 +8066,9 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                     && let Some(value) = &mut active
                     && value.depth == depth
                 {
-                    let owner = String::from_utf8_lossy(local.as_ref());
+                    let owner = std::str::from_utf8(local.as_ref()).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODG style property name: {error}"))
+                    })?;
                     for (name, property) in arbitrary_attributes(&reader, &element, &[])? {
                         if value
                             .properties
@@ -5770,7 +8096,7 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
                             value.parent,
                             value.properties,
                         ),
-                        xml: xml[value.start..end].to_owned(),
+                        xml: clone_xml_span(xml, value.start..end, "ODG style XML")?,
                         span: value.start..end,
                     });
                 }
@@ -5797,6 +8123,898 @@ fn parse_style_definitions(xml: &str) -> Result<Vec<ParsedStyleDefinition>> {
         return invalid("ODG style catalog XML is incomplete");
     }
     Ok(definitions)
+}
+
+/// Resolve inert transition metadata referenced by each drawing page.
+///
+/// Automatic styles in content.xml shadow named styles from styles.xml. The
+/// resolution is limited to the page's drawing-page style owner; a same-named
+/// graphic style is never treated as a transition source.
+fn parse_page_transitions(
+    content: &str,
+    styles: Option<&str>,
+    pages: &[Page],
+) -> Result<Vec<Option<Transition>>> {
+    let content_styles = parse_style_definitions(content)?;
+    let styles_styles = styles
+        .map(parse_style_definitions)
+        .transpose()?
+        .unwrap_or_default();
+    let mut definitions = BTreeMap::new();
+    for definition in &styles_styles {
+        if definition.style.family() != "drawing-page" {
+            continue;
+        }
+        if definitions
+            .insert(definition.style.name(), (definition, styles))
+            .is_some()
+        {
+            return invalid("ODG drawing-page style definition is ambiguous");
+        }
+    }
+    let mut content_names = BTreeSet::new();
+    for definition in &content_styles {
+        if definition.style.family() != "drawing-page" {
+            continue;
+        }
+        if !content_names.insert(definition.style.name()) {
+            return invalid("ODG automatic drawing-page style definition is ambiguous");
+        }
+        // Automatic styles in content.xml shadow same-named definitions from
+        // styles.xml, including their parent-style closure.
+        definitions.insert(definition.style.name(), (definition, Some(content)));
+    }
+    pages
+        .iter()
+        .map(|page| -> Result<Option<Transition>> {
+            let Some(name) = page.style_name() else {
+                return Ok(None);
+            };
+            resolve_transition_style(name, &definitions, &mut BTreeSet::new(), 0)
+        })
+        .collect()
+}
+
+fn resolve_transition_style(
+    name: &str,
+    definitions: &BTreeMap<&str, (&ParsedStyleDefinition, Option<&str>)>,
+    visiting: &mut BTreeSet<String>,
+    depth: usize,
+) -> Result<Option<Transition>> {
+    if depth > MAX_DEPTH {
+        return invalid("ODG drawing-page style inheritance exceeds the limit");
+    }
+    let Some((definition, source)) = definitions.get(name).copied() else {
+        return Ok(None);
+    };
+    if !visiting.insert(name.to_owned()) {
+        return invalid("ODG drawing-page style inheritance is cyclic");
+    }
+    let mut transition = transition_values_from_style(&definition.style, source)?;
+    if let Some(parent) = definition.style.parent()
+        && let Some(parent_transition) =
+            resolve_transition_style(parent, definitions, visiting, depth + 1)?
+    {
+        transition.inherit_from(&parent_transition);
+    }
+    visiting.remove(name);
+    Ok((!transition.is_empty()).then_some(transition))
+}
+
+fn transition_values_from_style(style: &Style, xml: Option<&str>) -> Result<Transition> {
+    if style.family() != "drawing-page" {
+        return Ok(Transition::new());
+    }
+    // Parse the transition attributes from the source-scoped owner rather
+    // than the generic style projection.  The latter intentionally retains
+    // raw QName prefixes, so using it here would miss a valid `p:*` alias for
+    // the presentation namespace.
+    let Some(xml) = xml else {
+        return Ok(Transition::new());
+    };
+    let Some(owner) = find_transition_style_owner(xml, style.name())? else {
+        return Ok(Transition::new());
+    };
+    let property = |name: &str| {
+        owner
+            .attributes
+            .get(name)
+            .map(|attribute| attribute.decoded.clone())
+    };
+    let transition = Transition::from_parts(
+        property("presentation:transition-type"),
+        property("presentation:transition-style"),
+        property("presentation:transition-speed"),
+        property("smil:type"),
+        property("smil:subtype"),
+        property("smil:direction"),
+        property("smil:fadeColor"),
+        property("presentation:duration"),
+        owner.sound,
+    )?;
+    Ok(transition)
+}
+
+fn parse_transition_sound_element(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+) -> Result<crate::transition::Sound> {
+    let href = required_attribute(reader, element, XLINK, b"href", "transition sound")?;
+    let link_type = required_attribute(reader, element, XLINK, b"type", "transition sound")?;
+    if link_type != "simple" {
+        return invalid("ODG transition sound xlink:type must be 'simple'");
+    }
+    let play_full = optional_bool_attribute(reader, element, PRESENTATION, b"play-full")?;
+    let actuate = attribute(reader, element, XLINK, b"actuate")?;
+    if let Some(value) = actuate.as_deref()
+        && value != "onRequest"
+    {
+        return invalid("ODG transition sound xlink:actuate must be 'onRequest'");
+    }
+    let show = attribute(reader, element, XLINK, b"show")?;
+    let xml_id = attribute(reader, element, XML, b"id")?;
+    crate::transition::Sound::new(href).and_then(|sound| {
+        sound
+            .with_play_full(play_full)
+            .with_actuate_on_request(actuate.is_some())
+            .with_show(show)?
+            .with_xml_id(xml_id)
+    })
+}
+
+#[derive(Clone)]
+struct TransitionAttributeSpan {
+    value: Range<usize>,
+    token: Range<usize>,
+    decoded: String,
+}
+
+struct TransitionStyleOwner {
+    style_span: Range<usize>,
+    style_open_span: Range<usize>,
+    style_close_start: Option<usize>,
+    property_open_span: Option<Range<usize>>,
+    property_span: Option<Range<usize>>,
+    sound_span: Option<Range<usize>>,
+    sound: Option<crate::transition::Sound>,
+    attributes: BTreeMap<String, TransitionAttributeSpan>,
+}
+
+fn edit_transition_style_xml(
+    source: &str,
+    style_name: &str,
+    transition: Option<&Transition>,
+) -> Result<String> {
+    validate_xml_source_size(source, "ODG transition XML")?;
+    let owner = find_transition_style_owner(source, style_name)?;
+    let Some(owner) = owner else {
+        return Err(Error::Unsupported(
+            "ODG drawing-page style has no transition owner".into(),
+        ));
+    };
+    let fields = transition_fields(transition);
+    if owner.property_open_span.is_none() {
+        let Some(transition) = transition else {
+            return clone_bounded_string(source, MAX_OUTPUT_BYTES, "ODG transition XML");
+        };
+        let property = serialize_transition_properties(transition)?;
+        let at = if let Some(close) = owner.style_close_start {
+            close
+        } else {
+            owner
+                .style_open_span
+                .end
+                .checked_sub(2)
+                .ok_or_else(|| Error::InvalidFormat("ODG style start span is invalid".into()))?
+        };
+        return if owner.style_close_start.is_some() {
+            insert_xml(source, at, &property)
+        } else {
+            insert_child_xml(source, at, &property)
+        };
+    }
+    let mut current = clone_bounded_string(source, MAX_OUTPUT_BYTES, "ODG transition XML")?;
+    for (qualified, value) in fields {
+        current = rewrite_transition_attribute(&current, style_name, qualified, value)?;
+    }
+    let current_owner = find_transition_style_owner(&current, style_name)?
+        .ok_or_else(|| Error::InvalidFormat("ODG transition style disappeared".into()))?;
+    match transition.and_then(Transition::sound) {
+        Some(sound) => {
+            let sound_xml = serialize_transition_sound(sound)?;
+            if let Some(span) = current_owner.sound_span {
+                if current_owner.sound.as_ref() != Some(sound) {
+                    return Err(Error::Unsupported(
+                        "ODG transition sound edit would discard producer markup".into(),
+                    ));
+                }
+                let _ = span;
+            } else if let Some(open) = current_owner.property_open_span {
+                if current
+                    .get(open.clone())
+                    .is_some_and(|tag| tag.ends_with("/>"))
+                {
+                    let tag = current.get(open.clone()).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "ODG transition property source span is invalid".into(),
+                        )
+                    })?;
+                    let name_end = tag
+                        .as_bytes()
+                        .iter()
+                        .enumerate()
+                        .skip(1)
+                        .find(|(_, byte)| {
+                            byte.is_ascii_whitespace() || **byte == b'/' || **byte == b'>'
+                        })
+                        .map(|(index, _)| index)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat("ODG transition property name is invalid".into())
+                        })?;
+                    let element_name = &tag[1..name_end];
+                    let start_tag = tag.strip_suffix("/>").ok_or_else(|| {
+                        Error::InvalidFormat("ODG transition property tag is invalid".into())
+                    })?;
+                    let replacement = format!(
+                        "{start_tag}>{sound_xml}</{element_name}>",
+                        element_name = element_name
+                    );
+                    current = replace_xml(&current, &open, &replacement)?;
+                } else {
+                    let at = insertion_before_tag_close(&current, &open)?;
+                    current = insert_xml(&current, at, &sound_xml)?;
+                }
+            }
+        },
+        None => {
+            if let Some(span) = current_owner.sound_span {
+                let _ = span;
+                return Err(Error::Unsupported(
+                    "ODG transition sound removal would discard producer markup".into(),
+                ));
+            }
+        },
+    }
+    Ok(current)
+}
+
+fn transition_fields(transition: Option<&Transition>) -> [(&'static str, Option<&str>); 8] {
+    [
+        (
+            "presentation:transition-type",
+            transition.and_then(Transition::transition_type),
+        ),
+        (
+            "presentation:transition-style",
+            transition.and_then(Transition::style),
+        ),
+        (
+            "presentation:transition-speed",
+            transition.and_then(Transition::speed),
+        ),
+        ("smil:type", transition.and_then(Transition::smil_type)),
+        (
+            "smil:subtype",
+            transition.and_then(Transition::smil_subtype),
+        ),
+        ("smil:direction", transition.and_then(Transition::direction)),
+        (
+            "smil:fadeColor",
+            transition.and_then(Transition::fade_color),
+        ),
+        (
+            "presentation:duration",
+            transition.and_then(Transition::duration),
+        ),
+    ]
+}
+
+fn validate_transition_budget(transition: Option<&Transition>) -> Result<()> {
+    let Some(transition) = transition else {
+        return Ok(());
+    };
+    let attribute_bytes = transition_fields(Some(transition))
+        .iter()
+        .map(|(name, value)| name.len().saturating_add(value.map_or(0, str::len)))
+        .sum::<usize>();
+    let sound_bytes = transition.sound().map_or(0, |sound| {
+        sound
+            .href()
+            .len()
+            .saturating_add(sound.show().map_or(0, str::len))
+            .saturating_add(sound.xml_id().map_or(0, str::len))
+    });
+    if attribute_bytes.saturating_add(sound_bytes) > MAX_TRANSITION_XML_BYTES {
+        return invalid("ODG transition metadata exceeds the aggregate limit");
+    }
+    Ok(())
+}
+
+fn validate_transition_sound_reference(
+    transaction: &Transaction,
+    transition: Option<&Transition>,
+) -> Result<()> {
+    let Some(href) = transition
+        .and_then(Transition::sound)
+        .map(crate::transition::Sound::href)
+    else {
+        return Ok(());
+    };
+    if href.is_empty() {
+        // The schema permits an empty anyIRI.  It denotes a same-document
+        // reference and has no package member to resolve.
+        return Ok(());
+    }
+    if is_linked_href(href) {
+        return Ok(());
+    }
+    let path = resolve_package_path(href)?;
+    if let Some(edit) = transaction
+        .resource_edits
+        .iter()
+        .find(|edit| edit.path == path)
+    {
+        if edit.after_bytes.is_some() {
+            return Ok(());
+        }
+        return invalid("ODG transition sound reference targets a removed resource");
+    }
+    if !transaction.source.0.package.package().has_file(&path)? {
+        return invalid("ODG transition sound reference targets a missing resource");
+    }
+    Ok(())
+}
+
+fn validate_transition_xml_ids(
+    transaction: &Transaction,
+    current: Option<&Transition>,
+    desired: Option<&Transition>,
+    in_content: bool,
+) -> Result<()> {
+    let Some(identifier) = desired
+        .and_then(Transition::sound)
+        .and_then(crate::transition::Sound::xml_id)
+    else {
+        return Ok(());
+    };
+    // XML IDs are document-scoped.  `content.xml` and `styles.xml` are
+    // separate XML documents, so equal IDs across those parts are legal.
+    let occurrences = if in_content {
+        collect_xml_ids(&transaction.content)?
+    } else {
+        transaction
+            .styles
+            .as_deref()
+            .map(collect_xml_ids)
+            .transpose()?
+            .unwrap_or_default()
+    };
+    let current_occurrence = current
+        .and_then(Transition::sound)
+        .and_then(crate::transition::Sound::xml_id)
+        .is_some_and(|value| value == identifier);
+    let allowed = usize::from(current_occurrence);
+    if occurrences.get(identifier).copied().unwrap_or_default() > allowed {
+        return invalid("ODG transition sound xml:id is already used in the package");
+    }
+    Ok(())
+}
+
+fn collect_xml_ids(xml: &str) -> Result<BTreeMap<String, usize>> {
+    validate_raw_xml_events(xml, "ODG XML-id event")?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut identifiers = BTreeMap::new();
+    loop {
+        let (_namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!(
+                "invalid ODG XML while checking xml:id values: {error}"
+            ))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG xml:id event")?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if let Some(identifier) = attribute(&reader, &element, XML, b"id")? {
+                    let entry = identifiers.entry(identifier).or_insert(0usize);
+                    *entry = entry
+                        .checked_add(1)
+                        .ok_or_else(|| Error::InvalidFormat("ODG xml:id count overflow".into()))?;
+                    if *entry > MAX_SHAPES {
+                        return invalid("ODG xml:id count exceeds the limit");
+                    }
+                }
+            },
+            Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODG XML"),
+            Event::Eof => break,
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::End(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+        }
+    }
+    Ok(identifiers)
+}
+
+fn serialize_transition_properties(transition: &Transition) -> Result<String> {
+    let prefix = "<style:drawing-page-properties xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" xmlns:presentation=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\" xmlns:smil=\"urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0\"";
+    let sound_capacity = transition
+        .sound()
+        .map(transition_sound_capacity)
+        .transpose()?;
+    let mut capacity = prefix.len();
+    for (name, value) in transition_fields(Some(transition)) {
+        capacity = capacity
+            .checked_add(serialized_attribute_len_allow_empty(name, value)?)
+            .ok_or_else(|| Error::InvalidFormat("ODG transition XML size overflow".into()))?;
+    }
+    if transition.sound().is_some() {
+        capacity = capacity
+            .checked_add(1)
+            .and_then(|size| size.checked_add(sound_capacity.unwrap_or_default()))
+            .and_then(|size| size.checked_add("</style:drawing-page-properties>".len()))
+            .ok_or_else(|| Error::InvalidFormat("ODG transition XML size overflow".into()))?;
+    } else {
+        capacity = capacity
+            .checked_add(2)
+            .ok_or_else(|| Error::InvalidFormat("ODG transition XML size overflow".into()))?;
+    }
+    let mut xml =
+        precharge_xml_capacity(String::from(prefix), capacity, "ODG transition properties")?;
+    for (name, value) in transition_fields(Some(transition)) {
+        if matches!(name, "smil:type" | "smil:subtype") {
+            push_attribute_allow_empty(&mut xml, name, value)?;
+        } else {
+            push_attribute(&mut xml, name, value)?;
+        }
+    }
+    if let Some(sound) = transition.sound() {
+        xml.push('>');
+        xml.push_str(&serialize_transition_sound(sound)?);
+        xml.push_str("</style:drawing-page-properties>");
+    } else {
+        xml.push_str("/>");
+    }
+    Ok(xml)
+}
+
+fn transition_sound_capacity(sound: &crate::transition::Sound) -> Result<usize> {
+    let prefix = "<presentation:sound xmlns:presentation=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xlink:type=\"simple\"";
+    let mut capacity = prefix.len();
+    capacity = capacity
+        .checked_add(serialized_attribute_len_allow_empty(
+            "xlink:href",
+            Some(sound.href()),
+        )?)
+        .ok_or_else(|| Error::InvalidFormat("ODG transition sound size overflow".into()))?;
+    if sound.actuate_on_request() {
+        capacity = capacity
+            .checked_add(serialized_attribute_len(
+                "xlink:actuate",
+                Some("onRequest"),
+            )?)
+            .ok_or_else(|| Error::InvalidFormat("ODG transition sound size overflow".into()))?;
+    }
+    for (name, value) in [
+        ("xlink:show", sound.show()),
+        ("xml:id", sound.xml_id()),
+        (
+            "presentation:play-full",
+            sound
+                .play_full()
+                .map(|value| if value { "true" } else { "false" }),
+        ),
+    ] {
+        capacity = capacity
+            .checked_add(serialized_attribute_len(name, value)?)
+            .ok_or_else(|| Error::InvalidFormat("ODG transition sound size overflow".into()))?;
+    }
+    capacity
+        .checked_add(2)
+        .ok_or_else(|| Error::InvalidFormat("ODG transition sound size overflow".into()))
+}
+
+fn serialize_transition_sound(sound: &crate::transition::Sound) -> Result<String> {
+    let prefix = "<presentation:sound xmlns:presentation=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xlink:type=\"simple\"";
+    let mut xml = precharge_xml_capacity(
+        String::from(prefix),
+        transition_sound_capacity(sound)?,
+        "ODG transition sound",
+    )?;
+    push_attribute_allow_empty(&mut xml, "xlink:href", Some(sound.href()))?;
+    if sound.actuate_on_request() {
+        push_attribute(&mut xml, "xlink:actuate", Some("onRequest"))?;
+    }
+    push_attribute(&mut xml, "xlink:show", sound.show())?;
+    push_attribute(&mut xml, "xml:id", sound.xml_id())?;
+    push_attribute(
+        &mut xml,
+        "presentation:play-full",
+        sound
+            .play_full()
+            .map(|value| if value { "true" } else { "false" }),
+    )?;
+    xml.push_str("/>");
+    Ok(xml)
+}
+
+fn push_attribute_allow_empty(output: &mut String, name: &str, value: Option<&str>) -> Result<()> {
+    let Some(attribute_value) = value else {
+        return Ok(());
+    };
+    if attribute_value.len() > MAX_TEXT_BYTES || attribute_value.contains('\0') {
+        return invalid("ODG XML attribute value is invalid");
+    }
+    output.push(' ');
+    output.push_str(name);
+    output.push_str("=\"");
+    push_escaped_xml(output, attribute_value, "ODG transition attribute")?;
+    output.push('"');
+    Ok(())
+}
+
+fn rewrite_transition_attribute(
+    source: &str,
+    style_name: &str,
+    qualified: &str,
+    value: Option<&str>,
+) -> Result<String> {
+    let owner = find_transition_style_owner(source, style_name)?
+        .ok_or_else(|| Error::InvalidFormat("ODG transition style disappeared".into()))?;
+    let Some(open) = owner.property_open_span else {
+        return Err(Error::InvalidFormat(
+            "ODG transition property source span is missing".into(),
+        ));
+    };
+    if let Some(attribute) = owner.attributes.get(qualified) {
+        return match value {
+            Some(value) => replace_xml_value(source, &attribute.value, value),
+            None => remove_xml(source, &attribute.token),
+        };
+    }
+    let Some(value) = value else {
+        return clone_bounded_string(source, MAX_OUTPUT_BYTES, "ODG transition XML");
+    };
+    let mut insertion = String::new();
+    let prefix = qualified
+        .split_once(':')
+        .map(|(prefix, _)| prefix)
+        .unwrap_or("");
+    if !source_has_local_namespace_declaration(source, &open, prefix) {
+        let namespace = match prefix {
+            "presentation" => "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0",
+            "smil" => "urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0",
+            _ => return invalid("ODG transition attribute namespace is unsupported"),
+        };
+        write!(insertion, " xmlns:{prefix}=\"{namespace}\"")
+            .map_err(|_| Error::InvalidFormat("ODG transition namespace write failed".into()))?;
+    }
+    write_attribute(&mut insertion, qualified, value)?;
+    let at = insertion_before_tag_close(source, &open)?;
+    insert_xml(source, at, &insertion)
+}
+
+fn source_has_local_namespace_declaration(source: &str, open: &Range<usize>, prefix: &str) -> bool {
+    source
+        .get(open.clone())
+        .is_some_and(|tag| tag.contains(&format!("xmlns:{prefix}=")))
+}
+
+fn insertion_before_tag_close(source: &str, open: &Range<usize>) -> Result<usize> {
+    let tag = source
+        .get(open.clone())
+        .ok_or_else(|| Error::InvalidFormat("ODG transition start tag span is invalid".into()))?;
+    if tag.ends_with("/>") {
+        Ok(open.end - 2)
+    } else if tag.ends_with('>') {
+        Ok(open.end - 1)
+    } else {
+        invalid("ODG transition start tag is unterminated")
+    }
+}
+
+fn write_attribute(target: &mut String, name: &str, value: &str) -> Result<()> {
+    target.push(' ');
+    target.push_str(name);
+    target.push_str("=\"");
+    push_escaped_xml(target, value, "ODG transition attribute")?;
+    target.push('"');
+    Ok(())
+}
+
+fn find_transition_style_owner(
+    xml: &str,
+    style_name: &str,
+) -> Result<Option<TransitionStyleOwner>> {
+    validate_raw_xml_events(xml, "ODG transition-style event")?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    let mut style: Option<(usize, usize, Range<usize>, bool)> = None;
+    let mut property: Option<(usize, usize, Range<usize>)> = None;
+    let mut active_sound: Option<(usize, usize)> = None;
+    let mut owner = None;
+    loop {
+        let start = position(&reader)?;
+        let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG transition XML: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG transition event")?;
+        let namespace = classify(&resolved_namespace);
+        let end = position(&reader)?;
+        match event {
+            Event::Start(element) => {
+                depth = checked_xml_depth(depth)?;
+                let local = element.local_name();
+                if active_sound.is_some() {
+                    return invalid("ODG transition sound must have empty content");
+                }
+                if namespace == NamespaceKind::Style && local.as_ref() == b"style" {
+                    let name = required_attribute(&reader, &element, STYLE, b"name", "style")?;
+                    let family = required_attribute(&reader, &element, STYLE, b"family", "style")?;
+                    if name == style_name && family == "drawing-page" {
+                        if style.is_some() || owner.is_some() {
+                            return invalid("ODG transition style is ambiguous");
+                        }
+                        style = Some((depth, start, start..end, false));
+                    }
+                } else if namespace == NamespaceKind::Style
+                    && local.as_ref() == b"drawing-page-properties"
+                    && style
+                        .as_ref()
+                        .is_some_and(|(style_depth, _, _, _)| *style_depth + 1 == depth)
+                {
+                    if property.is_some() {
+                        return invalid("ODG drawing-page transition property is duplicated");
+                    }
+                    let tag = xml.as_bytes().get(start..end).ok_or_else(|| {
+                        Error::InvalidFormat("ODG transition property span is invalid".into())
+                    })?;
+                    property = Some((depth, start, start..end));
+                    let attributes = transition_attribute_spans(&reader, &element, tag, start)?;
+                    if let Some((_, _, open)) = property.as_mut() {
+                        let mut transition_owner = TransitionStyleOwner {
+                            style_span: 0..0,
+                            style_open_span: 0..0,
+                            style_close_start: None,
+                            property_open_span: Some(open.clone()),
+                            property_span: None,
+                            sound_span: None,
+                            sound: None,
+                            attributes,
+                        };
+                        if let Some((_, style_start, style_open, _)) = style.as_ref() {
+                            transition_owner.style_span = *style_start..0;
+                            transition_owner.style_open_span = style_open.clone();
+                        }
+                        owner = Some(transition_owner);
+                    }
+                } else if namespace == NamespaceKind::Presentation
+                    && local.as_ref() == b"sound"
+                    && property
+                        .as_ref()
+                        .is_some_and(|(property_depth, _, _)| *property_depth + 1 == depth)
+                {
+                    if let Some(current) = owner.as_mut() {
+                        if current.sound_span.is_some() {
+                            return invalid("ODG transition sound is duplicated");
+                        }
+                        active_sound = Some((depth, start));
+                        current.sound = Some(parse_transition_sound_element(&reader, &element)?);
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                let local = element.local_name();
+                if active_sound.is_some() {
+                    return invalid("ODG transition sound must have empty content");
+                }
+                if namespace == NamespaceKind::Style && local.as_ref() == b"style" {
+                    let name = required_attribute(&reader, &element, STYLE, b"name", "style")?;
+                    let family = required_attribute(&reader, &element, STYLE, b"family", "style")?;
+                    if name == style_name && family == "drawing-page" {
+                        if style.is_some() || owner.is_some() {
+                            return invalid("ODG transition style is ambiguous");
+                        }
+                        owner = Some(TransitionStyleOwner {
+                            style_span: start..end,
+                            style_open_span: start..end,
+                            style_close_start: None,
+                            property_open_span: None,
+                            property_span: None,
+                            sound_span: None,
+                            sound: None,
+                            attributes: BTreeMap::new(),
+                        });
+                    }
+                } else if namespace == NamespaceKind::Style
+                    && local.as_ref() == b"drawing-page-properties"
+                    && style
+                        .as_ref()
+                        .is_some_and(|(style_depth, _, _, _)| *style_depth + 1 == depth + 1)
+                {
+                    if property.is_some() {
+                        return invalid("ODG drawing-page transition property is duplicated");
+                    }
+                    let tag = xml.as_bytes().get(start..end).ok_or_else(|| {
+                        Error::InvalidFormat("ODG transition property span is invalid".into())
+                    })?;
+                    let attributes = transition_attribute_spans(&reader, &element, tag, start)?;
+                    if let Some((_, style_start, style_open, _)) = style.as_ref() {
+                        owner = Some(TransitionStyleOwner {
+                            style_span: *style_start..end,
+                            style_open_span: style_open.clone(),
+                            style_close_start: None,
+                            property_open_span: Some(start..end),
+                            property_span: Some(start..end),
+                            sound_span: None,
+                            sound: None,
+                            attributes,
+                        });
+                    }
+                } else if namespace == NamespaceKind::Presentation
+                    && local.as_ref() == b"sound"
+                    && property
+                        .as_ref()
+                        .is_some_and(|(property_depth, _, _)| *property_depth + 1 == depth + 1)
+                {
+                    if let Some(current) = owner.as_mut() {
+                        if current.sound_span.is_some() {
+                            return invalid("ODG transition sound is duplicated");
+                        }
+                        current.sound_span = Some(start..end);
+                        current.sound = Some(parse_transition_sound_element(&reader, &element)?);
+                    }
+                }
+            },
+            Event::End(element) => {
+                let local = element.local_name();
+                if active_sound
+                    .as_ref()
+                    .is_some_and(|(sound_depth, _)| *sound_depth == depth)
+                {
+                    if namespace != NamespaceKind::Presentation || local.as_ref() != b"sound" {
+                        return invalid("ODG transition sound is incomplete");
+                    }
+                    let (_, sound_start) = active_sound.take().ok_or_else(|| {
+                        Error::InvalidFormat("ODG transition sound source is missing".into())
+                    })?;
+                    if let Some(current) = owner.as_mut() {
+                        current.sound_span = Some(sound_start..end);
+                    }
+                }
+                if property
+                    .as_ref()
+                    .is_some_and(|(property_depth, _, _)| *property_depth == depth)
+                {
+                    if let Some(current) = owner.as_mut() {
+                        if let Some((_, property_start, _)) = property.take() {
+                            current.property_span = Some(property_start..end);
+                        }
+                    }
+                }
+                if style
+                    .as_ref()
+                    .is_some_and(|(style_depth, _, _, empty)| !*empty && *style_depth == depth)
+                    && namespace == NamespaceKind::Style
+                    && local.as_ref() == b"style"
+                {
+                    if let Some(current) = owner.as_mut() {
+                        if let Some((_, style_start, _, _)) = style.take() {
+                            current.style_span = style_start..end;
+                            current.style_close_start = Some(start);
+                        }
+                    }
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("ODG transition XML depth underflow".into())
+                })?;
+            },
+            Event::DocType(_) => return invalid("DOCTYPE is not allowed in ODG transition XML"),
+            Event::Eof => break,
+            Event::CData(text) if active_sound.is_some() => {
+                if !text
+                    .as_ref()
+                    .iter()
+                    .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                {
+                    return invalid("ODG transition sound must have empty content");
+                }
+            },
+            Event::Text(text) if active_sound.is_some() => {
+                if !text
+                    .as_ref()
+                    .iter()
+                    .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                {
+                    return invalid("ODG transition sound must have empty content");
+                }
+            },
+            Event::GeneralRef(_) if active_sound.is_some() => {
+                return invalid("ODG transition sound must have empty content");
+            },
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_)
+            | Event::PI(_)
+            | Event::Text(_) => {},
+        }
+    }
+    if depth != 0 || style.is_some() || property.is_some() || active_sound.is_some() {
+        return invalid("ODG transition XML is incomplete");
+    }
+    Ok(owner)
+}
+
+fn transition_attribute_spans(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    tag: &[u8],
+    tag_start: usize,
+) -> Result<BTreeMap<String, TransitionAttributeSpan>> {
+    let mut result = BTreeMap::new();
+    for raw in element.attributes() {
+        let attribute = raw.map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG transition attribute: {error}"))
+        })?;
+        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let qualified = match (namespace, local.as_ref()) {
+            (ResolveResult::Bound(Namespace(uri)), b"transition-type") if *uri == *PRESENTATION => {
+                "presentation:transition-type"
+            },
+            (ResolveResult::Bound(Namespace(uri)), b"transition-style")
+                if *uri == *PRESENTATION =>
+            {
+                "presentation:transition-style"
+            },
+            (ResolveResult::Bound(Namespace(uri)), b"transition-speed")
+                if *uri == *PRESENTATION =>
+            {
+                "presentation:transition-speed"
+            },
+            (ResolveResult::Bound(Namespace(uri)), b"duration") if *uri == *PRESENTATION => {
+                "presentation:duration"
+            },
+            (ResolveResult::Bound(Namespace(uri)), b"type") if *uri == *SMIL => "smil:type",
+            (ResolveResult::Bound(Namespace(uri)), b"subtype") if *uri == *SMIL => "smil:subtype",
+            (ResolveResult::Bound(Namespace(uri)), b"direction") if *uri == *SMIL => {
+                "smil:direction"
+            },
+            (ResolveResult::Bound(Namespace(uri)), b"fadeColor") if *uri == *SMIL => {
+                "smil:fadeColor"
+            },
+            _ => continue,
+        };
+        let raw_name = attribute.key.as_ref();
+        validate_raw_xml_value(raw_name, "ODG transition attribute name")?;
+        validate_raw_xml_value(attribute.value.as_ref(), "ODG transition attribute value")?;
+        let (value_start, value_end) = attribute_value_span(tag, raw_name)?;
+        let token = attribute_token_span(tag, raw_name)?;
+        let decoded = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG transition attribute value: {error}"))
+            })?;
+        validate_decoded_xml_value(decoded.as_ref(), "ODG transition attribute value")?;
+        let decoded = own_bounded_cow(decoded, MAX_TEXT_BYTES, "ODG transition attribute value")?;
+        if result
+            .insert(
+                qualified.to_owned(),
+                TransitionAttributeSpan {
+                    value: tag_start + value_start..tag_start + value_end,
+                    token: tag_start + token.start..tag_start + token.end,
+                    decoded,
+                },
+            )
+            .is_some()
+        {
+            return invalid("ODG transition attribute is duplicated");
+        }
+    }
+    Ok(result)
 }
 
 fn checked_xml_depth(depth: usize) -> Result<usize> {
@@ -5826,15 +9044,22 @@ fn push_declared_layer(
 }
 
 fn text_value(text: &quick_xml::events::BytesText<'_>) -> Result<String> {
+    // The raw escaped form bounds every decoder/unescape allocation below.
+    validate_raw_xml_value(text.as_ref(), "ODG text")?;
     let decoded = text
         .decode()
         .map_err(|error| Error::InvalidFormat(format!("invalid ODG text: {error}")))?;
-    quick_xml::escape::unescape(&decoded)
-        .map(std::borrow::Cow::into_owned)
-        .map_err(|error| Error::InvalidFormat(format!("invalid ODG text escape: {error}")))
+    // Check the borrowed Cow before converting it into an owned String.
+    validate_decoded_xml_value(decoded.as_ref(), "ODG text")?;
+    let unescaped = quick_xml::escape::unescape(decoded.as_ref())
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODG text escape: {error}")))?;
+    let unescaped = own_bounded_cow(unescaped, MAX_TEXT_BYTES, "ODG text")?;
+    validate_decoded_xml_value(&unescaped, "ODG text")?;
+    Ok(unescaped)
 }
 
 fn reference_value(reference: &quick_xml::events::BytesRef<'_>) -> Result<String> {
+    validate_raw_xml_value(reference.as_ref(), "ODG character reference")?;
     if let Some(value) = reference.resolve_char_ref().map_err(|error| {
         Error::InvalidFormat(format!("invalid ODG character reference: {error}"))
     })? {
@@ -5877,6 +9102,7 @@ fn content_splice_publication(
 fn rebuild_spliced(
     source: &Snapshot,
     content: XmlSplicePublication,
+    styles: Option<&str>,
     replacements: &[ResourceReplacement<'_>],
     security_policy: SecurityWritePolicy,
 ) -> Result<Vec<u8>> {
@@ -5885,7 +9111,19 @@ fn rebuild_spliced(
     let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
     writer.set_mimetype(source.0.mimetype)?;
     content.publish(&mut writer)?;
-    for path in ["styles.xml", "meta.xml", "settings.xml"] {
+    if let Some(styles) = styles {
+        writer.add_file("styles.xml", styles.as_bytes())?;
+    } else if source.0.package.package().has_file("styles.xml")? {
+        // Preserve an untouched producer styles.xml through the checked splice
+        // path.  Exact-source publication intentionally accepts formatting
+        // that authored XML publication would reject.
+        XmlSplicePublication::new(XmlSourcePart::load(
+            source.0.package.package(),
+            "styles.xml",
+        )?)
+        .publish(&mut writer)?;
+    }
+    for path in ["meta.xml", "settings.xml"] {
         if archive.has_file(path)? {
             XmlSplicePublication::new(XmlSourcePart::load(archive, path)?).publish(&mut writer)?;
         }
@@ -5907,6 +9145,7 @@ fn rebuild_spliced(
 fn rebuild(
     source: &Snapshot,
     content: &str,
+    styles: Option<&str>,
     replacements: &[ResourceReplacement<'_>],
     security_policy: SecurityWritePolicy,
 ) -> Result<Vec<u8>> {
@@ -5915,7 +9154,15 @@ fn rebuild(
     let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
     writer.set_mimetype(source.0.mimetype)?;
     writer.add_file("content.xml", content.as_bytes())?;
-    for path in ["styles.xml", "meta.xml", "settings.xml"] {
+    if let Some(styles) = styles {
+        writer.add_file("styles.xml", styles.as_bytes())?;
+    } else if source.0.package.package().has_file("styles.xml")? {
+        writer.add_file(
+            "styles.xml",
+            &source.0.package.package().get_file("styles.xml")?,
+        )?;
+    }
+    for path in ["meta.xml", "settings.xml"] {
         if archive.has_file(path)? {
             writer.add_file(path, &archive.get_file(path)?)?;
         }
@@ -5973,11 +9220,11 @@ fn replace_xml_value(source: &str, span: &Range<usize>, replacement: &str) -> Re
     if span.start > span.end || span.end > source.len() {
         return invalid("ODG text source span is invalid");
     }
-    let escaped_replacement = quick_xml::escape::escape(replacement);
+    let escaped_replacement_len = escaped_xml_len(replacement)?;
     let capacity = source
         .len()
         .checked_sub(span.end - span.start)
-        .and_then(|size| size.checked_add(escaped_replacement.len()))
+        .and_then(|size| size.checked_add(escaped_replacement_len))
         .ok_or_else(|| Error::InvalidFormat("ODG edited content size overflow".to_string()))?;
     if capacity > MAX_OUTPUT_BYTES {
         return invalid("ODG edited content exceeds the output limit");
@@ -5990,7 +9237,7 @@ fn replace_xml_value(source: &str, span: &Range<usize>, replacement: &str) -> Re
             source: allocation_error,
         })?;
     output.push_str(&source[..span.start]);
-    output.push_str(&escaped_replacement);
+    push_escaped_xml(&mut output, replacement, "ODG edited content")?;
     output.push_str(&source[span.end..]);
     Ok(output)
 }
@@ -6127,6 +9374,7 @@ fn insert_xml(source: &str, at: usize, xml: &str) -> Result<String> {
 }
 
 fn insert_automatic_style(source: &str, style: &str) -> Result<String> {
+    validate_raw_xml_events(source, "ODG automatic-style event")?;
     let mut reader = NsReader::from_str(source);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -6138,6 +9386,7 @@ fn insert_automatic_style(source: &str, style: &str) -> Result<String> {
         let (resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG automatic-style owner XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG automatic-style event")?;
         let namespace = classify(&resolved_namespace);
         let end = position(&reader)?;
         match event {
@@ -6184,10 +9433,33 @@ fn insert_automatic_style(source: &str, style: &str) -> Result<String> {
     }
     let at = body_start
         .ok_or_else(|| Error::InvalidFormat("ODG office:body source span is missing".into()))?;
-    let owner = format!(
-        "<office:automatic-styles xmlns:office=\"{}\">{style}</office:automatic-styles>",
+    let prefix = format!(
+        "<office:automatic-styles xmlns:office=\"{}\">",
         std::str::from_utf8(OFFICE).unwrap_or_default()
     );
+    let suffix = "</office:automatic-styles>";
+    let owner_len = prefix
+        .len()
+        .checked_add(style.len())
+        .and_then(|size| size.checked_add(suffix.len()))
+        .ok_or_else(|| Error::InvalidFormat("ODG automatic-style size overflow".into()))?;
+    if source
+        .len()
+        .checked_add(owner_len)
+        .is_none_or(|size| size > MAX_OUTPUT_BYTES)
+    {
+        return invalid("ODG edited content exceeds the output limit");
+    }
+    let mut owner = String::new();
+    owner
+        .try_reserve_exact(owner_len)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG automatic styles",
+            source: allocation_error,
+        })?;
+    owner.push_str(&prefix);
+    owner.push_str(style);
+    owner.push_str(suffix);
     insert_xml(source, at, &owner)
 }
 
@@ -6214,19 +9486,30 @@ fn insert_child_xml(source: &str, at: usize, child: &str) -> Result<String> {
         .get(name_start..name_end)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| Error::InvalidFormat("ODG empty owner name is missing".into()))?;
+    let replacement_len = 1usize
+        .checked_add(child.len())
+        .and_then(|size| size.checked_add(name.len()))
+        .and_then(|size| size.checked_add(3))
+        .ok_or_else(|| Error::InvalidFormat("ODG XML insertion size overflow".into()))?;
+    let capacity = source
+        .len()
+        .checked_sub(2)
+        .and_then(|size| size.checked_add(replacement_len))
+        .ok_or_else(|| Error::InvalidFormat("ODG XML insertion size overflow".into()))?;
+    if capacity > MAX_OUTPUT_BYTES {
+        return invalid("ODG edited content exceeds the output limit");
+    }
     let replacement = format!(">{child}</{name}>");
-    let mut output = String::with_capacity(
-        source
-            .len()
-            .saturating_sub(2)
-            .saturating_add(replacement.len()),
-    );
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG edited content",
+            source: allocation_error,
+        })?;
     output.push_str(&source[..at]);
     output.push_str(&replacement);
     output.push_str(&source[at + 2..]);
-    if output.len() > MAX_OUTPUT_BYTES {
-        return invalid("ODG edited content exceeds the output limit");
-    }
     Ok(output)
 }
 
@@ -6238,7 +9521,17 @@ fn remove_xml(source: &str, span: &Range<usize>) -> Result<String> {
     {
         return invalid("ODG XML removal span is invalid");
     }
-    let mut output = String::with_capacity(source.len() - (span.end - span.start));
+    let capacity = source.len() - (span.end - span.start);
+    if capacity > MAX_OUTPUT_BYTES {
+        return invalid("ODG edited content exceeds the output limit");
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG edited content",
+            source: allocation_error,
+        })?;
     output.push_str(&source[..span.start]);
     output.push_str(&source[span.end..]);
     Ok(output)
@@ -6256,11 +9549,78 @@ fn start_tag_end(source: &str, start: usize) -> Result<usize> {
         .ok_or_else(|| Error::InvalidFormat("ODG element start tag is unterminated".into()))
 }
 
+fn unique_page_transition_style_name(
+    content: &str,
+    styles: Option<&str>,
+    pages: &[Page],
+) -> Result<String> {
+    let mut names = parse_style_definitions(content)?
+        .into_iter()
+        .map(|definition| definition.style.name().to_owned())
+        .collect::<BTreeSet<_>>();
+    if let Some(styles) = styles {
+        names.extend(
+            parse_style_definitions(styles)?
+                .into_iter()
+                .map(|definition| definition.style.name().to_owned()),
+        );
+    }
+    names.extend(pages.iter().filter_map(Page::style_name).map(str::to_owned));
+    for index in 0..MAX_PAGES {
+        let candidate = format!("LitchiPageTransition{index}");
+        if names.insert(candidate.clone()) {
+            return Ok(candidate);
+        }
+    }
+    invalid("ODG detached page transition style names are exhausted")
+}
+
+fn serialize_detached_page_style(name: &str, transition: &Transition) -> Result<String> {
+    validate_bounded_value(name, "ODG detached page transition style name")?;
+    let properties = serialize_transition_properties(transition)?;
+    let prefix = format!(
+        "<style:style xmlns:style=\"{}\"",
+        std::str::from_utf8(STYLE).unwrap_or_default()
+    );
+    let name_capacity = serialized_attribute_len("style:name", Some(name))?;
+    let family_capacity = serialized_attribute_len("style:family", Some("drawing-page"))?;
+    let mut capacity = prefix.len();
+    capacity = capacity
+        .checked_add(name_capacity)
+        .and_then(|size| size.checked_add(family_capacity))
+        .and_then(|size| size.checked_add(1))
+        .and_then(|size| size.checked_add(properties.len()))
+        .and_then(|size| size.checked_add("</style:style>".len()))
+        .ok_or_else(|| Error::InvalidFormat("ODG detached page style size overflow".into()))?;
+    let mut xml = precharge_xml_capacity(prefix, capacity, "ODG detached page style")?;
+    push_attribute(&mut xml, "style:name", Some(name))?;
+    push_attribute(&mut xml, "style:family", Some("drawing-page"))?;
+    xml.push('>');
+    xml.push_str(&properties);
+    xml.push_str("</style:style>");
+    Ok(xml)
+}
+
 fn serialize_page(page: &Page) -> Result<String> {
-    let mut xml = format!(
+    let prefix = format!(
         "<draw:page xmlns:draw=\"{}\"",
         std::str::from_utf8(DRAW).unwrap_or_default()
     );
+    let mut capacity = prefix.len();
+    for (name, value) in [
+        ("draw:name", page.name()),
+        ("xml:id", page.xml_id()),
+        ("draw:style-name", page.style_name()),
+        ("draw:master-page-name", page.master_page_name()),
+    ] {
+        capacity = capacity
+            .checked_add(serialized_attribute_len(name, value)?)
+            .ok_or_else(|| Error::InvalidFormat("ODG page XML size overflow".into()))?;
+    }
+    capacity = capacity
+        .checked_add("></draw:page>".len())
+        .ok_or_else(|| Error::InvalidFormat("ODG page XML size overflow".into()))?;
+    let mut xml = precharge_xml_capacity(prefix, capacity, "ODG serialized page")?;
     push_attribute(&mut xml, "draw:name", page.name())?;
     push_attribute(&mut xml, "xml:id", page.xml_id())?;
     push_attribute(&mut xml, "draw:style-name", page.style_name())?;
@@ -6271,7 +9631,25 @@ fn serialize_page(page: &Page) -> Result<String> {
 
 fn serialize_layer(layer: &Layer) -> Result<String> {
     validate_bounded_value(layer.name(), "ODG layer name")?;
-    let mut xml = String::from("<draw:layer");
+    let prefix = "<draw:layer";
+    let mut capacity = prefix.len();
+    let display_capacity = serialized_attribute_len("draw:display", layer.display())?;
+    capacity = capacity
+        .checked_add(serialized_attribute_len("draw:name", Some(layer.name()))?)
+        .and_then(|size| size.checked_add(display_capacity))
+        .ok_or_else(|| Error::InvalidFormat("ODG layer XML size overflow".into()))?;
+    if let Some(protected) = layer.protected() {
+        capacity = capacity
+            .checked_add(serialized_attribute_len(
+                "draw:protected",
+                Some(if protected { "true" } else { "false" }),
+            )?)
+            .ok_or_else(|| Error::InvalidFormat("ODG layer XML size overflow".into()))?;
+    }
+    capacity = capacity
+        .checked_add(2)
+        .ok_or_else(|| Error::InvalidFormat("ODG layer XML size overflow".into()))?;
+    let mut xml = precharge_xml_capacity(String::from(prefix), capacity, "ODG serialized layer")?;
     push_attribute(&mut xml, "draw:name", Some(layer.name()))?;
     push_attribute(&mut xml, "draw:display", layer.display())?;
     if let Some(protected) = layer.protected() {
@@ -6288,13 +9666,17 @@ fn serialize_layer(layer: &Layer) -> Result<String> {
 fn serialize_form_control(control: &FormControl) -> Result<String> {
     validate_bounded_value(control.id(), "ODG form-control identifier")?;
     validate_xml_local_name(control.element(), "ODG form-control element")?;
-    let mut xml = format!(
+    let prefix = format!(
         "<form:{} xmlns:form=\"{}\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"",
         control.element(),
         std::str::from_utf8(FORM).unwrap_or_default()
     );
-    push_attribute(&mut xml, "form:id", Some(control.id()))?;
-    push_attribute(&mut xml, "form:name", control.name())?;
+    let mut capacity = prefix.len();
+    let name_capacity = serialized_attribute_len("form:name", control.name())?;
+    capacity = capacity
+        .checked_add(serialized_attribute_len("form:id", Some(control.id()))?)
+        .and_then(|size| size.checked_add(name_capacity))
+        .ok_or_else(|| Error::InvalidFormat("ODG form-control XML size overflow".into()))?;
     for (name, value) in control.attributes() {
         validate_xml_qualified_name(name, "ODG form-control attribute")?;
         let prefix = name.split_once(':').map(|(prefix, _local)| prefix);
@@ -6304,6 +9686,17 @@ fn serialize_form_control(control: &FormControl) -> Result<String> {
         if matches!(name.as_str(), "form:id" | "form:name") {
             return invalid("ODG form-control arbitrary attributes duplicate identity");
         }
+        capacity = capacity
+            .checked_add(serialized_attribute_len(name, Some(value))?)
+            .ok_or_else(|| Error::InvalidFormat("ODG form-control XML size overflow".into()))?;
+    }
+    capacity = capacity
+        .checked_add(2)
+        .ok_or_else(|| Error::InvalidFormat("ODG form-control XML size overflow".into()))?;
+    let mut xml = precharge_xml_capacity(prefix, capacity, "ODG serialized form-control")?;
+    push_attribute(&mut xml, "form:id", Some(control.id()))?;
+    push_attribute(&mut xml, "form:name", control.name())?;
+    for (name, value) in control.attributes() {
         push_attribute(&mut xml, name, Some(value))?;
     }
     xml.push_str("/>");
@@ -6313,20 +9706,21 @@ fn serialize_form_control(control: &FormControl) -> Result<String> {
 fn serialize_style(style: &Style) -> Result<String> {
     validate_bounded_value(style.name(), "ODG style name")?;
     validate_bounded_value(style.family(), "ODG style family")?;
-    let mut xml = format!(
+    let prefix = format!(
         "<style:style xmlns:style=\"{}\" xmlns:draw=\"{}\" xmlns:svg=\"{}\" xmlns:fo=\"{}\"",
         std::str::from_utf8(STYLE).unwrap_or_default(),
         std::str::from_utf8(DRAW).unwrap_or_default(),
         std::str::from_utf8(SVG).unwrap_or_default(),
         std::str::from_utf8(FO).unwrap_or_default()
     );
-    push_attribute(&mut xml, "style:name", Some(style.name()))?;
-    push_attribute(&mut xml, "style:family", Some(style.family()))?;
-    push_attribute(&mut xml, "style:parent-style-name", style.parent())?;
-    if style.properties().is_empty() {
-        xml.push_str("/>");
-        return Ok(xml);
-    }
+    let mut capacity = prefix.len();
+    let family_capacity = serialized_attribute_len("style:family", Some(style.family()))?;
+    let parent_capacity = serialized_attribute_len("style:parent-style-name", style.parent())?;
+    capacity = capacity
+        .checked_add(serialized_attribute_len("style:name", Some(style.name()))?)
+        .and_then(|size| size.checked_add(family_capacity))
+        .and_then(|size| size.checked_add(parent_capacity))
+        .ok_or_else(|| Error::InvalidFormat("ODG style XML size overflow".into()))?;
     let mut owners: BTreeMap<&str, Vec<(&str, &str)>> = BTreeMap::new();
     for (path, value) in style.properties() {
         let (owner, name) = path.split_once('/').ok_or_else(|| {
@@ -6338,6 +9732,35 @@ fn serialize_style(style: &Style) -> Result<String> {
             .entry(owner)
             .or_default()
             .push((name, value.as_str()));
+    }
+    for (owner, properties) in &owners {
+        capacity = capacity
+            .checked_add(1)
+            .and_then(|size| size.checked_add(owner.len()))
+            .ok_or_else(|| Error::InvalidFormat("ODG style XML size overflow".into()))?;
+        for (name, value) in properties {
+            capacity = capacity
+                .checked_add(serialized_attribute_len(name, Some(value))?)
+                .ok_or_else(|| Error::InvalidFormat("ODG style XML size overflow".into()))?;
+        }
+        capacity = capacity
+            .checked_add(2)
+            .ok_or_else(|| Error::InvalidFormat("ODG style XML size overflow".into()))?;
+    }
+    capacity = capacity
+        .checked_add(if owners.is_empty() {
+            2
+        } else {
+            ">".len() + "</style:style>".len()
+        })
+        .ok_or_else(|| Error::InvalidFormat("ODG style XML size overflow".into()))?;
+    let mut xml = precharge_xml_capacity(prefix, capacity, "ODG serialized style")?;
+    push_attribute(&mut xml, "style:name", Some(style.name()))?;
+    push_attribute(&mut xml, "style:family", Some(style.family()))?;
+    push_attribute(&mut xml, "style:parent-style-name", style.parent())?;
+    if owners.is_empty() {
+        xml.push_str("/>");
+        return Ok(xml);
     }
     xml.push('>');
     for (owner, properties) in owners {
@@ -6354,14 +9777,20 @@ fn serialize_style(style: &Style) -> Result<String> {
 
 fn serialize_style_resource(resource: &StyleResource) -> Result<String> {
     validate_bounded_value(resource.name(), "ODG named style-resource name")?;
-    let mut xml = format!(
+    let prefix = format!(
         "<draw:{} xmlns:draw=\"{}\" xmlns:xlink=\"{}\" xmlns:svg=\"{}\"",
         resource.kind().element(),
         std::str::from_utf8(DRAW).unwrap_or_default(),
         std::str::from_utf8(XLINK).unwrap_or_default(),
         std::str::from_utf8(SVG).unwrap_or_default(),
     );
-    push_attribute(&mut xml, "draw:name", Some(resource.name()))?;
+    let mut capacity = prefix
+        .len()
+        .checked_add(serialized_attribute_len(
+            "draw:name",
+            Some(resource.name()),
+        )?)
+        .ok_or_else(|| Error::InvalidFormat("ODG style-resource XML size overflow".into()))?;
     for (name, value) in resource.attributes() {
         validate_xml_qualified_name(name, "ODG named style-resource attribute")?;
         if name == "draw:name" {
@@ -6371,6 +9800,16 @@ fn serialize_style_resource(resource: &StyleResource) -> Result<String> {
         if !matches!(prefix, Some("draw" | "svg" | "xlink")) {
             return invalid("ODG named style-resource attribute namespace is unsupported");
         }
+        capacity = capacity
+            .checked_add(serialized_attribute_len(name, Some(value))?)
+            .ok_or_else(|| Error::InvalidFormat("ODG style-resource XML size overflow".into()))?;
+    }
+    capacity = capacity
+        .checked_add(2)
+        .ok_or_else(|| Error::InvalidFormat("ODG style-resource XML size overflow".into()))?;
+    let mut xml = precharge_xml_capacity(prefix, capacity, "ODG serialized style-resource")?;
+    push_attribute(&mut xml, "draw:name", Some(resource.name()))?;
+    for (name, value) in resource.attributes() {
         push_attribute(&mut xml, name, Some(value))?;
     }
     xml.push_str("/>");
@@ -6419,14 +9858,338 @@ fn validate_xml_qualified_name(value: &str, context: &str) -> Result<()> {
     validate_xml_local_name(local, context)
 }
 
-fn serialize_shape(shape: &Shape) -> Result<String> {
-    let element = shape.kind().element_name();
-    let mut xml = format!(
-        "<draw:{element} xmlns:draw=\"{}\" xmlns:svg=\"{}\" xmlns:text=\"{}\"",
+fn escaped_xml_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |total, character| {
+        let extra = match character {
+            '&' | '<' | '>' | '\'' | '"' => match character {
+                '&' => 4,
+                '<' | '>' => 3,
+                '\'' | '"' => 5,
+                _ => 0,
+            },
+            _ => 0,
+        };
+        total
+            .checked_add(character.len_utf8())
+            .and_then(|size| size.checked_add(extra))
+            .ok_or_else(|| Error::InvalidFormat("ODG XML escaped size overflow".into()))
+    })
+}
+
+fn push_escaped_xml(output: &mut String, value: &str, resource: &'static str) -> Result<()> {
+    let escaped_len = escaped_xml_len(value)?;
+    let required = output
+        .len()
+        .checked_add(escaped_len)
+        .ok_or_else(|| Error::InvalidFormat("ODG escaped XML size overflow".into()))?;
+    if required > output.capacity() {
+        output
+            .try_reserve_exact(required - output.len())
+            .map_err(|allocation_error| Error::Allocation {
+                resource,
+                source: allocation_error,
+            })?;
+    }
+    let mut start = 0usize;
+    for (index, character) in value.char_indices() {
+        let replacement = match character {
+            '&' => "&amp;",
+            '<' => "&lt;",
+            '>' => "&gt;",
+            '\'' => "&apos;",
+            '"' => "&quot;",
+            _ => continue,
+        };
+        output.push_str(&value[start..index]);
+        output.push_str(replacement);
+        start = index + character.len_utf8();
+    }
+    output.push_str(&value[start..]);
+    Ok(())
+}
+
+fn escaped_xml_string(value: &str, maximum: usize, resource: &'static str) -> Result<String> {
+    let escaped_len = escaped_xml_len(value)?;
+    if escaped_len > maximum {
+        return invalid(format!("{resource} exceeds the output limit"));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(escaped_len)
+        .map_err(|allocation_error| Error::Allocation {
+            resource,
+            source: allocation_error,
+        })?;
+    push_escaped_xml(&mut output, value, resource)?;
+    Ok(output)
+}
+
+fn serialized_attribute_len(name: &str, value: Option<&str>) -> Result<usize> {
+    let Some(value) = value else {
+        return Ok(0);
+    };
+    validate_bounded_value(value, "ODG XML attribute value")?;
+    serialized_attribute_len_allow_empty(name, Some(value))
+}
+
+fn serialized_attribute_len_allow_empty(name: &str, value: Option<&str>) -> Result<usize> {
+    let Some(value) = value else {
+        return Ok(0);
+    };
+    if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
+        return invalid("ODG XML attribute value");
+    }
+    let escaped = escaped_xml_len(value)?;
+    1usize
+        .checked_add(name.len())
+        .and_then(|size| size.checked_add(2))
+        .and_then(|size| size.checked_add(escaped))
+        .and_then(|size| size.checked_add(1))
+        .ok_or_else(|| Error::InvalidFormat("ODG XML attribute size overflow".into()))
+}
+
+fn validate_xml_source_size(source: &str, owner: &str) -> Result<()> {
+    if source.len() > MAX_OUTPUT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} exceeds the output limit"
+        )));
+    }
+    Ok(())
+}
+
+fn clone_bounded_string(source: &str, maximum: usize, resource: &'static str) -> Result<String> {
+    if source.len() > maximum {
+        return Err(Error::InvalidFormat(format!(
+            "{resource} exceeds the byte limit"
+        )));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|allocation_error| Error::Allocation {
+            resource,
+            source: allocation_error,
+        })?;
+    output.push_str(source);
+    Ok(output)
+}
+
+fn own_bounded_cow<'a>(
+    value: std::borrow::Cow<'a, str>,
+    maximum: usize,
+    resource: &'static str,
+) -> Result<String> {
+    match value {
+        std::borrow::Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
+        std::borrow::Cow::Owned(value) => {
+            if value.len() > maximum {
+                return Err(Error::InvalidFormat(format!(
+                    "{resource} exceeds the byte limit"
+                )));
+            }
+            Ok(value)
+        },
+    }
+}
+
+fn precharge_xml_capacity(
+    mut xml: String,
+    capacity: usize,
+    resource: &'static str,
+) -> Result<String> {
+    if capacity > MAX_OUTPUT_BYTES || capacity < xml.len() {
+        return invalid("ODG serialized XML exceeds the output limit");
+    }
+    xml.try_reserve_exact(capacity - xml.len())
+        .map_err(|allocation_error| Error::Allocation {
+            resource,
+            source: allocation_error,
+        })?;
+    Ok(xml)
+}
+
+fn validate_text_content(value: &str, owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES
+        || value.contains('\0')
+        || value
+            .chars()
+            .any(|character| character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+    {
+        return invalid(owner);
+    }
+    Ok(())
+}
+
+fn shape_serialized_capacity(shape: &Shape, element: &str) -> Result<usize> {
+    let (prefix, local) = element.split_once(':').unwrap_or(("draw", element));
+    let mut prefix_xml = format!(
+        "<{prefix}:{local} xmlns:draw=\"{}\" xmlns:svg=\"{}\" xmlns:text=\"{}\"",
         std::str::from_utf8(DRAW).unwrap_or_default(),
         std::str::from_utf8(SVG).unwrap_or_default(),
         std::str::from_utf8(TEXT).unwrap_or_default()
     );
+    if prefix == "dr3d" {
+        prefix_xml.push_str(" xmlns:dr3d=\"");
+        prefix_xml.push_str(std::str::from_utf8(DR3D).unwrap_or_default());
+        prefix_xml.push('"');
+    }
+    if shape.control_reference().is_some() && shape.kind() != ShapeKind::Control {
+        return invalid("ODG draw:control is only supported on detached control shapes");
+    }
+    for value in [
+        shape.name(),
+        shape.layer(),
+        shape.control_reference(),
+        shape.style_name(),
+        shape.text_style_name(),
+        shape.x(),
+        shape.y(),
+        shape.width(),
+        shape.height(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        validate_bounded_value(value, "ODG XML attribute value")?;
+    }
+    for value in [shape.x(), shape.y(), shape.width(), shape.height()]
+        .into_iter()
+        .flatten()
+    {
+        if !is_odf_length(value) {
+            return invalid("ODG shape coordinate or size is not an ODF length");
+        }
+    }
+    if let Some(transform) = shape.transform() {
+        validate_advanced_geometry_value(transform, "ODG transform")?;
+    }
+    if shape.points().is_some()
+        && (!matches!(shape.kind(), ShapeKind::Polygon | ShapeKind::Polyline)
+            || shape.view_box().is_none())
+    {
+        return invalid("ODG points require a polygon/polyline with a paired view box");
+    }
+    if matches!(shape.kind(), ShapeKind::Polygon | ShapeKind::Polyline)
+        && shape.view_box().is_some()
+        && shape.points().is_none()
+    {
+        return invalid("ODG polygon/polyline view box requires paired points");
+    }
+    if let Some(points) = shape.points()
+        && !is_points(points)
+    {
+        return invalid("ODG polygon points are not an ODF point list");
+    }
+    if let Some(view_box) = shape.view_box()
+        && !is_integer_list(view_box, 4)
+    {
+        return invalid("ODG polygon view box is not four integers");
+    }
+    let line_geometry = shape.line_geometry();
+    validate_line_geometry(shape.kind(), &line_geometry, true)?;
+    for endpoint in line_geometry.iter().flatten().copied() {
+        if !is_odf_length(endpoint) {
+            return invalid("ODG line endpoint is not an ODF length");
+        }
+    }
+    if shape.path_data().is_some() && shape.kind() != ShapeKind::Path {
+        return invalid("ODG svg:d is only supported on detached path shapes");
+    }
+    if let Some(path_data) = shape.path_data() {
+        validate_path_data(path_data)?;
+    }
+    if let Some(title) = shape.title() {
+        validate_text_content(title, "ODG shape title is invalid")?;
+    }
+    if let Some(description) = shape.description() {
+        validate_text_content(description, "ODG shape description is invalid")?;
+    }
+    validate_text_content(shape.text(), "ODG shape text is invalid")?;
+
+    let mut capacity = prefix_xml.len();
+    for (name, value) in [
+        ("draw:name", shape.name()),
+        ("draw:layer", shape.layer()),
+        ("draw:control", shape.control_reference()),
+        ("draw:style-name", shape.style_name()),
+        ("draw:text-style-name", shape.text_style_name()),
+        (
+            "draw:z-index",
+            shape.z_index().map(|value| value.to_string()).as_deref(),
+        ),
+        ("svg:x", shape.x()),
+        ("svg:y", shape.y()),
+        ("svg:width", shape.width()),
+        ("svg:height", shape.height()),
+        ("draw:transform", shape.transform()),
+        ("svg:viewBox", shape.view_box()),
+        ("draw:points", shape.points()),
+        ("svg:x1", line_geometry[0]),
+        ("svg:y1", line_geometry[1]),
+        ("svg:x2", line_geometry[2]),
+        ("svg:y2", line_geometry[3]),
+        ("svg:d", shape.path_data()),
+    ] {
+        capacity = capacity
+            .checked_add(serialized_attribute_len(name, value)?)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape size overflow".into()))?;
+    }
+    if shape.title().is_some() || shape.description().is_some() || !shape.text().is_empty() {
+        capacity = capacity
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape size overflow".into()))?;
+        for (open, close, value) in [
+            ("<svg:title>", "</svg:title>", shape.title()),
+            ("<svg:desc>", "</svg:desc>", shape.description()),
+            (
+                "<text:p>",
+                "</text:p>",
+                (!shape.text().is_empty()).then_some(shape.text()),
+            ),
+        ] {
+            if let Some(value) = value {
+                let escaped = escaped_xml_len(value)?;
+                capacity = capacity
+                    .checked_add(open.len())
+                    .and_then(|size| size.checked_add(close.len()))
+                    .and_then(|size| size.checked_add(escaped))
+                    .ok_or_else(|| Error::InvalidFormat("ODG shape text size overflow".into()))?;
+            }
+        }
+        capacity = capacity
+            .checked_add(4 + prefix.len() + local.len())
+            .ok_or_else(|| Error::InvalidFormat("ODG shape size overflow".into()))?;
+    } else {
+        capacity = capacity
+            .checked_add(2)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape size overflow".into()))?;
+    }
+    if capacity > MAX_OUTPUT_BYTES {
+        return invalid("ODG serialized shape exceeds the output limit");
+    }
+    Ok(capacity)
+}
+
+fn serialize_shape(shape: &Shape) -> Result<String> {
+    let element = shape.kind().element_name();
+    let (prefix, local) = element.split_once(':').unwrap_or(("draw", element));
+    let capacity = shape_serialized_capacity(shape, element)?;
+    let mut xml = format!(
+        "<{prefix}:{local} xmlns:draw=\"{}\" xmlns:svg=\"{}\" xmlns:text=\"{}\"",
+        std::str::from_utf8(DRAW).unwrap_or_default(),
+        std::str::from_utf8(SVG).unwrap_or_default(),
+        std::str::from_utf8(TEXT).unwrap_or_default()
+    );
+    xml.try_reserve_exact(capacity.saturating_sub(xml.len()))
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG serialized shape",
+            source: allocation_error,
+        })?;
+    if prefix == "dr3d" {
+        xml.push_str(" xmlns:dr3d=\"");
+        xml.push_str(std::str::from_utf8(DR3D).unwrap_or_default());
+        xml.push('"');
+    }
     push_attribute(&mut xml, "draw:name", shape.name())?;
     push_attribute(&mut xml, "draw:layer", shape.layer())?;
     if shape.control_reference().is_some() && shape.kind() != ShapeKind::Control {
@@ -6446,13 +10209,17 @@ fn serialize_shape(shape: &Shape) -> Result<String> {
         validate_advanced_geometry_value(transform, "ODG transform")?;
     }
     push_attribute(&mut xml, "draw:transform", shape.transform())?;
-    let has_points = shape.points().is_some() || shape.view_box().is_some();
-    if has_points
+    if shape.points().is_some()
         && (!matches!(shape.kind(), ShapeKind::Polygon | ShapeKind::Polyline)
-            || shape.points().is_none()
             || shape.view_box().is_none())
     {
         return invalid("ODG points require a polygon/polyline with a paired view box");
+    }
+    if matches!(shape.kind(), ShapeKind::Polygon | ShapeKind::Polyline)
+        && shape.view_box().is_some()
+        && shape.points().is_none()
+    {
+        return invalid("ODG polygon/polyline view box requires paired points");
     }
     if let Some(points) = shape.points() {
         validate_advanced_geometry_value(points, "ODG polygon points")?;
@@ -6463,16 +10230,7 @@ fn serialize_shape(shape: &Shape) -> Result<String> {
     push_attribute(&mut xml, "svg:viewBox", shape.view_box())?;
     push_attribute(&mut xml, "draw:points", shape.points())?;
     let line_geometry = shape.line_geometry();
-    let line_values = line_geometry.iter().flatten().count();
-    if line_values != 0
-        && (line_values != 4
-            || !matches!(
-                shape.kind(),
-                ShapeKind::Line | ShapeKind::Connector | ShapeKind::Measure
-            ))
-    {
-        return invalid("ODG line geometry requires four endpoints on a line-like shape");
-    }
+    validate_line_geometry(shape.kind(), &line_geometry, true)?;
     for endpoint in line_geometry.iter().flatten().copied() {
         validate_advanced_geometry_value(endpoint, "ODG line endpoint")?;
     }
@@ -6494,21 +10252,23 @@ fn serialize_shape(shape: &Shape) -> Result<String> {
     xml.push('>');
     if let Some(title) = shape.title() {
         xml.push_str("<svg:title>");
-        xml.push_str(&quick_xml::escape::escape(title));
+        push_escaped_xml(&mut xml, title, "ODG serialized shape")?;
         xml.push_str("</svg:title>");
     }
     if let Some(description) = shape.description() {
         xml.push_str("<svg:desc>");
-        xml.push_str(&quick_xml::escape::escape(description));
+        push_escaped_xml(&mut xml, description, "ODG serialized shape")?;
         xml.push_str("</svg:desc>");
     }
     if !shape.text().is_empty() {
         xml.push_str("<text:p>");
-        xml.push_str(&quick_xml::escape::escape(shape.text()));
+        push_escaped_xml(&mut xml, shape.text(), "ODG serialized shape")?;
         xml.push_str("</text:p>");
     }
-    xml.push_str("</draw:");
-    xml.push_str(element);
+    xml.push_str("</");
+    xml.push_str(prefix);
+    xml.push(':');
+    xml.push_str(local);
     xml.push('>');
     Ok(xml)
 }
@@ -6521,7 +10281,7 @@ fn push_attribute(output: &mut String, name: &str, value: Option<&str>) -> Resul
     output.push(' ');
     output.push_str(name);
     output.push_str("=\"");
-    output.push_str(&quick_xml::escape::escape(attribute_value));
+    push_escaped_xml(output, attribute_value, "ODG XML attribute")?;
     output.push('"');
     Ok(())
 }
@@ -6533,11 +10293,25 @@ fn validate_bounded_value(value: &str, owner: &str) -> Result<()> {
     Ok(())
 }
 
+fn validate_raw_xml_value(value: &[u8], owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES {
+        return Err(Error::InvalidFormat(format!("{owner} exceeds the limit")));
+    }
+    Ok(())
+}
+
+fn validate_decoded_xml_value(value: &str, owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
+        return Err(Error::InvalidFormat(format!("{owner} exceeds the limit")));
+    }
+    Ok(())
+}
+
 fn validate_geometry(values: &[String; 4]) -> Result<()> {
     for value in values {
         validate_bounded_value(value, "ODG geometry value")?;
-        if value.bytes().any(|byte| byte.is_ascii_whitespace()) {
-            return invalid("ODG geometry value contains whitespace");
+        if !is_odf_length(value) {
+            return invalid("ODG geometry value is not an ODF length");
         }
     }
     Ok(())
@@ -6599,6 +10373,385 @@ fn transfer_xml_references(xml: &str, href: &str) -> bool {
         || xml.contains(&format!("xlink:href='{escaped}'"))
 }
 
+/// Collects root and inherited namespace declarations available to fragments
+/// copied out of the two XML parts.  A source package may declare producer
+/// namespaces such as `loext` only on its document root; those declarations
+/// must travel with an extracted shape or the destination document would have
+/// an unbound prefix.  Conflicting aliases are withheld and cause an explicit
+/// refusal below.
+fn transfer_source_namespaces(snapshot: &Snapshot) -> Result<BTreeMap<String, String>> {
+    let mut namespaces = BTreeMap::new();
+    let mut conflicts = BTreeSet::new();
+    for xml in [Some(snapshot.content_xml()), snapshot.styles_xml()] {
+        let Some(xml) = xml else {
+            continue;
+        };
+        for (prefix, uri) in transfer_root_namespaces(xml)? {
+            if let Some(previous) = namespaces.get(&prefix)
+                && previous != &uri
+            {
+                conflicts.insert(prefix.clone());
+            } else {
+                namespaces.insert(prefix, uri);
+            }
+        }
+    }
+    for prefix in conflicts {
+        namespaces.remove(&prefix);
+    }
+    Ok(namespaces)
+}
+
+/// Returns namespace prefixes and declarations found in one self-contained
+/// transfer fragment.  Declarations are collected at every depth so a
+/// declaration owned by a nested opaque child remains valid in its original
+/// scope; `close_transfer_fragment_namespaces` only adds declarations that are
+/// absent from the fragment altogether.
+fn transfer_fragment_namespaces(
+    xml: &str,
+) -> Result<(BTreeSet<String>, BTreeMap<String, String>, BTreeSet<String>)> {
+    validate_xml_source_size(xml, "ODG transfer fragment")?;
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut declarations = BTreeMap::<String, String>::new();
+    let mut used = BTreeSet::<String>::new();
+    let mut sensitive_aliases = BTreeSet::<String>::new();
+    let mut root_seen = false;
+    loop {
+        let event = reader.read_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG transfer fragment event")?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                record_transfer_qname(
+                    element.name().as_ref(),
+                    &mut used,
+                    &mut sensitive_aliases,
+                    !root_seen,
+                )?;
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODG transfer namespace: {error}"))
+                    })?;
+                    let name = attribute.key.as_ref();
+                    validate_raw_xml_value(name, "ODG transfer namespace name")?;
+                    if name == b"xmlns" {
+                        continue;
+                    }
+                    if let Some(prefix) = name.strip_prefix(b"xmlns:") {
+                        validate_raw_xml_value(prefix, "ODG transfer namespace prefix")?;
+                        let prefix = std::str::from_utf8(prefix).map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid ODG transfer namespace prefix: {error}"
+                            ))
+                        })?;
+                        validate_raw_xml_value(
+                            attribute.value.as_ref(),
+                            "ODG transfer namespace URI",
+                        )?;
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map_err(|error| {
+                                Error::InvalidFormat(format!(
+                                    "invalid ODG transfer namespace URI: {error}"
+                                ))
+                            })?;
+                        validate_decoded_xml_value(value.as_ref(), "ODG transfer namespace URI")?;
+                        let value =
+                            own_bounded_cow(value, MAX_TEXT_BYTES, "ODG transfer namespace URI")?;
+                        let prefix = clone_bounded_string(
+                            prefix,
+                            MAX_TEXT_BYTES,
+                            "ODG transfer namespace prefix",
+                        )?;
+                        declarations.insert(prefix, value);
+                    } else {
+                        record_transfer_qname(name, &mut used, &mut sensitive_aliases, false)?;
+                    }
+                }
+                root_seen = true;
+            },
+            Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
+                return invalid("active XML is prohibited in ODG transfer fragments");
+            },
+            Event::Eof => break,
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::End(_)
+            | Event::Text(_) => {},
+        }
+    }
+    if !root_seen {
+        return invalid("ODG transfer fragment has no root element");
+    }
+    Ok((used, declarations, sensitive_aliases))
+}
+
+/// Checks that every namespace used by a transfer fragment can be reproduced
+/// after the fragment is moved under a different content root.  Rewriting is
+/// intentionally limited to canonical ODF prefixes: an alias for a known
+/// dependency namespace would otherwise make resource/style closure checks
+/// silently miss a reference.  Such fragments are refused before any
+/// transaction state is changed.
+fn validate_transfer_fragment_namespaces(xml: &str) -> Result<()> {
+    let (used, declarations, sensitive_aliases) = transfer_fragment_namespaces(xml)?;
+    for prefix in used {
+        if prefix == "xml" {
+            continue;
+        }
+        let expected = transfer_namespace_uri(&prefix);
+        let declared = declarations.get(&prefix).map(String::as_str);
+        match (expected, declared) {
+            (Some(expected), Some(declared)) if declared != expected => {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer fragment binds canonical prefix '{prefix}' to another namespace"
+                )));
+            },
+            (Some(_), _) => {},
+            (None, Some(uri)) if transfer_namespace_uri_bytes(uri).is_some() => {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer fragment aliases known namespace '{uri}' with prefix '{prefix}'"
+                )));
+            },
+            (None, Some(_)) => {},
+            (None, None) if sensitive_aliases.contains(&prefix) => {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer fragment cannot prove dependency namespace for prefix '{prefix}'"
+                )));
+            },
+            (None, None) => {
+                return Err(Error::Unsupported(format!(
+                    "ODG transfer fragment cannot prove namespace for prefix '{prefix}'"
+                )));
+            },
+        }
+    }
+    Ok(())
+}
+
+/// Adds source-root declarations needed by an extracted fragment.  Unknown
+/// producer prefixes are copied verbatim when their source-root URI is
+/// unambiguous; otherwise the transfer is refused instead of publishing XML
+/// whose namespace identity depends on the destination root.
+fn close_transfer_fragment_namespaces(
+    xml: &str,
+    available: &BTreeMap<String, String>,
+) -> Result<String> {
+    let (used, declarations, _sensitive_aliases) = transfer_fragment_namespaces(xml)?;
+    let mut missing = BTreeMap::new();
+    for prefix in used {
+        if prefix == "xml"
+            || transfer_namespace_uri(&prefix).is_some()
+            || declarations.contains_key(&prefix)
+        {
+            continue;
+        }
+        let uri = available.get(&prefix).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "ODG transfer fragment cannot prove namespace closure for prefix '{prefix}'"
+            ))
+        })?;
+        missing.insert(prefix, uri.clone());
+    }
+    ensure_transfer_namespace_values(xml, &missing)
+}
+
+fn transfer_namespace_closure_bytes(
+    xml: &str,
+    available: &BTreeMap<String, String>,
+) -> Result<usize> {
+    let (used, declarations, _sensitive_aliases) = transfer_fragment_namespaces(xml)?;
+    used.into_iter().try_fold(0usize, |total, prefix| {
+        if prefix == "xml"
+            || transfer_namespace_uri(&prefix).is_some()
+            || declarations.contains_key(&prefix)
+        {
+            return Ok(total);
+        }
+        let uri = available.get(&prefix).ok_or_else(|| {
+            Error::Unsupported(format!(
+                "ODG transfer fragment cannot prove namespace closure for prefix '{prefix}'"
+            ))
+        })?;
+        // `ensure_transfer_namespace_values` writes exactly:
+        // ` xmlns:{prefix}="{uri}"`.
+        let escaped_uri_len = escaped_xml_len(uri)?;
+        let declaration_bytes = 1usize
+            .checked_add("xmlns:".len())
+            .and_then(|size| size.checked_add(prefix.len()))
+            .and_then(|size| size.checked_add(2))
+            .and_then(|size| size.checked_add(escaped_uri_len))
+            .and_then(|size| size.checked_add(1))
+            .ok_or_else(|| Error::InvalidFormat("ODG namespace closure size overflow".into()))?;
+        total
+            .checked_add(declaration_bytes)
+            .ok_or_else(|| Error::InvalidFormat("ODG namespace closure size overflow".into()))
+    })
+}
+
+fn transfer_root_namespaces(xml: &str) -> Result<BTreeMap<String, String>> {
+    validate_xml_source_size(xml, "ODG transfer root XML")?;
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    loop {
+        let event = reader.read_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG transfer root XML: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG transfer root event")?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let mut declarations = BTreeMap::new();
+                for raw_attribute in element.attributes() {
+                    let attribute = raw_attribute.map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid ODG transfer root namespace declaration: {error}"
+                        ))
+                    })?;
+                    let key = attribute.key.as_ref();
+                    validate_raw_xml_value(key, "ODG transfer root namespace name")?;
+                    let prefix = if key == b"xmlns" {
+                        ""
+                    } else if let Some(prefix) = key.strip_prefix(b"xmlns:") {
+                        validate_raw_xml_value(prefix, "ODG transfer root namespace prefix")?;
+                        std::str::from_utf8(prefix).map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid ODG transfer root namespace prefix: {error}"
+                            ))
+                        })?
+                    } else {
+                        continue;
+                    };
+                    validate_raw_xml_value(
+                        attribute.value.as_ref(),
+                        "ODG transfer root namespace URI",
+                    )?;
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|error| {
+                            Error::InvalidFormat(format!(
+                                "invalid ODG transfer root namespace URI: {error}"
+                            ))
+                        })?;
+                    validate_decoded_xml_value(value.as_ref(), "ODG transfer root namespace URI")?;
+                    let value =
+                        own_bounded_cow(value, MAX_TEXT_BYTES, "ODG transfer root namespace URI")?;
+                    let prefix = clone_bounded_string(
+                        prefix,
+                        MAX_TEXT_BYTES,
+                        "ODG transfer root namespace prefix",
+                    )?;
+                    if declarations.insert(prefix, value).is_some() {
+                        return invalid("ODG transfer root namespace declaration is duplicated");
+                    }
+                }
+                return Ok(declarations);
+            },
+            Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
+                return invalid("active XML is prohibited in ODG transfer roots");
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            Event::CData(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            Event::End(_) | Event::Text(_) | Event::CData(_) | Event::Eof => {
+                return invalid("ODG transfer root start tag is missing");
+            },
+        }
+    }
+}
+
+fn record_transfer_qname(
+    name: &[u8],
+    used: &mut BTreeSet<String>,
+    sensitive_aliases: &mut BTreeSet<String>,
+    root: bool,
+) -> Result<()> {
+    validate_raw_xml_value(name, "ODG transfer qualified name")?;
+    let Some(separator) = name.iter().position(|byte| *byte == b':') else {
+        return Ok(());
+    };
+    validate_raw_xml_value(&name[..separator], "ODG transfer qualified-name prefix")?;
+    let prefix = std::str::from_utf8(&name[..separator]).map_err(|error| {
+        Error::InvalidFormat(format!("invalid ODG transfer qualified name: {error}"))
+    })?;
+    if prefix.is_empty() {
+        return invalid("ODG transfer qualified name has an empty prefix");
+    }
+    used.insert(clone_bounded_string(
+        prefix,
+        MAX_TEXT_BYTES,
+        "ODG transfer qualified-name prefix",
+    )?);
+    if root || transfer_sensitive_local_name(&name[separator + 1..]) {
+        sensitive_aliases.insert(clone_bounded_string(
+            prefix,
+            MAX_TEXT_BYTES,
+            "ODG transfer qualified-name prefix",
+        )?);
+    }
+    Ok(())
+}
+
+fn transfer_sensitive_local_name(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"href"
+            | b"name"
+            | b"style-name"
+            | b"text-style-name"
+            | b"parent-style-name"
+            | b"fill-gradient-name"
+            | b"fill-hatch-name"
+            | b"fill-image-name"
+            | b"marker-start"
+            | b"marker-end"
+            | b"stroke-dash"
+            | b"opacity"
+            | b"control"
+            | b"id"
+    )
+}
+
+fn transfer_namespace_uri(prefix: &str) -> Option<&'static str> {
+    match prefix {
+        "office" => std::str::from_utf8(OFFICE).ok(),
+        "draw" => std::str::from_utf8(DRAW).ok(),
+        "dr3d" => std::str::from_utf8(DR3D).ok(),
+        "svg" => std::str::from_utf8(SVG).ok(),
+        "text" => std::str::from_utf8(TEXT).ok(),
+        "table" => std::str::from_utf8(TABLE).ok(),
+        "style" => std::str::from_utf8(STYLE).ok(),
+        "form" => std::str::from_utf8(FORM).ok(),
+        "fo" => std::str::from_utf8(FO).ok(),
+        "presentation" => std::str::from_utf8(PRESENTATION).ok(),
+        "smil" => std::str::from_utf8(SMIL).ok(),
+        "xlink" => std::str::from_utf8(XLINK).ok(),
+        "xml" => std::str::from_utf8(XML).ok(),
+        _ => None,
+    }
+}
+
+fn transfer_namespace_uri_bytes(uri: &str) -> Option<&'static [u8]> {
+    [
+        OFFICE,
+        DRAW,
+        DR3D,
+        SVG,
+        TEXT,
+        TABLE,
+        STYLE,
+        FORM,
+        FO,
+        PRESENTATION,
+        SMIL,
+        XLINK,
+        XML,
+    ]
+    .into_iter()
+    .find(|candidate| std::str::from_utf8(candidate).ok() == Some(uri))
+}
+
 fn declares_style(snapshot: &Snapshot, name: &str) -> Result<bool> {
     if declares_style_xml(snapshot.content_xml(), name)? {
         return Ok(true);
@@ -6643,12 +10796,14 @@ fn find_style_definition(snapshot: &Snapshot, name: &str) -> Result<Option<Parse
 }
 
 fn style_parent_name(xml: &str) -> Result<Option<String>> {
+    validate_raw_xml_events(xml, "ODG transferred style event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     loop {
         let (namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transferred style XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transferred style event")?;
         match event {
             Event::Start(element) | Event::Empty(element)
                 if classify(&namespace) == NamespaceKind::Style
@@ -6672,12 +10827,14 @@ fn style_parent_name(xml: &str) -> Result<Option<String>> {
 }
 
 fn xml_has_attribute(xml: &str, namespace: &[u8], local: &[u8], value: &str) -> Result<bool> {
+    validate_raw_xml_events(xml, "ODG dependency event")?;
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     loop {
         let (_resolved_namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG dependency XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG dependency event")?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if attribute(&reader, &element, namespace, local)?.as_deref() == Some(value) {
@@ -6800,8 +10957,9 @@ fn rewrite_qualified_attribute_values(
     after: &str,
 ) -> Result<String> {
     if before == after {
-        return Ok(xml.to_owned());
+        return clone_bounded_string(xml, MAX_OUTPUT_BYTES, "ODG transfer fragment");
     }
+    validate_xml_source_size(xml, "ODG transfer fragment")?;
     let mut reader = quick_xml::Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut spans = Vec::new();
@@ -6810,6 +10968,7 @@ fn rewrite_qualified_attribute_values(
         let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
         })?;
+        validate_borrowed_xml_event(&event, "ODG transfer fragment rewrite event")?;
         let end = position_reader(&reader)?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -6826,6 +10985,7 @@ fn rewrite_qualified_attribute_values(
                     {
                         continue;
                     }
+                    validate_raw_xml_value(parsed.value.as_ref(), "ODG transfer attribute value")?;
                     let value = parsed
                         .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                         .map_err(|error| {
@@ -6833,6 +10993,7 @@ fn rewrite_qualified_attribute_values(
                                 "invalid ODG transfer attribute value: {error}"
                             ))
                         })?;
+                    validate_decoded_xml_value(value.as_ref(), "ODG transfer attribute value")?;
                     if value == before {
                         let (value_start, value_end) =
                             attribute_value_span(tag, parsed.key.as_ref())?;
@@ -6851,7 +11012,7 @@ fn rewrite_qualified_attribute_values(
             | Event::Text(_) => {},
         }
     }
-    let mut output = xml.to_owned();
+    let mut output = clone_bounded_string(xml, MAX_OUTPUT_BYTES, "ODG transfer fragment")?;
     spans.sort_unstable_by_key(|span| std::cmp::Reverse(span.start));
     for span in spans {
         output = replace_xml_value(&output, &span, after)?;
@@ -6860,29 +11021,130 @@ fn rewrite_qualified_attribute_values(
 }
 
 fn ensure_transfer_namespaces(xml: &str, namespaces: &[(&str, &[u8])]) -> Result<String> {
-    let tag_end = xml
-        .find('>')
-        .ok_or_else(|| Error::InvalidFormat("ODG transfer fragment start tag is missing".into()))?;
-    let tag = &xml[..tag_end];
-    let name_end = xml
+    let namespaces = namespaces
+        .iter()
+        .map(|(prefix, uri)| {
+            validate_raw_xml_value(prefix.as_bytes(), "ODG transfer namespace prefix")?;
+            validate_raw_xml_value(uri, "ODG transfer namespace URI")?;
+            let uri = std::str::from_utf8(uri).map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG transfer namespace: {error}"))
+            })?;
+            let uri = clone_bounded_string(uri, MAX_TEXT_BYTES, "ODG transfer namespace URI")?;
+            let prefix =
+                clone_bounded_string(prefix, MAX_TEXT_BYTES, "ODG transfer namespace prefix")?;
+            Ok((prefix, uri))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    ensure_transfer_namespace_values(xml, &namespaces)
+}
+
+fn ensure_transfer_namespace_values(
+    xml: &str,
+    namespaces: &BTreeMap<String, String>,
+) -> Result<String> {
+    validate_xml_source_size(xml, "ODG transfer fragment")?;
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let (root_start, root_end) = loop {
+        let start = position_reader(&reader)?;
+        let event = reader.read_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG transfer namespace event")?;
+        let end = position_reader(&reader)?;
+        match event {
+            Event::Start(_) | Event::Empty(_) => break (start, end),
+            Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {},
+            Event::DocType(_) | Event::GeneralRef(_) => {
+                return invalid("active XML is prohibited in ODG transfer fragments");
+            },
+            Event::CData(_) | Event::End(_) | Event::Text(_) | Event::Eof => {
+                return invalid("ODG transfer fragment start tag is missing");
+            },
+        }
+    };
+    let tag = xml
+        .get(root_start..root_end)
+        .ok_or_else(|| Error::InvalidFormat("ODG transfer fragment start tag is invalid".into()))?;
+    let name_end = tag
         .bytes()
         .enumerate()
         .skip(1)
         .find(|(_index, byte)| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
-        .map(|(index, _byte)| index)
+        .map(|(index, _byte)| root_start + index)
         .ok_or_else(|| Error::InvalidFormat("ODG transfer fragment name is invalid".into()))?;
-    let mut declarations = String::new();
+    let mut declaration_capacity = 0usize;
     for (prefix, namespace_uri) in namespaces {
-        if !tag.contains(&format!("xmlns:{prefix}=")) {
-            let namespace_text = std::str::from_utf8(namespace_uri).map_err(|error| {
-                Error::InvalidFormat(format!("ODG transfer namespace is invalid: {error}"))
-            })?;
-            write!(declarations, " xmlns:{prefix}=\"{namespace_text}\"").map_err(|error| {
+        validate_decoded_xml_value(prefix, "ODG transfer namespace prefix")?;
+        validate_decoded_xml_value(namespace_uri, "ODG transfer namespace URI")?;
+        if !transfer_root_declares_namespace(xml, prefix)? {
+            let escaped_uri_len = escaped_xml_len(namespace_uri)?;
+            let declaration_bytes = 1usize
+                .checked_add("xmlns:".len())
+                .and_then(|size| size.checked_add(prefix.len()))
+                .and_then(|size| size.checked_add(2))
+                .and_then(|size| size.checked_add(escaped_uri_len))
+                .and_then(|size| size.checked_add(1))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer namespace declaration size overflow".into())
+                })?;
+            declaration_capacity = declaration_capacity
+                .checked_add(declaration_bytes)
+                .ok_or_else(|| {
+                    Error::InvalidFormat("ODG transfer namespace declaration size overflow".into())
+                })?;
+        }
+    }
+    let mut declarations = precharge_xml_capacity(
+        String::new(),
+        declaration_capacity,
+        "ODG transfer namespace declarations",
+    )?;
+    for (prefix, namespace_uri) in namespaces {
+        if !transfer_root_declares_namespace(xml, prefix)? {
+            write!(declarations, " xmlns:{prefix}=\"").map_err(|error| {
                 Error::InvalidFormat(format!("ODG transfer namespace write failed: {error}"))
             })?;
+            push_escaped_xml(
+                &mut declarations,
+                namespace_uri,
+                "ODG transfer namespace declarations",
+            )?;
+            declarations.push('"');
         }
     }
     insert_xml(xml, name_end, &declarations)
+}
+
+fn transfer_root_declares_namespace(xml: &str, prefix: &str) -> Result<bool> {
+    let expected = format!("xmlns:{prefix}");
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    loop {
+        let event = reader.read_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG transfer fragment XML: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG transfer namespace declaration event")?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                return element.attributes().try_fold(false, |found, raw| {
+                    let attribute = raw.map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "invalid ODG transfer namespace declaration: {error}"
+                        ))
+                    })?;
+                    Ok(found || attribute.key.as_ref() == expected.as_bytes())
+                });
+            },
+            Event::Decl(_) | Event::Comment(_) | Event::PI(_) => {},
+            Event::DocType(_) | Event::GeneralRef(_) => {
+                return invalid("active XML is prohibited in ODG transfer fragments");
+            },
+            Event::CData(_) | Event::End(_) | Event::Text(_) | Event::Eof => {
+                return invalid("ODG transfer fragment start tag is missing");
+            },
+        }
+    }
 }
 
 fn inverse_change(change: &Change) -> Change {
@@ -6939,6 +11201,11 @@ fn inverse_change(change: &Change) -> Change {
             before: value.after.clone(),
             after: value.before.clone(),
         }),
+        Change::PageTransition(value) => Change::PageTransition(Box::new(PageTransitionChange {
+            page: value.page,
+            before: value.after.clone(),
+            after: value.before.clone(),
+        })),
         Change::Structure(value) => Change::Structure(match value {
             StructureChange::PageInserted { position, name } => StructureChange::PageRemoved {
                 position: *position,
@@ -7066,12 +11333,16 @@ fn attribute(
             .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute: {error}")))?;
         let (namespace, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
         if resolved_bound(&namespace, expected) && name.as_ref() == local {
+            // Check the encoded attribute before quick-xml can materialize its Cow.
+            validate_raw_xml_value(parsed_attribute.value.as_ref(), "ODG attribute value")?;
             let decoded = parsed_attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| {
                     Error::InvalidFormat(format!("invalid ODG attribute value: {error}"))
-                })?
-                .into_owned();
+                })?;
+            // Keep the decoded Cow borrowed/temporary until its size is admitted.
+            validate_decoded_xml_value(decoded.as_ref(), "ODG attribute value")?;
+            let decoded = own_bounded_cow(decoded, MAX_TEXT_BYTES, "ODG attribute value")?;
             if value.replace(decoded).is_some() {
                 return invalid("ODG element has a duplicate namespaced attribute");
             }
@@ -7099,13 +11370,21 @@ fn arbitrary_attributes(
         }) {
             continue;
         }
-        let name = std::str::from_utf8(raw_name)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute name: {error}")))?
-            .to_owned();
+        validate_raw_xml_value(raw_name, "ODG arbitrary attribute name")?;
+        let name = std::str::from_utf8(raw_name).map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG attribute name: {error}"))
+        })?;
+        let name = clone_bounded_string(name, MAX_TEXT_BYTES, "ODG arbitrary attribute name")?;
+        // The raw escaped bytes bound normalization before it can allocate.
+        validate_raw_xml_value(parsed.value.as_ref(), "ODG arbitrary attribute value")?;
         let value = parsed
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute value: {error}")))?
-            .into_owned();
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid ODG attribute value: {error}"))
+            })?;
+        // Admit the decoded Cow before retaining an owned attribute value.
+        validate_decoded_xml_value(value.as_ref(), "ODG arbitrary attribute value")?;
+        let value = own_bounded_cow(value, MAX_TEXT_BYTES, "ODG arbitrary attribute value")?;
         if values.insert(name, value).is_some() {
             return invalid("ODG element has a duplicate arbitrary attribute");
         }
@@ -7152,6 +11431,235 @@ fn optional_u32_attribute(
             })
         })
         .transpose()
+}
+
+fn is_vector3d(value: &str) -> bool {
+    let Some(inner) = value
+        .strip_prefix('(')
+        .and_then(|value| value.strip_suffix(')'))
+    else {
+        return false;
+    };
+    let mut values = inner.split(' ').filter(|value| !value.is_empty());
+    let valid = (0..3).all(|_| values.next().is_some_and(is_odf_decimal));
+    valid && values.next().is_none()
+}
+
+fn validate_three_dimensional_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    kind: ShapeKind,
+) -> Result<()> {
+    if attribute(reader, element, DRAW, b"transform")?.is_some() {
+        return invalid("ODG 3D shapes use dr3d:transform, not draw:transform");
+    }
+    if let Some(transform) = attribute(reader, element, DR3D, b"transform")? {
+        validate_optional_lexical_value(&transform, "ODG dr3d:transform")?;
+    }
+    match kind {
+        ShapeKind::ThreeDimensionalScene => {
+            for local in [b"vrp".as_slice(), b"vpn", b"vup"] {
+                if let Some(value) = attribute(reader, element, DR3D, local)?
+                    && !is_vector3d(&value)
+                {
+                    return invalid("ODG dr3d scene vector is invalid");
+                }
+            }
+            if let Some(value) = attribute(reader, element, DR3D, b"projection")?
+                && !matches!(value.as_str(), "parallel" | "perspective")
+            {
+                return invalid("ODG dr3d projection is invalid");
+            }
+            for local in [b"distance".as_slice(), b"focal-length"] {
+                if let Some(value) = attribute(reader, element, DR3D, local)?
+                    && !is_odf_length(&value)
+                {
+                    return invalid("ODG dr3d scene distance is invalid");
+                }
+            }
+            if let Some(value) = attribute(reader, element, DR3D, b"shade-mode")?
+                && !matches!(value.as_str(), "flat" | "phong" | "gouraud" | "draft")
+            {
+                return invalid("ODG dr3d shade mode is invalid");
+            }
+            if let Some(value) = attribute(reader, element, DR3D, b"ambient-color")?
+                && !is_odf_color(&value)
+            {
+                return invalid("ODG dr3d ambient color is invalid");
+            }
+            let _ = optional_bool_attribute(reader, element, DR3D, b"lighting-mode")?;
+        },
+        ShapeKind::ThreeDimensionalLight => {
+            if let Some(value) = attribute(reader, element, DR3D, b"diffuse-color")?
+                && !is_odf_color(&value)
+            {
+                return invalid("ODG dr3d diffuse color is invalid");
+            }
+            let _ = optional_bool_attribute(reader, element, DR3D, b"enabled")?;
+            let _ = optional_bool_attribute(reader, element, DR3D, b"specular")?;
+        },
+        ShapeKind::ThreeDimensionalCube => {
+            for local in [b"min-edge".as_slice(), b"max-edge"] {
+                if let Some(value) = attribute(reader, element, DR3D, local)?
+                    && !is_vector3d(&value)
+                {
+                    return invalid("ODG dr3d cube edge is invalid");
+                }
+            }
+        },
+        ShapeKind::ThreeDimensionalSphere => {
+            for local in [b"center".as_slice(), b"size"] {
+                if let Some(value) = attribute(reader, element, DR3D, local)?
+                    && !is_vector3d(&value)
+                {
+                    return invalid("ODG dr3d sphere vector is invalid");
+                }
+            }
+        },
+        ShapeKind::ThreeDimensionalExtrude | ShapeKind::ThreeDimensionalRotate => {},
+        _ => {},
+    }
+    Ok(())
+}
+
+fn validate_optional_lexical_value(value: &str, owner: &str) -> Result<()> {
+    if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
+        return invalid(owner);
+    }
+    Ok(())
+}
+
+fn is_integer_list(value: &str, expected: usize) -> bool {
+    let mut values = value.split_ascii_whitespace();
+    let valid = (0..expected).all(|_| values.next().is_some_and(is_odf_integer));
+    valid && values.next().is_none()
+}
+
+fn is_points(value: &str) -> bool {
+    let mut points = value.split(' ');
+    let Some(first) = points.next() else {
+        return false;
+    };
+    is_point(first) && points.all(is_point)
+}
+
+fn is_point(point: &str) -> bool {
+    let Some((x, y)) = point.split_once(',') else {
+        return false;
+    };
+    is_points_integer(x) && is_points_integer(y)
+}
+
+fn is_points_integer(value: &str) -> bool {
+    let value = value.strip_prefix('-').unwrap_or(value);
+    !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn is_odf_integer(value: &str) -> bool {
+    let value = value
+        .strip_prefix('-')
+        .or_else(|| value.strip_prefix('+'))
+        .unwrap_or(value);
+    !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn is_odf_decimal(value: &str) -> bool {
+    let value = value.strip_prefix('-').unwrap_or(value);
+    let Some((whole, fraction)) = value.split_once('.') else {
+        return !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit());
+    };
+    if whole.is_empty() {
+        !fraction.is_empty() && fraction.bytes().all(|byte| byte.is_ascii_digit())
+    } else {
+        whole.bytes().all(|byte| byte.is_ascii_digit())
+            && fraction.bytes().all(|byte| byte.is_ascii_digit())
+    }
+}
+
+fn is_odf_length(value: &str) -> bool {
+    ["cm", "mm", "in", "pt", "pc", "px"]
+        .iter()
+        .any(|unit| value.strip_suffix(unit).is_some_and(is_odf_decimal))
+}
+
+fn is_odf_percent(value: &str) -> bool {
+    value.strip_suffix('%').is_some_and(is_odf_decimal)
+}
+
+fn is_odf_distance_or_percent(value: &str) -> bool {
+    is_odf_length(value) || is_odf_percent(value)
+}
+
+fn is_odf_color(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+}
+
+fn validate_shape_lexical_attributes(
+    kind: ShapeKind,
+    geometry: &[Option<String>; 4],
+    line_geometry: &[Option<String>; 4],
+    view_box: Option<&str>,
+    points: Option<&str>,
+) -> Result<()> {
+    for value in geometry.iter().flatten() {
+        if !is_odf_length(value) {
+            return invalid("ODG shape coordinate or size is not an ODF length");
+        }
+    }
+    validate_line_geometry(kind, line_geometry, false)?;
+    if let Some(value) = view_box
+        && !is_integer_list(value, 4)
+    {
+        return invalid("ODG shape viewBox is not four integers");
+    }
+    if let Some(value) = points
+        && !is_points(value)
+    {
+        return invalid("ODG shape points are not an ODF point list");
+    }
+    if points.is_some()
+        && (!matches!(kind, ShapeKind::Polygon | ShapeKind::Polyline) || view_box.is_none())
+    {
+        return invalid("ODG shape points require a polygon or polyline with a paired view box");
+    }
+    Ok(())
+}
+
+fn validate_line_geometry<T: AsRef<str>>(
+    kind: ShapeKind,
+    values: &[Option<T>; 4],
+    require_complete: bool,
+) -> Result<()> {
+    let present = values.iter().flatten().count();
+    match kind {
+        ShapeKind::Line | ShapeKind::Measure if require_complete && present != 4 => {
+            return invalid("ODG line geometry requires four endpoints");
+        },
+        ShapeKind::Connector
+            if require_complete
+                && (values[0].is_some() != values[1].is_some()
+                    || values[2].is_some() != values[3].is_some()) =>
+        {
+            return invalid("ODG connector endpoints must be paired");
+        },
+        _ if present != 0
+            && !matches!(
+                kind,
+                ShapeKind::Line | ShapeKind::Connector | ShapeKind::Measure
+            ) =>
+        {
+            return invalid("ODG line endpoints require a line-like shape");
+        },
+        _ => {},
+    }
+    for value in values.iter().flatten() {
+        if !is_odf_length(value.as_ref()) {
+            return invalid("ODG line endpoint is not an ODF length");
+        }
+    }
+    Ok(())
 }
 
 fn shape_name_span(
@@ -7243,6 +11751,56 @@ fn attribute_value_span(tag: &[u8], wanted: &[u8]) -> Result<(usize, usize)> {
     invalid("ODG shape name span was not found")
 }
 
+fn attribute_token_span(tag: &[u8], wanted: &[u8]) -> Result<Range<usize>> {
+    let mut cursor = 1usize;
+    while cursor < tag.len() && !tag[cursor].is_ascii_whitespace() && tag[cursor] != b'>' {
+        cursor += 1;
+    }
+    while cursor < tag.len() {
+        let whitespace_start = cursor;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if cursor >= tag.len() || matches!(tag[cursor], b'/' | b'>') {
+            break;
+        }
+        let name_start = cursor;
+        while cursor < tag.len()
+            && !tag[cursor].is_ascii_whitespace()
+            && !matches!(tag[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let name_end = cursor;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        if tag.get(cursor) != Some(&b'=') {
+            return invalid("ODG transition attribute is missing '='");
+        }
+        cursor += 1;
+        while cursor < tag.len() && tag[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+        let quote = *tag
+            .get(cursor)
+            .filter(|quote| matches!(quote, b'\'' | b'\"'))
+            .ok_or_else(|| Error::InvalidFormat("ODG transition attribute is not quoted".into()))?;
+        cursor += 1;
+        while cursor < tag.len() && tag[cursor] != quote {
+            cursor += 1;
+        }
+        if cursor >= tag.len() {
+            return invalid("ODG transition attribute is unterminated");
+        }
+        cursor += 1;
+        if &tag[name_start..name_end] == wanted {
+            return Ok(whitespace_start..cursor);
+        }
+    }
+    invalid("ODG transition attribute span was not found")
+}
+
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position()).map_err(|_error| {
         Error::InvalidFormat("ODG XML position exceeds platform limits".to_string())
@@ -7256,6 +11814,17 @@ fn position_reader(reader: &quick_xml::Reader<&[u8]>) -> Result<usize> {
 }
 
 fn shape_kind(namespace: NamespaceKind, local: &[u8]) -> Option<ShapeKind> {
+    if namespace == NamespaceKind::Dr3d {
+        return Some(match local {
+            b"scene" => ShapeKind::ThreeDimensionalScene,
+            b"light" => ShapeKind::ThreeDimensionalLight,
+            b"cube" => ShapeKind::ThreeDimensionalCube,
+            b"sphere" => ShapeKind::ThreeDimensionalSphere,
+            b"extrude" => ShapeKind::ThreeDimensionalExtrude,
+            b"rotate" => ShapeKind::ThreeDimensionalRotate,
+            _ => return None,
+        });
+    }
     (namespace == NamespaceKind::Draw).then_some(match local {
         b"caption" => ShapeKind::Caption,
         b"circle" => ShapeKind::Circle,
@@ -7281,10 +11850,13 @@ fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
     match namespace {
         ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE => NamespaceKind::Office,
         ResolveResult::Bound(Namespace(uri)) if *uri == DRAW => NamespaceKind::Draw,
+        ResolveResult::Bound(Namespace(uri)) if *uri == DR3D => NamespaceKind::Dr3d,
         ResolveResult::Bound(Namespace(uri)) if *uri == TEXT => NamespaceKind::Text,
+        ResolveResult::Bound(Namespace(uri)) if *uri == TABLE => NamespaceKind::Table,
         ResolveResult::Bound(Namespace(uri)) if *uri == SVG => NamespaceKind::Svg,
         ResolveResult::Bound(Namespace(uri)) if *uri == FORM => NamespaceKind::Form,
         ResolveResult::Bound(Namespace(uri)) if *uri == STYLE => NamespaceKind::Style,
+        ResolveResult::Bound(Namespace(uri)) if *uri == PRESENTATION => NamespaceKind::Presentation,
         ResolveResult::Bound(_) | ResolveResult::Unbound | ResolveResult::Unknown(_) => {
             NamespaceKind::Other
         },
@@ -7297,4 +11869,55 @@ fn resolved_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quick_xml::events::{BytesCData, BytesPI, BytesText};
+
+    #[test]
+    fn borrowed_event_admission_rejects_oversized_ignored_inputs() {
+        let oversized = "x".repeat(MAX_TEXT_BYTES + 1);
+        assert!(
+            validate_borrowed_xml_event(&Event::Text(BytesText::new(&oversized)), "text probe")
+                .is_err()
+        );
+        assert!(
+            validate_borrowed_xml_event(&Event::CData(BytesCData::new(&oversized)), "cdata probe")
+                .is_err()
+        );
+        assert!(
+            validate_borrowed_xml_event(
+                &Event::Comment(BytesText::new(&oversized)),
+                "comment probe"
+            )
+            .is_err()
+        );
+        assert!(
+            validate_borrowed_xml_event(
+                &Event::PI(BytesPI::new(&oversized)),
+                "processing-instruction probe"
+            )
+            .is_err()
+        );
+
+        let start = format!("draw:rect value=\"{oversized}\"");
+        assert!(
+            validate_borrowed_xml_event(
+                &Event::Start(BytesStart::from_content(&start, "draw:rect".len())),
+                "start-tag probe"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn bounded_clone_admission_refuses_before_reservation() {
+        let source = "0123456789";
+        let error = clone_bounded_string(source, 9, "allocation probe").unwrap_err();
+        assert!(
+            matches!(error, Error::InvalidFormat(reason) if reason.contains("allocation probe"))
+        );
+    }
 }

@@ -1,0 +1,7 @@
+{
+  "source": "/home/zhuhe/code/litchi-spec-gaps/Cargo.lock",
+  "destination": "/var/tmp/litchi-odg-v8-integration-base-clean-20260910/Cargo.lock",
+  "sha256": "28499130dfcc9fe70f86205d3872b5cac1290a74099bcaeabb88add3c418f3c5",
+  "tracked_in_base": false,
+  "purpose": "explicit locked offline integration validation input; no source change"
+}
