@@ -80,6 +80,15 @@ observer mutex can perturb scheduling, so use normal binaries for latency and
 scaling claims. Recapture both sides and update policy identity before using V3
 comparisons; earlier allocator policies remain historical.
 
+The allocator binary's canonical default selection now has a fail-closed
+201-row operation coverage contract. See
+[`FULL_DEFAULT_ALLOCATOR_COVERAGE.md`](../../docs/performance/FULL_DEFAULT_ALLOCATOR_COVERAGE.md)
+for the row matrix, absent-vector rules, allocator elapsed claim, and the
+required provenance for temporary dependency-lock overlays. A clean-tree
+status observed after restoring such an overlay does not prove that the
+executable was built from the unmodified lock file; the capture manifest must
+record the base lock digest and overlay identity.
+
 Allocator evidence correction: [change 0421](../../docs/performance/changes/0421-allocator-peak-counter.md)
 fixes under-reported `peak_live_bytes_*` values. 0421 allocator reports
 include `tool.allocator_counter_revision = "post_update_peak_v2"`; normal reports
@@ -3927,6 +3936,13 @@ allocation vector; its case/corpus/cache manifest is
 allocator-only comparator; the checked normal policy continues to reject this
 binary identity. The existing raw `filesystem_evidence` samples remain
 unchanged.
+
+The separate full-default allocator contract is operation-scoped and covers
+201 warm in-process rows (144 substrate, 9 fresh legacy writers, 45 XLSX, and
+3 ODP append rows). It requires the exact default corpus, payload, writer,
+XLSX, and semantic shape sets, rejects duplicate `(case, corpus)` identities,
+and records the canonical identity digest in `allocation_coverage`; every
+allocator elapsed vector remains evidence-only.
 
 The separate checked XLSX repeated-store allocator policy is warm-only and
 pins exactly `xlsx_source_repeated_store_medium` and

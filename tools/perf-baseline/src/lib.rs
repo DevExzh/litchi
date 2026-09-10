@@ -3643,6 +3643,8 @@ struct Report {
     parallel_metrics: parallel_metrics::ReportMetrics,
     results: Vec<CaseResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    allocation_coverage: Option<AllocationCoverage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     filesystem_evidence: Option<Vec<filesystem::Evidence>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     corpus_catalog: Option<corpus_manifest::CatalogReferenceV2>,
@@ -3797,6 +3799,29 @@ struct CaseResult {
     operation_metrics: Option<operation_metrics::OperationMetrics>,
 }
 
+const FULL_DEFAULT_ALLOCATOR_CONTRACT: &str = "default_case_matrix_201_rows";
+const FULL_DEFAULT_ALLOCATOR_SCHEMA_VERSION: u32 = 1;
+const FULL_DEFAULT_ALLOCATOR_RESULT_COUNT: usize = 201;
+const FULL_DEFAULT_ALLOCATOR_LATENCY_CLAIM: &str =
+    "allocator_instrumented_elapsed_not_latency_claim";
+
+/// Machine-readable proof that the allocator target covered the complete
+/// default matrix. This is intentionally emitted only after validation; a
+/// missing row or mixed allocation vector fails the run instead of producing
+/// a partial report with plausible zeros.
+#[derive(Debug, Serialize)]
+struct AllocationCoverage {
+    schema_version: u32,
+    contract: &'static str,
+    result_count: usize,
+    expected_result_count: usize,
+    measured_result_count: usize,
+    samples_per_result: usize,
+    allocation_status: &'static str,
+    latency_claim: &'static str,
+    result_key_sha256: String,
+}
+
 /// Promotes the deterministic logical sink summary into the aligned
 /// operation-metrics envelope.  The summary is retained at the top level for
 /// compatibility; this pass only adds a normalized per-sample view and does
@@ -3806,7 +3831,6 @@ fn promote_sink_operation_metrics(results: &mut [CaseResult]) -> Result<(), Box<
         let Some(summary) = result.sink else {
             continue;
         };
-        let sample_count = result.elapsed_ns.samples.len();
         let observation = operation_metrics::SinkObservation {
             accepted_bytes: summary.accepted_bytes,
             write_calls: summary.write_calls,
@@ -3819,15 +3843,374 @@ fn promote_sink_operation_metrics(results: &mut [CaseResult]) -> Result<(), Box<
             bytes_over_65536: summary.write_size_buckets.bytes_over_65536,
         };
         if let Some(metrics) = result.operation_metrics.as_mut() {
-            metrics.set_sink_observation(sample_count, observation)?;
+            metrics.set_sink_observation(&result.elapsed_ns.sample_order, observation)?;
         } else {
-            result.operation_metrics = Some(operation_metrics::from_sink_observation(
-                sample_count,
-                observation,
-            )?);
+            result.operation_metrics = Some(
+                operation_metrics::from_sink_observation_with_sample_indices(
+                    &result.elapsed_ns.sample_order,
+                    observation,
+                )?,
+            );
         }
     }
     Ok(())
+}
+
+fn full_default_allocator_case_rows(case: Case) -> Option<usize> {
+    match case {
+        Case::ZipIndex
+        | Case::ZipReadOne
+        | Case::OpcOpen
+        | Case::OpcOpenOwned
+        | Case::OpcNoopSave
+        | Case::OpcMutatedSave
+        | Case::OpcSourceOpen
+        | Case::OpcSourceOpenMainRead
+        | Case::OpcSourceCachedMainRead
+        | Case::OpcSourceConcurrentSamePart
+        | Case::CfbOpen
+        | Case::CfbListStreams
+        | Case::CfbReadOne
+        | Case::CfbCreateStreamBorrowed
+        | Case::CfbCreateStreamOwned
+        | Case::CfbSharedOpen
+        | Case::CfbSharedReadOne
+        | Case::CfbSharedConcurrentReads => Some(8),
+        Case::DocFreshWriteTo | Case::XlsFreshWriteTo | Case::PptFreshWriteTo => Some(3),
+        Case::XlsxOpenOwned
+        | Case::XlsxListSheets
+        | Case::XlsxFirstCell
+        | Case::XlsxFullCellScan
+        | Case::XlsxNarrowColumnRangeScan
+        | Case::XlsxNoopCommit
+        | Case::XlsxNoopCommitSave
+        | Case::XlsxOneCellCommit
+        | Case::XlsxOneCellCommitSave
+        | Case::XlsxOnePercentCommit
+        | Case::XlsxOnePercentCommitSave
+        | Case::XlsxSourceOpen
+        | Case::XlsxSourceListSheets
+        | Case::XlsxSourceFirstCell
+        | Case::XlsxSourceNarrowColumnRangeScan
+        | Case::OdpExistingAppendLifecycle => Some(3),
+        _ => None,
+    }
+}
+
+fn expected_full_default_allocator_rows() -> Result<BTreeMap<&'static str, usize>, Box<dyn Error>> {
+    let mut expected = BTreeMap::new();
+    for case in Case::DEFAULT {
+        let rows = full_default_allocator_case_rows(case).ok_or_else(|| {
+            format!(
+                "default allocator contract has no row definition for {}",
+                case.name()
+            )
+        })?;
+        if expected.insert(case.name(), rows).is_some() {
+            return Err(format!(
+                "default allocator contract defines duplicate case {}",
+                case.name()
+            )
+            .into());
+        }
+    }
+    let total = expected.values().try_fold(0usize, |total, rows| {
+        total
+            .checked_add(*rows)
+            .ok_or("default allocator contract row count overflows usize")
+    })?;
+    if total != FULL_DEFAULT_ALLOCATOR_RESULT_COUNT {
+        return Err(format!(
+            "default allocator contract totals {total} rows instead of {}",
+            FULL_DEFAULT_ALLOCATOR_RESULT_COUNT
+        )
+        .into());
+    }
+    Ok(expected)
+}
+
+fn selects_full_default_allocator_cases(cases: &[Case]) -> bool {
+    if cases.len() != Case::DEFAULT.len() {
+        return false;
+    }
+    let mut selected = cases.iter().map(|case| case.name()).collect::<Vec<_>>();
+    let mut expected = Case::DEFAULT
+        .iter()
+        .map(|case| case.name())
+        .collect::<Vec<_>>();
+    selected.sort_unstable();
+    expected.sort_unstable();
+    selected == expected
+}
+
+fn selects_exact_named<T: Copy>(
+    selected: &[T],
+    expected: &[T],
+    name: fn(T) -> &'static str,
+) -> bool {
+    if selected.len() != expected.len() {
+        return false;
+    }
+    let mut selected = selected.iter().copied().map(name).collect::<Vec<_>>();
+    let mut expected = expected.iter().copied().map(name).collect::<Vec<_>>();
+    selected.sort_unstable();
+    expected.sort_unstable();
+    selected == expected
+}
+
+fn selects_full_default_allocator_dimensions(options: &Options) -> bool {
+    selects_exact_named(&options.shapes, &CorpusShape::ALL, CorpusShape::name)
+        && selects_exact_named(&options.payloads, &PayloadKind::ALL, PayloadKind::name)
+        && selects_exact_named(&options.writer_shapes, &WriterShape::ALL, WriterShape::name)
+        && selects_exact_named(&options.xlsx_shapes, &XlsxShape::ALL, XlsxShape::name)
+        && selects_exact_named(
+            &options.semantic_shapes,
+            &SemanticShape::ALL,
+            SemanticShape::name,
+        )
+}
+
+fn canonical_json_bytes(
+    value: &serde_json::Value,
+    output: &mut Vec<u8>,
+) -> Result<(), Box<dyn Error>> {
+    match value {
+        serde_json::Value::Null
+        | serde_json::Value::Bool(_)
+        | serde_json::Value::Number(_)
+        | serde_json::Value::String(_) => {
+            serde_json::to_writer(&mut *output, value)?;
+        },
+        serde_json::Value::Array(values) => {
+            output.push(b'[');
+            for (index, value) in values.iter().enumerate() {
+                if index != 0 {
+                    output.push(b',');
+                }
+                canonical_json_bytes(value, output)?;
+            }
+            output.push(b']');
+        },
+        serde_json::Value::Object(values) => {
+            output.push(b'{');
+            let mut keys = values.keys().collect::<Vec<_>>();
+            keys.sort_unstable();
+            for (index, key) in keys.iter().enumerate() {
+                if index != 0 {
+                    output.push(b',');
+                }
+                serde_json::to_writer(&mut *output, key)?;
+                output.push(b':');
+                canonical_json_bytes(
+                    values
+                        .get(*key)
+                        .ok_or("canonical JSON object key disappeared")?,
+                    output,
+                )?;
+            }
+            output.push(b'}');
+        },
+    }
+    Ok(())
+}
+
+fn canonical_corpus_identity(corpus: &CorpusManifest) -> Result<String, Box<dyn Error>> {
+    let value = serde_json::to_value(corpus)?;
+    let mut output = Vec::new();
+    canonical_json_bytes(&value, &mut output)?;
+    Ok(String::from_utf8(output).expect("serde_json emits UTF-8"))
+}
+
+fn result_key_manifest_sha256(keys: &BTreeSet<(String, String)>) -> String {
+    let mut bytes = Vec::new();
+    for (case, corpus_identity) in keys {
+        bytes.extend_from_slice(case.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(corpus_identity.as_bytes());
+        bytes.push(b'\n');
+    }
+    sha256_hex(&bytes)
+}
+
+fn validate_full_default_allocator_coverage(
+    options: &Options,
+    results: &[CaseResult],
+) -> Result<Option<AllocationCoverage>, Box<dyn Error>> {
+    if allocation_metrics::instrumentation_identity() != "system_allocator_operation_scoped"
+        || !selects_full_default_allocator_cases(&options.cases)
+    {
+        return Ok(None);
+    }
+    if !selects_full_default_allocator_dimensions(options) {
+        return Err(format!(
+            "{FULL_DEFAULT_ALLOCATOR_CONTRACT} requires each default shape, payload, writer, XLSX, and semantic selection exactly once"
+        )
+        .into());
+    }
+
+    let expected = expected_full_default_allocator_rows()?;
+    let expected_result_count = expected.values().try_fold(0usize, |total, rows| {
+        total
+            .checked_add(*rows)
+            .ok_or("default allocator result count overflows usize")
+    })?;
+    if results.len() != expected_result_count {
+        return Err(format!(
+            "{FULL_DEFAULT_ALLOCATOR_CONTRACT} requires {expected_result_count} results, got {}",
+            results.len()
+        )
+        .into());
+    }
+
+    let mut actual = BTreeMap::<&'static str, usize>::new();
+    let mut result_keys = BTreeSet::<(String, String)>::new();
+    for result in results {
+        if result.cache_state.is_some() {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} cannot include filesystem cache rows ({})",
+                result.case
+            )
+            .into());
+        }
+        let count = actual.entry(result.case).or_insert(0);
+        *count = count
+            .checked_add(1)
+            .ok_or("default allocator case row count overflows usize")?;
+
+        let result_key = (
+            result.case.to_owned(),
+            canonical_corpus_identity(&result.corpus)?,
+        );
+        if !result_keys.insert(result_key) {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} contains a duplicate case/corpus identity for {}",
+                result.case
+            )
+            .into());
+        }
+
+        let metrics = result.operation_metrics.as_ref().ok_or_else(|| {
+            format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has no operation metrics",
+                result.case
+            )
+        })?;
+        if metrics.latency_claim != FULL_DEFAULT_ALLOCATOR_LATENCY_CLAIM {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} exposes allocator elapsed as a latency claim",
+                result.case
+            )
+            .into());
+        }
+        if metrics.sample_count != options.samples
+            || result.elapsed_ns.samples.len() != options.samples
+            || result.elapsed_ns.sample_order.len() != options.samples
+            || metrics.sample_indices.len() != options.samples
+        {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has incomplete sample alignment",
+                result.case
+            )
+            .into());
+        }
+        let mut sample_indices = metrics.sample_indices.clone();
+        sample_indices.sort_unstable();
+        if sample_indices != (0..options.samples).collect::<Vec<_>>() {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has mixed or duplicate sample identities",
+                result.case
+            )
+            .into());
+        }
+        let mut elapsed_order = result.elapsed_ns.sample_order.clone();
+        elapsed_order.sort_unstable();
+        if elapsed_order != (0..options.samples).collect::<Vec<_>>()
+            || metrics.sample_indices != result.elapsed_ns.sample_order
+            || metrics.alignment != "elapsed_ns.samples_by_elapsed_then_sample_index"
+        {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has sample order disagreement or invalid alignment",
+                result.case
+            )
+            .into());
+        }
+        let allocation = metrics.allocation.as_ref().ok_or_else(|| {
+            format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has no allocation vector",
+                result.case
+            )
+        })?;
+        if allocation.status != operation_metrics::MetricStatus::Measured
+            || allocation.scope != allocation_metrics::Scope::OperationGlobalSystemAllocator
+        {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has incomplete allocation status",
+                result.case
+            )
+            .into());
+        }
+        let vectors = [
+            ("allocation_calls", &allocation.allocation_calls),
+            ("deallocation_calls", &allocation.deallocation_calls),
+            ("reallocation_calls", &allocation.reallocation_calls),
+            (
+                "failed_allocation_calls",
+                &allocation.failed_allocation_calls,
+            ),
+            ("allocated_bytes", &allocation.allocated_bytes),
+            ("deallocated_bytes", &allocation.deallocated_bytes),
+            ("live_bytes_before", &allocation.live_bytes_before),
+            ("live_bytes_after", &allocation.live_bytes_after),
+            ("peak_live_bytes_before", &allocation.peak_live_bytes_before),
+            ("peak_live_bytes_after", &allocation.peak_live_bytes_after),
+            ("region_peak_live_bytes", &allocation.region_peak_live_bytes),
+        ];
+        for (name, vector) in vectors {
+            let values = vector.values.as_ref().ok_or_else(|| {
+                format!(
+                    "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has absent {name} vector",
+                    result.case
+                )
+            })?;
+            if vector.status != operation_metrics::MetricStatus::Measured
+                || values.len() != options.samples
+            {
+                return Err(format!(
+                    "{FULL_DEFAULT_ALLOCATOR_CONTRACT} row {} has incomplete {name} vector",
+                    result.case
+                )
+                .into());
+            }
+        }
+    }
+
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{FULL_DEFAULT_ALLOCATOR_CONTRACT} contains an unknown or missing case"
+        )
+        .into());
+    }
+    for (case, expected_rows) in expected {
+        let actual_rows = actual.get(case).copied().unwrap_or(0);
+        if actual_rows != expected_rows {
+            return Err(format!(
+                "{FULL_DEFAULT_ALLOCATOR_CONTRACT} case {case} requires {expected_rows} rows, got {actual_rows}"
+            )
+            .into());
+        }
+    }
+
+    Ok(Some(AllocationCoverage {
+        schema_version: FULL_DEFAULT_ALLOCATOR_SCHEMA_VERSION,
+        contract: FULL_DEFAULT_ALLOCATOR_CONTRACT,
+        result_count: results.len(),
+        expected_result_count,
+        measured_result_count: results.len(),
+        samples_per_result: options.samples,
+        allocation_status: "measured",
+        latency_claim: FULL_DEFAULT_ALLOCATOR_LATENCY_CLAIM,
+        result_key_sha256: result_key_manifest_sha256(&result_keys),
+    }))
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
@@ -10991,6 +11374,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     }
 
     promote_sink_operation_metrics(&mut results)?;
+    let allocation_coverage = validate_full_default_allocator_coverage(&options, &results)?;
 
     let configuration = Configuration {
         samples_per_case: options.samples,
@@ -11110,6 +11494,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         configuration,
         parallel_metrics,
         results,
+        allocation_coverage,
         filesystem_evidence: (!filesystem_evidence.is_empty()).then_some(filesystem_evidence),
         corpus_catalog: corpus_catalog.as_ref().map(|catalog| catalog.reference()),
     };
@@ -39722,18 +40107,31 @@ fn run_xlsx_open_owned(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let owned = corpus.archive.clone();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let workbook = Workbook::from_bytes(owned)?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if workbook.len() != spec.sheet_count {
             return Err("owned XLSX open sheet count differs from corpus specification".into());
         }
         std::hint::black_box(&workbook);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::XlsxOpenOwned, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::XlsxOpenOwned, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn run_xlsx_named_sheet_lookup(
@@ -39851,14 +40249,17 @@ fn run_xlsx_list_sheets(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let names = workbook
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>();
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         let expected = (0..spec.sheet_count)
             .map(xlsx_sheet_name)
             .collect::<Vec<_>>();
@@ -39866,9 +40267,19 @@ fn run_xlsx_list_sheets(
             return Err("XLSX sheet listing differs from corpus specification".into());
         }
         std::hint::black_box(&names);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::XlsxListSheets, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::XlsxListSheets, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn run_xlsx_first_cell(
@@ -39877,22 +40288,35 @@ fn run_xlsx_first_cell(
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let sheet = workbook
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let cell = sheet.cell("A1")?.stored().cloned();
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if !matches!(cell, Some(XlsxCell::Value(XlsxValue::Number(ref value))) if value.as_str() == "0")
         {
             return Err("XLSX first cell differs from deterministic expectation".into());
         }
         std::hint::black_box(&cell);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::XlsxFirstCell, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::XlsxFirstCell, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn run_xlsx_full_cell_scan(
@@ -39903,21 +40327,34 @@ fn run_xlsx_full_cell_scan(
     let spec = xlsx_spec(corpus)?;
     let expected = xlsx_cell_count(spec)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let sheet = workbook
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let count = sheet.cells("A1:XFD1048576")?.count();
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if count != expected / spec.sheet_count {
             return Err("XLSX full cell scan count differs from corpus specification".into());
         }
         std::hint::black_box(count);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::XlsxFullCellScan, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::XlsxFullCellScan, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn run_xlsx_narrow_column_range_scan(
@@ -39928,6 +40365,7 @@ fn run_xlsx_narrow_column_range_scan(
     let spec = xlsx_spec(corpus)?;
     let range = format!("B1:B{}", spec.row_count);
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let sheet = workbook
@@ -39938,21 +40376,28 @@ fn run_xlsx_narrow_column_range_scan(
         // row-major worksheet, exposing iterator work that is proportional to
         // all stored cells in the selected rows.
         let _ = sheet.cell("A1")?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let count = sheet.cells(range.as_str())?.count();
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if count != spec.row_count {
             return Err("XLSX narrow-column range scan count differs from specification".into());
         }
         std::hint::black_box(count);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(
-        Case::XlsxNarrowColumnRangeScan,
-        corpus,
-        elapsed,
-        None,
-    ))
+    attach_default_operation_metrics(
+        result(Case::XlsxNarrowColumnRangeScan, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn xlsx_source_cell_has_value(cell: Option<&XlsxCell>, expected: i32) -> bool {
@@ -40011,12 +40456,15 @@ fn run_xlsx_source_open(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = xlsx_instrumented_source(corpus)?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if workbook.len() != spec.sheet_count {
             return Err("source-backed XLSX open sheet count differs from specification".into());
         }
@@ -40042,14 +40490,19 @@ fn run_xlsx_source_open(
         if iteration >= warmup_iterations {
             source_summary.record_xlsx(metrics);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::XlsxSourceOpen,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(Case::XlsxSourceOpen, corpus, elapsed, source_summary),
+        &observations,
+    )
 }
 
 fn run_xlsx_source_list_sheets(
@@ -40062,17 +40515,20 @@ fn run_xlsx_source_list_sheets(
         .map(xlsx_sheet_name)
         .collect::<Vec<_>>();
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = xlsx_instrumented_source(corpus)?;
         let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
         source.reset();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let names = workbook
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>();
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if names != expected {
             return Err("source-backed XLSX sheet listing differs from specification".into());
         }
@@ -40098,14 +40554,19 @@ fn run_xlsx_source_list_sheets(
         if iteration >= warmup_iterations {
             source_summary.record_xlsx(metrics);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::XlsxSourceListSheets,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(Case::XlsxSourceListSheets, corpus, elapsed, source_summary),
+        &observations,
+    )
 }
 
 fn run_xlsx_source_first_cell(
@@ -40115,6 +40576,7 @@ fn run_xlsx_source_first_cell(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = xlsx_instrumented_source(corpus)?;
@@ -40123,9 +40585,11 @@ fn run_xlsx_source_first_cell(
             .sheet("Sheet1")?
             .ok_or("source-backed XLSX first sheet is missing")?;
         source.reset();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let cell = first.cell("A1")?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if !xlsx_source_cell_has_value(cell.stored(), 0) {
             return Err("source-backed XLSX first cell differs from expectation".into());
         }
@@ -40141,14 +40605,19 @@ fn run_xlsx_source_first_cell(
         if iteration >= warmup_iterations {
             source_summary.record_xlsx(metrics);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::XlsxSourceFirstCell,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(Case::XlsxSourceFirstCell, corpus, elapsed, source_summary),
+        &observations,
+    )
 }
 
 fn run_xlsx_source_narrow_column_range_scan(
@@ -40159,6 +40628,7 @@ fn run_xlsx_source_narrow_column_range_scan(
     let spec = xlsx_spec(corpus)?;
     let range = format!("B1:B{}", spec.row_count);
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = xlsx_instrumented_source(corpus)?;
@@ -40167,9 +40637,11 @@ fn run_xlsx_source_narrow_column_range_scan(
             .sheet("Sheet1")?
             .ok_or("source-backed XLSX first sheet is missing")?;
         source.reset();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let cells = first.cells(range.as_str())?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if cells.len() != spec.row_count {
             return Err("source-backed XLSX narrow range count differs from specification".into());
         }
@@ -40200,14 +40672,24 @@ fn run_xlsx_source_narrow_column_range_scan(
         if iteration >= warmup_iterations {
             source_summary.record_xlsx(metrics);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::XlsxSourceNarrowColumnRangeScan,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(
+            Case::XlsxSourceNarrowColumnRangeScan,
+            corpus,
+            elapsed,
+            source_summary,
+        ),
+        &observations,
+    )
 }
 
 fn xlsx_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, Box<dyn Error>> {
@@ -40547,20 +41029,33 @@ fn run_xlsx_noop_commit(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let edit = workbook.edit()?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if !commit.patch().is_empty() {
             return Err("XLSX no-op commit produced semantic changes".into());
         }
         verify_xlsx_cells(commit.workbook(), spec, &[])?;
         std::hint::black_box(&commit);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::XlsxNoopCommit, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::XlsxNoopCommit, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn run_xlsx_noop_commit_save(
@@ -40571,16 +41066,19 @@ fn run_xlsx_noop_commit_save(
     let spec = xlsx_spec(corpus)?;
     let maximum = xlsx_output_ceiling(corpus.archive.len())?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let edit = workbook.edit()?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
         commit.workbook().write_to(&mut sink)?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if !commit.patch().is_empty() || sink.bytes != corpus.archive {
             return Err("XLSX no-op commit/save is not byte-exact for generated corpus".into());
         }
@@ -40589,15 +41087,20 @@ fn run_xlsx_noop_commit_save(
         if iteration >= warmup_iterations {
             sink_summaries.push(sink.summary());
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
     let sink = deterministic_sink_summary(&sink_summaries, "XLSX no-op commit/save")?;
-    Ok(result(
-        Case::XlsxNoopCommitSave,
-        corpus,
-        elapsed,
-        Some(sink),
-    ))
+    attach_default_operation_metrics(
+        result(Case::XlsxNoopCommitSave, corpus, elapsed, Some(sink)),
+        &observations,
+    )
 }
 
 fn run_xlsx_update_commit(
@@ -40618,19 +41121,29 @@ fn run_xlsx_update_commit(
         Case::XlsxOnePercentCommit
     };
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut final_commit = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if commit.patch().len() != updates.len() {
             return Err("XLSX update commit has an unexpected semantic change count".into());
         }
         std::hint::black_box(&commit);
         final_commit = Some(commit);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
     verify_xlsx_cells(
         final_commit
@@ -40640,7 +41153,7 @@ fn run_xlsx_update_commit(
         spec,
         updates,
     )?;
-    Ok(result(case, corpus, elapsed, None))
+    attach_default_operation_metrics(result(case, corpus, elapsed, None), &observations)
 }
 
 fn run_xlsx_one_cell_commit_first_read(
@@ -40722,16 +41235,19 @@ fn run_xlsx_update_commit_save(
     let expected = xlsx_expected_output(corpus, updates)?;
     let maximum = xlsx_output_ceiling(expected.len())?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
         commit.workbook().write_to(&mut sink)?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if sink.bytes != expected {
             return Err(
                 "XLSX changed commit/save differs from deterministic expected output".into(),
@@ -40742,10 +41258,17 @@ fn run_xlsx_update_commit_save(
         if iteration >= warmup_iterations {
             sink_summaries.push(sink.summary());
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
     let sink = deterministic_sink_summary(&sink_summaries, "XLSX changed commit/save")?;
-    Ok(result(case, corpus, elapsed, Some(sink)))
+    attach_default_operation_metrics(result(case, corpus, elapsed, Some(sink)), &observations)
 }
 
 fn xlsx_cell_crud_eager_output(
@@ -42798,35 +43321,48 @@ fn run_zip_index(
     let expected_member_count = corpus.manifest.archive_member_count;
     let mut observed_member_counts = Vec::with_capacity(samples);
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let archive = ArchiveReader::new(&corpus.archive)?;
         let observed = archive.file_names().count();
         std::hint::black_box(observed);
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if observed != expected_member_count {
             return Err(format!(
                 "ZIP index member count differs from deterministic manifest: observed={observed}, expected={expected_member_count}"
             )
             .into());
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
         if iteration >= warmup_iterations {
             observed_member_counts.push(observed);
         }
     }
-    Ok(result_with_source(
-        Case::ZipIndex,
-        corpus,
-        elapsed,
-        SourceSummary {
-            zip_index: Some(ZipIndexSummary {
-                expected_member_count,
-                observed_member_counts,
-            }),
-            ..SourceSummary::default()
-        },
-    ))
+    attach_default_operation_metrics(
+        result_with_source(
+            Case::ZipIndex,
+            corpus,
+            elapsed,
+            SourceSummary {
+                zip_index: Some(ZipIndexSummary {
+                    expected_member_count,
+                    observed_member_counts,
+                }),
+                ..SourceSummary::default()
+            },
+        ),
+        &observations,
+    )
 }
 
 fn run_detection_case(
@@ -42908,21 +43444,30 @@ fn run_zip_read_one(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let archive = ArchiveReader::new(&corpus.archive)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let bytes = archive.read(&corpus.target_name)?;
         if bytes != corpus.target_payload {
             return Err("ZIP read result differs from deterministic corpus payload".into());
         }
         std::hint::black_box(&bytes);
-        record_elapsed(
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        record_default_operation(
             &mut elapsed,
+            &mut observations,
             iteration,
             warmup_iterations,
-            started.elapsed(),
+            duration,
+            allocation_metrics,
         )?;
     }
-    Ok(result(Case::ZipReadOne, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::ZipReadOne, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn opc_payload_ranges(corpus: &Corpus) -> Result<(Vec<Range<u64>>, Range<u64>), Box<dyn Error>> {
@@ -45080,9 +45625,11 @@ fn run_opc_source_open(
     };
     let cache_limits = opc_source_cache_limits(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let package =
             SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
@@ -45106,6 +45653,7 @@ fn run_opc_source_open(
             after_open
         };
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if !read_main {
             std::hint::black_box(verify_opc_main_payload(&package, corpus)?);
             let after_proof_read = source.snapshot();
@@ -45121,9 +45669,19 @@ fn run_opc_source_open(
         if iteration >= warmup_iterations {
             source_summary.record_opc(metrics, u64::from(read_main));
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(case, corpus, elapsed, source_summary))
+    attach_default_operation_metrics(
+        result_with_source(case, corpus, elapsed, source_summary),
+        &observations,
+    )
 }
 
 /// Compact deterministic expectations for the complete logical graph produced
@@ -45704,6 +46262,7 @@ fn run_opc_source_cached_main_read(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let cache_limits = opc_source_cache_limits(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
@@ -45711,6 +46270,7 @@ fn run_opc_source_cached_main_read(
             SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
         let cold = verify_opc_main_payload(&package, corpus)?;
         source.reset();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let cached = verify_opc_main_payload(&package, corpus)?;
         let duration = started.elapsed();
@@ -45721,17 +46281,28 @@ fn run_opc_source_cached_main_read(
         if metrics != SourceSnapshot::default() {
             return Err("source-backed OPC cache hit performed a source read".into());
         }
+        let allocation_metrics = allocation_region.finish();
         if iteration >= warmup_iterations {
             source_summary.record_opc(metrics, 0);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::OpcSourceCachedMainRead,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(
+            Case::OpcSourceCachedMainRead,
+            corpus,
+            elapsed,
+            source_summary,
+        ),
+        &observations,
+    )
 }
 
 fn run_opc_source_concurrent_same_part(
@@ -45741,6 +46312,7 @@ fn run_opc_source_concurrent_same_part(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let cache_limits = opc_source_cache_limits(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
@@ -45751,6 +46323,7 @@ fn run_opc_source_concurrent_same_part(
         }
         source.reset();
         let start = Arc::new(Barrier::new(3));
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let (first, second) = std::thread::scope(|scope| {
             let first_start = Arc::clone(&start);
@@ -45777,6 +46350,7 @@ fn run_opc_source_concurrent_same_part(
         let first = first.map_err(|_panic| "first OPC source worker panicked")??;
         let second = second.map_err(|_panic| "second OPC source worker panicked")??;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if first.as_slice() != corpus.target_payload || second.as_slice() != corpus.target_payload {
             return Err("concurrent same-part OPC reads returned unexpected bytes".into());
         }
@@ -45794,14 +46368,24 @@ fn run_opc_source_concurrent_same_part(
         if iteration >= warmup_iterations {
             source_summary.record_opc(metrics, 1);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::OpcSourceConcurrentSamePart,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(
+            Case::OpcSourceConcurrentSamePart,
+            corpus,
+            elapsed,
+            source_summary,
+        ),
+        &observations,
+    )
 }
 
 fn opc_overlay_replacement_payload(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -53260,7 +53844,9 @@ fn run_opc_open(
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let package = OpcPackage::from_bytes(&corpus.archive)?;
         let count = package.part_count();
@@ -53268,14 +53854,18 @@ fn run_opc_open(
             return Err("OPC open part count differs from generated corpus manifest".into());
         }
         std::hint::black_box(count);
-        record_elapsed(
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        record_default_operation(
             &mut elapsed,
+            &mut observations,
             iteration,
             warmup_iterations,
-            started.elapsed(),
+            duration,
+            allocation_metrics,
         )?;
     }
-    Ok(result(Case::OpcOpen, corpus, elapsed, None))
+    attach_default_operation_metrics(result(Case::OpcOpen, corpus, elapsed, None), &observations)
 }
 
 #[derive(Default)]
@@ -54166,8 +54756,10 @@ fn run_opc_open_owned(
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let owned = corpus.archive.clone();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let package = OpcPackage::from_vec(owned)?;
         let count = package.part_count();
@@ -54175,14 +54767,21 @@ fn run_opc_open_owned(
             return Err("owned OPC open part count differs from generated corpus manifest".into());
         }
         std::hint::black_box(&package);
-        record_elapsed(
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        record_default_operation(
             &mut elapsed,
+            &mut observations,
             iteration,
             warmup_iterations,
-            started.elapsed(),
+            duration,
+            allocation_metrics,
         )?;
     }
-    Ok(result(Case::OpcOpenOwned, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::OpcOpenOwned, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn run_opc_noop_save(
@@ -54196,18 +54795,24 @@ fn run_opc_noop_save(
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("sequential output ceiling overflows u64")?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         PackageWriter::write_to_stream(&mut sink, &package)?;
-        record_elapsed(
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        record_default_operation(
             &mut elapsed,
+            &mut observations,
             iteration,
             warmup_iterations,
-            started.elapsed(),
+            duration,
+            allocation_metrics,
         )?;
         let summary = sink.summary();
         if summary.accepted_bytes == 0 || summary.write_calls == 0 {
@@ -54227,7 +54832,10 @@ fn run_opc_noop_save(
     if sink_summaries.iter().any(|summary| *summary != first) {
         return Err("deterministic no-op save produced differing sink summaries".into());
     }
-    Ok(result(Case::OpcNoopSave, corpus, elapsed, Some(first)))
+    attach_default_operation_metrics(
+        result(Case::OpcNoopSave, corpus, elapsed, Some(first)),
+        &observations,
+    )
 }
 
 fn run_opc_mutated_save(
@@ -54250,18 +54858,24 @@ fn run_opc_mutated_save(
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("sequential output ceiling overflows u64")?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         PackageWriter::write_to_stream(&mut sink, &package)?;
-        record_elapsed(
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        record_default_operation(
             &mut elapsed,
+            &mut observations,
             iteration,
             warmup_iterations,
-            started.elapsed(),
+            duration,
+            allocation_metrics,
         )?;
         if sink.bytes != expected {
             return Err("mutated OPC save differs from deterministic expected output".into());
@@ -54277,7 +54891,10 @@ fn run_opc_mutated_save(
     if sink_summaries.iter().any(|summary| *summary != first) {
         return Err("deterministic mutated save produced differing sink summaries".into());
     }
-    Ok(result(Case::OpcMutatedSave, corpus, elapsed, Some(first)))
+    attach_default_operation_metrics(
+        result(Case::OpcMutatedSave, corpus, elapsed, Some(first)),
+        &observations,
+    )
 }
 
 fn run_cfb_open(
@@ -54287,17 +54904,27 @@ fn run_cfb_open(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let expected_file_size = u64::try_from(corpus.archive.len())?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if ole.file_size() != expected_file_size {
             return Err("CFB open file size differs from generated corpus manifest".into());
         }
         std::hint::black_box(&ole);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::CfbOpen, corpus, elapsed, None))
+    attach_default_operation_metrics(result(Case::CfbOpen, corpus, elapsed, None), &observations)
 }
 
 fn run_cfb_list_streams(
@@ -54307,17 +54934,30 @@ fn run_cfb_list_streams(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let streams = ole.list_streams();
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if streams.len() != corpus.manifest.entry_count {
             return Err("CFB list stream count differs from generated corpus manifest".into());
         }
         std::hint::black_box(&streams);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::CfbListStreams, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::CfbListStreams, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn run_cfb_read_one(
@@ -54328,17 +54968,30 @@ fn run_cfb_read_one(
     let mut ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
     let path = [corpus.target_name.as_str()];
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let bytes = ole.open_stream(&path)?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if bytes != corpus.target_payload {
             return Err("CFB read result differs from deterministic corpus payload".into());
         }
         std::hint::black_box(&bytes);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(Case::CfbReadOne, corpus, elapsed, None))
+    attach_default_operation_metrics(
+        result(Case::CfbReadOne, corpus, elapsed, None),
+        &observations,
+    )
 }
 
 fn cfb_instrumented_source(corpus: &Corpus) -> Arc<InstrumentedSource> {
@@ -54359,12 +55012,15 @@ fn run_cfb_shared_open(
     let limits = cfb_shared_limits(corpus)?;
     let expected_size = u64::try_from(corpus.archive.len())?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if ole.file_size() != expected_size {
             return Err("shared CFB open file size differs from corpus manifest".into());
         }
@@ -54376,14 +55032,19 @@ fn run_cfb_shared_open(
         if iteration >= warmup_iterations {
             source_summary.record(metrics);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::CfbSharedOpen,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(Case::CfbSharedOpen, corpus, elapsed, source_summary),
+        &observations,
+    )
 }
 
 fn run_cfb_shared_read_one(
@@ -54394,14 +55055,17 @@ fn run_cfb_shared_read_one(
     let limits = cfb_shared_limits(corpus)?;
     let path = [corpus.target_name.as_str()];
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
         let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
         source.reset();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let bytes = ole.open_stream(&path)?;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if bytes != corpus.target_payload {
             return Err("shared CFB read differs from deterministic stream payload".into());
         }
@@ -54413,14 +55077,19 @@ fn run_cfb_shared_read_one(
         if iteration >= warmup_iterations {
             source_summary.record(metrics);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::CfbSharedReadOne,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(Case::CfbSharedReadOne, corpus, elapsed, source_summary),
+        &observations,
+    )
 }
 
 fn run_cfb_selective_read(
@@ -55959,12 +56628,14 @@ fn run_cfb_shared_concurrent_reads(
     let first_expected =
         payload_bytes(corpus_payload_kind(corpus)?, 0, corpus.manifest.entry_bytes);
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
         let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
         source.reset();
         let start = Arc::new(Barrier::new(3));
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let (first, second) = std::thread::scope(|scope| {
             let first_start = Arc::clone(&start);
@@ -55987,6 +56658,7 @@ fn run_cfb_shared_concurrent_reads(
         let first = first.map_err(|_panic| "first shared CFB worker panicked")??;
         let second = second.map_err(|_panic| "second shared CFB worker panicked")??;
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if first != first_expected || second != corpus.target_payload {
             return Err("concurrent shared CFB reads returned unexpected stream bytes".into());
         }
@@ -55998,14 +56670,24 @@ fn run_cfb_shared_concurrent_reads(
         if iteration >= warmup_iterations {
             source_summary.record(metrics);
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result_with_source(
-        Case::CfbSharedConcurrentReads,
-        corpus,
-        elapsed,
-        source_summary,
-    ))
+    attach_default_operation_metrics(
+        result_with_source(
+            Case::CfbSharedConcurrentReads,
+            corpus,
+            elapsed,
+            source_summary,
+        ),
+        &observations,
+    )
 }
 
 fn run_cfb_create_stream(
@@ -56021,9 +56703,11 @@ fn run_cfb_create_stream(
     };
     let path = [corpus.target_name.as_str()];
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let prepared = std::hint::black_box(corpus.target_payload.clone());
         let mut writer = OleWriter::new();
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         if owned {
             writer.create_stream_owned(&path, prepared)?;
@@ -56031,10 +56715,18 @@ fn run_cfb_create_stream(
             writer.create_stream(&path, &prepared)?;
         }
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         std::hint::black_box(&writer);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(case, corpus, elapsed, None))
+    attach_default_operation_metrics(result(case, corpus, elapsed, None), &observations)
 }
 
 fn run_ole_common_one_edit_save(
@@ -57008,7 +57700,9 @@ fn run_fresh_writer(
         _ => return Err("fresh writer corpus has an unknown writer shape".into()),
     };
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let (output, entry_count, content_bytes) = match case {
             Case::DocFreshWriteTo => write_fresh_doc(shape)?,
@@ -57017,6 +57711,7 @@ fn run_fresh_writer(
             _ => return Err("non-writer case passed to fresh writer runner".into()),
         };
         let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
         if entry_count != corpus.manifest.entry_count
             || content_bytes != corpus.manifest.uncompressed_payload_bytes
         {
@@ -57028,9 +57723,16 @@ fn run_fresh_writer(
             return Err("fresh writer package differs from deterministic corpus output".into());
         }
         std::hint::black_box(&output);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        record_default_operation(
+            &mut elapsed,
+            &mut observations,
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+        )?;
     }
-    Ok(result(case, corpus, elapsed, None))
+    attach_default_operation_metrics(result(case, corpus, elapsed, None), &observations)
 }
 
 fn result(case: Case, corpus: &Corpus, elapsed: Vec<u64>, sink: Option<SinkSummary>) -> CaseResult {
@@ -57106,6 +57808,47 @@ fn record_elapsed(
         elapsed.push(elapsed_ns(duration)?);
     }
     Ok(())
+}
+
+/// Records the retained timing and the matching operation-scoped allocator
+/// sample. The allocator region is finished for warmups as well, but warmup
+/// observations are deliberately discarded with their elapsed values.
+/// Keeping this boundary beside `record_elapsed` makes the normal and
+/// allocator binaries execute the same timed workload; the normal binary's
+/// disabled region simply contributes no allocation sample.
+fn record_default_operation(
+    elapsed: &mut Vec<u64>,
+    observations: &mut Vec<operation_metrics::InProcessObservation>,
+    iteration: usize,
+    warmup_iterations: usize,
+    duration: Duration,
+    allocation_metrics: Option<allocation_metrics::Sample>,
+) -> Result<(), Box<dyn Error>> {
+    if iteration >= warmup_iterations {
+        let elapsed_ns = elapsed_ns(duration)?;
+        elapsed.push(elapsed_ns);
+        observations.push(operation_metrics::InProcessObservation {
+            elapsed_ns,
+            process_metrics: None,
+            allocation_metrics,
+        });
+    }
+    Ok(())
+}
+
+fn attach_default_operation_metrics(
+    mut result: CaseResult,
+    observations: &[operation_metrics::InProcessObservation],
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !observations
+        .iter()
+        .any(|observation| observation.allocation_metrics.is_some())
+    {
+        return Ok(result);
+    }
+    result.operation_metrics =
+        Some(operation_metrics::from_in_process_observations_without_sink(observations)?);
+    Ok(result)
 }
 
 fn statistics(samples: Vec<u64>) -> Statistics {
@@ -57457,7 +58200,7 @@ fn write_report(report: &Report, output: Option<&PathBuf>) -> Result<(), Box<dyn
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::BTreeMap,
+        collections::{BTreeMap, BTreeSet},
         io::{Read, Write},
         sync::Arc,
         time::Duration,
@@ -67029,5 +67772,77 @@ mod tests {
         assert_eq!(identity.profile, super::executable_profile());
         #[cfg(unix)]
         assert!(identity.mode_bits.is_some());
+    }
+
+    #[test]
+    fn default_allocator_contract_covers_exactly_201_rows() {
+        let expected = super::expected_full_default_allocator_rows().unwrap();
+        assert_eq!(expected.len(), 37);
+        assert_eq!(
+            expected.values().sum::<usize>(),
+            super::FULL_DEFAULT_ALLOCATOR_RESULT_COUNT
+        );
+        assert_eq!(
+            expected.iter().filter(|&(_case, &rows)| rows == 8).count(),
+            18
+        );
+        assert_eq!(
+            expected.iter().filter(|&(_case, &rows)| rows == 3).count(),
+            19
+        );
+    }
+
+    #[test]
+    fn default_allocator_dimension_selection_rejects_duplicate_or_missing_values() {
+        assert!(super::selects_exact_named(
+            &CorpusShape::ALL,
+            &CorpusShape::ALL,
+            CorpusShape::name
+        ));
+        let mut duplicate_shapes = CorpusShape::ALL.to_vec();
+        duplicate_shapes[3] = CorpusShape::Tiny;
+        assert!(!super::selects_exact_named(
+            &duplicate_shapes,
+            &CorpusShape::ALL,
+            CorpusShape::name
+        ));
+        assert!(super::selects_exact_named(
+            &PayloadKind::ALL,
+            &PayloadKind::ALL,
+            PayloadKind::name
+        ));
+        assert!(super::selects_exact_named(
+            &WriterShape::ALL,
+            &WriterShape::ALL,
+            WriterShape::name
+        ));
+        assert!(super::selects_exact_named(
+            &XlsxShape::ALL,
+            &XlsxShape::ALL,
+            XlsxShape::name
+        ));
+        assert!(super::selects_exact_named(
+            &SemanticShape::ALL,
+            &SemanticShape::ALL,
+            SemanticShape::name
+        ));
+    }
+
+    #[test]
+    fn default_allocator_result_identity_set_is_duplicate_sensitive() {
+        let mut keys = BTreeSet::new();
+        assert!(keys.insert((
+            "zip_index".to_owned(),
+            "{\"archive_sha256\":\"a\"}".to_owned(),
+        )));
+        assert!(!keys.insert((
+            "zip_index".to_owned(),
+            "{\"archive_sha256\":\"a\"}".to_owned(),
+        )));
+        assert_ne!(
+            super::result_key_manifest_sha256(&keys),
+            super::sha256_hex(b""),
+            "a nonempty canonical identity set must have a digest"
+        );
     }
 }
