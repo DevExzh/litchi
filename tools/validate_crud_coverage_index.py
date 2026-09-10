@@ -212,7 +212,25 @@ INDEX_KEYS = {
 }
 SCOPE_KEYS = {"included_formats", "excluded_formats"}
 TAXONOMY_KEYS = {"source", "category_count", "category_ids"}
-REGISTRY_KEYS = {"source", "minimum_selectable_cases"}
+REGISTRY_V1_KEYS = {"source", "minimum_selectable_cases"}
+REGISTRY_V2_KEYS = {
+    "source",
+    "registry_format",
+    "minimum_selectable_cases",
+    "selector_count",
+    "selector_names_sha256",
+    "selector_names",
+    "coverage",
+}
+REGISTRY_COVERAGE_KEYS = {"mapped", "excluded"}
+MAPPED_SELECTOR_KEYS = {"selector", "category_id", "status"}
+EXCLUDED_SELECTOR_KEYS = {"selector", "reason"}
+REGISTRY_FORMAT = "case-name-utf8-newline-v1"
+EXCLUSION_REASONS = {
+    "not-selected-in-representative-matrix",
+    "out-of-scope-iwork",
+}
+OUT_OF_SCOPE_REASON = "out-of-scope-iwork"
 CATALOG_REFERENCE_KEYS = {
     "path",
     "catalog_id",
@@ -574,56 +592,532 @@ def _validate_catalog(
     return corpus_by_id, cases, binding_roles
 
 
-def _balanced_body(source: str, start: int, context: str) -> str:
-    brace = source.find("{", start)
-    if brace < 0:
-        raise ValidationError(f"{context} has no body")
+def _rust_identifier_start(character: str) -> bool:
+    return character == "_" or character.isalpha()
+
+
+def _rust_identifier_continue(character: str) -> bool:
+    return character == "_" or character.isalnum()
+
+
+def _scan_rust_string(
+    source: str,
+    start: int,
+    quote: int,
+    *,
+    kind: str,
+) -> tuple[tuple[str, str], int]:
+    """Scan a normal Rust string/byte string after its opening quote."""
+
+    index = quote + 1
+    value: list[str] = []
+    while index < len(source):
+        character = source[index]
+        if character == "\"":
+            return (kind, "".join(value)), index + 1
+        if character == "\\":
+            if index + 1 >= len(source):
+                break
+            value.extend((character, source[index + 1]))
+            index += 2
+            continue
+        value.append(character)
+        index += 1
+    raise ValidationError(f"unterminated Rust string literal at byte {start}")
+
+
+def _raw_string_prefix(source: str, start: int) -> tuple[int, int, str] | None:
+    """Return `(quote, hashes, token_kind)` for a raw string prefix."""
+
+    index = start
+    kind = "raw_string"
+    if source.startswith("br", index):
+        index += 2
+        kind = "raw_byte_string"
+    elif source.startswith("r", index):
+        index += 1
+    else:
+        return None
+    hashes = 0
+    while index < len(source) and source[index] == "#":
+        hashes += 1
+        index += 1
+    if index >= len(source) or source[index] != '"':
+        return None
+    return index, hashes, kind
+
+
+def _scan_raw_rust_string(
+    source: str,
+    start: int,
+    quote: int,
+    hashes: int,
+    kind: str,
+) -> tuple[tuple[str, str], int]:
+    terminator = '"' + ("#" * hashes)
+    end = source.find(terminator, quote + 1)
+    if end < 0:
+        raise ValidationError(f"unterminated raw Rust string literal at byte {start}")
+    return (kind, source[quote + 1 : end]), end + len(terminator)
+
+
+def _scan_rust_char_or_lifetime(
+    source: str,
+    start: int,
+) -> tuple[tuple[str, str], int]:
+    index = start + 1
+    if index < len(source) and _rust_identifier_start(source[index]):
+        end = index + 1
+        while end < len(source) and _rust_identifier_continue(source[end]):
+            end += 1
+        if end >= len(source) or source[end] != "'":
+            return ("lifetime", source[index:end]), end
+    value: list[str] = []
+    while index < len(source):
+        character = source[index]
+        if character == "'":
+            return ("char", "".join(value)), index + 1
+        if character == "\\":
+            if index + 1 >= len(source):
+                break
+            value.extend((character, source[index + 1]))
+            index += 2
+            continue
+        value.append(character)
+        index += 1
+    raise ValidationError(f"unterminated Rust character literal at byte {start}")
+
+
+def _lex_rust(source: str) -> list[tuple[str, str]]:
+    """Tokenize enough Rust to inspect `Case::name` without regex code injection."""
+
+    tokens: list[tuple[str, str]] = []
+    index = 0
+    while index < len(source):
+        character = source[index]
+        if character.isspace():
+            index += 1
+            continue
+        if source.startswith("//", index):
+            newline = source.find("\n", index + 2)
+            index = len(source) if newline < 0 else newline + 1
+            continue
+        if source.startswith("/*", index):
+            depth = 1
+            index += 2
+            while index < len(source) and depth:
+                if source.startswith("/*", index):
+                    depth += 1
+                    index += 2
+                elif source.startswith("*/", index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            if depth:
+                raise ValidationError("unterminated nested Rust block comment")
+            continue
+
+        raw_prefix = _raw_string_prefix(source, index)
+        if raw_prefix is not None:
+            quote, hashes, kind = raw_prefix
+            token, index = _scan_raw_rust_string(
+                source,
+                index,
+                quote,
+                hashes,
+                kind,
+            )
+            tokens.append(token)
+            continue
+        if character == '"':
+            token, index = _scan_rust_string(source, index, index, kind="string")
+            tokens.append(token)
+            continue
+        if character == "b" and index + 1 < len(source) and source[index + 1] == '"':
+            token, index = _scan_rust_string(
+                source,
+                index,
+                index + 1,
+                kind="byte_string",
+            )
+            tokens.append(token)
+            continue
+        if character == "'":
+            token, index = _scan_rust_char_or_lifetime(source, index)
+            tokens.append(token)
+            continue
+        if _rust_identifier_start(character):
+            end = index + 1
+            while end < len(source) and _rust_identifier_continue(source[end]):
+                end += 1
+            tokens.append(("ident", source[index:end]))
+            index = end
+            continue
+        if character.isdigit():
+            end = index + 1
+            while end < len(source) and (source[end].isalnum() or source[end] == "_"):
+                end += 1
+            tokens.append(("number", source[index:end]))
+            index = end
+            continue
+        tokens.append(("punct", character))
+        index += 1
+    return tokens
+
+
+def _matching_token_delimiter(
+    tokens: list[tuple[str, str]],
+    opening: int,
+    context: str,
+) -> int:
+    if tokens[opening] != ("punct", "{"):
+        raise ValidationError(f"{context} does not start with a brace")
     depth = 0
-    for index in range(brace, len(source)):
-        if source[index] == "{":
+    for index in range(opening, len(tokens)):
+        if tokens[index] == ("punct", "{"):
             depth += 1
-        elif source[index] == "}":
+        elif tokens[index] == ("punct", "}"):
             depth -= 1
             if depth == 0:
-                return source[brace : index + 1]
-    raise ValidationError(f"{context} has an unterminated body")
+                return index
+    raise ValidationError(f"{context} has an unterminated brace body")
+
+
+def _expect_rust_token(
+    tokens: list[tuple[str, str]],
+    index: int,
+    expected: tuple[str, str],
+    context: str,
+) -> int:
+    if index >= len(tokens) or tokens[index] != expected:
+        actual = "end of input" if index >= len(tokens) else repr(tokens[index])
+        raise ValidationError(f"{context} expected {expected!r}, found {actual}")
+    return index + 1
+
+
+def _decode_rust_string(value: str, context: str) -> str:
+    """Decode the ordinary escapes accepted in a selector string literal."""
+
+    decoded: list[str] = []
+    index = 0
+    escapes = {"\\": "\\", '"': '"', "'": "'", "n": "\n", "r": "\r", "t": "\t", "0": "\0"}
+    while index < len(value):
+        character = value[index]
+        if character != "\\":
+            decoded.append(character)
+            index += 1
+            continue
+        index += 1
+        if index >= len(value):
+            raise ValidationError(f"{context} has a trailing string escape")
+        escape = value[index]
+        if escape in escapes:
+            decoded.append(escapes[escape])
+            index += 1
+        elif escape == "x":
+            digits = value[index + 1 : index + 3]
+            if len(digits) != 2 or any(digit not in "0123456789abcdefABCDEF" for digit in digits):
+                raise ValidationError(f"{context} has an invalid hex escape")
+            decoded.append(chr(int(digits, 16)))
+            index += 3
+        elif escape == "u" and index + 1 < len(value) and value[index + 1] == "{":
+            end = value.find("}", index + 2)
+            if end < 0:
+                raise ValidationError(f"{context} has an unterminated Unicode escape")
+            digits = value[index + 2 : end]
+            if not digits or any(digit not in "0123456789abcdefABCDEF_" for digit in digits):
+                raise ValidationError(f"{context} has an invalid Unicode escape")
+            codepoint = int(digits.replace("_", ""), 16)
+            try:
+                decoded.append(chr(codepoint))
+            except ValueError as error:
+                raise ValidationError(f"{context} has an invalid Unicode codepoint") from error
+            index = end + 1
+        else:
+            raise ValidationError(f"{context} has an unsupported string escape")
+    return "".join(decoded)
+
+
+def _selector_registry_names(source: str) -> list[str]:
+    """Extract the exact registry using a fail-closed Rust token grammar.
+
+    Comments and string literals are removed by the lexer before parsing.  The
+    parser accepts only the unit-variant ``Case`` enum and a direct exhaustive
+    ``Case::name`` match whose arms return string literals; unsupported syntax
+    is rejected instead of being guessed into the registry.
+    """
+
+    tokens = _lex_rust(source)
+    enum_candidates = [
+        index
+        for index in range(len(tokens) - 2)
+        if tokens[index : index + 3]
+        == [("ident", "enum"), ("ident", "Case"), ("punct", "{")]
+    ]
+    if len(enum_candidates) != 1:
+        raise ValidationError("selector registry must contain exactly one enum Case body")
+    enum_open = enum_candidates[0] + 2
+    enum_close = _matching_token_delimiter(tokens, enum_open, "selector registry enum Case")
+    variants: list[str] = []
+    index = enum_open + 1
+    while index < enum_close:
+        token = tokens[index]
+        if token[0] != "ident" or re.fullmatch(r"[A-Z][A-Za-z0-9_]*", token[1]) is None:
+            raise ValidationError("selector registry enum Case has an unsupported variant")
+        variants.append(token[1])
+        index = _expect_rust_token(
+            tokens,
+            index + 1,
+            ("punct", ","),
+            "selector registry enum Case variant",
+        )
+    if not variants:
+        raise ValidationError("selector registry enum Case is empty")
+    if len(set(variants)) != len(variants):
+        raise ValidationError("selector registry enum Case contains duplicate variants")
+
+    impl_candidates = [
+        index
+        for index in range(len(tokens) - 2)
+        if tokens[index : index + 3]
+        == [("ident", "impl"), ("ident", "Case"), ("punct", "{")]
+    ]
+    if len(impl_candidates) != 1:
+        raise ValidationError("selector registry must contain exactly one impl Case body")
+    impl_open = impl_candidates[0] + 2
+    impl_close = _matching_token_delimiter(tokens, impl_open, "selector registry impl Case")
+
+    name_candidates: list[tuple[int, int]] = []
+    for index in range(impl_open + 1, impl_close):
+        if tokens[index : index + 3] != [
+            ("ident", "const"),
+            ("ident", "fn"),
+            ("ident", "name"),
+        ]:
+            continue
+        cursor = index + 3
+        cursor = _expect_rust_token(tokens, cursor, ("punct", "("), "Case::name signature")
+        cursor = _expect_rust_token(tokens, cursor, ("ident", "self"), "Case::name signature")
+        cursor = _expect_rust_token(tokens, cursor, ("punct", ")"), "Case::name signature")
+        cursor = _expect_rust_token(tokens, cursor, ("punct", "-"), "Case::name signature")
+        cursor = _expect_rust_token(tokens, cursor, ("punct", ">"), "Case::name signature")
+        cursor = _expect_rust_token(tokens, cursor, ("punct", "&"), "Case::name signature")
+        if cursor >= len(tokens) or tokens[cursor] != ("lifetime", "static"):
+            raise ValidationError("Case::name signature must return &'static str")
+        cursor += 1
+        cursor = _expect_rust_token(tokens, cursor, ("ident", "str"), "Case::name signature")
+        cursor = _expect_rust_token(tokens, cursor, ("punct", "{"), "Case::name signature")
+        name_candidates.append((cursor - 1, _matching_token_delimiter(tokens, cursor - 1, "Case::name")))
+    if len(name_candidates) != 1:
+        raise ValidationError("selector registry must contain exactly one Case::name function")
+    name_open, name_close = name_candidates[0]
+    body = tokens[name_open + 1 : name_close]
+    if len(body) < 4 or body[0:3] != [
+        ("ident", "match"),
+        ("ident", "self"),
+        ("punct", "{"),
+    ]:
+        raise ValidationError("Case::name must be a direct match on self")
+    match_open = 2
+    match_close = _matching_token_delimiter(body, match_open, "Case::name match")
+    if match_close != len(body) - 1:
+        raise ValidationError("Case::name contains unsupported statements around its match")
+
+    values: list[str] = []
+    arm_variants: list[str] = []
+    cursor = match_open + 1
+    while cursor < match_close:
+        cursor = _expect_rust_token(body, cursor, ("ident", "Self"), "Case::name arm")
+        cursor = _expect_rust_token(body, cursor, ("punct", ":"), "Case::name arm")
+        cursor = _expect_rust_token(body, cursor, ("punct", ":"), "Case::name arm")
+        if cursor >= match_close or body[cursor][0] != "ident":
+            raise ValidationError("Case::name arm must name a Case variant")
+        arm_variants.append(body[cursor][1])
+        cursor += 1
+        cursor = _expect_rust_token(body, cursor, ("punct", "="), "Case::name arm")
+        cursor = _expect_rust_token(body, cursor, ("punct", ">"), "Case::name arm")
+        if cursor >= match_close:
+            raise ValidationError("Case::name arm has no string result")
+        if body[cursor][0] in {"string", "raw_string"}:
+            literal_kind, literal_value = body[cursor]
+            cursor += 1
+            value = (
+                literal_value
+                if literal_kind == "raw_string"
+                else _decode_rust_string(literal_value, "Case::name selector literal")
+            )
+        elif body[cursor] == ("punct", "{"):
+            block_open = cursor
+            block_close = _matching_token_delimiter(body, block_open, "Case::name arm block")
+            block = body[block_open + 1 : block_close]
+            if len(block) != 1 or block[0][0] not in {"string", "raw_string"}:
+                raise ValidationError("Case::name arm block must contain one string literal")
+            literal_kind, literal_value = block[0]
+            value = (
+                literal_value
+                if literal_kind == "raw_string"
+                else _decode_rust_string(literal_value, "Case::name selector literal")
+            )
+            cursor = block_close + 1
+        else:
+            raise ValidationError("Case::name arm must return a string literal")
+        values.append(value)
+        cursor = _expect_rust_token(body, cursor, ("punct", ","), "Case::name arm")
+
+    if len(arm_variants) != len(variants) or len(set(arm_variants)) != len(arm_variants):
+        raise ValidationError("selector registry Case::name has duplicate or missing arms")
+    if set(arm_variants) != set(variants):
+        raise ValidationError("selector registry Case::name is not exhaustive")
+    if len(set(values)) != len(values):
+        raise ValidationError("selector registry contains duplicate selector names")
+    if any(SELECTOR.fullmatch(value) is None for value in values):
+        raise ValidationError("selector registry contains a malformed selector name")
+    return values
 
 
 def _selector_names(source: str) -> set[str]:
-    enum_start = source.find("enum Case {")
-    if enum_start < 0:
-        raise ValidationError("selector registry has no Case enum")
-    enum_end_marker = "\n}\n\nimpl Case"
-    enum_end = source.find(enum_end_marker, enum_start)
-    if enum_end < 0:
-        raise ValidationError("selector registry Case enum boundary is missing")
-    variants = {
-        match.group(1)
-        for match in re.finditer(
-            r"^\s*([A-Z][A-Za-z0-9_]*)\s*,\s*$",
-            source[enum_start + len("enum Case {") : enum_end],
-            re.MULTILINE,
-        )
-    }
-    impl_start = source.find("impl Case", enum_end)
-    name_start = source.find("const fn name(self)", impl_start)
-    if impl_start < 0 or name_start < 0:
-        raise ValidationError("selector registry Case::name is missing")
-    name_body = _balanced_body(source, name_start, "selector registry Case::name")
-    pairs = re.findall(
-        r"\bSelf::([A-Za-z0-9_]+)\s*=>\s*(?:\{\s*)?\"([^\"]+)\"",
-        name_body,
-        re.DOTALL,
+    """Return the selector set used by the historical v1 contract."""
+
+    return set(_selector_registry_names(source))
+
+
+def _selector_names_digest(names: list[str]) -> str:
+    """Hash the exact Case::name order, including one final newline per name."""
+
+    canonical = "".join(f"{name}\n" for name in names).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _validate_exact_selector_registry(
+    registry: dict[str, Any],
+    selector_names: list[str],
+) -> dict[str, tuple[str, str]]:
+    """Validate the v2 registry identity and return its mapped bindings."""
+
+    registry = _exact(registry, REGISTRY_V2_KEYS, "index selector_registry")
+    if _string(registry["source"], "index selector_registry source") != (
+        "tools/perf-baseline/src/lib.rs"
+    ):
+        raise ValidationError("index selector registry source is not authoritative")
+    if _string(registry["registry_format"], "index selector_registry registry_format") != (
+        REGISTRY_FORMAT
+    ):
+        raise ValidationError("index selector registry format is unsupported")
+    selector_count = _integer(
+        registry["selector_count"],
+        "index selector_registry selector_count",
+        minimum=1,
     )
-    name_variants = {variant for variant, _ in pairs}
-    names = [name for _, name in pairs]
-    if name_variants != variants or len(pairs) != len(variants):
-        raise ValidationError("selector registry Case::name is not exhaustive")
-    if len(set(names)) != len(names):
-        raise ValidationError("selector registry contains duplicate selector names")
-    if any(SELECTOR.fullmatch(name) is None for name in names):
-        raise ValidationError("selector registry contains a malformed selector name")
-    return set(names)
+    minimum = _integer(
+        registry["minimum_selectable_cases"],
+        "index selector_registry minimum_selectable_cases",
+        minimum=1,
+    )
+    if minimum != selector_count:
+        raise ValidationError(
+            "index selector_registry minimum_selectable_cases must equal selector_count"
+        )
+    if selector_count != len(selector_names):
+        raise ValidationError(
+            "index selector_registry selector_count does not match the source registry"
+        )
+    listed_names = _string_list(
+        registry["selector_names"], "index selector_registry selector_names"
+    )
+    if len(listed_names) != len(set(listed_names)):
+        raise ValidationError("index selector_registry selector_names must be unique")
+    if any(SELECTOR.fullmatch(name) is None for name in listed_names):
+        raise ValidationError("index selector_registry selector_names contains a malformed name")
+    if listed_names != selector_names:
+        raise ValidationError(
+            "index selector_registry selector_names do not match Case::name order"
+        )
+    if _hash(
+        registry["selector_names_sha256"],
+        "index selector_registry selector_names_sha256",
+    ) != _selector_names_digest(selector_names):
+        raise ValidationError(
+            "index selector_registry selector_names_sha256 does not match Case::name order"
+        )
+
+    coverage = _exact(
+        registry["coverage"],
+        REGISTRY_COVERAGE_KEYS,
+        "index selector_registry coverage",
+    )
+    mapped_values = _list(
+        coverage["mapped"], "index selector_registry coverage mapped"
+    )
+    excluded_values = _list(
+        coverage["excluded"], "index selector_registry coverage excluded"
+    )
+    mapped: dict[str, tuple[str, str]] = {}
+    previous = ""
+    for index, value in enumerate(mapped_values):
+        context = f"index selector_registry coverage mapped {index}"
+        entry = _exact(value, MAPPED_SELECTOR_KEYS, context)
+        selector = _string(entry["selector"], f"{context} selector")
+        if SELECTOR.fullmatch(selector) is None:
+            raise ValidationError(f"{context} selector is malformed")
+        if selector <= previous:
+            raise ValidationError("index selector_registry coverage mapped must be sorted")
+        previous = selector
+        if selector in mapped:
+            raise ValidationError(f"{context} selector is duplicated")
+        if selector not in selector_names:
+            raise ValidationError(f"{context} selector is not in the source registry")
+        if FORBIDDEN_IWORK.search(selector):
+            raise ValidationError(f"{context} selector is outside the non-iWork scope")
+        category_id = _string(entry["category_id"], f"{context} category_id")
+        status = _enum(
+            entry["status"],
+            f"{context} status",
+            {"measured", "correctness-only"},
+        )
+        mapped[selector] = (category_id, status)
+
+    excluded: set[str] = set()
+    previous = ""
+    for index, value in enumerate(excluded_values):
+        context = f"index selector_registry coverage excluded {index}"
+        entry = _exact(value, EXCLUDED_SELECTOR_KEYS, context)
+        selector = _string(entry["selector"], f"{context} selector")
+        if SELECTOR.fullmatch(selector) is None:
+            raise ValidationError(f"{context} selector is malformed")
+        if selector <= previous:
+            raise ValidationError("index selector_registry coverage excluded must be sorted")
+        previous = selector
+        if selector in excluded or selector in mapped:
+            raise ValidationError(f"{context} selector is duplicated")
+        if selector not in selector_names:
+            raise ValidationError(f"{context} selector is not in the source registry")
+        reason = _enum(
+            entry["reason"],
+            f"{context} reason",
+            EXCLUSION_REASONS,
+        )
+        if FORBIDDEN_IWORK.search(selector):
+            if reason != OUT_OF_SCOPE_REASON:
+                raise ValidationError(
+                    f"{context} iWork selector must use {OUT_OF_SCOPE_REASON!r}"
+                )
+        elif reason == OUT_OF_SCOPE_REASON:
+            raise ValidationError(
+                f"{context} non-iWork selector cannot use {OUT_OF_SCOPE_REASON!r}"
+            )
+        excluded.add(selector)
+
+    accounted = set(mapped) | excluded
+    expected = set(selector_names)
+    if accounted != expected:
+        missing = sorted(expected - accounted)
+        extra = sorted(accounted - expected)
+        detail = f"missing {missing[0]!r}" if missing else f"extra {extra[0]!r}"
+        raise ValidationError(
+            f"index selector_registry coverage does not account for every selector ({detail})"
+        )
+    return mapped
 
 
 def _validate_evidence(value: Any, context: str, repo_root: Path) -> None:
@@ -1140,8 +1634,9 @@ def _validate_index(
     report: dict[str, Any] | None = None,
 ) -> tuple[int, int]:
     index = _exact(index, INDEX_KEYS, "index")
-    if _integer(index["schema_version"], "index schema_version") != 1:
-        raise ValidationError("index schema_version must be 1")
+    schema_version = _integer(index["schema_version"], "index schema_version")
+    if schema_version not in {1, 2}:
+        raise ValidationError("index schema_version must be 1 or 2")
     if _string(index["index_kind"], "index index_kind") != "crud-coverage-index":
         raise ValidationError("index index_kind is unexpected")
     scope = _exact(index["scope"], SCOPE_KEYS, "index scope")
@@ -1173,19 +1668,33 @@ def _validate_index(
     if not checklist_labels:
         raise ValidationError("CRUD checklist has no check rows")
 
-    registry = _exact(index["selector_registry"], REGISTRY_KEYS, "index selector_registry")
-    registry_source_path = _string(registry["source"], "index selector_registry source")
-    if registry_source_path != "tools/perf-baseline/src/lib.rs":
-        raise ValidationError("index selector registry source is not authoritative")
-    minimum = _integer(
-        registry["minimum_selectable_cases"],
-        "index selector_registry minimum_selectable_cases",
-        minimum=408,
-    )
-    selector_names = _selector_names(selector_source)
-    if len(selector_names) < minimum:
-        raise ValidationError(
-            f"selector registry exposes {len(selector_names)} names, below required {minimum}"
+    selector_registry_names = _selector_registry_names(selector_source)
+    selector_names = set(selector_registry_names)
+    exact_registry_bindings: dict[str, tuple[str, str]] | None = None
+    if schema_version == 1:
+        registry = _exact(
+            index["selector_registry"],
+            REGISTRY_V1_KEYS,
+            "index selector_registry",
+        )
+        registry_source_path = _string(
+            registry["source"], "index selector_registry source"
+        )
+        if registry_source_path != "tools/perf-baseline/src/lib.rs":
+            raise ValidationError("index selector registry source is not authoritative")
+        minimum = _integer(
+            registry["minimum_selectable_cases"],
+            "index selector_registry minimum_selectable_cases",
+            minimum=408,
+        )
+        if len(selector_names) < minimum:
+            raise ValidationError(
+                f"selector registry exposes {len(selector_names)} names, below required {minimum}"
+            )
+    else:
+        exact_registry_bindings = _validate_exact_selector_registry(
+            index["selector_registry"],
+            selector_registry_names,
         )
 
     checked_catalog = catalog if checked_catalog is None else checked_catalog
@@ -1218,6 +1727,7 @@ def _validate_index(
     if len(categories) != len(EXPECTED_CATEGORIES):
         raise ValidationError("index must contain exactly fifteen categories")
     seen_selectors: set[str] = set()
+    mapped_bindings: dict[str, tuple[str, str]] = {}
     measured_scenarios: list[tuple[str, list[str]]] = []
     for index_number, (expected_id, expected_name) in enumerate(EXPECTED_CATEGORIES):
         context = f"index category {index_number}"
@@ -1316,6 +1826,7 @@ def _validate_index(
                 if selector in seen_selectors:
                     raise ValidationError(f"selector {selector!r} is duplicated in the index")
                 seen_selectors.add(selector)
+                mapped_bindings[selector] = (category["id"], status)
                 corpus_kind = _string(
                     _object(scenario["corpus"], f"{scenario_context} corpus").get("kind"),
                     f"{scenario_context} corpus kind",
@@ -1365,6 +1876,10 @@ def _validate_index(
             scenario["status"] == "measured" for scenario in scenarios
         ):
             raise ValidationError(f"{context} measured category has no measured scenario")
+    if exact_registry_bindings is not None and exact_registry_bindings != mapped_bindings:
+        raise ValidationError(
+            "index selector_registry coverage mapped bindings do not match category scenarios"
+        )
     identity = _validate_identity_artifact(
         _read_json(repo_root / IDENTITY_ARTIFACT),
         "identity artifact",
@@ -1452,7 +1967,7 @@ def main() -> int:
     parser.add_argument(
         "--index",
         type=Path,
-        default=Path("docs/performance/crud-coverage-index-v1.json"),
+        default=Path("docs/performance/crud-coverage-index-v2.json"),
     )
     parser.add_argument(
         "--catalog",
