@@ -69,6 +69,7 @@ const WORD_2023_DATE_UTC_NAMESPACE_BYTES: &[u8] =
 
 const MAX_REVISION_DATE_UTC_BYTES: usize = 128;
 
+pub mod authoring;
 pub mod conflict;
 mod limits;
 #[cfg(test)]

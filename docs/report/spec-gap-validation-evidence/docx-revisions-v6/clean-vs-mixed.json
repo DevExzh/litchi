@@ -1,0 +1,47 @@
+{
+  "clean_candidate": "/var/tmp/litchi-docx-revision-integration-validation-20260910",
+  "clean_candidate_excludes_primary_pending": true,
+  "clean_candidate_owned_paths": [
+    "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+    "crates/litchi-docx/src/revision.rs",
+    "crates/litchi-docx/src/revision/authoring.rs"
+  ],
+  "clean_candidate_status_paths": [
+    " M crates/litchi-docx/docs/FEATURE_MATRIX.md",
+    " M crates/litchi-docx/src/revision.rs",
+    "?? crates/litchi-docx/src/revision/authoring.rs"
+  ],
+  "current_spec_gaps_primary_docx_path_count": 0,
+  "mixed_overlay_was_applied": false,
+  "mixed_overlay_would_have_path_count": 26,
+  "overlap_paths": [],
+  "primary_pending_docx_paths": [
+    "crates/litchi-docx/src/document/mod.rs",
+    "crates/litchi-docx/src/document/transaction.rs",
+    "crates/litchi-docx/src/document/transaction/durable.rs",
+    "crates/litchi-docx/src/paragraph/codec/content.rs",
+    "crates/litchi-docx/src/paragraph/codec/editing.rs",
+    "crates/litchi-docx/src/paragraph/codec/inlines.rs",
+    "crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs",
+    "crates/litchi-docx/src/paragraph/codec/run.rs",
+    "crates/litchi-docx/src/paragraph/codec/run_contents.rs",
+    "crates/litchi-docx/src/paragraph/codec/run_properties.rs",
+    "crates/litchi-docx/src/paragraph/codec/runs.rs",
+    "crates/litchi-docx/src/paragraph/codec/text.rs",
+    "crates/litchi-docx/src/paragraph/collapsed/package.rs",
+    "crates/litchi-docx/src/paragraph/extensions/codec.rs",
+    "crates/litchi-docx/src/paragraph/extensions/package.rs",
+    "crates/litchi-docx/src/paragraph/model.rs",
+    "crates/litchi-docx/src/paragraph/package.rs",
+    "crates/litchi-docx/src/run_symbols/package.rs",
+    "crates/litchi-docx/src/source_backed.rs",
+    "crates/litchi-docx/src/source_backed/story_text.rs",
+    "crates/litchi-docx/tests/source_backed_managed.rs",
+    "crates/litchi-docx/src/source_backed/document_policy.rs",
+    "crates/litchi-docx/tests/source_backed_managed_document_edit.rs"
+  ],
+  "primary_pending_root": "/home/zhuhe/code/litchi",
+  "primary_tracked_patch": "/var/tmp/litchi-docx-primary-pending-tracked.patch",
+  "primary_tracked_patch_sha256": "36aa802901a7732a6cf8779d9fda3fcb3ad8b9ea17d0969034d9add48ef1172d",
+  "schema": "docx-revision-clean-vs-mixed/v1"
+}
