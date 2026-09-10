@@ -1,0 +1,28 @@
+[package]
+name = "litchi-numbers-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[[bin]]
+name = "numbers_table_merges"
+path = "fuzz_targets/numbers_table_merges.rs"
+test = false
+doc = false
+bench = false
+
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi-numbers = { path = ".." }
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"

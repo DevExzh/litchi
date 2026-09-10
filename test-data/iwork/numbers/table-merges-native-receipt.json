@@ -1,0 +1,28 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-11",
+  "file": "table-merges-native.numbers",
+  "size": 136130,
+  "sha256": "392aaacdd50a494cbd161d103f98254c42311e0c6989e11512d57be7f94d4e5d",
+  "source": "table-data-list-native.numbers",
+  "sheet": "Sheet 1",
+  "table": "shared-model",
+  "rows": 12,
+  "columns": 3,
+  "merged_range": "B11:C12",
+  "zero_based_region": {
+    "row": 10,
+    "column": 1,
+    "rows": 2,
+    "columns": 2
+  },
+  "lifecycle": [
+    "Copied the existing native table-data-list control into a disposable directory.",
+    "Extended the table to twelve rows in Numbers and selected B11:C12.",
+    "Used Table > Merge Cells, saved, and closed the document.",
+    "Reopened the exact saved path and visually verified the merged rectangle, twelve rows, and three columns.",
+    "Closed the verified document."
+  ],
+  "scope": "Native merged-cell read control. Accessibility span-count text is inconsistent; selected coordinates and visible geometry establish native verification. Corruption and resource limits are covered by separate tests."
+}
