@@ -178,7 +178,7 @@ impl Editor {
         targets: Targets,
         limits: Limits,
     ) -> Result<(Targets, Package, Objects), OleError> {
-        codec::open(ole)?;
+        codec::open(ole, limits.max_package_directory_entries())?;
         if targets
             .iter()
             .any(|target| target.path().len() > limits.max_storage_depth)
@@ -190,7 +190,7 @@ impl Editor {
         let resolved_target_entries = targets
             .into_vec()
             .into_iter()
-            .map(|target| target.resolve(ole))
+            .map(|target| target.resolve(ole, limits.max_package_directory_entries()))
             .collect::<Result<Vec<_>, _>>()?;
         let resolved_targets = Targets::new(resolved_target_entries)?;
         let package = Package::capture(&mut *ole, limits)?;
@@ -342,8 +342,13 @@ impl Editor {
             return Ok(None);
         }
         let mut replacement_ole = OleFile::open(Cursor::new(compound_file))?;
-        codec::open(&replacement_ole)?;
-        let replacement = Package::capture(&mut replacement_ole, self.limits)?;
+        codec::open(
+            &replacement_ole,
+            self.limits
+                .max_object_storages()
+                .saturating_add(self.limits.max_object_streams()),
+        )?;
+        let replacement = Package::capture_object(&mut replacement_ole, self.limits)?;
         replacement.check_object_limits(self.limits)?;
         Ok(Some(PreparedReplacement {
             key: key.to_owned(),
@@ -804,8 +809,13 @@ impl Editor {
             ));
         }
         let mut nested_ole = OleFile::open(Cursor::new(compound_file))?;
-        codec::open(&nested_ole)?;
-        let nested = Package::capture(&mut nested_ole, self.limits)?;
+        codec::open(
+            &nested_ole,
+            self.limits
+                .max_object_storages()
+                .saturating_add(self.limits.max_object_streams()),
+        )?;
+        let nested = Package::capture_object(&mut nested_ole, self.limits)?;
         let mut candidate = self.clone();
         candidate
             .package
@@ -878,7 +888,7 @@ impl Editor {
         self.package.check(self.limits)?;
         let rendered = self.package.render()?;
         let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
-        codec::open(&check)?;
+        codec::open(&check, self.limits.max_package_directory_entries())?;
         let mut parsed = Package::capture(&mut check, self.limits)?;
         parsed.reuse_stream_allocations(&self.package)?;
         self.package = parsed;

@@ -67,6 +67,37 @@ impl Limits {
         }
         Ok(())
     }
+
+    /// Maximum number of directory entries that one complete package
+    /// capture may visit in any one sibling tree.  A package capture admits
+    /// all selected objects together, so its storage ceiling is the product
+    /// of the object and depth limits.
+    pub(crate) const fn max_package_storages(self) -> usize {
+        self.max_objects.saturating_mul(self.max_storage_depth)
+    }
+
+    /// Maximum direct children admitted while walking one complete package
+    /// directory.  This is the package-level storage plus stream budget.
+    pub(crate) const fn max_package_directory_entries(self) -> usize {
+        self.max_package_storages().saturating_add(self.max_streams)
+    }
+
+    /// Maximum number of descendant storages retained for one selected or
+    /// standalone object compound file.
+    pub(crate) const fn max_object_storages(self) -> usize {
+        self.max_storage_depth
+    }
+
+    /// Maximum streams admitted for one selected or standalone object. The
+    /// per-object and complete-package ceilings both apply when a standalone
+    /// object is captured as part of one edit operation.
+    pub(crate) const fn max_object_streams(self) -> usize {
+        if self.max_streams < self.max_streams_per_object {
+            self.max_streams
+        } else {
+            self.max_streams_per_object
+        }
+    }
 }
 
 /// One captured CFB storage below a selected object.

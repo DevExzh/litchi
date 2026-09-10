@@ -552,6 +552,63 @@ fn added_storage_uses_zero_metadata_for_nonzero_source_root() {
 }
 
 #[test]
+fn object_add_and_replace_preflight_limits_are_failure_atomic() {
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_storage(&["A"])
+            .expect("first replacement storage should write");
+        writer
+            .create_storage(&["B"])
+            .expect("second replacement storage should write");
+    });
+    let limits = Limits {
+        max_objects: 2,
+        max_storage_depth: 2,
+        ..Limits::default()
+    };
+
+    let original = write_cfb(|writer| {
+        writer
+            .create_storage(&["ObjectPool", "_42"])
+            .expect("selected storage should write");
+        writer
+            .create_storage(&["Other"])
+            .expect("unrelated storage should write");
+    });
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("object", &["ObjectPool", "_42"]),
+        limits,
+    )
+    .expect("source should fit aggregate storage limits");
+    let prepared = editor
+        .prepare_replacement("object", replacement.clone())
+        .expect("replacement should be admitted independently")
+        .expect("replacement should change the selected object");
+    assert!(editor.replace_prepared(prepared).is_err());
+    assert!(!editor.is_changed());
+    assert_eq!(
+        editor.finish().expect("failed replacement stays exact"),
+        original
+    );
+
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let mut editor = Editor::open(
+        original.clone(),
+        targets("first", &["ObjectPool", "_42"]),
+        limits,
+    )
+    .expect("source should fit aggregate storage limits");
+    assert!(
+        editor
+            .add_storage(target("second", &["ObjectPool", "_43"]), replacement)
+            .is_err()
+    );
+    assert!(!editor.is_changed());
+    assert_eq!(editor.finish().expect("failed add stays exact"), original);
+}
+
+#[test]
 fn failed_replacement_is_transactional() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = Editor::open(

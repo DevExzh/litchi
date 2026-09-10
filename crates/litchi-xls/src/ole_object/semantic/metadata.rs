@@ -70,6 +70,14 @@ impl ObjectMetadataEdit {
                     "FtPioGrbit fDde cannot change without migrating the OLE storage reference",
                 ));
             }
+            if current.is_control() != picture_flags.is_control()
+                || current.uses_control_stream() != picture_flags.uses_control_stream()
+                || current.camera_picture() != picture_flags.camera_picture()
+            {
+                return Err(invalid(
+                    "FtPioGrbit storage-class flags cannot change without migrating the OLE identity closure",
+                ));
+            }
         }
         if let Some(object_id) = self.object_id {
             common_mut(object)?.object_id = object_id;
