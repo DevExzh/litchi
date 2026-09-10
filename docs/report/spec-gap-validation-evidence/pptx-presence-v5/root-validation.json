@@ -1,0 +1,21 @@
+{
+  "tests": 892,
+  "doctests_passed": 6,
+  "doctests_ignored": 2,
+  "strict_clippy": true,
+  "rustdoc_warnings_denied": true,
+  "owned_rustfmt": true,
+  "source_pre_post_hashes_match": true,
+  "independent_review": "CLEAR V5",
+  "integration": {
+    "status": "current HEAD overlay verified",
+    "base": "c44a1ac0cee56c180862d75069ec6d8d5b7fb5e9",
+    "primary_before": "9d3da11b61f05707a5320e1c8145f07930f0bc8c",
+    "tests": 917,
+    "doctests_passed": 6,
+    "doctests_ignored": 2,
+    "strict_clippy": true,
+    "rustdoc_warnings_denied": true,
+    "reconciliation": "8 Rust files identical to independently reviewed V5; feature matrix changes only Classic comments row on current HEAD"
+  }
+}

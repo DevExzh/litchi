@@ -1,0 +1,91 @@
+[
+  {
+    "gate": "tests",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--no-fail-fast"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-pptx-presence-root-v5-20260910-tests.log",
+    "sha256": "3545d4b921580c12c06b9da5bd4522dc0f1987280623db3683ed4c9b577f0524"
+  },
+  {
+    "gate": "doctests",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "test",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--doc"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-pptx-presence-root-v5-20260910-doctests.log",
+    "sha256": "c6937641073382d857e52b06471e44df83608d6df2b693ce3d35f44f9b2b0f6a"
+  },
+  {
+    "gate": "clippy",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "clippy",
+      "-p",
+      "litchi-pptx",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-pptx-presence-root-v5-20260910-clippy.log",
+    "sha256": "15965daadf7ba0539e8e82f990e8362ec27bc11f6a06f0b9451cb284b26122af"
+  },
+  {
+    "gate": "rustdoc",
+    "command": [
+      "cargo",
+      "+1.95.0",
+      "doc",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--no-deps"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-pptx-presence-root-v5-20260910-rustdoc.log",
+    "sha256": "5483353462ce292409444f4c89e126e3e06bb992ee4eb80144837d90f8e1814f"
+  },
+  {
+    "gate": "fmt",
+    "command": [
+      "rustup",
+      "run",
+      "1.95.0",
+      "rustfmt",
+      "--check",
+      "--edition",
+      "2024",
+      "--config",
+      "skip_children=true",
+      "crates/litchi-pptx/src/comments/codec.rs",
+      "crates/litchi-pptx/src/comments/mod.rs",
+      "crates/litchi-pptx/src/lib.rs",
+      "crates/litchi-pptx/src/comments/collaboration.rs",
+      "crates/litchi-pptx/src/comments/collaboration/codec.rs",
+      "crates/litchi-pptx/src/comments/collaboration/package.rs",
+      "crates/litchi-pptx/src/comments/collaboration/tests.rs",
+      "crates/litchi-pptx/src/comments/collaboration/transaction.rs"
+    ],
+    "exit": 0,
+    "log": "/var/tmp/litchi-pptx-presence-root-v5-20260910-fmt.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

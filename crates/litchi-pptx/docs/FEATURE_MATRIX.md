@@ -90,7 +90,7 @@ for DrawingML, charts, diagrams, ink, math, and 3D extensions, [MS-OWEXML] for w
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| Classic comments | ✅ | ✅ | ✅ | Validated authors, comments, anchors, dates, IDs, package relationships, and graph-safe CRUD |
+| Classic comments | ✅ | ✅ | ✅ | Validated authors, comments, anchors, dates, IDs, package relationships, graph-safe CRUD, and source-bound inert `p15:presenceInfo`/`p15:threadingInfo` metadata with exact owner-URI closure |
 | Modern comments | ✅ | ✅ | ✅ | Validated authors, anchors, replies, status, author references, and bounded task, reaction, moniker, and V2 command/change package models; command data is inert, unknown XML is preserved, unsafe mutations are rejected, and collaboration behavior is never executed |
 | Embedded OLE and package objects | ✅ | ✅ | ✅ | `presentation::embedded::ole::slide::{Snapshot, Transaction, Commit, Patch}` adds source-checked slide-owned metadata, anchor, link, payload, add/remove/detach, and replace edits while preserving OLE/XML/MCE bytes; objects are never activated |
 | ActiveX/control payloads | 🟡 | ✅ | 🟡 | Contextual `presentation::embedded::controls::slide::{Snapshot, Transaction, Commit, Patch}` edits bounded ActiveX metadata, binary replacement, detach, and orphan cleanup while preserving MCE choice/fallback branches and opaque payloads; controls are not instantiated, rendered, or executed |
