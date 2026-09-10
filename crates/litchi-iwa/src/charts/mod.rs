@@ -84,7 +84,7 @@ pub(crate) mod style;
 
 pub use litchi_iwa_common::chart::gaps::{Percentage, Spacing};
 
-pub(crate) use archive::IWorkChartArchive;
+pub(crate) use archive::{IWorkChartArchive, IWorkChartGraphArchive};
 pub use axis_gridline_stroke::{ChartAxisGridline, ChartAxisGridlineStroke};
 pub use data::ChartData;
 pub use depth_3d::Chart3dDepth;

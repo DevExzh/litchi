@@ -71,7 +71,7 @@ use crate::charts::source::{
     CHART_MESSAGE_TYPE, CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE,
     CHART_STYLE_MESSAGE_TYPE, ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE,
     LEGEND_STYLE_MESSAGE_TYPE, SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE,
-    STANDIN_MESSAGE_TYPE, SourceChartObjectIds, chart_data, chart_geometry, chart_grid,
+    STANDIN_MESSAGE_TYPE, SourceChartObjectIds, chart_data_from_source, chart_geometry, chart_grid,
     drawable_geometry, geometry_archive, local_chart_style_ids, reference, register_chart_styles,
     require_creatable_kind, single_message_index, source_chart_objects, unregister_chart_styles,
     validate_chart_styles_registered,

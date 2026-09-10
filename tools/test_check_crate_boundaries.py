@@ -7954,6 +7954,123 @@ def add_iwa_chart_metadata_scaffold(root: Path, *, include_focus: bool = True) -
         )
 
 
+def add_iwa_chart_data_scaffold(root: Path, *, include_focus: bool = True) -> None:
+    """Install a compact common/codec/focused chart-data topology."""
+
+    common = root / boundaries.IWA_COMMON_CHART_DATA_SOURCE
+    common.parent.mkdir(parents=True, exist_ok=True)
+    common.write_text(
+        "pub struct ChartData { rows: Vec<String>, columns: Vec<String> }\n"
+        "pub enum DataError { Invalid }\n"
+        "impl ChartData {\n"
+        "    pub fn new() -> Result<Self, DataError> { todo!() }\n"
+        "    pub fn row_names(&self) -> &[String] { &self.rows }\n"
+        "    pub fn column_names(&self) -> &[String] { &self.columns }\n"
+        "    pub fn values(&self) -> &[Vec<Option<f64>>] { todo!() }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    chart_module = root / boundaries.IWA_COMMON_CHART_DATA_MODULE_SOURCE
+    chart_module.parent.mkdir(parents=True, exist_ok=True)
+    chart_module.write_text("pub mod data;\n", encoding="utf-8")
+
+    projection = root / boundaries.IWA_CHART_DATA_CODEC_PROJECTION_SOURCE
+    projection.parent.mkdir(parents=True, exist_ok=True)
+    projection.write_text(
+        "syntax = \"proto2\";\n"
+        "package LitchiIwaProjection;\n"
+        "message ChartArchive { optional bytes grid = 7; }\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.IWA_CHART_DATA_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions as BuffaDecodeOptions;\n"
+        "pub struct DecodeOptions;\n"
+        "pub struct DecodeReport;\n"
+        "pub struct ChartDataSnapshot<'source>(&'source [u8]);\n"
+        "pub fn decode_chart_data<'source>() {}\n"
+        "fn preflight<'source>() {}\n"
+        "fn decode_lazy_view(source: &[u8]) { let _ = source; }\n",
+        encoding="utf-8",
+    )
+    proto_lib = root / boundaries.IWA_CHART_DATA_CODEC_PUBLIC_SOURCE
+    proto_lib.parent.mkdir(parents=True, exist_ok=True)
+    proto_lib.write_text(
+        "#[doc(hidden)]\n"
+        "pub mod chart_data_codec;\n"
+        "mod buffa_chart_data_generated {\n"
+        "    include!(concat!(env!(\"OUT_DIR\"), \"/buffa-chart-data/"
+        "iwa_chart_data_buffa_protos.rs\"));\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    charts_mod = root / boundaries.IWA_CHART_DATA_HOST_MODULE_SOURCE
+    charts_mod.parent.mkdir(parents=True, exist_ok=True)
+    charts_mod.write_text(
+        "pub use litchi_iwa_common::chart::data::ChartData;\n",
+        encoding="utf-8",
+    )
+    host = root / boundaries.IWA_CHART_DATA_HOST_SOURCE
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "pub use litchi_iwa_common::chart::data::ChartData;\n"
+        "fn extract() -> Result<ChartData, ()> { todo!() }\n",
+        encoding="utf-8",
+    )
+
+    if not include_focus:
+        return
+
+    owners = {
+        "Pages": (
+            "use litchi_iwa_common::chart::data::ChartData;\n"
+            "use litchi_iwa_protos::chart_data_codec;\n"
+            "impl Package {\n"
+            "    pub fn body_chart_data(&self, selector: BodyChartSelector) "
+            "-> Result<ChartData, Error> {\n"
+            "        let _ = selector; chart_data_codec::decode_chart_data(); "
+            "todo!()\n"
+            "    }\n"
+            "}\n"
+        ),
+        "Numbers": (
+            "use litchi_iwa_common::chart::data::ChartData;\n"
+            "use litchi_iwa_protos::chart_data_codec as codec;\n"
+            "impl Package {\n"
+            "    pub fn sheet_chart_data(&self, selector: SheetSelector) "
+            "-> Result<ChartData, Error> {\n"
+            "        let _ = selector; codec::decode_chart_data(); "
+            "todo!()\n"
+            "    }\n"
+            "}\n"
+        ),
+        "Keynote": (
+            "use litchi_iwa_common::chart::{data::ChartData};\n"
+            "use litchi_iwa_protos::chart_data_codec;\n"
+            "impl Package {\n"
+            "    pub fn slide_chart_data(&self, selector: SlideSelector) "
+            "-> Result<ChartData, Error> {\n"
+            "        let _ = selector; chart_data_codec::decode_chart_data(); "
+            "todo!()\n"
+            "    }\n"
+            "}\n"
+        ),
+    }
+    for (format_name, source) in owners.items():
+        owner = root / boundaries.IWA_CHART_DATA_FOCUSED_OWNERS[format_name]
+        owner.parent.mkdir(parents=True, exist_ok=True)
+        owner.write_text(source, encoding="utf-8")
+        package = root / boundaries.IWA_CHART_DATA_FOCUSED_PACKAGES[format_name]
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            f"mod {boundaries.IWA_CHART_DATA_FOCUSED_MODULES[format_name]};\n",
+            encoding="utf-8",
+        )
+
+
 def add_iwa_object_index_reference_extraction_retirement_scaffold(
     root: Path,
     *,
@@ -48540,6 +48657,134 @@ fn rewrite_movie_title_operation(
             )
         main_source = inspect.getsource(boundaries.main)
         self.assertIn("+ audit_iwa_chart_metadata_source_topology()", main_source)
+
+    def test_chart_data_boundary_accepts_common_codec_and_focused_owners(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            self.assertEqual(boundaries.audit_iwa_chart_data_source_topology(root), [])
+
+    def test_chart_data_boundary_rejects_common_physical_or_raw_id_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            common = root / boundaries.IWA_COMMON_CHART_DATA_SOURCE
+            common.write_text(
+                common.read_text(encoding="utf-8")
+                + "pub fn leaked(object_id: u64, source: &[u8]) {}\n"
+                + "use litchi_iwa_protos::chart_data_codec;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_data_source_topology(root)
+            self.assertTrue(
+                any("imports a concrete format, wire, or protobuf" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("exposes a raw ID parameter" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("exposes raw bytes" in item for item in violations),
+                violations,
+            )
+
+    def test_chart_data_boundary_keeps_codec_buffa_projection_private(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            codec = root / boundaries.IWA_CHART_DATA_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "use buffa::DecodeOptions as BuffaDecodeOptions;",
+                    "use prost::Message;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_data_source_topology(root)
+            self.assertTrue(any("must use Buffa" in item for item in violations), violations)
+
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "pub fn generated_leak() -> buffa_chart_data_generated::Projection { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_data_source_topology(root)
+            self.assertTrue(
+                any("must not expose Buffa generated types" in item for item in violations),
+                violations,
+            )
+
+            codec_lib = root / boundaries.IWA_CHART_DATA_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text(
+                codec_lib.read_text(encoding="utf-8").replace(
+                    "mod buffa_chart_data_generated {",
+                    "pub mod buffa_chart_data_generated {",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_data_source_topology(root)
+            self.assertTrue(
+                any("generated module must remain private" in item for item in violations),
+                violations,
+            )
+
+    def test_chart_data_focused_apis_reject_raw_bytes_ids_and_public_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            owner = root / boundaries.IWA_CHART_DATA_FOCUSED_OWNERS["Pages"]
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "impl Package {\n"
+                + "    pub fn leaked(&self, object_id: u64, bytes: &[u8]) "
+                + "-> Result<ChartData, Error> { todo!() }\n"
+                + "    pub fn leaks_view(&self, selector: BodyChartSelector) "
+                + "-> chart_data_codec::ChartDataSnapshot<'static> { todo!() }\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.IWA_CHART_DATA_FOCUSED_PACKAGES["Pages"]
+            package.write_text("pub mod body_chart_data;\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_chart_data_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("exposes a raw ID" in item for item in violations), violations)
+            self.assertTrue(
+                any("exposes generated or wire type" in item for item in violations),
+                violations,
+            )
+
+    def test_chart_data_host_uses_common_type_and_rejects_duplicate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            charts_mod = root / boundaries.IWA_CHART_DATA_HOST_MODULE_SOURCE
+            charts_mod.write_text("pub use data::ChartData;\n", encoding="utf-8")
+            self.assertEqual(boundaries.audit_iwa_chart_data_source_topology(root), [])
+            host = root / boundaries.IWA_CHART_DATA_HOST_SOURCE
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "pub struct ChartData { object_id: u64 }\n",
+                encoding="utf-8",
+            )
+            charts_mod.write_text(
+                charts_mod.read_text(encoding="utf-8")
+                + "pub use data::ChartData;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_data_source_topology(root)
+            self.assertTrue(any("duplicate" in item for item in violations), violations)
+
+    def test_chart_data_boundary_allows_future_host_deletion_and_is_dispatched(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_data_scaffold(root)
+            (root / boundaries.IWA_CHART_DATA_HOST_SOURCE).unlink()
+            (root / boundaries.IWA_CHART_DATA_HOST_MODULE_SOURCE).unlink()
+            self.assertEqual(boundaries.audit_iwa_chart_data_source_topology(root), [])
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn("+ audit_iwa_chart_data_source_topology()", main_source)
 
     def test_table_merge_boundaries_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)

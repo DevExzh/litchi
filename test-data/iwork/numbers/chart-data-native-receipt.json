@@ -1,0 +1,40 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "chart-data-native.numbers",
+  "size": 127968,
+  "sha256": "2ee739a2cbd676e55fd0f56a4733fd1bd1f3a0cf6e0a3fd90d178bfb265e496e",
+  "source": "chart-arrangement-native.numbers",
+  "lifecycle": [
+    "Copied existing native chart control to a disposable directory.",
+    "Changed first series April from 17 to 17.25 and cleared its May value through the native application UI.",
+    "Saved, closed, and reopened the exact saved path.",
+    "Verified fractional value and absent May data point; closed the verified document."
+  ],
+  "row_labels": [
+    "North",
+    "South"
+  ],
+  "column_labels": [
+    "April",
+    "May",
+    "June",
+    "July"
+  ],
+  "numeric_values": [
+    [
+      17.25,
+      null,
+      53,
+      96
+    ],
+    [
+      55,
+      43,
+      70,
+      58
+    ]
+  ],
+  "scope": "Modern chart data from a linked source table. The reopened table displays 17.25 and a blank May cell; chart accessibility omits the missing point and rounds 17.25 to 17.2."
+}

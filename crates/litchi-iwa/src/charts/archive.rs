@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::parse_wire_fields_with_limits;
-use prost::Message;
+use prost::{Message, bytes::Buf};
 
 use crate::protobuf::{tsch, tsp};
 use crate::wire::{
@@ -19,6 +19,7 @@ use crate::{Error, Result};
 const DRAWABLE_SUPER_FIELD: u32 = 1;
 const CHART_EXTENSION_FIELD: u32 = 10_000;
 const CHART_REFERENCE_LINES_EXTENSION_FIELD: u32 = 10_005;
+const CHART_GRID_FIELD: u32 = 7;
 const CHART_BASE_FIELDS: std::ops::RangeInclusive<u32> = 1..=24;
 const MAX_REFERENCE_LINE_GRAPH_AXES: usize = 32;
 const MAX_REFERENCE_LINE_GRAPH_ENTRIES: usize = 128;
@@ -31,6 +32,34 @@ pub struct IWorkChartArchive {
     pub chart: Option<tsch::ChartArchive>,
     chart_opaque_fields: Vec<Vec<u8>>,
     opaque_fields: Vec<Vec<u8>>,
+}
+
+/// Read-only chart graph projection with the repeated data grid omitted.
+///
+/// This type intentionally exposes no encoder or conversion back to
+/// [`IWorkChartArchive`]. Graph discovery can therefore not accidentally
+/// publish a chart whose grid was skipped during decoding.
+#[derive(Debug, Clone)]
+pub(crate) struct IWorkChartGraphArchive {
+    inner: IWorkChartArchive,
+}
+
+impl IWorkChartGraphArchive {
+    pub(crate) fn drawable(&self) -> &tsch::ChartDrawableArchive {
+        &self.inner.drawable
+    }
+
+    pub(crate) fn chart(&self) -> Option<&tsch::ChartArchive> {
+        self.inner.chart.as_ref()
+    }
+
+    pub(crate) fn reference_lines(&self) -> Result<Option<tsch::ChartReferenceLinesArchive>> {
+        self.inner.reference_lines()
+    }
+
+    pub(crate) fn typed_reference_identifiers(&self) -> Result<HashSet<u64>> {
+        self.inner.typed_reference_identifiers()
+    }
 }
 
 impl IWorkChartArchive {
@@ -247,20 +276,56 @@ impl IWorkChartArchive {
 
     /// Decode a chart drawable without discarding extensions or future fields.
     pub fn decode(data: &[u8]) -> Result<Self> {
+        Self::decode_with_chart_grid(data, true)
+    }
+
+    /// Decode the chart graph while leaving its repeated inline grid borrowed.
+    ///
+    /// Graph discovery reads chart metadata, references, and styles but does
+    /// not inspect `ChartArchive.grid`; the selected chart-data reader owns
+    /// that lazy projection. The generated chart message is therefore fed a
+    /// segmented buffer that omits field 7 without copying the remaining
+    /// payload. Mutation and encoding paths must continue using [`Self::decode`]
+    /// so the complete grid remains available.
+    pub(crate) fn decode_without_chart_grid(data: &[u8]) -> Result<IWorkChartGraphArchive> {
+        Ok(IWorkChartGraphArchive {
+            inner: Self::decode_with_chart_grid(data, false)?,
+        })
+    }
+
+    fn decode_with_chart_grid(data: &[u8], include_chart_grid: bool) -> Result<Self> {
         let fields = parse_wire_fields(data)?;
         let chart_field = unique_field(&fields, CHART_EXTENSION_FIELD)?;
         let chart_data = chart_field
             .map(|field| length_delimited_payload(data, field))
             .transpose()?;
-        let chart = chart_data.map(tsch::ChartArchive::decode).transpose()?;
-        let chart_opaque_fields = if let Some(chart_data) = chart_data {
-            parse_wire_fields(chart_data)?
+        let chart_fields = chart_data.map(parse_wire_fields).transpose()?;
+        let chart = match (chart_data, chart_fields.as_deref(), include_chart_grid) {
+            (Some(chart_data), Some(_chart_fields), true) => {
+                Some(tsch::ChartArchive::decode(chart_data)?)
+            },
+            (Some(chart_data), Some(chart_fields), false) => Some(tsch::ChartArchive::decode(
+                ChartArchiveWithoutGrid::new(chart_data, chart_fields)?,
+            )?),
+            (Some(_), None, _) => {
+                return Err(Error::InvalidFormat(
+                    "chart extension fields disappeared during decoding".to_owned(),
+                ));
+            },
+            (None, _, _) => None,
+        };
+        let chart_opaque_fields = match (chart_data, chart_fields) {
+            (Some(chart_data), Some(chart_fields)) => chart_fields
                 .into_iter()
                 .filter(|field| !CHART_BASE_FIELDS.contains(&field.number()))
                 .map(|field| chart_data[field.start()..field.end()].to_vec())
-                .collect()
-        } else {
-            Vec::new()
+                .collect(),
+            (None, None) => Vec::new(),
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(Error::InvalidFormat(
+                    "chart extension fields disappeared during decoding".to_owned(),
+                ));
+            },
         };
         let opaque_fields = fields
             .iter()
@@ -292,6 +357,111 @@ impl IWorkChartArchive {
             output.extend_from_slice(field);
         }
         Ok(output)
+    }
+}
+
+/// A zero-copy `Buf` view of a chart payload with the repeated grid field
+/// skipped. `prost` only sees the remaining encoded fields, while every slice
+/// still points into the original chart message.
+struct ChartArchiveWithoutGrid<'a> {
+    source: &'a [u8],
+    fields: &'a [WireField],
+    field_index: usize,
+    field_offset: usize,
+    remaining_bytes: usize,
+}
+
+impl<'a> ChartArchiveWithoutGrid<'a> {
+    fn new(source: &'a [u8], fields: &'a [WireField]) -> Result<Self> {
+        let mut remaining_bytes = source.len();
+        let mut grid_count = 0usize;
+        for field in fields
+            .iter()
+            .filter(|field| field.number() == CHART_GRID_FIELD)
+        {
+            if field.wire_type() != 2 {
+                return Err(Error::InvalidFormat(
+                    "chart grid field is not length-delimited".to_owned(),
+                ));
+            }
+            field.validate_canonical_key(source)?;
+            field.validate_canonical_length(source)?;
+            field.checked_payload(source)?;
+            grid_count = grid_count.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("chart grid field count overflow".to_owned())
+            })?;
+            if grid_count > 1 {
+                return Err(Error::InvalidFormat(
+                    "chart grid field occurs more than once".to_owned(),
+                ));
+            }
+            let field_bytes = field.end().checked_sub(field.start()).ok_or_else(|| {
+                Error::InvalidFormat("chart grid field has invalid byte offsets".to_owned())
+            })?;
+            remaining_bytes = remaining_bytes.checked_sub(field_bytes).ok_or_else(|| {
+                Error::InvalidFormat("chart grid field exceeds chart payload".to_owned())
+            })?;
+        }
+        let mut view = Self {
+            source,
+            fields,
+            field_index: 0,
+            field_offset: 0,
+            remaining_bytes,
+        };
+        view.normalize();
+        Ok(view)
+    }
+
+    fn normalize(&mut self) {
+        loop {
+            let Some(field) = self.fields.get(self.field_index) else {
+                return;
+            };
+            let field_len = field.end() - field.start();
+            if field.number() == CHART_GRID_FIELD || self.field_offset == field_len {
+                self.field_index += 1;
+                self.field_offset = 0;
+                continue;
+            }
+            return;
+        }
+    }
+}
+
+impl Buf for ChartArchiveWithoutGrid<'_> {
+    fn remaining(&self) -> usize {
+        self.remaining_bytes
+    }
+
+    fn chunk(&self) -> &[u8] {
+        let Some(field) = self.fields.get(self.field_index) else {
+            return &[];
+        };
+        let start = field.start() + self.field_offset;
+        &self.source[start..field.end()]
+    }
+
+    fn advance(&mut self, count: usize) {
+        assert!(
+            count <= self.remaining_bytes,
+            "chart archive buffer advanced past end"
+        );
+        let mut remaining = count;
+        while remaining != 0 {
+            self.normalize();
+            let field = self
+                .fields
+                .get(self.field_index)
+                .expect("chart archive buffer has no remaining field");
+            let field_len = field.end() - field.start();
+            let available = field_len - self.field_offset;
+            let consumed = remaining.min(available);
+            self.field_offset += consumed;
+            self.remaining_bytes -= consumed;
+            remaining -= consumed;
+        }
+        self.normalize();
     }
 }
 
@@ -1129,6 +1299,104 @@ mod tests {
         .unwrap();
 
         assert!(IWorkChartArchive::decode(&encoded).is_err());
+    }
+
+    #[test]
+    fn graph_decode_skips_grid_across_field_boundaries() {
+        let grid = tsch::ChartGridArchive {
+            row_name: vec!["row".to_owned()],
+            column_name: vec!["column".to_owned()],
+            grid_row: vec![tsch::GridRow {
+                value: vec![tsch::GridValue {
+                    numeric_value: Some(42.0),
+                    ..Default::default()
+                }],
+            }],
+            ..Default::default()
+        };
+        let archive = IWorkChartArchive::new(
+            tsch::ChartDrawableArchive::default(),
+            tsch::ChartArchive {
+                chart_type: Some(tsch::ChartType::ColumnChartType2D as i32),
+                contains_default_data: Some(true),
+                grid: Some(grid),
+                ..Default::default()
+            },
+        );
+        let encoded = archive.encode().unwrap();
+        let full = IWorkChartArchive::decode(&encoded).unwrap();
+        let graph = IWorkChartArchive::decode_without_chart_grid(&encoded).unwrap();
+        let mut expected = full.clone();
+        expected.chart.as_mut().unwrap().grid = None;
+
+        assert_eq!(graph.inner, expected);
+        assert_eq!(
+            graph.chart().unwrap().chart_type,
+            full.chart.as_ref().unwrap().chart_type
+        );
+        assert!(graph.chart().unwrap().grid.is_none());
+    }
+
+    #[test]
+    fn graph_decode_handles_grid_only_chart_payload() {
+        let archive = IWorkChartArchive::new(
+            tsch::ChartDrawableArchive::default(),
+            tsch::ChartArchive {
+                grid: Some(tsch::ChartGridArchive {
+                    row_name: vec!["row".to_owned()],
+                    column_name: vec!["column".to_owned()],
+                    grid_row: vec![tsch::GridRow {
+                        value: vec![tsch::GridValue {
+                            numeric_value: Some(1.0),
+                            ..Default::default()
+                        }],
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        );
+
+        let graph =
+            IWorkChartArchive::decode_without_chart_grid(&archive.encode().unwrap()).unwrap();
+        assert!(graph.chart().unwrap().grid.is_none());
+    }
+
+    #[test]
+    fn graph_decode_rejects_duplicate_grid_fields() {
+        let grid = tsch::ChartGridArchive {
+            row_name: vec!["row".to_owned()],
+            column_name: vec!["column".to_owned()],
+            grid_row: vec![tsch::GridRow {
+                value: vec![tsch::GridValue {
+                    numeric_value: Some(1.0),
+                    ..Default::default()
+                }],
+            }],
+            ..Default::default()
+        };
+        let mut chart_data = tsch::ChartArchive {
+            chart_type: Some(tsch::ChartType::ColumnChartType2D as i32),
+            grid: Some(grid.clone()),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        append_length_delimited_field(&mut chart_data, CHART_GRID_FIELD, &grid.encode_to_vec())
+            .unwrap();
+        let mut encoded = tsch::ChartDrawableArchive::default().encode_to_vec();
+        append_length_delimited_field(&mut encoded, CHART_EXTENSION_FIELD, &chart_data).unwrap();
+
+        assert!(IWorkChartArchive::decode_without_chart_grid(&encoded).is_err());
+    }
+
+    #[test]
+    fn graph_decode_rejects_malformed_dropped_grid_field() {
+        let mut chart_data = tsch::ChartArchive::default().encode_to_vec();
+        append_varint_field(&mut chart_data, CHART_GRID_FIELD, 1).unwrap();
+        let mut encoded = tsch::ChartDrawableArchive::default().encode_to_vec();
+        append_length_delimited_field(&mut encoded, CHART_EXTENSION_FIELD, &chart_data).unwrap();
+
+        assert!(IWorkChartArchive::decode_without_chart_grid(&encoded).is_err());
     }
 
     #[test]

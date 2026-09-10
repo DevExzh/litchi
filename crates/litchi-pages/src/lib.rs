@@ -74,6 +74,7 @@ pub use header_footer::{HeaderFooter, HeaderFooterSelector, Kind, Template};
 pub use image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
 pub use litchi_core::Position;
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
+pub use litchi_iwa_common::chart::data::ChartData;
 pub use litchi_iwa_common::chart::metadata::ChartMetadata;
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
@@ -102,6 +103,7 @@ pub use package::{
     BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit,
     BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch,
 };
+pub use package::{BodyChartDataError, BodyChartDataLimitKind};
 pub use package::{BodyChartMetadataError, BodyChartMetadataLimitKind};
 pub use package::{
     BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,

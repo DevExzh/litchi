@@ -157,6 +157,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "chart_data_codec"
+path = "fuzz_targets/chart_data_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_chart_legend_codec"
 path = "fuzz_targets/keynote_chart_legend_codec.rs"
 test = false

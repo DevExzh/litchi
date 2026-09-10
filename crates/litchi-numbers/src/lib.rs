@@ -335,6 +335,7 @@ pub use document::{
     ReadLimitKind as DocumentReadLimitKind, Result as DocumentResult, Stats as DocumentStats,
 };
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
+pub use litchi_iwa_common::chart::data::ChartData;
 pub use litchi_iwa_common::chart::metadata::ChartMetadata;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
@@ -360,6 +361,7 @@ pub use package::{
     ChartArrangementLimitKind as SheetChartArrangementLimitKind,
     ChartArrangementPatch as SheetChartArrangementPatch,
 };
+pub use package::{ChartDataError, ChartDataLimitKind};
 pub use package::{ChartMetadataError, ChartMetadataLimitKind};
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
