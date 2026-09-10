@@ -155,8 +155,13 @@ pub use litchi_ooxml_common::package_encryption::{
 /// Resource policy for package ingestion through [`Package`].
 pub use litchi_opc::ReadLimits;
 pub use master_layout::{
-    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID, PlaceholderKind,
-    PlaceholderSpec, SlideLayoutKind,
+    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID,
+    PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSignaturePolicy, PlaceholderSpec,
+    PlaceholderTypeExtension, PlaceholderTypeExtensionCommit, PlaceholderTypeExtensionEdit,
+    PlaceholderTypeExtensionLimits, PlaceholderTypeExtensionPatch,
+    PlaceholderTypeExtensionSlotCommit, PlaceholderTypeExtensionSlotEdit,
+    PlaceholderTypeExtensionSlotPatch, PlaceholderTypeExtensionSlotSnapshot,
+    PlaceholderTypeExtensionSnapshot, SlideLayoutKind,
 };
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,

@@ -1484,12 +1484,24 @@ impl Package {
         name: &str,
         placeholders: &[crate::master_layout::PlaceholderSpec],
     ) -> Result<crate::master_layout::AuthoredSlideLayout> {
-        self.edit_typed(|opc| {
+        self.synchronize_legacy_raw_graph("add_slide_layout")?;
+        crate::master_layout::preflight_add_slide_layout(
+            &self.opc,
+            master_part_name,
+            kind,
+            name,
+            placeholders,
+        )?;
+        let result = self.edit_typed(|opc| {
             crate::master_layout::add_slide_layout(opc, master_part_name, kind, name, placeholders)
-        })
+        });
+        if result.is_ok() {
+            self.mutable_pres = None;
+        }
+        result
     }
 
-    /// Add or replace one master/layout placeholder shape.
+    /// Add or update one slide, master, or layout placeholder shape.
     ///
     /// # Errors
     ///
@@ -1499,7 +1511,126 @@ impl Package {
         part_name: &PackURI,
         spec: &crate::master_layout::PlaceholderSpec,
     ) -> Result<()> {
-        self.edit_typed(|opc| crate::master_layout::store_placeholder_shape(opc, part_name, spec))
+        self.synchronize_legacy_raw_graph("store_placeholder_shape")?;
+        if crate::master_layout::preflight_store_placeholder_shape(&self.opc, part_name, spec)? {
+            return Ok(());
+        }
+        let result = self
+            .edit_typed(|opc| crate::master_layout::store_placeholder_shape(opc, part_name, spec));
+        if result.is_ok() {
+            self.mutable_pres = None;
+        }
+        result
+    }
+
+    /// Read one source-bound PowerPoint 2023 placeholder type extension.
+    ///
+    /// The snapshot retains the exact slide, master, or layout XML needed for a
+    /// scalar, lossless edit. Markup-compatibility owners that require branch
+    /// selection are rejected by the source-preserving transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the owner, selected shape, or p232 extension is
+    /// missing or malformed.
+    pub fn placeholder_type_extension_snapshot<'a>(
+        &self,
+        part_name: &PackURI,
+        key: impl Into<crate::shape::Key<'a>>,
+    ) -> Result<crate::master_layout::PlaceholderTypeExtensionSnapshot> {
+        self.ensure_graph_current("placeholder_type_extension_snapshot")?;
+        crate::master_layout::load_placeholder_type_extension_snapshot(&self.opc, part_name, key)
+    }
+
+    /// Apply a source-checked reversible p232 placeholder patch.
+    ///
+    /// A changed signed source is rejected. Use
+    /// [`Self::apply_placeholder_type_extension_patch_with_policy`] when the
+    /// caller has deliberately chosen signature invalidation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected owner is stale, malformed, or signed.
+    pub fn apply_placeholder_type_extension_patch(
+        &mut self,
+        patch: &crate::master_layout::PlaceholderTypeExtensionPatch,
+    ) -> Result<crate::master_layout::PlaceholderTypeExtensionSnapshot> {
+        self.apply_placeholder_type_extension_patch_with_policy(
+            patch,
+            crate::master_layout::PlaceholderSignaturePolicy::Reject,
+        )
+    }
+
+    /// Apply a p232 placeholder patch under an explicit signature policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected owner is stale or malformed, or if
+    /// the chosen policy cannot publish the package.
+    pub fn apply_placeholder_type_extension_patch_with_policy(
+        &mut self,
+        patch: &crate::master_layout::PlaceholderTypeExtensionPatch,
+        policy: crate::master_layout::PlaceholderSignaturePolicy,
+    ) -> Result<crate::master_layout::PlaceholderTypeExtensionSnapshot> {
+        self.ensure_graph_current("apply_placeholder_type_extension_patch")?;
+        self.ensure_plain_mutation("apply_placeholder_type_extension_patch")?;
+        let changed = patch.is_changed();
+        let snapshot = crate::master_layout::apply_placeholder_type_extension_patch_with_policy(
+            &mut self.opc,
+            patch,
+            policy,
+        )?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
+    /// Read an optional, source-bound PowerPoint 2023 placeholder extension
+    /// from a slide, master, or layout owner.
+    pub fn placeholder_type_extension_slot_snapshot<'a>(
+        &self,
+        part_name: &PackURI,
+        key: impl Into<crate::shape::Key<'a>>,
+    ) -> Result<crate::master_layout::PlaceholderTypeExtensionSlotSnapshot> {
+        self.ensure_graph_current("placeholder_type_extension_slot_snapshot")?;
+        crate::master_layout::load_placeholder_type_extension_slot_snapshot(
+            &self.opc, part_name, key,
+        )
+    }
+
+    /// Apply an optional p232 placeholder extension patch with the default
+    /// signature policy.
+    pub fn apply_placeholder_type_extension_slot_patch(
+        &mut self,
+        patch: &crate::master_layout::PlaceholderTypeExtensionSlotPatch,
+    ) -> Result<crate::master_layout::PlaceholderTypeExtensionSlotSnapshot> {
+        self.apply_placeholder_type_extension_slot_patch_with_policy(
+            patch,
+            crate::master_layout::PlaceholderSignaturePolicy::Reject,
+        )
+    }
+
+    /// Apply an optional p232 placeholder extension patch with an explicit
+    /// signature disposition.
+    pub fn apply_placeholder_type_extension_slot_patch_with_policy(
+        &mut self,
+        patch: &crate::master_layout::PlaceholderTypeExtensionSlotPatch,
+        policy: crate::master_layout::PlaceholderSignaturePolicy,
+    ) -> Result<crate::master_layout::PlaceholderTypeExtensionSlotSnapshot> {
+        self.ensure_graph_current("apply_placeholder_type_extension_slot_patch")?;
+        self.ensure_plain_mutation("apply_placeholder_type_extension_slot_patch")?;
+        let changed = patch.is_changed();
+        let snapshot =
+            crate::master_layout::apply_placeholder_type_extension_slot_patch_with_policy(
+                &mut self.opc,
+                patch,
+                policy,
+            )?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
     }
 
     /// Remove an unreferenced layout and its owning relationship.
@@ -1594,6 +1725,16 @@ impl Package {
             .ordinary_output()
             .map_err(|source| Error::EncryptionPolicy { operation, source })?;
         Ok(())
+    }
+
+    /// Publish pending mutable-writer state before a legacy raw-owner preflight.
+    /// The legacy owner operations inspect the canonical OPC graph, while the
+    /// new-package writer may still hold newly added slide parts only in its
+    /// mutable model. Successful raw-owner mutations retire that model below;
+    /// otherwise a later presentation flush could overwrite the raw edit.
+    fn synchronize_legacy_raw_graph(&mut self, operation: &'static str) -> Result<()> {
+        self.ensure_plain_mutation(operation)?;
+        self.flush_presentation()
     }
 
     fn ensure_graph_current(&self, operation: &'static str) -> Result<()> {
