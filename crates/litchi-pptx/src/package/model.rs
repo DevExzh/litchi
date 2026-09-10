@@ -902,6 +902,153 @@ impl Package {
         self.edit_typed(crate::presentation_properties::remove_math_from_package)
     }
 
+    /// Read the inert `p1710:readonlyRecommended` presentation hint.
+    ///
+    /// The recommendation is document data only. It does not make this
+    /// package read-only and never changes host editing or save policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the presentation-properties owner is malformed or
+    /// ambiguous.
+    pub fn readonly_recommended(&self) -> Result<Option<bool>> {
+        self.ensure_graph_current("readonly_recommended")?;
+        crate::presentation_properties::readonly_recommended::load(&self.opc)
+    }
+
+    /// Alias using the conventional Rust spelling.
+    pub fn read_only_recommended(&self) -> Result<Option<bool>> {
+        self.readonly_recommended()
+    }
+
+    /// Capture the exact presentation-properties source for a checked edit.
+    ///
+    /// The snapshot is absent when the package has no presentation-properties
+    /// owner. An existing owner still yields a snapshot when the recommendation
+    /// itself is absent, allowing an insertion to preserve the owner's source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the owner is malformed or ambiguous.
+    pub fn readonly_recommended_snapshot(
+        &self,
+    ) -> Result<Option<crate::presentation_properties::readonly_recommended::Snapshot>> {
+        self.ensure_graph_current("readonly_recommended_snapshot")?;
+        crate::presentation_properties::readonly_recommended::load_snapshot(&self.opc)
+    }
+
+    /// Alias using the conventional Rust spelling.
+    pub fn read_only_recommended_snapshot(
+        &self,
+    ) -> Result<Option<crate::presentation_properties::readonly_recommended::Snapshot>> {
+        self.readonly_recommended_snapshot()
+    }
+
+    /// Set the inert `p1710:readonlyRecommended` hint transactionally.
+    ///
+    /// An exact semantic no-op preserves the package bytes and any retained
+    /// signature. A changed signed source requires an explicit package
+    /// signature policy, as do all other typed package edits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the owner is malformed, ambiguous, stale, or the
+    /// package signature policy rejects the mutation.
+    pub fn put_readonly_recommended(&mut self, value: bool) -> Result<Option<bool>> {
+        self.ensure_graph_current("put_readonly_recommended")?;
+        let previous = self.edit_typed(move |opc| {
+            crate::presentation_properties::readonly_recommended::put(opc, value)
+        })?;
+        if previous != Some(value) {
+            self.mutable_pres = None;
+        }
+        Ok(previous)
+    }
+
+    /// Alias using the conventional Rust spelling.
+    pub fn put_read_only_recommended(&mut self, value: bool) -> Result<Option<bool>> {
+        self.put_readonly_recommended(value)
+    }
+
+    /// Remove the inert recommendation while retaining its owner part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the owner is malformed, ambiguous, stale, or the
+    /// package signature policy rejects the mutation.
+    pub fn remove_readonly_recommended(&mut self) -> Result<Option<bool>> {
+        self.ensure_graph_current("remove_readonly_recommended")?;
+        let previous =
+            self.edit_typed(crate::presentation_properties::readonly_recommended::remove)?;
+        if previous.is_some() {
+            self.mutable_pres = None;
+        }
+        Ok(previous)
+    }
+
+    /// Alias using the conventional Rust spelling.
+    pub fn remove_read_only_recommended(&mut self) -> Result<Option<bool>> {
+        self.remove_readonly_recommended()
+    }
+
+    /// Publish a committed source-preserving recommendation edit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source is stale, malformed, or the package
+    /// signature policy rejects the mutation.
+    pub fn apply_readonly_recommended_commit(
+        &mut self,
+        commit: crate::presentation_properties::readonly_recommended::Commit,
+    ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
+        self.ensure_graph_current("apply_readonly_recommended_commit")?;
+        let changed = commit.is_changed();
+        let snapshot = self.edit_typed(move |opc| {
+            crate::presentation_properties::readonly_recommended::apply_commit(opc, commit)
+        })?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
+    /// Alias using the conventional Rust spelling.
+    pub fn apply_read_only_recommended_commit(
+        &mut self,
+        commit: crate::presentation_properties::readonly_recommended::Commit,
+    ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
+        self.apply_readonly_recommended_commit(commit)
+    }
+
+    /// Publish a reversible source-checked recommendation patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the source is stale, malformed, or the package
+    /// signature policy rejects the mutation.
+    pub fn apply_readonly_recommended_patch(
+        &mut self,
+        patch: &crate::presentation_properties::readonly_recommended::Patch,
+    ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
+        self.ensure_graph_current("apply_readonly_recommended_patch")?;
+        let changed = patch.is_changed();
+        let snapshot = self.edit_typed(|opc| {
+            crate::presentation_properties::readonly_recommended::apply_patch(opc, patch)
+        })?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
+    /// Alias using the conventional Rust spelling.
+    pub fn apply_read_only_recommended_patch(
+        &mut self,
+        patch: &crate::presentation_properties::readonly_recommended::Patch,
+    ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
+        self.apply_readonly_recommended_patch(patch)
+    }
+
     /// Read the lossless zoom owner of one slide.
     ///
     /// # Errors

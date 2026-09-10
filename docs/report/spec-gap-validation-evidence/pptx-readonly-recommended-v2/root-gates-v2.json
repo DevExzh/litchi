@@ -1,0 +1,37 @@
+{
+  "source_manifest_sha256": "84a1eda1500f2e9524240b25111e3893fb43f74514672f898884b5e3b21fabcd",
+  "logs": {
+    "tests": {
+      "path": "litchi-pptx-readonly-root-tests-v2.log.gz",
+      "raw_sha256": "05454ba9d1e293776842761ed1ca988b1876d5220305ca3f4fac671c2a0b3f86",
+      "exit_code": 0
+    },
+    "clippy": {
+      "path": "litchi-pptx-readonly-root-clippy-v2.log.gz",
+      "raw_sha256": "280ce8d18e97afa60b331e7c27b789982d3ed76d8aeeaa24547453b23cc9f95b",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "path": "litchi-pptx-readonly-root-rustdoc-v2.log.gz",
+      "raw_sha256": "e6927505a47cc861fff4d34c3461b3768a05564d5aa9aa86c4b4c45353191c94",
+      "exit_code": 0
+    }
+  },
+  "ordinary_tests_passed": 894,
+  "doctests_passed": 6,
+  "ordinary_tests_ignored": 0,
+  "doctests_ignored": 2,
+  "commands": [
+    "cargo +1.95.0 test -p litchi-pptx --all-features --no-fail-fast",
+    "cargo +1.95.0 clippy -p litchi-pptx --all-features --all-targets -- -D warnings",
+    "RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-pptx --all-features --no-deps"
+  ],
+  "environment": {
+    "affinity": "8-31",
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-pptx-readonly-root-v2-target-195",
+    "CARGO_BUILD_JOBS": "4"
+  },
+  "scoped_rustfmt_and_diff": "pass"
+}

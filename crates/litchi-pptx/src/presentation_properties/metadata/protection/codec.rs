@@ -116,7 +116,11 @@ impl Settings {
     #[must_use]
     pub fn to_pres_props_xml(&self) -> String {
         if self.read_only_recommended {
-            r#"<p:extLst><p:ext uri="{E76CE94A-603C-4142-B9EB-6D1370010A27}"><p14:discardImageEditData xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="0"/></p:ext></p:extLst>"#.to_owned()
+            format!(
+                r#"<p:extLst><p:ext uri="{}"><p1710:readonlyRecommended xmlns:p1710="{}" val="1"/></p:ext></p:extLst>"#,
+                crate::presentation_properties::READONLY_RECOMMENDED_URI,
+                crate::presentation_properties::P1710_NS,
+            )
         } else {
             String::new()
         }
