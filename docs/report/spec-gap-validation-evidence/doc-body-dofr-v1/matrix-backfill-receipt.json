@@ -1,0 +1,20 @@
+{
+  "matrix_sha256": "a30159b8f11266b2c77b627a906ed774574fdcd1c901bceab285cb1f43d00477",
+  "added_rows": [
+    "| AutoText and attached glossary (`PlcfGlsy`, `SttbfGlsy`, `SttbGlsyStyle`, `LEGOXTR_V11`) | \ud83d\udfe1 | \u2705 | \ud83d\udfe1 | `Document::{glossary_metadata,glossary_item_text,attached_glossary}` exposes metadata and selected content, including the secondary FIB. `Writer` can set/clear glossary metadata and attached glossary documents; `GlossaryMetadata::to_table_bytes` encodes tables. This is not arbitrary opened-template glossary transaction support. |",
+    "| Word 2003 XML schema references (`Hplxsdr`, `XSDR`, `TIQ`) | \ud83d\udfe1 | \u2705 | \u274c | `Document::xml_schemas()` returns typed schema and name references through `parts::xml_schemas`; schema URIs remain inert. No semantic schema-table writer or external schema resolver. |",
+    "| Structured document tags (`SttbfBkmkSdt`, SDT bookmark PLCs, `SDTI`) | \ud83d\udfe1 | \u2705 | \u274c | `Document::structured_tags()` exposes the checked `parts::structured_tags` projection; no general tag authoring or binding evaluation. |",
+    "| Format consistency checker marks (`SttbfBkmkFcc`, `DPCID`) | \ud83d\udfe1 | \u2705 | \u274c | `Document::format_consistency_marks()` returns typed ranges and metadata; no checker execution or dedicated mark editor. |",
+    "| Text Services Framework tables (`Plcfuim`, `PlfguidUim`, `UIM`) | \ud83d\udfe1 | \u2705 | \ud83d\udfe1 | `Document::text_services_tables()` exposes validated records/GUIDs. Public record/table encoders retain inert values; they do not attach an input service or provide an ordinary package transaction. |",
+    "| Grammar checker cookies (`Plcfcookie` and legacy cookies) | \ud83d\udfe1 | \u2705 | \ud83d\udfe1 | `Document::grammar_cookie_tables()` returns current/legacy cookie tables; checked record/table codecs serialize the values. No grammar checking or ordinary cookie-table package editor. |",
+    "| Language auto-detection state (`Plcflad`, `LadSpls`) | \ud83d\udfe1 | \u2705 | \ud83d\udfe1 | `Document::proofing_tables().language_detection()` exposes ranges/states through the fallible proofing accessor. `parts::proofing` supplies table encoding and in-memory set/remove; this does not detect languages. |",
+    "| Table character cache (`PlcfTch`) | \ud83d\udfe1 | \u2705 | \ud83d\udfe1 | `Document::table_character_cache()` exposes checked CP ranges and `TableCharInfo`; `TableCharacterCache::to_bytes` serializes a table. No cache regeneration or standalone package editor. |",
+    "| E-mail revision threading (`RmdThreading`) | \ud83d\udfe1 | \u2705 | \u274c | `Document::rmd_threading()` exposes messages, display metadata, author indices, and personal styles. No mail transport, threading engine, or semantic writer. |",
+    "| Repair bookmarks (`SttbfBkmkBPRepairs` and companion PLCs) | \ud83d\udfe1 | \u2705 | \ud83d\udfe1 | `Document::repair_bookmarks()` exposes retained repair ranges. `DocumentRepairBookmarks::to_bytes` encodes the three tables; it does not apply repairs or provide an ordinary repair-bookmark transaction. |",
+    "| Annotation bookmarks (`SttbfAtnBkmk`) | \u2705 | \u2705 | \u2705 | `parts::annotation_bookmarks` provides typed tags, source-checked transactions/inverse patches, and a package `Editor` that supports insert/replace/remove/clear. Annotation-tag edits are distinct from rewriting comment stories. |",
+    "| Embedded font descriptions (`SttbTtmbd`) | \ud83d\udfe1 | \u2705 | \u274c | `Document::embedded_fonts()` exposes font indices, source offsets, bold/italic flags, and subset order. This row covers descriptions only; no font-program interpretation or dedicated description authoring. |"
+  ],
+  "count": 12,
+  "independent_review_sha256": "f98ad878e7d53f40f4a3057bb1cf08997f80befb8785a14d3c6c609474e83286",
+  "scope": "Documentation of existing APIs; no new execution, rendering, native acceptance or generic transaction claim. DOFR footer reflects bounded passive records. Earlier count 11 combined grammar/language rows; actual table has12."
+}
