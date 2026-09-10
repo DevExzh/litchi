@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized] target(s) in 0.07s
+     Running tests/drawing_skip_projection.rs (/var/tmp/litchi-xlsb-drawing-current-target-20260910/debug/deps/drawing_skip_projection-b17fe41b6ea8394f)
+
+running 4 tests
+test skipped_projection_cell_noop_and_scalar_change_keep_malformed_drawings_opaque ... ok
+test skipped_projection_keeps_opaque_graph_across_noop_reparse_and_save ... ok
+test workbook_patch_respects_skipped_target_and_durable_decode_boundary ... ok
+test skipped_malformed_donor_transfers_to_eager_target_without_drawing_parse ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+

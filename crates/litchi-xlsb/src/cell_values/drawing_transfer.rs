@@ -228,6 +228,11 @@ pub(super) fn transfer(
     source_anchor: usize,
     target_sheet: usize,
 ) -> Result<()> {
+    if target.drawing_load_policy() == crate::workbook::DrawingLoadPolicy::Skipped {
+        return Err(Error::UnsupportedFeature(
+            "drawing transfer requires an eager drawing projection".to_string(),
+        ));
+    }
     let source = super::root::validated_workbook_with_external_link_limits(
         source_bytes,
         target.external_link_limits(),
@@ -275,10 +280,8 @@ pub(super) fn transfer(
         target_relationships,
     )?;
     package.unsign();
-    *target = Workbook::from_opc_package_with_external_link_limits(
-        package,
-        target.external_link_limits(),
-    )?;
+    let validated = target.reparse_candidate(package)?;
+    *target = validated;
     validate_readback(
         target,
         target_sheet,

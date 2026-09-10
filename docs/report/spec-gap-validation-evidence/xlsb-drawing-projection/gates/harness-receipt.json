@@ -1,0 +1,109 @@
+{
+  "parent": "9cc442c5178f53a271a16e2f812dbb09a2aaa2f6",
+  "sources_before": {
+    "crates/litchi-xlsb/src/calculation_chain/workbook.rs": "fe31c8a35d7123214335a9584c5ec4b8faed6d72ef23085964507ffb5e36e958",
+    "crates/litchi-xlsb/src/cell_values/drawing_transfer.rs": "eddad86ea4e0647acc64fd5371e1d1051a44944d4f1f55d07f78e013fa979870",
+    "crates/litchi-xlsb/src/cell_values/root.rs": "22739d85acb81b746884af33e67e2618c1dbd49f3ddf41ac5726aa4730b80bb1",
+    "crates/litchi-xlsb/src/cell_values/workbook.rs": "27da115cabb1c56d3b760225094d536865662a818a14d83b0356a0f971d13e62",
+    "crates/litchi-xlsb/src/cell_watches/workbook.rs": "c62b6e1220e80144b1ae3f1c6da4f6e9796707359c02d2f3fda6442148f42d57",
+    "crates/litchi-xlsb/src/sparkline/workbook.rs": "d86096fbd0719bbf2dc0356a2e3101f6bfeac07702cb5e64573121e71a224cfd",
+    "crates/litchi-xlsb/src/workbook/mod.rs": "9ad9fdb3d90334ab7cce689146b9e3332a046356f5bfeab6ccde644d44f78233",
+    "crates/litchi-xlsb/src/workbook/model.rs": "4c4b7a74fcac6274fdb0bd52acbd2d830165cf4e35b20708258f27118d403653",
+    "crates/litchi-xlsb/src/workbook/package.rs": "662ea9b0594cb6020e58b3d5b1bd8a2d9175a714bb460e38f4f6d4df5e6eaa25",
+    "crates/litchi-xlsb/src/workbook/tests.rs": "f0fb118f9e28cb59391e18bf76e96561432f609fa23610a0dde58a5eb3b412ad",
+    "tools/perf-baseline/README.md": "43717854e80576c8fc2971d0407c28319d36570c170739f7e9c57575bb3d184d",
+    "tools/perf-baseline/src/bin/xlsb_crud.rs": "fb9946ee16657d81ca118bc8df9e81afd34f8f104468ccca7c242667e8aaad71",
+    "crates/litchi-xlsb/tests/drawing_skip_projection.rs": "d7d7ed725c13c798a109e371e5a57687d2f8286046e4a3d6e4ea3b60db017e7e",
+    "tools/perf-baseline/Cargo.lock": "e1c66239cd25a5657a72ed48ece0cd39938a734867f621eeeacdf1217b04d14b"
+  },
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--offline",
+        "--locked",
+        "--features",
+        "xlsb-crud",
+        "--bin",
+        "xlsb_crud",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "log": "harness-tests.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--offline",
+        "--locked",
+        "--features",
+        "xlsb-crud",
+        "--bin",
+        "xlsb_crud",
+        "--tests",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "harness-clippy.log"
+    },
+    {
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "tools/perf-baseline/src/bin/xlsb_crud.rs"
+      ],
+      "exit_code": 0,
+      "log": "harness-format.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "HEAD",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "diff.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-xlsb",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "xlsb-format.log"
+    }
+  ],
+  "sources_after": {
+    "crates/litchi-xlsb/src/calculation_chain/workbook.rs": "fe31c8a35d7123214335a9584c5ec4b8faed6d72ef23085964507ffb5e36e958",
+    "crates/litchi-xlsb/src/cell_values/drawing_transfer.rs": "eddad86ea4e0647acc64fd5371e1d1051a44944d4f1f55d07f78e013fa979870",
+    "crates/litchi-xlsb/src/cell_values/root.rs": "22739d85acb81b746884af33e67e2618c1dbd49f3ddf41ac5726aa4730b80bb1",
+    "crates/litchi-xlsb/src/cell_values/workbook.rs": "27da115cabb1c56d3b760225094d536865662a818a14d83b0356a0f971d13e62",
+    "crates/litchi-xlsb/src/cell_watches/workbook.rs": "c62b6e1220e80144b1ae3f1c6da4f6e9796707359c02d2f3fda6442148f42d57",
+    "crates/litchi-xlsb/src/sparkline/workbook.rs": "d86096fbd0719bbf2dc0356a2e3101f6bfeac07702cb5e64573121e71a224cfd",
+    "crates/litchi-xlsb/src/workbook/mod.rs": "9ad9fdb3d90334ab7cce689146b9e3332a046356f5bfeab6ccde644d44f78233",
+    "crates/litchi-xlsb/src/workbook/model.rs": "4c4b7a74fcac6274fdb0bd52acbd2d830165cf4e35b20708258f27118d403653",
+    "crates/litchi-xlsb/src/workbook/package.rs": "662ea9b0594cb6020e58b3d5b1bd8a2d9175a714bb460e38f4f6d4df5e6eaa25",
+    "crates/litchi-xlsb/src/workbook/tests.rs": "f0fb118f9e28cb59391e18bf76e96561432f609fa23610a0dde58a5eb3b412ad",
+    "tools/perf-baseline/README.md": "43717854e80576c8fc2971d0407c28319d36570c170739f7e9c57575bb3d184d",
+    "tools/perf-baseline/src/bin/xlsb_crud.rs": "fb9946ee16657d81ca118bc8df9e81afd34f8f104468ccca7c242667e8aaad71",
+    "crates/litchi-xlsb/tests/drawing_skip_projection.rs": "d7d7ed725c13c798a109e371e5a57687d2f8286046e4a3d6e4ea3b60db017e7e",
+    "tools/perf-baseline/Cargo.lock": "e1c66239cd25a5657a72ed48ece0cd39938a734867f621eeeacdf1217b04d14b"
+  },
+  "sources_stable": true
+}

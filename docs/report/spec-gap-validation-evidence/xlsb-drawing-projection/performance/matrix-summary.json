@@ -1,0 +1,1130 @@
+{
+  "binary_sha256": "07f44c8b63fd46b94b66d024871f15b1933cea04062ad47134638ff1e54bdbca",
+  "contract": {
+    "processes_per_backend_case": 3,
+    "raw_json_reports": 78,
+    "samples_per_process": 30,
+    "supported_backend_cases": 26,
+    "warmup_per_process": 3
+  },
+  "cross_lane_comparison": "No equivalent-work speedup inferred; backend API/validation scopes differ.",
+  "expected_unavailable_gates": {
+    "source_backed/tight_cell_limits_refused": "source-backed is read-only and does not run the eager cell-limit probe"
+  },
+  "fixture": {
+    "bytes": 22715,
+    "sha256": "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc"
+  },
+  "groups": {
+    "owned/edit_ceil_one_percent_existing_cells_save": {
+      "backend": "owned",
+      "case": "edit_ceil_one_percent_existing_cells_save",
+      "median_process_p50_ns": 3086831,
+      "median_process_p95_ns": 3122552,
+      "median_process_p99_ns": 3140052,
+      "output_sha256": [
+        "115047074163a95bd89936f2554bfa5de3dc004e1a7aca942cd9d00410208989"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        3073499.566666667,
+        3223762.3,
+        3060977.3666666667
+      ],
+      "process_p50_ns": [
+        3086831,
+        3222632,
+        3058721
+      ],
+      "process_p95_ns": [
+        3122552,
+        3255121,
+        3088881
+      ],
+      "process_p99_ns": [
+        3140052,
+        3272302,
+        3105061
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct XLSB open plus deterministic ceil(1%) existing scalar edits on the selected worksheet, commit, publication, and save"
+      ]
+    },
+    "owned/edit_one_existing_scalar_save": {
+      "backend": "owned",
+      "case": "edit_one_existing_scalar_save",
+      "median_process_p50_ns": 3043941,
+      "median_process_p95_ns": 3100021,
+      "median_process_p99_ns": 3118971,
+      "output_sha256": [
+        "115047074163a95bd89936f2554bfa5de3dc004e1a7aca942cd9d00410208989"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        3049260.033333333,
+        3045535.3333333335,
+        3050961.7333333334
+      ],
+      "process_p50_ns": [
+        3036901,
+        3043941,
+        3048061
+      ],
+      "process_p95_ns": [
+        3121212,
+        3100021,
+        3082231
+      ],
+      "process_p99_ns": [
+        3130141,
+        3100931,
+        3118971
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct XLSB open plus one existing scalar edit, commit, publication, and save"
+      ]
+    },
+    "owned/full_stored_cell_scan": {
+      "backend": "owned",
+      "case": "full_stored_cell_scan",
+      "median_process_p50_ns": 1118974,
+      "median_process_p95_ns": 1132704,
+      "median_process_p99_ns": 1146575,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        1120960.1,
+        1133308.7666666666,
+        1114212.0333333334
+      ],
+      "process_p50_ns": [
+        1118974,
+        1133364,
+        1112724
+      ],
+      "process_p95_ns": [
+        1131754,
+        1146644,
+        1132704
+      ],
+      "process_p99_ns": [
+        1135934,
+        1153364,
+        1146575
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct XLSB open plus complete source-bound stored-cell scan on the selected worksheet"
+      ]
+    },
+    "owned/full_text": {
+      "backend": "owned",
+      "case": "full_text",
+      "median_process_p50_ns": 140961,
+      "median_process_p95_ns": 165720,
+      "median_process_p99_ns": 179351,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        145628.2,
+        145170.5,
+        146070.2
+      ],
+      "process_p50_ns": [
+        140961,
+        141121,
+        140891
+      ],
+      "process_p95_ns": [
+        173700,
+        165560,
+        165720
+      ],
+      "process_p99_ns": [
+        179351,
+        171820,
+        186811
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "facade bytes open plus all-worksheet text extraction"
+      ]
+    },
+    "owned/noop_transaction_commit_save": {
+      "backend": "owned",
+      "case": "noop_transaction_commit_save",
+      "median_process_p50_ns": 1990917,
+      "median_process_p95_ns": 2035497,
+      "median_process_p99_ns": 2060037,
+      "output_sha256": [
+        "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        1999347.9333333333,
+        1998881.5666666667,
+        1999622.2
+      ],
+      "process_p50_ns": [
+        1990917,
+        1985667,
+        1998517
+      ],
+      "process_p95_ns": [
+        2035497,
+        2081638,
+        2016667
+      ],
+      "process_p99_ns": [
+        2060037,
+        2088858,
+        2022647
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct XLSB open plus exact no-op transaction, commit, publication, and save"
+      ]
+    },
+    "owned/open_identify": {
+      "backend": "owned",
+      "case": "open_identify",
+      "median_process_p50_ns": 2035838,
+      "median_process_p95_ns": 2058078,
+      "median_process_p99_ns": 2059407,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        2021441.7,
+        2040661.7333333334,
+        2071471.5
+      ],
+      "process_p50_ns": [
+        2021857,
+        2035838,
+        2083458
+      ],
+      "process_p95_ns": [
+        2048857,
+        2058078,
+        2117068
+      ],
+      "process_p99_ns": [
+        2051048,
+        2059407,
+        2127598
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "facade format identification plus XLSB facade open"
+      ]
+    },
+    "owned/selected_worksheet_cell": {
+      "backend": "owned",
+      "case": "selected_worksheet_cell",
+      "median_process_p50_ns": 1114044,
+      "median_process_p95_ns": 1133984,
+      "median_process_p99_ns": 1141824,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        1114346.7333333334,
+        1124385.0666666667,
+        1112362.3666666667
+      ],
+      "process_p50_ns": [
+        1114044,
+        1122994,
+        1110024
+      ],
+      "process_p95_ns": [
+        1133984,
+        1135354,
+        1129294
+      ],
+      "process_p99_ns": [
+        1145964,
+        1141824,
+        1129974
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct XLSB open plus selected-worksheet snapshot materialization and one cell lookup"
+      ]
+    },
+    "owned/worksheet_catalog": {
+      "backend": "owned",
+      "case": "worksheet_catalog",
+      "median_process_p50_ns": 1122405,
+      "median_process_p95_ns": 1145764,
+      "median_process_p99_ns": 1147174,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        1123071.7333333334,
+        1126865.7666666666,
+        1117141.7
+      ],
+      "process_p50_ns": [
+        1125704,
+        1122405,
+        1115374
+      ],
+      "process_p95_ns": [
+        1145764,
+        1152904,
+        1131914
+      ],
+      "process_p99_ns": [
+        1147174,
+        1154394,
+        1133014
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct XLSB open plus worksheet count and names"
+      ]
+    },
+    "owned_direct/edit_ceil_one_percent_existing_cells_save": {
+      "backend": "owned_direct",
+      "case": "edit_ceil_one_percent_existing_cells_save",
+      "median_process_p50_ns": 3026751,
+      "median_process_p95_ns": 3113901,
+      "median_process_p99_ns": 3131871,
+      "output_sha256": [
+        "115047074163a95bd89936f2554bfa5de3dc004e1a7aca942cd9d00410208989"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        2995135.5,
+        3115138.933333333,
+        3037637.6666666665
+      ],
+      "process_p50_ns": [
+        2990501,
+        3139532,
+        3026751
+      ],
+      "process_p95_ns": [
+        3023831,
+        3176882,
+        3113901
+      ],
+      "process_p99_ns": [
+        3024350,
+        3186422,
+        3131871
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct eager XLSB open plus deterministic ceil(1%) existing scalar edits on the selected worksheet, commit, publication, and save"
+      ]
+    },
+    "owned_direct/edit_one_existing_scalar_save": {
+      "backend": "owned_direct",
+      "case": "edit_one_existing_scalar_save",
+      "median_process_p50_ns": 3031501,
+      "median_process_p95_ns": 3074921,
+      "median_process_p99_ns": 3084141,
+      "output_sha256": [
+        "115047074163a95bd89936f2554bfa5de3dc004e1a7aca942cd9d00410208989"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        3030288.4,
+        3046401.033333333,
+        3051174.3
+      ],
+      "process_p50_ns": [
+        3026901,
+        3031501,
+        3047971
+      ],
+      "process_p95_ns": [
+        3048041,
+        3126422,
+        3074921
+      ],
+      "process_p99_ns": [
+        3051181,
+        3137601,
+        3084141
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct eager XLSB open plus one existing scalar edit, commit, publication, and save"
+      ]
+    },
+    "owned_direct/full_stored_cell_scan": {
+      "backend": "owned_direct",
+      "case": "full_stored_cell_scan",
+      "median_process_p50_ns": 1118864,
+      "median_process_p95_ns": 1131555,
+      "median_process_p99_ns": 1135825,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        1119354.4333333333,
+        1111017.3666666667,
+        1129396.7666666666
+      ],
+      "process_p50_ns": [
+        1118864,
+        1110324,
+        1126154
+      ],
+      "process_p95_ns": [
+        1131555,
+        1123254,
+        1148444
+      ],
+      "process_p99_ns": [
+        1135825,
+        1126534,
+        1156794
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct eager XLSB open plus complete source-bound stored-cell scan on the selected worksheet"
+      ]
+    },
+    "owned_direct/noop_transaction_commit_save": {
+      "backend": "owned_direct",
+      "case": "noop_transaction_commit_save",
+      "median_process_p50_ns": 2003447,
+      "median_process_p95_ns": 2031378,
+      "median_process_p99_ns": 2038037,
+      "output_sha256": [
+        "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        1991118.5333333334,
+        2014177.9666666666,
+        2005092.2666666666
+      ],
+      "process_p50_ns": [
+        1987807,
+        2013037,
+        2003447
+      ],
+      "process_p95_ns": [
+        2008037,
+        2059448,
+        2031378
+      ],
+      "process_p99_ns": [
+        2014227,
+        2062657,
+        2038037
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct eager XLSB open plus exact no-op transaction, commit, publication, and save"
+      ]
+    },
+    "owned_direct/open_identify": {
+      "backend": "owned_direct",
+      "case": "open_identify",
+      "median_process_p50_ns": 1113503,
+      "median_process_p95_ns": 1128604,
+      "median_process_p99_ns": 1133224,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        1119240.7333333334,
+        1114668.0333333334,
+        1110138.3333333333
+      ],
+      "process_p50_ns": [
+        1118054,
+        1113503,
+        1108984
+      ],
+      "process_p95_ns": [
+        1141844,
+        1125284,
+        1128604
+      ],
+      "process_p99_ns": [
+        1149914,
+        1131394,
+        1133224
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct eager XLSB open plus worksheet count"
+      ]
+    },
+    "owned_direct/selected_worksheet_cell": {
+      "backend": "owned_direct",
+      "case": "selected_worksheet_cell",
+      "median_process_p50_ns": 1120664,
+      "median_process_p95_ns": 1137334,
+      "median_process_p99_ns": 1149434,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        1116723.4,
+        1122116.7333333334,
+        1125285.0666666667
+      ],
+      "process_p50_ns": [
+        1115804,
+        1120664,
+        1124244
+      ],
+      "process_p95_ns": [
+        1130224,
+        1137334,
+        1145774
+      ],
+      "process_p99_ns": [
+        1137525,
+        1149434,
+        1149944
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct eager XLSB open plus selected-worksheet snapshot materialization and one cell lookup"
+      ]
+    },
+    "owned_direct/worksheet_catalog": {
+      "backend": "owned_direct",
+      "case": "worksheet_catalog",
+      "median_process_p50_ns": 1134874,
+      "median_process_p95_ns": 1145914,
+      "median_process_p99_ns": 1146974,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        1133758.1333333333,
+        1143935.4666666666,
+        1120586.0666666667
+      ],
+      "process_p50_ns": [
+        1134874,
+        1143524,
+        1117844
+      ],
+      "process_p95_ns": [
+        1145894,
+        1152095,
+        1145914
+      ],
+      "process_p99_ns": [
+        1146854,
+        1173354,
+        1146974
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "direct eager XLSB open plus worksheet count and names"
+      ]
+    },
+    "owned_without_drawings/edit_ceil_one_percent_existing_cells_save": {
+      "backend": "owned_without_drawings",
+      "case": "edit_ceil_one_percent_existing_cells_save",
+      "median_process_p50_ns": 438451,
+      "median_process_p95_ns": 468351,
+      "median_process_p99_ns": 483952,
+      "output_sha256": [
+        "115047074163a95bd89936f2554bfa5de3dc004e1a7aca942cd9d00410208989"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        440492.56666666665,
+        442583.93333333335,
+        440731.93333333335
+      ],
+      "process_p50_ns": [
+        438411,
+        440082,
+        438451
+      ],
+      "process_p95_ns": [
+        464742,
+        468351,
+        469992
+      ],
+      "process_p99_ns": [
+        467312,
+        483952,
+        484931
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "owned XLSB cell/catalog projection open with worksheet drawing parse skipped plus deterministic ceil(1%) existing scalar edits on the selected worksheet, commit, publication, and save"
+      ]
+    },
+    "owned_without_drawings/edit_one_existing_scalar_save": {
+      "backend": "owned_without_drawings",
+      "case": "edit_one_existing_scalar_save",
+      "median_process_p50_ns": 440821,
+      "median_process_p95_ns": 472582,
+      "median_process_p99_ns": 478952,
+      "output_sha256": [
+        "115047074163a95bd89936f2554bfa5de3dc004e1a7aca942cd9d00410208989"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        442153.3,
+        442221.93333333335,
+        444415.63333333336
+      ],
+      "process_p50_ns": [
+        440821,
+        440602,
+        441281
+      ],
+      "process_p95_ns": [
+        472582,
+        466902,
+        477691
+      ],
+      "process_p99_ns": [
+        478952,
+        470631,
+        486092
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "owned XLSB cell/catalog projection open with worksheet drawing parse skipped plus one existing scalar edit, commit, publication, and save"
+      ]
+    },
+    "owned_without_drawings/full_stored_cell_scan": {
+      "backend": "owned_without_drawings",
+      "case": "full_stored_cell_scan",
+      "median_process_p50_ns": 207360,
+      "median_process_p95_ns": 243041,
+      "median_process_p99_ns": 251461,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        211814.76666666666,
+        213469.76666666666,
+        213171.43333333332
+      ],
+      "process_p50_ns": [
+        207360,
+        208210,
+        207330
+      ],
+      "process_p95_ns": [
+        240801,
+        243041,
+        251311
+      ],
+      "process_p99_ns": [
+        250301,
+        258041,
+        251461
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "owned XLSB cell/catalog projection open with worksheet drawing parse skipped plus complete source-bound stored-cell scan"
+      ]
+    },
+    "owned_without_drawings/noop_transaction_commit_save": {
+      "backend": "owned_without_drawings",
+      "case": "noop_transaction_commit_save",
+      "median_process_p50_ns": 255631,
+      "median_process_p95_ns": 287712,
+      "median_process_p99_ns": 291981,
+      "output_sha256": [
+        "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc"
+      ],
+      "process_count": 3,
+      "process_mean_ns": [
+        258648.96666666667,
+        258296.13333333333,
+        259374.63333333333
+      ],
+      "process_p50_ns": [
+        255781,
+        253150,
+        255631
+      ],
+      "process_p95_ns": [
+        287712,
+        286211,
+        288551
+      ],
+      "process_p99_ns": [
+        290441,
+        301231,
+        291981
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "owned XLSB cell/catalog projection open with worksheet drawing parse skipped plus exact no-op transaction, commit, publication, and save"
+      ]
+    },
+    "owned_without_drawings/open_identify": {
+      "backend": "owned_without_drawings",
+      "case": "open_identify",
+      "median_process_p50_ns": 204100,
+      "median_process_p95_ns": 238531,
+      "median_process_p99_ns": 252301,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        209466.1,
+        209913.43333333332,
+        209307.73333333334
+      ],
+      "process_p50_ns": [
+        204100,
+        205351,
+        203361
+      ],
+      "process_p95_ns": [
+        239321,
+        238531,
+        238411
+      ],
+      "process_p99_ns": [
+        261731,
+        245741,
+        252301
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "owned XLSB cell/catalog projection open with worksheet drawing parse skipped plus worksheet count"
+      ]
+    },
+    "owned_without_drawings/selected_worksheet_cell": {
+      "backend": "owned_without_drawings",
+      "case": "selected_worksheet_cell",
+      "median_process_p50_ns": 207501,
+      "median_process_p95_ns": 244611,
+      "median_process_p99_ns": 249481,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        212389.43333333332,
+        212614.1,
+        215610.46666666667
+      ],
+      "process_p50_ns": [
+        207501,
+        207010,
+        210340
+      ],
+      "process_p95_ns": [
+        239881,
+        244611,
+        252971
+      ],
+      "process_p99_ns": [
+        249401,
+        249481,
+        257271
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "owned XLSB cell/catalog projection open with worksheet drawing parse skipped plus selected-worksheet snapshot materialization and one cell lookup"
+      ]
+    },
+    "owned_without_drawings/worksheet_catalog": {
+      "backend": "owned_without_drawings",
+      "case": "worksheet_catalog",
+      "median_process_p50_ns": 200080,
+      "median_process_p95_ns": 244141,
+      "median_process_p99_ns": 244731,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        205471.43333333332,
+        205910.4,
+        206269.4
+      ],
+      "process_p50_ns": [
+        199411,
+        200080,
+        201691
+      ],
+      "process_p95_ns": [
+        244141,
+        237711,
+        244231
+      ],
+      "process_p99_ns": [
+        244731,
+        241891,
+        245770
+      ],
+      "source_observations": [],
+      "timing_scopes": [
+        "owned XLSB cell/catalog projection open with worksheet drawing parse skipped plus worksheet count and names"
+      ]
+    },
+    "source_backed/full_stored_cell_scan": {
+      "backend": "source_backed",
+      "case": "full_stored_cell_scan",
+      "median_process_p50_ns": 128340,
+      "median_process_p95_ns": 147601,
+      "median_process_p99_ns": 152541,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        132184.13333333333,
+        131229.13333333333,
+        131154.16666666666
+      ],
+      "process_p50_ns": [
+        128340,
+        128540,
+        128090
+      ],
+      "process_p95_ns": [
+        147601,
+        147771,
+        145700
+      ],
+      "process_p99_ns": [
+        151920,
+        152541,
+        171271
+      ],
+      "source_observations": [
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 4,
+          "operation_source_read_bytes": 2173,
+          "operation_source_read_calls": 12,
+          "operation_source_read_requested_bytes": 2173,
+          "part_cache_hits": 0,
+          "part_materializations": 5,
+          "retained_part_bytes": 6673,
+          "retained_part_entries": 5,
+          "source_read_bytes": 6180,
+          "source_read_calls": 36,
+          "source_read_requested_bytes": 6180
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 4,
+          "operation_source_read_bytes": 2173,
+          "operation_source_read_calls": 12,
+          "operation_source_read_requested_bytes": 2173,
+          "part_cache_hits": 0,
+          "part_materializations": 5,
+          "retained_part_bytes": 6673,
+          "retained_part_entries": 5,
+          "source_read_bytes": 6180,
+          "source_read_calls": 36,
+          "source_read_requested_bytes": 6180
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 4,
+          "operation_source_read_bytes": 2173,
+          "operation_source_read_calls": 12,
+          "operation_source_read_requested_bytes": 2173,
+          "part_cache_hits": 0,
+          "part_materializations": 5,
+          "retained_part_bytes": 6673,
+          "retained_part_entries": 5,
+          "source_read_bytes": 6180,
+          "source_read_calls": 36,
+          "source_read_requested_bytes": 6180
+        }
+      ],
+      "timing_scopes": [
+        "source-backed XLSB catalog open plus complete stored-cell scan on the selected worksheet"
+      ]
+    },
+    "source_backed/open_identify": {
+      "backend": "source_backed",
+      "case": "open_identify",
+      "median_process_p50_ns": 88350,
+      "median_process_p95_ns": 97440,
+      "median_process_p99_ns": 103881,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        89154.66666666667,
+        89709.66666666667,
+        90141.33333333333
+      ],
+      "process_p50_ns": [
+        87530,
+        88500,
+        88350
+      ],
+      "process_p95_ns": [
+        97440,
+        97161,
+        97830
+      ],
+      "process_p99_ns": [
+        103881,
+        99940,
+        107670
+      ],
+      "source_observations": [
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 0,
+          "operation_source_read_bytes": 0,
+          "operation_source_read_calls": 0,
+          "operation_source_read_requested_bytes": 0,
+          "part_cache_hits": 0,
+          "part_materializations": 1,
+          "retained_part_bytes": 384,
+          "retained_part_entries": 1,
+          "source_read_bytes": 4007,
+          "source_read_calls": 24,
+          "source_read_requested_bytes": 4007
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 0,
+          "operation_source_read_bytes": 0,
+          "operation_source_read_calls": 0,
+          "operation_source_read_requested_bytes": 0,
+          "part_cache_hits": 0,
+          "part_materializations": 1,
+          "retained_part_bytes": 384,
+          "retained_part_entries": 1,
+          "source_read_bytes": 4007,
+          "source_read_calls": 24,
+          "source_read_requested_bytes": 4007
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 0,
+          "operation_source_read_bytes": 0,
+          "operation_source_read_calls": 0,
+          "operation_source_read_requested_bytes": 0,
+          "part_cache_hits": 0,
+          "part_materializations": 1,
+          "retained_part_bytes": 384,
+          "retained_part_entries": 1,
+          "source_read_bytes": 4007,
+          "source_read_calls": 24,
+          "source_read_requested_bytes": 4007
+        }
+      ],
+      "timing_scopes": [
+        "source-backed XLSB catalog open plus worksheet count (facade detection excluded)"
+      ]
+    },
+    "source_backed/selected_worksheet_cell": {
+      "backend": "source_backed",
+      "case": "selected_worksheet_cell",
+      "median_process_p50_ns": 125330,
+      "median_process_p95_ns": 147020,
+      "median_process_p99_ns": 149140,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        128520.13333333333,
+        128124.46666666666,
+        128859.46666666666
+      ],
+      "process_p50_ns": [
+        125120,
+        125330,
+        125471
+      ],
+      "process_p95_ns": [
+        147020,
+        147361,
+        146550
+      ],
+      "process_p99_ns": [
+        149210,
+        147900,
+        149140
+      ],
+      "source_observations": [
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 4,
+          "operation_source_read_bytes": 2173,
+          "operation_source_read_calls": 12,
+          "operation_source_read_requested_bytes": 2173,
+          "part_cache_hits": 0,
+          "part_materializations": 5,
+          "retained_part_bytes": 6673,
+          "retained_part_entries": 5,
+          "source_read_bytes": 6180,
+          "source_read_calls": 36,
+          "source_read_requested_bytes": 6180
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 4,
+          "operation_source_read_bytes": 2173,
+          "operation_source_read_calls": 12,
+          "operation_source_read_requested_bytes": 2173,
+          "part_cache_hits": 0,
+          "part_materializations": 5,
+          "retained_part_bytes": 6673,
+          "retained_part_entries": 5,
+          "source_read_bytes": 6180,
+          "source_read_calls": 36,
+          "source_read_requested_bytes": 6180
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 4,
+          "operation_source_read_bytes": 2173,
+          "operation_source_read_calls": 12,
+          "operation_source_read_requested_bytes": 2173,
+          "part_cache_hits": 0,
+          "part_materializations": 5,
+          "retained_part_bytes": 6673,
+          "retained_part_entries": 5,
+          "source_read_bytes": 6180,
+          "source_read_calls": 36,
+          "source_read_requested_bytes": 6180
+        }
+      ],
+      "timing_scopes": [
+        "source-backed XLSB catalog open plus selected worksheet materialization and one cell lookup"
+      ]
+    },
+    "source_backed/worksheet_catalog": {
+      "backend": "source_backed",
+      "case": "worksheet_catalog",
+      "median_process_p50_ns": 88870,
+      "median_process_p95_ns": 99860,
+      "median_process_p99_ns": 100431,
+      "output_sha256": [],
+      "process_count": 3,
+      "process_mean_ns": [
+        90138.33333333333,
+        89055.33333333333,
+        91439.0
+      ],
+      "process_p50_ns": [
+        88870,
+        87490,
+        89600
+      ],
+      "process_p95_ns": [
+        99860,
+        98000,
+        100201
+      ],
+      "process_p99_ns": [
+        100431,
+        98330,
+        100831
+      ],
+      "source_observations": [
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 0,
+          "operation_source_read_bytes": 0,
+          "operation_source_read_calls": 0,
+          "operation_source_read_requested_bytes": 0,
+          "part_cache_hits": 0,
+          "part_materializations": 1,
+          "retained_part_bytes": 384,
+          "retained_part_entries": 1,
+          "source_read_bytes": 4007,
+          "source_read_calls": 24,
+          "source_read_requested_bytes": 4007
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 0,
+          "operation_source_read_bytes": 0,
+          "operation_source_read_calls": 0,
+          "operation_source_read_requested_bytes": 0,
+          "part_cache_hits": 0,
+          "part_materializations": 1,
+          "retained_part_bytes": 384,
+          "retained_part_entries": 1,
+          "source_read_bytes": 4007,
+          "source_read_calls": 24,
+          "source_read_requested_bytes": 4007
+        },
+        {
+          "open_part_cache_hits": 0,
+          "open_part_materializations": 1,
+          "open_source_read_bytes": 4007,
+          "open_source_read_calls": 24,
+          "open_source_read_requested_bytes": 4007,
+          "operation_part_cache_hits": 0,
+          "operation_part_materializations": 0,
+          "operation_source_read_bytes": 0,
+          "operation_source_read_calls": 0,
+          "operation_source_read_requested_bytes": 0,
+          "part_cache_hits": 0,
+          "part_materializations": 1,
+          "retained_part_bytes": 384,
+          "retained_part_entries": 1,
+          "source_read_bytes": 4007,
+          "source_read_calls": 24,
+          "source_read_requested_bytes": 4007
+        }
+      ],
+      "timing_scopes": [
+        "source-backed XLSB catalog open plus worksheet count and names"
+      ]
+    }
+  },
+  "raw_run_directory": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-drawing-projection/performance/runs/final-release",
+  "schema": "litchi-xlsb-drawing-projection-matrix-v1"
+}

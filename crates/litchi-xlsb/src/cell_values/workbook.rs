@@ -9,6 +9,7 @@
 use super::{Commit, Limits, Snapshot, Value};
 use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
+use crate::workbook::DrawingLoadPolicy;
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
@@ -63,6 +64,27 @@ pub fn apply_with_external_link_limits(
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
 ) -> Result<Snapshot> {
+    apply_with_external_link_limits_and_drawing_policy(
+        package,
+        worksheet,
+        commit,
+        external_link_limits,
+        DrawingLoadPolicy::Eager,
+    )
+}
+
+/// Apply a cell commit while retaining the caller's typed drawing boundary.
+///
+/// Workbook-level publication uses this internal seam so a skipped drawing
+/// projection validates only the selected worksheet dependency closure and
+/// leaves unrelated drawing XML opaque.
+pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    commit: &Commit,
+    external_link_limits: ExternalLinkLimits,
+    drawing_load_policy: DrawingLoadPolicy,
+) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     let updated = commit.patch().apply(part.blob())?;
@@ -73,9 +95,10 @@ pub fn apply_with_external_link_limits(
     let mut candidate = package.clone();
     candidate.get_part_mut(worksheet)?.set_blob(updated.clone());
     candidate.unsign();
-    let parsed = crate::Workbook::from_opc_package_with_external_link_limits(
+    let parsed = crate::Workbook::reparse_candidate_with_policy(
         candidate.clone(),
         external_link_limits,
+        drawing_load_policy,
     )?;
     let worksheet_index = (0..parsed.worksheet_count())
         .find_map(|index| {

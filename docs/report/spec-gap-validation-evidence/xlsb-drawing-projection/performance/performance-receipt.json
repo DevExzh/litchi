@@ -1,0 +1,59 @@
+{
+  "binary": {
+    "bytes": 11736696,
+    "path": "/var/tmp/litchi-xlsb-projection-root-20260910/release/xlsb_crud",
+    "sha256": "07f44c8b63fd46b94b66d024871f15b1933cea04062ad47134638ff1e54bdbca"
+  },
+  "fixture": {
+    "bytes": 22715,
+    "path": "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+    "sha256": "8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc"
+  },
+  "locked_inputs": {
+    "Cargo.lock": {
+      "bytes": 138823,
+      "sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b"
+    },
+    "tools/perf-baseline/Cargo.lock": {
+      "bytes": 56369,
+      "sha256": "e1c66239cd25a5657a72ed48ece0cd39938a734867f621eeeacdf1217b04d14b"
+    }
+  },
+  "matrix": {
+    "cross_lane_comparison": "No equivalent-work speedup inferred; backend API/validation scopes differ.",
+    "processes_per_backend_case": 3,
+    "raw_json_manifest": "raw-json-sha256.txt",
+    "raw_json_manifest_sha256": "9c9a9b79fce26e9cd211e0409c681352bedda359ca0c6df0fa4cf72c44051097",
+    "raw_json_reports": 78,
+    "raw_samples": 2340,
+    "samples_per_process": 30,
+    "summary": "matrix-summary.json",
+    "summary_sha256": "d173b6fd38db6e8df2df1af0c34115cd450d7f72895c46276a25dbc2c3db56b3",
+    "supported_backend_cases": 26,
+    "warmup_per_process": 3
+  },
+  "reproduction_files": {
+    "README.md": "a680cbf083dff19d5295613c64b641f1455dfe037f76dbe0e99d58b85e25ede0",
+    "record-provenance.py": "90c8aa836cf522593c7e85ef8f2d245f1c0aa3897a3d413f8c10389c7aed33ea",
+    "release-build-command.txt": "8dcedc8ac5de24c216e62181d1001f43962bcd9791e816d8b24f555c43f9df2f",
+    "run-release-matrix.sh": "c8089cbb32d3ccf0272abfef810c28540845f30cf661b937a730155cf28294f1",
+    "runs/final-release/commands.txt": "babcc597959615daf36384b3c3082bf48eaefe9ce5698c249769c54dcdc3c078",
+    "runs/final-release/completed.txt": "790e96b4e82bcd91a4c1f26f03ad4d9ebe65e8bd9301de714e8cf5467298b0d7",
+    "verify-matrix.py": "667ac52097b6d1280dbd05eeea7ea0b0f42a069ce165c3cf98ec431d07edfea5",
+    "write-receipt.py": "1a731dbf3f65822df12fbb46ae796759114fedb7b59b10e9e8053da44cdf0f6d"
+  },
+  "schema": "litchi-xlsb-drawing-projection-performance-receipt-v1",
+  "source_stability": {
+    "after_record_sha256": "16426e5cdde726fcce42b7eb3123ef576a5e0cad209202f6a4fcc5c6a3660887",
+    "before_record_sha256": "7ff83ba54ba84a01e964779a77666b15856f3a2ff11da06b983a9aa810085a06",
+    "files_equal_before_after": true,
+    "fixture_equal_before_after": true,
+    "git_head_after": "9cc442c5178f53a271a16e2f812dbb09a2aaa2f6",
+    "git_head_before": "9cc442c5178f53a271a16e2f812dbb09a2aaa2f6"
+  },
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "rustup_toolchain": null
+  }
+}

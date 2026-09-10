@@ -1,6 +1,6 @@
 //! OPC/package integration for the typed XLSB workbook.
 
-use super::model::Workbook;
+use super::model::{DrawingLoadPolicy, Workbook};
 use crate::calc::Props;
 use crate::cell_values;
 use crate::cell_watches;
@@ -55,6 +55,31 @@ fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
 }
 
 impl Workbook {
+    /// Reparse an owned candidate while retaining this workbook's typed
+    /// drawing projection boundary.
+    pub(crate) fn reparse_candidate(&self, package: OpcPackage) -> Result<Self> {
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            self.external_link_limits,
+            self.drawing_load_policy,
+        )
+    }
+
+    /// Reparse bytes after a caller has already selected the projection
+    /// policy.  This is the single internal seam used by detached CRUD
+    /// validators so opaque drawing parts are never parsed accidentally.
+    pub(crate) fn reparse_candidate_with_policy(
+        package: OpcPackage,
+        external_link_limits: ExternalLinkLimits,
+        drawing_load_policy: DrawingLoadPolicy,
+    ) -> Result<Self> {
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            external_link_limits,
+            drawing_load_policy,
+        )
+    }
+
     /// Start a detached, exact-source transaction spanning sheet metadata and
     /// dependency-managed cross-workbook cell transfer.
     pub fn edit_workbook_structure(&self) -> Result<cell_values::WorkbookEdit> {
@@ -128,7 +153,9 @@ impl Workbook {
     }
 
     /// Apply an exact-source cell-value commit and refresh this workbook's
-    /// typed sheet cache only after whole-workbook readback succeeds.
+    /// typed sheet cache only after whole-workbook readback succeeds. A
+    /// drawing-skipped projection keeps that typed-inventory boundary after
+    /// publication.
     ///
     /// # Errors
     ///
@@ -141,14 +168,15 @@ impl Workbook {
     ) -> Result<cell_values::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let mut candidate = self.package.clone();
-        let snapshot = cell_values::workbook::apply_with_external_link_limits(
+        let snapshot = cell_values::workbook::apply_with_external_link_limits_and_drawing_policy(
             &mut candidate,
             &uri,
             commit,
             self.external_link_limits,
+            self.drawing_load_policy,
         )?;
-        *self =
-            Self::from_opc_package_with_external_link_limits(candidate, self.external_link_limits)?;
+        let validated = self.reparse_candidate(candidate)?;
+        *self = validated;
         Ok(snapshot)
     }
 
@@ -244,11 +272,12 @@ impl Workbook {
     ) -> Result<sparkline::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
         sparkline::workbook::validate_commit_context(&commit, &self.formula_context)?;
-        sparkline::workbook::apply_with_external_link_limits(
+        sparkline::workbook::apply_with_external_link_limits_and_drawing_policy(
             &mut self.package,
             &uri,
             commit,
             self.external_link_limits,
+            self.drawing_load_policy,
         )
     }
 
@@ -277,11 +306,12 @@ impl Workbook {
         commit: &cell_watches::Commit,
     ) -> Result<cell_watches::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        cell_watches::workbook::apply_with_external_link_limits(
+        cell_watches::workbook::apply_with_external_link_limits_and_drawing_policy(
             &mut self.package,
             &uri,
             commit,
             self.external_link_limits,
+            self.drawing_load_policy,
         )
     }
 
@@ -384,15 +414,15 @@ impl Workbook {
     /// or unwinding leaves this workbook unchanged. A successful edit drops
     /// package signatures, reparses workbook-owned state, and revalidates the
     /// inert VBA and External Data Connections relationship graphs before
-    /// publication.
+    /// publication. A drawing-skipped projection remains drawing-skipped after
+    /// this reparse.
     pub fn edit_opc<T>(&mut self, edit: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let mut candidate = self.package.clone();
         candidate.unsign();
         let value = edit(&mut candidate)?;
 
         Self::validate_edit_candidate(&candidate)?;
-        let validated =
-            Self::from_opc_package_with_external_link_limits(candidate, self.external_link_limits)?;
+        let validated = self.reparse_candidate(candidate)?;
         *self = validated;
         Ok(value)
     }
@@ -734,6 +764,50 @@ impl Workbook {
         )
     }
 
+    /// Read an XLSB workbook for cell/catalog CRUD without decoding standard
+    /// SpreadsheetDrawing parts during open.
+    ///
+    /// This explicit projection retains every drawing, chart, image, and
+    /// relationship part in the underlying OPC package for lossless save, but
+    /// does not populate the typed [`Workbook::sheet_drawings`] inventory.
+    /// Callers that need typed drawing access must use [`Self::new`] instead.
+    /// The source-backed workbook remains the preferred selector-first path
+    /// when positional input and deferred worksheet payloads are available.
+    pub fn new_without_drawing_parse<R: Read + Seek>(reader: R) -> Result<Self> {
+        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
+            reader,
+            litchi_opc::ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read a cell/catalog CRUD projection with explicit OPC resource limits.
+    pub fn new_without_drawing_parse_with_limits<R: Read + Seek>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
+            reader,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Read a cell/catalog CRUD projection with explicit OPC and external-link
+    /// resource limits.
+    pub fn new_without_drawing_parse_with_limits_and_external_link_limits<R: Read + Seek>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        let package = OpcPackage::from_reader_with_limits(reader, limits)?;
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            external_link_limits,
+            DrawingLoadPolicy::Skipped,
+        )
+    }
+
     /// Read and validate an XLSB workbook with explicit OPC resource limits.
     pub fn new_with_limits<R: Read + Seek>(
         reader: R,
@@ -788,6 +862,18 @@ impl Workbook {
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
+        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            external_link_limits,
+            DrawingLoadPolicy::Eager,
+        )
+    }
+
+    pub(crate) fn from_opc_package_with_external_link_limits_and_drawing_policy(
+        package: OpcPackage,
+        external_link_limits: ExternalLinkLimits,
+        drawing_load_policy: DrawingLoadPolicy,
+    ) -> Result<Self> {
         let mut external_link_budget = external_link_limits.budget();
         let mut workbook = Workbook {
             package,
@@ -806,17 +892,25 @@ impl Workbook {
             structured_tables: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_drawings: Vec::new(),
+            drawing_load_policy,
             connections: None,
         };
 
-        workbook.load_workbook_info(&mut external_link_budget)?;
+        workbook.load_workbook_info(
+            &mut external_link_budget,
+            drawing_load_policy == DrawingLoadPolicy::Eager,
+        )?;
         workbook.load_styles()?;
         workbook.load_shared_strings()?;
 
         Ok(workbook)
     }
 
-    fn load_workbook_info(&mut self, external_link_budget: &mut Budget) -> Result<()> {
+    fn load_workbook_info(
+        &mut self,
+        external_link_budget: &mut Budget,
+        load_drawings: bool,
+    ) -> Result<()> {
         let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
@@ -1037,7 +1131,9 @@ impl Workbook {
                         });
                     }
                     let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
-                    sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                    if load_drawings {
+                        sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                    }
                 }
                 chart_sheets.push((sheet_index, chart_sheet));
                 continue;
@@ -1066,7 +1162,9 @@ impl Workbook {
                     });
                 }
                 let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
-                sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                if load_drawings {
+                    sheet_drawings.push(self.load_sheet_drawing(sheet_index, drawing_part)?);
+                }
             }
             for table_rel_id in crate::package::table::parse_table_part_rel_ids(sheet_part.blob())?
             {

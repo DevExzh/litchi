@@ -337,6 +337,32 @@ CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
   --json target/perf/xlsb-crud.json
 ```
 
+`--backend owned` retains the existing workload mix: facade identification/open
+and full text, with direct owned APIs for the other cases. `owned_direct` uses
+the eager XLSB constructor; `owned_without_drawings` uses the explicit cell/catalog
+projection, preserving raw drawing parts while omitting their typed inventory.
+Both support read and cell CRUD cases; `full_text` remains facade-only.
+`source_backed` supports only `open_identify`, `worksheet_catalog`,
+`selected_worksheet_cell`, and `full_stored_cell_scan`. Specify supported cases
+explicitly for these backends. Their unsupported `all` combination fails before
+corpus loading because it includes facade-only and edit workloads.
+These are different API/validation scopes, so their timings do not establish an
+equivalent-work speedup. Each timed open includes cloning the in-memory input.
+
+Source-backed reports include positional read calls, requested/returned bytes,
+and part-cache diagnostics split at constructor return into open and operation
+intervals. Counts must agree across all timed samples and the untimed representative
+run. Retained part bytes describe the cache, not total heap usage or peak RSS;
+cold part loads do not directly measure decompressed bytes. The fixture
+geometry gate checks stored-cell counts against dimensions; only scan cases
+check the returned stored-cell sequence. It is not an allocation-level proof
+against rectangular expansion. Fresh untimed scan replays compare complete
+coordinates and values with the eager corpus oracle. Source-backed timing
+includes counter instrumentation. Its separate cell-limit gate is inapplicable
+because that API has no cell-value-limit parameter. Reopen and preservation gates
+include package-level and per-part relationships; they check semantic digests,
+not compressed ZIP member identity.
+
 The default XLSB fixture SHA-256 is
 `8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc`.
 Use `--fixture` to select another public fixture; capability-dependent

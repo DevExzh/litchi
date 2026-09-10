@@ -1,0 +1,19 @@
+   Compiling litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi-spec-gaps/tools/perf-baseline)
+    Finished `test` profile [unoptimized] target(s) in 20.76s
+     Running unittests src/bin/xlsb_crud.rs (/var/tmp/litchi-xlsb-projection-root-20260910/debug/deps/xlsb_crud-fd8470eafbfdd7b2)
+
+running 9 tests
+test tests::deterministic_public_fixture_identity ... ok
+test tests::drawing_skipped_projection_preserves_raw_drawing_graph_on_noop_save ... ok
+test tests::exact_noop_identity_and_edit_readback_are_preserved ... ok
+test tests::malformed_and_tight_limits_are_refused ... ok
+test tests::parses_every_case_and_all ... ok
+test tests::rejects_malformed_case_and_arguments ... ok
+test tests::skipped_projection_propagates_through_reparse_paths_and_ignores_opaque_drawing ... ok
+test tests::source_backed_measurements_validate_selected_value_and_counter_intervals ... ok
+test tests::sparse_iteration_does_not_expand_to_rectangle ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
