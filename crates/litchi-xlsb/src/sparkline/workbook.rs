@@ -47,6 +47,7 @@ pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
 
     let snapshot = worksheet::read_with_limits(&updated, limits).map_err(map_error)?;
     let mut candidate = package.clone();
+    crate::worksheet_index::maintain(&mut candidate, worksheet, current, &updated)?;
     candidate.get_part_mut(worksheet)?.set_blob(updated);
     candidate.unsign();
     crate::Workbook::reparse_candidate_with_policy(

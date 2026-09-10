@@ -1,0 +1,25 @@
+build_mode external-binary
+binary_sha256_before 316d0d0d90ebec49978c9a9a08b6a60db82fd3bbb0d3b97d7ec194b49b3f5490
+binary_sha256_after 316d0d0d90ebec49978c9a9a08b6a60db82fd3bbb0d3b97d7ec194b49b3f5490
+toolchain rustc 1.95.0 (59807616e 2026-04-14)
+cargo cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+rustup_home /tmp/litchi-spec-gap-rustup
+target_dir /var/tmp/litchi-xlsb-binary-index-final-target
+build_jobs 2
+git_commit 973a70c504950735e0f8cff7eece09364516892c
+source_state_before_sha256 97596cf13262da189cf0ba293a0aae3c9835dea0f56b62c2e7517bbe82b76707
+source_state_after_sha256 97596cf13262da189cf0ba293a0aae3c9835dea0f56b62c2e7517bbe82b76707
+external_manifest /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-binary-index/performance/raw/final-release/release-build-manifest.txt
+external_manifest_sha256 0be82f304edd4f17915fce9aaee79ca7d474e3fd7437f8c162e20c653baf38c7
+harness_source_sha256 fba5d0c6781164827d18a4b7b2dfd96db95eccf349698a95bf1e773c8b19794f
+profile_script_sha256 7dadb001fc744e92ac8db321b797c92212338c8f4e9b1b200af93ce2694da044
+verifier_sha256 15753564e6338518e3440b8cd2d1175710dfff1b9ca64466589d62891131207e
+warmup 3
+samples 30
+processes 3
+cargo_incremental 0
+ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b  /home/zhuhe/code/litchi-spec-gaps/Cargo.lock
+e1c66239cd25a5657a72ed48ece0cd39938a734867f621eeeacdf1217b04d14b  /home/zhuhe/code/litchi-spec-gaps/tools/perf-baseline/Cargo.lock
+8c600e97d719b0266dcfb49c1872feb8d10c6ed12bc768ff16ace7dae555ebfc  /home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb
+2c1da74896f383b8cb33cb128bfeef20783572b81ca48410229bb098ac5c3565  /home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb
+generated_fixture synthetic:131072

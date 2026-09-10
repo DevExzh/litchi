@@ -1239,6 +1239,12 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
             "worksheet has no safe BrtDrawing insertion boundary".to_string(),
         ));
     }
+    crate::worksheet_index::maintain(
+        &mut package,
+        &worksheet_uri,
+        &worksheet_source,
+        &worksheet_output,
+    )?;
     package
         .get_part_mut(&worksheet_uri)?
         .set_blob(worksheet_output);

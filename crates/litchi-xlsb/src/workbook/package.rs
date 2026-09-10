@@ -21,6 +21,7 @@ use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
 use litchi_opc::OpcPackage;
 use litchi_opc::constants::{content_type, relationship_type};
+use litchi_opc::part::Part;
 use std::collections::HashMap;
 use std::io::{Read, Seek, Write};
 use std::sync::Arc;
@@ -55,6 +56,65 @@ fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
 }
 
 impl Workbook {
+    /// Read and bind the Worksheet Binary Index attached to one worksheet.
+    /// Offsets are validated against the worksheet bytes during this call;
+    /// the returned metadata owns the parsed index bytes but does not retain a
+    /// live view of the workbook's worksheet part.
+    pub fn worksheet_binary_index(
+        &self,
+        worksheet_index: usize,
+    ) -> Result<Option<crate::binary_index::WorksheetBinaryIndex>> {
+        self.worksheet_binary_index_with_limits(
+            worksheet_index,
+            crate::binary_index::Limits::DEFAULT,
+        )
+    }
+
+    /// Read a Worksheet Binary Index with explicit finite index limits.
+    pub fn worksheet_binary_index_with_limits(
+        &self,
+        worksheet_index: usize,
+        limits: crate::binary_index::Limits,
+    ) -> Result<Option<crate::binary_index::WorksheetBinaryIndex>> {
+        let worksheet_uri = self.worksheet_uri(worksheet_index)?;
+        let worksheet = self.package.get_part(&worksheet_uri)?;
+        let mut relationships = worksheet.rels().iter().filter(|relationship| {
+            relationship.reltype() == crate::binary_index::BINARY_INDEX_RELATIONSHIP
+        });
+        let Some(relationship) = relationships.next() else {
+            return Ok(None);
+        };
+        if relationships.next().is_some() {
+            return Err(crate::package::error::Error::InvalidRelationship(
+                "worksheet has multiple binary index relationships".to_string(),
+            ));
+        }
+        if relationship.is_external() {
+            return Err(crate::package::error::Error::InvalidRelationship(
+                "worksheet binary index relationship is external".to_string(),
+            ));
+        }
+        let index_uri = relationship.target_partname()?;
+        let index_part = self.package.get_part(&index_uri)?;
+        if index_part.content_type() != crate::binary_index::BINARY_INDEX_CONTENT_TYPE {
+            return Err(crate::package::error::Error::InvalidContentType {
+                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE.to_string(),
+                got: index_part.content_type().to_string(),
+            });
+        }
+        if !index_part.rels().is_empty() {
+            return Err(crate::package::error::Error::InvalidRelationship(
+                "worksheet binary index part must not have relationships".to_string(),
+            ));
+        }
+        crate::binary_index::WorksheetBinaryIndex::from_parts(
+            index_part.blob(),
+            worksheet.blob(),
+            limits,
+        )
+        .map(Some)
+    }
+
     /// Reparse an owned candidate while retaining this workbook's typed
     /// drawing projection boundary.
     pub(crate) fn reparse_candidate(&self, package: OpcPackage) -> Result<Self> {
@@ -615,7 +675,7 @@ impl Workbook {
     fn load_sheet_drawing(
         &self,
         sheet_index: usize,
-        drawing_part: &dyn litchi_opc::part::Part,
+        drawing_part: &dyn Part,
     ) -> Result<crate::package::drawing::SheetDrawing> {
         use crate::package::drawing::{EmbeddedChart, EmbeddedImage, Object, SheetDrawing};
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {

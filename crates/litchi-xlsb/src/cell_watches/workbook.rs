@@ -87,6 +87,7 @@ pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
     }
 
     let mut candidate = package.clone();
+    crate::worksheet_index::maintain(&mut candidate, worksheet, part.blob(), &updated)?;
     candidate.get_part_mut(worksheet)?.set_blob(updated.clone());
     candidate.unsign();
     crate::Workbook::reparse_candidate_with_policy(

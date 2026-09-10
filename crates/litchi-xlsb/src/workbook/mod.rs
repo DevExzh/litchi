@@ -13,4 +13,7 @@ mod tests;
 
 pub(crate) use model::DrawingLoadPolicy;
 pub use model::{Workbook, WorksheetIterator};
-pub use source::{SourceBackedExternalLink, SourceBackedWorkbook, SourceBackedWorksheet};
+pub use source::{
+    SourceBackedExternalLink, SourceBackedIndexedWorksheet, SourceBackedWorkbook,
+    SourceBackedWorksheet,
+};

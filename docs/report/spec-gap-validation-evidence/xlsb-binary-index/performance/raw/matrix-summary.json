@@ -1,0 +1,1562 @@
+{
+  "comparison_scope": "No equivalent-work speedup inferred; indexed and materialized API validation scopes differ.",
+  "contract": {
+    "cases_per_fixture": 4,
+    "fixtures": 3,
+    "process_reports": 36,
+    "samples_per_report": 30,
+    "warmup_per_report": 3
+  },
+  "groups": {
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/indexed_cold": {
+      "case": "indexed_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 114271,
+      "median_process_p95_ns": 132950,
+      "median_process_p99_ns": 137371,
+      "process_count": 3,
+      "process_mean_ns": [
+        116602.767,
+        118540.8,
+        117842.467
+      ],
+      "process_p50_ns": [
+        113541,
+        114990,
+        114271
+      ],
+      "process_p95_ns": [
+        130160,
+        132950,
+        134990
+      ],
+      "process_p99_ns": [
+        136481,
+        140581,
+        137371
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 6,
+            "requested_bytes": 2641,
+            "returned_bytes": 2641
+          },
+          "retained_bytes": 25126,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 6,
+            "requested_bytes": 2641,
+            "returned_bytes": 2641
+          },
+          "retained_bytes": 25126,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 6,
+            "requested_bytes": 2641,
+            "returned_bytes": 2641
+          },
+          "retained_bytes": 25126,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_bytes": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_entries": [
+        null,
+        null,
+        null
+      ],
+      "timing_scopes": [
+        "source-backed open + indexed_values preparation + cached_value lookups + source-backed teardown"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/indexed_warm": {
+      "case": "indexed_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 260,
+      "median_process_p95_ns": 320,
+      "median_process_p99_ns": 390,
+      "process_count": 3,
+      "process_mean_ns": [
+        270.0,
+        265.333,
+        278.0
+      ],
+      "process_p50_ns": [
+        260,
+        250,
+        270
+      ],
+      "process_p95_ns": [
+        310,
+        320,
+        320
+      ],
+      "process_p99_ns": [
+        510,
+        390,
+        390
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 25126,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 25126,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 25126,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 267030,
+          "calls": 323,
+          "dealloc_calls": 305,
+          "deallocated_bytes": 222753,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 81025,
+          "live_before": 36748,
+          "peak_after": 141960,
+          "peak_before": 36748,
+          "realloc_calls": 18
+        },
+        {
+          "allocated_bytes": 267030,
+          "calls": 323,
+          "dealloc_calls": 305,
+          "deallocated_bytes": 222753,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 81025,
+          "live_before": 36748,
+          "peak_after": 141960,
+          "peak_before": 36748,
+          "realloc_calls": 18
+        },
+        {
+          "allocated_bytes": 267030,
+          "calls": 323,
+          "dealloc_calls": 305,
+          "deallocated_bytes": 222753,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 81025,
+          "live_before": 36748,
+          "peak_after": 141960,
+          "peak_before": 36748,
+          "realloc_calls": 18
+        }
+      ],
+      "setup_retained_bytes": [
+        25126,
+        25126,
+        25126
+      ],
+      "setup_retained_entries": [
+        3,
+        3,
+        3
+      ],
+      "timing_scopes": [
+        "cached_value lookups on one retained indexed handle"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/materialize_cold": {
+      "case": "materialize_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 332211,
+      "median_process_p95_ns": 348581,
+      "median_process_p99_ns": 356201,
+      "process_count": 3,
+      "process_mean_ns": [
+        334467.267,
+        335824.233,
+        334581.267
+      ],
+      "process_p50_ns": [
+        330312,
+        334541,
+        332211
+      ],
+      "process_p95_ns": [
+        348422,
+        352312,
+        348581
+      ],
+      "process_p99_ns": [
+        356201,
+        361761,
+        348621
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 6,
+            "requested_bytes": 2620,
+            "returned_bytes": 2620
+          },
+          "retained_bytes": 23990,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 6,
+            "requested_bytes": 2620,
+            "returned_bytes": 2620
+          },
+          "retained_bytes": 23990,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 6,
+            "requested_bytes": 2620,
+            "returned_bytes": 2620
+          },
+          "retained_bytes": 23990,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_bytes": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_entries": [
+        null,
+        null,
+        null
+      ],
+      "timing_scopes": [
+        "source-backed open + complete worksheet materialization + cell lookups + source-backed teardown"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/materialize_warm": {
+      "case": "materialize_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 100,
+      "median_process_p95_ns": 110,
+      "median_process_p99_ns": 220,
+      "process_count": 3,
+      "process_mean_ns": [
+        110.0,
+        106.0,
+        107.0
+      ],
+      "process_p50_ns": [
+        110,
+        100,
+        100
+      ],
+      "process_p95_ns": [
+        110,
+        110,
+        110
+      ],
+      "process_p99_ns": [
+        220,
+        220,
+        220
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 23990,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 23990,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 23990,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 747288,
+          "calls": 3627,
+          "dealloc_calls": 1900,
+          "deallocated_bytes": 501924,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 282112,
+          "live_before": 36748,
+          "peak_after": 282594,
+          "peak_before": 36748,
+          "realloc_calls": 1090
+        },
+        {
+          "allocated_bytes": 747288,
+          "calls": 3627,
+          "dealloc_calls": 1900,
+          "deallocated_bytes": 501924,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 282112,
+          "live_before": 36748,
+          "peak_after": 282594,
+          "peak_before": 36748,
+          "realloc_calls": 1090
+        },
+        {
+          "allocated_bytes": 747288,
+          "calls": 3627,
+          "dealloc_calls": 1900,
+          "deallocated_bytes": 501924,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 282112,
+          "live_before": 36748,
+          "peak_after": 282594,
+          "peak_before": 36748,
+          "realloc_calls": 1090
+        }
+      ],
+      "setup_retained_bytes": [
+        23990,
+        23990,
+        23990
+      ],
+      "setup_retained_entries": [
+        3,
+        3,
+        3
+      ],
+      "timing_scopes": [
+        "cell lookups on one retained complete Worksheet"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/indexed_cold": {
+      "case": "indexed_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 117111,
+      "median_process_p95_ns": 133801,
+      "median_process_p99_ns": 138990,
+      "process_count": 3,
+      "process_mean_ns": [
+        120345.767,
+        120268.133,
+        119296.433
+      ],
+      "process_p50_ns": [
+        117300,
+        117111,
+        116631
+      ],
+      "process_p95_ns": [
+        136021,
+        133801,
+        132280
+      ],
+      "process_p99_ns": [
+        138990,
+        139670,
+        136830
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 3,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 3,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 9,
+            "requested_bytes": 1433,
+            "returned_bytes": 1433
+          },
+          "retained_bytes": 4349,
+          "retained_entries": 4
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 3,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 3,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 9,
+            "requested_bytes": 1433,
+            "returned_bytes": 1433
+          },
+          "retained_bytes": 4349,
+          "retained_entries": 4
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 3,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 3,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 9,
+            "requested_bytes": 1433,
+            "returned_bytes": 1433
+          },
+          "retained_bytes": 4349,
+          "retained_entries": 4
+        }
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_bytes": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_entries": [
+        null,
+        null,
+        null
+      ],
+      "timing_scopes": [
+        "source-backed open + indexed_values preparation + cached_value lookups + source-backed teardown"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/indexed_warm": {
+      "case": "indexed_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 340,
+      "median_process_p95_ns": 390,
+      "median_process_p99_ns": 490,
+      "process_count": 3,
+      "process_mean_ns": [
+        345.333,
+        348.0,
+        344.667
+      ],
+      "process_p50_ns": [
+        320,
+        340,
+        340
+      ],
+      "process_p95_ns": [
+        390,
+        380,
+        410
+      ],
+      "process_p99_ns": [
+        640,
+        480,
+        490
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 4349,
+          "retained_entries": 4
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 4349,
+          "retained_entries": 4
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 4349,
+          "retained_entries": 4
+        }
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 259572,
+          "calls": 103,
+          "dealloc_calls": 58,
+          "deallocated_bytes": 250032,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 81530,
+          "live_before": 71990,
+          "peak_after": 158122,
+          "peak_before": 71990,
+          "realloc_calls": 11
+        },
+        {
+          "allocated_bytes": 259572,
+          "calls": 103,
+          "dealloc_calls": 58,
+          "deallocated_bytes": 250032,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 81530,
+          "live_before": 71990,
+          "peak_after": 158122,
+          "peak_before": 71990,
+          "realloc_calls": 11
+        },
+        {
+          "allocated_bytes": 259572,
+          "calls": 103,
+          "dealloc_calls": 58,
+          "deallocated_bytes": 250032,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 81530,
+          "live_before": 71990,
+          "peak_after": 158122,
+          "peak_before": 71990,
+          "realloc_calls": 11
+        }
+      ],
+      "setup_retained_bytes": [
+        4349,
+        4349,
+        4349
+      ],
+      "setup_retained_entries": [
+        4,
+        4,
+        4
+      ],
+      "timing_scopes": [
+        "cached_value lookups on one retained indexed handle"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/materialize_cold": {
+      "case": "materialize_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 136491,
+      "median_process_p95_ns": 158341,
+      "median_process_p99_ns": 158721,
+      "process_count": 3,
+      "process_mean_ns": [
+        138489.2,
+        139666.5,
+        139952.533
+      ],
+      "process_p50_ns": [
+        135511,
+        136701,
+        136491
+      ],
+      "process_p95_ns": [
+        152550,
+        158600,
+        158341
+      ],
+      "process_p99_ns": [
+        156901,
+        158721,
+        162001
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 4,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 4,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 12,
+            "requested_bytes": 2173,
+            "returned_bytes": 2173
+          },
+          "retained_bytes": 6673,
+          "retained_entries": 5
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 4,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 4,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 12,
+            "requested_bytes": 2173,
+            "returned_bytes": 2173
+          },
+          "retained_bytes": 6673,
+          "retained_entries": 5
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 4,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 4,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 12,
+            "requested_bytes": 2173,
+            "returned_bytes": 2173
+          },
+          "retained_bytes": 6673,
+          "retained_entries": 5
+        }
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_bytes": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_entries": [
+        null,
+        null,
+        null
+      ],
+      "timing_scopes": [
+        "source-backed open + complete worksheet materialization + cell lookups + source-backed teardown"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/materialize_warm": {
+      "case": "materialize_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 190,
+      "median_process_p95_ns": 200,
+      "median_process_p99_ns": 410,
+      "process_count": 3,
+      "process_mean_ns": [
+        204.667,
+        201.667,
+        198.667
+      ],
+      "process_p50_ns": [
+        200,
+        190,
+        190
+      ],
+      "process_p95_ns": [
+        200,
+        210,
+        200
+      ],
+      "process_p99_ns": [
+        480,
+        410,
+        330
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 6673,
+          "retained_entries": 5
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 6673,
+          "retained_entries": 5
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 6673,
+          "retained_entries": 5
+        }
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 389773,
+          "calls": 260,
+          "dealloc_calls": 57,
+          "deallocated_bytes": 344173,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 117590,
+          "live_before": 71990,
+          "peak_after": 195329,
+          "peak_before": 71990,
+          "realloc_calls": 34
+        },
+        {
+          "allocated_bytes": 389773,
+          "calls": 260,
+          "dealloc_calls": 57,
+          "deallocated_bytes": 344173,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 117590,
+          "live_before": 71990,
+          "peak_after": 195329,
+          "peak_before": 71990,
+          "realloc_calls": 34
+        },
+        {
+          "allocated_bytes": 389773,
+          "calls": 260,
+          "dealloc_calls": 57,
+          "deallocated_bytes": 344173,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 117590,
+          "live_before": 71990,
+          "peak_after": 195329,
+          "peak_before": 71990,
+          "realloc_calls": 34
+        }
+      ],
+      "setup_retained_bytes": [
+        6673,
+        6673,
+        6673
+      ],
+      "setup_retained_entries": [
+        5,
+        5,
+        5
+      ],
+      "timing_scopes": [
+        "cell lookups on one retained complete Worksheet"
+      ]
+    },
+    "synthetic:131072/indexed_cold": {
+      "case": "indexed_cold",
+      "fixture": "synthetic:131072",
+      "median_process_p50_ns": 3086792,
+      "median_process_p95_ns": 3101591,
+      "median_process_p99_ns": 3109552,
+      "process_count": 3,
+      "process_mean_ns": [
+        3088954.867,
+        3090614.533,
+        3080997.867
+      ],
+      "process_p50_ns": [
+        3088601,
+        3086792,
+        3080531
+      ],
+      "process_p95_ns": [
+        3101591,
+        3110972,
+        3095451
+      ],
+      "process_p99_ns": [
+        3109552,
+        3211032,
+        3106932
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 20,
+            "requested_bytes": 352138,
+            "returned_bytes": 352138
+          },
+          "retained_bytes": 2500095,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 20,
+            "requested_bytes": 352138,
+            "returned_bytes": 352138
+          },
+          "retained_bytes": 2500095,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 20,
+            "requested_bytes": 352138,
+            "returned_bytes": 352138
+          },
+          "retained_bytes": 2500095,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_bytes": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_entries": [
+        null,
+        null,
+        null
+      ],
+      "timing_scopes": [
+        "source-backed open + indexed_values preparation + cached_value lookups + source-backed teardown"
+      ]
+    },
+    "synthetic:131072/indexed_warm": {
+      "case": "indexed_warm",
+      "fixture": "synthetic:131072",
+      "median_process_p50_ns": 650,
+      "median_process_p95_ns": 710,
+      "median_process_p99_ns": 970,
+      "process_count": 3,
+      "process_mean_ns": [
+        675.667,
+        664.667,
+        664.7
+      ],
+      "process_p50_ns": [
+        660,
+        650,
+        650
+      ],
+      "process_p95_ns": [
+        700,
+        710,
+        710
+      ],
+      "process_p99_ns": [
+        970,
+        960,
+        980
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 2500095,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 2500095,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 2500095,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 3698803,
+          "calls": 4394,
+          "dealloc_calls": 4257,
+          "deallocated_bytes": 998913,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 3678741,
+          "live_before": 978851,
+          "peak_after": 4256756,
+          "peak_before": 978851,
+          "realloc_calls": 27
+        },
+        {
+          "allocated_bytes": 3698803,
+          "calls": 4394,
+          "dealloc_calls": 4257,
+          "deallocated_bytes": 998913,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 3678741,
+          "live_before": 978851,
+          "peak_after": 4256756,
+          "peak_before": 978851,
+          "realloc_calls": 27
+        },
+        {
+          "allocated_bytes": 3698803,
+          "calls": 4394,
+          "dealloc_calls": 4257,
+          "deallocated_bytes": 998913,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 3678741,
+          "live_before": 978851,
+          "peak_after": 4256756,
+          "peak_before": 978851,
+          "realloc_calls": 27
+        }
+      ],
+      "setup_retained_bytes": [
+        2500095,
+        2500095,
+        2500095
+      ],
+      "setup_retained_entries": [
+        3,
+        3,
+        3
+      ],
+      "timing_scopes": [
+        "cached_value lookups on one retained indexed handle"
+      ]
+    },
+    "synthetic:131072/materialize_cold": {
+      "case": "materialize_cold",
+      "fixture": "synthetic:131072",
+      "median_process_p50_ns": 18002467,
+      "median_process_p95_ns": 18141118,
+      "median_process_p99_ns": 18185048,
+      "process_count": 3,
+      "process_mean_ns": [
+        18011251.767,
+        17700819.6,
+        18403194.867
+      ],
+      "process_p50_ns": [
+        18002467,
+        17652626,
+        18017637
+      ],
+      "process_p95_ns": [
+        18141118,
+        18036778,
+        18348538
+      ],
+      "process_p99_ns": [
+        18185048,
+        18044598,
+        29941692
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 20,
+            "requested_bytes": 351122,
+            "returned_bytes": 351122
+          },
+          "retained_bytes": 2470736,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 20,
+            "requested_bytes": 351122,
+            "returned_bytes": 351122
+          },
+          "retained_bytes": 2470736,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 2,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 2,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 20,
+            "requested_bytes": 351122,
+            "returned_bytes": 351122
+          },
+          "retained_bytes": 2470736,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_bytes": [
+        null,
+        null,
+        null
+      ],
+      "setup_retained_entries": [
+        null,
+        null,
+        null
+      ],
+      "timing_scopes": [
+        "source-backed open + complete worksheet materialization + cell lookups + source-backed teardown"
+      ]
+    },
+    "synthetic:131072/materialize_warm": {
+      "case": "materialize_warm",
+      "fixture": "synthetic:131072",
+      "median_process_p50_ns": 130,
+      "median_process_p95_ns": 140,
+      "median_process_p99_ns": 520,
+      "process_count": 3,
+      "process_mean_ns": [
+        143.333,
+        144.0,
+        144.333
+      ],
+      "process_p50_ns": [
+        130,
+        130,
+        130
+      ],
+      "process_p95_ns": [
+        140,
+        140,
+        140
+      ],
+      "process_p99_ns": [
+        420,
+        530,
+        520
+      ],
+      "sample_source_observations": [
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 2470736,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 2470736,
+          "retained_entries": 3
+        },
+        {
+          "cache_operation": {
+            "allocation_bypasses": 0,
+            "budget_reservation_failures": 0,
+            "bypasses": 0,
+            "cold_loads": 0,
+            "evictions": 0,
+            "failed_loads": 0,
+            "hits": 0,
+            "oversized_bypasses": 0,
+            "successful_loads": 0,
+            "waiter_joins": 0
+          },
+          "reads_operation": {
+            "calls": 0,
+            "requested_bytes": 0,
+            "returned_bytes": 0
+          },
+          "retained_bytes": 2470736,
+          "retained_entries": 3
+        }
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 71116920,
+          "calls": 25995,
+          "dealloc_calls": 8,
+          "deallocated_bytes": 423755,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 71672016,
+          "live_before": 978851,
+          "peak_after": 71673040,
+          "peak_before": 978851,
+          "realloc_calls": 11
+        },
+        {
+          "allocated_bytes": 71116920,
+          "calls": 25995,
+          "dealloc_calls": 8,
+          "deallocated_bytes": 423755,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 71672016,
+          "live_before": 978851,
+          "peak_after": 71673040,
+          "peak_before": 978851,
+          "realloc_calls": 11
+        },
+        {
+          "allocated_bytes": 71116920,
+          "calls": 25995,
+          "dealloc_calls": 8,
+          "deallocated_bytes": 423755,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 71672016,
+          "live_before": 978851,
+          "peak_after": 71673040,
+          "peak_before": 978851,
+          "realloc_calls": 11
+        }
+      ],
+      "setup_retained_bytes": [
+        2470736,
+        2470736,
+        2470736
+      ],
+      "setup_retained_entries": [
+        3,
+        3,
+        3
+      ],
+      "timing_scopes": [
+        "cell lookups on one retained complete Worksheet"
+      ]
+    }
+  },
+  "raw_run_directory": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-binary-index/performance/raw/final-release",
+  "schema": "xlsb-binary-index-profile-matrix-v1"
+}

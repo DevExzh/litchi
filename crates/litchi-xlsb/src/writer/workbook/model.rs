@@ -73,23 +73,6 @@ pub(super) struct AuthoredPivotCache {
     pub(super) bytes: Vec<u8>,
 }
 
-/// Minimal Worksheet Binary Index payload for an empty worksheet.
-///
-/// This binary blob was captured from an Excel-generated empty XLSB file
-/// (`excel_empty.xlsb`) and represents a valid Worksheet Binary Index part
-/// for a simple sheet without additional features. According to
-/// [MS-XLSB] 2.1.7.63 (Worksheet Binary Index), a worksheet MUST have a
-/// corresponding binary index part.
-///
-/// TODO: If we start emitting advanced worksheet features that rely on the
-/// binary index (for example, very large sheets or complex structures),
-/// this payload should be generated from the official ABNF grammar instead
-/// of using this minimal fixed template.
-pub(super) const XLSB_WORKSHEET_BINARY_INDEX_EMPTY: [u8; 29] = [
-    0x2a, 0x18, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x95, 0x02, 0x00,
-];
-
 impl WorkbookWriter {
     /// Create a new XLSB workbook writer
     pub fn new() -> Self {

@@ -577,6 +577,13 @@ pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<Vi
 
 /// Replace a worksheet's slicer views and relationship references.
 pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
+    let mut candidate = package.clone();
+    store_views_inner(&mut candidate, worksheet, views)?;
+    *package = candidate;
+    Ok(())
+}
+
+fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
     validate_views(views)?;
     if let Some(existing) = load_views(package, worksheet)? {
         let target = PackURI::new(&existing.part_name)?;
@@ -600,6 +607,7 @@ pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views)
         kind::END_SLICER_EX,
     )?;
     let mut worksheet_blob = package.get_part(worksheet)?.blob().to_vec();
+    let original_worksheet_blob = worksheet_blob.clone();
     if let Some(old) = old {
         let part = package.get_part_mut(worksheet)?;
         part.rels_mut().remove(&old.relationship_id);
@@ -607,6 +615,12 @@ pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views)
     }
     if views.items.is_empty() {
         worksheet_blob = rewrite_block(&worksheet_blob, old_block, None, kind::END_SHEET)?;
+        crate::worksheet_index::maintain(
+            package,
+            worksheet,
+            &original_worksheet_blob,
+            &worksheet_blob,
+        )?;
         package.get_part_mut(worksheet)?.set_blob(worksheet_blob);
         package.unsign();
         return Ok(());
@@ -626,6 +640,12 @@ pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views)
         old_block,
         Some(&replacement),
         kind::END_SHEET,
+    )?;
+    crate::worksheet_index::maintain(
+        package,
+        worksheet,
+        &original_worksheet_blob,
+        &worksheet_blob,
     )?;
     {
         let part = package.get_part_mut(worksheet)?;
