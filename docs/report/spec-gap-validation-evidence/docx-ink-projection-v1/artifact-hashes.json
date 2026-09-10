@@ -1,0 +1,13 @@
+{
+  "self_excluded": "artifact-hashes.json",
+  "files": {
+    "root-gates.json": "5d14a81aadc985e7bac3ecd9c6aad8454f8abc47d08d4dd4f89e0442736261d1",
+    "source-manifest.json": "53dc72db0a6d735ecfb78629036b313f3be25b591fad3144e86cb97fb3062812",
+    "receipt.json": "5132411fad7340eb3dc6d5e778704016360391d74788a032ca0eb403141bcc36",
+    "README.md": "03d2e0897220c957dfe28c2115664e417424349da7a4b507c49c7645cba1de4a",
+    "Cargo.lock.gz": "29a8c7d3c80fb98d13bb6ab78f17fa145d2184810fd12ddf0317af6c0645f830",
+    "tests.log.gz": "60c6eda34557d0749cec64211eb0b54e4e51338a9634a60084c241b4e43f04e0",
+    "rustdoc.log.gz": "1c0783ace1e20d9d3ef289e349285d5eb71a5db3c18efa671c262eaad5885f51",
+    "clippy.log.gz": "6d15e1d2252274c16a3b8347e1216d7eb387beeefdd5a66fe8e6bb89ca74fbaf"
+  }
+}

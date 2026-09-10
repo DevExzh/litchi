@@ -3,12 +3,14 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_drawingml::ink as shared;
+use litchi_ooxml_common::xml_name::is_ncname;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{
     OpcPackage, PackURI, Part, PartData, PartReadSession, PartView, Relationships,
     SourceBackedPackage,
 };
-use quick_xml::events::Event;
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
@@ -19,6 +21,7 @@ use crate::package::story::{StoryDialect, StoryKind, capture};
 use crate::{Error, Package, Result};
 
 const STRICT_CUSTOM_XML: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/customXml";
+const MAX_PROFILE_ATTRIBUTES: usize = 256;
 
 impl Package {
     /// Inventory active InkML annotations across all reachable Word stories.
@@ -100,6 +103,606 @@ fn check_catalog(package: PackageRef<'_>, limits: Limits) -> Result<()> {
         check("relationships", relationships, limits.max_relationships)?;
     }
     Ok(())
+}
+
+/// Select the MS-ODRAWXML Ink content-part profile before generic typed
+/// projection. This bounded pass does not replace the shared reader: it
+/// supplies the semantic spans that it may decode.
+///
+/// The shared reader intentionally remains a namespace-aware generic InkML
+/// projection.  A Word Ink content part has one additional graph contract:
+/// trace references must resolve to local definitions, and Microsoft context
+/// records are recognized only in the normative EMMA/annotationXML/traceGroup
+/// placement.  Unknown namespaces and extension elements are not interpreted
+/// here, so a source-preserving no-op can retain them byte-for-byte. The
+/// returned source spans identify the subset that the DOCX owner exposes
+/// after the generic DrawingML projection has been parsed. Elements outside
+/// those spans remain structurally scanned by the shared reader but are not
+/// decoded as typed metadata.
+pub(crate) fn validate_content_part(xml: &[u8]) -> Result<ProfileProjection> {
+    check(
+        "DOCX Ink profile source bytes",
+        xml.len(),
+        shared::MAX_SOURCE_BYTES,
+    )?;
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader.resolver_mut().set_max_declarations_per_element(256);
+    let mut stack = Vec::new();
+    let mut definitions = Vec::new();
+    let mut traces = Vec::new();
+    let mut projection = ProfileProjection::default();
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut nodes = 0usize;
+
+    loop {
+        let start = position(&reader)?;
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        let end = position(&reader)?;
+        match event {
+            Event::Start(element) => {
+                if root_closed {
+                    return Err(Error::Invalid(
+                        "DOCX Ink content part has content after its root".into(),
+                    ));
+                }
+                validate_profile_attributes(&element)?;
+                increment_profile_nodes(&mut nodes)?;
+                enforce_profile_depth(stack.len().saturating_add(1))?;
+                let kind = profile_kind(&element, &namespace);
+                let frame = if !root_seen {
+                    if kind != ProfileKind::Root {
+                        return Err(Error::Invalid(
+                            "DOCX Ink content part root is not namespace-bound InkML".into(),
+                        ));
+                    }
+                    root_seen = true;
+                    ProfileFrame::recognized(kind, start)
+                } else {
+                    observe_profile_element(
+                        &element,
+                        kind,
+                        &namespace,
+                        &stack,
+                        &mut definitions,
+                        &mut traces,
+                        start,
+                    )?
+                };
+                stack.try_reserve(1).map_err(|source| Error::Allocation {
+                    resource: "DOCX Ink profile XML stack",
+                    source,
+                })?;
+                stack.push(frame);
+            },
+            Event::Empty(element) => {
+                if root_closed {
+                    return Err(Error::Invalid(
+                        "DOCX Ink content part has content after its root".into(),
+                    ));
+                }
+                validate_profile_attributes(&element)?;
+                increment_profile_nodes(&mut nodes)?;
+                enforce_profile_depth(stack.len().saturating_add(1))?;
+                let kind = profile_kind(&element, &namespace);
+                let frame = if !root_seen {
+                    if kind != ProfileKind::Root {
+                        return Err(Error::Invalid(
+                            "DOCX Ink content part root is not namespace-bound InkML".into(),
+                        ));
+                    }
+                    root_seen = true;
+                    ProfileFrame::recognized(kind, start)
+                } else {
+                    observe_profile_element(
+                        &element,
+                        kind,
+                        &namespace,
+                        &stack,
+                        &mut definitions,
+                        &mut traces,
+                        start,
+                    )?
+                };
+                record_projection(
+                    frame.projection,
+                    shared::SourceSpan::new(start, end),
+                    &mut projection,
+                )?;
+                if kind == ProfileKind::Root && stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::End(_) => {
+                let frame = stack.pop().ok_or_else(|| {
+                    Error::Invalid("DOCX Ink content part has an unexpected end".into())
+                })?;
+                record_projection(
+                    frame.projection,
+                    shared::SourceSpan::new(frame.start, end),
+                    &mut projection,
+                )?;
+                if frame.kind == ProfileKind::Root && stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::Eof => break,
+            Event::Decl(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(Error::Invalid(
+            "DOCX Ink content part root is absent or unterminated".into(),
+        ));
+    }
+    validate_definition_ids(&mut definitions)?;
+    for trace in traces {
+        let context = local_reference(trace.context.as_deref(), "contextRef")?;
+        if !has_definition(&definitions, DefinitionKind::Context, context) {
+            return Err(Error::Invalid(format!(
+                "DOCX Ink trace contextRef has no matching context definition: {context}"
+            )));
+        }
+        let brush = local_reference(trace.brush.as_deref(), "brushRef")?;
+        if !has_definition(&definitions, DefinitionKind::Brush, brush) {
+            return Err(Error::Invalid(format!(
+                "DOCX Ink trace brushRef has no matching brush definition: {brush}"
+            )));
+        }
+    }
+    Ok(projection)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ProfileKind {
+    Root,
+    Definitions,
+    Context,
+    Brush,
+    Trace,
+    TraceGroup,
+    BrushProperty,
+    SourceLink,
+    DestinationLink,
+    AnnotationXml,
+    Emma,
+    Interpretation,
+    MicrosoftContext,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DefinitionKind {
+    Context,
+    Brush,
+}
+
+struct Definition {
+    kind: DefinitionKind,
+    value: String,
+}
+
+struct TraceReferences {
+    context: Option<String>,
+    brush: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ProjectionKind {
+    Context,
+    Trace,
+    BrushProperty,
+    Link,
+}
+
+#[derive(Default)]
+pub(crate) struct ProfileProjection {
+    contexts: Vec<shared::SourceSpan>,
+    traces: Vec<shared::SourceSpan>,
+    brush_properties: Vec<shared::SourceSpan>,
+    links: Vec<shared::SourceSpan>,
+}
+
+impl ProfileProjection {
+    pub(crate) fn contexts(&self) -> &[shared::SourceSpan] {
+        &self.contexts
+    }
+
+    pub(crate) fn traces(&self) -> &[shared::SourceSpan] {
+        &self.traces
+    }
+
+    pub(crate) fn brush_properties(&self) -> &[shared::SourceSpan] {
+        &self.brush_properties
+    }
+
+    pub(crate) fn links(&self) -> &[shared::SourceSpan] {
+        &self.links
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ProfileFrame {
+    kind: ProfileKind,
+    recognized: bool,
+    opaque: bool,
+    projection: Option<ProjectionKind>,
+    start: usize,
+}
+
+impl ProfileFrame {
+    const fn recognized(kind: ProfileKind, start: usize) -> Self {
+        Self {
+            kind,
+            recognized: true,
+            opaque: false,
+            projection: None,
+            start,
+        }
+    }
+
+    const fn recognized_projection(
+        kind: ProfileKind,
+        start: usize,
+        projection: ProjectionKind,
+    ) -> Self {
+        Self {
+            kind,
+            recognized: true,
+            opaque: false,
+            projection: Some(projection),
+            start,
+        }
+    }
+
+    const fn ignored(kind: ProfileKind, start: usize) -> Self {
+        Self {
+            kind,
+            recognized: false,
+            opaque: true,
+            projection: None,
+            start,
+        }
+    }
+}
+
+fn profile_kind(element: &BytesStart<'_>, namespace: &ResolveResult<'_>) -> ProfileKind {
+    let local = element.local_name();
+    if is_bound_namespace(namespace, shared::INKML_NAMESPACE) {
+        return match local.as_ref() {
+            b"ink" => ProfileKind::Root,
+            b"definitions" => ProfileKind::Definitions,
+            b"context" => ProfileKind::Context,
+            b"brush" => ProfileKind::Brush,
+            b"trace" => ProfileKind::Trace,
+            b"traceGroup" => ProfileKind::TraceGroup,
+            b"brushProperty" => ProfileKind::BrushProperty,
+            b"annotationXML" => ProfileKind::AnnotationXml,
+            _ => ProfileKind::Other,
+        };
+    }
+    if is_bound_namespace(namespace, "http://www.w3.org/2003/04/emma") {
+        return match local.as_ref() {
+            b"emma" => ProfileKind::Emma,
+            b"interpretation" => ProfileKind::Interpretation,
+            _ => ProfileKind::Other,
+        };
+    }
+    if is_bound_namespace(namespace, shared::NAMESPACE) {
+        return match local.as_ref() {
+            b"context" => ProfileKind::MicrosoftContext,
+            b"sourceLink" => ProfileKind::SourceLink,
+            b"destinationLink" => ProfileKind::DestinationLink,
+            _ => ProfileKind::Other,
+        };
+    }
+    ProfileKind::Other
+}
+
+fn is_bound_namespace(namespace: &ResolveResult<'_>, expected: &str) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value)) if *value == expected.as_bytes()
+    )
+}
+
+fn observe_profile_element(
+    element: &BytesStart<'_>,
+    kind: ProfileKind,
+    _namespace: &ResolveResult<'_>,
+    stack: &[ProfileFrame],
+    definitions: &mut Vec<Definition>,
+    traces: &mut Vec<TraceReferences>,
+    start: usize,
+) -> Result<ProfileFrame> {
+    let Some(parent) = stack.last() else {
+        return Err(Error::Invalid(
+            "DOCX Ink content part has an element outside its root".into(),
+        ));
+    };
+    if parent.opaque {
+        return Ok(ProfileFrame::ignored(kind, start));
+    }
+    match kind {
+        ProfileKind::Definitions if parent.recognized && parent.kind == ProfileKind::Root => {
+            Ok(ProfileFrame::recognized(kind, start))
+        },
+        ProfileKind::Context | ProfileKind::Brush
+            if parent.recognized && parent.kind == ProfileKind::Definitions =>
+        {
+            if definitions.len() >= shared::MAX_NODES {
+                return Err(exceeded(
+                    "DOCX Ink profile definition records",
+                    definitions.len().saturating_add(1),
+                    shared::MAX_NODES,
+                ));
+            }
+            if let Some(value) = xml_id(element)? {
+                if !is_ncname(&value) {
+                    return Err(Error::Invalid(
+                        "DOCX Ink definition xml:id is not an XML NCName".into(),
+                    ));
+                }
+                definitions
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "DOCX Ink definition identifiers",
+                        source,
+                    })?;
+                definitions.push(Definition {
+                    kind: if kind == ProfileKind::Context {
+                        DefinitionKind::Context
+                    } else {
+                        DefinitionKind::Brush
+                    },
+                    value,
+                });
+            }
+            Ok(ProfileFrame::recognized(kind, start))
+        },
+        ProfileKind::Trace
+            if parent.recognized
+                && matches!(parent.kind, ProfileKind::Root | ProfileKind::TraceGroup) =>
+        {
+            if traces.len() >= shared::MAX_TRACES {
+                return Err(exceeded(
+                    "DOCX Ink profile trace references",
+                    traces.len().saturating_add(1),
+                    shared::MAX_TRACES,
+                ));
+            }
+            traces.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "DOCX Ink trace references",
+                source,
+            })?;
+            traces.push(TraceReferences {
+                context: profile_attr(element, b"contextRef")?,
+                brush: profile_attr(element, b"brushRef")?,
+            });
+            Ok(ProfileFrame::recognized_projection(
+                kind,
+                start,
+                ProjectionKind::Trace,
+            ))
+        },
+        ProfileKind::TraceGroup
+            if parent.recognized
+                && matches!(parent.kind, ProfileKind::Root | ProfileKind::TraceGroup) =>
+        {
+            Ok(ProfileFrame::recognized(kind, start))
+        },
+        ProfileKind::BrushProperty if parent.recognized && parent.kind == ProfileKind::Brush => Ok(
+            ProfileFrame::recognized_projection(kind, start, ProjectionKind::BrushProperty),
+        ),
+        ProfileKind::SourceLink | ProfileKind::DestinationLink
+            if parent.recognized && parent.kind == ProfileKind::MicrosoftContext =>
+        {
+            Ok(ProfileFrame::recognized_projection(
+                kind,
+                start,
+                ProjectionKind::Link,
+            ))
+        },
+        ProfileKind::AnnotationXml
+            if parent.recognized && parent.kind == ProfileKind::TraceGroup =>
+        {
+            Ok(ProfileFrame::recognized(kind, start))
+        },
+        ProfileKind::Emma if parent.recognized && parent.kind == ProfileKind::AnnotationXml => {
+            Ok(ProfileFrame::recognized(kind, start))
+        },
+        ProfileKind::Interpretation if parent.recognized && parent.kind == ProfileKind::Emma => {
+            Ok(ProfileFrame::recognized(kind, start))
+        },
+        ProfileKind::MicrosoftContext => {
+            if stack.len() < 5
+                || !stack[stack.len() - 1].recognized
+                || stack[stack.len() - 1].kind != ProfileKind::Interpretation
+                || !stack[stack.len() - 2].recognized
+                || stack[stack.len() - 2].kind != ProfileKind::Emma
+                || !stack[stack.len() - 3].recognized
+                || stack[stack.len() - 3].kind != ProfileKind::AnnotationXml
+                || !stack[stack.len() - 4].recognized
+                || stack[stack.len() - 4].kind != ProfileKind::TraceGroup
+            {
+                return Ok(ProfileFrame::ignored(kind, start));
+            }
+            Ok(ProfileFrame::recognized_projection(
+                kind,
+                start,
+                ProjectionKind::Context,
+            ))
+        },
+        // A known InkML construct in a non-recognized parent is ignored by
+        // the MS-ODRAWXML subset.  The opaque frame also prevents a nested
+        // trace or context record from being mistaken for a recognized one.
+        _ => Ok(ProfileFrame::ignored(kind, start)),
+    }
+}
+
+fn validate_profile_attributes(element: &BytesStart<'_>) -> Result<()> {
+    let mut count = 0usize;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count.checked_add(1).ok_or_else(|| {
+            exceeded(
+                "DOCX Ink profile attributes",
+                usize::MAX,
+                MAX_PROFILE_ATTRIBUTES,
+            )
+        })?;
+        check("DOCX Ink profile attributes", count, MAX_PROFILE_ATTRIBUTES)?;
+        check(
+            "DOCX Ink profile attribute bytes",
+            attribute.value.len(),
+            shared::MAX_ATTRIBUTE_VALUE_BYTES,
+        )?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, element.decoder())
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        check(
+            "DOCX Ink profile decoded attribute bytes",
+            value.len(),
+            shared::MAX_ATTRIBUTE_VALUE_BYTES,
+        )?;
+    }
+    Ok(())
+}
+
+fn increment_profile_nodes(nodes: &mut usize) -> Result<()> {
+    *nodes = nodes
+        .checked_add(1)
+        .ok_or_else(|| exceeded("DOCX Ink profile XML nodes", usize::MAX, shared::MAX_NODES))?;
+    check("DOCX Ink profile XML nodes", *nodes, shared::MAX_NODES)
+}
+
+fn enforce_profile_depth(depth: usize) -> Result<()> {
+    check("DOCX Ink profile XML depth", depth, shared::MAX_DEPTH)
+}
+
+fn record_projection(
+    kind: Option<ProjectionKind>,
+    span: shared::SourceSpan,
+    projection: &mut ProfileProjection,
+) -> Result<()> {
+    let values = match kind {
+        Some(ProjectionKind::Context) => &mut projection.contexts,
+        Some(ProjectionKind::Trace) => &mut projection.traces,
+        Some(ProjectionKind::BrushProperty) => &mut projection.brush_properties,
+        Some(ProjectionKind::Link) => &mut projection.links,
+        None => return Ok(()),
+    };
+    let maximum = match kind {
+        Some(ProjectionKind::Context) => shared::MAX_CONTEXTS,
+        Some(ProjectionKind::Trace) => shared::MAX_TRACES,
+        Some(ProjectionKind::BrushProperty) => shared::MAX_BRUSH_PROPERTIES,
+        Some(ProjectionKind::Link) => shared::MAX_NODES,
+        None => unreachable!(),
+    };
+    if values.len() >= maximum {
+        return Err(exceeded(
+            "DOCX Ink semantic projection",
+            values.len().saturating_add(1),
+            maximum,
+        ));
+    }
+    values.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "DOCX Ink semantic projection",
+        source,
+    })?;
+    values.push(span);
+    Ok(())
+}
+
+fn xml_id(element: &BytesStart<'_>) -> Result<Option<String>> {
+    let mut result = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_ref() != b"xml:id" {
+            continue;
+        }
+        if result.is_some() {
+            return Err(Error::Invalid(
+                "DOCX Ink definition xml:id is duplicated".into(),
+            ));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, element.decoder())
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        result = Some(value.into_owned());
+    }
+    Ok(result)
+}
+
+fn profile_attr(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
+    let mut result = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.prefix().is_some() || attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        if result.is_some() {
+            return Err(Error::Invalid(format!(
+                "DOCX Ink trace attribute '{}' is duplicated",
+                String::from_utf8_lossy(name)
+            )));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, element.decoder())
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        result = Some(value.into_owned());
+    }
+    Ok(result)
+}
+
+fn validate_definition_ids(definitions: &mut [Definition]) -> Result<()> {
+    definitions.sort_unstable_by(|left, right| left.value.cmp(&right.value));
+    if definitions
+        .windows(2)
+        .any(|pair| pair[0].value == pair[1].value)
+    {
+        return Err(Error::Invalid(
+            "DOCX Ink definition identifiers must be unique across contexts and brushes".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn has_definition(definitions: &[Definition], kind: DefinitionKind, value: &str) -> bool {
+    definitions
+        .binary_search_by(|definition| definition.value.as_str().cmp(value))
+        .ok()
+        .is_some_and(|index| definitions[index].kind == kind)
+}
+
+fn local_reference<'a>(value: Option<&'a str>, name: &'static str) -> Result<&'a str> {
+    let Some(value) = value else {
+        return Err(Error::Invalid(format!("DOCX Ink trace {name} is required")));
+    };
+    let target = value.strip_prefix('#').ok_or_else(|| {
+        Error::Invalid(format!(
+            "DOCX Ink trace {name} must target a local # identifier"
+        ))
+    })?;
+    if !is_ncname(target) {
+        return Err(Error::Invalid(format!(
+            "DOCX Ink trace {name} is not a valid local identifier"
+        )));
+    }
+    Ok(target)
 }
 
 fn load_stories<'story>(
@@ -217,10 +820,30 @@ fn load_stories<'story>(
                         ));
                     }
                     Some(Arc::new(match bytes {
-                        PayloadBytes::Owned(source) => Payload::Owned(shared::read_shared(source)?),
-                        PayloadBytes::Pinned(source) => Payload::Pinned {
-                            metadata: shared::read_metadata(source.as_bytes())?,
-                            _source: source,
+                        PayloadBytes::Owned(source) => {
+                            let projection = validate_content_part(source.as_slice())?;
+                            let document = shared::read_shared_with_source_spans(
+                                source,
+                                projection.contexts(),
+                                projection.traces(),
+                                projection.brush_properties(),
+                                projection.links(),
+                            )?;
+                            Payload::Owned(document)
+                        },
+                        PayloadBytes::Pinned(source) => {
+                            let projection = validate_content_part(source.as_bytes())?;
+                            let metadata = shared::read_metadata_with_source_spans(
+                                source.as_bytes(),
+                                projection.contexts(),
+                                projection.traces(),
+                                projection.brush_properties(),
+                                projection.links(),
+                            )?;
+                            Payload::Pinned {
+                                metadata,
+                                _source: source,
+                            }
                         },
                     }))
                 } else if is_declared_ink {
@@ -409,6 +1032,11 @@ pub(crate) fn has_ink_root(xml: &[u8]) -> Result<bool> {
     Err(exceeded("payload prolog events", 257, 256))
 }
 
+fn position<R: std::io::BufRead>(reader: &NsReader<R>) -> Result<usize> {
+    usize::try_from(reader.buffer_position())
+        .map_err(|_| Error::Invalid("DOCX Ink XML offset exceeds usize".into()))
+}
+
 const fn role_index(kind: StoryKind) -> usize {
     match kind {
         StoryKind::Main => 0,
@@ -460,7 +1088,7 @@ mod tests {
         package.add_part(Box::new(main));
         package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
         let payload = Arc::new(
-            br#"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:trace>1 2</i:trace></i:ink>"#
+            br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace></i:ink>"##
                 .to_vec(),
         );
         package.add_part(Box::new(BlobPart::new_shared(
@@ -474,10 +1102,145 @@ mod tests {
         let second = &snapshot.annotations()[1].document;
         assert!(Arc::ptr_eq(first, second));
         assert_eq!(first.source().as_ptr(), payload.as_ptr());
+        assert_eq!(first.source(), payload.as_slice());
         let clone = snapshot.clone();
         assert!(Arc::ptr_eq(&snapshot.annotations, &clone.annotations));
         drop(package);
         drop(payload);
         assert_eq!(clone.annotations()[0].trace_count(), 1);
+    }
+
+    #[test]
+    fn profile_accepts_forward_references() {
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions></i:ink>"##;
+        validate_content_part(source).unwrap();
+    }
+
+    #[test]
+    fn profile_rejects_missing_dangling_external_and_duplicate_ids() {
+        let missing = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace brushRef="#br0">1 2</i:trace></i:ink>"##;
+        assert!(validate_content_part(missing).is_err());
+
+        let dangling = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="#other" brushRef="#br0">1 2</i:trace></i:ink>"##;
+        assert!(validate_content_part(dangling).is_err());
+
+        let external = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"/></i:definitions><i:trace contextRef="/other.xml#ctx0" brushRef="#br0">1 2</i:trace></i:ink>"##;
+        assert!(validate_content_part(external).is_err());
+
+        let duplicate = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:context xml:id="same"/><i:brush xml:id="same"/></i:definitions></i:ink>"##;
+        assert!(validate_content_part(duplicate).is_err());
+    }
+
+    #[test]
+    fn profile_ignores_misplaced_context_and_normative_extension_subtrees() {
+        let misplaced = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main"><i:traceGroup><m:context type="writingRegion"/></i:traceGroup></i:ink>"##;
+        validate_content_part(misplaced).unwrap();
+
+        let ignored_trace = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:trace>1 2</i:trace></i:definitions></i:ink>"##;
+        validate_content_part(ignored_trace).unwrap();
+
+        let ignored_context = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:group><m:context type="writingRegion"/></e:group></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        validate_content_part(ignored_context).unwrap();
+    }
+
+    #[test]
+    fn profile_projection_excludes_ignored_typed_elements_and_nested_roots() {
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:trace>ignored definitions trace</i:trace><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:ink/><i:ink><i:trace>ignored nested root trace</i:trace></i:ink><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion"/></e:interpretation><e:group><m:context type="line"/></e:group></e:emma></i:annotationXML><i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace></i:traceGroup><i:brushProperty name="color" value="#FFFFFF"/></i:ink>"##;
+        let projection = validate_content_part(source).unwrap();
+        let filtered = shared::read_shared_with_source_spans(
+            Arc::new(source.to_vec()),
+            projection.contexts(),
+            projection.traces(),
+            projection.brush_properties(),
+            projection.links(),
+        )
+        .unwrap();
+        assert_eq!(filtered.source(), source);
+        assert_eq!(filtered.context_count(), 1);
+        assert_eq!(filtered.trace_count(), 1);
+        assert_eq!(filtered.brush_property_count(), 1);
+        assert_eq!(
+            filtered.contexts()[0].xml(&filtered),
+            br#"<m:context type="writingRegion"/>"#
+        );
+        assert_eq!(
+            filtered.traces()[0].xml(&filtered),
+            br##"<i:trace contextRef="#ctx0" brushRef="#br0">1 2</i:trace>"##
+        );
+        assert_eq!(
+            filtered.brush_properties()[0].xml(&filtered),
+            br##"<i:brushProperty name="inkEffects" value="pencil"/>"##
+        );
+    }
+
+    #[test]
+    fn ignored_ancestry_skips_invalid_typed_values_but_keeps_bounded_scan() {
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:opaque><m:sourceLink direction="bad" ref="bad"/><m:context/><m:context type="not-a-guid"/><m:context type="writingRegion" id="not-a-guid"/><m:context type="writingRegion" rotatedBoundingBox="not points"/><i:brushProperty/></i:opaque><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion"/></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        let projection = validate_content_part(source).unwrap();
+        let document = shared::read_shared_with_source_spans(
+            Arc::new(source.to_vec()),
+            projection.contexts(),
+            projection.traces(),
+            projection.brush_properties(),
+            projection.links(),
+        )
+        .expect("ignored typed values must remain opaque");
+        assert_eq!(document.context_count(), 1);
+        assert_eq!(document.trace_count(), 0);
+        assert_eq!(document.brush_property_count(), 1);
+        assert_eq!(document.source(), source);
+    }
+
+    #[test]
+    fn recognized_invalid_typed_values_are_still_rejected() {
+        let invalid_contexts = [
+            r#"<m:context/>"#,
+            r#"<m:context type="not-a-guid"/>"#,
+            r#"<m:context type="writingRegion" id="not-a-guid"/>"#,
+            r#"<m:context type="writingRegion" rotatedBoundingBox="not points"/>"#,
+        ];
+        for context in invalid_contexts {
+            let source = format!(
+                r#"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation>{context}</e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"#
+            );
+            let projection = validate_content_part(source.as_bytes()).unwrap();
+            assert!(
+                shared::read_metadata_with_source_spans(
+                    source.as_bytes(),
+                    projection.contexts(),
+                    projection.traces(),
+                    projection.brush_properties(),
+                    projection.links(),
+                )
+                .is_err(),
+                "recognized context must be typed and rejected: {context}"
+            );
+        }
+
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion"><m:sourceLink direction="bad" ref="bad"/></m:context></e:interpretation></e:emma></i:annotationXML></i:traceGroup></i:ink>"##;
+        let projection = validate_content_part(source).unwrap();
+        assert!(
+            shared::read_metadata_with_source_spans(
+                source,
+                projection.contexts(),
+                projection.traces(),
+                projection.brush_properties(),
+                projection.links(),
+            )
+            .is_err()
+        );
+
+        let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:brush><i:brushProperty/></i:brush></i:definitions></i:ink>"##;
+        let projection = validate_content_part(source).unwrap();
+        assert!(
+            shared::read_metadata_with_source_spans(
+                source,
+                projection.contexts(),
+                projection.traces(),
+                projection.brush_properties(),
+                projection.links(),
+            )
+            .is_err()
+        );
     }
 }

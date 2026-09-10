@@ -46,7 +46,7 @@ enum NamespaceId {
 /// or an exhausted resource budget.
 pub fn read(xml: &[u8]) -> Result<Document> {
     enforce_source_limit(xml.len())?;
-    let metadata = scan(xml)?.into_metadata();
+    let metadata = scan(xml, Projection::all())?.into_metadata();
     let source = copy_source(xml)?;
     Document::new(source, metadata).map_err(value_error)
 }
@@ -70,7 +70,7 @@ pub fn read(xml: &[u8]) -> Result<Document> {
 /// on success.
 pub fn read_shared(xml: Arc<Vec<u8>>) -> Result<Document> {
     enforce_source_limit(xml.len())?;
-    let metadata = scan(xml.as_slice())?.into_metadata();
+    let metadata = scan(xml.as_slice(), Projection::all())?.into_metadata();
     Document::new(xml, metadata).map_err(value_error)
 }
 
@@ -88,7 +88,48 @@ pub fn read_shared(xml: Arc<Vec<u8>>) -> Result<Document> {
 /// validation and is never retained by the returned projection.
 pub fn read_metadata(xml: &[u8]) -> Result<Metadata> {
     enforce_source_limit(xml.len())?;
-    Ok(scan(xml)?.into_metadata())
+    Ok(scan(xml, Projection::all())?.into_metadata())
+}
+
+/// Read a source-backed document while retaining only the semantic elements
+/// selected by the owning package profile.
+///
+/// Every selected span must be a source span produced by the same XML source,
+/// listed in strictly increasing order for its semantic kind, and must match
+/// exactly one generic InkML semantic element. The scanner still validates all
+/// XML, namespace declarations, attributes, nodes, depth, text, and resource
+/// limits; selection only suppresses typed decoding for unselected semantic
+/// elements. An unmatched or out-of-order selection is rejected.
+pub fn read_shared_with_source_spans(
+    xml: Arc<Vec<u8>>,
+    contexts: &[SourceSpan],
+    traces: &[SourceSpan],
+    brush_properties: &[SourceSpan],
+    links: &[SourceSpan],
+) -> Result<Document> {
+    enforce_source_limit(xml.len())?;
+    let projection = Projection::filtered(xml.len(), contexts, traces, brush_properties, links)?;
+    let metadata = scan(xml.as_slice(), projection)?.into_metadata();
+    Document::new(xml, metadata).map_err(value_error)
+}
+
+/// Read bounded typed InkML metadata while retaining only the semantic
+/// elements selected by the owning package profile.
+///
+/// The selected spans must be source ordered, in bounds, and must each match
+/// exactly one semantic element. All XML remains subject to the generic
+/// scanner's structural and resource limits; unselected typed elements are
+/// skipped before their typed attributes are decoded.
+pub fn read_metadata_with_source_spans(
+    xml: &[u8],
+    contexts: &[SourceSpan],
+    traces: &[SourceSpan],
+    brush_properties: &[SourceSpan],
+    links: &[SourceSpan],
+) -> Result<Metadata> {
+    enforce_source_limit(xml.len())?;
+    let projection = Projection::filtered(xml.len(), contexts, traces, brush_properties, links)?;
+    Ok(scan(xml, projection)?.into_metadata())
 }
 
 #[derive(Debug)]
@@ -104,7 +145,160 @@ impl Parsed {
     }
 }
 
-fn scan(xml: &[u8]) -> Result<Parsed> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SemanticKind {
+    Context,
+    Trace,
+    BrushProperty,
+    Link,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SelectedSpan {
+    kind: SemanticKind,
+    expected: SourceSpan,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectionToken {
+    All,
+    Selected(SelectedSpan),
+}
+
+struct Projection<'a> {
+    all: bool,
+    contexts: &'a [SourceSpan],
+    traces: &'a [SourceSpan],
+    brush_properties: &'a [SourceSpan],
+    links: &'a [SourceSpan],
+    matched_contexts: usize,
+    matched_traces: usize,
+    matched_brush_properties: usize,
+    matched_links: usize,
+}
+
+impl<'a> Projection<'a> {
+    fn all() -> Self {
+        Self {
+            all: true,
+            contexts: &[],
+            traces: &[],
+            brush_properties: &[],
+            links: &[],
+            matched_contexts: 0,
+            matched_traces: 0,
+            matched_brush_properties: 0,
+            matched_links: 0,
+        }
+    }
+
+    fn filtered(
+        source_len: usize,
+        contexts: &'a [SourceSpan],
+        traces: &'a [SourceSpan],
+        brush_properties: &'a [SourceSpan],
+        links: &'a [SourceSpan],
+    ) -> Result<Self> {
+        validate_selected_spans(source_len, "InkML context projection", contexts)?;
+        validate_selected_spans(source_len, "InkML trace projection", traces)?;
+        validate_selected_spans(
+            source_len,
+            "InkML brush-property projection",
+            brush_properties,
+        )?;
+        validate_selected_spans(source_len, "InkML link projection", links)?;
+        Ok(Self {
+            all: false,
+            contexts,
+            traces,
+            brush_properties,
+            links,
+            matched_contexts: 0,
+            matched_traces: 0,
+            matched_brush_properties: 0,
+            matched_links: 0,
+        })
+    }
+
+    fn select(&self, kind: SemanticKind, start: usize) -> Option<ProjectionToken> {
+        if self.all {
+            return Some(ProjectionToken::All);
+        }
+        let spans = match kind {
+            SemanticKind::Context => self.contexts,
+            SemanticKind::Trace => self.traces,
+            SemanticKind::BrushProperty => self.brush_properties,
+            SemanticKind::Link => self.links,
+        };
+        spans
+            .binary_search_by_key(&start, |span| span.start())
+            .ok()
+            .map(|index| {
+                ProjectionToken::Selected(SelectedSpan {
+                    kind,
+                    expected: spans[index],
+                })
+            })
+    }
+
+    fn complete(&mut self, token: ProjectionToken, actual: SourceSpan) -> Result<()> {
+        let ProjectionToken::Selected(selected) = token else {
+            return Ok(());
+        };
+        if selected.expected != actual {
+            return Err(invalid(
+                "InkML semantic projection span does not match its source element",
+            ));
+        }
+        let matched = match selected.kind {
+            SemanticKind::Context => &mut self.matched_contexts,
+            SemanticKind::Trace => &mut self.matched_traces,
+            SemanticKind::BrushProperty => &mut self.matched_brush_properties,
+            SemanticKind::Link => &mut self.matched_links,
+        };
+        *matched = matched
+            .checked_add(1)
+            .ok_or_else(|| invalid("InkML semantic projection count overflowed"))?;
+        Ok(())
+    }
+
+    fn finish(self) -> Result<()> {
+        if self.all
+            || (self.matched_contexts == self.contexts.len()
+                && self.matched_traces == self.traces.len()
+                && self.matched_brush_properties == self.brush_properties.len()
+                && self.matched_links == self.links.len())
+        {
+            Ok(())
+        } else {
+            Err(invalid(
+                "InkML semantic projection contains an unmatched source span",
+            ))
+        }
+    }
+}
+
+fn validate_selected_spans(
+    source_len: usize,
+    resource: &'static str,
+    spans: &[SourceSpan],
+) -> Result<()> {
+    let mut previous = None;
+    for &span in spans {
+        if span.start() > span.end() || span.end() > source_len {
+            return Err(invalid(format!("{resource} span is outside the source")));
+        }
+        if previous.is_some_and(|previous: SourceSpan| previous.start() >= span.start()) {
+            return Err(invalid(format!(
+                "{resource} spans are not strictly source ordered"
+            )));
+        }
+        previous = Some(span);
+    }
+    Ok(())
+}
+
+fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -152,6 +346,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     &mut contexts,
                     &mut traces,
                     &mut brush_properties,
+                    &mut projection,
                 )?;
                 reserve_one(&mut stack, "InkML XML stack")?;
                 stack.push(frame);
@@ -173,6 +368,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     &mut contexts,
                     &mut traces,
                     &mut brush_properties,
+                    &mut projection,
                 )?;
             },
             Event::Start(element) if root_seen && !root_closed => {
@@ -190,6 +386,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     &mut contexts,
                     &mut traces,
                     &mut brush_properties,
+                    &mut projection,
                 )?;
                 reserve_one(&mut stack, "InkML XML stack")?;
                 stack.push(frame);
@@ -209,6 +406,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     &mut contexts,
                     &mut traces,
                     &mut brush_properties,
+                    &mut projection,
                 )?;
             },
             Event::Start(_) | Event::Empty(_) if root_closed => {
@@ -231,6 +429,9 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                 }
                 if let Some(index) = frame.brush_property {
                     brush_properties[index].source = SourceSpan::new(frame.start, end);
+                }
+                if let Some(token) = frame.projection {
+                    projection.complete(token, SourceSpan::new(frame.start, end))?;
                 }
                 if stack.is_empty() {
                     root_closed = true;
@@ -293,6 +494,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
     if brush_properties.len() > MAX_BRUSH_PROPERTIES {
         return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
     }
+    projection.finish()?;
     Ok(Parsed {
         contexts,
         traces,
@@ -328,6 +530,7 @@ struct Frame {
     context: Option<usize>,
     trace: Option<usize>,
     brush_property: Option<usize>,
+    projection: Option<ProjectionToken>,
 }
 
 fn frame_for_start<R: std::io::BufRead>(
@@ -340,17 +543,22 @@ fn frame_for_start<R: std::io::BufRead>(
     contexts: &mut Vec<Context>,
     traces: &mut Vec<Trace>,
     brush_properties: &mut Vec<BrushProperty>,
+    projection: &mut Projection<'_>,
 ) -> Result<Frame> {
     let local = element.name().local_name();
-    if is_namespace(
+    let is_link = is_namespace(
         resolved,
         element,
         b"msink",
         NAMESPACE.as_bytes(),
         legacy_fragment,
-    ) && matches!(local.as_ref(), b"sourceLink" | b"destinationLink")
-    {
-        validate_link(element, reader)?;
+    ) && matches!(local.as_ref(), b"sourceLink" | b"destinationLink");
+    let mut projection_token = None;
+    if is_link {
+        if let Some(token) = projection.select(SemanticKind::Link, start) {
+            validate_link(element, reader)?;
+            projection_token = Some(token);
+        }
     }
     let context = if is_namespace(
         resolved,
@@ -360,13 +568,19 @@ fn frame_for_start<R: std::io::BufRead>(
         legacy_fragment,
     ) && local.as_ref() == b"context"
     {
-        if contexts.len() >= MAX_CONTEXTS {
-            return Err(limit("InkML context nodes", MAX_CONTEXTS));
+        let token = projection.select(SemanticKind::Context, start);
+        if let Some(token) = token {
+            if contexts.len() >= MAX_CONTEXTS {
+                return Err(limit("InkML context nodes", MAX_CONTEXTS));
+            }
+            let index = contexts.len();
+            reserve_one(contexts, "InkML context records")?;
+            contexts.push(parse_context(element, start, reader)?);
+            projection_token = Some(token);
+            Some(index)
+        } else {
+            None
         }
-        let index = contexts.len();
-        reserve_one(contexts, "InkML context records")?;
-        contexts.push(parse_context(element, start, reader)?);
-        Some(index)
     } else {
         None
     };
@@ -378,13 +592,19 @@ fn frame_for_start<R: std::io::BufRead>(
         legacy_fragment,
     ) && local.as_ref() == b"trace"
     {
-        if traces.len() >= MAX_TRACES {
-            return Err(limit("InkML traces", MAX_TRACES));
+        let token = projection.select(SemanticKind::Trace, start);
+        if let Some(token) = token {
+            if traces.len() >= MAX_TRACES {
+                return Err(limit("InkML traces", MAX_TRACES));
+            }
+            let index = traces.len();
+            reserve_one(traces, "InkML trace records")?;
+            traces.push(parse_trace(element, start, data_start, false, reader)?);
+            projection_token = Some(token);
+            Some(index)
+        } else {
+            None
         }
-        let index = traces.len();
-        reserve_one(traces, "InkML trace records")?;
-        traces.push(parse_trace(element, start, data_start, false, reader)?);
-        Some(index)
     } else {
         None
     };
@@ -396,15 +616,21 @@ fn frame_for_start<R: std::io::BufRead>(
         legacy_fragment,
     ) && local.as_ref() == b"brushProperty"
     {
-        if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
-            return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+        let token = projection.select(SemanticKind::BrushProperty, start);
+        if let Some(token) = token {
+            if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
+                return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+            }
+            let index = brush_properties.len();
+            reserve_one(brush_properties, "InkML brush-property records")?;
+            brush_properties.push(parse_brush_property(
+                element, start, data_start, false, reader,
+            )?);
+            projection_token = Some(token);
+            Some(index)
+        } else {
+            None
         }
-        let index = brush_properties.len();
-        reserve_one(brush_properties, "InkML brush-property records")?;
-        brush_properties.push(parse_brush_property(
-            element, start, data_start, false, reader,
-        )?);
-        Some(index)
     } else {
         None
     };
@@ -415,6 +641,7 @@ fn frame_for_start<R: std::io::BufRead>(
         context,
         trace,
         brush_property,
+        projection: projection_token,
     })
 }
 
@@ -428,8 +655,16 @@ fn parse_empty<R: std::io::BufRead>(
     contexts: &mut Vec<Context>,
     traces: &mut Vec<Trace>,
     brush_properties: &mut Vec<BrushProperty>,
+    projection: &mut Projection<'_>,
 ) -> Result<()> {
     let local = element.name().local_name();
+    let is_link = is_namespace(
+        resolved,
+        element,
+        b"msink",
+        NAMESPACE.as_bytes(),
+        legacy_fragment,
+    ) && matches!(local.as_ref(), b"sourceLink" | b"destinationLink");
     if is_namespace(
         resolved,
         element,
@@ -438,13 +673,21 @@ fn parse_empty<R: std::io::BufRead>(
         legacy_fragment,
     ) && local.as_ref() == b"context"
     {
-        if contexts.len() >= MAX_CONTEXTS {
-            return Err(limit("InkML context nodes", MAX_CONTEXTS));
+        if let Some(token) = projection.select(SemanticKind::Context, start) {
+            if contexts.len() >= MAX_CONTEXTS {
+                return Err(limit("InkML context nodes", MAX_CONTEXTS));
+            }
+            let mut context = parse_context(element, start, reader)?;
+            context.source = SourceSpan::new(start, end);
+            reserve_one(contexts, "InkML context records")?;
+            contexts.push(context);
+            projection.complete(token, SourceSpan::new(start, end))?;
         }
-        let mut context = parse_context(element, start, reader)?;
-        context.source = SourceSpan::new(start, end);
-        reserve_one(contexts, "InkML context records")?;
-        contexts.push(context);
+    } else if is_link {
+        if let Some(token) = projection.select(SemanticKind::Link, start) {
+            validate_link(element, reader)?;
+            projection.complete(token, SourceSpan::new(start, end))?;
+        }
     } else if is_namespace(
         resolved,
         element,
@@ -453,14 +696,17 @@ fn parse_empty<R: std::io::BufRead>(
         legacy_fragment,
     ) && local.as_ref() == b"trace"
     {
-        if traces.len() >= MAX_TRACES {
-            return Err(limit("InkML traces", MAX_TRACES));
+        if let Some(token) = projection.select(SemanticKind::Trace, start) {
+            if traces.len() >= MAX_TRACES {
+                return Err(limit("InkML traces", MAX_TRACES));
+            }
+            let mut trace = parse_trace(element, start, end, true, reader)?;
+            trace.source = SourceSpan::new(start, end);
+            trace.data = SourceSpan::new(end, end);
+            reserve_one(traces, "InkML trace records")?;
+            traces.push(trace);
+            projection.complete(token, SourceSpan::new(start, end))?;
         }
-        let mut trace = parse_trace(element, start, end, true, reader)?;
-        trace.source = SourceSpan::new(start, end);
-        trace.data = SourceSpan::new(end, end);
-        reserve_one(traces, "InkML trace records")?;
-        traces.push(trace);
     } else if is_namespace(
         resolved,
         element,
@@ -469,22 +715,16 @@ fn parse_empty<R: std::io::BufRead>(
         legacy_fragment,
     ) && local.as_ref() == b"brushProperty"
     {
-        if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
-            return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+        if let Some(token) = projection.select(SemanticKind::BrushProperty, start) {
+            if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
+                return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+            }
+            let mut property = parse_brush_property(element, start, end, true, reader)?;
+            property.source = SourceSpan::new(start, end);
+            reserve_one(brush_properties, "InkML brush-property records")?;
+            brush_properties.push(property);
+            projection.complete(token, SourceSpan::new(start, end))?;
         }
-        let mut property = parse_brush_property(element, start, end, true, reader)?;
-        property.source = SourceSpan::new(start, end);
-        reserve_one(brush_properties, "InkML brush-property records")?;
-        brush_properties.push(property);
-    } else if is_namespace(
-        resolved,
-        element,
-        b"msink",
-        NAMESPACE.as_bytes(),
-        legacy_fragment,
-    ) && matches!(local.as_ref(), b"sourceLink" | b"destinationLink")
-    {
-        validate_link(element, reader)?;
     }
     Ok(())
 }

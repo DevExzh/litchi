@@ -1,0 +1,89 @@
+{
+  "kind": "DOCX Ink semantic preselection candidate",
+  "candidate_root": "/var/tmp/litchi-docx-ink-validation-20260909",
+  "base_commit": "6da91778c4003b6c9819e5c25168cfe9a847359e",
+  "working_tree": "unstaged candidate changes only; no primary worktree edits/staging/commit",
+  "changed_files": [
+    {
+      "path": "crates/litchi-docx/src/ink/package.rs",
+      "sha256": "bc4a85fe3453874055856c11456d1af3957189300b627a4b7eb3056f4dbf55fa"
+    },
+    {
+      "path": "crates/litchi-docx/src/ink/graph.rs",
+      "sha256": "eaea944042abe96ef498db03d4317bb0f133477b04bfd67ec0653ef0a5d8b685"
+    },
+    {
+      "path": "crates/litchi-docx/src/ink/graph/add.rs",
+      "sha256": "5bf346edfb67db4865effe7293e37e4c7bb17b7d71c9bd8119a72dc83b3a419c"
+    },
+    {
+      "path": "crates/litchi-docx/tests/ink_inventory.rs",
+      "sha256": "905cfba9c2a6de451d482fb9b981b5b7a5a82f910647b51c501dc7a3068399d7"
+    },
+    {
+      "path": "crates/litchi-drawingml/src/ink/codec.rs",
+      "sha256": "21d5efbebff0d5c6ba24e23d5f5c452040494acd2edeed49275237974d5e80f7"
+    },
+    {
+      "path": "crates/litchi-drawingml/src/ink/mod.rs",
+      "sha256": "7cd5e4665b121f96e42e143f9937b4ab16216b9f095b5d1367b1317207155757"
+    },
+    {
+      "path": "crates/litchi-drawingml/src/ink/model.rs",
+      "sha256": "810b8608ccccb460677cf489648f3db879f70f0dfc9ab35f3b97523a76bfd4b0"
+    },
+    {
+      "path": "crates/litchi-drawingml/src/ink/tests.rs",
+      "sha256": "97bd4fe49738503badf50c8115b7148b84131db045cfa8124a34fa6c124601dd"
+    }
+  ],
+  "diff_sha256": "5debdc337001e84470f623e092d2f42697e011280096832af5f19d6c0aeab737",
+  "validation": {
+    "toolchain": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup rustup run 1.95.0",
+    "tests": "cargo test -p litchi-drawingml -p litchi-docx --all-features --all-targets (PASS; current-v2 log)",
+    "doctests": "cargo test -p litchi-drawingml -p litchi-docx --all-features --doc (PASS; current-v2 log)",
+    "clippy": "cargo clippy -p litchi-drawingml -p litchi-docx --all-targets --all-features -- -D warnings (PASS; current-v2 log)",
+    "rustdoc": "cargo rustdoc -p litchi-drawingml --all-features -- -D warnings; cargo rustdoc -p litchi-docx --all-features -- -D warnings (PASS)",
+    "format": "rustfmt --edition 2024 --check on changed files; git diff --check (PASS)"
+  },
+  "logs": [
+    {
+      "path": "/var/tmp/litchi-docx-ink-validation-20260910-full-tests-current-v2.log",
+      "exists": true,
+      "sha256": "aae136d7f062c4ce759dd76d530f081d18baf3c723f871aaaaf4d0a3ec2816b4"
+    },
+    {
+      "path": "/var/tmp/litchi-docx-ink-validation-20260910-doctests-current-v2.log",
+      "exists": true,
+      "sha256": "a0a34679c4d35448d99ea6ffc7e37a5c70d02842c32837369345e27e61df7b05"
+    },
+    {
+      "path": "/var/tmp/litchi-docx-ink-validation-20260910-clippy-current-v2.log",
+      "exists": true,
+      "sha256": "74bbb7c5c32b13a7858163b8eb096ed4933adcf612c053bc0a9428a65ef1212a"
+    },
+    {
+      "path": "/var/tmp/litchi-docx-ink-validation-20260910-rustdoc-drawing-current-v2.log",
+      "exists": true,
+      "sha256": "bd63212ba39750f8bac53ba9760bb89d443581d3897f1ca77e70c8883242ec97"
+    },
+    {
+      "path": "/var/tmp/litchi-docx-ink-validation-20260910-rustdoc-docx-current-v2.log",
+      "exists": true,
+      "sha256": "0a15171216586c2e6e008bc39014fb4ac82acbaf1af24ecc1f1f99772ee92e4a"
+    }
+  ],
+  "scope": {
+    "fixed": [
+      "profile selects recognized context/trace/brushProperty/sourceLink/destinationLink spans before shared typed decoding",
+      "ignored ancestry remains opaque while shared scanner still applies XML structure, namespace, node/depth/attribute/text/resource bounds",
+      "exact source spans and unmatched/out-of-order projections are rejected",
+      "generic DrawingML read/read_shared/read_metadata retain all-semantic behavior"
+    ],
+    "remaining": [
+      "full InkML trace lexical syntax",
+      "full EMMA first-child/mode ordering and broader MS-ODRAWXML semantics",
+      "richer brush/context/link/channel semantics"
+    ]
+  }
+}

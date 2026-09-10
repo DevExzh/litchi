@@ -24,7 +24,7 @@ const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relations
 const SW: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 const SR: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const INK_TYPE: &str = "application/inkml+xml";
-const INK: &[u8] = br#"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main"><i:annotationXML><m:context type="writingRegion" semanticType="comment"/></i:annotationXML><i:brush><i:brushProperty name="inkEffects" value="pencil"/></i:brush><i:trace>1 2 3</i:trace></i:ink>"#;
+const INK: &[u8] = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML" xmlns:m="http://schemas.microsoft.com/ink/2010/main" xmlns:e="http://www.w3.org/2003/04/emma"><i:definitions><i:context xml:id="ctx0"/><i:brush xml:id="br0"><i:brushProperty name="inkEffects" value="pencil"/></i:brush></i:definitions><i:traceGroup><i:annotationXML><e:emma><e:interpretation><m:context type="writingRegion" semanticType="comment"/></e:interpretation></e:emma></i:annotationXML><i:trace contextRef="#ctx0" brushRef="#br0">1 2 3</i:trace></i:traceGroup></i:ink>"##;
 
 fn part(opc: &mut OpcPackage, name: &str, content_type: &str, data: &[u8]) {
     opc.add_part(Box::new(BlobPart::new(
@@ -727,9 +727,11 @@ fn source_session_keeps_distinct_story_payloads_correct_across_cold_and_cached_r
             "/word/glossary.xml",
         ];
         for (index, owner) in owners.iter().enumerate() {
-            let traces = "<i:trace>1 2</i:trace>".repeat(index + 1);
-            let payload =
-                format!("<i:ink xmlns:i=\"http://www.w3.org/2003/InkML\">{traces}</i:ink>");
+            let traces =
+                "<i:trace contextRef=\"#ctx0\" brushRef=\"#br0\">1 2</i:trace>".repeat(index + 1);
+            let payload = format!(
+                "<i:ink xmlns:i=\"http://www.w3.org/2003/InkML\"><i:definitions><i:context xml:id=\"ctx0\"/><i:brush xml:id=\"br0\"/></i:definitions>{traces}</i:ink>"
+            );
             let target = format!("/payload/ink{index}.xml");
             part(&mut opc, &target, INK_TYPE, payload.as_bytes());
             opc.get_part_mut(&PackURI::new(*owner).unwrap())
