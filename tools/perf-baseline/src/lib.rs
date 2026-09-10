@@ -11070,6 +11070,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 Ok(corpus_manifest::LegacyCaseCorpus {
                     case: result.case.to_owned(),
                     corpus: serde_json::to_value(&result.corpus)?,
+                    dimensions: result
+                        .cache_state
+                        .map(|cache_state| {
+                            BTreeMap::from([("cache_state".to_owned(), cache_state.to_owned())])
+                        })
+                        .unwrap_or_default(),
                 })
             })
             .collect::<Result<Vec<_>, Box<dyn Error>>>()?;

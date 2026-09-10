@@ -1289,6 +1289,9 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 `--corpus-manifest` writes the additive schema-2 deterministic corpus catalog
 and places a reference under `corpus_catalog` in the schema-1 report.  It does
 not change the existing case/corpus identity keys or their comparator digest.
+When a filesystem selector emits warm and cold rows over the same input, the
+catalog retains one content-addressed corpus and records `cache_state` under
+each binding's optional `dimensions` object.
 See [`docs/performance/CORPUS_MANIFEST_V2.md`](../../docs/performance/CORPUS_MANIFEST_V2.md).
 
 For a short local smoke run:

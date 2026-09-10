@@ -426,7 +426,16 @@
         "corpus_id": { "type": "string", "pattern": "^[a-z0-9-]+:sha256:[0-9a-f]{64}$" },
         "legacy_name": { "type": "string", "minLength": 1 },
         "legacy_archive_sha256": { "$ref": "#/$defs/sha256" },
-        "role": { "enum": ["timed", "guard", "inventory-only"] }
+        "role": { "enum": ["timed", "guard", "inventory-only"] },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cache_state": {
+              "enum": ["warm", "cold-requested", "cold-verified"]
+            }
+          }
+        }
       }
     }
   }

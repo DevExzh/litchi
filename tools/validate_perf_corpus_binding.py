@@ -145,6 +145,8 @@ MEMBER_KEYS = {
 TARGET_KEYS = {"entry", "logical_bytes", "sha256"}
 COVERAGE_KEYS = {"timed_cases", "guard_cases", "inventory_only"}
 BINDING_KEYS = {"case", "corpus_id", "legacy_name", "legacy_archive_sha256", "role"}
+BINDING_OPTIONAL_KEYS = {"dimensions"}
+CACHE_STATES = {"warm", "cold-requested", "cold-verified"}
 
 
 class ValidationError(ValueError):
@@ -265,6 +267,38 @@ def _enum(value: Any, context: str, values: set[str]) -> str:
     if value not in values:
         raise ValidationError(f"{context} has unsupported value {value!r}")
     return value
+
+
+def _validate_dimensions(value: Any, context: str) -> dict[str, str]:
+    dimensions = _object(value, context)
+    normalized: dict[str, str] = {}
+    for key, dimension in dimensions.items():
+        if not isinstance(key, str) or not key:
+            raise ValidationError(f"{context} keys must be non-empty strings")
+        if key != "cache_state":
+            raise ValidationError(f"{context} has unsupported dimension {key!r}")
+        normalized[key] = _string(dimension, f"{context}.{key}")
+    if "cache_state" in normalized and normalized["cache_state"] not in CACHE_STATES:
+        raise ValidationError(
+            f"{context}.cache_state has unsupported value {normalized['cache_state']!r}"
+        )
+    return dict(sorted(normalized.items()))
+
+
+def _binding_dimensions(binding: dict[str, Any], context: str) -> dict[str, str]:
+    if "dimensions" not in binding:
+        return {}
+    return _validate_dimensions(binding["dimensions"], f"{context} dimensions")
+
+
+def _dimension_key(dimensions: dict[str, str]) -> tuple[tuple[str, str], ...]:
+    return tuple(dimensions.items())
+
+
+def _result_dimensions(result: dict[str, Any], context: str) -> dict[str, str]:
+    if "cache_state" not in result:
+        return {}
+    return {"cache_state": _enum(result["cache_state"], f"{context} cache_state", CACHE_STATES)}
 
 
 def _string_list(value: Any, context: str, *, nonempty: bool = True) -> list[str]:
@@ -627,11 +661,11 @@ def _content_set(catalog: dict[str, Any]) -> tuple[list[dict[str, Any]], list[di
         raise ValidationError("catalog corpora are not sorted by id")
 
     projected_bindings: list[dict[str, Any]] = []
-    binding_keys: set[tuple[str, str]] = set()
+    binding_keys: set[tuple[str, str, tuple[tuple[str, str], ...]]] = set()
     timed_cases_by_corpus: dict[str, list[str]] = {identifier: [] for identifier in corpus_ids}
     for index, value in enumerate(bindings):
         context = f"catalog binding {index}"
-        binding = _exact_keys(value, BINDING_KEYS, context)
+        binding = _exact_keys(value, BINDING_KEYS, context, optional=BINDING_OPTIONAL_KEYS)
         case = _string(binding["case"], f"{context} case")
         identifier = _string(binding["corpus_id"], f"{context} corpus_id")
         legacy_name = _string(binding["legacy_name"], f"{context} legacy_name")
@@ -648,14 +682,25 @@ def _content_set(catalog: dict[str, Any]) -> tuple[list[dict[str, Any]], list[di
             raise ValidationError(f"{context} legacy_name does not match referenced corpus")
         if archive_sha256 != legacy["archive_sha256"]:
             raise ValidationError(f"{context} legacy_archive_sha256 does not match referenced corpus")
-        key = (case, identifier)
+        dimensions = _binding_dimensions(binding, context)
+        key = (case, identifier, _dimension_key(dimensions))
         if key in binding_keys:
             raise ValidationError(f"duplicate catalog binding {key!r}")
         binding_keys.add(key)
         if role == "timed":
             timed_cases_by_corpus[identifier].append(case)
-        projected_bindings.append({"case": case, "corpus_id": identifier, "role": role})
-    binding_order = [(item["case"], item["corpus_id"]) for item in projected_bindings]
+        projected = {"case": case, "corpus_id": identifier, "role": role}
+        if dimensions:
+            projected["dimensions"] = dimensions
+        projected_bindings.append(projected)
+    binding_order = [
+        (
+            item["case"],
+            item["corpus_id"],
+            _dimension_key(item.get("dimensions", {})),
+        )
+        for item in projected_bindings
+    ]
     if binding_order != sorted(binding_order):
         raise ValidationError("catalog case_bindings are not sorted")
 
@@ -746,7 +791,7 @@ def validate_binding(report: dict[str, Any], catalog: dict[str, Any]) -> tuple[i
         _string(corpus["id"], f"catalog corpus {index} id"): corpus
         for index, corpus in enumerate(catalog_corpora)
     }
-    expected_bindings: list[tuple[str, str, str, str, str]] = []
+    expected_bindings: list[tuple[str, str, str, str, str, tuple[tuple[str, str], ...]]] = []
     for index, value in enumerate(results):
         context = f"report result {index}"
         result = _object(value, context)
@@ -759,6 +804,7 @@ def validate_binding(report: dict[str, Any], catalog: dict[str, Any]) -> tuple[i
             raise ValidationError(f"{context} is absent from catalog: {identifier}")
         if _required(catalog_corpus, "legacy_v1", f"catalog corpus {identifier}") != corpus:
             raise ValidationError(f"{context} corpus differs from catalog legacy_v1")
+        dimensions = _result_dimensions(result, context)
         expected_bindings.append(
             (
                 case,
@@ -769,22 +815,26 @@ def validate_binding(report: dict[str, Any], catalog: dict[str, Any]) -> tuple[i
                     f"{context} corpus archive_sha256",
                 ),
                 "timed",
+                _dimension_key(dimensions),
             )
         )
-    expected_bindings.sort(key=lambda binding: (binding[0], binding[1]))
+    expected_bindings.sort(key=lambda binding: (binding[0], binding[1], binding[5]))
     actual_bindings = []
     for index, value in enumerate(_list(catalog["case_bindings"], "catalog case_bindings")):
-        binding = _exact_keys(value, BINDING_KEYS, f"catalog binding {index}")
+        context = f"catalog binding {index}"
+        binding = _exact_keys(value, BINDING_KEYS, context, optional=BINDING_OPTIONAL_KEYS)
+        dimensions = _binding_dimensions(binding, context)
         actual_bindings.append(
             (
-                _string(binding["case"], f"catalog binding {index} case"),
-                _string(binding["corpus_id"], f"catalog binding {index} corpus_id"),
-                _string(binding["legacy_name"], f"catalog binding {index} legacy_name"),
+                _string(binding["case"], f"{context} case"),
+                _string(binding["corpus_id"], f"{context} corpus_id"),
+                _string(binding["legacy_name"], f"{context} legacy_name"),
                 _hash(
                     binding["legacy_archive_sha256"],
-                    f"catalog binding {index} legacy_archive_sha256",
+                    f"{context} legacy_archive_sha256",
                 ),
-                _enum(binding["role"], f"catalog binding {index} role", {"timed", "guard", "inventory-only"}),
+                _enum(binding["role"], f"{context} role", {"timed", "guard", "inventory-only"}),
+                _dimension_key(dimensions),
             )
         )
     if actual_bindings != expected_bindings:
