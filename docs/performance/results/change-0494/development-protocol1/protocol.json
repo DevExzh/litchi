@@ -1,0 +1,669 @@
+{
+  "arms": [
+    {
+      "delay_us": null,
+      "kind": "owned",
+      "max_range_bytes": null,
+      "name": "owned",
+      "provider": "owned",
+      "short_read_bytes": null,
+      "trace_ranges": false,
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": null,
+      "kind": "instrumented",
+      "max_range_bytes": null,
+      "name": "instrumented",
+      "provider": "instrumented",
+      "short_read_bytes": null,
+      "trace_ranges": true,
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": null,
+      "kind": "file-warm",
+      "max_range_bytes": null,
+      "name": "file-warm",
+      "provider": "file",
+      "short_read_bytes": null,
+      "trace_ranges": false,
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": null,
+      "kind": "short-read",
+      "max_range_bytes": 4096,
+      "name": "short",
+      "provider": "short",
+      "short_read_bytes": 4096,
+      "trace_ranges": true,
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps"
+    },
+    {
+      "delay_us": 1000,
+      "kind": "range-delay",
+      "max_range_bytes": 65536,
+      "name": "delayed",
+      "provider": "delayed",
+      "short_read_bytes": null,
+      "trace_ranges": true,
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum-service"
+    },
+    {
+      "delay_us": 0,
+      "kind": "range-control",
+      "max_range_bytes": 65536,
+      "name": "range-zero",
+      "provider": "delayed",
+      "short_read_bytes": null,
+      "trace_ranges": true,
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum-service"
+    }
+  ],
+  "builds": {
+    "allocator": {
+      "binary": {
+        "bytes": 475229832,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0494/final1/allocator/litchi-perf-baseline-alloc",
+        "sha256": "ce16c50e2c456fca68edd69d8eeb860651f04363707b48225c8e378ffe44aae8"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "litchi-perf-baseline-alloc"
+      ],
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+        "DEBUGINFOD_URLS": "",
+        "LC_ALL": "C",
+        "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--features",
+          "allocator-metrics",
+          "--bin",
+          "litchi-perf-baseline-alloc"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation/final4-build-allocator.json",
+        "sha256": "5b841b4f5542de85cbef7b9cb80bb47cdd28576e6569342de4ff25f32854f1c7",
+        "source": {
+          "files": 7165,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+          "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+        }
+      },
+      "git_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+      "receipt_sha256": "261d99d89d8281b98dee77c3583a18381074f83222bddce7c35aea1e2b5ab5d8",
+      "source": {
+        "files": 7165,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+        "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+      }
+    },
+    "normal": {
+      "binary": {
+        "bytes": 475513208,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0494/final1/normal/litchi-perf-baseline",
+        "sha256": "7d4f852f5bd7965a76046bb6a32a516de095f7c41e1a2439a0edfef2efc882e0"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline"
+      ],
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+        "DEBUGINFOD_URLS": "",
+        "LC_ALL": "C",
+        "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation/final4-build-normal.json",
+        "sha256": "905323c93137f2b12065a92bf2c96b1bfade1e489df67e600f7a2a03f773397c",
+        "source": {
+          "files": 7165,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+          "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+        }
+      },
+      "git_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+      "receipt_sha256": "71f8cf873203636852cc282ae7218736b5602f687fccbd295ffc77ca4da42d7b",
+      "source": {
+        "files": 7165,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+        "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+      }
+    }
+  },
+  "case": "docx_opened_document_one_paragraph_edit_save",
+  "change": 494,
+  "claim_authorized": false,
+  "corpus": {
+    "archive_bytes": 16793036,
+    "archive_member_count": 20,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "expected_text_bytes": 10000,
+    "expected_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "media_member_bytes": 2097152,
+    "media_member_count": 8,
+    "paragraph_count": 200,
+    "shape": "200 paragraphs + eight 2 MiB PNG-signature media members",
+    "version": "0188-media-v1"
+  },
+  "cpu": 2,
+  "cpu_lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+  "driver": {
+    "gate.py": "7b2b2764e321565d6283cac27607021bdff0d7671dffaa35d1fb3ae33c7c668e",
+    "measure.py": "e1faa63a9c168f6798c8e8d1c55919b86219ae266555b19def42c579ac625409",
+    "retain_build.py": "4c1ab6583251d0d61a41bf0c9027537bd29077f5988466d0ea12bf59dc5c2b48",
+    "support.py": "64dfdfc91564fff9d9169ad6278ccfa67a8a43b1d622fcba9eb57a6a47c7f1c3",
+    "test_measure.py": "6df650268c29b8265ae29903886790e7ebbafd9c3626687012c1a162112804ee"
+  },
+  "driver_limits": {
+    "max_samples": 10000,
+    "max_traced_ranges": 131072,
+    "max_warmup": 1000
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+  },
+  "environment_artifact": {
+    "path": "environment.json",
+    "sha256": "a11aaa96344ae7e47fd8d34e81ad128b07ee78f87dd877a90e9a92e1b987f303"
+  },
+  "expected_formal_processes": 24,
+  "expected_measured_samples": 720,
+  "formal_runs": [
+    {
+      "arm": "owned",
+      "kind": "formal",
+      "label": "r1-normal-owned",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented",
+      "kind": "formal",
+      "label": "r1-normal-instrumented",
+      "provider": "instrumented",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file-warm",
+      "kind": "formal",
+      "label": "r1-normal-file-warm",
+      "provider": "file",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "short",
+      "kind": "formal",
+      "label": "r1-normal-short",
+      "provider": "short",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "delayed",
+      "kind": "formal",
+      "label": "r1-normal-delayed",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-zero",
+      "kind": "formal",
+      "label": "r1-normal-range-zero",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "owned",
+      "kind": "formal",
+      "label": "r1-allocator-owned",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented",
+      "kind": "formal",
+      "label": "r1-allocator-instrumented",
+      "provider": "instrumented",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file-warm",
+      "kind": "formal",
+      "label": "r1-allocator-file-warm",
+      "provider": "file",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "short",
+      "kind": "formal",
+      "label": "r1-allocator-short",
+      "provider": "short",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "delayed",
+      "kind": "formal",
+      "label": "r1-allocator-delayed",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-zero",
+      "kind": "formal",
+      "label": "r1-allocator-range-zero",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-zero",
+      "kind": "formal",
+      "label": "r2-allocator-range-zero",
+      "provider": "delayed",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "delayed",
+      "kind": "formal",
+      "label": "r2-allocator-delayed",
+      "provider": "delayed",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "short",
+      "kind": "formal",
+      "label": "r2-allocator-short",
+      "provider": "short",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file-warm",
+      "kind": "formal",
+      "label": "r2-allocator-file-warm",
+      "provider": "file",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented",
+      "kind": "formal",
+      "label": "r2-allocator-instrumented",
+      "provider": "instrumented",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "owned",
+      "kind": "formal",
+      "label": "r2-allocator-owned",
+      "provider": "owned",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "range-zero",
+      "kind": "formal",
+      "label": "r2-normal-range-zero",
+      "provider": "delayed",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "delayed",
+      "kind": "formal",
+      "label": "r2-normal-delayed",
+      "provider": "delayed",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "short",
+      "kind": "formal",
+      "label": "r2-normal-short",
+      "provider": "short",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "file-warm",
+      "kind": "formal",
+      "label": "r2-normal-file-warm",
+      "provider": "file",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "instrumented",
+      "kind": "formal",
+      "label": "r2-normal-instrumented",
+      "provider": "instrumented",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "owned",
+      "kind": "formal",
+      "label": "r2-normal-owned",
+      "provider": "owned",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    }
+  ],
+  "limits": {
+    "cache_max_bytes": 8388608,
+    "cache_max_entries": 128,
+    "max_tracked_ranges": 131072,
+    "read_limits": {
+      "max_archive_compressed_bytes": 536870912,
+      "max_archive_entry_bytes": 536870912,
+      "max_archive_member_name_bytes": 4096,
+      "max_archive_members": 100000,
+      "max_archive_metadata_bytes": 67108864,
+      "max_archive_total_bytes": 2147483648,
+      "max_content_type_mappings": 100000,
+      "max_content_types_bytes": 8388608,
+      "max_input_bytes": 536870912,
+      "max_part_bytes": 536870912,
+      "max_parts": 100000,
+      "max_relationship_graph_nodes": 100000,
+      "max_relationship_parts": 100000,
+      "max_relationship_target_bytes": 4096,
+      "max_relationship_xml_bytes": 8388608,
+      "max_relationships_per_part": 100000,
+      "max_total_part_bytes": 536870912,
+      "max_total_relationship_xml_bytes": 67108864,
+      "max_total_relationship_xml_events": 8000000,
+      "max_total_relationships": 1000000,
+      "max_xml_attribute_bytes": 65536,
+      "max_xml_depth": 256,
+      "max_xml_events": 1000000
+    },
+    "resource_budget": {
+      "depth": null,
+      "input_bytes": null,
+      "managed": false,
+      "memory_bytes": null,
+      "objects": null,
+      "output_bytes": null,
+      "unmanaged_reason": "publish_docx_source_edit uses the compatibility constructor without an ExecutionContext",
+      "work": null
+    },
+    "sink_max_write_bytes": 1048576
+  },
+  "oracle": {
+    "text_bytes": 10000,
+    "text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af"
+  },
+  "performance_claim": "descriptive same-binary provider evidence; no before-after optimization claim",
+  "pilot_runs": [
+    {
+      "arm": "owned",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-owned",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "instrumented",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-instrumented",
+      "provider": "instrumented",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "file-warm",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-file-warm",
+      "provider": "file",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "short",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-short",
+      "provider": "short",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "delayed",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-delayed",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "range-zero",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-range-zero",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "owned",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-owned",
+      "provider": "owned",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "instrumented",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-instrumented",
+      "provider": "instrumented",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "file-warm",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-file-warm",
+      "provider": "file",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "short",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-short",
+      "provider": "short",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "delayed",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-delayed",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "range-zero",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-range-zero",
+      "provider": "delayed",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    }
+  ],
+  "repeats": [
+    1,
+    2
+  ],
+  "roles": [
+    "normal",
+    "allocator"
+  ],
+  "samples": 30,
+  "schema": "docx-edit-provider-protocol-v1",
+  "scopes": {
+    "allocation": "operation-scoped global-system-allocator region surrounds the timed opened document edit, commit, publication, diagnostics, and package/document drop; normal binaries report unavailable and allocator binaries report the separate region sample",
+    "physical": "caller-visible ReadAt calls at the selected provider/source boundary; requested and returned ranges are transport observations, not filesystem or network I/O",
+    "provider": "explicit caller-owned positional provider matrix for one DOCX paragraph replacement; no ambient filesystem or network behavior",
+    "range": "logical ReadAt calls and adapter calls observed by harness wrappers; zero-length caller calls are counted separately; counters are transport-model evidence, not physical network or filesystem observations",
+    "setup": "deterministic corpus construction, expected publication, source adapter construction, warm file staging, sink reservation, and oracle preparation are outside the clock",
+    "timing": "fresh source-backed DOCX open + one paragraph edit staging/commit + sequential publication + commit/package/document drops; provider construction, sink reservation and retained output are outside; commit diagnostics and source/candidate XML identity comparisons are inside, while output hashing, semantic/media verification and preflight patch oracles are outside",
+    "zero_length": "zero-length caller ReadAt calls are delegated to the wrapped provider, preserve its return/error behavior, and are counted separately from nonempty range totals"
+  },
+  "source": {
+    "files": 7165,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "version": 1,
+  "warmups": 3
+}

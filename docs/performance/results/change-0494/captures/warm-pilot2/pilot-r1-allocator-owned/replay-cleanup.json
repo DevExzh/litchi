@@ -1,0 +1,12 @@
+{
+  "remaining": [],
+  "removed": [
+    "/home/zhuhe/.cache/litchi-goal-0494/managed/warm-pilot2/pilot-r1-allocator-owned/tmp",
+    "/home/zhuhe/.cache/litchi-goal-0494/managed/warm-pilot2/pilot-r1-allocator-owned",
+    "/home/zhuhe/.cache/litchi-goal-0494/managed/warm-pilot2"
+  ],
+  "root": "/home/zhuhe/.cache/litchi-goal-0494/managed/warm-pilot2/pilot-r1-allocator-owned",
+  "schema": "docx-edit-provider-private-cleanup-v1",
+  "status": "pass",
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0494/managed/warm-pilot2/pilot-r1-allocator-owned/tmp"
+}

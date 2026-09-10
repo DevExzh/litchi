@@ -1,0 +1,25 @@
+{
+  "cold": {
+    "base_protocol_sha256": "b02e9e6cb59d31268525c05b226a3e3d2210b03951abc3dcf70b286cbc36e720",
+    "formal_attempt": "cold-formal1",
+    "formal_samples": 120,
+    "formal_verification": {
+      "bytes": 1252,
+      "path": "verification/cold-formal1.json",
+      "sha256": "154bdfdd176602263eaabb9ae472a2e3ee9cbeeb54feb3beed36eb60e3093e02"
+    },
+    "pilot_attempt": "cold-pilot2",
+    "pilot_samples": 6,
+    "pilot_verification": {
+      "bytes": 879,
+      "path": "verification/cold-pilot2-pilot.json",
+      "sha256": "45baf5cdd66f081a14e519b2be91482c058688b7facd6597cee51f5762589cd1"
+    }
+  },
+  "formal_attempt": "warm-formal1",
+  "formal_samples": 720,
+  "pilot_attempt": "warm-pilot2",
+  "pilot_samples": 36,
+  "schema": "docx-edit-provider-accepted-v1",
+  "version": 1
+}

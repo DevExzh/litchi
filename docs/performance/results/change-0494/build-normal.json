@@ -1,0 +1,57 @@
+{
+  "attempt": "final1",
+  "binary": {
+    "bytes": 475513208,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0494/final1/normal/litchi-perf-baseline",
+    "sha256": "7d4f852f5bd7965a76046bb6a32a516de095f7c41e1a2439a0edfef2efc882e0"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "copied_utc": "2026-09-10T07:54:17.977152+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+  },
+  "gate": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation/final4-build-normal.json",
+    "sha256": "905323c93137f2b12065a92bf2c96b1bfade1e489df67e600f7a2a03f773397c"
+  },
+  "git_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+  "original_binary": {
+    "bytes": 475513208,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-build-0494/release/litchi-perf-baseline",
+    "sha256": "7d4f852f5bd7965a76046bb6a32a516de095f7c41e1a2439a0edfef2efc882e0"
+  },
+  "retainer_sha256": "4c1ab6583251d0d61a41bf0c9027537bd29077f5988466d0ea12bf59dc5c2b48",
+  "role": "normal",
+  "schema": "docx-provider-lifecycle-build-v1",
+  "source_after": {
+    "files": 7165,
+    "path": "validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "source_before": {
+    "files": 7165,
+    "path": "validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "source_unchanged": true,
+  "version": 1
+}

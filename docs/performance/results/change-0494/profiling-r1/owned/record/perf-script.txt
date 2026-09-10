@@ -1,0 +1,34 @@
+# ========
+# captured on    : Thu Sep 10 08:18:22 2026
+# header version : 1
+# data offset    : 520
+# data size      : 11855792
+# feat offset    : 11856312
+# hostname : ip-172-31-39-190
+# os release : 7.0.0-1011-aws
+# perf version : 7.0.14
+# arch : x86_64
+# nrcpus online : 32
+# nrcpus avail : 32
+# cpudesc : AMD EPYC 9R45
+# cpuid : AuthenticAMD,26,2,1
+# total memory : 129447068 kB
+# cmdline : /usr/bin/perf 
+# event : name = cycles:u, , id = { 129848, 129849, 129850, 129851, 129852, 129853, 129854, 129855, 129856, 129857, 129858, 129859, 129860, 129861, 129862, 129863, 129864, 129865, 129866, 129867, 129868, 129869, 129870, 129871, 129872, 129873, 129874, 129875, 129876, 129877, 129878, 129879 }, type = 0 (PERF_TYPE_HARDWARE), size = 144, config = 0 (PERF_COUNT_HW_CPU_CYCLES), { sample_period, sample_freq } = 199, sample_type = IP|TID|TIME|CALLCHAIN|PERIOD|REGS_USER|STACK_USER, read_format = ID|LOST, disabled = 1, inherit = 1, exclude_kernel = 1, exclude_hv = 1, mmap = 1, comm = 1, freq = 1, enable_on_exec = 1, task = 1, mmap_data = 1, sample_id_all = 1, exclude_callchain_user = 1, mmap2 = 1, comm_exec = 1, ksymbol = 1, bpf_event = 1, build_id = 1, sample_regs_user = 0xff0fff, sample_stack_user = 8192
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, breakpoint = 5, hwmon_nvme = 4294901760, kprobe = 8, msr = 10, software = 1, tool = 4294967294, tracepoint = 2, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 588840.645660
+# time of last sample : 588847.800972
+# sample duration :   7155.312 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info empty
+# btf info empty
+# cpu pmu capabilities: max_precise=0
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+#   e_flags : 0
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY 
+# ========
+#

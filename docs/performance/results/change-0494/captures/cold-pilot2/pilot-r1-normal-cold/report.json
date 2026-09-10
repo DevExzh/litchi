@@ -1,0 +1,106 @@
+{
+  "attempt": "cold-pilot2",
+  "binary": {
+    "bytes": 475513208,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0494/final1/normal/litchi-perf-baseline",
+    "sha256": "7d4f852f5bd7965a76046bb6a32a516de095f7c41e1a2439a0edfef2efc882e0"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/build-normal.json",
+    "sha256": "71f8cf873203636852cc282ae7218736b5602f687fccbd295ffc77ca4da42d7b",
+    "source": {
+      "files": 7165,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+      "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+    }
+  },
+  "claim": "same-cold-cell repeat variance only; no warm-versus-cold timing comparison",
+  "completed_invocations": 3,
+  "expected_invocations": 3,
+  "protocol": {
+    "path": "cold-protocol.json",
+    "sha256": "9da29d99eca8bbad8f857c2ea199a82babc76a5815d973e932e60e678f27db51"
+  },
+  "reports": [
+    {
+      "eligible": true,
+      "index": 0,
+      "path": "samples/000/report.json",
+      "sha256": "97cfdcae26f8324a8ce8f5da3060dd405ad22809c57e39a936361911cc7afef9",
+      "status": "eligible",
+      "terminal_sha256": "e2310d391f164fd6599fbebfb8ea93eb695305a74c3a3bb848bb549cb6f70d33"
+    },
+    {
+      "eligible": true,
+      "index": 1,
+      "path": "samples/001/report.json",
+      "sha256": "c5a1c533b9bc4d9e80ed1df9630cfed03acdf36f6d8184c0c217bfa4322e8e58",
+      "status": "eligible",
+      "terminal_sha256": "e1323f8917263247db37a94b454f266c56f4ae9b964f82607695342129fe7196"
+    },
+    {
+      "eligible": true,
+      "index": 2,
+      "path": "samples/002/report.json",
+      "sha256": "3f2afc7e21aab984ecb37a9e2e79bbd2a834352eba41b05ccf4672097149e9a1",
+      "status": "eligible",
+      "terminal_sha256": "62cbd8bc4209e6beae33ed72a71d6fdb80665294dbee43da2c596da8d87ea7a5"
+    }
+  ],
+  "rows": [
+    {
+      "allocation": null,
+      "child_process_id": 2646847,
+      "latency_ns": 116817518,
+      "output_bytes": 16793612,
+      "process_peak_rss_bytes": 134508544,
+      "process_read_bytes": 16793600,
+      "process_rss_bytes": 17121280,
+      "source_calls": 379,
+      "source_returned_bytes": 16865530
+    },
+    {
+      "allocation": null,
+      "child_process_id": 2646928,
+      "latency_ns": 104401313,
+      "output_bytes": 16793612,
+      "process_peak_rss_bytes": 135393280,
+      "process_read_bytes": 16793600,
+      "process_rss_bytes": 262144,
+      "source_calls": 379,
+      "source_returned_bytes": 16865530
+    },
+    {
+      "allocation": null,
+      "child_process_id": 2647072,
+      "latency_ns": 108907917,
+      "output_bytes": 16793612,
+      "process_peak_rss_bytes": 135438336,
+      "process_read_bytes": 16793600,
+      "process_rss_bytes": 262144,
+      "source_calls": 379,
+      "source_returned_bytes": 16865530
+    }
+  ],
+  "run": {
+    "kind": "pilot",
+    "label": "pilot-r1-normal-cold",
+    "provider": "file-cold-verified",
+    "repeat": 1,
+    "role": "normal",
+    "samples": 3,
+    "warmups": 0
+  },
+  "schema": "docx-edit-provider-cold-capture-v1",
+  "scope": "fresh parent invocation per sample; each parent starts one fresh measured cold child",
+  "source": {
+    "files": 7165,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "status": "pass",
+  "stopped_on_ineligible": false,
+  "version": 1,
+  "warmups": 0
+}

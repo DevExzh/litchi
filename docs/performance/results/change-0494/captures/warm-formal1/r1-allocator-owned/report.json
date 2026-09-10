@@ -1,0 +1,3183 @@
+{
+  "schema": "docx_edit_provider_v1",
+  "version": 1,
+  "case_name": "docx_opened_document_one_paragraph_edit_save",
+  "benchmark": "one DOCX paragraph replacement through source-backed open/commit/sequential publication",
+  "provider_scope": "explicit caller-owned positional provider matrix for one DOCX paragraph replacement; no ambient filesystem or network behavior",
+  "timing_scope": "fresh source-backed DOCX open + one paragraph edit staging/commit + sequential publication + commit/package/document drops; provider construction, sink reservation and retained output are outside; commit diagnostics and source/candidate XML identity comparisons are inside, while output hashing, semantic/media verification and preflight patch oracles are outside",
+  "setup_scope": "deterministic corpus construction, expected publication, source adapter construction, warm file staging, sink reservation, and oracle preparation are outside the clock",
+  "allocation_scope": "operation-scoped global-system-allocator region surrounds the timed opened document edit, commit, publication, diagnostics, and package/document drop; normal binaries report unavailable and allocator binaries report the separate region sample",
+  "physical_scope": "caller-visible ReadAt calls at the selected provider/source boundary; requested and returned ranges are transport observations, not filesystem or network I/O",
+  "range_scope": "logical ReadAt calls and adapter calls observed by harness wrappers; zero-length caller calls are counted separately; counters are transport-model evidence, not physical network or filesystem observations",
+  "zero_length_scope": "zero-length caller ReadAt calls are delegated to the wrapped provider, preserve its return/error behavior, and are counted separately from nonempty range totals",
+  "file_scope": "recently-written FileSource reopened for each iteration; warm-cache observation only, with no cold-filesystem claim",
+  "corpus_version": "0188-media-v1",
+  "corpus_generator": "litchi-docx-source-edit-media-v1",
+  "source_archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+  "source_archive_bytes": 16793036,
+  "source_bytes": 16793036,
+  "source_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+  "expected_text_bytes": 10000,
+  "expected_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+  "expected_text_scope": "original deterministic corpus text identity before the selected paragraph replacement; it is not the changed output text identity",
+  "expected_archive_members": 20,
+  "expected_output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+  "expected_output_bytes": 16793048,
+  "source_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+  "requested_source_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+  "limits": {
+    "read_limits": {
+      "max_input_bytes": 536870912,
+      "max_archive_members": 100000,
+      "max_archive_member_name_bytes": 4096,
+      "max_archive_metadata_bytes": 67108864,
+      "max_archive_compressed_bytes": 536870912,
+      "max_archive_entry_bytes": 536870912,
+      "max_archive_total_bytes": 2147483648,
+      "max_parts": 100000,
+      "max_part_bytes": 536870912,
+      "max_total_part_bytes": 536870912,
+      "max_content_types_bytes": 8388608,
+      "max_content_type_mappings": 100000,
+      "max_relationship_parts": 100000,
+      "max_relationship_xml_bytes": 8388608,
+      "max_total_relationship_xml_bytes": 67108864,
+      "max_relationships_per_part": 100000,
+      "max_total_relationships": 1000000,
+      "max_relationship_graph_nodes": 100000,
+      "max_xml_events": 1000000,
+      "max_total_relationship_xml_events": 8000000,
+      "max_xml_depth": 256,
+      "max_xml_attribute_bytes": 65536,
+      "max_relationship_target_bytes": 4096
+    },
+    "cache_max_bytes": 8388608,
+    "cache_max_entries": 128,
+    "resource_budget": {
+      "managed": false,
+      "unmanaged_reason": "publish_docx_source_edit uses the compatibility constructor without an ExecutionContext",
+      "memory_bytes": null,
+      "input_bytes": null,
+      "output_bytes": null,
+      "objects": null,
+      "depth": null,
+      "work": null
+    },
+    "max_tracked_ranges": 131072,
+    "sink_max_write_bytes": 1048576
+  },
+  "binary_sha256": "ce16c50e2c456fca68edd69d8eeb860651f04363707b48225c8e378ffe44aae8",
+  "binary_bytes": 475229832,
+  "current_exe": "/home/zhuhe/.cache/litchi-goal-0494/final1/allocator/litchi-perf-baseline-alloc",
+  "provider": {
+    "name": "owned",
+    "provider": "owned",
+    "kind": "owned",
+    "trace_ranges": false,
+    "short_read_bytes": null,
+    "zero_length_scope": "zero-length caller ReadAt calls are delegated to the wrapped provider, preserve its return/error behavior, and are counted separately from nonempty range totals",
+    "max_range_bytes": null,
+    "delay_us": null,
+    "transfer_bytes_per_second": null,
+    "transfer_delay_policy": "separate-sleeps",
+    "source_construction": "source adapters and FileSource handles are constructed before the operation clock",
+    "file_scope": "recently-written FileSource reopened for each iteration; warm-cache observation only, with no cold-filesystem claim",
+    "range_scope": "logical ReadAt calls and adapter calls observed by harness wrappers; zero-length caller calls are counted separately; counters are transport-model evidence, not physical network or filesystem observations"
+  },
+  "corpus": {
+    "name": "docx-source-backed-media",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "package_format": "DOCX/OPC/ZIP",
+    "shape": "media-rich",
+    "payload_kind": "deterministic-incompressible-media",
+    "compression": "deflate",
+    "entry_count": 17,
+    "archive_member_count": 20,
+    "entry_bytes": 2097152,
+    "uncompressed_payload_bytes": 16833643,
+    "archive_bytes": 16793036,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "target_entry": "paragraph:100",
+    "target_payload_bytes": 50,
+    "target_payload_sha256": "08ea83c6e3287e74125f5a70c3ce3a4bdb6de13b7930312a5059060e24e56c14",
+    "xlsx": null
+  },
+  "preflight": {
+    "expected_materializations": 1,
+    "source_document_xml_sha256": "24dbc247cac87f0827d9ed5a88d370f5032c0777ad18f3a9c9cecf2b7179fad0",
+    "candidate_document_xml_sha256": "26cb3f85d721e84b8808bce3cd92d7f669bd2a7b332235c5b9011eb1da46faee",
+    "output_exact_source_changed": true,
+    "semantic_reopen_verified": true,
+    "unchanged_media_preserved": true,
+    "replay_forward_verified": true,
+    "inverse_restores_source_verified": true,
+    "stale_target_refusal_verified": true,
+    "foreign_source_refusal_verified": true
+  },
+  "warmup": 3,
+  "samples": 30,
+  "allocator": "CountingSystemAllocator(std::alloc::System)",
+  "instrumentation": "system_allocator_operation_scoped",
+  "rows": [
+    {
+      "sample_index": 0,
+      "latency_ns": 5107539,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 6,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 6,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171276,
+        "live_bytes_after": 87171276,
+        "peak_live_bytes_before": 139817433,
+        "peak_live_bytes_after": 139817433,
+        "region_peak_live_bytes": 87778262
+      }
+    },
+    {
+      "sample_index": 1,
+      "latency_ns": 5067968,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 7,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 7,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171340,
+        "live_bytes_after": 87171340,
+        "peak_live_bytes_before": 139817433,
+        "peak_live_bytes_after": 139817433,
+        "region_peak_live_bytes": 87778326
+      }
+    },
+    {
+      "sample_index": 2,
+      "latency_ns": 4655126,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 8,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 8,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171404,
+        "live_bytes_after": 87171404,
+        "peak_live_bytes_before": 139817497,
+        "peak_live_bytes_after": 139817497,
+        "region_peak_live_bytes": 87778390
+      }
+    },
+    {
+      "sample_index": 3,
+      "latency_ns": 5115719,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 9,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 9,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171468,
+        "live_bytes_after": 87171468,
+        "peak_live_bytes_before": 139817561,
+        "peak_live_bytes_after": 139817561,
+        "region_peak_live_bytes": 87778454
+      }
+    },
+    {
+      "sample_index": 4,
+      "latency_ns": 5134978,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 10,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 10,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171532,
+        "live_bytes_after": 87171532,
+        "peak_live_bytes_before": 139817625,
+        "peak_live_bytes_after": 139817625,
+        "region_peak_live_bytes": 87778518
+      }
+    },
+    {
+      "sample_index": 5,
+      "latency_ns": 5143639,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 11,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 11,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171596,
+        "live_bytes_after": 87171596,
+        "peak_live_bytes_before": 139817689,
+        "peak_live_bytes_after": 139817689,
+        "region_peak_live_bytes": 87778582
+      }
+    },
+    {
+      "sample_index": 6,
+      "latency_ns": 5111209,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 12,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 12,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171660,
+        "live_bytes_after": 87171660,
+        "peak_live_bytes_before": 139817753,
+        "peak_live_bytes_after": 139817753,
+        "region_peak_live_bytes": 87778646
+      }
+    },
+    {
+      "sample_index": 7,
+      "latency_ns": 5093218,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 13,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 13,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171724,
+        "live_bytes_after": 87171724,
+        "peak_live_bytes_before": 139817817,
+        "peak_live_bytes_after": 139817817,
+        "region_peak_live_bytes": 87778710
+      }
+    },
+    {
+      "sample_index": 8,
+      "latency_ns": 7307580,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 14,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 14,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171788,
+        "live_bytes_after": 87171788,
+        "peak_live_bytes_before": 139817881,
+        "peak_live_bytes_after": 139817881,
+        "region_peak_live_bytes": 87778774
+      }
+    },
+    {
+      "sample_index": 9,
+      "latency_ns": 5141759,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 15,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 15,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171852,
+        "live_bytes_after": 87171852,
+        "peak_live_bytes_before": 139817945,
+        "peak_live_bytes_after": 139817945,
+        "region_peak_live_bytes": 87778838
+      }
+    },
+    {
+      "sample_index": 10,
+      "latency_ns": 4970158,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 16,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 16,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171916,
+        "live_bytes_after": 87171916,
+        "peak_live_bytes_before": 139818009,
+        "peak_live_bytes_after": 139818009,
+        "region_peak_live_bytes": 87778902
+      }
+    },
+    {
+      "sample_index": 11,
+      "latency_ns": 4984528,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 17,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 17,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87171980,
+        "live_bytes_after": 87171980,
+        "peak_live_bytes_before": 139818073,
+        "peak_live_bytes_after": 139818073,
+        "region_peak_live_bytes": 87778966
+      }
+    },
+    {
+      "sample_index": 12,
+      "latency_ns": 4861527,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 18,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 18,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172044,
+        "live_bytes_after": 87172044,
+        "peak_live_bytes_before": 139818137,
+        "peak_live_bytes_after": 139818137,
+        "region_peak_live_bytes": 87779030
+      }
+    },
+    {
+      "sample_index": 13,
+      "latency_ns": 5058408,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 19,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 19,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172108,
+        "live_bytes_after": 87172108,
+        "peak_live_bytes_before": 139818201,
+        "peak_live_bytes_after": 139818201,
+        "region_peak_live_bytes": 87779094
+      }
+    },
+    {
+      "sample_index": 14,
+      "latency_ns": 5077259,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 20,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 20,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172172,
+        "live_bytes_after": 87172172,
+        "peak_live_bytes_before": 139818265,
+        "peak_live_bytes_after": 139818265,
+        "region_peak_live_bytes": 87779158
+      }
+    },
+    {
+      "sample_index": 15,
+      "latency_ns": 4856957,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 21,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 21,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172236,
+        "live_bytes_after": 87172236,
+        "peak_live_bytes_before": 139818329,
+        "peak_live_bytes_after": 139818329,
+        "region_peak_live_bytes": 87779222
+      }
+    },
+    {
+      "sample_index": 16,
+      "latency_ns": 5077919,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 22,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 22,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172300,
+        "live_bytes_after": 87172300,
+        "peak_live_bytes_before": 139818393,
+        "peak_live_bytes_after": 139818393,
+        "region_peak_live_bytes": 87779286
+      }
+    },
+    {
+      "sample_index": 17,
+      "latency_ns": 5041397,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 23,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 23,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172364,
+        "live_bytes_after": 87172364,
+        "peak_live_bytes_before": 139818457,
+        "peak_live_bytes_after": 139818457,
+        "region_peak_live_bytes": 87779350
+      }
+    },
+    {
+      "sample_index": 18,
+      "latency_ns": 5082407,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 24,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 24,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172428,
+        "live_bytes_after": 87172428,
+        "peak_live_bytes_before": 139818521,
+        "peak_live_bytes_after": 139818521,
+        "region_peak_live_bytes": 87779414
+      }
+    },
+    {
+      "sample_index": 19,
+      "latency_ns": 5085017,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 25,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 25,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172492,
+        "live_bytes_after": 87172492,
+        "peak_live_bytes_before": 139818585,
+        "peak_live_bytes_after": 139818585,
+        "region_peak_live_bytes": 87779478
+      }
+    },
+    {
+      "sample_index": 20,
+      "latency_ns": 5018497,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 26,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 26,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172556,
+        "live_bytes_after": 87172556,
+        "peak_live_bytes_before": 139818649,
+        "peak_live_bytes_after": 139818649,
+        "region_peak_live_bytes": 87779542
+      }
+    },
+    {
+      "sample_index": 21,
+      "latency_ns": 5043867,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 27,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 27,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172620,
+        "live_bytes_after": 87172620,
+        "peak_live_bytes_before": 139818713,
+        "peak_live_bytes_after": 139818713,
+        "region_peak_live_bytes": 87779606
+      }
+    },
+    {
+      "sample_index": 22,
+      "latency_ns": 5017747,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 28,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 28,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172684,
+        "live_bytes_after": 87172684,
+        "peak_live_bytes_before": 139818777,
+        "peak_live_bytes_after": 139818777,
+        "region_peak_live_bytes": 87779670
+      }
+    },
+    {
+      "sample_index": 23,
+      "latency_ns": 5163348,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 29,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 29,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172748,
+        "live_bytes_after": 87172748,
+        "peak_live_bytes_before": 139818841,
+        "peak_live_bytes_after": 139818841,
+        "region_peak_live_bytes": 87779734
+      }
+    },
+    {
+      "sample_index": 24,
+      "latency_ns": 5111446,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 30,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 30,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172812,
+        "live_bytes_after": 87172812,
+        "peak_live_bytes_before": 139818905,
+        "peak_live_bytes_after": 139818905,
+        "region_peak_live_bytes": 87779798
+      }
+    },
+    {
+      "sample_index": 25,
+      "latency_ns": 5139897,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 31,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 31,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172876,
+        "live_bytes_after": 87172876,
+        "peak_live_bytes_before": 139818969,
+        "peak_live_bytes_after": 139818969,
+        "region_peak_live_bytes": 87779862
+      }
+    },
+    {
+      "sample_index": 26,
+      "latency_ns": 4693545,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 32,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 32,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87172940,
+        "live_bytes_after": 87172940,
+        "peak_live_bytes_before": 139819033,
+        "peak_live_bytes_after": 139819033,
+        "region_peak_live_bytes": 87779926
+      }
+    },
+    {
+      "sample_index": 27,
+      "latency_ns": 2596844,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 33,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 33,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87173004,
+        "live_bytes_after": 87173004,
+        "peak_live_bytes_before": 139819097,
+        "peak_live_bytes_after": 139819097,
+        "region_peak_live_bytes": 87779990
+      }
+    },
+    {
+      "sample_index": 28,
+      "latency_ns": 4767235,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 34,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 34,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87173068,
+        "live_bytes_after": 87173068,
+        "peak_live_bytes_before": 139819161,
+        "peak_live_bytes_after": 139819161,
+        "region_peak_live_bytes": 87780054
+      }
+    },
+    {
+      "sample_index": 29,
+      "latency_ns": 2614804,
+      "output_bytes": 16793048,
+      "output_sha256": "9af99bf7f63aac1ffc13ff59a5038703c96229b906b3db1602d5af5590171795",
+      "output_exact_bytes": true,
+      "materializations": 1,
+      "commit_changed": true,
+      "commit_operations": 1,
+      "source_version_before": {
+        "id": 35,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 35,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "reads": {
+        "logical": {
+          "availability": "unavailable",
+          "scope": "caller-visible logical ReadAt calls",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "physical": {
+          "availability": "unavailable",
+          "scope": "underlying adapter ReadAt calls; transport model only",
+          "calls": null,
+          "empty_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "min_request_bytes": null,
+          "max_request_bytes": null,
+          "traced_ranges": null,
+          "ranges": null,
+          "requested_media_overlap_bytes": null,
+          "returned_media_overlap_bytes": null
+        },
+        "range_adapter": {
+          "availability": "unavailable",
+          "logical_calls": null,
+          "requested_bytes": null,
+          "returned_bytes": null,
+          "short_reads": null,
+          "delayed_calls": null,
+          "transfer_paced_calls": null,
+          "transfer_delay_ns": null
+        },
+        "media_scope": "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads"
+      },
+      "cache": {
+        "successful_loads": 1,
+        "expected_successful_loads": 1,
+        "exactly_one_main_part_materialization": true
+      },
+      "sink": {
+        "accepted_bytes": 16793048,
+        "write_calls": 339,
+        "largest_write": 65536
+      },
+      "oracles": {
+        "commit_identity_verified": true,
+        "output_exact_bytes": true,
+        "semantic_reopen": true,
+        "unchanged_media_preserved": true,
+        "source_version_unchanged": true,
+        "cache_load_count": true,
+        "patch_oracles": {
+          "scope": "untimed_preflight_commit_patch_oracles",
+          "replay_forward": true,
+          "inverse_restores_source": true,
+          "stale_target_refused": true,
+          "foreign_source_refused": true
+        }
+      },
+      "allocation": {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+        "allocation_calls": 22859,
+        "deallocation_calls": 22674,
+        "reallocation_calls": 185,
+        "failed_allocation_calls": 0,
+        "allocated_bytes": 5721361,
+        "deallocated_bytes": 5721361,
+        "live_bytes_before": 87173132,
+        "live_bytes_after": 87173132,
+        "peak_live_bytes_before": 139819225,
+        "peak_live_bytes_after": 139819225,
+        "region_peak_live_bytes": 87780118
+      }
+    }
+  ]
+}

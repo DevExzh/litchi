@@ -21,6 +21,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("docx-provider-lifecycle") => {
             litchi_perf_baseline::docx_provider_lifecycle::run_from_args(args)
         },
+        Some(selector) if selector == std::ffi::OsStr::new("docx-edit-provider-cold") => {
+            litchi_perf_baseline::docx_edit_provider::run_cold_from_args(args)
+        },
+        Some(selector) if selector == std::ffi::OsStr::new("docx-edit-provider") => {
+            litchi_perf_baseline::docx_edit_provider::run_from_args(args)
+        },
         Some(selector) if selector == std::ffi::OsStr::new("docx-managed-read-ahead") => {
             litchi_perf_baseline::docx_managed_read_ahead::run_from_args(args)
         },

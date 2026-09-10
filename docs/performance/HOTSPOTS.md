@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## 0494: opened DOCX edit/save exposes range-request cost
+
+The six-provider baseline records 377 nonempty reads for one paragraph edit and
+sequential save, or 4,217 calls through a 4 KiB short-read adapter. Both return
+16,799,430 logical bytes. The simulated 1 ms/request provider therefore adds
+377 ms of fixed service, above 160.212 ms of modeled transfer service. This
+makes request coalescing during publication a measured investigation target;
+the 0493 selective-read result does not prove an edit/save improvement.
+
+One main Part is materialized and unchanged media survives every output check.
+Warm allocator operations add 606,986 peak live bytes over their preallocated
+baseline. Provider-local timings and 120 verified-cold observations vary greatly
+between repeats, so these results establish neither a stable local ranking nor
+a production speedup. Managed ordinary edits, true borrowed lifetimes, atomic
+save, native producers, and concurrent scaling remain open. See
+[0494](changes/0494-docx-edit-provider-baseline.md) for individual results and
+[methods](results/change-0494/methods.md) for timing and memory boundaries.
+
 ## 0493: managed source read-ahead reduces delayed DOCX requests
 
 The opt-in production OPC window, forwarded through DOCX, reduces the pinned

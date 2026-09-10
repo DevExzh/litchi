@@ -1,5 +1,84 @@
 # Performance program phase report
 
+## 0494: opened DOCX edit/save provider baseline
+
+[0494](results/change-0494/README.md) measures one changed paragraph in an
+opened DOCX document through commit and sequential publication. It is a
+descriptive provider baseline, not a before/after optimization comparison. The
+same deterministic 0188 logical media-rich content is used for all rows: 200
+paragraphs, 20 archive members, and eight 2 MiB media members. Warm rows use
+the unpadded archive; cold rows use a page-aligned copy with a padded ZIP tail
+and therefore have distinct physical bytes and archive hashes. Warm setup and
+untimed preflight patch oracles remain outside the operation clock; the timed
+lifecycle includes open, edit, commit, publication, and teardown. Output,
+semantic, untouched-member, media, and source-version checks pass. Patch
+replay, inverse, and stale-source checks are untimed preflight gates.
+
+The warm lane retains 24 formal processes and 720 samples across six provider
+arms, two executable roles, and two reversed repeats, plus 36 pilot samples.
+The verified-cold file lane retains 120 formal samples and six pilot samples.
+The formal warm p50s in milliseconds are:
+
+| Provider | Normal R1 / R2 | Allocator R1 / R2 |
+| --- | ---: | ---: |
+| owned | 4.539 / 4.430 | 5.073 / 5.069 |
+| instrumented | 2.298 / 4.521 | 5.026 / 8.226 |
+| file-warm | 4.721 / 2.318 | 5.281 / 7.230 |
+| short (4 KiB) | 5.530 / 5.503 | 6.093 / 8.585 |
+| delayed (1 ms + 100 MiB/s) | 569.581 / 563.998 | 568.455 / 568.827 |
+| range-zero (0 ms + 100 MiB/s) | 185.923 / 184.997 | 185.471 / 185.581 |
+
+The cold normal p50 is 148.065 / 238.430 ms and cold allocator p50 is
+98.139 / 93.802 ms. The cold clock includes `FileSource` opening after strict
+residency and process-I/O eligibility checks, whereas warm file construction
+is outside its clock; the lanes therefore are not a warm-versus-cold timing
+comparison. Traced ordinary rows use 377 source calls; the 4 KiB short-read
+arm uses 4,217 calls and 3,840 short reads. Warm allocator rows hold a 606,986-byte
+peak increment and 22,859 allocation calls; cold allocator rows hold 607,702
+bytes and 22,864 calls. An independent 63-row cold allocator audit passes.
+
+Repeat variance is substantial: normal instrumented p50 changes +96.7% and
+normal file-warm p50 changes −50.9% between repeats, while cold normal p50
+changes +61.0%. Those observations are retained as baseline variance and do
+not authorize a provider speedup, a warm/cold delta, or an optimization claim.
+The managed ordinary edit remains a typed refusal, and genuine borrowed
+sources, atomic filesystem save, native-producer round trips, concurrent
+scaling, and broader CRUD coverage remain open. The representative index is
+unchanged at 15 categories and 34 rows (11 measured, 22 correctness-only, and
+one unsupported dynamic-content row).
+
+## 0493: bounded managed OPC read-ahead is production-integrated
+
+[0493](changes/0493-managed-opc-source-read-ahead.md) moves the bounded
+forward-start window from the benchmark-only 0492 experiment into the OPC
+source owner and exposes it through an explicit DOCX source-backed policy.
+Exact remains the default. The package-wide publication transition drains
+admitted forward reads and releases the window before exact source traversal;
+the final source tests cover re-entry, source freshness, budgets, cancellation,
+panic/poison cleanup, short reads, and preservation seams.
+
+The retained comparison uses the same normal or allocator executable for exact
+and managed arms, a pinned synthetic 200-paragraph DOCX with eight 2 MiB media
+members, and a fresh managed open → main-document load → text extraction → drop
+lifecycle. It contains 24 pilot and 480 formal samples. Under the modeled
+1 ms plus 100 MiB/s provider, managed p50 is 81.82–84.87% lower across the
+normal and allocator repeats. Physical calls fall 19→3, while accepted source
+bytes rise 3,966→5,445 (+37.29%); 69 extra bytes are compressed media
+prefetch. Zero-delay p50 changes range from −2.01% to +2.28%; no same-repeat
+latency or whole-child RSS comparison crosses the five-percent adverse
+threshold. The allocator arm adds three allocation calls and 4,384 bytes, with
+reallocation counts unchanged.
+
+This is accepted evidence for an opt-in synthetic managed **read-only**
+provider lifecycle. It does not measure opened-document edit/save, independent
+producer files, filesystem-cold behavior, borrowed-source lifetimes, or
+multi-worker scaling. It also leaves the representative CRUD index unchanged
+at 15 categories and 34 rows (11 measured, 22 correctness-only, and one
+explicitly unsupported dynamic-content row). The full non-iWork performance
+goal remains open; the next evidence target is an opened DOCX one-edit/save
+matrix across provider and cold boundaries, followed by bounded lifecycle
+scaling and independent-producer coverage.
+
 ## 0485: bounded OPC splice consumption and remaining DOCX metadata cost
 
 [0485](changes/0485-opc-splice-consumed-window-batching.md) batches bytes

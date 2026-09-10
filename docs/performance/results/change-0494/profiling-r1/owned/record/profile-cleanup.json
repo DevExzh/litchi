@@ -1,0 +1,12 @@
+{
+  "remaining": [],
+  "removed": [
+    "/home/zhuhe/.cache/litchi-goal-0494/managed/profile-r1-owned-record/owned-record/tmp",
+    "/home/zhuhe/.cache/litchi-goal-0494/managed/profile-r1-owned-record/owned-record",
+    "/home/zhuhe/.cache/litchi-goal-0494/managed/profile-r1-owned-record"
+  ],
+  "root": "/home/zhuhe/.cache/litchi-goal-0494/managed/profile-r1-owned-record/owned-record",
+  "schema": "docx-edit-provider-private-cleanup-v1",
+  "status": "pass",
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0494/managed/profile-r1-owned-record/owned-record/tmp"
+}

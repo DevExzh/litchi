@@ -1,0 +1,14 @@
+{
+  "base_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+  "patch": {
+    "bytes": 110818,
+    "sha256": "7e8d3595541bc40f9cc74dd4de4eaaf18ead7e25185c5fbc43ef2cda0cae9538"
+  },
+  "source": {
+    "files": 7165,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "reverse_apply_check": true,
+  "scope": "Compilation inputs only; preexisting Keynote delta included solely for binary reproduction and excluded from commit."
+}

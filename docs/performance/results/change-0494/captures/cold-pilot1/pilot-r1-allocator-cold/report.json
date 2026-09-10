@@ -1,0 +1,148 @@
+{
+  "attempt": "cold-pilot1",
+  "binary": {
+    "bytes": 475229832,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0494/final1/allocator/litchi-perf-baseline-alloc",
+    "sha256": "ce16c50e2c456fca68edd69d8eeb860651f04363707b48225c8e378ffe44aae8"
+  },
+  "build": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/build-allocator.json",
+    "sha256": "261d99d89d8281b98dee77c3583a18381074f83222bddce7c35aea1e2b5ab5d8",
+    "source": {
+      "files": 7165,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+      "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+    }
+  },
+  "claim": "same-cold-cell repeat variance only; no warm-versus-cold timing comparison",
+  "completed_invocations": 3,
+  "expected_invocations": 3,
+  "protocol": {
+    "path": "cold-protocol.json",
+    "sha256": "3cfdea5acacb318247ffcb29818a062d96e72ab7a37235b67bfc465cc679ee2b"
+  },
+  "reports": [
+    {
+      "eligible": true,
+      "index": 0,
+      "path": "samples/000/report.json",
+      "sha256": "140f2ead7d664f39f7533a05f24c36ece92c5dae7ba13996cde05d5378052d2f",
+      "status": "eligible",
+      "terminal_sha256": "2f4f96dc930603caf30032226463b73d5466b7374937758e50db0150433a3102"
+    },
+    {
+      "eligible": true,
+      "index": 1,
+      "path": "samples/001/report.json",
+      "sha256": "f98b0aca40dd6b6712f188b727b6d447c58cf2bd2351616ef69e79a4fb1308e0",
+      "status": "eligible",
+      "terminal_sha256": "b700281046ce0ca06727aa680c06a36d0681d1564741b5aeab881268bbd6c38d"
+    },
+    {
+      "eligible": true,
+      "index": 2,
+      "path": "samples/002/report.json",
+      "sha256": "988befd80630d1c44b34b842ee21f3fcc05a2c49f607f356e066601a5a54692a",
+      "status": "eligible",
+      "terminal_sha256": "66378aa0b546e45b9dbe586076a2bd59dae86e0e70a04efbfd6f291ce9aecafe"
+    }
+  ],
+  "rows": [
+    {
+      "allocation": {
+        "allocated_bytes": 5722133,
+        "allocation_calls": 22864,
+        "deallocated_bytes": 5722133,
+        "deallocation_calls": 22679,
+        "failed_allocation_calls": 0,
+        "live_bytes_after": 90291033,
+        "live_bytes_before": 90291033,
+        "peak_live_bytes_after": 122933986,
+        "peak_live_bytes_before": 122933986,
+        "reallocation_calls": 185,
+        "region_peak_live_bytes": 90898735,
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "child_process_id": 2578643,
+      "latency_ns": 98051950,
+      "output_bytes": 16793612,
+      "process_peak_rss_bytes": 136916992,
+      "process_read_bytes": 16793600,
+      "process_rss_bytes": 180224,
+      "source_calls": 379,
+      "source_returned_bytes": 16865530
+    },
+    {
+      "allocation": {
+        "allocated_bytes": 5722133,
+        "allocation_calls": 22864,
+        "deallocated_bytes": 5722133,
+        "deallocation_calls": 22679,
+        "failed_allocation_calls": 0,
+        "live_bytes_after": 90291033,
+        "live_bytes_before": 90291033,
+        "peak_live_bytes_after": 122933986,
+        "peak_live_bytes_before": 122933986,
+        "reallocation_calls": 185,
+        "region_peak_live_bytes": 90898735,
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "child_process_id": 2583100,
+      "latency_ns": 142595794,
+      "output_bytes": 16793612,
+      "process_peak_rss_bytes": 133619712,
+      "process_read_bytes": 16793600,
+      "process_rss_bytes": 16990208,
+      "source_calls": 379,
+      "source_returned_bytes": 16865530
+    },
+    {
+      "allocation": {
+        "allocated_bytes": 5722133,
+        "allocation_calls": 22864,
+        "deallocated_bytes": 5722133,
+        "deallocation_calls": 22679,
+        "failed_allocation_calls": 0,
+        "live_bytes_after": 90291033,
+        "live_bytes_before": 90291033,
+        "peak_live_bytes_after": 122933986,
+        "peak_live_bytes_before": 122933986,
+        "reallocation_calls": 185,
+        "region_peak_live_bytes": 90898735,
+        "scope": "operation_global_system_allocator",
+        "status": "measured"
+      },
+      "child_process_id": 2587470,
+      "latency_ns": 126537367,
+      "output_bytes": 16793612,
+      "process_peak_rss_bytes": 134557696,
+      "process_read_bytes": 16793600,
+      "process_rss_bytes": 196608,
+      "source_calls": 379,
+      "source_returned_bytes": 16865530
+    }
+  ],
+  "run": {
+    "kind": "pilot",
+    "label": "pilot-r1-allocator-cold",
+    "provider": "file-cold-verified",
+    "repeat": 1,
+    "role": "allocator",
+    "samples": 3,
+    "warmups": 0
+  },
+  "schema": "docx-edit-provider-cold-capture-v1",
+  "scope": "fresh parent invocation per sample; each parent starts one fresh measured cold child",
+  "source": {
+    "files": 7165,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "status": "pass",
+  "stopped_on_ineligible": false,
+  "version": 1,
+  "warmups": 0
+}

@@ -1,5 +1,86 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0494 adds opened-edit provider baselines; the full goal remains open
+
+0494 supplies the missing descriptive baseline for one opened DOCX paragraph
+replacement, commit, and sequential publication across six explicit warm
+provider arms and a verified-cold `FileSource` lane. The warm capture retains
+24 formal processes and 720 samples (plus 36 pilot samples); the cold capture
+retains 120 formal samples and six pilot samples. The deterministic corpus has
+200 paragraphs, 20 archive members, and eight 2 MiB media members. Warm and
+cold rows use the same logical content; the cold lane uses a page-aligned copy
+with a padded ZIP tail and therefore a distinct physical archive hash. Output,
+semantic edit, untouched-part/media, and source-version checks pass for the
+retained rows. Patch replay, inverse, and stale-source checks are untimed
+preflight gates.
+
+The result is baseline evidence with `claim_authorized: false` and no
+before/after optimization claim. Warm normal p50 ranges from 2.298 ms for the
+first instrumented repeat to 569.581 ms for the delayed-range arm; the two
+repeat values vary substantially for several providers. The verified-cold
+normal p50 is 148.065 / 238.430 ms and allocator p50 is 98.139 / 93.802 ms.
+The cold lane has its own source-open and residency/I/O boundary, so these
+values are not a warm-versus-cold performance comparison. The 4 KiB short-read
+rows produce 4,217 source calls and 3,840 short reads; other traced rows
+produce 377 source calls. Warm allocator rows retain a 606,986-byte peak
+increment and 22,859 calls; cold allocator rows retain 607,702 bytes and
+22,864 calls. The independent 63-row cold allocator audit passes.
+
+| Goal area | Current evidence | Audit status and boundary |
+| --- | --- | --- |
+| Opened-document edit/save | One existing paragraph replacement through commit and sequential publication across six warm providers and verified-cold file input | Baseline coverage is now present; no optimization claim, managed ordinary edit remains a typed refusal, and atomic filesystem save remains open |
+| Read-only managed provider lifecycle | 0493 synthetic opt-in open/load/text evidence | Accepted as a separate read-only slice; it must not be conflated with 0494 edit/save |
+| Provider and cache boundaries | Owned, instrumented, warm file, short-read, delayed-range, range-control, and verified-cold file cells | Descriptive provider baselines; no provider ranking or warm/cold delta is authorized |
+| Borrowed and independent-producer coverage | No genuine borrowed source and no native producer round trip | Open |
+| Concurrency and scaling | Both 0493 and 0494 use one worker and serial lifecycle execution | Open; bounded multi-worker evidence and Amdahl analysis remain required |
+| Complete non-iWork CRUD checklist | The 0494 path adds no selector or representative-index row | Open; broader format and CRUD rows remain to be evidenced |
+
+The ordinary managed edit boundary is intentional. The current production
+surface refuses before detached ownership could escape its managed reservation;
+0494 therefore does not convert the harness's unmanaged/provider baseline into
+managed production functionality. iWork remains outside this audit while its
+separate work is in progress.
+
+## Current audit: 0493 production read-ahead is accepted; the full goal remains open
+
+0493 completes the production OPC integration of the bounded forward-start
+read-ahead policy selected by 0492. The policy is explicit and opt-in, the
+default source-backed constructors remain exact, and publication or exact
+preservation paths permanently close forward admission before their first
+exact archive read. The DOCX facade forwards the policy without exposing
+archive implementation types. The source and focused integration tests cover
+budget charging, retained-window release, source-version changes, re-entry,
+panic/poison recovery, queued cancellation, short reads, and untouched-member
+preservation.
+
+The accepted 0493 evidence is a policy comparison using the same retained
+executable within each normal or allocator role for a fresh managed DOCX open,
+main-document load, text extraction, and drop over a pinned in-memory provider.
+It contains 24 pilot and 480 formal samples. The modeled
+delayed provider reduces managed p50 by 81.82–84.87%; physical calls fall
+19→3 while accepted bytes rise 3,966→5,445 (+37.29%). Zero-delay changes stay
+within −2.01% to +2.28%, allocator cost is +3 calls and +4,384 bytes, and no
+same-repeat latency or whole-child RSS regression exceeds five percent. These
+figures establish a bounded provider/read-only result, not a default-local,
+real-network, cold-filesystem, or broad format claim.
+
+| Goal area | Current evidence | Audit status and boundary |
+| --- | --- | --- |
+| Explicit caller-supplied range reads | OPC-owned bounded managed window, physical-fill accounting, exact fallback, and DOCX forwarding | Partial completion for the opt-in source-backed path; default behavior remains exact |
+| Read-only content extraction | Fresh synthetic managed DOCX open/load/text lifecycle with strict source, text, cache, physical-trace, and budget oracles | Accepted but narrowly scoped to the pinned in-memory provider and one worker |
+| Opened-document edit/save | Existing narrow DOCX edit evidence remains separate from 0493 | Open; provider/storage and cold/edit/save coverage is the next measured slice |
+| Provider, cold, and producer breadth | No 0493 filesystem-cold, borrowed-lifetime, or independent-producer capture | Open |
+| Bounded concurrency and scaling | 0493 uses one worker and serializes the bounded window | Open; explicit 1/2/4/8-worker evidence and Amdahl analysis remain required |
+| Complete non-iWork CRUD checklist | No 0493 selector or representative-index promotion | Open; conversion, structural/deletion, cross-document, merge/split, patch, repair, dynamic-content, security, malformed, and broader format rows remain to be evidenced |
+
+The source validation for this batch passed 628 OPC tests, 1,390 DOCX tests,
+456 harness tests, and 27 selected Python helper tests, alongside warning-
+denied lint/documentation and boundary gates. Those are scoped correctness and
+integration gates; they do not turn the read-only synthetic slice into
+opened-edit, native-producer, cold-cache, borrowed-lifetime, scaling, or full
+CRUD evidence. iWork remains outside this audit while its separate work is in
+progress.
+
 ## 0485: bounded consumed-window batching; full goal remains open
 
 [0485](changes/0485-opc-splice-consumed-window-batching.md) applies a private

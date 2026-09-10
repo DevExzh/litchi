@@ -1,0 +1,59 @@
+{
+  "schema": "docx-edit-provider-profile-availability-v1",
+  "probe_scope": "tiny true command only; no Cargo build, benchmark, or document workload was run",
+  "recorded_utc": "2026-09-10T07:01:18Z",
+  "probe_time_note": "The tiny probes completed immediately before this clock read; the original command timestamp was not captured, so this receipt does not invent one.",
+  "host_tools": {
+    "perf": {
+      "path": "/usr/bin/perf",
+      "version": "perf version 7.0.14",
+      "probe_argv": [
+        "/usr/bin/perf",
+        "stat",
+        "-x,",
+        "-e",
+        "cycles,instructions,branches,branch-misses,cache-misses,minor-faults,major-faults",
+        "--",
+        "true"
+      ],
+      "exit_code": 0,
+      "status": "available",
+      "events": {
+        "cycles": "available",
+        "instructions": "available",
+        "branches": "available",
+        "branch-misses": "available",
+        "cache-misses": "available",
+        "minor-faults": "available",
+        "major-faults": "available"
+      },
+      "stderr": "1321589,,cycles,35558136,100.00,,\n761561,,instructions,35558136,100.00,,\n138616,,branches,35558136,100.00,,\n7296,,branch-misses,35558136,100.00,,\n24164,,cache-misses,35558136,100.00,,\n56,,minor-faults,35558136,100.00,,\n1,,major-faults,35558136,100.00,,"
+    },
+    "strace": {
+      "path": "/usr/bin/strace",
+      "version": "strace -- version 6.19",
+      "probe_argv": [
+        "/usr/bin/strace",
+        "-c",
+        "-f",
+        "-o",
+        "<temporary strace summary>",
+        "--",
+        "true"
+      ],
+      "exit_code": 0,
+      "status": "available",
+      "summary_header": "% time     seconds  usecs/call     calls    errors syscall",
+      "summary_total": "100.00    0.000000           0        30         1 total"
+    },
+    "taskset": {
+      "path": "/usr/bin/taskset",
+      "status": "available"
+    }
+  },
+  "interpretation": {
+    "perf": "A later workload profile may use the listed events. An event that becomes unsupported must be recorded as unavailable for that run; it must not be serialized as zero.",
+    "strace": "The later -f -c summary is whole-child syscall evidence. It reports calls, errors, and time, not bytes transferred.",
+    "scope": "The probes establish tool support only. They are not performance measurements and are not evidence about the DOCX implementation."
+  }
+}

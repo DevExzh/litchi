@@ -1,0 +1,37 @@
+{
+  "attempt": "cold-formal1",
+  "pilot": false,
+  "protocol_sha256": "9da29d99eca8bbad8f857c2ea199a82babc76a5815d973e932e60e678f27db51",
+  "raw_receipts": [
+    {
+      "aggregate_sha256": "d6d1444bb03f6392de1dab1b5a2a6b22fc4b01dcd18ff8a26ae08d75bd7f6912",
+      "eligible": true,
+      "label": "r1-normal-cold",
+      "sample_count": 30
+    },
+    {
+      "aggregate_sha256": "39762cdacfcc1a2cbfb02943c05e5652e0afe3f1817c5e2fd5f360b4903543d9",
+      "eligible": true,
+      "label": "r1-allocator-cold",
+      "sample_count": 30
+    },
+    {
+      "aggregate_sha256": "ddaf8cdfa7d5d65297f9e2055f5346606756c3979b0fa2fac14b7549c7a82fd2",
+      "eligible": true,
+      "label": "r2-allocator-cold",
+      "sample_count": 30
+    },
+    {
+      "aggregate_sha256": "484c050eacbed2b09f0f250b7e78a339efc4331aa34a849860ff2afdffee567f",
+      "eligible": true,
+      "label": "r2-normal-cold",
+      "sample_count": 30
+    }
+  ],
+  "schema": "docx-edit-provider-cold-verification-v1",
+  "status": "pass",
+  "summary_sha256": "b342f43802d9ad08b9a9b75da08db4431648b392770337351b3c04ada4be70e6",
+  "verified_utc": "2026-09-10T08:16:56.338648+00:00",
+  "version": 1,
+  "warm_protocol_sha256": "b02e9e6cb59d31268525c05b226a3e3d2210b03951abc3dcf70b286cbc36e720"
+}

@@ -1,0 +1,78 @@
+{
+  "artifacts": {
+    "perf-record-report.json": {
+      "bytes": 292245,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf-record-report.json",
+      "sha256": "eaf7c4d7c6905a9dfdf312b80ce475922ad3753f75d67de27343c9ea5d7a45fb"
+    },
+    "perf-record.stderr": {
+      "bytes": 207,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf-record.stderr",
+      "sha256": "6811bee9e8d50872dc58b458e29c2818dd5613b179bd7548e30de7aeaf35f466"
+    },
+    "perf-record.stdout": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf-record.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf.data": {
+      "bytes": 11897248,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf.data",
+      "sha256": "9ef157633f59e231f93111714ad9b0177f626512479eebdf145a13ab774d2c4e"
+    }
+  },
+  "finished_utc": "2026-09-10T08:18:23.359771+00:00",
+  "process": {
+    "argv": [
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/usr/bin/perf",
+      "record",
+      "-F",
+      "199",
+      "-e",
+      "cycles:u",
+      "--call-graph",
+      "dwarf",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf.data",
+      "--",
+      "/home/zhuhe/.cache/litchi-goal-0494/final1/normal/litchi-perf-baseline",
+      "docx-edit-provider",
+      "--provider",
+      "owned",
+      "--samples",
+      "100",
+      "--warmup",
+      "3",
+      "--source-revision",
+      "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0494/profiling-r1/owned/record/perf-record-report.json"
+    ],
+    "exit_code": 0,
+    "finished_utc": "2026-09-10T08:18:22.786634+00:00",
+    "new_session": true,
+    "pid": 2903209,
+    "process_group_id": 2903209,
+    "started_utc": "2026-09-10T08:18:15.208920+00:00",
+    "termination": null,
+    "timed_out": false
+  },
+  "reason": null,
+  "role": "owned-perf-record",
+  "schema": "docx-edit-provider-profile-process-terminal-v1",
+  "source_after": {
+    "files": 7165,
+    "path": "validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "source_before": {
+    "files": 7165,
+    "path": "validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+    "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+  },
+  "source_unchanged": true,
+  "status": "pass"
+}

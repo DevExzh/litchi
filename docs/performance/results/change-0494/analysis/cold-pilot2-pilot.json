@@ -1,0 +1,670 @@
+{
+  "builds": {
+    "allocator": {
+      "binary": {
+        "bytes": 475229832,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0494/final1/allocator/litchi-perf-baseline-alloc",
+        "sha256": "ce16c50e2c456fca68edd69d8eeb860651f04363707b48225c8e378ffe44aae8"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "litchi-perf-baseline-alloc"
+      ],
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+        "DEBUGINFOD_URLS": "",
+        "LC_ALL": "C",
+        "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--features",
+          "allocator-metrics",
+          "--bin",
+          "litchi-perf-baseline-alloc"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation/final4-build-allocator.json",
+        "sha256": "5b841b4f5542de85cbef7b9cb80bb47cdd28576e6569342de4ff25f32854f1c7",
+        "source": {
+          "files": 7165,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+          "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+        }
+      },
+      "git_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+      "receipt_sha256": "261d99d89d8281b98dee77c3583a18381074f83222bddce7c35aea1e2b5ab5d8",
+      "source": {
+        "files": 7165,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+        "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+      }
+    },
+    "normal": {
+      "binary": {
+        "bytes": 475513208,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0494/final1/normal/litchi-perf-baseline",
+        "sha256": "7d4f852f5bd7965a76046bb6a32a516de095f7c41e1a2439a0edfef2efc882e0"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline"
+      ],
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0494",
+        "DEBUGINFOD_URLS": "",
+        "LC_ALL": "C",
+        "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "RUSTUP_TOOLCHAIN": "1.98.1",
+        "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0494/test-tmp"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation/final4-build-normal.json",
+        "sha256": "905323c93137f2b12065a92bf2c96b1bfade1e489df67e600f7a2a03f773397c",
+        "source": {
+          "files": 7165,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+          "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+        }
+      },
+      "git_revision": "c9bf304cf8cbe2d6193013a7fe66977bdde0c5fb",
+      "receipt_sha256": "71f8cf873203636852cc282ae7218736b5602f687fccbd295ffc77ca4da42d7b",
+      "source": {
+        "files": 7165,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0494/validation-sources/214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d.json",
+        "sha256": "214d10bba4b2cd40bf99d80f50a508efb98ef1d01091ed776999edfebca3144d"
+      }
+    }
+  },
+  "case": "docx_opened_document_one_paragraph_edit_save",
+  "cells": [
+    {
+      "bootstrap_median_ci": {
+        "elapsed_ns": {
+          "ci_high": 116817518,
+          "ci_low": 104401313,
+          "confidence": 0.95,
+          "median": 108907917,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 389649794
+        },
+        "output_bytes": {
+          "ci_high": 16793612,
+          "ci_low": 16793612,
+          "confidence": 0.95,
+          "median": 16793612,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 127139898
+        },
+        "parent_tree_rss_kbytes": {
+          "ci_high": 168832,
+          "ci_low": 152468,
+          "confidence": 0.95,
+          "median": 168788,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 76790390
+        },
+        "process_peak_rss_bytes": {
+          "ci_high": 135438336,
+          "ci_low": 134508544,
+          "confidence": 0.95,
+          "median": 135393280,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 482197534
+        },
+        "process_read_bytes": {
+          "ci_high": 16793600,
+          "ci_low": 16793600,
+          "confidence": 0.95,
+          "median": 16793600,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 127139870
+        },
+        "process_rss_bytes": {
+          "ci_high": 17121280,
+          "ci_low": 262144,
+          "confidence": 0.95,
+          "median": 262144,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 93945886
+        },
+        "source_read_calls": {
+          "ci_high": 379,
+          "ci_low": 379,
+          "confidence": 0.95,
+          "median": 379,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 76858479
+        },
+        "source_read_returned_bytes": {
+          "ci_high": 16865530,
+          "ci_low": 16865530,
+          "confidence": 0.95,
+          "median": 16865530,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 126929648
+        }
+      },
+      "child_pids": [
+        2646847,
+        2646928,
+        2647072
+      ],
+      "claim_scope": "same-cold-cell repeat variance only; no warm-versus-cold timing comparison",
+      "label": "pilot-r1-normal-cold",
+      "percentiles": {
+        "elapsed_ns": {
+          "max": 116817518,
+          "mean": 110042249.33333333,
+          "min": 104401313,
+          "n": 3,
+          "p50": 108907917,
+          "p95": 116817518,
+          "p99": 116817518
+        },
+        "output_bytes": {
+          "max": 16793612,
+          "mean": 16793612.0,
+          "min": 16793612,
+          "n": 3,
+          "p50": 16793612,
+          "p95": 16793612,
+          "p99": 16793612
+        },
+        "parent_tree_rss_kbytes": {
+          "max": 168832,
+          "mean": 163362.66666666666,
+          "min": 152468,
+          "n": 3,
+          "p50": 168788,
+          "p95": 168832,
+          "p99": 168832
+        },
+        "process_peak_rss_bytes": {
+          "max": 135438336,
+          "mean": 135113386.66666666,
+          "min": 134508544,
+          "n": 3,
+          "p50": 135393280,
+          "p95": 135438336,
+          "p99": 135438336
+        },
+        "process_read_bytes": {
+          "max": 16793600,
+          "mean": 16793600.0,
+          "min": 16793600,
+          "n": 3,
+          "p50": 16793600,
+          "p95": 16793600,
+          "p99": 16793600
+        },
+        "process_rss_bytes": {
+          "max": 17121280,
+          "mean": 5881856.0,
+          "min": 262144,
+          "n": 3,
+          "p50": 262144,
+          "p95": 17121280,
+          "p99": 17121280
+        },
+        "source_read_calls": {
+          "max": 379,
+          "mean": 379.0,
+          "min": 379,
+          "n": 3,
+          "p50": 379,
+          "p95": 379,
+          "p99": 379
+        },
+        "source_read_returned_bytes": {
+          "max": 16865530,
+          "mean": 16865530.0,
+          "min": 16865530,
+          "n": 3,
+          "p50": 16865530,
+          "p95": 16865530,
+          "p99": 16865530
+        }
+      },
+      "provider": "file-cold-verified",
+      "raw_vectors": {
+        "elapsed_ns": [
+          116817518,
+          104401313,
+          108907917
+        ],
+        "output_bytes": [
+          16793612,
+          16793612,
+          16793612
+        ],
+        "parent_tree_rss_kbytes": [
+          152468,
+          168788,
+          168832
+        ],
+        "process_peak_rss_bytes": [
+          134508544,
+          135393280,
+          135438336
+        ],
+        "process_read_bytes": [
+          16793600,
+          16793600,
+          16793600
+        ],
+        "process_rss_bytes": [
+          17121280,
+          262144,
+          262144
+        ],
+        "source_read_calls": [
+          379,
+          379,
+          379
+        ],
+        "source_read_returned_bytes": [
+          16865530,
+          16865530,
+          16865530
+        ]
+      },
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 0
+    },
+    {
+      "bootstrap_median_ci": {
+        "allocated_bytes": {
+          "ci_high": 5722133,
+          "ci_low": 5722133,
+          "confidence": 0.95,
+          "median": 5722133,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 93401121
+        },
+        "allocation_calls": {
+          "ci_high": 22864,
+          "ci_low": 22864,
+          "confidence": 0.95,
+          "median": 22864,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 76925934
+        },
+        "deallocation_calls": {
+          "ci_high": 22679,
+          "ci_low": 22679,
+          "confidence": 0.95,
+          "median": 22679,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 76925403
+        },
+        "elapsed_ns": {
+          "ci_high": 122304234,
+          "ci_low": 112193763,
+          "confidence": 0.95,
+          "median": 116649917,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 276486036
+        },
+        "output_bytes": {
+          "ci_high": 16793612,
+          "ci_low": 16793612,
+          "confidence": 0.95,
+          "median": 16793612,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 127139898
+        },
+        "parent_tree_rss_kbytes": {
+          "ci_high": 153864,
+          "ci_low": 151496,
+          "confidence": 0.95,
+          "median": 152340,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 76692474
+        },
+        "process_peak_rss_bytes": {
+          "ci_high": 137777152,
+          "ci_low": 133541888,
+          "confidence": 0.95,
+          "median": 134586368,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 480600094
+        },
+        "process_read_bytes": {
+          "ci_high": 16793600,
+          "ci_low": 16793600,
+          "confidence": 0.95,
+          "median": 16793600,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 127139870
+        },
+        "process_rss_bytes": {
+          "ci_high": 17104896,
+          "ci_low": 16990208,
+          "confidence": 0.95,
+          "median": 17072128,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 127402014
+        },
+        "reallocation_calls": {
+          "ci_high": 185,
+          "ci_low": 185,
+          "confidence": 0.95,
+          "median": 185,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 76857909
+        },
+        "region_peak_live_bytes": {
+          "ci_high": 90898735,
+          "ci_low": 90898735,
+          "confidence": 0.95,
+          "median": 90898735,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 349553555
+        },
+        "source_read_calls": {
+          "ci_high": 379,
+          "ci_low": 379,
+          "confidence": 0.95,
+          "median": 379,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 76858479
+        },
+        "source_read_returned_bytes": {
+          "ci_high": 16865530,
+          "ci_low": 16865530,
+          "confidence": 0.95,
+          "median": 16865530,
+          "method": "deterministic_percentile_bootstrap_median",
+          "resamples": 2000,
+          "seed": 126929648
+        }
+      },
+      "child_pids": [
+        2647263,
+        2647440,
+        2647553
+      ],
+      "claim_scope": "same-cold-cell repeat variance only; no warm-versus-cold timing comparison",
+      "label": "pilot-r1-allocator-cold",
+      "percentiles": {
+        "allocated_bytes": {
+          "max": 5722133,
+          "mean": 5722133.0,
+          "min": 5722133,
+          "n": 3,
+          "p50": 5722133,
+          "p95": 5722133,
+          "p99": 5722133
+        },
+        "allocation_calls": {
+          "max": 22864,
+          "mean": 22864.0,
+          "min": 22864,
+          "n": 3,
+          "p50": 22864,
+          "p95": 22864,
+          "p99": 22864
+        },
+        "deallocation_calls": {
+          "max": 22679,
+          "mean": 22679.0,
+          "min": 22679,
+          "n": 3,
+          "p50": 22679,
+          "p95": 22679,
+          "p99": 22679
+        },
+        "elapsed_ns": {
+          "max": 122304234,
+          "mean": 117049304.66666667,
+          "min": 112193763,
+          "n": 3,
+          "p50": 116649917,
+          "p95": 122304234,
+          "p99": 122304234
+        },
+        "output_bytes": {
+          "max": 16793612,
+          "mean": 16793612.0,
+          "min": 16793612,
+          "n": 3,
+          "p50": 16793612,
+          "p95": 16793612,
+          "p99": 16793612
+        },
+        "parent_tree_rss_kbytes": {
+          "max": 153864,
+          "mean": 152566.66666666666,
+          "min": 151496,
+          "n": 3,
+          "p50": 152340,
+          "p95": 153864,
+          "p99": 153864
+        },
+        "process_peak_rss_bytes": {
+          "max": 137777152,
+          "mean": 135301802.66666666,
+          "min": 133541888,
+          "n": 3,
+          "p50": 134586368,
+          "p95": 137777152,
+          "p99": 137777152
+        },
+        "process_read_bytes": {
+          "max": 16793600,
+          "mean": 16793600.0,
+          "min": 16793600,
+          "n": 3,
+          "p50": 16793600,
+          "p95": 16793600,
+          "p99": 16793600
+        },
+        "process_rss_bytes": {
+          "max": 17104896,
+          "mean": 17055744.0,
+          "min": 16990208,
+          "n": 3,
+          "p50": 17072128,
+          "p95": 17104896,
+          "p99": 17104896
+        },
+        "reallocation_calls": {
+          "max": 185,
+          "mean": 185.0,
+          "min": 185,
+          "n": 3,
+          "p50": 185,
+          "p95": 185,
+          "p99": 185
+        },
+        "region_peak_live_bytes": {
+          "max": 90898735,
+          "mean": 90898735.0,
+          "min": 90898735,
+          "n": 3,
+          "p50": 90898735,
+          "p95": 90898735,
+          "p99": 90898735
+        },
+        "source_read_calls": {
+          "max": 379,
+          "mean": 379.0,
+          "min": 379,
+          "n": 3,
+          "p50": 379,
+          "p95": 379,
+          "p99": 379
+        },
+        "source_read_returned_bytes": {
+          "max": 16865530,
+          "mean": 16865530.0,
+          "min": 16865530,
+          "n": 3,
+          "p50": 16865530,
+          "p95": 16865530,
+          "p99": 16865530
+        }
+      },
+      "provider": "file-cold-verified",
+      "raw_vectors": {
+        "allocated_bytes": [
+          5722133,
+          5722133,
+          5722133
+        ],
+        "allocation_calls": [
+          22864,
+          22864,
+          22864
+        ],
+        "deallocation_calls": [
+          22679,
+          22679,
+          22679
+        ],
+        "elapsed_ns": [
+          112193763,
+          122304234,
+          116649917
+        ],
+        "output_bytes": [
+          16793612,
+          16793612,
+          16793612
+        ],
+        "parent_tree_rss_kbytes": [
+          153864,
+          152340,
+          151496
+        ],
+        "process_peak_rss_bytes": [
+          137777152,
+          134586368,
+          133541888
+        ],
+        "process_read_bytes": [
+          16793600,
+          16793600,
+          16793600
+        ],
+        "process_rss_bytes": [
+          17072128,
+          17104896,
+          16990208
+        ],
+        "reallocation_calls": [
+          185,
+          185,
+          185
+        ],
+        "region_peak_live_bytes": [
+          90898735,
+          90898735,
+          90898735
+        ],
+        "source_read_calls": [
+          379,
+          379,
+          379
+        ],
+        "source_read_returned_bytes": [
+          16865530,
+          16865530,
+          16865530
+        ]
+      },
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 0
+    }
+  ],
+  "change": 494,
+  "claim_authorized": false,
+  "comparisons": [],
+  "inventory": {
+    "completed_cells": 2,
+    "eligible_invocations": 6,
+    "expected_cells": 2,
+    "expected_invocations": 6
+  },
+  "performance_claim": "descriptive verified-cold evidence; repeat variance only; no warm-versus-cold timing claim",
+  "pilot": true,
+  "protocol_sha256": "9da29d99eca8bbad8f857c2ea199a82babc76a5815d973e932e60e678f27db51",
+  "repeat_variance": [],
+  "repeats": [
+    1
+  ],
+  "roles": [
+    "normal",
+    "allocator"
+  ],
+  "samples": 3,
+  "schema": "docx-edit-provider-cold-analysis-v1",
+  "status": "pass",
+  "version": 1,
+  "warm_protocol_sha256": "b02e9e6cb59d31268525c05b226a3e3d2210b03951abc3dcf70b286cbc36e720",
+  "warmups": 0
+}

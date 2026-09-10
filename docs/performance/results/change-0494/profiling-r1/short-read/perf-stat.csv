@@ -1,0 +1,16 @@
+# started on Thu Sep 10 08:17:55 2026
+
+1824.85,msec,task-clock,1824848398,100.00,,
+7608742813,,cycles,1526524731,83.00,,
+18047422603,,instructions,1527519672,83.00,,
+2662778973,,branches,1526445543,83.00,,
+30890007,,branch-misses,1525992516,83.00,,
+0,,L1-dcache-loads,1526117252,83.00,,
+0,,L1-dcache-load-misses,1491642276,81.00,,
+<not supported>,,LLC-loads,0,100.00,,
+<not supported>,,LLC-load-misses,0,100.00,,
+148413,,minor-faults,1824848398,100.00,,
+0,,major-faults,1824848398,100.00,,
+15,,context-switches,1824848398,100.00,,
+0,,cpu-migrations,1824848398,100.00,,
+148413,,page-faults,1824848398,100.00,,

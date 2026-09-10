@@ -1,0 +1,25 @@
+{
+  "attempt": "cold-pilot2",
+  "pilot": true,
+  "protocol_sha256": "9da29d99eca8bbad8f857c2ea199a82babc76a5815d973e932e60e678f27db51",
+  "raw_receipts": [
+    {
+      "aggregate_sha256": "8ae79abebeae206c8335258c54545486d4d4d60b262010ff5a3c780da8db2ece",
+      "eligible": true,
+      "label": "pilot-r1-normal-cold",
+      "sample_count": 3
+    },
+    {
+      "aggregate_sha256": "d38c3966993bdaf991ae76facc859d8198dddc4ad3ad4eab7fda92320573c073",
+      "eligible": true,
+      "label": "pilot-r1-allocator-cold",
+      "sample_count": 3
+    }
+  ],
+  "schema": "docx-edit-provider-cold-verification-v1",
+  "status": "pass",
+  "summary_sha256": "02f3e69326e0e37009a643fbdb3af583111ba4094687758a35bf1b8ad1db4595",
+  "verified_utc": "2026-09-10T08:07:42.935842+00:00",
+  "version": 1,
+  "warm_protocol_sha256": "b02e9e6cb59d31268525c05b226a3e3d2210b03951abc3dcf70b286cbc36e720"
+}
