@@ -1,0 +1,13 @@
+{
+  "reviewer": "pptx_presence_v3_review",
+  "verdict": "CLEAR for archival publication",
+  "rows_recomputed": 621,
+  "statistics_or_order_mismatches": 0,
+  "raw_v2_v3_files_identical": 27,
+  "inventory_inputs_verified": 3587,
+  "archived_depfiles_verified": 235,
+  "checksums_verified": 283,
+  "workload_started": false,
+  "corpus_reproduction": "identity_only",
+  "observation": "Live target retains 24 original depfile paths; all 235 archived copies and complete binary closure verified."
+}
