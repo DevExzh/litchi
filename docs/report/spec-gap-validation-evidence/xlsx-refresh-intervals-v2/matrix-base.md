@@ -109,7 +109,7 @@ query, macro, chart, pivot, or external content is executed.
 
 | Feature family exposed by [MS-XLSX] | Status | Read | Write | Notes |
 |-------------------------------------|--------|------|-------|-------|
-| Rich values and modern rich-data objects | 🟡 | ✅ | ✅ | `rich_values` owns typed `rvData`, `rvStructures`, `arrayData`, and inert `refreshIntervals` metadata under each `rvTypesInfo` type's existing `extLst`; rich styles, supporting bags, other type metadata, and web-image payloads remain bounded opaque documents. Refresh metadata edits are source-bound to that part's relationship closure and never execute a service refresh. |
+| Rich values and modern rich-data objects | 🟡 | ✅ | ✅ | `rich_values` owns typed `rvData`, `rvStructures`, and `arrayData`; rich styles, supporting bags, type metadata, and web-image payloads remain bounded opaque documents. Package snapshots retain complete relationship topology. |
 | Feature property bags and checkbox/XF-control extensions | 🟡 | ✅ | ✅ | Typed `FeaturePropertyBags`, checkbox defaults, `XFControls`, `XFComplement`, `XFComplements`, and `DXFComplements` validation are inert; unknown XML and relationship IDs/topology are retained. |
 | Python in Excel and external code services | ❌ | ❌ | ❌ | Python environments, scripts, parameter encodings, external-code-service parts, and execution are not implemented. |
 | Complete PivotTable refresh/calculation | ❌ | ❌ | ❌ | Pivot metadata can be read or edited in bounded scope, but caches are not refreshed, cube connections are not queried, and report layouts are not calculated. |
