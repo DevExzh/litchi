@@ -1,0 +1,197 @@
+{
+  "kind": "independent-opc-fuzz-v3-publication-review",
+  "revision": "v3-review-1",
+  "date_utc": "2026-09-10",
+  "verdict": "clear",
+  "scope": "Read-only independent review of frozen V3 bounded OPC fuzz evidence; no primary/candidate source edits, staging, or reruns.",
+  "author_bundle": {
+    "root": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence",
+    "receipt": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/receipt-v3.json",
+      "sha256": "ae973f3dcbf13cf229292f7ff93f69d2db5f04ca9f0d0ceeb7b6946688e59e91"
+    },
+    "source_manifest": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/source-manifest-v3.json",
+      "sha256": "0e79b495e581e65a4de234313a1da6af2b56d4f78c814f50509b7089d56b5504"
+    },
+    "source_delta_patch": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/source-delta-v3.patch",
+      "sha256": "a60be8e2838960bcf9bcfa352c051351cbc10b86f0ddf182b6c6f96eebc4f"
+    },
+    "corpus_manifest": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/corpus-manifest-v3.json",
+      "sha256": "5e3ff96285a0f7f79820878ecd827c854c374f48d0de33fb4cd8030ea5f57861"
+    },
+    "readme": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/README-v3.md",
+      "sha256": "a951d90a7c94fccdff2e74e925dfd93eddde73f28d856151e973a5cd6b7841d0"
+    }
+  },
+  "source_and_patch_reproduction": {
+    "base_head": "5953a2ed1a036179042b55f96a4ee333e554b659",
+    "overlay_root": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3",
+    "patch_check": "git archive 5953a2ed1a036179042b55f96a4ee333e554b659 | tar -x; git apply --check source-delta-v3.patch; git apply source-delta-v3.patch",
+    "patch_check_result": "pass",
+    "reproduced_overlay_hashes": [
+      {
+        "path": "crates/litchi-opc/fuzz/Cargo.toml",
+        "sha256": "e30d40781c458aee1f1f876b92fba7f3a1114001f334ef38381c7ddd2a8b8d26",
+        "bytes": 588
+      },
+      {
+        "path": "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+        "sha256": "0efaaec21ec84fe478608b81c125ec3fec3abe5995d44950079d62b71a966db4",
+        "bytes": 301
+      },
+      {
+        "path": "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+        "sha256": "26c16672bb312113ae481e08b3f38b52fa70906b19238989be5e19ada6292d2b",
+        "bytes": 27833
+      },
+      {
+        "path": "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+        "sha256": "1cb4d03cf5953bc64c567d98f48cb66f60b7f7f6dd918675f730a3009ea39949",
+        "bytes": 9312
+      }
+    ],
+    "manifest_status": "overlay has exactly the four owned source paths plus ignored fuzz Cargo.lock; no other source paths are bound."
+  },
+  "primary_v1_preservation": {
+    "proof": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/primary-v1-preservation-v3.json",
+      "sha256": "da6152f4f69b9c4522a82b2c4d91c9f88421a1500fa274d371aeeb5cb22c0663"
+    },
+    "primary_head": "52519031b4c877032553bf5d4ea4393f3e0e60d1",
+    "v2_reference": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910/source-manifest-v2.json",
+      "sha256": "1f6fa02220f2a730399d53d5c84b456adbfc622dca018c525ffbc0d605120563"
+    },
+    "preimage_hashes_verified": [
+      {
+        "path": "crates/litchi-opc/fuzz/Cargo.toml",
+        "sha256": "e30d40781c458aee1f1f876b92fba7f3a1114001f334ef38381c7ddd2a8b8d26",
+        "bytes": 588
+      },
+      {
+        "path": "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs",
+        "sha256": "8ab521491d73022eee117c604ef96dd76e834866d55b6784693188947258ba18",
+        "bytes": 165
+      },
+      {
+        "path": "crates/litchi-opc/fuzz/fuzz_targets/opc_harness.rs",
+        "sha256": "750397855f35ae4d316e5841f696d3dbba45ec45d63527491bb684dde94acf79",
+        "bytes": 10148
+      },
+      {
+        "path": "crates/litchi-opc/fuzz/fuzz_targets/smoke_opc.rs",
+        "sha256": "990cc510aab67c191809ebf3719e931008ef7192c7aebd87d77b1a714077cbca",
+        "bytes": 5443
+      }
+    ],
+    "primary_to_base_git_checks": {
+      "command": "git diff --name-status 5953a2ed1a036179042b55f96a4ee333e554b659..52519031b4c877032553bf5d4ea4393f3e0e60d1 -- crates/litchi-opc",
+      "result": "empty",
+      "source_closure_command": "git diff --name-status 5953a2ed1a036179042b55f96a4ee333e554b659 -- crates/litchi-opc/src crates/litchi-opc/Cargo.toml crates/litchi-opc/build.rs",
+      "source_closure_result": "empty",
+      "unrelated_current_dirty_file": "crates/litchi-opc/README.md"
+    }
+  },
+  "smoke_and_boundary_review": {
+    "smoke_log": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/smoke-v3-rerun.log",
+      "sha256": "aca5c14c273f9a7261ca74e3268ae1955545bafa40ba1635acd553b4141e343e",
+      "anchor": "line 4: bounded OPC smoke passed: valid=1 malformed=6 boundaries=22 bytes=1724"
+    },
+    "fixture": {
+      "bytes": 1724,
+      "sha256": "fbb8cf01b98323d5403b2ab817632f996f0e5d3158e0a3ad41de371fd9c6758b",
+      "resolution_scope": [
+        "source-backed and eager admission",
+        "metadata-only probe admission",
+        "all admitted internal package/part relationship targets resolve against in-memory parts",
+        "source-backed and eager main_document_part resolve exactly to /word/document.xml",
+        "source topology writes to an in-memory buffer and reopens through both readers",
+        "reopened topology preserves main-document resolution and the appended inert external relationship"
+      ],
+      "malformed_scope": "six deterministic malformed seeds return default ExerciseStats through source-backed, eager, and probe paths without panic"
+    },
+    "tested_boundaries": [
+      "InputBytes",
+      "ArchiveMembers",
+      "Parts",
+      "RelationshipParts",
+      "ContentTypesBytes",
+      "ContentTypeMappings",
+      "RelationshipXmlBytes",
+      "TotalRelationshipXmlBytes",
+      "RelationshipsPerPart",
+      "TotalRelationships",
+      "ArchiveMemberNameBytes",
+      "ArchiveMetadataBytes",
+      "ArchiveCompressedBytes",
+      "ArchiveEntryBytes",
+      "ArchiveTotalBytes",
+      "PartBytes",
+      "TotalPartBytes",
+      "RelationshipGraphNodes",
+      "XmlEvents",
+      "TotalRelationshipXmlEvents",
+      "XmlAttributeBytes",
+      "RelationshipTargetBytes"
+    ],
+    "boundary_semantics": "For each listed resource, exact and one-over values admit source-backed, eager, and probe ingress; one-under returns the named ReadResource through all three.",
+    "omitted_boundaries": [
+      {
+        "resource": "ArchiveTotalEntries",
+        "reason": "The fixture has no separate directory-entry population, and ReadLimitsBuilder requires archive_members <= archive_total_entries; an isolated under-limit cannot be constructed."
+      },
+      {
+        "resource": "XmlDepth",
+        "reason": "The fixture reaches depth 1 and the builder rejects a zero depth ceiling; no exact/over/under triple exists for this fixture."
+      }
+    ],
+    "claim_scope": "The receipt claims 22 applicable boundaries, not all 24 configured ceilings."
+  },
+  "lock_and_instrumentation_review": {
+    "fuzz_lock": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3/crates/litchi-opc/fuzz/Cargo.lock",
+      "sha256": "c94123f2c10e92123034bb2b916b986ba989c0f51d4c202b5916d4a321f7b70d",
+      "bytes": 22400,
+      "package_count": 99,
+      "replay_mode": "--locked"
+    },
+    "locked_wrapper_sha256": "3307eec7fbd232fb48d6e63aa8a63f8f2c1ed57ed5ec9329efee87b447af1e5c",
+    "build_log": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/fuzz-build-v3-final.log",
+      "sha256": "9ef777a7151a789bd1800e12301f904971d4a46da63c5ce126ad93c278fa8cec",
+      "receipt_anchor": "receipt lines 191-203: nightly cargo-fuzz 0.13.2, -s address, offline, locked wrapper"
+    },
+    "retained_binary": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-target-fuzz-final/x86_64-unknown-linux-gnu/release/parse_opc",
+      "bytes": 39085640,
+      "sha256": "593c412c1186d37205c30a58c9b9da150e47565797f654bf002e6d45ff96bc97",
+      "independent_symbol_observation": [
+        "__asan_*",
+        "__sancov_lowest_stack",
+        "LLVMFuzzerCustomCrossOver"
+      ]
+    },
+    "campaign_log": {
+      "path": "/var/tmp/litchi-opc-fuzz-instrumented-validation-20260910-v3-evidence/fuzz-run-v3-final.log",
+      "sha256": "b896675fd2ef2cb24bf276ef30b7bfa81e18ae97d925a9e4df4d6ca6b581f92a",
+      "anchors": {
+        "line_155": "actual retained binary command with -runs=10000 -max_len=1048576 -timeout=3 -rss_limit_mb=512",
+        "lines_158_161": "1 module, 88253 inline counters, 236 nonempty initial files, 349428 initial bytes",
+        "lines_311_316": "10000 executed units, 127 new units, 392 MiB peak RSS"
+      },
+      "result": "exit 0; no crash, timeout, or artifact"
+    }
+  },
+  "claim_audit": {
+    "one_mib": "Accurately described as configured input/archive-total ceiling and campaign max_len; no claim that a 1 MiB fixture was exercised.",
+    "producer_scope": "Successful XML/topology authoring assertions are required only for the deterministic valid fixture; arbitrary fuzz inputs remain refusal/diagnostic cases.",
+    "safety_scope": "External targets are inert strings; no ambient filesystem resolution, network fetch, macro/VBA/ActiveX/OLE execution, performance claim, or completeness claim.",
+    "non_blocking_precision_note": "Topology reopen checks relationships and main-document behavior but does not byte-compare replacement/addition XML after reopen; current receipt does not claim that stronger property."
+  },
+  "independent_conclusion": "CLEAR; no publication blocker found under the current evidence wording and scope."
+}
