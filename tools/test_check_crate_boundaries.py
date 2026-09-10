@@ -7839,6 +7839,71 @@ def add_iwa_drawable_container_scaffold(
         build.write_text("fn unrelated_build_step() {}\n", encoding="utf-8")
 
 
+def add_iwa_object_index_reference_extraction_retirement_scaffold(
+    root: Path,
+    *,
+    reference_source: str | None = None,
+    object_index_source: str | None = None,
+    document_source: str | None = None,
+    chart_source: str | None = None,
+    build_source: str | None = None,
+) -> None:
+    """Install the retired fallback seam and its retained lookup consumers."""
+
+    object_index = root / boundaries.IWA_OBJECT_INDEX_SOURCE
+    object_index.parent.mkdir(parents=True, exist_ok=True)
+    object_index.write_text(
+        object_index_source or "pub struct ObjectIndex;\n",
+        encoding="utf-8",
+    )
+
+    document = root / boundaries.IWA_OBJECT_INDEX_DOCUMENT_SOURCE
+    document.parent.mkdir(parents=True, exist_ok=True)
+    document.write_text(
+        document_source
+        or (
+            "use crate::object_index::ObjectIndex;\n"
+            "struct DocumentState { object_index: ObjectIndex }\n"
+            "fn open(bundle: Bundle) {\n"
+            "    let object_index = ObjectIndex::from_bundle(&bundle);\n"
+            "    let _ = object_index;\n"
+            "}\n"
+            "fn stats(state: &DocumentState) {\n"
+            "    let _ = state.object_index.iter_refs(&self.state.bundle);\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    chart = root / boundaries.IWA_OBJECT_INDEX_CHART_SOURCE
+    chart.parent.mkdir(parents=True, exist_ok=True)
+    chart.write_text(
+        chart_source
+        or (
+            "use crate::object_index::{ObjectIndex, ResolvedObjectRef};\n"
+            "fn read(index: &ObjectIndex, bundle: &Bundle) {\n"
+            "    let _ = index.iter_entries_by_type(5000);\n"
+            "    let _ = index.resolve_ref(self.bundle, entry.id());\n"
+            "    let _ = index.resolve_ref_id(self.bundle, reference.identifier);\n"
+            "    let _ = ResolvedObjectRef;\n"
+            "}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    build = root / boundaries.IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_BUILD_SOURCE
+    build.parent.mkdir(parents=True, exist_ok=True)
+    build.write_text(
+        build_source or "fn unrelated_build_step() {}\n",
+        encoding="utf-8",
+    )
+
+    if reference_source is not None:
+        reference = root / boundaries.IWA_OBJECT_INDEX_REFERENCE_EXTRACTION_SOURCE
+        reference.parent.mkdir(parents=True, exist_ok=True)
+        reference.write_text(reference_source, encoding="utf-8")
+
+
 def add_keynote_media_creation_scaffold(
     root: Path,
     *,
@@ -30226,6 +30291,105 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
+    def test_iwa_object_index_reference_extraction_retirement_allows_deleted_source(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_object_index_reference_extraction_retirement_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_object_index_reference_extraction_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_object_index_reference_extraction_retirement_rejects_returned_seams(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_object_index_reference_extraction_retirement_scaffold(
+                root,
+                reference_source="fn extract() {}\n",
+                object_index_source=(
+                    "mod reference_extraction;\n"
+                    "fn route() { reference_extraction::extract(source, object, builder); }\n"
+                ),
+                build_source='const STALE: &str = "reference_extraction.rs";\n',
+            )
+            violations = (
+                boundaries.audit_iwa_object_index_reference_extraction_retirement_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("source returned" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("module returned" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("call returned" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("build provenance returned" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_object_index_reference_extraction_retirement_rejects_host_graph_ingestion(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_object_index_reference_extraction_retirement_scaffold(
+                root,
+                object_index_source=(
+                    "fn append_archive(object: &ArchiveObject, builder: &mut IndexBuilder) {\n"
+                    "    for message_info in &object.archive_info.message_infos {\n"
+                    "        let _ = message_info.object_references;\n"
+                    "        builder.add_reference_if_absent(source, target);\n"
+                    "    }\n"
+                    "}\n"
+                ),
+            )
+            violations = (
+                boundaries.audit_iwa_object_index_reference_extraction_retirement_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("graph insertion returned" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_object_index_reference_extraction_retirement_keeps_physical_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_object_index_reference_extraction_retirement_scaffold(
+                root,
+                document_source="struct Document;\n",
+                chart_source="struct ChartMetadataExtractor;\n",
+            )
+            violations = (
+                boundaries.audit_iwa_object_index_reference_extraction_retirement_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("Document must retain physical ObjectIndex lookup marker" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("chart metadata must retain physical ObjectIndex lookup marker" in item for item in violations),
+                violations,
+            )
+
     def test_iwa_drawable_container_codec_rejects_eager_decode_and_missing_ownership(
         self,
     ) -> None:
@@ -30263,6 +30427,10 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_drawable_container_reference_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_iwa_object_index_reference_extraction_retirement_source_topology()",
             main_source,
         )
         self.assertIn(

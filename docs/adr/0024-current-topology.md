@@ -4554,3 +4554,17 @@ mutation APIs remain separate migration debt. The Pages adapter currently copies
 package source bytes; both adapters perform separate cell and merge scans.
 A shared source and combined read API can remove these temporary costs. Format mutation
 and other host modules remain, so the monolith deletion gate is still open.
+
+## 2026-09-10 Retire unused host reference traversal
+
+The remaining host object index is a physical location catalog for document
+statistics and chart metadata lookup. Neither caller traverses reference
+edges. Its MessageInfo edge ingestion, payload-reference fallback, and private
+graph query adapters are removed. Physical identity, span, source-position,
+duplicate-object, allocation, and deterministic-order checks remain.
+
+Generic graph behavior remains owned by `litchi-iwa-index` and
+`litchi-iwa-graph`. Format-specific reference proofs remain in concrete package
+owners and their bounded wire codecs; the host no longer scans unrelated
+payloads merely to construct a graph with no consumer. Document text, chart
+metadata decoding, and the remaining mutation paths still require migration.
