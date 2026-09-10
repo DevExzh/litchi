@@ -32,7 +32,7 @@ pub fn parse_bytes(data: &[u8]) -> Result<Tags> {
     }
     let count = usize::from(read_u16(data, 2, "SttbfAtnBkmk cData")?);
     if count > validation::MAX_ENTRIES {
-        return Err(corrupted("SttbfAtnBkmk cData exceeds 0x3FFC entries"));
+        return Err(corrupted("SttbfAtnBkmk cData exceeds 0x3FFB entries"));
     }
     if read_u16(data, 4, "SttbfAtnBkmk cbExtra")? != validation::ATNBE_SIZE as u16 {
         return Err(corrupted("SttbfAtnBkmk cbExtra must be 0x000A"));

@@ -1,0 +1,6 @@
+{
+  "source": "/home/zhuhe/code/litchi/3rdparty/specs/[MS-DOC]/2 Structures/2.9 Basic Types.md",
+  "sha256": "254c301ad3ab03099c4cd8093fde4c77b7793ec0a64f386cfc46742982eeee2e",
+  "section": "2.9.277 SttbfAtnBkmk",
+  "requirement": "In a document, the number of annotation bookmarks MUST NOT exceed 0x3FFB."
+}

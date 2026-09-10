@@ -169,6 +169,13 @@ impl Document {
         let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
         let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
         let comments_table = CommentsTable::parse(&fib, &table_stream)?;
+        let annotation_bookmarks_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::annotation_bookmarks::FIB_INDEX,
+            crate::parts::annotation_bookmarks::MAX_TABLE_BYTES,
+            "SttbfAtnBkmk",
+        );
         let document_properties = DocumentProperties::parse(&fib, &table_stream);
         let bookmarks_table = BookmarksTable::parse(&fib, &table_stream)?;
         let smart_tags = DocumentSmartTags::parse(&fib, &table_stream)?;
@@ -338,6 +345,8 @@ impl Document {
             footnotes_table,
             endnotes_table,
             comments_table,
+            annotation_bookmarks_source,
+            annotation_bookmarks: std::sync::OnceLock::new(),
             document_properties,
             bookmarks_table,
             smart_tags,
