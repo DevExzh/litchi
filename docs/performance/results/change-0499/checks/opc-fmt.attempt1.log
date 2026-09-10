@@ -1,0 +1,14 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-opc/src/source_backed.rs:4229:
+     fn drop(&mut self) {
+         if let Some(flight) = self.flight.take() {
+             let mut observer = NoopDiagnosticObserver;
+[31m-            self.cache.complete_failure_with_observer(
+[m[31m-                self.entry_id,
+[m[31m-                &flight,
+[m[31m-                &mut observer,
+[m[31m-            );
+[m[32m+            self.cache
+[m[32m+                .complete_failure_with_observer(self.entry_id, &flight, &mut observer);
+[m         }
+     }
+ }

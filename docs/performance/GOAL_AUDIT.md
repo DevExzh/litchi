@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0499 targets bounded Part worker lifetime; the full goal remains open
+
+[0499](changes/0499-operation-local-part-workers.md) reuses a bounded,
+operation-local scoped worker set when an ordered Part batch spans waves, with
+the existing single-wave path retained. The implementation preserves source
+and cancellation fences, worker/task/byte limits, owner-retained results,
+monotonic `Work` and `InputBytes`, typed error ordering, and complete joins.
+An unwind guard also closes a provider-panic cache flight; recovery is limited
+to unwind builds because release uses `panic = abort`. The matched capture has
+60 children, 3,600 measured samples, and 360 warmups. Many-small owned p50
+improves 3.59x/2.92x/2.08x and warm-file 2.64x/2.26x/1.81x at widths 2/4/8,
+but both remain slower than their ordinary serial controls. Five aggregate and
+ten per-repeat flags remain retained, so this is scoped workload evidence
+rather than a program-wide speed result. CRUD, native-producer, controlled-cold,
+history/composition, and other goal areas remain open.
+
 ## Current audit: 0498 adds explicit bounded Part batches; the full goal remains open
 
 [0498](changes/0498-bounded-source-backed-part-batch.md) adds an owning ordered

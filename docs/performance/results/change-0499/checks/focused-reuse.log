@@ -1,0 +1,12 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 8.44s
+     Running tests/source_backed_batch_reuse.rs (/home/zhuhe/.cache/litchi-goal-0499/target/release/deps/source_backed_batch_reuse-5460ddcca41efa4d)
+
+running 4 tests
+test batch_reuses_at_most_configured_worker_threads_across_many_waves ... ok
+test duplicate_waiter_recovers_after_a_gated_provider_panic ... ok
+test provider_panic_is_a_typed_terminal_batch_error ... ok
+test separate_batch_operations_do_not_reuse_worker_threads ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

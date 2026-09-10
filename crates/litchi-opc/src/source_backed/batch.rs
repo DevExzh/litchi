@@ -11,12 +11,18 @@ use crate::packuri::PackURI;
 use litchi_core::{ExecutionContext, Reservation, Resource};
 use soapberry_zip::office::EntryId;
 use std::mem::size_of;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::thread;
 
 // Keep the platform's ordinary scoped-worker depth envelope conservative. The
 // reservation is explicit even though the OS owns the actual stack mapping.
 const THREAD_STACK_BYTES: usize = 2 * 1024 * 1024;
 const SCHEDULER_CONTROL_BYTES: usize = 1024;
+// Conservative per-worker allowance for the two bounded std channels and
+// their cacheline-padded control/wait state. This is an admission envelope,
+// not a portable exact allocator-size claim.
+const WORKER_CHANNEL_CONTROL_BYTES: usize = 4096;
 
 /// An ordered collection returned by [`SourceBackedPackage::read_parts_ordered`].
 ///
@@ -112,8 +118,19 @@ struct OutputAdmission {
 
 struct SchedulerAdmission {
     handle_bytes: usize,
+    command_vec_bytes: usize,
+    reply_vec_bytes: usize,
+    ordinal_vec_bytes: usize,
     _memory: Reservation,
     _objects: Reservation,
+}
+
+enum WorkerCommand {
+    Read {
+        ordinal: usize,
+        request: PreparedRequest,
+    },
+    Shutdown,
 }
 
 /// Read a bounded ordered request set through the package's existing Part
@@ -174,7 +191,15 @@ pub(super) fn read_parts_ordered(
         let context = context
             .as_ref()
             .ok_or_else(|| batch_refusal("parallel scheduling requires an execution context"))?;
-        let scheduler = match SchedulerAdmission::reserve(context, workers) {
+        let reuse_workers = wave_end(
+            &prepared.requests,
+            0,
+            workers,
+            context.limits().max_in_flight_bytes().get(),
+        )
+        .map(|end| end < prepared.requests.len())
+        .unwrap_or(false);
+        let scheduler = match SchedulerAdmission::reserve(context, workers, reuse_workers) {
             Ok(scheduler) => scheduler,
             Err(error) => {
                 drop(parts);
@@ -334,17 +359,78 @@ impl OutputAdmission {
 }
 
 impl SchedulerAdmission {
-    fn reserve(context: &ExecutionContext, workers: usize) -> Result<Self> {
+    fn reserve(context: &ExecutionContext, workers: usize, reuse_workers: bool) -> Result<Self> {
         let handle_bytes = checked_collection_bytes(
             workers,
-            size_of::<(usize, thread::ScopedJoinHandle<'static, Result<PartData>>)>(),
+            if reuse_workers {
+                size_of::<(usize, thread::ScopedJoinHandle<'static, ()>)>()
+            } else {
+                size_of::<(usize, thread::ScopedJoinHandle<'static, Result<PartData>>)>()
+            },
             "source-backed batch worker handles",
         )?;
+        let (wave_bytes, command_vec_bytes, reply_vec_bytes, ordinal_vec_bytes) = if reuse_workers {
+            let command_message_bytes = checked_collection_bytes(
+                workers,
+                size_of::<WorkerCommand>(),
+                "source-backed batch worker commands",
+            )?;
+            let reply_message_bytes = checked_collection_bytes(
+                workers,
+                size_of::<Result<PartData>>(),
+                "source-backed batch worker results",
+            )?;
+            let command_vec_bytes = checked_collection_bytes(
+                workers,
+                size_of::<SyncSender<WorkerCommand>>(),
+                "source-backed batch worker command senders",
+            )?;
+            let reply_vec_bytes = checked_collection_bytes(
+                workers,
+                size_of::<Receiver<Result<PartData>>>(),
+                "source-backed batch worker reply receivers",
+            )?;
+            let ordinal_vec_bytes = checked_collection_bytes(
+                workers,
+                size_of::<Option<usize>>(),
+                "source-backed batch worker ordinals",
+            )?;
+            let endpoint_per_worker = size_of::<SyncSender<WorkerCommand>>()
+                .checked_add(size_of::<Receiver<WorkerCommand>>())
+                .and_then(|bytes| bytes.checked_add(size_of::<SyncSender<Result<PartData>>>()))
+                .and_then(|bytes| bytes.checked_add(size_of::<Receiver<Result<PartData>>>()))
+                .ok_or_else(|| batch_refusal("source-backed batch worker endpoints overflow"))?;
+            let endpoint_bytes = checked_collection_bytes(
+                workers,
+                endpoint_per_worker,
+                "source-backed batch worker endpoints",
+            )?;
+            let channel_control_bytes = checked_collection_bytes(
+                workers,
+                WORKER_CHANNEL_CONTROL_BYTES,
+                "source-backed batch worker channels",
+            )?;
+            let wave_bytes = command_message_bytes
+                .checked_add(reply_message_bytes)
+                .and_then(|bytes| bytes.checked_add(endpoint_bytes))
+                .and_then(|bytes| bytes.checked_add(channel_control_bytes))
+                .and_then(|bytes| bytes.checked_add(ordinal_vec_bytes))
+                .ok_or_else(|| batch_refusal("source-backed batch worker channels overflow"))?;
+            (
+                wave_bytes,
+                command_vec_bytes,
+                reply_vec_bytes,
+                ordinal_vec_bytes,
+            )
+        } else {
+            (0, 0, 0, 0)
+        };
         let stack_bytes = workers
             .checked_mul(THREAD_STACK_BYTES)
             .ok_or_else(|| batch_refusal("source-backed batch worker stacks overflow"))?;
         let control_bytes = SCHEDULER_CONTROL_BYTES
             .checked_add(handle_bytes)
+            .and_then(|bytes| bytes.checked_add(wave_bytes))
             .and_then(|bytes| bytes.checked_add(stack_bytes))
             .ok_or_else(|| batch_refusal("source-backed batch scheduler overflows"))?;
         let memory = context
@@ -354,9 +440,17 @@ impl SchedulerAdmission {
                     .map_err(|_| batch_refusal("batch scheduler exceeds u64"))?,
             )
             .map_err(super::map_execution_error)?;
+        let channel_objects = if reuse_workers {
+            workers
+                .checked_mul(4)
+                .ok_or_else(|| batch_refusal("source-backed batch channel objects overflow"))?
+        } else {
+            0
+        };
         let object_count = u64::try_from(
             workers
                 .checked_add(1)
+                .and_then(|count| count.checked_add(channel_objects))
                 .ok_or_else(|| batch_refusal("batch scheduler objects overflow"))?,
         )
         .map_err(|_| batch_refusal("batch scheduler objects exceed u64"))?;
@@ -369,6 +463,9 @@ impl SchedulerAdmission {
         };
         Ok(Self {
             handle_bytes,
+            command_vec_bytes,
+            reply_vec_bytes,
+            ordinal_vec_bytes,
             _memory: memory,
             _objects: objects,
         })
@@ -401,84 +498,336 @@ fn read_parallel(
     output: &mut Vec<PartData>,
 ) -> Result<()> {
     let max_bytes = context.limits().max_in_flight_bytes().get();
+    fence(package)?;
+    let first_end = wave_end(requests, 0, workers, max_bytes)?;
+    if first_end == requests.len() {
+        return read_one_wave(package, requests, 0, first_end, scheduler, output);
+    }
+    read_reused_workers(package, requests, workers, max_bytes, scheduler, output)
+}
+
+fn read_one_wave(
+    package: &SourceBackedPackage,
+    requests: &[PreparedRequest],
+    start: usize,
+    end: usize,
+    scheduler: &SchedulerAdmission,
+    output: &mut Vec<PartData>,
+) -> Result<()> {
+    let selected = thread::scope(|scope| {
+        let width = end - start;
+        let mut handles = Vec::new();
+        if let Err(source) = handles.try_reserve_exact(width) {
+            return Some((
+                start,
+                OpcError::Allocation {
+                    resource: "source-backed batch worker handles",
+                    source,
+                },
+            ));
+        }
+        if let Err(error) =
+            capacity_fits::<(usize, thread::ScopedJoinHandle<'static, Result<PartData>>)>(
+                handles.capacity(),
+                scheduler.handle_bytes,
+                "source-backed batch worker handles",
+            )
+        {
+            return Some((start, error));
+        }
+        let mut selected = None;
+        for (ordinal, request) in requests.iter().copied().enumerate().take(end).skip(start) {
+            let result = thread::Builder::new()
+                .stack_size(THREAD_STACK_BYTES)
+                .spawn_scoped(scope, move || {
+                    let declared = request.declared_bytes.ok_or_else(|| {
+                        batch_refusal("parallel batch request lacks prepared metadata")
+                    })?;
+                    package.read_part_prepared(request.index, request.entry_id, declared)
+                });
+            match result {
+                Ok(handle) => handles.push((ordinal, handle)),
+                Err(error) => {
+                    select_error(&mut selected, ordinal, OpcError::IoError(error));
+                    break;
+                },
+            }
+        }
+        for (ordinal, handle) in handles.drain(..) {
+            match handle.join() {
+                Ok(Ok(data)) => output.push(data),
+                Ok(Err(error)) => select_error(&mut selected, ordinal, error),
+                Err(_) => select_error(
+                    &mut selected,
+                    ordinal,
+                    OpcError::SourceBackedBatchWorkerPanic { ordinal },
+                ),
+            }
+        }
+        selected
+    });
+    selected.map_or(Ok(()), |(_, error)| Err(error))
+}
+
+fn read_reused_workers(
+    package: &SourceBackedPackage,
+    requests: &[PreparedRequest],
+    workers: usize,
+    max_bytes: u64,
+    scheduler: &SchedulerAdmission,
+    output: &mut Vec<PartData>,
+) -> Result<()> {
+    thread::scope(|scope| {
+        let mut command_senders = Vec::new();
+        let mut reply_receivers = Vec::new();
+        let mut worker_handles = Vec::new();
+        let mut active_ordinals = Vec::new();
+        command_senders
+            .try_reserve_exact(workers)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed batch worker channels",
+                source,
+            })?;
+        reply_receivers
+            .try_reserve_exact(workers)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed batch worker reply receivers",
+                source,
+            })?;
+        worker_handles
+            .try_reserve_exact(workers)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed batch worker handles",
+                source,
+            })?;
+        active_ordinals
+            .try_reserve_exact(workers)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed batch worker ordinals",
+                source,
+            })?;
+        capacity_fits::<SyncSender<WorkerCommand>>(
+            command_senders.capacity(),
+            scheduler.command_vec_bytes,
+            "source-backed batch worker command senders",
+        )?;
+        capacity_fits::<Receiver<Result<PartData>>>(
+            reply_receivers.capacity(),
+            scheduler.reply_vec_bytes,
+            "source-backed batch worker reply receivers",
+        )?;
+        capacity_fits::<(usize, thread::ScopedJoinHandle<'static, ()>)>(
+            worker_handles.capacity(),
+            scheduler.handle_bytes,
+            "source-backed batch worker handles",
+        )?;
+        capacity_fits::<Option<usize>>(
+            active_ordinals.capacity(),
+            scheduler.ordinal_vec_bytes,
+            "source-backed batch worker ordinals",
+        )?;
+        for _ in 0..workers {
+            active_ordinals.push(None);
+        }
+
+        let mut startup_error = None;
+        for worker in 0..workers {
+            let (command_sender, command_receiver) = mpsc::sync_channel::<WorkerCommand>(1);
+            let (reply_sender, reply_receiver) = mpsc::sync_channel::<Result<PartData>>(1);
+            match thread::Builder::new()
+                .stack_size(THREAD_STACK_BYTES)
+                .spawn_scoped(scope, move || {
+                    worker_loop(package, command_receiver, reply_sender)
+                }) {
+                Ok(handle) => {
+                    command_senders.push(command_sender);
+                    reply_receivers.push(reply_receiver);
+                    worker_handles.push((worker, handle));
+                },
+                Err(error) => {
+                    startup_error = Some((worker, OpcError::IoError(error)));
+                    break;
+                },
+            }
+        }
+        if let Some((ordinal, error)) = startup_error {
+            shutdown_workers(&command_senders);
+            let mut selected = Some((ordinal, error));
+            join_workers(worker_handles, &active_ordinals, &mut selected, ordinal);
+            return selected.map_or_else(
+                || Err(batch_refusal("source-backed batch worker startup failed")),
+                |(_, error)| Err(error),
+            );
+        }
+
+        let run_result = run_reused_waves(
+            package,
+            requests,
+            max_bytes,
+            &command_senders,
+            &reply_receivers,
+            &mut active_ordinals,
+            output,
+        );
+        shutdown_workers(&command_senders);
+        let mut selected = run_result.err();
+        let fallback_ordinal = selected
+            .as_ref()
+            .map_or(requests.len(), |(ordinal, _)| *ordinal);
+        join_workers(
+            worker_handles,
+            &active_ordinals,
+            &mut selected,
+            fallback_ordinal,
+        );
+        selected.map_or(Ok(()), |(_, error)| Err(error))
+    })
+}
+
+fn run_reused_waves(
+    package: &SourceBackedPackage,
+    requests: &[PreparedRequest],
+    max_bytes: u64,
+    command_senders: &[SyncSender<WorkerCommand>],
+    reply_receivers: &[Receiver<Result<PartData>>],
+    active_ordinals: &mut [Option<usize>],
+    output: &mut Vec<PartData>,
+) -> std::result::Result<(), (usize, OpcError)> {
+    let workers = command_senders.len();
     let mut start = 0;
     while start < requests.len() {
-        // Recheck before admitting each later wave.  Workers already admitted
-        // in the current wave are joined below; this check prevents a
-        // cancellation or source transition from starting fresh work.
-        fence(package)?;
-        let end = wave_end(requests, start, workers, max_bytes)?;
-        let selected = thread::scope(|scope| {
-            let width = end - start;
-            let mut handles = Vec::new();
-            if let Err(source) = handles.try_reserve_exact(width) {
-                return Some((
-                    start,
-                    OpcError::Allocation {
-                        resource: "source-backed batch worker handles",
-                        source,
-                    },
-                ));
-            }
-            if let Err(error) =
-                capacity_fits::<(usize, thread::ScopedJoinHandle<'static, Result<PartData>>)>(
-                    handles.capacity(),
-                    scheduler.handle_bytes,
-                    "source-backed batch worker handles",
-                )
-            {
-                return Some((start, error));
-            }
-            let mut setup_error = None;
-            for (ordinal, request) in requests.iter().copied().enumerate().take(end).skip(start) {
-                let result = thread::Builder::new()
-                    .stack_size(THREAD_STACK_BYTES)
-                    .spawn_scoped(scope, move || {
-                        let declared = request.declared_bytes.ok_or_else(|| {
-                            batch_refusal("parallel batch request lacks prepared metadata")
-                        })?;
-                        package.read_part_prepared(request.index, request.entry_id, declared)
-                    });
-                match result {
-                    Ok(handle) => handles.push((ordinal, handle)),
-                    Err(error) => {
-                        setup_error = Some((ordinal, OpcError::IoError(error)));
-                        break;
-                    },
-                }
-            }
+        fence(package).map_err(|error| (start, error))?;
+        let end = wave_end(requests, start, workers, max_bytes).map_err(|error| (start, error))?;
+        let width = end - start;
+        for ordinal in active_ordinals.iter_mut() {
+            *ordinal = None;
+        }
 
-            let mut selected = setup_error;
-            for (ordinal, handle) in handles.drain(..) {
-                match handle.join() {
-                    Ok(Ok(data)) => output.push(data),
-                    Ok(Err(error)) => {
-                        if selected
-                            .as_ref()
-                            .is_none_or(|(selected_ordinal, _)| ordinal < *selected_ordinal)
-                        {
-                            selected = Some((ordinal, error));
-                        }
-                    },
-                    Err(_) => {
-                        let error = OpcError::SourceBackedBatchWorkerPanic { ordinal };
-                        if selected
-                            .as_ref()
-                            .is_none_or(|(selected_ordinal, _)| ordinal < *selected_ordinal)
-                        {
-                            selected = Some((ordinal, error));
-                        }
-                    },
-                }
+        let mut sent = 0;
+        let mut selected = None;
+        for lane in 0..width {
+            let ordinal = start + lane;
+            active_ordinals[lane] = Some(ordinal);
+            if command_senders[lane]
+                .send(WorkerCommand::Read {
+                    ordinal,
+                    request: requests[ordinal],
+                })
+                .is_err()
+            {
+                select_error(
+                    &mut selected,
+                    ordinal,
+                    OpcError::SourceBackedBatchWorkerPanic { ordinal },
+                );
+                break;
             }
-            selected
-        });
-        if let Some((_, error)) = selected {
-            return Err(error);
+            sent += 1;
+        }
+
+        // Each lane has its own one-slot reply queue. Receive in input order
+        // so no shared transport can strand a later idle worker's reply.
+        for lane in 0..sent {
+            match reply_receivers[lane].recv() {
+                Ok(result) => {
+                    active_ordinals[lane] = None;
+                    match result {
+                        Ok(data) => output.push(data),
+                        Err(error) => select_error(&mut selected, start + lane, error),
+                    }
+                },
+                Err(_) => {
+                    let ordinal = active_ordinals[lane].unwrap_or(start + lane);
+                    select_error(
+                        &mut selected,
+                        ordinal,
+                        OpcError::SourceBackedBatchWorkerPanic { ordinal },
+                    );
+                },
+            }
+        }
+
+        if let Some((ordinal, error)) = selected {
+            return Err((ordinal, error));
+        }
+        if sent != width {
+            return Err((
+                start + sent,
+                OpcError::SourceBackedBatchWorkerPanic {
+                    ordinal: start + sent,
+                },
+            ));
         }
         start = end;
     }
     Ok(())
+}
+
+fn worker_loop(
+    package: &SourceBackedPackage,
+    commands: Receiver<WorkerCommand>,
+    replies: SyncSender<Result<PartData>>,
+) {
+    while let Ok(command) = commands.recv() {
+        match command {
+            WorkerCommand::Shutdown => return,
+            WorkerCommand::Read { ordinal, request } => {
+                let outcome = catch_unwind(AssertUnwindSafe(|| {
+                    let declared = request.declared_bytes.ok_or_else(|| {
+                        batch_refusal("parallel batch request lacks prepared metadata")
+                    })?;
+                    package.read_part_prepared(request.index, request.entry_id, declared)
+                }));
+                let panicked = outcome.is_err();
+                let result = match outcome {
+                    Ok(result) => result,
+                    Err(_) => Err(OpcError::SourceBackedBatchWorkerPanic { ordinal }),
+                };
+                if replies.send(result).is_err() {
+                    return;
+                }
+                if panicked {
+                    return;
+                }
+            },
+        }
+    }
+}
+
+fn shutdown_workers(senders: &[SyncSender<WorkerCommand>]) {
+    for sender in senders {
+        let _ = sender.send(WorkerCommand::Shutdown);
+    }
+}
+
+fn join_workers<'scope>(
+    handles: Vec<(usize, thread::ScopedJoinHandle<'scope, ()>)>,
+    active_ordinals: &[Option<usize>],
+    selected: &mut Option<(usize, OpcError)>,
+    fallback_ordinal: usize,
+) {
+    for (worker, handle) in handles {
+        if handle.join().is_err() {
+            let ordinal = active_ordinals
+                .get(worker)
+                .and_then(|ordinal| *ordinal)
+                .unwrap_or(fallback_ordinal);
+            select_error(
+                selected,
+                ordinal,
+                OpcError::SourceBackedBatchWorkerPanic { ordinal },
+            );
+        }
+    }
+}
+
+fn select_error(selected: &mut Option<(usize, OpcError)>, ordinal: usize, error: OpcError) {
+    if selected
+        .as_ref()
+        .is_none_or(|(selected_ordinal, _)| ordinal < *selected_ordinal)
+    {
+        *selected = Some((ordinal, error));
+    }
 }
 
 fn wave_end(

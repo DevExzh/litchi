@@ -1,0 +1,22 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `release` profile [optimized] target(s) in 13.31s
+     Running tests/source_backed_batch.rs (/home/zhuhe/.cache/litchi-goal-0499/target/release/deps/source_backed_batch-c13c81c6f18772d8)
+
+running 14 tests
+test batch_below_parallel_threshold_uses_serial_fallback ... ok
+test batch_cancellation_during_a_gated_load_returns_cancelled_and_joins_workers ... ok
+test batch_empty_one_worker_and_oversized_single_part_use_serial_fallbacks ... ok
+test batch_missing_and_corrupt_parts_fail_without_partial_results_or_flights ... ok
+test batch_parallel_overlap_obeys_task_and_byte_caps ... ok
+test batch_preserves_request_order_duplicates_and_exact_serial_bytes ... ok
+test batch_reports_low_ordinal_failure_and_does_not_start_a_later_wave ... ok
+test batch_request_count_limit_remains_a_typed_read_limit ... ok
+test batch_short_read_provider_preserves_exact_bytes ... ok
+test batch_source_mutation_during_a_gated_load_returns_source_changed ... ok
+test batch_work_limit_preserves_the_dynamic_resource_limit_scope ... ok
+test deflated_multi_part_batch_decodes_varied_payloads_on_an_explicit_two_mib_stack ... ok
+test managed_batch_releases_finite_memory_and_object_reservations_after_drop ... ok
+test warm_batch_holds_structural_memory_until_the_returned_batch_drops ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.01s
+

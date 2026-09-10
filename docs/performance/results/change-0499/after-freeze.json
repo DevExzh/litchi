@@ -1,0 +1,7 @@
+{
+  "binary": "/home/zhuhe/.cache/litchi-goal-0499/retained/source_backed_batch_perf-after",
+  "binary_sha256": "0b97affe90f75d29bd685a60b014e5c89c353007a1828a563355a877bd078413",
+  "base_revision": "b27718fe8",
+  "candidate_source_sha256": "af7ff7a9e89d529bdbd708de832f8d278f823200b4b60d00532e7312bfb870ba",
+  "harness_sha256": "d5e38b4ff99451d35cc546a356b4a3afcb79b83852cea579c24a06ada29d7662"
+}

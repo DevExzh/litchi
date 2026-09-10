@@ -1,5 +1,33 @@
 # Performance program phase report
 
+## 0499: operation-local worker reuse for multi-wave Part batches
+
+[0499](changes/0499-operation-local-part-workers.md) keeps the explicit 0498
+ordered Part API and reuses one bounded operation-local worker set across
+multi-wave batches. Per-worker command/reply queues are bounded, replies are
+collected in input order, all started workers are shut down and joined, and
+single-wave calls retain the existing path. Source/cancellation fences,
+typed-error ordering, owner-retained output, and monotonic accounting remain
+unchanged. The loader unwind guard closes provider-panic cache flights in
+unwind builds; release panic-abort behavior is not presented as recoverable.
+
+The frozen 0498 executable and unchanged harness provide the before control for
+the matched capture: 60 children, 3,600 measured samples, and 360 warmups.
+Many-small owned batch p50 falls from 669.84/542.70/475.25 to
+186.51/186.04/228.74 microseconds at widths 2/4/8; warm-file falls from
+780.59/562.99/496.17 to 296.04/248.77/273.70. The batch route remains slower
+than ordinary after serial for these local small-Part rows. Five aggregate
+flags and ten per-repeat latency/throughput flags remain retained, including
+the sparse few-large width-eight tails. The many-small width-four clone trace
+falls from 64 to four successful `clone3` calls; traced times and whole-child
+profiles do not supply operation-local causal attribution.
+
+Four focused reuse/error tests pass alongside the 14 existing focused tests.
+The default OPC gate has 623 passing tests and one ignored external-corpus
+test; the all-feature gate has 645 passing tests and one ignored test. This is
+a low-level scheduler change and does not close the broader CRUD, producer,
+cold-cache, history, or full-goal requirements.
+
 ## 0498: bounded source-backed Part reads with measured workload tradeoffs
 
 [0498](changes/0498-bounded-source-backed-part-batch.md) introduces explicit

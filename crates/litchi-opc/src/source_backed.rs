@@ -4209,6 +4209,32 @@ enum CacheAccess {
     Bypass(LoadResources),
 }
 
+/// Release a loader's flight if caller-provided source code unwinds before
+/// the ordinary result path can publish success or failure. This guard owns
+/// only another reference to the existing flight; it allocates no new payload
+/// or bookkeeping object. Normal completion disarms it without another lock.
+struct LoadFlightUnwindGuard<'cache> {
+    cache: &'cache PartCache,
+    entry_id: EntryId,
+    flight: Option<Arc<LoadFlight>>,
+}
+
+impl LoadFlightUnwindGuard<'_> {
+    fn disarm(mut self) {
+        drop(self.flight.take());
+    }
+}
+
+impl Drop for LoadFlightUnwindGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(flight) = self.flight.take() {
+            let mut observer = NoopDiagnosticObserver;
+            self.cache
+                .complete_failure_with_observer(self.entry_id, &flight, &mut observer);
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum CachePublication {
     Pending,
@@ -9895,7 +9921,12 @@ impl SourceBackedPackage {
                     // retained error. This also re-checks source freshness.
                 },
                 CacheAccess::Loader(flight) => {
-                    return self.load_part_with_accounting(
+                    let unwind_guard = LoadFlightUnwindGuard {
+                        cache: &self.cache,
+                        entry_id,
+                        flight: Some(Arc::clone(&flight)),
+                    };
+                    let result = self.load_part_with_accounting(
                         index,
                         entry_id,
                         declared_bytes,
@@ -9906,6 +9937,8 @@ impl SourceBackedPackage {
                         observer,
                         capture,
                     );
+                    unwind_guard.disarm();
+                    return result;
                 },
                 CacheAccess::Bypass(reservation) => {
                     return self.load_part_with_accounting(

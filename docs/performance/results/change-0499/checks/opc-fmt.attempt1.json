@@ -1,0 +1,16 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "16-31",
+    "cargo",
+    "fmt",
+    "-p",
+    "litchi-opc",
+    "--",
+    "--check"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 0.3661832809448242,
+  "log_sha256": "a1909f8e265ef1d795f11feca35f6d530c9c3de16cb573a95ccd8f4170f83a39"
+}
