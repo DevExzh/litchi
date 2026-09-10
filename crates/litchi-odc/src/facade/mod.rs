@@ -145,6 +145,40 @@ impl Chart {
         self.0.package.styles_xml()
     }
 
+    /// Read one typed ODF chart formatting property from a chart-family style.
+    ///
+    /// The value is read from `styles.xml` without evaluating style cascades or
+    /// applying renderer defaults.  A missing style or property returns
+    /// `None`.
+    pub fn chart_style_property(
+        &self,
+        style_name: &str,
+        property: crate::ChartStyleProperty,
+    ) -> Result<Option<crate::ChartStyleValue>> {
+        let Some(styles) = self.styles_xml() else {
+            return Ok(None);
+        };
+        crate::style_format::read_property(styles, style_name, property, self.limits())
+    }
+
+    /// Return the retained normative ODF package kind.
+    #[must_use]
+    pub fn package_kind(&self) -> crate::ChartPackageKind {
+        self.0.package.package_kind()
+    }
+
+    /// Return the retained package MIME type.
+    #[must_use]
+    pub fn mime_type(&self) -> &'static str {
+        self.package_kind().mime_type()
+    }
+
+    /// Return whether this snapshot is an OpenDocument Chart Template.
+    #[must_use]
+    pub fn is_template(&self) -> bool {
+        self.package_kind().is_template()
+    }
+
     #[must_use]
     pub fn metadata(&self) -> Option<&Metadata> {
         self.0.package.metadata()
@@ -211,6 +245,7 @@ impl Chart {
             typed_transaction: None,
             flat_content_staged: false,
             staged_styles: None,
+            style_property_changes: Vec::new(),
             resource_edits: Vec::new(),
         }
     }
@@ -232,6 +267,7 @@ pub struct Edit<'a> {
     typed_transaction: Option<crate::DefinitionEdit>,
     flat_content_staged: bool,
     staged_styles: Option<StagedStyles>,
+    style_property_changes: Vec<crate::ChartStylePropertyChange>,
     resource_edits: Vec<ResourceEdit>,
 }
 
@@ -445,12 +481,83 @@ impl Edit<'_> {
 
     /// Add or replace the complete validated `styles.xml` package part.
     pub fn set_styles_xml(&mut self, styles_xml: impl Into<String>) {
+        self.style_property_changes.clear();
         self.staged_styles = Some(StagedStyles::Replace(styles_xml.into()));
     }
 
     /// Remove `styles.xml` from the package.
     pub fn remove_styles_xml(&mut self) {
+        self.style_property_changes.clear();
         self.staged_styles = Some(StagedStyles::Remove);
+    }
+
+    /// Stage one typed ODF chart formatting property edit.
+    ///
+    /// `None` removes the explicit property.  The transaction records the
+    /// source value and checks it again at commit, so a stale caller cannot
+    /// overwrite a changed styles part.  Multiple property edits publish in
+    /// the same package transaction as chart content and resources.
+    pub fn update_chart_style_property(
+        &mut self,
+        style_name: impl Into<String>,
+        property: crate::ChartStyleProperty,
+        after: Option<crate::ChartStyleValue>,
+    ) -> Result<()> {
+        if self.staged_styles.is_some() {
+            return Err(Error::InvalidFormat(
+                "ODC chart style properties cannot follow a complete styles.xml replacement".into(),
+            ));
+        }
+        let style_name = style_name.into();
+        let styles = self.source.styles_xml().ok_or_else(|| {
+            Error::InvalidFormat("ODC chart style property requires styles.xml".into())
+        })?;
+        if !crate::style_format::has_style(styles, &style_name, self.source.limits())? {
+            return Err(Error::InvalidFormat(
+                "ODC chart style selector is missing".into(),
+            ));
+        }
+        let existing = self
+            .style_property_changes
+            .iter()
+            .find(|change| change.style_name() == style_name && change.property() == property);
+        let before = existing.map_or_else(
+            || {
+                crate::style_format::read_property(
+                    styles,
+                    &style_name,
+                    property,
+                    self.source.limits(),
+                )
+            },
+            |change| Ok(change.before().cloned()),
+        )?;
+        if before == after {
+            self.style_property_changes.retain(|change| {
+                change.style_name() != style_name || change.property() != property
+            });
+            return Ok(());
+        }
+        crate::style_format::validate_change_value(property, after.as_ref(), self.source.limits())?;
+        let change = crate::ChartStylePropertyChange::new(style_name, property, before, after);
+        if let Some(slot) = self.style_property_changes.iter_mut().find(|candidate| {
+            candidate.style_name() == change.style_name() && candidate.property() == property
+        }) {
+            *slot = change;
+        } else {
+            self.style_property_changes.push(change);
+        }
+        Ok(())
+    }
+
+    /// Alias for [`Self::update_chart_style_property`].
+    pub fn set_chart_style_property(
+        &mut self,
+        style_name: impl Into<String>,
+        property: crate::ChartStyleProperty,
+        after: Option<crate::ChartStyleValue>,
+    ) -> Result<()> {
+        self.update_chart_style_property(style_name, property, after)
     }
 
     /// Add an inert package-local resource.
@@ -602,16 +709,45 @@ impl Edit<'_> {
                 .to_string()
         };
         let replaces_chart = replacement.is_some() && content != self.source.content_xml();
-        let style_change = self.staged_styles.as_ref().and_then(|staged| {
-            let before = self.source.styles_xml();
-            let after = match staged {
-                StagedStyles::Replace(xml) => Some(xml.as_str()),
-                StagedStyles::Remove => None,
-            };
-            (before != after).then(|| StylesChange {
-                before_size: before.map(str::len),
-                after_size: after.map(str::len),
-            })
+        let style_property_changes = self.style_property_changes.clone();
+        let property_styles = if style_property_changes.is_empty() {
+            None
+        } else {
+            let source_styles = self.source.styles_xml().ok_or_else(|| {
+                Error::InvalidFormat("ODC chart style property requires styles.xml".into())
+            })?;
+            Some(crate::style_format::apply_changes(
+                source_styles,
+                &style_property_changes,
+                self.source.limits(),
+            )?)
+        };
+        let property_splices = if style_property_changes.is_empty() {
+            None
+        } else {
+            let source_styles = self.source.styles_xml().ok_or_else(|| {
+                Error::InvalidFormat("ODC chart style property requires styles.xml".into())
+            })?;
+            Some(crate::style_format::source_splices(
+                source_styles,
+                &style_property_changes,
+                self.source.limits(),
+            )?)
+        };
+        let style_after = match (self.staged_styles.as_ref(), property_styles.as_deref()) {
+            (Some(StagedStyles::Replace(xml)), None) => Some(xml.as_str()),
+            (Some(StagedStyles::Remove), None) => None,
+            (None, Some(xml)) => Some(xml),
+            (None, None) => self.source.styles_xml(),
+            (Some(_), Some(_)) => {
+                return Err(Error::InvalidFormat(
+                    "ODC chart style properties cannot combine with styles.xml replacement".into(),
+                ));
+            },
+        };
+        let style_change = (self.source.styles_xml() != style_after).then(|| StylesChange {
+            before_size: self.source.styles_xml().map(str::len),
+            after_size: style_after.map(str::len),
         });
         self.resource_edits
             .sort_unstable_by(|left, right| left.path.cmp(&right.path));
@@ -625,10 +761,24 @@ impl Edit<'_> {
         {
             self.source.clone()
         } else {
-            let styles = match self.staged_styles.as_ref() {
-                None => crate::package::StylesReplacement::Unchanged,
-                Some(StagedStyles::Replace(xml)) => crate::package::StylesReplacement::Replace(xml),
-                Some(StagedStyles::Remove) => crate::package::StylesReplacement::Remove,
+            let styles = match (self.staged_styles.as_ref(), property_styles.as_deref()) {
+                (None, None) => crate::package::StylesReplacement::Unchanged,
+                (None, Some(_xml)) => {
+                    let splices = property_splices.as_deref().ok_or_else(|| {
+                        Error::InvalidFormat("ODC chart style splice is missing".into())
+                    })?;
+                    crate::package::StylesReplacement::SourceSplice(splices)
+                },
+                (Some(StagedStyles::Replace(xml)), None) => {
+                    crate::package::StylesReplacement::Replace(xml)
+                },
+                (Some(StagedStyles::Remove), None) => crate::package::StylesReplacement::Remove,
+                (Some(_), Some(_)) => {
+                    return Err(Error::InvalidFormat(
+                        "ODC chart style properties cannot combine with styles.xml replacement"
+                            .into(),
+                    ));
+                },
             };
             let replacements = self
                 .resource_edits
@@ -670,13 +820,7 @@ impl Edit<'_> {
                 }
             }
         }
-        if let Some(staged) = self.staged_styles.as_ref()
-            && snapshot.styles_xml()
-                != match staged {
-                    StagedStyles::Replace(xml) => Some(xml.as_str()),
-                    StagedStyles::Remove => None,
-                }
-        {
+        if snapshot.styles_xml() != style_after {
             return Err(Error::InvalidFormat(
                 "ODC styles edit failed package readback".into(),
             ));
@@ -703,6 +847,7 @@ impl Edit<'_> {
                 exact_changes,
                 replaces_chart,
                 style_change,
+                style_property_changes,
                 resource_changes,
                 definition_changes,
             },
@@ -771,6 +916,7 @@ pub struct Patch {
     exact_changes: Vec<crate::ExactChange>,
     replaces_chart: bool,
     style_change: Option<StylesChange>,
+    style_property_changes: Vec<crate::ChartStylePropertyChange>,
     resource_changes: Vec<ResourceChange>,
     definition_changes: Vec<crate::DefinitionChange>,
 }
@@ -861,7 +1007,7 @@ impl Patch {
         }
         let source = Chart::from_bytes_with_limits(bytes[cursor..source_end].to_vec(), limits)?;
         let target = Chart::from_bytes_with_limits(bytes[source_end..target_end].to_vec(), limits)?;
-        Ok(patch_between(source, target))
+        patch_between(source, target)
     }
 
     /// Returns the semantic axis changes in transaction order.
@@ -886,6 +1032,16 @@ impl Patch {
     #[must_use]
     pub const fn style_change(&self) -> Option<&StylesChange> {
         self.style_change.as_ref()
+    }
+
+    /// Return typed chart formatting property changes.
+    ///
+    /// Direct commits retain transaction order. Composition collapses repeated
+    /// keys to one source-bound change, and durable patch reconstruction uses
+    /// the stable property order defined by the ODF surface.
+    #[must_use]
+    pub fn style_property_changes(&self) -> &[crate::ChartStylePropertyChange] {
+        &self.style_property_changes
     }
 
     /// Return package-resource changes in stable path order.
@@ -927,6 +1083,7 @@ impl Patch {
                 self.style_change.as_ref(),
                 next.style_change.as_ref(),
             ),
+            style_property_changes: compose_style_property_changes(self, next)?,
             resource_changes,
             definition_changes: self
                 .definition_changes
@@ -957,7 +1114,7 @@ impl Patch {
         let mut conflicts = Vec::new();
         let mut edit = self.source.edit();
         merge_package_content(self, other, &mut edit, &mut conflicts)?;
-        merge_package_styles(self, other, &mut edit, &mut conflicts);
+        merge_package_styles(self, other, &mut edit, &mut conflicts)?;
         merge_package_resources(self, other, &mut edit, &mut conflicts)?;
         if !conflicts.is_empty() {
             return Ok(PackageMerge::new(None, conflicts));
@@ -980,7 +1137,7 @@ impl Patch {
         let mut conflicts = Vec::new();
         let mut edit = destination.edit();
         transfer_package_content(self, destination, &mut edit, &mut conflicts)?;
-        transfer_package_styles(self, destination, &mut edit, &mut conflicts);
+        transfer_package_styles(self, destination, &mut edit, &mut conflicts)?;
         transfer_package_resources(self, destination, &mut edit, &mut conflicts)?;
         if !conflicts.is_empty() {
             return Ok(PackageMerge::new(None, conflicts));
@@ -1007,6 +1164,12 @@ impl Patch {
                 .collect(),
             replaces_chart: self.replaces_chart,
             style_change: self.style_change.as_ref().map(StylesChange::inverse),
+            style_property_changes: self
+                .style_property_changes
+                .iter()
+                .rev()
+                .map(crate::ChartStylePropertyChange::inverse)
+                .collect(),
             resource_changes: self
                 .resource_changes
                 .iter()
@@ -1284,7 +1447,26 @@ fn merge_package_styles(
     right: &Patch,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) {
+) -> Result<()> {
+    if style_property_only(left)? && style_property_only(right)? {
+        let before_conflicts = conflicts.len();
+        let merged = merge_style_property_changes(
+            &left.style_property_changes,
+            &right.style_property_changes,
+            conflicts,
+        )?;
+        if conflicts.len() != before_conflicts {
+            return Ok(());
+        }
+        for change in merged {
+            edit.update_chart_style_property(
+                change.style_name().to_owned(),
+                change.property(),
+                change.after().cloned(),
+            )?;
+        }
+        return Ok(());
+    }
     let base = left.source.styles_xml().map(str::to_owned);
     let left_value = left.target.styles_xml().map(str::to_owned);
     let right_value = right.target.styles_xml().map(str::to_owned);
@@ -1296,6 +1478,7 @@ fn merge_package_styles(
         Some(_) => {},
         None => conflicts.push(crate::Conflict::new("package.styles")),
     }
+    Ok(())
 }
 
 fn transfer_package_content(
@@ -1517,7 +1700,53 @@ fn transfer_package_styles(
     destination: &Chart,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) {
+) -> Result<()> {
+    if style_property_only(patch)? {
+        if !patch.style_property_changes.is_empty() && destination.styles_xml().is_none() {
+            conflicts.extend(
+                patch
+                    .style_property_changes
+                    .iter()
+                    .map(|change| crate::Conflict::new(style_property_path(change))),
+            );
+            return Ok(());
+        }
+        if !patch.style_property_changes.is_empty() {
+            let destination_styles = destination
+                .styles_xml()
+                .ok_or_else(|| Error::InvalidFormat("ODC destination styles are missing".into()))?;
+            if !crate::style_format::can_host_changes(
+                destination_styles,
+                &patch.style_property_changes,
+                destination.limits(),
+            )? {
+                conflicts.extend(
+                    patch
+                        .style_property_changes
+                        .iter()
+                        .map(|change| crate::Conflict::new(style_property_path(change))),
+                );
+                return Ok(());
+            }
+        }
+        for change in &patch.style_property_changes {
+            let current =
+                destination.chart_style_property(change.style_name(), change.property())?;
+            if current == change.after().cloned() {
+                continue;
+            }
+            if current != change.before().cloned() {
+                conflicts.push(crate::Conflict::new(style_property_path(change)));
+                continue;
+            }
+            edit.update_chart_style_property(
+                change.style_name().to_owned(),
+                change.property(),
+                change.after().cloned(),
+            )?;
+        }
+        return Ok(());
+    }
     let base = patch.source.styles_xml().map(str::to_owned);
     let changed = patch.target.styles_xml().map(str::to_owned);
     let destination_value = destination.styles_xml().map(str::to_owned);
@@ -1527,6 +1756,157 @@ fn transfer_package_styles(
         Some(None) => edit.remove_styles_xml(),
         None => conflicts.push(crate::Conflict::new("package.styles")),
     }
+    Ok(())
+}
+
+fn style_property_only(patch: &Patch) -> Result<bool> {
+    match (patch.source.styles_xml(), patch.target.styles_xml()) {
+        (None, None) => Ok(true),
+        (Some(before), Some(after)) => {
+            if before == after {
+                return Ok(true);
+            }
+            if patch.style_property_changes.is_empty() {
+                return Ok(false);
+            }
+            if !crate::style_format::owns_changes_between(
+                before,
+                after,
+                &patch.style_property_changes,
+                patch.source.limits(),
+            )? {
+                return Ok(false);
+            }
+            Ok(crate::style_format::apply_changes(
+                before,
+                &patch.style_property_changes,
+                patch.source.limits(),
+            )? == after)
+        },
+        _ => Ok(false),
+    }
+}
+
+fn normalize_style_property_changes(
+    left: &[crate::ChartStylePropertyChange],
+    right: &[crate::ChartStylePropertyChange],
+) -> Result<Vec<crate::ChartStylePropertyChange>> {
+    let mut normalized: Vec<crate::ChartStylePropertyChange> = Vec::new();
+    normalized
+        .try_reserve(left.len().saturating_add(right.len()))
+        .map_err(|error| {
+            Error::InvalidFormat(format!("ODC style compose allocation failed: {error}"))
+        })?;
+    for change in left.iter().chain(right) {
+        let existing_index = normalized.iter().position(|candidate| {
+            candidate.style_name() == change.style_name()
+                && candidate.property() == change.property()
+        });
+        let Some(index) = existing_index else {
+            if change.before() != change.after() {
+                normalized.push(change.clone());
+            }
+            continue;
+        };
+        let existing = &normalized[index];
+        if existing.after() != change.before() {
+            return Err(Error::InvalidFormat(format!(
+                "ODC composed chart style property '{}' is stale",
+                style_property_path(change)
+            )));
+        }
+        let before = existing.before().cloned();
+        let after = change.after().cloned();
+        if before == after {
+            normalized.remove(index);
+        } else {
+            normalized[index] = crate::ChartStylePropertyChange::new(
+                change.style_name().to_owned(),
+                change.property(),
+                before,
+                after,
+            );
+        }
+    }
+    Ok(normalized)
+}
+
+fn compose_style_property_changes(
+    earlier: &Patch,
+    later: &Patch,
+) -> Result<Vec<crate::ChartStylePropertyChange>> {
+    let normalized = normalize_style_property_changes(
+        &earlier.style_property_changes,
+        &later.style_property_changes,
+    )?;
+    let actual = match (earlier.source.styles_xml(), later.target.styles_xml()) {
+        (Some(before), Some(after)) => {
+            crate::style_format::changes_between(before, after, earlier.source.limits())?
+        },
+        _ => Vec::new(),
+    };
+    if style_property_changes_equivalent(&normalized, &actual) {
+        Ok(normalized)
+    } else {
+        // A complete styles.xml replacement can change the source value that a
+        // later typed patch records.  Reconstruct the final source-bound
+        // summary so merge/transfer can correctly classify that structural
+        // history as a whole-part change.
+        Ok(actual)
+    }
+}
+
+fn style_property_changes_equivalent(
+    left: &[crate::ChartStylePropertyChange],
+    right: &[crate::ChartStylePropertyChange],
+) -> bool {
+    left.len() == right.len()
+        && left.iter().all(|candidate| {
+            right.iter().any(|other| {
+                candidate.style_name() == other.style_name()
+                    && candidate.property() == other.property()
+                    && candidate.before() == other.before()
+                    && candidate.after() == other.after()
+            })
+        })
+}
+
+fn merge_style_property_changes(
+    left: &[crate::ChartStylePropertyChange],
+    right: &[crate::ChartStylePropertyChange],
+    conflicts: &mut Vec<crate::Conflict>,
+) -> Result<Vec<crate::ChartStylePropertyChange>> {
+    let mut merged = Vec::new();
+    merged
+        .try_reserve(left.len().saturating_add(right.len()))
+        .map_err(|error| {
+            Error::InvalidFormat(format!("ODC style merge allocation failed: {error}"))
+        })?;
+    for change in left.iter().chain(right) {
+        if let Some(existing) =
+            merged
+                .iter()
+                .find(|candidate: &&crate::ChartStylePropertyChange| {
+                    candidate.style_name() == change.style_name()
+                        && candidate.property() == change.property()
+                })
+        {
+            if existing.before() != change.before() || existing.after() != change.after() {
+                conflicts.push(crate::Conflict::new(style_property_path(change)));
+            }
+        } else {
+            merged.push(change.clone());
+        }
+    }
+    Ok(merged)
+}
+
+fn style_property_path(change: &crate::ChartStylePropertyChange) -> String {
+    format!(
+        "package.styles[{}].{:?}",
+        change.style_name(),
+        change.property()
+    )
 }
 
 fn merge_package_resources(
@@ -1648,7 +2028,7 @@ fn read_wire_length(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
         .map_err(|error| Error::InvalidFormat(format!("ODC patch length is too large: {error}")))
 }
 
-fn patch_between(source: Chart, target: Chart) -> Patch {
+fn patch_between(source: Chart, target: Chart) -> Result<Patch> {
     let before_axes = axis_states(&source);
     let after_axes = axis_states(&target);
     let changes = before_axes
@@ -1665,6 +2045,12 @@ fn patch_between(source: Chart, target: Chart) -> Patch {
         before_size: source.styles_xml().map(str::len),
         after_size: target.styles_xml().map(str::len),
     });
+    let style_property_changes = match (source.styles_xml(), target.styles_xml()) {
+        (Some(before), Some(after)) => {
+            crate::style_format::changes_between(before, after, source.limits())?
+        },
+        _ => Vec::new(),
+    };
     let resource_changes = resource_changes_between(&source, &target);
     let definition_changes = match (source.definition(), target.definition()) {
         (Ok(before), Ok(after)) if before != after => {
@@ -1677,16 +2063,17 @@ fn patch_between(source: Chart, target: Chart) -> Patch {
         &source.0.package.content_snapshot(),
         &target.0.package.content_snapshot(),
     );
-    Patch {
+    Ok(Patch {
         source,
         target,
         changes,
         exact_changes,
         replaces_chart,
         style_change,
+        style_property_changes,
         resource_changes,
         definition_changes,
-    }
+    })
 }
 
 fn axis_states(chart: &Chart) -> Vec<(Option<String>, Option<String>)> {

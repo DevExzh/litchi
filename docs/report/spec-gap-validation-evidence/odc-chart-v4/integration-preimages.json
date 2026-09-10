@@ -1,0 +1,63 @@
+{
+  "primary": "/home/zhuhe/code/litchi-spec-gaps",
+  "head": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+  "v4": "/var/tmp/litchi-odc-chart-validation-v4-20260910",
+  "paths": [
+    {
+      "path": "crates/litchi-odc/docs/FEATURE_MATRIX.md",
+      "primary_current_sha256": "f21053be26e52ec443c7a2b07b178f03febe277072f47999ae8408feffec36ab",
+      "primary_head_sha256": "f21053be26e52ec443c7a2b07b178f03febe277072f47999ae8408feffec36ab",
+      "v4_sha256": "b443cf0197150438f845b61836aad9c49d131d421330d7c99821372741922a0c",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/docs/FEATURE_MATRIX.md"
+    },
+    {
+      "path": "crates/litchi-odc/src/authoring/builder.rs",
+      "primary_current_sha256": "9001d0faf063fb8db3a88890fcb2c0a92a3e8f8b67ae5d99e234b385cc09a172",
+      "primary_head_sha256": "d8f0431443bd5147e18d17a1331b56cd192674c79785273b4e8cebd9329a53d5",
+      "v4_sha256": "9001d0faf063fb8db3a88890fcb2c0a92a3e8f8b67ae5d99e234b385cc09a172",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/src/authoring/builder.rs"
+    },
+    {
+      "path": "crates/litchi-odc/src/facade/mod.rs",
+      "primary_current_sha256": "cd1468091c84a74d92495b6bfe39e7c54a3d64fc54569d26e6707becfa7909ba",
+      "primary_head_sha256": "3a1284b5ce775b05df57bbe4b1e86919e54b5a163e4642b5176bf1d94c42a4c3",
+      "v4_sha256": "dd27c41236c709341afd249179908900a69b4c8dc5ac5bd7855560f22fed6934",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/src/facade/mod.rs"
+    },
+    {
+      "path": "crates/litchi-odc/src/lib.rs",
+      "primary_current_sha256": "7e40a1d19bd3f93d9a31b8cfbf2910341a19ae8b53628b24bda76ef86731a10b",
+      "primary_head_sha256": "eb5891a1fb2801fbe755f7d3938ac72cbc01c44da055e3c4515a7fe92df1ccea",
+      "v4_sha256": "7e40a1d19bd3f93d9a31b8cfbf2910341a19ae8b53628b24bda76ef86731a10b",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/src/lib.rs"
+    },
+    {
+      "path": "crates/litchi-odc/src/package/mod.rs",
+      "primary_current_sha256": "b188771cf96c28f8c009a60e608520991b5e1a6b2fb11ebe51be55091f100c69",
+      "primary_head_sha256": "ed50776769b9329c5bb53cc9923499429457d7a96402e2ff5a201099be078222",
+      "v4_sha256": "b188771cf96c28f8c009a60e608520991b5e1a6b2fb11ebe51be55091f100c69",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/src/package/mod.rs"
+    },
+    {
+      "path": "crates/litchi-odc/src/package/snapshot.rs",
+      "primary_current_sha256": "8c720887fe7d52243a293b326e10ddb254c1df772b5cce134ab5dadd8607cbbc",
+      "primary_head_sha256": "fd6a61bf8413019926c38412e1c5ff8baab5632e528cc2b85ffb1422c5993efe",
+      "v4_sha256": "e77aa54685ffe2abf3af7e17589578934362ee010a156f7a8bc2439f162e2b48",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/src/package/snapshot.rs"
+    },
+    {
+      "path": "crates/litchi-odc/src/style_format.rs",
+      "primary_current_sha256": "3a20fd0f0a3bc1d3b09c21f44ccf7f8d9c3b298ac0910c222c44960ac5ce6eb6",
+      "primary_head_sha256": null,
+      "v4_sha256": "0b573fdaadc3c55f64abb1c341a1296dda298cb96c3cf81fb206cce406eb402f",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/src/style_format.rs"
+    },
+    {
+      "path": "crates/litchi-odc/tests/chart_template_format.rs",
+      "primary_current_sha256": "28a2f5900ae68f2735fc9efc946295e20a5451f88296104dcbe09dfb0df1ceab",
+      "primary_head_sha256": null,
+      "v4_sha256": "a92e9e4092dc3fff958357c725b35f3f573edd1c2bcfde43f8c138492c8d5445",
+      "preimage_file": "/var/tmp/litchi-odc-primary-preimages-07fdb2f8a/crates/litchi-odc/tests/chart_template_format.rs"
+    }
+  ]
+}

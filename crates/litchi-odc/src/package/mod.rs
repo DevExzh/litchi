@@ -2,6 +2,7 @@
 
 mod snapshot;
 
+pub use snapshot::ChartPackageKind;
 pub(crate) use snapshot::{
-    MIMETYPE, ResourceReplacement, Snapshot, StylesReplacement, validate_authored_resource,
+    ResourceReplacement, Snapshot, StylesReplacement, validate_authored_resource,
 };

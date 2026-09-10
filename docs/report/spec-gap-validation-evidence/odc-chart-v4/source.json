@@ -1,0 +1,38 @@
+{
+  "base": "42be13576f97958c81526d9b239351c72d179fa8",
+  "status": " M crates/litchi-odc/docs/FEATURE_MATRIX.md\n M crates/litchi-odc/src/authoring/builder.rs\n M crates/litchi-odc/src/facade/mod.rs\n M crates/litchi-odc/src/lib.rs\n M crates/litchi-odc/src/package/mod.rs\n M crates/litchi-odc/src/package/snapshot.rs\n?? crates/litchi-odc/src/style_format.rs\n?? crates/litchi-odc/tests/chart_template_format.rs\n",
+  "paths": [
+    {
+      "path": "crates/litchi-odc/docs/FEATURE_MATRIX.md",
+      "sha256": "b443cf0197150438f845b61836aad9c49d131d421330d7c99821372741922a0c"
+    },
+    {
+      "path": "crates/litchi-odc/src/authoring/builder.rs",
+      "sha256": "9001d0faf063fb8db3a88890fcb2c0a92a3e8f8b67ae5d99e234b385cc09a172"
+    },
+    {
+      "path": "crates/litchi-odc/src/facade/mod.rs",
+      "sha256": "dd27c41236c709341afd249179908900a69b4c8dc5ac5bd7855560f22fed6934"
+    },
+    {
+      "path": "crates/litchi-odc/src/lib.rs",
+      "sha256": "7e40a1d19bd3f93d9a31b8cfbf2910341a19ae8b53628b24bda76ef86731a10b"
+    },
+    {
+      "path": "crates/litchi-odc/src/package/mod.rs",
+      "sha256": "b188771cf96c28f8c009a60e608520991b5e1a6b2fb11ebe51be55091f100c69"
+    },
+    {
+      "path": "crates/litchi-odc/src/package/snapshot.rs",
+      "sha256": "e77aa54685ffe2abf3af7e17589578934362ee010a156f7a8bc2439f162e2b48"
+    },
+    {
+      "path": "crates/litchi-odc/src/style_format.rs",
+      "sha256": "0b573fdaadc3c55f64abb1c341a1296dda298cb96c3cf81fb206cce406eb402f"
+    },
+    {
+      "path": "crates/litchi-odc/tests/chart_template_format.rs",
+      "sha256": "a92e9e4092dc3fff958357c725b35f3f573edd1c2bcfde43f8c138492c8d5445"
+    }
+  ]
+}

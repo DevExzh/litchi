@@ -10,6 +10,7 @@ mod merge;
 mod package;
 mod project;
 mod resource;
+mod style_format;
 mod transaction;
 mod validation;
 
@@ -30,7 +31,12 @@ pub use flat::{
 pub use limits::Limits;
 pub use litchi_odf_common::chart;
 pub use merge::{Conflict, DefinitionMerge};
+pub use package::ChartPackageKind;
 pub use resource::Resource;
+pub use style_format::{
+    ChartErrorCategory, ChartRegressionMovingType, ChartRegressionType, ChartStyleProperty,
+    ChartStylePropertyChange, ChartStyleValue, ChartSymbolName, ChartSymbolType,
+};
 pub use transaction::{
     DefinitionChange, DefinitionCommit, DefinitionEdit, DefinitionHistory, DefinitionPatch,
     DefinitionSnapshot, StyleTarget,
