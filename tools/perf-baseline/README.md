@@ -200,18 +200,26 @@ and summary SHA-256
 This partial custom publication metric is intentionally not entered into
 `claim-registry-v1.json`.
 
-The non-iWork Phase-1 CRUD taxonomy is recorded in the machine-readable
-[`docs/performance/crud-coverage-index-v1.json`](../../docs/performance/crud-coverage-index-v1.json).
-It is a representative (not exhaustive) mapping: `measured` is reserved for
-the full-run timing contract; the checked identity artifact is not timing
-evidence. Scheduled/manual full runs validate `target/perf/container-baseline.json`
-with at least 15 samples for each measured selector/corpus. `correctness-only`
-rows explicitly make no retained baseline timing claim. Each category binds to
-exact selectors and either checked schema-2 corpus IDs or an explicit
-generated-per-run shape. Validate it with
-`python3 tools/validate_crud_coverage_index.py`; the checker reads the current
-selector registry directly, treats documentation paths as navigation only, and
-keeps unsupported work explicit.
+The current non-iWork Phase-1 CRUD taxonomy is recorded in the machine-readable
+[`docs/performance/crud-coverage-index-v2.json`](../../docs/performance/crud-coverage-index-v2.json).
+Version 2 binds the exact `Case::name` order, count, and newline-delimited
+selector-name SHA-256 from `tools/perf-baseline/src/lib.rs` (currently 443
+selectors). Its coverage section accounts for every selector as either a
+representative mapping or an explicit exclusion reason. The historical
+[`crud-coverage-index-v1.json`](../../docs/performance/crud-coverage-index-v1.json)
+is retained unchanged for old publication replay. The mapping remains
+representative rather than exhaustive: `measured` is reserved for the full-run
+timing contract; the checked identity artifact is not timing evidence.
+Scheduled/manual full runs validate `target/perf/container-baseline.json` with
+at least 15 samples for each measured selector/corpus. `correctness-only` rows
+explicitly make no retained baseline timing claim. Each category binds to exact
+selectors and either checked schema-2 corpus IDs or an explicit generated-per-run
+shape. Validate the current index with
+`python3 tools/validate_crud_coverage_index.py`; the checker reads and compares
+the complete current selector registry with a fail-closed Rust lexer/parser that
+ignores nested comments and string literals and rejects wildcard or unsupported
+`Case::name` arms. Documentation paths are navigation only, and unsupported work
+stays explicit.
 
 ## Real-producer security correctness corpus
 

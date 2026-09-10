@@ -44,6 +44,15 @@ not a current completion score. The authority record lists eight remaining
 work classes. ADR-0005 and ADR-0008 remain open for their full applicable
 latency, resource, I/O, corpus, native/readback, scaling and release evidence.
 
+The active Phase-1 matrix is
+[`crud-coverage-index-v2.json`](crud-coverage-index-v2.json). It binds all 443
+current `Case::name` selectors by ordered list and SHA-256, and records whether
+each selector is a representative mapping or an explicit exclusion. The
+unchanged [`crud-coverage-index-v1.json`](crud-coverage-index-v1.json) remains
+the historical publication snapshot. Version 2 does not add timing evidence:
+`measured` still requires a validated full-run report, while
+`correctness-only` and `unsupported` remain non-timing statuses.
+
 ## Current audit: 0466 dense XLSX investigation (2026-09-08)
 
 [0466](changes/0466-xlsx-dense-commit-profile.md) advances the required
