@@ -7,6 +7,11 @@
 //! variable payloads as typed views.  It deliberately does not build a frame
 //! renderer tree, resolve frame file names, or apply list styles.
 //!
+//! The only supported write operation is a source-checked replacement of a
+//! complete record with another record of the same serialized length.  The
+//! candidate array is reparsed before the transaction is committed; therefore
+//! unknown payload bytes and all record boundaries remain intact.
+//!
 //! Unknown `Dofrh.dofrt` values are accepted as inert, source-preserved
 //! records. Known record types still enforce their typed field domains; this
 //! distinction lets an existing producer extension round-trip without making
@@ -14,6 +19,7 @@
 
 use super::super::package::{Error as PackageError, Result};
 use super::fib::FileInformationBlock;
+use std::sync::Arc;
 
 /// FIB `FibRgFcLcb2000` index for `fcRgDofr`/`lcbRgDofr`.
 pub const FIB_INDEX_RG_DOFR: usize = 99;
@@ -563,11 +569,23 @@ struct DofrRecordMeta {
 }
 
 /// A bounded `RgDofr` array from the main table stream.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct DofrArray {
     source: Vec<u8>,
     records: Vec<DofrRecordMeta>,
+    /// Optional owning DOC source used by the high-level facade to keep a
+    /// component patch bound to its complete immutable artifact. Detached
+    /// component readers leave this unset intentionally.
+    owner: Option<Arc<[u8]>>,
 }
+
+impl PartialEq for DofrArray {
+    fn eq(&self, other: &Self) -> bool {
+        self.source == other.source && self.records == other.records
+    }
+}
+
+impl Eq for DofrArray {}
 
 impl DofrArray {
     /// Parse the optional `RgDofr` table selected by `fcRgDofr`.
@@ -633,7 +651,26 @@ impl DofrArray {
             .try_reserve_exact(data.len())
             .map_err(|error| corrupted(format!("could not retain RgDofr source: {error}")))?;
         source.extend_from_slice(data);
-        Ok(Self { source, records })
+        Ok(Self {
+            source,
+            records,
+            owner: None,
+        })
+    }
+
+    /// Attach the immutable owning DOC source used by facade-level patches.
+    ///
+    /// The component bytes remain independently retained for borrowed record
+    /// access. The owner is an existing shared allocation, so this operation
+    /// does not copy the complete DOC artifact.
+    pub(crate) fn with_owner(mut self, owner: Arc<[u8]>) -> Self {
+        self.owner = Some(owner);
+        self
+    }
+
+    fn with_optional_owner(mut self, owner: Option<Arc<[u8]>>) -> Self {
+        self.owner = owner;
+        self
     }
 
     /// Exact source bytes, including every unknown payload byte.
@@ -670,6 +707,223 @@ impl DofrArray {
             bytes: &self.source[meta.start..meta.end],
             kind: meta.kind,
         })
+    }
+
+    /// Start a source-bound, same-length record replacement transaction.
+    #[must_use]
+    pub fn transaction(&self) -> DofrTransaction {
+        DofrTransaction {
+            source: self.clone(),
+            draft: self.source.clone(),
+        }
+    }
+
+    /// Validate a complete record replacement without creating a transaction.
+    ///
+    /// The returned value is `false` when the replacement is an exact byte
+    /// no-op. Index and fixed-record-length failures are reported before a
+    /// transaction can retain a second copy of the array.
+    pub fn preflight_record_replacement(&self, index: usize, replacement: &[u8]) -> Result<bool> {
+        let meta = *self
+            .records
+            .get(index)
+            .ok_or_else(|| corrupted("RgDofr record index is out of range"))?;
+        let expected_len = meta.end - meta.start;
+        if replacement.len() != expected_len {
+            return Err(corrupted(format!(
+                "RgDofr record replacement must remain {expected_len} bytes"
+            )));
+        }
+        Ok(&self.source[meta.start..meta.end] != replacement)
+    }
+}
+
+/// A checked transaction over complete `Dofrh` records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DofrTransaction {
+    source: DofrArray,
+    draft: Vec<u8>,
+}
+
+impl DofrTransaction {
+    /// Original parsed array that this transaction is based on.
+    #[must_use]
+    pub fn source(&self) -> &DofrArray {
+        &self.source
+    }
+
+    /// Current validated draft.
+    pub fn snapshot(&self) -> Result<DofrArray> {
+        DofrArray::parse_bytes(&self.draft)
+            .map(|array| array.with_optional_owner(self.source.owner.clone()))
+    }
+
+    /// Replace one complete record with a same-length serialized `Dofrh`.
+    ///
+    /// The replacement is copied only after the candidate array has been
+    /// reparsed successfully. A failed replacement leaves the draft unchanged.
+    pub fn replace_record_bytes(&mut self, index: usize, replacement: &[u8]) -> Result<&mut Self> {
+        self.source
+            .preflight_record_replacement(index, replacement)?;
+        let meta = *self
+            .source
+            .records
+            .get(index)
+            .ok_or_else(|| corrupted("RgDofr record index is out of range"))?;
+        let mut candidate = self.draft.clone();
+        candidate[meta.start..meta.end].copy_from_slice(replacement);
+        DofrArray::parse_bytes(&candidate)?;
+        self.draft = candidate;
+        Ok(self)
+    }
+
+    /// Commit the validated draft and return its reversible source patch.
+    pub fn commit(self) -> Result<DofrCommit> {
+        let owner = self.source.owner.clone();
+        let snapshot = DofrArray::parse_bytes(&self.draft)?.with_optional_owner(owner.clone());
+        let patch = DofrPatch {
+            source: self.source.source,
+            replacement: snapshot.source.clone(),
+            owner,
+        };
+        Ok(DofrCommit { snapshot, patch })
+    }
+}
+
+/// The result of committing a [`DofrTransaction`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DofrCommit {
+    snapshot: DofrArray,
+    patch: DofrPatch,
+}
+
+impl DofrCommit {
+    /// Validated post-edit array.
+    #[must_use]
+    pub fn snapshot(&self) -> &DofrArray {
+        &self.snapshot
+    }
+
+    /// Source-checked reversible patch.
+    #[must_use]
+    pub fn patch(&self) -> &DofrPatch {
+        &self.patch
+    }
+
+    /// Whether any serialized byte changed.
+    #[must_use]
+    pub fn changed(&self) -> bool {
+        self.patch.changed()
+    }
+
+    /// Consume the commit and return its post-edit array.
+    #[must_use]
+    pub fn into_snapshot(self) -> DofrArray {
+        self.snapshot
+    }
+}
+
+/// A reversible, source-checked same-length byte patch for `RgDofr`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DofrPatch {
+    source: Vec<u8>,
+    replacement: Vec<u8>,
+    owner: Option<Arc<[u8]>>,
+}
+
+impl DofrPatch {
+    /// Exact source bytes required before applying this patch.
+    #[must_use]
+    pub fn source_bytes(&self) -> &[u8] {
+        &self.source
+    }
+
+    /// Exact replacement bytes written by this patch.
+    #[must_use]
+    pub fn replacement_bytes(&self) -> &[u8] {
+        &self.replacement
+    }
+
+    /// Whether applying this patch changes any serialized `RgDofr` byte.
+    #[must_use]
+    pub fn changed(&self) -> bool {
+        self.source != self.replacement
+    }
+
+    /// Validate the FIB-selected range and its exact source bytes without
+    /// taking a mutable stream copy.
+    ///
+    /// The returned range is suitable for a subsequent in-place apply after
+    /// the caller has completed any policy checks. No bytes are modified.
+    pub fn preflight_table_stream(
+        &self,
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+    ) -> Result<(usize, usize)> {
+        let (start, end) = table_range(fib, table_stream.len())?;
+        if table_stream[start..end] != self.source {
+            return Err(corrupted(
+                "RgDofr patch source does not match the table stream",
+            ));
+        }
+        Ok((start, end))
+    }
+
+    /// Apply this patch to a matching parsed array.
+    pub fn apply(&self, source: &DofrArray) -> Result<DofrArray> {
+        if source.source != self.source {
+            return Err(corrupted("RgDofr patch source does not match the array"));
+        }
+        DofrArray::parse_bytes(&self.replacement)
+            .map(|array| array.with_optional_owner(source.owner.clone()))
+    }
+
+    /// Revert this patch from a matching post-edit array.
+    pub fn revert(&self, replacement: &DofrArray) -> Result<DofrArray> {
+        if replacement.source != self.replacement {
+            return Err(corrupted(
+                "RgDofr patch replacement does not match the array",
+            ));
+        }
+        DofrArray::parse_bytes(&self.source)
+            .map(|array| array.with_optional_owner(replacement.owner.clone()))
+    }
+
+    /// Apply this patch in place to the FIB-selected table-stream range.
+    pub fn apply_to_table_stream(
+        &self,
+        fib: &FileInformationBlock,
+        table_stream: &mut [u8],
+    ) -> Result<()> {
+        let (start, end) = self.preflight_table_stream(fib, table_stream)?;
+        table_stream[start..end].copy_from_slice(&self.replacement);
+        Ok(())
+    }
+
+    /// Revert this patch in place from the matching table-stream range.
+    pub fn revert_to_table_stream(
+        &self,
+        fib: &FileInformationBlock,
+        table_stream: &mut [u8],
+    ) -> Result<()> {
+        let (start, end) = table_range(fib, table_stream.len())?;
+        if table_stream[start..end] != self.replacement {
+            return Err(corrupted(
+                "RgDofr patch replacement does not match the table stream",
+            ));
+        }
+        table_stream[start..end].copy_from_slice(&self.source);
+        Ok(())
+    }
+
+    /// Whether this changed patch was produced from the supplied immutable
+    /// DOC source. Pointer identity is a fast path, while exact bytes permit
+    /// independently reopened snapshots of the same source to authorize the
+    /// patch without admitting a different document.
+    pub(crate) fn owner_matches(&self, owner: &Arc<[u8]>) -> bool {
+        self.owner
+            .as_ref()
+            .is_some_and(|bound| Arc::ptr_eq(bound, owner) || bound.as_ref() == owner.as_ref())
     }
 }
 
@@ -943,6 +1197,31 @@ fn parse_record_payload<'a>(data: &'a [u8], record: DofrRecordMeta) -> Result<Do
     decode_payload(record.kind, &bytes[DOFR_HEADER_SIZE..])
 }
 
+fn table_range(fib: &FileInformationBlock, table_stream_len: usize) -> Result<(usize, usize)> {
+    let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_RG_DOFR) else {
+        return Err(corrupted("RgDofr table pointer is unavailable"));
+    };
+    let length =
+        usize::try_from(length).map_err(|_| corrupted("RgDofr length does not fit in memory"))?;
+    if length == 0 {
+        return Err(corrupted("RgDofr table pointer has zero length"));
+    }
+    if length > MAX_DOFR_BYTES {
+        return Err(corrupted(format!(
+            "RgDofr exceeds the {MAX_DOFR_BYTES}-byte limit"
+        )));
+    }
+    let start =
+        usize::try_from(offset).map_err(|_| corrupted("RgDofr offset does not fit in memory"))?;
+    let end = start
+        .checked_add(length)
+        .ok_or_else(|| corrupted("RgDofr range overflows"))?;
+    if end > table_stream_len {
+        return Err(corrupted("RgDofr extends beyond the table stream"));
+    }
+    Ok((start, end))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1135,5 +1414,74 @@ mod tests {
             assert_eq!(array.len(), 6);
             assert_eq!(array.get(2).unwrap().kind(), DofrType::from_raw(name_kind));
         }
+    }
+
+    #[test]
+    fn replacement_is_atomic_source_checked_and_reversible() {
+        let source_bytes = frame_set();
+        let source = DofrArray::parse_bytes(&source_bytes).unwrap();
+        let mut transaction = source.transaction();
+        let replacement = record(1, &frame_payload(1));
+        transaction.replace_record_bytes(1, &replacement).unwrap();
+        let commit = transaction.commit().unwrap();
+        assert!(commit.changed());
+        assert_eq!(commit.patch().apply(&source).unwrap(), *commit.snapshot());
+        assert_eq!(
+            commit.patch().revert(commit.snapshot()).unwrap().bytes(),
+            source.bytes()
+        );
+
+        let mut stale = source.transaction();
+        assert!(
+            stale
+                .replace_record_bytes(1, &record(1, &[0; DOFR_FSN_SIZE - 1]))
+                .is_err()
+        );
+        assert_eq!(stale.snapshot().unwrap().bytes(), source.bytes());
+        let mut changed_source = source_bytes.clone();
+        let last = changed_source.len() - 1;
+        changed_source[last] ^= 0xFF;
+        let changed = DofrArray::parse_bytes(&changed_source).unwrap();
+        assert!(commit.patch().apply(&changed).is_err());
+    }
+
+    #[test]
+    fn applies_only_to_the_declared_fib_range() {
+        let source = frame_set();
+        let mut replacement = source.clone();
+        let frame_start = record(0, &[]).len();
+        replacement[frame_start + 4..frame_start + 8].copy_from_slice(&1u32.to_le_bytes());
+        let source_array = DofrArray::parse_bytes(&source).unwrap();
+        let replacement_array = DofrArray::parse_bytes(&replacement).unwrap();
+        let mut transaction = source_array.transaction();
+        transaction
+            .replace_record_bytes(1, replacement_array.get(1).unwrap().bytes())
+            .unwrap();
+        let patch = transaction.commit().unwrap().patch().clone();
+
+        let index = FIB_INDEX_RG_DOFR;
+        let offset = 3u32;
+        let mut fib_data = vec![0; 154 + (index + 1) * 8];
+        fib_data[0..2].copy_from_slice(&0xA5ECu16.to_le_bytes());
+        fib_data[2..4].copy_from_slice(&0x00C1u16.to_le_bytes());
+        fib_data[152..154].copy_from_slice(&((index + 1) as u16).to_le_bytes());
+        let pointer = 154 + index * 8;
+        fib_data[pointer..pointer + 4].copy_from_slice(&offset.to_le_bytes());
+        fib_data[pointer + 4..pointer + 8].copy_from_slice(&(source.len() as u32).to_le_bytes());
+        let fib = FileInformationBlock::parse(&fib_data).unwrap();
+        let mut table = vec![0xCC; offset as usize + source.len() + 2];
+        table[offset as usize..offset as usize + source.len()].copy_from_slice(&source);
+        patch.apply_to_table_stream(&fib, &mut table).unwrap();
+        assert_eq!(
+            &table[offset as usize..offset as usize + source.len()],
+            replacement.as_slice()
+        );
+        patch.revert_to_table_stream(&fib, &mut table).unwrap();
+        assert_eq!(
+            &table[offset as usize..offset as usize + source.len()],
+            source.as_slice()
+        );
+        table[offset as usize] ^= 1;
+        assert!(patch.apply_to_table_stream(&fib, &mut table).is_err());
     }
 }

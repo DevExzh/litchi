@@ -241,9 +241,9 @@ pub use parts::document_properties_2007::{
 pub use parts::document_properties_2010::{DocumentId, Dop2010};
 pub use parts::document_properties_2013::Dop2013;
 pub use parts::dofr::{
-    DofrArray, DofrChildMarker, DofrDivider, DofrDividerUnits, DofrFrame, DofrFrameKind,
-    DofrListStyle, DofrListStyles, DofrPayload, DofrRecord, DofrScrollType, DofrSplitter, DofrType,
-    DofrXstz,
+    DofrArray, DofrChildMarker, DofrCommit, DofrDivider, DofrDividerUnits, DofrFrame,
+    DofrFrameKind, DofrListStyle, DofrListStyles, DofrPatch, DofrPayload, DofrRecord,
+    DofrScrollType, DofrSplitter, DofrTransaction, DofrType, DofrXstz,
 };
 pub use parts::embedded_fonts::{DocumentEmbeddedFonts, EmbeddedFont};
 pub use parts::envelope::{
