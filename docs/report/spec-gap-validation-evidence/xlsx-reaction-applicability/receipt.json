@@ -1,0 +1,11 @@
+{
+  "base": "026b6fc8b54fffedc799f6ab58d80ffc69a10507",
+  "matrix_sha256": "fcb4fe52e27f71d8bc867d9e5824ac343344753ea7ada95e43a1f9eaaf3ad5a6",
+  "normative_inputs": {
+    "3rdparty/specs/[MS-OREACTXML]/1 Introduction/1.3 Overview.md": "b86b4432b23ca671b38b454ef9ec97d35829b892ae4e28f3e4a9654299386365",
+    "3rdparty/specs/[MS-OREACTXML]/1 Introduction/1.5 Applicability Statement.md": "11eb259f989f2825571b874bbd50ab349555c7110c26d15c1dc953f3003f673d"
+  },
+  "review": "Both local normative sections explicitly identify WordprocessingML; the pending one-row XLSX N/A correction is accurate. No general claim about Excel service reactions.",
+  "scope": "documentation only; no implementation or native compatibility claim",
+  "pending_row_preservation": "existing row staged byte-identically; no other matrix changes"
+}
