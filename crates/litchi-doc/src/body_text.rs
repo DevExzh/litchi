@@ -2041,10 +2041,14 @@ impl Edit {
         mut cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Commit> {
         let mut observer = observer;
+        let signed = self.signed;
         let bytes = observe_phase(&mut observer, DiagnosticPhase::Finish, || {
             self.finish_candidate()
         })?;
         if bytes != self.source.bytes() {
+            if signed {
+                return Err(Error::Refused(Refusal::SignedSource));
+            }
             self.editor
                 .authorize_rendered(&bytes)
                 .map_err(map_protection_error)?;
@@ -2218,6 +2222,10 @@ impl Patch {
     }
 
     /// Whether this in-memory patch changed a supported inert auxiliary table.
+    ///
+    /// Auxiliary bytes remain fully covered by exact-source apply/inverse
+    /// operations; the durable semantic envelope intentionally refuses them
+    /// until it has a dedicated wire vocabulary.
     #[must_use]
     pub const fn has_auxiliary_changes(&self) -> bool {
         self.auxiliary_changed
@@ -2303,7 +2311,9 @@ impl Patch {
     /// # Errors
     ///
     /// Returns [`PatchError`] when the requested wire limits cannot represent
-    /// every semantic operation and inverse.
+    /// every semantic operation and inverse. In-memory auxiliary-table edits
+    /// are intentionally refused until the durable envelope has a matching
+    /// binary-table vocabulary.
     pub fn to_durable(
         &self,
         limits: PatchLimits,
@@ -4279,6 +4289,7 @@ mod tests {
         CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
         Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
     };
+    use crate::parts::dofr::{DofrFrameKind, DofrPayload};
     use crate::parts::fib::FileInformationBlock;
     use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
@@ -4375,6 +4386,81 @@ mod tests {
         package
             .add_stream(vec!["OpaqueVendorData".to_string()], b"untouched".to_vec())
             .expect("opaque stream should be admitted");
+        package.finish().expect("fixture package should finish")
+    }
+
+    fn dofr_record(kind: u32, payload: &[u8]) -> Vec<u8> {
+        let size = u32::try_from(8usize + payload.len()).expect("Dofr record fits");
+        let mut record = Vec::with_capacity(usize::try_from(size).expect("record size fits"));
+        record.extend_from_slice(&size.to_le_bytes());
+        record.extend_from_slice(&kind.to_le_bytes());
+        record.extend_from_slice(payload);
+        record
+    }
+
+    fn doc_with_auxiliary_tables() -> Vec<u8> {
+        let mut package =
+            PackageEditor::open(doc(&["alpha bravo"]), Targets::default(), Limits::default())
+                .expect("fixture package should open");
+        let word_path = ["WordDocument".to_string()];
+        let mut word = package
+            .stream(&word_path)
+            .expect("WordDocument stream")
+            .to_vec();
+        let fib = FileInformationBlock::parse(&word).expect("fixture FIB");
+        assert!(fib.table_pointer_count().expect("FIB pair count") > 99);
+        let table_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+        let table_path = [table_name.to_string()];
+        let mut table = package.stream(&table_path).expect("table stream").to_vec();
+
+        let mut selection = vec![0u8; 36];
+        selection[2] = 1;
+        selection[4..8].copy_from_slice(&4i32.to_le_bytes());
+        selection[8..12].copy_from_slice(&8i32.to_le_bytes());
+        selection[20..24].copy_from_slice(&4i32.to_le_bytes());
+        selection[24..26].copy_from_slice(&1u16.to_le_bytes());
+        selection[32..34].copy_from_slice(&(-100i16).to_le_bytes());
+        selection[34..36].copy_from_slice(&100i16.to_le_bytes());
+        let selection_offset = u32::try_from(table.len()).expect("table offset fits");
+        table.extend_from_slice(&selection);
+
+        let mut frame_payload = vec![0u8; 36];
+        frame_payload[12..16].copy_from_slice(&2u32.to_le_bytes());
+        let mut dofr = dofr_record(0, &[]);
+        dofr.extend_from_slice(&dofr_record(1, &frame_payload));
+        let dofr_offset = u32::try_from(table.len()).expect("table offset fits");
+        table.extend_from_slice(&dofr);
+
+        for (index, offset, length) in [
+            (30usize, selection_offset, selection.len()),
+            (99usize, dofr_offset, dofr.len()),
+        ] {
+            let pair = 154usize
+                .checked_add(index.checked_mul(8).expect("FIB pair offset"))
+                .expect("FIB pair offset");
+            word[pair..pair + 4].copy_from_slice(&offset.to_le_bytes());
+            word[pair + 4..pair + 8].copy_from_slice(
+                &u32::try_from(length)
+                    .expect("table length fits")
+                    .to_le_bytes(),
+            );
+        }
+        package
+            .put_stream(&word_path, word)
+            .expect("replace WordDocument stream");
+        package
+            .put_stream(&table_path, table)
+            .expect("replace table stream");
+        package
+            .add_stream(
+                vec!["OpaqueVendorData".to_string()],
+                b"untouched auxiliary stream".to_vec(),
+            )
+            .expect("opaque auxiliary stream");
         package.finish().expect("fixture package should finish")
     }
 
@@ -5013,6 +5099,131 @@ mod tests {
 
         let other = Snapshot::open(doc(&["other"]), Limits::default()).expect("other source");
         assert!(matches!(commit.patch().apply(&other), Err(Error::Conflict)));
+    }
+
+    #[test]
+    fn auxiliary_tables_publish_through_body_commit_and_reopen() {
+        let source =
+            Snapshot::open(doc_with_auxiliary_tables(), Limits::default()).expect("auxiliary DOC");
+        let selection = source
+            .saved_selection()
+            .expect("saved-selection read")
+            .expect("saved-selection record");
+        assert_eq!(selection.cp_first(), 4);
+        let dofr = source
+            .dofr_records()
+            .expect("Dofr read")
+            .expect("Dofr records");
+        assert_eq!(dofr.len(), 2);
+
+        let mut no_op = source.edit().expect("no-op body edit");
+        assert!(
+            !no_op
+                .edit_saved_selection(|_| Ok(()))
+                .expect("no-op Selsf edit")
+        );
+        let no_op_commit = no_op.commit().expect("no-op auxiliary commit");
+        assert!(!no_op_commit.changed());
+        assert_eq!(no_op_commit.snapshot().bytes(), source.bytes());
+
+        let mut edit = source.edit().expect("body edit");
+        assert!(
+            edit.edit_saved_selection(|transaction| {
+                transaction.set_cp_anchor(5)?.set_range(5, 9).map(|_| ())
+            })
+            .expect("Selsf edit")
+        );
+        let mut replacement = dofr.get(1).expect("frame record").bytes().to_vec();
+        replacement[20..24].copy_from_slice(&1u32.to_le_bytes());
+        assert!(
+            edit.replace_dofr_record(1, &replacement)
+                .expect("Dofr edit")
+        );
+        let commit = edit.commit().expect("auxiliary commit");
+        assert!(commit.changed());
+        assert!(commit.patch().has_auxiliary_changes());
+        assert!(commit.patch().to_durable(patch_limits()).is_err());
+        let published = commit.snapshot();
+        let package =
+            PackageEditor::open(published.finish(), Targets::default(), Limits::default())
+                .expect("published package");
+        assert_eq!(
+            package
+                .stream(&["OpaqueVendorData".to_string()])
+                .expect("opaque stream"),
+            b"untouched auxiliary stream"
+        );
+        assert_eq!(
+            published
+                .saved_selection()
+                .expect("published Selsf")
+                .expect("published record")
+                .cp_first(),
+            5
+        );
+        let published_dofr = published
+            .dofr_records()
+            .expect("published Dofr")
+            .expect("published records");
+        let DofrPayload::Frame(frame) = published_dofr
+            .get(1)
+            .expect("published frame")
+            .payload()
+            .expect("published frame payload")
+        else {
+            panic!("expected frame payload");
+        };
+        assert_eq!(frame.frame_kind(), DofrFrameKind::FrameSet);
+
+        let reopened =
+            Snapshot::open(published.finish(), Limits::default()).expect("reopen published DOC");
+        assert_eq!(
+            reopened
+                .saved_selection()
+                .expect("reopened Selsf")
+                .expect("reopened record")
+                .cp_first(),
+            5
+        );
+        let reopened_dofr = reopened
+            .dofr_records()
+            .expect("reopened Dofr")
+            .expect("reopened records");
+        let DofrPayload::Frame(frame) = reopened_dofr
+            .get(1)
+            .expect("reopened frame")
+            .payload()
+            .expect("reopened payload")
+        else {
+            panic!("expected reopened frame payload");
+        };
+        assert_eq!(frame.frame_kind(), DofrFrameKind::FrameSet);
+
+        let inverse = commit.patch().inverse();
+        let reverted = inverse.apply(published).expect("inverse auxiliary patch");
+        assert_eq!(reverted.bytes(), source.bytes());
+
+        let mut stale = published.edit().expect("stale edit");
+        assert!(
+            stale
+                .edit_saved_selection(|transaction| {
+                    transaction.set_cp_anchor(6)?.set_range(6, 10).map(|_| ())
+                })
+                .expect("second selection edit")
+        );
+        let stale_commit = stale.commit().expect("second edit");
+        let mut mismatched = stale_commit.snapshot().edit().expect("mismatched edit");
+        let source_patch = selection
+            .transaction()
+            .commit()
+            .expect("no-op selection patch")
+            .patch()
+            .clone();
+        assert!(
+            mismatched
+                .apply_saved_selection_patch(&source_patch)
+                .is_err()
+        );
     }
 
     #[test]

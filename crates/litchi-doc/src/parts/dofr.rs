@@ -377,7 +377,7 @@ impl DofrSplitter {
         self.three_d_border
     }
 
-    /// Undefined splitter flags retained as a raw value.
+    /// Required-zero splitter flags (always zero in a valid record).
     #[must_use]
     pub const fn unused(&self) -> u32 {
         self.unused
@@ -449,7 +449,7 @@ impl DofrListStyle {
         self.style_defined
     }
 
-    /// Undefined high bits retained from the serialized entry.
+    /// Required-zero high bits (always zero in a valid record).
     #[must_use]
     pub const fn unused(&self) -> u8 {
         self.unused
@@ -1038,12 +1038,15 @@ fn decode_payload<'a>(kind: DofrType, payload: &'a [u8]) -> Result<DofrPayload<'
                 )));
             }
             let flags = read_u32(payload, 8, "DofrFsnSpbd.flags")?;
+            if flags >> 2 != 0 {
+                return Err(corrupted("DofrFsnSpbd.fUnused must be zero"));
+            }
             Ok(DofrPayload::FrameSplitter(DofrSplitter {
                 width_twips,
                 color: read_u32(payload, 4, "DofrFsnSpbd.cvSpb")?,
                 no_border: flags & 1 != 0,
                 three_d_border: flags & 2 != 0,
-                unused: flags >> 2,
+                unused: 0,
             }))
         },
         DofrType::ListStyles => Ok(DofrPayload::ListStyles(parse_list_styles(payload)?)),
@@ -1098,6 +1101,12 @@ fn parse_list_styles<'a>(data: &'a [u8]) -> Result<DofrListStyles<'a>> {
         return Err(corrupted(
             "DofrRglstsf list-style array is not record-bounded",
         ));
+    }
+    for index in 0..count {
+        let raw = read_u32(data, 4 + index * 4, "DofrRglstsf.rglstsf")?;
+        if raw >> 29 != 0 {
+            return Err(corrupted("DofrRglstsf.Lstsf.fUnused must be zero"));
+        }
     }
     Ok(DofrListStyles {
         source: data,
@@ -1357,9 +1366,6 @@ mod tests {
         bytes.extend_from_slice(&record(1, &payload));
         bytes.extend_from_slice(&record(2, &u32::MAX.to_le_bytes()));
         bytes.extend_from_slice(&record(2, &0u32.to_le_bytes()));
-        let mut splitter = [0u8; DOFR_FSN_SPBD_SIZE];
-        splitter[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
-        bytes.extend_from_slice(&record(5, &splitter));
         let array = DofrArray::parse_bytes(&bytes).unwrap();
         let DofrPayload::Frame(frame) = array.get(1).unwrap().payload().unwrap() else {
             panic!("expected frame payload");
@@ -1370,10 +1376,29 @@ mod tests {
             panic!("expected marker payload");
         };
         assert_eq!(marker.unused(), 0x7FFF_FFFF);
-        let DofrPayload::FrameSplitter(splitter) = array.get(4).unwrap().payload().unwrap() else {
-            panic!("expected splitter payload");
+    }
+
+    #[test]
+    fn rejects_required_zero_bits_in_splitter_and_list_style() {
+        let mut splitter = [0u8; DOFR_FSN_SPBD_SIZE];
+        splitter[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
+        let mut splitter_bytes = record(0, &[]);
+        splitter_bytes.extend_from_slice(&record(5, &splitter));
+        assert!(DofrArray::parse_bytes(&splitter_bytes).is_err());
+
+        let mut list_style = Vec::new();
+        list_style.extend_from_slice(&1i32.to_le_bytes());
+        list_style.extend_from_slice(&0xE000_0000u32.to_le_bytes());
+        let mut list_style_bytes = record(6, &list_style);
+        assert!(DofrArray::parse_bytes(&list_style_bytes).is_err());
+
+        list_style[4..8].copy_from_slice(&0x1000_0003u32.to_le_bytes());
+        list_style_bytes = record(6, &list_style);
+        let array = DofrArray::parse_bytes(&list_style_bytes).unwrap();
+        let DofrPayload::ListStyles(styles) = array.get(0).unwrap().payload().unwrap() else {
+            panic!("expected list-style payload");
         };
-        assert_eq!(splitter.unused(), 0x3FFF_FFFF);
+        assert_eq!(styles.get(0).unwrap().unused(), 0);
     }
 
     #[test]

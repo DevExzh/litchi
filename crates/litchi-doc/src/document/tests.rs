@@ -10,7 +10,7 @@ mod lazy_auxiliary_tests {
     use std::io::Cursor;
 
     #[test]
-    fn malformed_pgp_dofr_and_print_metadata_are_deferred_and_cached() {
+    fn malformed_optional_auxiliary_tables_are_deferred_until_access() {
         let mut writer = Writer::new();
         writer.add_paragraph("Body").expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
@@ -23,7 +23,7 @@ mod lazy_auxiliary_tests {
             .stream(&word_path)
             .expect("WordDocument stream")
             .to_vec();
-        for index in [27usize, 28, 29, 99, 109] {
+        for index in [27usize, 28, 29, 30, 60, 99, 109] {
             let pair = 154 + index * 8;
             word[pair..pair + 4].copy_from_slice(&0u32.to_le_bytes());
             word[pair + 4..pair + 8].copy_from_slice(&1u32.to_le_bytes());
@@ -47,6 +47,7 @@ mod lazy_auxiliary_tests {
             .expect("unrelated document open must not parse optional tables");
         assert!(document.paragraph_groups_source.is_err());
         assert!(document.dofr_records_source.is_err());
+        assert!(document.saved_selection().is_err());
         let paragraph_error = document
             .paragraph_groups()
             .expect_err("malformed PGP metadata");
@@ -77,6 +78,7 @@ mod lazy_auxiliary_tests {
                 .to_string(),
             print_error.to_string()
         );
+        assert!(document.vba_signatures().is_err());
     }
 
     #[test]

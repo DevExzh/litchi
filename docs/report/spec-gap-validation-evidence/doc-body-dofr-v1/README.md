@@ -1,0 +1,7 @@
+# DOC body publication and DOFR validation
+
+Body edit/patch publication retains saved-selection and DOFR metadata through commit/reopen and exact inverse. Changed signed sources refuse publication. Optional malformed auxiliary tables remain lazy and their errors remain cached until access. DOFR splitter and list-style reserved fields now enforce the required-zero grammar in local MS-DOC sections 2.9.60 and 2.9.148; valid source encodings remain unchanged. These APIs expose inert metadata and do not render frames, execute list styles or apply UI selections.
+
+Root's clean archive of 527b1481c plus three reviewed code files passed 1,274 tests across 45 targets including doctests, with 14 existing ignored tests, strict all-target/all-feature Clippy, warnings-denied rustdoc and scoped Rust 1.95 formatting. Source and explicit build lock hashes stayed unchanged. Independent tests cover required-zero values, body publish/reopen, lazy malformed tables, auxiliary APIs and saved selections.
+
+The two earlier pending body/test files match the integrated files byte-for-byte. The third file adds the reviewed DOFR checks. Exact preimages and independent evidence are retained. The author manifest also names unchanged context files and a matrix backfill; root verified the context files and excluded matrix documentation from this code batch. That backfill contains 12 rows, correcting the earlier report's count of 11.
