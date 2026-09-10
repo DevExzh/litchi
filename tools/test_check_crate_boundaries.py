@@ -1257,6 +1257,57 @@ def add_iwa_table_cell_read_scaffold(
         )
 
 
+def add_neutral_table_model_scaffold(
+    root: Path,
+    *,
+    pages_source: str,
+) -> None:
+    """Install the smallest neutral-table fixture for the Pages seam ratchet."""
+
+    write_cargo_manifest_fixture(
+        root,
+        str(boundaries.NEUTRAL_TABLE_MANIFEST),
+        "[package]\nname = \"litchi-iwa-common\"\nversion = \"0.0.0\"\n",
+    )
+    module = root / boundaries.NEUTRAL_TABLE_MODULE_SOURCE
+    module.parent.mkdir(parents=True, exist_ok=True)
+    module.write_text(
+        "pub mod cell;\npub mod coordinate;\npub mod model;\n",
+        encoding="utf-8",
+    )
+    (module.parent / "cell.rs").write_text("pub mod value;\n", encoding="utf-8")
+    (module.parent / "cell" / "value.rs").parent.mkdir(parents=True, exist_ok=True)
+    (module.parent / "cell" / "value.rs").write_text(
+        "pub struct FiniteF64;\n"
+        "pub struct FiniteF64Error;\n"
+        "pub enum Type {}\n"
+        "pub enum Update {}\n"
+        "pub enum Value {}\n",
+        encoding="utf-8",
+    )
+    (module.parent / "coordinate.rs").write_text(
+        "pub struct AddressError;\n"
+        "pub struct CellPosition;\n"
+        "pub struct CellRange;\n"
+        "pub enum Error {}\n"
+        "pub type Result<T> = std::result::Result<T, Error>;\n",
+        encoding="utf-8",
+    )
+    (module.parent / "model.rs").write_text(
+        "pub struct Builder;\n"
+        "pub struct Cell;\n"
+        "pub struct Dimensions;\n"
+        "pub struct Error;\n"
+        "pub struct Grid;\n"
+        "pub struct Table;\n"
+        "pub struct View;\n",
+        encoding="utf-8",
+    )
+    pages = root / Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs")
+    pages.parent.mkdir(parents=True, exist_ok=True)
+    pages.write_text(pages_source, encoding="utf-8")
+
+
 def add_iwa_numbers_wire_formula_names_scaffold(
     root: Path,
     *,
@@ -26775,6 +26826,128 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_iwa_numbers_table_reader_retirement_accepts_deleted_host_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_reader_retirement_source_topology(
+                    Path(directory)
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_reader_retirement_rejects_each_source_return(
+        self,
+    ) -> None:
+        for relative in boundaries.RETIRED_IWA_NUMBERS_TABLE_READER_SOURCES:
+            with self.subTest(relative=relative):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / relative
+                    source.parent.mkdir(parents=True)
+                    source.write_text("fn restored_reader() {}\n", encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_numbers_table_reader_retirement_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(str(relative), violations[0])
+
+    def test_iwa_numbers_table_reader_retirement_rejects_exports_and_callers(
+        self,
+    ) -> None:
+        declarations = (
+            "mod formula_renderer;\n",
+            "pub mod table;\n",
+            "pub mod table_extractor;\n",
+            "pub use table::NumbersTable;\n",
+            "pub use table_extractor::TableDataExtractor;\n",
+        )
+        for declaration in declarations:
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    module = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_READER_MODULE_SOURCE
+                    module.parent.mkdir(parents=True)
+                    module.write_text(declaration, encoding="utf-8")
+
+                    violations = (
+                        boundaries.audit_iwa_numbers_table_reader_retirement_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "retired litchi-iwa Numbers table reader",
+                        violations[0],
+                    )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            caller = root / "crates/litchi-iwa/src/pages/editor/tables.rs"
+            caller.parent.mkdir(parents=True)
+            caller.write_text(
+                "use crate::numbers::table_extractor::TableDataExtractor;\n"
+                "fn read() { let _ = TableDataExtractor::new; }\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_numbers_table_reader_retirement_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 2)
+            self.assertTrue(any("import returned" in item for item in violations))
+            self.assertTrue(any("type returned" in item for item in violations))
+
+    def test_iwa_numbers_table_reader_retirement_ignores_focused_and_nested_tables(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            focused = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            focused.parent.mkdir(parents=True)
+            focused.write_text(
+                "struct TableDataExtractor;\n"
+                "fn focused() { let _ = TableDataExtractor; }\n",
+                encoding="utf-8",
+            )
+            nested = root / "crates/litchi-iwa/src/numbers/editor/table.rs"
+            nested.parent.mkdir(parents=True)
+            nested.write_text(
+                "mod table {\n    struct OtherTable;\n}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_reader_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_iwa_numbers_table_reader_retirement_masks_non_code_callers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            caller = root / "crates/litchi-iwa/src/pages/editor/tables.rs"
+            caller.parent.mkdir(parents=True)
+            caller.write_text(
+                "// use crate::numbers::table_extractor::TableDataExtractor;\n"
+                'const NOTE: &str = "NumbersTable TableDataExtractor";\n'
+                "fn read() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_reader_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_iwa_numbers_table_extractor_accepts_bounded_model_tile_routes(
         self,
     ) -> None:
@@ -47769,6 +47942,41 @@ fn rewrite_movie_title_operation(
             ):
                 with self.subTest(audit=audit.__name__):
                     self.assertEqual(audit(root), [])
+
+    def test_neutral_table_pages_semantic_requires_table_read_after_host_migration(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_neutral_table_model_scaffold(
+                root,
+                pages_source=(
+                    "use litchi_iwa_common::table::model::Table;\n"
+                    "pub struct PagesTable { semantic_table: Table }\n"
+                ),
+            )
+
+            violations = boundaries.audit_neutral_table_model_source_topology(root)
+            self.assertTrue(
+                any("must import common table::read::TableRead" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must store common table::read::TableRead" in item for item in violations),
+                violations,
+            )
+
+            (root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs").write_text(
+                "use litchi_iwa_common::table::read::TableRead;\n"
+                "pub struct PagesTable {\n"
+                "    table_read: TableRead,\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_neutral_table_model_source_topology(root),
+                [],
+            )
 
     def test_common_table_read_boundary_rejects_physical_imports_and_raw_ids(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

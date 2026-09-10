@@ -2,13 +2,15 @@
 
 use super::*;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};
-use litchi_iwa_common::comment::Comment;
+use litchi_iwa_common::LimitKind;
 use litchi_iwa_common::table::lock::State as TableLockState;
+use litchi_iwa_common::table::read::{Comment, TableRead};
 use litchi_numbers::cell::data_format::{
     Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
     Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
 };
 use litchi_numbers::table::merge::Region;
+use litchi_pages::{BodyTableSelector, Package as FocusedPagesPackage};
 
 /// Stable identity and dimensions of one native table attached to the Pages body.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,8 +38,7 @@ pub struct PagesTableInfo {
 pub struct PagesTable {
     /// Stable identity and dimensions of this table.
     pub info: PagesTableInfo,
-    semantic_table: litchi_iwa_common::table::model::Table,
-    comments: Box<[((usize, usize), Comment)]>,
+    table_read: TableRead,
     merges: Vec<Region>,
 }
 
@@ -46,12 +47,12 @@ impl PagesTable {
     pub fn get_cell(&self, row: usize, column: usize) -> Option<&PagesCellValue> {
         let position =
             litchi_iwa_common::table::coordinate::CellPosition::try_from_usize(row, column).ok()?;
-        self.semantic_table.get(position)
+        self.table_read.get(position)
     }
 
     /// Iterate over materialized cells without exposing the backing map.
     pub fn iter_cells(&self) -> impl Iterator<Item = ((usize, usize), &PagesCellValue)> + '_ {
-        self.semantic_table.iter_cells().map(|cell| {
+        self.table_read.iter_cells().map(|cell| {
             (
                 (
                     cell.position().row() as usize,
@@ -64,33 +65,186 @@ impl PagesTable {
 
     /// Return the number of materialized cells, including explicit empty cells.
     pub fn cell_count(&self) -> usize {
-        self.semantic_table.cell_count()
+        self.table_read.cell_count()
     }
 
     /// Borrow the comment attached to a materialized cell, if any.
     pub fn get_comment(&self, row: usize, column: usize) -> Option<&Comment> {
-        self.comments
-            .binary_search_by_key(&(row, column), |(position, _comment)| *position)
-            .ok()
-            .map(|index| &self.comments[index].1)
+        let position =
+            litchi_iwa_common::table::coordinate::CellPosition::try_from_usize(row, column).ok()?;
+        self.table_read.get_comment(position)
     }
 
     /// Iterate over cell comments without exposing the backing map.
     pub fn iter_comments(&self) -> impl Iterator<Item = ((usize, usize), &Comment)> + '_ {
-        self.comments
-            .iter()
-            .map(|(position, comment)| (*position, comment))
+        self.table_read.iter_comments().map(|comment| {
+            let position = comment.position();
+            (
+                (position.row() as usize, position.column() as usize),
+                comment.comment(),
+            )
+        })
     }
 
     /// Return the number of materialized cell comments.
     pub fn comment_count(&self) -> usize {
-        self.comments.len()
+        self.table_read.comment_count()
     }
 
     /// Borrow native merged-cell rectangles in formula-store order.
     pub fn merges(&self) -> &[Region] {
         &self.merges
     }
+}
+
+fn map_focused_cells_error(error: litchi_pages::BodyTableCellsError) -> Error {
+    match error {
+        litchi_pages::BodyTableCellsError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => map_focused_cells_limit(kind, observed, maximum),
+        litchi_pages::BodyTableCellsError::Allocation { amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Pages body-table cell read",
+                amount,
+            })
+        },
+        litchi_pages::BodyTableCellsError::TableNotFound
+        | litchi_pages::BodyTableCellsError::AmbiguousTableName
+        | litchi_pages::BodyTableCellsError::AmbiguousSelector => {
+            Error::ParseError(error.to_string())
+        },
+        litchi_pages::BodyTableCellsError::UnsupportedSource
+        | litchi_pages::BodyTableCellsError::InvalidSource => {
+            Error::InvalidFormat(format!("focused Pages table cells: {error}"))
+        },
+        error => Error::InvalidFormat(format!("focused Pages table cells: {error}")),
+    }
+}
+
+fn map_focused_cells_limit(
+    kind: litchi_pages::BodyTableCellsLimitKind,
+    observed: u64,
+    maximum: u64,
+) -> Error {
+    let Some(kind) = map_wire_limit_kind(kind) else {
+        return Error::InvalidFormat(format!(
+            "focused Pages table cells: {kind} limit exceeded: observed {observed}, maximum {maximum}"
+        ));
+    };
+    let (Ok(observed), Ok(maximum)) = (usize::try_from(observed), usize::try_from(maximum)) else {
+        return Error::InvalidFormat(format!(
+            "focused Pages table cells: {kind} limit values do not fit the host platform"
+        ));
+    };
+    Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+        kind,
+        observed,
+        limit: maximum,
+    })
+}
+
+fn map_focused_merges_error(error: litchi_pages::BodyTableMergesError) -> Error {
+    match error {
+        litchi_pages::BodyTableMergesError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => map_focused_merges_limit(kind, observed, maximum),
+        litchi_pages::BodyTableMergesError::Allocation { amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Pages body-table merge read",
+                amount,
+            })
+        },
+        litchi_pages::BodyTableMergesError::TableNotFound
+        | litchi_pages::BodyTableMergesError::AmbiguousTableName
+        | litchi_pages::BodyTableMergesError::AmbiguousSelector => {
+            Error::ParseError(error.to_string())
+        },
+        litchi_pages::BodyTableMergesError::UnsupportedSource
+        | litchi_pages::BodyTableMergesError::InvalidSource => {
+            Error::InvalidFormat(format!("focused Pages table merges: {error}"))
+        },
+        error => Error::InvalidFormat(format!("focused Pages table merges: {error}")),
+    }
+}
+
+fn map_focused_merges_limit(
+    kind: litchi_pages::BodyTableMergesLimitKind,
+    observed: u64,
+    maximum: u64,
+) -> Error {
+    let Some(kind) = map_wire_limit_kind(kind) else {
+        return Error::InvalidFormat(format!(
+            "focused Pages table merges: {kind} limit exceeded: observed {observed}, maximum {maximum}"
+        ));
+    };
+    let (Ok(observed), Ok(maximum)) = (usize::try_from(observed), usize::try_from(maximum)) else {
+        return Error::InvalidFormat(format!(
+            "focused Pages table merges: {kind} limit values do not fit the host platform"
+        ));
+    };
+    Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+        kind,
+        observed,
+        limit: maximum,
+    })
+}
+
+trait IntoWireLimitKind {
+    fn into_wire_limit_kind(self) -> Option<LimitKind>;
+}
+
+impl IntoWireLimitKind for litchi_pages::BodyTableCellsLimitKind {
+    fn into_wire_limit_kind(self) -> Option<LimitKind> {
+        match self {
+            Self::InputBytes | Self::WireBytes => Some(LimitKind::InputBytes),
+            Self::OutputBytes | Self::WireOutputBytes => Some(LimitKind::OutputBytes),
+            Self::WireFields => Some(LimitKind::Fields),
+            Self::WireNesting => Some(LimitKind::Nesting),
+            Self::WireWork => Some(LimitKind::RewriteWork),
+            Self::Entries
+            | Self::EntryBytes
+            | Self::TotalEntryBytes
+            | Self::PackageBytes
+            | Self::PayloadBytes
+            | Self::TotalPayloadBytes
+            | Self::PayloadObjects
+            | Self::PayloadMessages
+            | Self::PayloadItems
+            | Self::PayloadReferences => None,
+            _ => None,
+        }
+    }
+}
+
+impl IntoWireLimitKind for litchi_pages::BodyTableMergesLimitKind {
+    fn into_wire_limit_kind(self) -> Option<LimitKind> {
+        match self {
+            Self::InputBytes | Self::WireBytes => Some(LimitKind::InputBytes),
+            Self::OutputBytes | Self::WireOutputBytes => Some(LimitKind::OutputBytes),
+            Self::WireFields => Some(LimitKind::Fields),
+            Self::WireNesting => Some(LimitKind::Nesting),
+            Self::WireWork => Some(LimitKind::RewriteWork),
+            Self::Entries
+            | Self::EntryBytes
+            | Self::TotalEntryBytes
+            | Self::PackageBytes
+            | Self::PayloadBytes
+            | Self::TotalPayloadBytes
+            | Self::PayloadObjects
+            | Self::PayloadMessages
+            | Self::PayloadItems
+            | Self::PayloadReferences => None,
+            _ => None,
+        }
+    }
+}
+
+fn map_wire_limit_kind(kind: impl IntoWireLimitKind) -> Option<LimitKind> {
+    kind.into_wire_limit_kind()
 }
 
 impl PagesEditor {
@@ -104,39 +258,49 @@ impl PagesEditor {
 
     /// Read all materialized cell values from one reachable body table.
     pub fn table(&self, model_object_id: u64) -> Result<PagesTable> {
-        let info = self
-            .tables()?
+        let tables = self.tables()?;
+        let (table_position, info) = tables
             .into_iter()
-            .find(|table| table.model_object_id == model_object_id)
+            .enumerate()
+            .find(|(_position, table)| table.model_object_id == model_object_id)
             .ok_or_else(|| {
                 Error::ParseError(format!(
                     "Pages table model {model_object_id} is not attached to the body"
                 ))
             })?;
         let bytes = self.package().to_bytes()?;
-        let bundle = Bundle::from_bytes(&bytes)?;
-        let index = ObjectIndex::from_bundle(&bundle)?;
-        let object = index
-            .resolve_ref_id(&bundle, model_object_id)?
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("Pages table model {model_object_id} is missing"))
-            })?;
-        let table = TableDataExtractor::new(&bundle, &index)
-            .extract_table_from_object(&object)?
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Pages object {model_object_id} has no native table model"
-                ))
-            })?;
-        let (semantic_table, comments) = table.into_semantic_parts()?;
+        let package_limits = self.package().limits();
+        let archive_limits = package_limits.effective_archive_limits()?;
+        let focused_limits = litchi_pages::Limits::new(
+            package_limits.max_input_bytes(),
+            package_limits.max_entries(),
+            package_limits.max_entry_bytes(),
+            package_limits.max_total_bytes(),
+            package_limits.max_iwa_stream_bytes(),
+        )
+        .map_err(|error| Error::InvalidFormat(format!("Pages table limits: {error}")))?
+        .with_archive_limits(archive_limits)
+        .map_err(|error| Error::InvalidFormat(format!("Pages table archive limits: {error}")))?;
+        let focused = FocusedPagesPackage::from_bytes_with_limits(&bytes, focused_limits).map_err(
+            |error| Error::InvalidFormat(format!("focused Pages table source: {error}")),
+        )?;
+        let table_read = focused
+            .body_table_cells(BodyTableSelector::index(table_position))
+            .map_err(map_focused_cells_error)?;
+        if table_read.name() != info.name
+            || table_read.row_count() as usize != info.rows
+            || table_read.column_count() as usize != info.columns
+        {
+            return Err(Error::InvalidFormat(format!(
+                "focused Pages table at position {table_position} does not match host model {model_object_id}"
+            )));
+        }
         Ok(PagesTable {
             info,
-            semantic_table: semantic_table.into_shared(),
-            comments,
-            merges: crate::numbers::editor::table_cell_merges_in_package(
-                self.package(),
-                model_object_id,
-            )?,
+            table_read,
+            merges: focused
+                .body_table_merges(BodyTableSelector::index(table_position))
+                .map_err(map_focused_merges_error)?,
         })
     }
 

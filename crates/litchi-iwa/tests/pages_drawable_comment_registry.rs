@@ -536,7 +536,7 @@ fn assert_unrelated_content_preserved(
 struct TableSnapshot {
     info: PagesTableInfo,
     cells: Vec<((usize, usize), litchi_iwa::pages::PagesCellValue)>,
-    comments: Vec<((usize, usize), litchi_iwa_common::comment::Comment)>,
+    comments: Vec<((usize, usize), litchi_iwa_common::table::read::Comment)>,
 }
 
 fn table_snapshot(editor: &PagesEditor, model_object_id: u64) -> TestResult<TableSnapshot> {

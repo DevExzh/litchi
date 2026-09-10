@@ -4,15 +4,19 @@
 //! locations in IWA files. This allows objects to reference each other
 //! across different archive files.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+#[cfg(test)]
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::bundle::Bundle;
 use crate::{Error, Result};
+#[cfg(test)]
+use litchi_iwa_index::Reference;
 use litchi_iwa_index::{
     ByteSpan, FragmentId, IndexBuilder, IndexError, ObjectId, ObjectIndex as NeutralObjectIndex,
-    ObjectRecord, Reference,
+    ObjectRecord,
 };
 
 mod reference_extraction;
@@ -98,6 +102,7 @@ impl ObjectIndexEntry<'_> {
     }
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy)]
 struct BatchObject<'a> {
     request_position: usize,
@@ -366,6 +371,7 @@ impl ObjectIndex {
     /// The index validates identities while it is built and stores this order
     /// as compact immutable neutral records, so traversal does not allocate or
     /// depend on randomized hash-map order.
+    #[cfg(test)]
     pub fn iter_object_ids(&self) -> impl Iterator<Item = ObjectId> + '_ {
         self.snapshot.locations.objects().map(ObjectRecord::id)
     }
@@ -375,6 +381,7 @@ impl ObjectIndex {
     /// This is an owned convenience collection over [`Self::iter_object_ids`].
     /// The index invariants make the operation infallible; callers that only
     /// need to inspect the catalog should prefer the borrowed iterator.
+    #[cfg(test)]
     pub fn object_ids(&self) -> Vec<ObjectId> {
         self.iter_object_ids().collect()
     }
@@ -383,6 +390,7 @@ impl ObjectIndex {
     ///
     /// The identities are validated while the index is built, so this view
     /// performs no allocation or repeated wire-boundary conversion.
+    #[cfg(test)]
     pub fn fragment_object_ids(&self, fragment_name: &str) -> Option<&[ObjectId]> {
         let fragment = self
             .snapshot
@@ -424,21 +432,25 @@ impl ObjectIndex {
     }
 
     /// Collect all entries in deterministic numeric object-ID order.
+    #[cfg(test)]
     pub fn all_entries(&self) -> Vec<ObjectIndexEntry<'_>> {
         self.iter_entries().collect()
     }
 
     /// Find objects by type in deterministic numeric object-ID order.
+    #[cfg(test)]
     pub fn find_objects_by_type(&self, object_type: u32) -> Vec<ObjectIndexEntry<'_>> {
         self.iter_entries_by_type(object_type).collect()
     }
 
     /// Get typed dependencies without exposing raw sentinel IDs.
+    #[cfg(test)]
     pub fn dependencies(&self, object_id: ObjectId) -> Option<impl Iterator<Item = ObjectId> + '_> {
         self.snapshot.locations.outgoing(object_id)
     }
 
     /// Get typed dependents without exposing raw sentinel IDs.
+    #[cfg(test)]
     pub fn dependents(&self, object_id: ObjectId) -> Option<impl Iterator<Item = ObjectId> + '_> {
         self.snapshot.locations.incoming(object_id)
     }
@@ -447,11 +459,13 @@ impl ObjectIndex {
     ///
     /// Graph storage and native identifiers remain private to the adapter and
     /// neutral index; callers receive only the stable semantic edge values.
+    #[cfg(test)]
     pub fn references(&self) -> impl Iterator<Item = Reference> + '_ {
         self.snapshot.locations.references()
     }
 
     /// Check for a cycle through the validated identity API.
+    #[cfg(test)]
     pub fn has_cycle_from(&self, object_id: ObjectId) -> bool {
         self.snapshot.locations.has_cycle(object_id)
     }
@@ -475,6 +489,7 @@ impl ObjectIndex {
     /// O(V + E) where V is vertices and E is edges in the reachable subgraph
     ///
     /// Get typed transitive dependencies, including the starting object.
+    #[cfg(test)]
     pub fn reachable_from(&self, object_id: ObjectId) -> Vec<ObjectId> {
         self.snapshot.locations.reachable(object_id)
     }
@@ -495,8 +510,7 @@ impl ObjectIndex {
     ///
     /// The returned view borrows the bundle's immutable archive storage, so
     /// resolving an object does not clone its archive metadata or message
-    /// payloads. The view cannot outlive `bundle`; use [`Self::resolve`] when
-    /// an owned result must be retained after the bundle is dropped.
+    /// payloads. The view cannot outlive `bundle`.
     pub fn resolve_ref<'a>(
         &self,
         bundle: &'a Bundle,
@@ -516,7 +530,6 @@ impl ObjectIndex {
 
         Ok(Some(ResolvedObjectRef {
             id: object_id,
-            archive_info: &object.archive_info,
             messages: &object.messages,
         }))
     }
@@ -541,16 +554,8 @@ impl ObjectIndex {
         })
     }
 
-    /// Resolve an object through the validated identity API.
-    pub fn resolve(&self, bundle: &Bundle, object_id: ObjectId) -> Result<Option<ResolvedObject>> {
-        self.resolve_ref(bundle, object_id)
-            .map(|object| object.map(ResolvedObjectRef::into_owned))
-    }
     /// Borrow multiple indexed objects in the caller's request order.
-    ///
-    /// Archive lookups are grouped by fragment, while the returned views
-    /// borrow the original bundle and retain no duplicate payload allocation.
-    /// Duplicate typed IDs are rejected just like [`Self::resolve_many`].
+    #[cfg(test)]
     pub fn resolve_many_refs<'a>(
         &self,
         bundle: &'a Bundle,
@@ -605,6 +610,8 @@ impl ObjectIndex {
         Ok(objects)
     }
 
+    /// Resolve grouped batch requests while preserving caller order.
+    #[cfg(test)]
     fn resolve_many_refs_inner<'a>(
         &self,
         bundle: &'a Bundle,
@@ -651,7 +658,6 @@ impl ObjectIndex {
                     let object = indexed_object(archive, &request.entry, object_id, fragment_name)?;
                     let resolved_object = ResolvedObjectRef {
                         id: object_id,
-                        archive_info: &object.archive_info,
                         messages: &object.messages,
                     };
                     if resolved_slots[request.request_position]
@@ -671,34 +677,8 @@ impl ObjectIndex {
         Ok(resolved_slots)
     }
 
-    /// Batch-resolve objects through the validated identity API.
-    pub fn resolve_many(
-        &self,
-        bundle: &Bundle,
-        object_ids: &[ObjectId],
-    ) -> Result<Vec<ResolvedObject>> {
-        let references = self.resolve_many_refs(bundle, object_ids)?;
-        let mut objects = Vec::new();
-        reserve_vec_exact(
-            &mut objects,
-            references.len(),
-            "object index owned batch result storage",
-        )?;
-        objects.extend(references.into_iter().map(ResolvedObjectRef::into_owned));
-        Ok(objects)
-    }
-
-    /// Resolve an object and its typed dependency closure.
-    pub fn resolve_reachable(
-        &self,
-        bundle: &Bundle,
-        object_id: ObjectId,
-    ) -> Result<Vec<ResolvedObject>> {
-        let object_ids = self.reachable_from(object_id);
-        self.resolve_many(bundle, &object_ids)
-    }
-
     /// Check for an indexed object through the validated identity API.
+    #[cfg(test)]
     pub fn contains(&self, object_id: ObjectId) -> bool {
         self.snapshot.locations.object(object_id).is_some()
     }
@@ -706,30 +686,6 @@ impl ObjectIndex {
     /// Get the total number of indexed objects
     pub fn object_count(&self) -> usize {
         self.snapshot.locations.len()
-    }
-
-    /// Get the number of fragments (IWA files) in the index
-    pub fn fragment_count(&self) -> usize {
-        self.snapshot.locations.fragment_count()
-    }
-
-    /// Get statistics about the object index
-    pub fn stats(&self) -> ObjectIndexStats {
-        let total_objects = self.snapshot.locations.len();
-        let total_fragments = self.snapshot.locations.fragment_count();
-        let total_references = self.snapshot.locations.reference_count();
-        let avg_refs_per_object = if total_objects > 0 {
-            total_references as f64 / total_objects as f64
-        } else {
-            0.0
-        };
-
-        ObjectIndexStats {
-            total_objects,
-            total_fragments,
-            total_references,
-            avg_refs_per_object,
-        }
     }
 }
 
@@ -788,6 +744,7 @@ where
     })
 }
 
+#[cfg(test)]
 fn reserve_set<K>(values: &mut HashSet<K>, additional: usize, resource: &str) -> Result<()>
 where
     K: Eq + std::hash::Hash,
@@ -1014,30 +971,6 @@ fn indexed_object<'a>(
     Ok(object)
 }
 
-/// Statistics about the object index
-#[derive(Debug, Clone)]
-pub struct ObjectIndexStats {
-    /// Total number of objects in the index
-    pub total_objects: usize,
-    /// Total number of IWA fragments
-    pub total_fragments: usize,
-    /// Total number of object references
-    pub total_references: usize,
-    /// Average references per object
-    pub avg_refs_per_object: f64,
-}
-
-/// A resolved object with its full data
-#[derive(Debug, Clone)]
-pub struct ResolvedObject {
-    /// Validated object identifier.
-    id: ObjectId,
-    /// Archive information
-    pub archive_info: crate::archive::ArchiveInfo,
-    /// Raw message data
-    pub messages: Vec<RawMessage>,
-}
-
 /// A borrowed view of an indexed object and its immutable payloads.
 ///
 /// The view is tied to the private bundle used for resolution. It is the
@@ -1047,8 +980,6 @@ pub struct ResolvedObject {
 pub struct ResolvedObjectRef<'a> {
     /// Validated object identifier.
     id: ObjectId,
-    /// Borrowed archive information.
-    pub archive_info: &'a crate::archive::ArchiveInfo,
     /// Borrowed raw message data.
     pub messages: &'a [RawMessage],
 }
@@ -1059,13 +990,8 @@ impl ResolvedObjectRef<'_> {
         self.id
     }
 
-    /// Return the validated object identity, if the compatibility payload is
-    /// non-null.
-    pub const fn object_id(&self) -> Option<ObjectId> {
-        Some(self.id)
-    }
-
     /// Get the primary message type without allocating.
+    #[cfg(test)]
     pub fn primary_message_type(&self) -> Option<u32> {
         self.messages.first().map(|message| message.type_)
     }
@@ -1073,38 +999,6 @@ impl ResolvedObjectRef<'_> {
     /// Iterate over message types without cloning the message payloads.
     pub fn message_types(&self) -> impl Iterator<Item = u32> + '_ {
         self.messages.iter().map(|message| message.type_)
-    }
-
-    /// Clone the borrowed payloads into the legacy owned representation.
-    pub fn into_owned(self) -> ResolvedObject {
-        ResolvedObject {
-            id: self.id,
-            archive_info: self.archive_info.clone(),
-            messages: self.messages.to_vec(),
-        }
-    }
-}
-
-impl ResolvedObject {
-    /// Return the validated object identity.
-    pub const fn id(&self) -> ObjectId {
-        self.id
-    }
-
-    /// Return the validated object identity, if the compatibility payload is
-    /// non-null.
-    pub fn object_id(&self) -> Option<ObjectId> {
-        Some(self.id)
-    }
-
-    /// Get the primary message type
-    pub fn primary_message_type(&self) -> Option<u32> {
-        self.messages.first().map(|msg| msg.type_)
-    }
-
-    /// Get all message types
-    pub fn message_types(&self) -> Vec<u32> {
-        self.messages.iter().map(|msg| msg.type_).collect()
     }
 }
 
@@ -1460,7 +1354,7 @@ mod tests {
                 .map(|references| references.collect::<Vec<_>>()),
             Some(vec![source])
         );
-        assert_eq!(index.stats().total_references, 2);
+        assert_eq!(index.snapshot.locations.reference_count(), 2);
     }
 
     #[test]
@@ -1495,7 +1389,7 @@ mod tests {
                 .dependencies(ObjectId::try_from(10).unwrap())
                 .is_none()
         );
-        assert_eq!(index.stats().total_references, 0);
+        assert_eq!(index.snapshot.locations.reference_count(), 0);
     }
 
     #[test]
@@ -1530,7 +1424,7 @@ mod tests {
                 .map(|references| references.collect::<Vec<_>>()),
             Some(vec![ObjectId::try_from(20).unwrap()])
         );
-        assert_eq!(index.stats().total_references, 1);
+        assert_eq!(index.snapshot.locations.reference_count(), 1);
     }
 
     #[test]
@@ -1706,23 +1600,6 @@ mod tests {
                 ObjectId::try_from(2).unwrap()
             ]
         );
-
-        let resolved = index
-            .resolve_many(
-                &bundle,
-                &[
-                    ObjectId::try_from(2).unwrap(),
-                    ObjectId::try_from(1).unwrap(),
-                ],
-            )
-            .unwrap();
-        assert_eq!(
-            resolved
-                .into_iter()
-                .map(|object| object.id().get())
-                .collect::<Vec<_>>(),
-            vec![2, 1]
-        );
     }
 
     #[test]
@@ -1878,7 +1755,7 @@ mod tests {
 
         let empty_index = ObjectIndex::new();
         let error = empty_index
-            .resolve_many(&empty_bundle, &[object_id])
+            .resolve_many_refs(&empty_bundle, &[object_id])
             .unwrap_err();
         assert!(matches!(error, Error::Archive(message) if message.contains("not present")));
 
@@ -1900,7 +1777,9 @@ mod tests {
             )
             .unwrap();
 
-        let error = index.resolve_many(&empty_bundle, &[object_id]).unwrap_err();
+        let error = index
+            .resolve_many_refs(&empty_bundle, &[object_id])
+            .unwrap_err();
         assert!(
             matches!(error, Error::Bundle(message) if message.contains("could not be resolved"))
         );

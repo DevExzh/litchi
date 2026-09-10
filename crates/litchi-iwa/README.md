@@ -3503,3 +3503,12 @@ save/actual-close/exact-reopen receipt was produced. All four raw host APIs
 and their private helper remain retained. `MEDIA_PROPERTIES_NATIVE_VERIFIED`
 is absent, so this increment records source ownership and does not retire
 those routes or complete the monolith exit.
+
+### Host table reader retired (2026-09-10)
+
+The historical extractor described above has now been deleted along with its
+private renderer and `NumbersTable` model. Pages and Keynote host read adapters
+delegate to the focused packages and store common `TableRead` results. Read
+comments expose resolved semantic metadata rather than archive IDs. Focused
+Numbers and common-model tests retain the native and in-memory regressions.
+The host editor and mutation paths remain migration debt.

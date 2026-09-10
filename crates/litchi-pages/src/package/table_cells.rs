@@ -278,7 +278,9 @@ impl<'source> IntoIterator for NativeMessages<'source> {
     }
 }
 
-const MAX_MATERIALIZED_CELLS: usize = 1_000_000;
+// Keep the legacy table-reader ceiling.  The focused reader must not reduce
+// the number of sparse cells an already supported package can expose.
+const MAX_MATERIALIZED_CELLS: usize = 1 << 20;
 const MAX_SIDECAR_ENTRIES: usize = 1_000_000;
 
 /// Pages' aggregate ledger adapter for the shared cell and sidecar readers.
@@ -323,17 +325,11 @@ impl TableCellReadBudget for PagesCellReadBudget {
     }
 
     fn check_materialized_cells(&mut self, observed: usize) -> Result<(), Self::Error> {
-        if observed > MAX_MATERIALIZED_CELLS {
-            return Err(BodyTableCellsError::LimitExceeded {
-                kind: BodyTableCellsLimitKind::PayloadItems,
-                observed: usize_as_u64(observed),
-                maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
-            });
-        }
+        check_materialized_cell_limit(observed)?;
         let additional = observed.saturating_sub(self.materialized_cells);
-        self.wire
-            .charge_payload_items(additional)
-            .map_err(map_lock_error)?;
+        // Materialized cells are a semantic result bound, not archive header
+        // metadata items. Keep this counter independent so the archive's
+        // tighter metadata-item ceiling cannot reduce the legacy cell cap.
         self.wire
             .charge_payload_work(additional)
             .map_err(map_lock_error)?;
@@ -358,6 +354,17 @@ impl TableCellReadBudget for PagesCellReadBudget {
     fn map_issue(&mut self, issue: wire_cells::TableCellIssue) -> Self::Error {
         map_table_cell_issue(issue)
     }
+}
+
+fn check_materialized_cell_limit(observed: usize) -> Result<(), BodyTableCellsError> {
+    if observed > MAX_MATERIALIZED_CELLS {
+        return Err(BodyTableCellsError::LimitExceeded {
+            kind: BodyTableCellsLimitKind::PayloadItems,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
+        });
+    }
+    Ok(())
 }
 
 impl SidecarReadBudget for PagesCellReadBudget {
@@ -2293,6 +2300,38 @@ mod tests {
                 maximum,
             } if observed > maximum && maximum < 256
         ));
+    }
+
+    #[test]
+    fn materialized_cell_ceiling_is_inclusive_and_cumulative() {
+        let archive_limits = litchi_iwa_core::Limits::default()
+            .with_metadata_items(1)
+            .expect("a one-item metadata budget is valid");
+        let physical_limits = litchi_iwa_archive::Limits::default()
+            .with_archive_limits(archive_limits)
+            .expect("archive limits should accept the metadata budget");
+        let wire = table_lock::WireBudget::new(physical_limits).expect("wire budget");
+        let mut budget = PagesCellReadBudget::new(wire);
+        let first = MAX_MATERIALIZED_CELLS - 257;
+        let second = 257;
+        let total = first.checked_add(second).expect("test count fits usize");
+        assert_eq!(total, MAX_MATERIALIZED_CELLS);
+        TableCellReadBudget::check_materialized_cells(&mut budget, first)
+            .expect("first bounded batch");
+        TableCellReadBudget::check_materialized_cells(&mut budget, total)
+            .expect("legacy ceiling is inclusive");
+        assert_eq!(budget.materialized_cells, MAX_MATERIALIZED_CELLS);
+
+        let error = TableCellReadBudget::check_materialized_cells(&mut budget, total + 1)
+            .expect_err("the next cumulative cell must be refused");
+        assert_eq!(
+            error,
+            BodyTableCellsError::LimitExceeded {
+                kind: BodyTableCellsLimitKind::PayloadItems,
+                observed: usize_as_u64(MAX_MATERIALIZED_CELLS + 1),
+                maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
+            }
+        );
     }
 
     #[test]

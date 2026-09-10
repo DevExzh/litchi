@@ -2984,13 +2984,15 @@ pub(super) fn update_formula_dependencies(
     let tile_row_begin = row / FORMULA_DEPENDENCY_TILE_ROWS * FORMULA_DEPENDENCY_TILE_ROWS;
     let tile_column_begin =
         column / FORMULA_DEPENDENCY_TILE_COLUMNS * FORMULA_DEPENDENCY_TILE_COLUMNS;
-    let new_identifier = object_locations(package)?
-        .keys()
-        .copied()
-        .max()
-        .unwrap_or(0)
-        .checked_add(1)
-        .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
+    // Only a new dependency tile consumes an object identifier. In particular,
+    // removals and updates to an existing tile must remain usable when the
+    // package watermark is already at `u64::MAX` and the allocator cannot
+    // produce another identifier.
+    // Compute the result before the archive callback so the callback remains
+    // atomic, but consume the result only in the branch that creates a tile.
+    let new_identifier = next_object_identifier(package);
+    let mut removed_tile_id = None;
+    let mut created_tile_id = None;
 
     package.update_archive(&component, |archive| {
         let engine_id = archive
@@ -3072,7 +3074,6 @@ pub(super) fn update_formula_dependencies(
                     && tile.tile_column_begin == tile_column_begin)
                     .then_some((reference.identifier, tile))
             });
-
         let expanded_edges = expanded_formula_edges(local_precedents, external_precedents)?;
         if let Some(inline_dependencies) = owner.cell_dependencies.as_mut() {
             if present {
@@ -3097,7 +3098,6 @@ pub(super) fn update_formula_dependencies(
             }
         }
 
-        let mut removed_tile_id = None;
         let tile_id = if !uses_tiled {
             None
         } else if let Some((tile_id, mut tile)) = existing_tile {
@@ -3176,6 +3176,7 @@ pub(super) fn update_formula_dependencies(
             Some(tile_id)
             }
         } else if present {
+            let new_identifier = new_identifier?;
             let tile = tsce::CellRecordTileArchive {
                 internal_owner_id: owner.internal_formula_owner_id,
                 tile_column_begin,
@@ -3202,6 +3203,7 @@ pub(super) fn update_formula_dependencies(
                     data: tile.encode_to_vec(),
                 }],
             )?)?;
+            created_tile_id = Some(new_identifier);
             Some(new_identifier)
         } else {
             return Err(Error::InvalidFormat(format!(
@@ -3269,7 +3271,24 @@ pub(super) fn update_formula_dependencies(
             },
         )?;
         Ok(())
-    })
+    })?;
+
+    // A newly materialized dependency tile is a real CalculationEngine
+    // object. Keep the package metadata UUID registry and identifier
+    // watermark in sync with the physical insertion so strict focused readers
+    // can prove the graph's ownership. Removing an empty tile is similarly
+    // reflected in the UUID registry; the watermark remains monotonic.
+    if let Some(created_tile_id) = created_tile_id {
+        set_package_last_object_identifier(package, created_tile_id)?;
+        if let Some(component_identifier) = component_identifier_for_entry(package, &component)? {
+            add_component_object_uuids(package, component_identifier, &[created_tile_id])?;
+        }
+    } else if let Some(removed_tile_id) = removed_tile_id
+        && let Some(component_identifier) = component_identifier_for_entry(package, &component)?
+    {
+        remove_component_object_uuids(package, component_identifier, &[removed_tile_id])?;
+    }
+    Ok(())
 }
 
 pub(super) fn expanded_formula_edges(
@@ -4114,6 +4133,7 @@ pub(super) fn row_offset_capacity(tile: &Tile, table_columns: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::package_metadata::{PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE};
 
     #[test]
     fn table_info_model_identifier_keeps_canonical_and_legacy_aliases() {
@@ -4368,5 +4388,157 @@ mod tests {
             Some(1)
         );
         assert_eq!(object.messages, before);
+    }
+
+    fn formula_dependency_package(last_object_identifier: u64) -> IWorkPackage {
+        let owner = tsce::FormulaOwnerDependenciesArchive {
+            formula_owner_uid: tsp::Uuid {
+                lower: 0x0200_0000_0000_0000,
+                upper: 0x0100_0000_0000_0000,
+            },
+            internal_formula_owner_id: 0,
+            owner_kind: Some(1),
+            cell_dependencies: Some(tsce::CellDependenciesExpandedArchive::default()),
+            formula_owner: Some(tsp::Reference {
+                identifier: 3,
+                ..Default::default()
+            }),
+            tiled_cell_dependencies: Some(tsce::CellDependenciesTiledArchive::default()),
+            ..Default::default()
+        };
+        let engine = tsce::CalculationEngineArchive {
+            dependency_tracker: tsce::DependencyTrackerArchive {
+                number_of_formulas: Some(0),
+                formula_owner_dependencies: vec![tsp::Reference {
+                    identifier: 101,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut calculation_engine = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    100,
+                    vec![RawMessage {
+                        type_: 4000,
+                        data: engine.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+                ArchiveObject::new(
+                    101,
+                    vec![RawMessage {
+                        type_: 4008,
+                        data: owner.encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+        calculation_engine.objects[0].archive_info.message_infos[0]
+            .object_references
+            .push(101);
+
+        let component = tsp::ComponentInfo {
+            identifier: 7,
+            preferred_locator: "CalculationEngine".to_owned(),
+            object_uuid_map_entries: [100, 101]
+                .into_iter()
+                .map(|identifier| tsp::ObjectUuidMapEntry {
+                    identifier,
+                    uuid: tsp::Uuid {
+                        lower: identifier + 1,
+                        upper: identifier + 2,
+                    },
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let metadata = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    200,
+                    vec![RawMessage {
+                        type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                        data: tsp::PackageMetadata {
+                            last_object_identifier,
+                            components: vec![component],
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                )
+                .unwrap(),
+            ],
+        };
+
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive("Index/CalculationEngine.iwa", &calculation_engine)
+            .unwrap();
+        package
+            .replace_archive(PACKAGE_METADATA_ENTRY, &metadata)
+            .unwrap();
+        package
+    }
+
+    #[test]
+    fn formula_dependency_allocator_error_is_deferred_until_new_tile_creation() {
+        let mut package = formula_dependency_package(1_000);
+
+        update_formula_dependencies(&mut package, 3, 0, 0, true, &[], &[]).unwrap();
+
+        let calculation_engine = package.archive("Index/CalculationEngine.iwa").unwrap();
+        let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+            calculation_engine.object(101).unwrap().messages[0]
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        let tile_id = owner.tiled_cell_dependencies.unwrap().cell_record_tiles[0].identifier;
+        assert_eq!(tile_id, 1_001);
+        assert_eq!(
+            crate::package_metadata::package_last_object_identifier(&package).unwrap(),
+            Some(1_001)
+        );
+        assert!(
+            crate::package_metadata::component_uuid_identifiers(&package, 7)
+                .unwrap()
+                .unwrap()
+                .contains(&tile_id)
+        );
+
+        set_package_last_object_identifier(&mut package, u64::MAX).unwrap();
+        assert!(crate::package_metadata::next_object_identifier(&package).is_err());
+
+        update_formula_dependencies(&mut package, 3, 0, 0, false, &[], &[]).unwrap();
+
+        let calculation_engine = package.archive("Index/CalculationEngine.iwa").unwrap();
+        let owner = tsce::FormulaOwnerDependenciesArchive::decode(
+            calculation_engine.object(101).unwrap().messages[0]
+                .data
+                .as_slice(),
+        )
+        .unwrap();
+        assert!(
+            owner
+                .tiled_cell_dependencies
+                .unwrap()
+                .cell_record_tiles
+                .is_empty()
+        );
+        assert!(calculation_engine.object(tile_id).is_none());
+        assert_eq!(
+            crate::package_metadata::package_last_object_identifier(&package).unwrap(),
+            Some(u64::MAX)
+        );
+        assert!(
+            !crate::package_metadata::component_uuid_identifiers(&package, 7)
+                .unwrap()
+                .unwrap()
+                .contains(&tile_id)
+        );
     }
 }
