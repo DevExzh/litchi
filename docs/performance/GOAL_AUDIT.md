@@ -20,8 +20,13 @@ retains descriptive fixed-work and simulated-range evidence without a common
 Amdahl or production-wide scaling claim.
 
 The [provider/sink implementation](results/provider-sinks-validation-v3-20260910/README.md)
-is committed with four opt-in axes and unchanged default selection. Its
-correctness checks are available; measured provider captures remain pending.
+is committed with four opt-in axes and unchanged default selection. The
+[verified capture](results/provider-sinks-capture-v3-20260910/README.md), published
+in `c44a1ac0c`, retains 18 provider/sink rows and 603 default rows from source
+`cab92a6bb`, with 15 samples per row after three warmups. This historical
+observation makes no gain claim: corpus verification establishes identity only,
+filesystem cold requests are advisory, and range reads are simulated. A baseline
+covering the later feature source remains open.
 The [dated 264-row audit](results/performance-requirements-audit-20260910/README.md)
 retains its original counts (10 complete, 99 incomplete, 116 weak, 39 missing),
 not a current completion score. The authority record lists eight remaining
