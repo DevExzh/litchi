@@ -56,8 +56,8 @@ pub(super) fn chart_graph(
             "Numbers drawable {drawable_object_id} is not exactly one chart"
         )));
     };
-    let chart = IWorkChartArchive::decode(&message.data)?;
-    let drawable = chart.drawable.super_.as_ref().ok_or_else(|| {
+    let chart = IWorkChartArchive::decode_without_chart_grid(&message.data)?;
+    let drawable = chart.drawable().super_.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Numbers chart {drawable_object_id} has no drawable payload"
         ))
@@ -73,7 +73,7 @@ pub(super) fn chart_graph(
         )));
     }
     let reference_line_objects = chart_reference_line_objects(&chart)?;
-    let payload = chart.chart.as_ref().ok_or_else(|| {
+    let payload = chart.chart().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Numbers chart {drawable_object_id} has no chart payload"
         ))
@@ -303,7 +303,7 @@ pub(super) fn chart_graph(
                     .series_direction
                     .unwrap_or(tsch::SeriesDirection::Unknown as i32),
             ),
-            data: chart_data("Numbers", drawable_object_id, payload)?,
+            data: chart_data_from_source("Numbers", drawable_object_id, &message.data)?,
             geometry: drawable_geometry("Numbers", drawable_object_id, drawable)?,
             // Chart Arrange values are owned by the focused Numbers package.
             // Callers that publish a listing or return a lifecycle result

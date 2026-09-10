@@ -11683,3 +11683,47 @@ matched all three titles, chart kinds, series counts, row labels, and category
 labels. Pages' native title reference crosses components; its declared
 reference path and unique typed resolution are validated without requiring
 the chart and title to share one component.
+
+## 2026-09-10 Focused numeric chart data
+
+The archive-free common `chart::data::ChartData` now owns the validated
+rectangular numeric grid previously defined in the migration host. Its typed
+construction errors distinguish empty axes, dimension mismatches, and
+nonfinite numeric cells. Missing numeric values remain `None`.
+
+Pages `body_chart_data`, Numbers `sheet_chart_data`, and Keynote
+`slide_chart_data` select modern charts through the existing rooted format
+graphs and return this common value without native identifiers. The shared
+`chart_data_codec` reads the modern drawable unity extension and inline grid
+through borrowed source spans and narrow Buffa lazy scalar projections.
+Repeated rows and cells do not enter generated repeated-message vectors.
+Date- and duration-only fields are not converted into numeric values, matching
+the former host reader. Legacy PreUFF chart data is a separate migration task.
+
+The host compatibility model is now a reexport, and its three chart graph
+readers use the shared numeric projection instead of cloning generated grid
+values. Graph-only chart decoding now omits the grid with a borrowed segmented
+buffer, so the compatibility bridge does not first allocate a generated grid.
+Its private read-only result exposes no encoder or conversion back to the
+mutable archive type. Mutation paths retain the complete decoder and source
+preservation behavior. The host authoring grid encoder and broader mutation
+graphs remain migration debt; this change does not claim their complete Buffa
+conversion.
+
+Computer Use created `chart-data-native` controls for all three formats from
+the existing native chart fixtures. The first series now has April 17.25 and
+an empty May value, with the remaining six values preserved. Each control
+was saved, closed, and reopened in application version 14.4. Pages and
+Keynote data editors showed the exact fractional value; Numbers' source
+table showed 17.25 and a blank May cell. The chart accessibility values round
+the fraction to 17.2 and omit the absent point. Keynote also retained its
+separate chart caption. Adjacent receipts record hashes and verification
+scope; the original controls are unchanged.
+
+Validation covers nine shared codec tests, native golden grids and exact
+source preservation in all three format readers, selected-operation work
+and retention refusals, and four host graph projection regressions. The
+chart-data fuzz target completes 100 sanitizer runs without failure. Decoder
+work and post-decode iterator replay are bounded separately; owned vectors
+and strings are admitted by logical storage size before fallible reservation.
+The boundary suite passes 1,089 tests with the existing 11 debt entries.

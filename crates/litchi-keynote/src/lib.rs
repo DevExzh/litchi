@@ -429,6 +429,7 @@ pub use document::{
 };
 pub use error::{Error, Result};
 pub use litchi_core::Position;
+pub use litchi_iwa_common::chart::data::ChartData;
 /// Maximum canonical `Metadata/Properties.plist` bytes retained by
 /// archive-free document ingress.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
@@ -521,6 +522,7 @@ pub use package::{
     SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
     SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
 };
+pub use package::{SlideChartDataError, SlideChartDataLimitKind};
 pub use package::{SlideChartMetadataError, SlideChartMetadataLimitKind};
 pub use package::{
     SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,

@@ -34,8 +34,8 @@ use litchi_iwa_protos::chart_arrangement_codec::{
     self as codec, ChartArrangementWrite, DecodeLimit, DecodeOptions, DecodeReport,
     RewriteExecutionRequirements,
 };
-use litchi_iwa_protos::chart_metadata_codec;
 use litchi_iwa_protos::numbers_sheet_order_codec;
+use litchi_iwa_protos::{chart_data_codec, chart_metadata_codec};
 use thiserror::Error;
 
 use super::{Error as PackageError, Package};
@@ -863,6 +863,70 @@ impl ChartBudget {
         self.retained(report.text_bytes())?;
         self.retained(report.retained_bytes())?;
         self.allocations(report.allocations())
+    }
+
+    /// Build residual limits for the borrowed chart-data projection.
+    ///
+    /// The grid decoder has an independent cell ceiling in addition to its
+    /// wire and text axes.  Keep that ceiling derived from the same finite
+    /// field budget so a large package limit cannot turn into an unbounded
+    /// rectangular allocation at the package boundary.
+    pub(super) fn data_codec_options(
+        &self,
+    ) -> Result<chart_data_codec::DecodeOptions, ChartArrangementError> {
+        let limits = self.residual_wire_limits()?;
+        let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
+            .unwrap_or(MAX_CODEC_NESTING);
+        let max_input = limits.max_input_bytes().clamp(1, MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
+        let max_cells = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
+        let max_labels = limits
+            .max_fields()
+            .min(MAX_METADATA_LABEL_COUNT)
+            .clamp(1, MAX_CODEC_LIMIT);
+        let max_text = self
+            .max_retained
+            .saturating_sub(self.retained)
+            .clamp(1, MAX_CODEC_LIMIT);
+        Ok(chart_data_codec::DecodeOptions::new(
+            max_input, max_fields, max_work, depth, max_cells, max_labels, max_text,
+        ))
+    }
+
+    /// Charge one chart-data decode against the selector's aggregate ledger.
+    pub(super) fn data_codec_report(
+        &mut self,
+        report: chart_data_codec::DecodeReport,
+    ) -> Result<(), ChartArrangementError> {
+        self.source(report.source_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        // The codec's cell ceiling is independent from protobuf field count.
+        // Charge one bounded unit for each validated cell before the package
+        // adapter starts walking the borrowed rows to own them.
+        self.work(report.cell_count())?;
+        let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
+        if depth > self.max_nesting {
+            return Err(ChartArrangementError::LimitExceeded {
+                kind: ChartArrangementLimitKind::WireNesting,
+                observed: depth as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
+        self.nesting = self.nesting.max(depth);
+        self.retained(report.text_bytes())?;
+        self.retained(report.retained_bytes())?;
+        self.allocations(report.allocations())
+    }
+
+    /// Charge the bounded wire work needed to walk the lazy chart-data views
+    /// before any fallible semantic allocation starts.
+    pub(super) fn data_materialization_work(
+        &mut self,
+        amount: usize,
+    ) -> Result<(), ChartArrangementError> {
+        self.work(amount)
     }
 
     /// Build the title codec's residual options from the same aggregate

@@ -5,6 +5,7 @@
 //! semantic content is represented by the archive-free [`crate::Document`].
 
 mod body_chart_arrangement;
+mod body_chart_data;
 mod body_chart_metadata;
 mod body_footnote;
 pub(crate) mod body_table_appearance;
@@ -70,6 +71,7 @@ pub use body_chart_arrangement::{
     BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit,
     BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch,
 };
+pub use body_chart_data::{BodyChartDataError, BodyChartDataLimitKind};
 pub use body_chart_metadata::{BodyChartMetadataError, BodyChartMetadataLimitKind};
 pub use body_footnote::{
     BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,

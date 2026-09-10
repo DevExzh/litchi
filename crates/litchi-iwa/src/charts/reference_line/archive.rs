@@ -11,9 +11,9 @@ use litchi_iwa_common::wire::parse_wire_view;
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
-use crate::charts::IWorkChartArchive;
 use crate::charts::source::{CHART_MESSAGE_TYPE, checked_single_message_index};
 use crate::charts::unique_chart_object_archive_name;
+use crate::charts::{IWorkChartArchive, IWorkChartGraphArchive};
 use crate::package_metadata::{
     add_component_object_uuids, component_identifier_for_entry, component_uuid_identifiers,
     next_object_identifier, release_package_identifier_suffix, remove_component_object_uuids,
@@ -59,7 +59,7 @@ struct ReferenceLineGraph {
 }
 
 pub(crate) fn chart_reference_line_objects(
-    chart: &IWorkChartArchive,
+    chart: &IWorkChartGraphArchive,
 ) -> Result<Vec<(u64, u32, &'static str)>> {
     let Some(reference_lines) = chart.reference_lines()? else {
         return Ok(Vec::new());

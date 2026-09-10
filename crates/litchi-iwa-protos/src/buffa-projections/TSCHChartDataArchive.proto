@@ -1,0 +1,20 @@
+// Wire-only projection for modern chart grid data.
+//
+// The handwritten codec scans ChartDrawableArchive's extension and the
+// repeated ChartGridArchive/ChartGridRow fields. Buffa only forces the
+// selected ChartArchive.grid span and one GridValue scalar at a time; it
+// never materializes repeated row or value fields.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message ChartArchive {
+  optional bytes grid = 7;
+}
+
+message GridValue {
+  optional double numeric_value = 1;
+  optional double date_value_1_0 = 2;
+  optional double duration_value = 3;
+  optional double date_value = 4;
+}

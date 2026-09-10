@@ -188,8 +188,8 @@ pub(super) fn body_chart_graph(
             "Pages drawable {drawable_object_id} is not exactly one chart"
         )));
     };
-    let chart = IWorkChartArchive::decode(&message.data)?;
-    let drawable = chart.drawable.super_.as_ref().ok_or_else(|| {
+    let chart = IWorkChartArchive::decode_without_chart_grid(&message.data)?;
+    let drawable = chart.drawable().super_.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} has no drawable payload"
         ))
@@ -206,7 +206,7 @@ pub(super) fn body_chart_graph(
         )));
     }
     let reference_line_objects = chart_reference_line_objects(&chart)?;
-    let payload = chart.chart.as_ref().ok_or_else(|| {
+    let payload = chart.chart().ok_or_else(|| {
         Error::InvalidFormat(format!(
             "Pages chart {drawable_object_id} has no chart payload"
         ))
@@ -575,7 +575,7 @@ pub(super) fn body_chart_graph(
                     .series_direction
                     .unwrap_or(tsch::SeriesDirection::Unknown as i32),
             ),
-            data: chart_data("Pages", drawable_object_id, payload)?,
+            data: chart_data_from_source("Pages", drawable_object_id, &message.data)?,
             geometry: drawable_geometry("Pages", drawable_object_id, drawable)?,
             // Arrange-panel state is projected by the focused Pages package
             // when the public chart listing is assembled. Internal graph
@@ -596,7 +596,7 @@ fn chart_reference_owner_counts(package: &IWorkPackage) -> Result<HashMap<u64, u
                 .iter()
                 .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
             {
-                let chart = IWorkChartArchive::decode(message.data.as_slice())?;
+                let chart = IWorkChartArchive::decode_without_chart_grid(message.data.as_slice())?;
                 for identifier in chart.typed_reference_identifiers()? {
                     let count = counts.entry(identifier).or_insert(0usize);
                     *count = count.checked_add(1).ok_or_else(|| {

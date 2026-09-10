@@ -1,0 +1,40 @@
+{
+  "application": "Pages",
+  "version": "14.4",
+  "verification_date": "2026-09-10",
+  "file": "chart-data-native.pages",
+  "size": 117747,
+  "sha256": "2bbd7f63e660fcc5ff2ee351923209c73e004f327e5549fb591a105b52dce68d",
+  "source": "chart-arrangement-native.pages",
+  "lifecycle": [
+    "Copied existing native chart control to a disposable directory.",
+    "Changed first series April from 17 to 17.25 and cleared its May value through the native application UI.",
+    "Saved, closed, and reopened the exact saved path.",
+    "Verified fractional value and absent May data point; closed the verified document."
+  ],
+  "row_labels": [
+    "Region 1",
+    "Region 2"
+  ],
+  "column_labels": [
+    "April",
+    "May",
+    "June",
+    "July"
+  ],
+  "numeric_values": [
+    [
+      17.25,
+      null,
+      53,
+      96
+    ],
+    [
+      55,
+      43,
+      70,
+      58
+    ]
+  ],
+  "scope": "Modern numeric chart data and missing values. Native chart accessibility rounds 17.25 to 17.2; exact 17.25 was confirmed in the chart data editor."
+}

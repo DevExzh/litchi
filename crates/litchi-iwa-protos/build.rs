@@ -33,6 +33,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/chart_arrangement_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_metadata_codec.rs");
     println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartMetadataArchive.proto");
+    println!("cargo:rerun-if-changed=src/chart_data_codec.rs");
+    println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartDataArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
@@ -183,6 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     enforce_chart_arrangement_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_chart_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_chart_data_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_chart_axis_title_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -639,6 +642,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_chart_metadata_projection_budget(&buffa_chart_metadata_out_directory)?;
+
+    // Chart data retains repeated rows and values on the handwritten source
+    // path. Buffa only generates lazy views for the chart grid span and one
+    // GridValue's scalar fields, so no unbounded repeated allocation crosses
+    // this boundary.
+    let buffa_chart_data_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-chart-data");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSCHChartDataArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_chart_data_out_directory)
+        .include_file("iwa_chart_data_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_chart_data_projection_budget(&buffa_chart_data_out_directory)?;
 
     // Keynote chart-axis-title reads need only the four scalar fields from
     // the generated ChartAxisNonStyleArchive extension. Keep the outer
@@ -1675,6 +1699,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "afc942459e9e469a9c10fa8790fcc2740cf8d5587cdfb8e75ddd497a4c61ae7c",
         ),
         (
+            "TSCHChartDataArchive.proto",
+            597,
+            "479beeca75235b729119e5df39a210cd2f90ccdcab4a3ca1c4190ac6c9d197a3",
+        ),
+        (
             "TSCHChartLegendArchive.proto",
             440,
             "8c81e0862ee6f01742f1689207b81cc8ccc0ea37f027b338dc86996b1d9a92ba",
@@ -1997,6 +2026,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/chart_metadata_codec.rs",
             "crate::buffa_chart_metadata_generated::",
             "mod buffa_chart_metadata_generated {",
+        ),
+        (
+            "src/chart_data_codec.rs",
+            "crate::buffa_chart_data_generated::",
+            "mod buffa_chart_data_generated {",
         ),
         (
             "src/keynote_chart_axis_title_codec.rs",
@@ -4151,6 +4185,76 @@ fn enforce_chart_metadata_projection_provenance(
     {
         return Err(
             "derived chart-metadata projection/router drifted from canonical TSCH modern/legacy chart messages or introduced generated production encoding".into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_chart_data_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const PROJECTION_SCHEMA: &str =
+        include_str!("src/buffa-projections/TSCHChartDataArchive.proto");
+    const SOURCE_MARKERS: [&str; 13] = [
+        "message ChartDrawableArchive {",
+        "optional .TSCH.ChartArchive unity = 10000;",
+        "message ChartArchive {",
+        "optional .TSCH.ChartGridArchive grid = 7;",
+        "message ChartGridArchive {",
+        "repeated string row_name = 1;",
+        "repeated string column_name = 2;",
+        "repeated .TSCH.GridRow grid_row = 3;",
+        "message GridValue {",
+        "optional double numeric_value = 1;",
+        "optional double date_value_1_0 = 2;",
+        "optional double duration_value = 3;",
+        "optional double date_value = 4;",
+    ];
+    const ROUTER_MARKERS: [&str; 4] = [
+        "pub fn decode_modern<'source>(",
+        "pub fn decode_modern_with_report<'source>(",
+        "pub fn decode_grid<'source>(",
+        "pub fn decode_grid_with_report<'source>(",
+    ];
+    const PRIVATE_MODULE_MARKERS: [&str; 2] = [
+        "mod buffa_chart_data_generated {",
+        "/buffa-chart-data/iwa_chart_data_buffa_protos.rs",
+    ];
+    let modern = fs::read_to_string(proto_directory.join("TSCHArchives.proto"))?;
+    let modern_generated = fs::read_to_string(proto_directory.join("TSCHArchives.GEN.proto"))?;
+    let common = fs::read_to_string(proto_directory.join("TSCHArchives.Common.proto"))?;
+    let projection = fs::read_to_string(projection_directory.join("TSCHChartDataArchive.proto"))?;
+    let codec = fs::read_to_string("src/chart_data_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let source_has = |marker: &str| {
+        modern.contains(marker) || modern_generated.contains(marker) || common.contains(marker)
+    };
+    if !SOURCE_MARKERS.iter().all(|marker| source_has(marker))
+        || normalize(&projection) != normalize(PROJECTION_SCHEMA)
+        || projection.len() > 4 * 1024
+        || !ROUTER_MARKERS
+            .iter()
+            .all(|marker| production_codec_source(&codec).matches(marker).count() == 1)
+        || !PRIVATE_MODULE_MARKERS
+            .iter()
+            .all(|marker| lib.matches(marker).count() == 1)
+        || has_forbidden_codec_marker(&codec)
+        || production_codec_source(&codec).contains("IWorkPackage")
+        || production_codec_source(&codec).contains("encode_to_vec")
+        || production_codec_source(&codec).contains("try_encode")
+    {
+        return Err(
+            "derived chart-data projection/router drifted from the canonical modern chart grid or exposed generated/encoding ingress"
+                .into(),
         );
     }
     Ok(())
@@ -10232,6 +10336,45 @@ fn enforce_chart_metadata_projection_budget(directory: &Path) -> Result<(), Box<
     if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES {
         return Err(format!(
             "chart-metadata projection generated {files} files/{bytes} bytes; expected {EXPECTED_FILES} files and at most {MAX_GENERATED_BYTES} bytes"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_chart_data_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    // The projection contains only ChartArchive.grid bytes and four scalar
+    // GridValue fields. Repeated rows and values must remain absent from the
+    // generated view so a hostile chart cannot force eager collection.
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 96 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated = 0usize;
+    let mut lazy_repeated = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated = repeated
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("generated repeated-view count overflow")?;
+        lazy_repeated = lazy_repeated
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("generated lazy-repeated-view count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES || repeated != 0 || lazy_repeated != 0
+    {
+        return Err(format!(
+            "chart-data projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

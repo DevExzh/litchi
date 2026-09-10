@@ -737,6 +737,7 @@ mod tests {
             include_str!("chart_arrangement_codec.rs"),
         ),
         ("chart_metadata", include_str!("chart_metadata_codec.rs")),
+        ("chart_data", include_str!("chart_data_codec.rs")),
         (
             "keynote_chart_title",
             include_str!("keynote_chart_title_codec.rs"),

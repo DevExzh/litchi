@@ -4584,3 +4584,14 @@ uses the same projection and common result while retaining its historical
 global inventory, including unrooted chart objects. This temporary host
 inventory is not equivalent to the focused rooted APIs and remains migration
 debt; the monolithic crate is not yet removed.
+
+## 2026-09-10 Numeric chart data ownership
+
+The common chart module owns the archive-free `ChartData` value and its typed
+construction errors. `litchi-iwa-protos::chart_data_codec` owns the private
+Buffa projection and bounded borrowed modern numeric-grid decoder. Pages,
+Numbers, and Keynote own rooted selection and bounded semantic materialization
+through `body_chart_data`, `sheet_chart_data`, and `slide_chart_data`.
+The migration host reexports the common model and delegates numeric reading;
+its remaining source-building encoder and mutation graph machinery are not
+new canonical owners. The dependency-debt count is unchanged.
