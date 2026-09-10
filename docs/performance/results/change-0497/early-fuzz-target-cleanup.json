@@ -1,0 +1,6 @@
+{
+  "path": "/home/zhuhe/.cache/litchi-goal-0497/fuzz-target/target",
+  "allocated_bytes": 1148923904,
+  "completed_ns": 1789061578613365068,
+  "reason": "ASan build and both20k total fuzz iterations verified; retained binary SHA authenticated; interrupted formal capture ENOSPC emergency cleanup."
+}

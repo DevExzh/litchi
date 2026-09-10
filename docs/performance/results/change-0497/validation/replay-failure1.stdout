@@ -1,0 +1,38 @@
+
+running 33 tests
+test changed_text_event_boundaries_are_rejected_even_when_encoded_xml_matches ... ok
+test default_and_shadowed_namespaces_cannot_capture_generated_prefix ... ok
+test default_stream_limits_accept_a_tiny_valid_append ... ok
+test deterministic_replay_change_and_truncated_event_eof_are_typed_refusals ... ok
+test durable_forward_and_inverse_authorizations_are_compact_canonical_wire ... ok
+test durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provider ... ok
+test durable_resolver_cancellation_refuses_before_replay_reader_or_output ... ok
+test durable_resolver_error_yields_source_mismatch_when_resolver_mutates_current ... ok
+test each_replay_pass_opens_one_cursor_independent_of_encoded_window_count ... ok
+test explicit_store_capacity_must_fit_selected_replay_limit_before_producer ... ok
+test finite_limits_cancellation_and_partial_sink_errors_remain_at_public_boundary ... ok
+test malformed_order_empty_stream_invalid_xml_and_provider_errors_refuse_before_output ... ok
+test managed_external_output_is_charged_once_for_one_publication ... ok
+test managed_memory_store_zero_object_budget_refuses_before_append ... ok
+test managed_replay_readers_each_hold_object_lease_until_final_handle_drop ... ok
+test managed_store_lease_survives_plan_and_handle_then_releases ... ok
+test managed_store_memory_budget_refuses_before_one_shot_producer ... ok
+test one_shot_producer_requires_and_uses_explicit_replay_store ... ok
+test one_shot_store_must_return_the_encoder_proof_before_candidate_or_output ... ok
+test path_publication_can_replace_the_open_source_path_and_inverse_from_the_new_inode ... ok
+test path_publication_cancellation_leaves_destination_and_managed_memory_untouched ... ok
+test path_publication_hardlink_destination_preserves_the_original_source_inode ... ok
+test path_publication_late_managed_output_failure_leaves_destination_and_no_temporary_file ... ok
+test path_publication_preserves_existing_unix_permissions ... ok
+test path_publication_refuses_symlink_and_nonregular_destinations_before_output ... ok
+test path_publication_rejects_stale_or_mutated_sources_without_replacing_destination ... ok
+test path_publication_releases_managed_workspace_after_success ... ok
+test path_publication_replaces_new_and_existing_destinations_with_exact_reopenable_bytes ... ok
+test path_publication_replay_failure_after_prepare_preserves_destination ... ok
+test path_publication_retains_durable_forward_and_inverse_authorizations ... ok
+test replayable_stream_escapes_borrowed_chunks_and_preserves_section_and_inverse ... ok
+test source_change_after_preparation_refuses_without_archive_output ... ok
+test source_size_and_authored_count_are_independent ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+

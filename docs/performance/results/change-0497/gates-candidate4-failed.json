@@ -1,0 +1,14 @@
+{
+  "doc-tests": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate4-doc-tests.json",
+    "wrapper_exit_code": 0
+  },
+  "opc-preservation": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate4-opc-preservation.json",
+    "wrapper_exit_code": 0
+  },
+  "workspace-check": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate4-workspace-check.json",
+    "wrapper_exit_code": 1
+  }
+}

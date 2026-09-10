@@ -1,0 +1,15 @@
+{
+  "started_ns": 1789061096318586272,
+  "audit_directory": "/home/zhuhe/.cache/litchi-cleanup-0497-postfreeze",
+  "scope": "Emergency shared-disk cleanup while formal1 was running; potential I/O interference, no isolated-host causal claim.",
+  "finished_ns": 1789061098558798257,
+  "removed_entries": 2963,
+  "allocated_bytes": 16923615232,
+  "skipped_entries": 0,
+  "overlapping_formal_children": [
+    "r2-after-hashing_sink-allocator-deterministic-latency-s64-a16384-short-c64",
+    "r2-before-hashing_sink-allocator-deterministic-latency-s64-a16384-short-c64"
+  ],
+  "overlap_scope": "Whole-child time intervals; cannot assign syscall interference to particular timed samples.",
+  "interpretation": "Recorded overlap is not an upper bound on background writeback effects; all results remain shared-host descriptive evidence."
+}

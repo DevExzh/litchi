@@ -1,0 +1,10 @@
+{
+  "boundaries": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate8-boundaries.json",
+    "wrapper_exit_code": 0
+  },
+  "harness-fmt": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate8-harness-fmt.json",
+    "wrapper_exit_code": 0
+  }
+}

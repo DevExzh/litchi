@@ -1,0 +1,10 @@
+{
+  "docx-default": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate2-docx-default.json",
+    "wrapper_exit_code": 1
+  },
+  "focused": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate2-focused.json",
+    "wrapper_exit_code": 0
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--lib",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0497/after",
+  "driver": {
+    "bytes": 3009,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/gate.py",
+    "sha256": "3110e9c00df63de75a6458af51ef01bb3747b7ba6495fc42025271bb1ebf68be"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-goal-0497/target",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-Dwarnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0497/tmp"
+  },
+  "source_manifest": {
+    "bytes": 1930173,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/harness-normal1.source.json",
+    "sha256": "569e6f8d7f04818cd8b1d8b5e2a54a950686c04a61a97a2039cc513e6b47a255"
+  },
+  "started_ns": 1789052747280891905,
+  "timeout_seconds": 3600
+}

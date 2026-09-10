@@ -1,0 +1,205 @@
+{
+  "archived_capture_directory": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/capture",
+  "archived_private_root": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/private-root",
+  "attempt": "formal1",
+  "builds": {
+    "bytes": 3505,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds.json",
+    "sha256": "c2a40c21e208f0ef6fffa47d5a9bd1ef36a07df84e86649d2e4d0aecf96dff17"
+  },
+  "capture_files": [
+    {
+      "archive": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/capture/replay-cleanup.json.raw",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/replay-cleanup.json",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original_name": "replay-cleanup.json"
+    },
+    {
+      "archive": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/capture/resource.txt.raw",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/resource.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original_name": "resource.txt"
+    },
+    {
+      "archive": {
+        "bytes": 5250,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/capture/started.json.raw",
+        "sha256": "71badaf2735ff89ff0c050b81e2a1e944387d3fef6be4209065ad5957e2fa856"
+      },
+      "original": {
+        "bytes": 5250,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/started.json",
+        "sha256": "71badaf2735ff89ff0c050b81e2a1e944387d3fef6be4209065ad5957e2fa856"
+      },
+      "original_name": "started.json"
+    },
+    {
+      "archive": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/capture/stderr.txt.raw",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original_name": "stderr.txt"
+    },
+    {
+      "archive": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/capture/stdout.txt.raw",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original": {
+        "bytes": 0,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "original_name": "stdout.txt"
+    }
+  ],
+  "capture_inventory_before": [
+    {
+      "bytes": 0,
+      "kind": "file",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/replay-cleanup.json",
+      "relative": "replay-cleanup.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/resource.txt",
+      "relative": "resource.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 5250,
+      "kind": "file",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/started.json",
+      "relative": "started.json",
+      "sha256": "71badaf2735ff89ff0c050b81e2a1e944387d3fef6be4209065ad5957e2fa856"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/stderr.txt",
+      "relative": "stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "kind": "file",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/stdout.txt",
+      "relative": "stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "driver_error": {
+    "child_exit_code": "unknown",
+    "coordinator_exit_code": 1,
+    "kind": "ENOSPC",
+    "message": "OSError: [Errno 28] No space left on device while _write_new(directory / replay-cleanup.json, cleanup) closed its output file",
+    "scope": "the child stopped before report/resource/terminal completion"
+  },
+  "inputs": {
+    "builds.json": {
+      "bytes": 3505,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds.json",
+      "sha256": "c2a40c21e208f0ef6fffa47d5a9bd1ef36a07df84e86649d2e4d0aecf96dff17"
+    },
+    "candidate-source.json": {
+      "bytes": 1058,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/candidate-source.json",
+      "sha256": "f4b7438287bbd70524c8a3596648493c3d7238ce7c6e0f32152f5db049a7f49a"
+    },
+    "interruption-observation.json": {
+      "bytes": 657,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interruption-observation.json",
+      "sha256": "89f37079f88bd22f42af77fcbd0c4e8df3e4fdf030e432e81d22cad00f191123"
+    },
+    "machine.json": {
+      "bytes": 1347,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/machine.json",
+      "sha256": "37096578ef4ef061afda775953b4a594168f4b12d51bf78711f828107bcc18f2"
+    },
+    "measure.py": {
+      "bytes": 108524,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/measure.py",
+      "sha256": "6c7d29f5c2e7fcaf7ea7478c0e54326a3e0f7307e07b77b726f7d683273c930c"
+    },
+    "protocol.json": {
+      "bytes": 165122,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/protocol.json",
+      "sha256": "c47939dcb7fb44fa1a8a3ffe9524f211ee1e671c5209ca6a4a5090d87268227d"
+    },
+    "provenance.json": {
+      "bytes": 5260,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/provenance.json",
+      "sha256": "06943af8483cf3ae5168a887e72c516f36417911784c78401405552142ce73b8"
+    },
+    "resume.py": {
+      "bytes": 26684,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/resume.py",
+      "sha256": "984b25a0e838d3441c5b772ff525d13c137d2e65f71c1a68024e3dbe7d69bd01"
+    },
+    "test_resume.py": {
+      "bytes": 6758,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/test_resume.py",
+      "sha256": "907e521fbd46bf9be7091ef5e8c3835e0e5fcfcc9d34d09c41317ab52f795785"
+    }
+  },
+  "label": "r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64",
+  "measure_driver": {
+    "bytes": 108524,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/measure.py",
+    "sha256": "6c7d29f5c2e7fcaf7ea7478c0e54326a3e0f7307e07b77b726f7d683273c930c"
+  },
+  "observation": {
+    "bytes": 657,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interruption-observation.json",
+    "sha256": "89f37079f88bd22f42af77fcbd0c4e8df3e4fdf030e432e81d22cad00f191123"
+  },
+  "ordinal": 191,
+  "original_capture_directory": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64",
+  "original_private_root": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64",
+  "private_inventory_after": [
+    {
+      "kind": "directory",
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/interrupted/formal1-enospc/private-root/tmp",
+      "relative": "tmp"
+    }
+  ],
+  "private_inventory_before": [
+    {
+      "kind": "directory",
+      "path": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-after-atomic_path-allocator-deterministic-latency-s131072-a64-short-c64/tmp",
+      "relative": "tmp"
+    }
+  ],
+  "protocol": {
+    "bytes": 165122,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/protocol.json",
+    "sha256": "c47939dcb7fb44fa1a8a3ffe9524f211ee1e671c5209ca6a4a5090d87268227d"
+  },
+  "schema": "docx-replayable-tail-publication-interrupted-v1",
+  "scope": "raw interrupted evidence only; no terminal receipt or measurement is reconstructed",
+  "status": "archived_incomplete",
+  "version": 1
+}

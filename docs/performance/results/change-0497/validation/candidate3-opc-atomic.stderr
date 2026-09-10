@@ -1,0 +1,38 @@
+   Compiling zeroize v1.9.0
+   Compiling subtle v2.6.1
+   Compiling const-oid v0.9.6
+   Compiling getrandom v0.2.17
+   Compiling syn v2.0.114
+   Compiling generic-array v0.14.9
+   Compiling der v0.7.10
+   Compiling rand_core v0.6.4
+   Compiling ff v0.13.1
+   Compiling group v0.13.0
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling crypto-bigint v0.5.5
+   Compiling digest v0.10.7
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling sec1 v0.7.3
+   Compiling thiserror-impl v2.0.18
+   Compiling elliptic-curve v0.13.8
+   Compiling rfc6979 v0.4.0
+   Compiling signature v2.2.0
+   Compiling bitflags v2.13.1
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/.cache/litchi-goal-0497/after/crates/xml-minifier-macros)
+   Compiling ecdsa v0.16.9
+   Compiling rustix v1.1.4
+   Compiling primeorder v0.13.6
+   Compiling thiserror v2.0.18
+   Compiling smallvec v1.16.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/.cache/litchi-goal-0497/after/crates/xml-minifier)
+   Compiling p256 v0.13.2
+   Compiling litchi-core v0.0.1 (/home/zhuhe/.cache/litchi-goal-0497/after/crates/litchi-core)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/.cache/litchi-goal-0497/after/crates/soapberry-zip)
+   Compiling tempfile v3.27.0
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0497/after/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 39.02s
+     Running unittests src/lib.rs (/home/zhuhe/.cache/litchi-goal-0497/target/release/deps/litchi_opc-aa7f9505152f7479)

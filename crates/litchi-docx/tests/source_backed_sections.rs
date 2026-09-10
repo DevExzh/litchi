@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
-    OwnedSource, ReadAt, Resource, SourceVersion,
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits,
+    Limits as CoreLimits, OwnedSource, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::section::{
     Column, Columns, Emu, Limits, Margins, Orientation, Ownership, PageSize, Property,
@@ -113,8 +113,14 @@ impl Write for SectionFailingSink {
 }
 
 fn managed_document_fixture(document: &[u8]) -> (Budget, source_backed::Package) {
+    managed_document_fixture_with_memory(document, 16 * 1024 * 1024)
+}
+
+fn managed_document_fixture_with_memory(
+    document: &[u8],
+    memory: u64,
+) -> (Budget, source_backed::Package) {
     let bytes = malformed_fixture(document);
-    let memory = 16 * 1024 * 1024;
     let budget = Budget::root(
         "docx-managed-section-test",
         CoreLimits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
@@ -468,7 +474,15 @@ fn managed_document_bounds_namespace_scan_depth_and_events() {
         events.push_str("<w:p/>");
     }
     events.push_str("</w:body></w:document>");
-    let (_budget, package) = managed_document_fixture(events.as_bytes());
+    let (_tight_budget, tight_package) = managed_document_fixture(events.as_bytes());
+    assert!(matches!(
+        tight_package.document(),
+        Err(Error::Opc(litchi_opc::OpcError::Execution(
+            ExecutionError::ResourceLimit(limit),
+        ))) if limit.resource == Resource::Memory
+    ));
+    let (_budget, package) =
+        managed_document_fixture_with_memory(events.as_bytes(), 256 * 1024 * 1024);
     assert!(matches!(
         package.document(),
         Err(Error::InvalidFormat(reason)) if reason.contains("event limit")

@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497",
+    "-p",
+    "test_*.py"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started_ns": 1789066602948268761,
+  "finished_ns": 1789066603326285822,
+  "exit_code": 0,
+  "helper_sha256": {
+    "build.py": "f2b14181973fb84c56af1e60345b71c7c91ab49f5d4cdc2c1fbb3e5f2db4f529",
+    "cleanup.py": "3ca125e68cecd7fe6e85a1d11796c12020f3337f6dfa25bfc119880ce5e61fba",
+    "fuzz.py": "89d8fd8d3f32f0d882217b343c02d92faf269a7eaa60ec305eeacbe5933a2123",
+    "gate.py": "3110e9c00df63de75a6458af51ef01bb3747b7ba6495fc42025271bb1ebf68be",
+    "gates.py": "55c5ff4859e044cc6c8b7f410686a5e21b746beda0e9b497828bfc886e3c2ab7",
+    "measure.py": "6c7d29f5c2e7fcaf7ea7478c0e54326a3e0f7307e07b77b726f7d683273c930c",
+    "profile.py": "b433b8831bfaa3470bd3e67e420bf780a8b8e490152c75366cb89d8fadc5509a",
+    "profile_v2.py": "2eda27edad8c18314cbac1b356187644323c4381822e1a8fa1e979928c5cfb89",
+    "resume.py": "984b25a0e838d3441c5b772ff525d13c137d2e65f71c1a68024e3dbe7d69bd01",
+    "seal.py": "56c615ba3421bfbd3bffb424d8ef3734c9d0ccdd6d9f62cdc7ad3fc3332a8467",
+    "test_cleanup.py": "ab8237004e8bf6a0c25b65f64eee9f7c659e1f8d965608fa514bb4bd9e5240c3",
+    "test_fuzz.py": "63c499ce0f3363eda8819d3ee73d343c5363d4e2009c7bda3934ad5f19c179c4",
+    "test_measure.py": "746eecb04d1eed8c0b3e19565e9f1624bf0023dfafe64165c19cdfedba5e3873",
+    "test_profile.py": "4961dd4516cfc3c142acffa408246b098dc42c8b8e3111d02212b2008c557bee",
+    "test_profile_v2.py": "feee13a535d85d35049d713a309df1fc5ee70107d12ac6ad00018b8c2ba62cd8",
+    "test_resume.py": "907e521fbd46bf9be7091ef5e8c3835e0e5fcfcc9d34d09c41317ab52f795785",
+    "test_seal.py": "a9f85adc30ee0000234a3d3de737542502175fa53e67b745345211305adda667"
+  },
+  "helpers_unchanged": true,
+  "scope": "Final evidence helpers after resume-root and protocol-reference schema corrections."
+}

@@ -1,0 +1,23 @@
+[package]
+name = "litchi-docx-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+libfuzzer-sys = "0.4"
+litchi-docx = { path = "/home/zhuhe/.cache/litchi-goal-0497/after/crates/litchi-docx" }
+
+[[bin]]
+name = "source_backed_tail_append_stream"
+path = "source_backed_tail_append_stream.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"
+
+[workspace]

@@ -1,0 +1,11 @@
+
+running 6 tests
+test atomic::tests::caller_owned_write_error_is_not_erased ... ok
+test atomic::tests::directory_sync_failure_reports_that_replacement_already_committed ... ok
+test atomic::tests::failed_finalization_leaves_the_destination_untouched ... ok
+test atomic::tests::replacement_preserves_existing_file_permissions ... ok
+test atomic::tests::successful_finalization_replaces_the_destination ... ok
+test atomic::tests::symbolic_link_destinations_are_refused_without_touching_the_target ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 382 filtered out; finished in 0.02s
+

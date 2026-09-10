@@ -1,0 +1,112 @@
+{
+  "historical_evidence": "0495 and 0496 regression flags remain unresolved; 0489/0484 validators retain their exact sealed hashes through the protocol.",
+  "inputs": {
+    "adr-refresh.json": {
+      "bytes": 3599,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/adr-refresh.json",
+      "sha256": "5693d4d0227f416b0a0cbaa444102dc375e74884c1ccf0594938ed5d8f91036f"
+    },
+    "build-after-candidate1.json": {
+      "bytes": 1642,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-after-candidate1.json",
+      "sha256": "6059be79a8632a6712815918cf10668170b20ef550dc04144506fa00cc2c3788"
+    },
+    "build-before-baseline1.json": {
+      "bytes": 1646,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build-before-baseline1.json",
+      "sha256": "f3114e9d4037952a0562bd58f45a5363ccff1a3da60c78f7177cefe7253ee089"
+    },
+    "build.py": {
+      "bytes": 4586,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/build.py",
+      "sha256": "f2b14181973fb84c56af1e60345b71c7c91ab49f5d4cdc2c1fbb3e5f2db4f529"
+    },
+    "builds.json": {
+      "bytes": 3505,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/builds.json",
+      "sha256": "c2a40c21e208f0ef6fffa47d5a9bd1ef36a07df84e86649d2e4d0aecf96dff17"
+    },
+    "candidate-source.json": {
+      "bytes": 1058,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/candidate-source.json",
+      "sha256": "f4b7438287bbd70524c8a3596648493c3d7238ce7c6e0f32152f5db049a7f49a"
+    },
+    "candidate.patch": {
+      "bytes": 80527,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/candidate.patch",
+      "sha256": "e903b7a8e30884d3f23e1d67802864ededf704251713fa6289d32c4c505cb5fe"
+    },
+    "environment.json": {
+      "bytes": 1178,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/environment.json",
+      "sha256": "afc63f2e61fe85f48ffdddca17dba2c388f855ca0ada866cb134be91656e0067"
+    },
+    "final-gates.json": {
+      "bytes": 10134,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/final-gates.json",
+      "sha256": "7b8bdac39667ec6a6fd64d2561e195038ac5682ebab568a0bf262176c063c0de"
+    },
+    "fixture-inputs.json": {
+      "bytes": 472139,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/fixture-inputs.json",
+      "sha256": "eda7c7afd1ef9ff92847ef4268b65b2ad2b6ac2c5b079c833537a854905c1d75"
+    },
+    "fixture-verification.json": {
+      "bytes": 512,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/fixture-verification.json",
+      "sha256": "7104b47e5967259badba3071109f1883b71381af032726ef2738cd5e85820bb3"
+    },
+    "gate.py": {
+      "bytes": 3009,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/gate.py",
+      "sha256": "3110e9c00df63de75a6458af51ef01bb3747b7ba6495fc42025271bb1ebf68be"
+    },
+    "gates.py": {
+      "bytes": 3988,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/gates.py",
+      "sha256": "55c5ff4859e044cc6c8b7f410686a5e21b746beda0e9b497828bfc886e3c2ab7"
+    },
+    "machine.json": {
+      "bytes": 1347,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/machine.json",
+      "sha256": "37096578ef4ef061afda775953b4a594168f4b12d51bf78711f828107bcc18f2"
+    },
+    "matrix.json": {
+      "bytes": 123804,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/matrix.json",
+      "sha256": "fb4227ccfbc68991f711cc53b099cd4a2c6fdb2210f874c8f48eb1443c02c43b"
+    },
+    "measure.py": {
+      "bytes": 108524,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/measure.py",
+      "sha256": "6c7d29f5c2e7fcaf7ea7478c0e54326a3e0f7307e07b77b726f7d683273c930c"
+    },
+    "plan.md": {
+      "bytes": 5146,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/plan.md",
+      "sha256": "ddec69717ec829403e35a382a93077ac4a044f511808e9ca9a422866aa13ba66"
+    },
+    "profile.py": {
+      "bytes": 65338,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profile.py",
+      "sha256": "b433b8831bfaa3470bd3e67e420bf780a8b8e490152c75366cb89d8fadc5509a"
+    },
+    "test_measure.py": {
+      "bytes": 21008,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/test_measure.py",
+      "sha256": "746eecb04d1eed8c0b3e19565e9f1624bf0023dfafe64165c19cdfedba5e3873"
+    },
+    "test_profile.py": {
+      "bytes": 11336,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/test_profile.py",
+      "sha256": "4961dd4516cfc3c142acffa408246b098dc42c8b8e3111d02212b2008c557bee"
+    },
+    "workspace-Cargo.lock": {
+      "bytes": 138626,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/workspace-Cargo.lock",
+      "sha256": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292"
+    }
+  },
+  "production_change": "Format-owned atomic publication for bounded DOCX replayable logical-tail append; counting and atomic are after-only capabilities. Default hashing is the before/after control.",
+  "schema": "docx-phase-provenance-v1"
+}

@@ -1,0 +1,6 @@
+.cleanup.py: error: destructive mode is restricted to fixed 0497 roots
+.....................................
+----------------------------------------------------------------------
+Ran 38 tests in 0.241s
+
+OK

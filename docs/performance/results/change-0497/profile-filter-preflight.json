@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "strace",
+    "-e",
+    "trace=open,openat,openat2,creat,read,pread64,preadv,readv,write,pwrite64,pwritev,writev,close,fsync,fdatasync,rename,renameat,renameat2,unlink,unlinkat,stat,statx,fstat,newfstatat,mkdir,mkdirat",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profiles/strace-filter-preflight.txt",
+    "--",
+    "true"
+  ],
+  "exit_code": 0,
+  "stderr": "",
+  "scope": "Tool filter compatibility only; no benchmark process.",
+  "retained_trace": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/profile-filter-preflight.strace",
+    "bytes": 647,
+    "sha256": "6718688b741833844be322dcbeb2a39991379bb4ef6091163cb67c9ec7f1e048"
+  },
+  "relocation": "Raw trace moved out of the profile-attempt namespace after preflight; argv retains actual invocation."
+}

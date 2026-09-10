@@ -1,0 +1,23 @@
+	Command being timed: "/usr/bin/taskset -c 2 /home/zhuhe/.cache/litchi-goal-0497/retained/before/normal/docx_replayable_tail_append --source-counts 64 --authored-counts 16384 --chunks 64 --text short --samples 30 --warmups 3 --sink-write 4096 --authored-provider deterministic --replay-max-bytes 1 --replay-sync none --compression current --input-mode file --input-file /home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r1-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/input/s64-a16384-short-c64-source.docx --json /home/zhuhe/code/litchi/docs/performance/results/change-0497/captures/formal1/r1-before-hashing_sink-normal-deterministic-file-s64-a16384-short-c64/report.json"
+	User time (seconds): 3.44
+	System time (seconds): 1.06
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:04.50
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 17952
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 4054
+	Voluntary context switches: 1
+	Involuntary context switches: 7
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 144
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

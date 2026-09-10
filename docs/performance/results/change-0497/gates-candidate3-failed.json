@@ -1,0 +1,22 @@
+{
+  "docx-default": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate3-docx-default.json",
+    "wrapper_exit_code": 0
+  },
+  "docx-features": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate3-docx-features.json",
+    "wrapper_exit_code": 0
+  },
+  "focused": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate3-focused.json",
+    "wrapper_exit_code": 0
+  },
+  "opc-atomic": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate3-opc-atomic.json",
+    "wrapper_exit_code": 0
+  },
+  "opc-preservation": {
+    "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate3-opc-preservation.json",
+    "wrapper_exit_code": 1
+  }
+}

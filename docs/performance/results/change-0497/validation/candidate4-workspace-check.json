@@ -1,0 +1,53 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--release",
+    "--locked",
+    "--offline",
+    "--workspace",
+    "--all-targets"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0497/after",
+  "driver": {
+    "bytes": 3009,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/gate.py",
+    "sha256": "3110e9c00df63de75a6458af51ef01bb3747b7ba6495fc42025271bb1ebf68be"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-goal-0497/target",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "RUSTDOCFLAGS": "-Dwarnings",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0497/tmp"
+  },
+  "exit_code": 101,
+  "finished_ns": 1789055065662313644,
+  "pid": 467171,
+  "source_manifest": {
+    "bytes": 1930173,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate4-workspace-check.source.json",
+    "sha256": "52c1deca9ed37ccc2ae53a6db5ba4ec8eaa1bad50ff2105429b351d7f6cf62e3"
+  },
+  "source_unchanged": true,
+  "started_ns": 1789054938571242854,
+  "stderr": {
+    "bytes": 111564,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate4-workspace-check.stderr",
+    "sha256": "870d7eb7cff9e98e3f0ee70be520424419317f82ae794adb053fd919b9ba96a3"
+  },
+  "stdout": {
+    "bytes": 0,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/validation/candidate4-workspace-check.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 3600
+}

@@ -1,0 +1,18 @@
+{
+  "attempt": "formal1",
+  "completed_children": 97,
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T17:58:41.367135Z",
+  "remaining_children": 97,
+  "schema": "docx-replayable-tail-publication-resume-terminal-v1",
+  "scope": "resume receipts do not replace the frozen formal protocol or child terminals",
+  "start_ordinal": 191,
+  "start_receipt": {
+    "bytes": 341261,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0497/resume/formal1/resume-start.json",
+    "sha256": "766ff787e3869e82a4c8a3f7b09d9d10509585d8ae4395c9d48ff93dcd2ae4d2"
+  },
+  "started_utc": "2026-09-10T17:45:32.243154Z",
+  "status": "pass",
+  "version": 1
+}

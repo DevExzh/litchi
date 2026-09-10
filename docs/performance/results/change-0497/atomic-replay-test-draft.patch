@@ -1,0 +1,141 @@
+--- a/crates/litchi-docx/tests/source_backed_tail_append_stream.rs
++++ b/crates/litchi-docx/tests/source_backed_tail_append_stream.rs
+@@ -632,10 +632,74 @@
+             .expect("forged store must have accepted the producer bytes");
+         Ok(self
+             .replacement
+             .take()
+             .expect("forged store must have a presealed replacement"))
++    }
++}
++
++#[derive(Debug)]
++struct PostPrepareFailingReplayHandle {
++    inner: MemoryReplayHandle,
++    fail_open: Arc<AtomicUsize>,
++}
++
++impl AuthoredReplayHandle for PostPrepareFailingReplayHandle {
++    fn proof(&self) -> AuthoredStreamProof {
++        self.inner.proof()
++    }
++
++    fn open(&self) -> Result<Box<dyn AuthoredReplayReader + '_>, AuthoredReplayError> {
++        if self.fail_open.load(Ordering::Acquire) != 0 {
++            return Err(AuthoredReplayError::Changed);
++        }
++        self.inner.open()
++    }
++
++    fn durable_reference(&self) -> Option<AuthoredReplayReference> {
++        self.inner.durable_reference()
++    }
++}
++
++#[derive(Debug)]
++struct PostPrepareFailingReplayStore {
++    inner: Option<MemoryReplayStore>,
++    fail_open: Arc<AtomicUsize>,
++}
++
++impl AuthoredReplayStore for PostPrepareFailingReplayStore {
++    type Handle = PostPrepareFailingReplayHandle;
++
++    fn prepare_for_operation(
++        &mut self,
++        limits: ParagraphStreamLimits,
++        context: Option<&ExecutionContext>,
++        cancellation: Option<&CancellationToken>,
++    ) -> Result<(), AuthoredReplayError> {
++        self.inner
++            .as_mut()
++            .expect("post-prepare replay store must remain available")
++            .prepare_for_operation(limits, context, cancellation)
++    }
++
++    fn append(&mut self, chunk: &[u8]) -> Result<(), AuthoredReplayError> {
++        self.inner
++            .as_mut()
++            .expect("post-prepare replay store must remain available")
++            .append(chunk)
++    }
++
++    fn finish(mut self, proof: AuthoredStreamProof) -> Result<Self::Handle, AuthoredReplayError> {
++        let inner = self
++            .inner
++            .take()
++            .expect("post-prepare replay store must remain available")
++            .finish(proof)?;
++        Ok(PostPrepareFailingReplayHandle {
++            inner,
++            fail_open: self.fail_open,
++        })
+     }
+ }
+ 
+ fn forged_payload() -> (Vec<u8>, AuthoredStreamProof) {
+     let text = "forged";
+@@ -1999,10 +2063,63 @@
+     assert_eq!(restored, source_archive);
+     assert_no_atomic_temporary_files(directory.path());
+ }
+ 
+ #[test]
++fn path_publication_replay_failure_after_prepare_preserves_destination() {
++    let source_xml = source_xml_without_section(false);
++    let source_archive = archive(&source_xml, false, Compression::Store);
++    let stream_limits = limits(source_xml.len());
++    let fail_open = Arc::new(AtomicUsize::new(0));
++    let producer = |sink: &mut dyn ParagraphEventSink| -> Result<(), AuthoredReplayError> {
++        sink.push(PlainParagraphEvent::ParagraphStart)?;
++        sink.push(PlainParagraphEvent::TextChunk("replay failure"))?;
++        sink.push(PlainParagraphEvent::ParagraphEnd)?;
++        Ok(())
++    };
++    let package = open_package(source_archive);
++    let plan = package
++        .tail_append_plain_paragraphs_from_producer(
++            producer,
++            PostPrepareFailingReplayStore {
++                inner: Some(
++                    MemoryReplayStore::new(stream_limits.max_replay_bytes)
++                        .expect("post-prepare replay store limit is finite"),
++                ),
++                fail_open: Arc::clone(&fail_open),
++            },
++            stream_limits,
++        )
++        .expect("post-prepare replay producer route must be accepted")
++        .prepare()
++        .expect("post-prepare replay plan must prepare before failure");
++
++    let directory = tempdir().expect("replay failure temporary directory");
++    let destination = directory.path().join("candidate.docx");
++    let original_destination = b"replay failure destination".to_vec();
++    fs::write(&destination, &original_destination).expect("replay failure destination seed");
++    fail_open.store(1, Ordering::Release);
++
++    let result = plan.write_to_path(&destination);
++    assert!(
++        matches!(
++            &result,
++            Err(StreamError::Opc(
++                litchi_opc::error::OpcError::IncompleteOutput { .. }
++                    | litchi_opc::error::OpcError::IoError(_)
++            ))
++        ),
++        "post-prepare replay failure must remain a typed OPC error: {result:?}"
++    );
++    assert_eq!(
++        fs::read(&destination).expect("replay failure destination must remain readable"),
++        original_destination
++    );
++    assert_no_atomic_temporary_files(directory.path());
++}
++
++#[test]
+ fn path_publication_can_replace_the_open_source_path_and_inverse_from_the_new_inode() {
+     let source_xml = source_xml_without_section(false);
+     let source_archive = archive(&source_xml, false, Compression::Store);
+     let directory = tempdir().expect("source-path temporary directory");
+     let source_path = directory.path().join("source.docx");

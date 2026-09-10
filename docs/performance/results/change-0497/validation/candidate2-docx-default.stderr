@@ -1,0 +1,39 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0497/after/crates/litchi-docx)
+error: unnecessary qualification
+   --> crates/litchi-docx/tests/source_backed_sections.rs:270:24
+    |
+270 |         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+270 -         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+270 +         Err(Error::Opc(OpcError::SourceChanged { .. }))
+    |
+
+error: unnecessary qualification
+    --> crates/litchi-docx/tests/source_backed_sections.rs:1281:13
+     |
+1281 |             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1281 -             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
+1281 +             OpcError::SignedSourceRequiresExplicitPolicy
+     |
+
+error: unnecessary qualification
+    --> crates/litchi-docx/tests/source_backed_sections.rs:1304:24
+     |
+1304 |         Err(Error::Opc(litchi_opc::OpcError::IncompleteOutput { .. }))
+     |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+help: remove the unnecessary path segments
+     |
+1304 -         Err(Error::Opc(litchi_opc::OpcError::IncompleteOutput { .. }))
+1304 +         Err(Error::Opc(OpcError::IncompleteOutput { .. }))
+     |
+
+error: could not compile `litchi-docx` (test "source_backed_sections") due to 3 previous errors

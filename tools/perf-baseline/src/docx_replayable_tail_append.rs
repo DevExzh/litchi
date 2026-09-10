@@ -2,10 +2,15 @@
 //!
 //! The harness keeps source and authored paragraph counts as independent axes.
 //! Corpus construction, XML/semantic/ZIP oracles, and exact inverse checks run
-//! outside the timed lifecycle.  A timed sample owns source admission,
-//! replayable stream preparation, publication to a short sequential sink, and
-//! all drops.  The authored provider emits borrowed chunks from one bounded
-//! cursor buffer; it never builds a complete authored XML stream.
+//! outside the timed lifecycle.  The historical timed sample owns source
+//! admission, replayable stream preparation, publication to a short
+//! sequential sink, and all drops.  The after-only counting arm keeps the sink
+//! nonretaining and authenticates its emitted bytes with the production
+//! publication proof.  The after-only atomic arm times the production path
+//! through temporary-file sync, rename, and parent-directory sync; destination
+//! byte/hash/semantic checks and cleanup run after the clock.  The authored
+//! provider emits borrowed chunks from one bounded cursor buffer; it never
+//! builds a complete authored XML stream.
 
 #![allow(clippy::module_name_repetitions)]
 
@@ -31,7 +36,7 @@ use litchi_docx::source_backed::tail_append_stream::{
     AuthoredPassProof, AuthoredReplayError, AuthoredReplayHandle, AuthoredReplayReader,
     AuthoredReplayReference, AuthoredReplayStore, AuthoredStreamProof, MemoryReplayHandle,
     MemoryReplayStore, OneShotParagraphProducer, ParagraphCursor, ParagraphEventSink,
-    ParagraphStreamLimits, PlainParagraphEvent, ReplayableParagraphSource,
+    ParagraphStreamLimits, ParagraphStreamPlan, PlainParagraphEvent, ReplayableParagraphSource,
 };
 use litchi_docx::{Package as OwnedDocxPackage, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -54,11 +59,14 @@ mod compression_profiles;
 mod file_store;
 mod input_profiles;
 #[cfg(test)]
+mod publication_route_tests;
+#[cfg(test)]
 mod route_failure_tests;
 #[cfg(test)]
 mod route_smoke_tests;
 
 const SCHEMA: &str = "docx-replayable-tail-append-v1";
+const PUBLICATION_SCHEMA: &str = "docx-replayable-tail-append-publication-v1";
 const DEFAULT_SOURCE_COUNTS: [usize; 3] = [64, 8_192, 131_072];
 const DEFAULT_AUTHORED_COUNTS: [usize; 4] = [64, 256, 4_096, 16_384];
 const DEFAULT_CHUNK_BYTES: [usize; 3] = [0, 64, 8 * 1024];
@@ -191,6 +199,42 @@ impl ReplaySync {
     }
 }
 
+/// Selects the output sink used by the timed publication lifecycle.
+///
+/// `HashingSink` is the historical default and remains byte-for-byte and
+/// schema compatible with the before baseline.  `CountingSink` deliberately
+/// does not compute a local digest or retain archive bytes: the production
+/// publication's returned artifact proof authenticates the bytes accepted by
+/// the sink.  `AtomicPath` is an after-only capability because the production
+/// `write_to_path` method did not exist in the before baseline.
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+enum PublicationMode {
+    HashingSink,
+    CountingSink,
+    AtomicPath,
+}
+
+impl PublicationMode {
+    const fn is_default(self) -> bool {
+        matches!(self, Self::HashingSink)
+    }
+
+    fn parse(value: &str) -> BenchResult<Self> {
+        match value {
+            "hashing" | "hashing-sink" | "hashing_sink" => Ok(Self::HashingSink),
+            "counting" | "counting-sink" | "counting_sink" => Ok(Self::CountingSink),
+            "atomic" | "atomic-path" | "atomic_path" => {
+                Ok(Self::AtomicPath)
+            },
+            _ => Err(format!(
+                "invalid publication mode {value:?}; expected hashing-sink, counting-sink, or atomic-path"
+            )
+            .into()),
+        }
+    }
+}
+
 impl TextMode {
     fn parse(value: &str) -> BenchResult<Self> {
         match value {
@@ -232,6 +276,7 @@ struct Config {
     input_delay_us: u64,
     input_overhead_us: u64,
     input_bytes_per_second: Option<u64>,
+    publication: PublicationMode,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -270,6 +315,8 @@ struct ConfigRecord {
     input_bytes_per_second: Option<u64>,
     sink: &'static str,
     fixture_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    publication: Option<PublicationMode>,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
@@ -380,6 +427,8 @@ struct Sample {
     sink: SinkRecord,
     allocation: Option<allocation_metrics::Sample>,
     process: Option<process_metrics::Delta>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    publication: Option<PublicationRecord>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1959,7 +2008,8 @@ struct SinkObservation {
     write_calls: u64,
     largest_write: u64,
     histogram: SinkHistogram,
-    digest: [u8; 32],
+    digest: Option<[u8; 32]>,
+    observed: bool,
 }
 
 impl HashingSink {
@@ -1983,8 +2033,85 @@ impl HashingSink {
             write_calls: self.write_calls,
             largest_write: self.largest_write,
             histogram: self.histogram,
-            digest: self.digest.finalize().into(),
+            digest: Some(self.digest.finalize().into()),
+            observed: true,
         }
+    }
+}
+
+/// A bounded, nonretaining sequential sink used by the after-only counting
+/// arm.  It intentionally has no digest state: the timed
+/// `ParagraphStreamPublication` artifact proof is the authoritative byte/hash
+/// evidence for this arm.
+#[derive(Debug)]
+struct CountingSink {
+    max_write: usize,
+    accepted_bytes: u64,
+    write_calls: u64,
+    largest_write: u64,
+    histogram: SinkHistogram,
+}
+
+impl CountingSink {
+    fn new(max_write: usize) -> BenchResult<Self> {
+        if max_write == 0 {
+            return Err("sink write size must be nonzero".into());
+        }
+        Ok(Self {
+            max_write,
+            accepted_bytes: 0,
+            write_calls: 0,
+            largest_write: 0,
+            histogram: SinkHistogram::default(),
+        })
+    }
+
+    fn finish(self) -> SinkObservation {
+        SinkObservation {
+            accepted_bytes: self.accepted_bytes,
+            write_calls: self.write_calls,
+            largest_write: self.largest_write,
+            histogram: self.histogram,
+            digest: None,
+            observed: true,
+        }
+    }
+}
+
+impl Write for CountingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if bytes.is_empty() {
+            return Ok(0);
+        }
+        let accepted = bytes.len().min(self.max_write);
+        self.accepted_bytes = self
+            .accepted_bytes
+            .checked_add(
+                u64::try_from(accepted)
+                    .map_err(|_| io::Error::other("DOCX replay sink byte count overflow"))?,
+            )
+            .ok_or_else(|| io::Error::other("DOCX replay sink byte count overflow"))?;
+        self.write_calls = self
+            .write_calls
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("DOCX replay sink call count overflow"))?;
+        self.largest_write = self.largest_write.max(
+            u64::try_from(accepted)
+                .map_err(|_| io::Error::other("DOCX replay sink write size overflow"))?,
+        );
+        match accepted {
+            0 => self.histogram.bytes_0 += 1,
+            1..=512 => self.histogram.bytes_1_to_512 += 1,
+            513..=4_096 => self.histogram.bytes_513_to_4096 += 1,
+            4_097..=16_384 => self.histogram.bytes_4097_to_16384 += 1,
+            16_385..=65_536 => self.histogram.bytes_16385_to_65536 += 1,
+            _ => self.histogram.bytes_over_65536 += 1,
+        }
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
@@ -2027,24 +2154,93 @@ impl Write for HashingSink {
 }
 
 impl SinkObservation {
+    fn atomic(length: u64) -> Self {
+        Self {
+            accepted_bytes: length,
+            write_calls: 0,
+            largest_write: 0,
+            histogram: SinkHistogram::default(),
+            digest: None,
+            observed: false,
+        }
+    }
+
     fn record(self) -> SinkRecord {
         SinkRecord {
-            accepted_bytes: self.accepted_bytes,
-            write_calls: self.write_calls,
-            largest_write: self.largest_write,
-            histogram: self.histogram,
-            sha256: hex_digest(&self.digest),
+            accepted_bytes: self.observed.then_some(self.accepted_bytes),
+            write_calls: self.observed.then_some(self.write_calls),
+            largest_write: self.observed.then_some(self.largest_write),
+            histogram: self.observed.then_some(self.histogram),
+            sha256: self.digest.map(|digest| hex_digest(&digest)),
         }
     }
 }
 
 #[derive(Clone, Debug, Serialize)]
 struct SinkRecord {
-    accepted_bytes: u64,
-    write_calls: u64,
-    largest_write: u64,
-    histogram: SinkHistogram,
-    sha256: String,
+    accepted_bytes: Option<u64>,
+    write_calls: Option<u64>,
+    largest_write: Option<u64>,
+    histogram: Option<SinkHistogram>,
+    sha256: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TimedArtifactProof {
+    length: u64,
+    sha256: [u8; 32],
+}
+
+impl TimedArtifactProof {
+    fn from_publication(
+        publication: &litchi_docx::source_backed::tail_append_stream::ParagraphStreamPublication,
+    ) -> Self {
+        Self {
+            length: publication.candidate_artifact_length(),
+            sha256: publication.candidate_artifact_fingerprint().into_sha256(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct PublicationRecord {
+    schema: &'static str,
+    route: PublicationMode,
+    timing_scope: &'static str,
+    timed_candidate_artifact_bytes: u64,
+    timed_candidate_artifact_sha256: String,
+    timed_candidate_matches_oracle: bool,
+    verification_scope: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    atomic: Option<AtomicOutputRecord>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct AtomicPathState {
+    exists: bool,
+    regular_file: bool,
+    bytes: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct AtomicCleanupRecord {
+    destination_removed: bool,
+    parent_removed: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct AtomicOutputRecord {
+    destination_path: String,
+    private_parent_path: String,
+    before: AtomicPathState,
+    after: AtomicPathState,
+    post_timer_archive_bytes: u64,
+    post_timer_archive_sha256: String,
+    output_bytes_exact: bool,
+    output_sha256_exact: bool,
+    inverse_oracle_scope: &'static str,
+    post_timer_oracle: OracleRecord,
+    cleanup: AtomicCleanupRecord,
 }
 
 #[derive(Clone, Debug)]
@@ -2056,6 +2252,7 @@ struct Fixture {
     limit_record: StreamLimitRecord,
     source_archive: Arc<[u8]>,
     candidate_archive: Arc<[u8]>,
+    inverse_archive: Arc<[u8]>,
     source_record: SourceRecord,
     oracle: OracleRecord,
     proof: ProofRecord,
@@ -2064,6 +2261,145 @@ struct Fixture {
 struct PreparedInput {
     profile: InputProfile,
     capability: InputSourceCapability,
+}
+
+static NEXT_ATOMIC_DESTINATION: AtomicU64 = AtomicU64::new(0);
+
+struct AtomicDestination {
+    parent: PathBuf,
+    path: PathBuf,
+    before: AtomicPathState,
+    cleaned: bool,
+}
+
+impl AtomicDestination {
+    fn prepare() -> BenchResult<Self> {
+        let parent = match (0..32_u8).find_map(|_| {
+            let serial = NEXT_ATOMIC_DESTINATION.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "litchi-docx-replay-atomic-{}-{serial}",
+                std::process::id()
+            ));
+            match std::fs::create_dir(&path) {
+                Ok(()) => Some(Ok(path)),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => None,
+                Err(error) => Some(Err(error)),
+            }
+        }) {
+            Some(parent) => parent?,
+            None => return Err("unable to allocate a private atomic publication directory".into()),
+        };
+        let path = parent.join("published.docx");
+        let before = atomic_path_state(&path)?;
+        if before.exists {
+            return Err("atomic publication destination unexpectedly exists during setup".into());
+        }
+        Ok(Self {
+            parent,
+            path,
+            before,
+            cleaned: false,
+        })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    fn verify_and_cleanup(
+        &mut self,
+        fixture: &Fixture,
+        proof: TimedArtifactProof,
+    ) -> BenchResult<AtomicOutputRecord> {
+        let bytes = std::fs::read(&self.path)?;
+        let after = atomic_path_state(&self.path)?;
+        let byte_len = u64::try_from(bytes.len())?;
+        let archive_sha256 = sha256_hex(&bytes);
+        let output_bytes_exact = bytes.len() == fixture.oracle.candidate_archive_bytes
+            && proof.length == byte_len
+            && after.bytes == Some(byte_len);
+        let output_sha256_exact = archive_sha256 == fixture.oracle.candidate_archive_sha256
+            && hex_digest(&proof.sha256) == fixture.oracle.candidate_archive_sha256;
+        let source_xml = source_main_xml(fixture.source_record.semantic.paragraph_count)?;
+        let expected_candidate_xml = independent_candidate_xml(&source_xml, fixture.authored)?;
+        let post_timer_oracle = verify_candidate_oracles(
+            fixture.source_archive.as_ref(),
+            &source_xml,
+            &bytes,
+            &expected_candidate_xml,
+            fixture.source_record.semantic.paragraph_count,
+            fixture.authored,
+            fixture.inverse_archive.as_ref(),
+        )?;
+        if !output_bytes_exact || !output_sha256_exact || !after.exists || !after.regular_file {
+            return Err(
+                "atomic publication destination failed its post-timer artifact oracle".into(),
+            );
+        }
+        let cleanup = self.cleanup()?;
+        Ok(AtomicOutputRecord {
+            destination_path: self.path.display().to_string(),
+            private_parent_path: self.parent.display().to_string(),
+            before: self.before.clone(),
+            after,
+            post_timer_archive_bytes: byte_len,
+            post_timer_archive_sha256: archive_sha256,
+            output_bytes_exact,
+            output_sha256_exact,
+            inverse_oracle_scope: "untimed_fixture_publication_inverse_exact; timed_atomic_publication_inverse_not_reexecuted",
+            post_timer_oracle,
+            cleanup,
+        })
+    }
+
+    fn cleanup(&mut self) -> BenchResult<AtomicCleanupRecord> {
+        let destination_removed = match std::fs::remove_file(&self.path) {
+            Ok(()) => true,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error.into()),
+        };
+        let parent_removed = match std::fs::remove_dir(&self.parent) {
+            Ok(()) => true,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error.into()),
+        };
+        self.cleaned = true;
+        Ok(AtomicCleanupRecord {
+            destination_removed,
+            parent_removed,
+        })
+    }
+}
+
+impl Drop for AtomicDestination {
+    fn drop(&mut self) {
+        if !self.cleaned {
+            // A failed atomic write may have returned `OpcError::Committed`:
+            // the destination can already be durable even though the parent
+            // directory sync failed.  Keep that artifact and its private
+            // parent for the driver to audit.  If no destination was created,
+            // only remove the empty setup directory.
+            if std::fs::symlink_metadata(&self.path).is_err() {
+                let _ = std::fs::remove_dir(&self.parent);
+            }
+        }
+    }
+}
+
+fn atomic_path_state(path: &Path) -> BenchResult<AtomicPathState> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) => Ok(AtomicPathState {
+            exists: true,
+            regular_file: metadata.is_file(),
+            bytes: metadata.is_file().then_some(metadata.len()),
+        }),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(AtomicPathState {
+            exists: false,
+            regular_file: false,
+            bytes: None,
+        }),
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2419,6 +2755,11 @@ fn build_fixture(
     if !source_record.unchanged_oracle || !source_record.opaque_member_exact {
         return Err("DOCX replay source oracle failed".into());
     }
+    // The independent inverse oracle above proves that the restored archive is
+    // byte-identical to the already-owned source fixture.  Reuse that source
+    // owner for post-timer oracle comparison instead of retaining another
+    // full archive allocation.
+    let inverse_archive = Arc::clone(&source_bytes);
     Ok(Fixture {
         authored,
         compression,
@@ -2427,6 +2768,7 @@ fn build_fixture(
         limit_record,
         source_archive: source_bytes,
         candidate_archive: candidate_bytes,
+        inverse_archive,
         source_record,
         oracle,
         proof,
@@ -2711,6 +3053,37 @@ fn elapsed_ns(start: Instant) -> BenchResult<u64> {
         .map_err(|_| "DOCX replay elapsed time overflows u64 nanoseconds".into())
 }
 
+/// Execute one of the after-only publication arms.  The returned publication
+/// proof is extracted and the owning publication is dropped before the caller
+/// stops its lifecycle clock.  No candidate archive bytes are retained by the
+/// counting sink or by this helper.
+fn publish_alternative_plan(
+    plan: ParagraphStreamPlan<'_>,
+    publication: PublicationMode,
+    sink_write_bytes: usize,
+    atomic_path: Option<&Path>,
+) -> BenchResult<(SinkObservation, TimedArtifactProof)> {
+    match publication {
+        PublicationMode::CountingSink => {
+            let mut output = CountingSink::new(sink_write_bytes)?;
+            let publication = plan.write_to_stream(&mut output)?;
+            let proof = TimedArtifactProof::from_publication(&publication);
+            drop(publication);
+            Ok((output.finish(), proof))
+        },
+        PublicationMode::AtomicPath => {
+            let path = atomic_path.ok_or("atomic publication has no prepared destination")?;
+            let publication = plan.commit().write_to_path(path)?;
+            let proof = TimedArtifactProof::from_publication(&publication);
+            drop(publication);
+            Ok((SinkObservation::atomic(proof.length), proof))
+        },
+        PublicationMode::HashingSink => {
+            Err("hashing-sink must use the historical publication path".into())
+        },
+    }
+}
+
 fn run_iteration(
     fixture: &Fixture,
     config: &Config,
@@ -2722,6 +3095,7 @@ fn run_iteration(
     ReadObservation,
     AuthoredObservation,
     Option<ReplayObservation>,
+    Option<PublicationRecord>,
     Option<allocation_metrics::Sample>,
     Option<process_metrics::Delta>,
 )> {
@@ -2738,10 +3112,15 @@ fn run_iteration(
         .as_ref()
         .map(|_| Arc::new(Mutex::new(None::<FileReplayCleanupRecord>)));
     let file_monitor = file_path.as_ref().map(|_| FileReplayMonitor::new());
+    let mut atomic_destination = if matches!(config.publication, PublicationMode::AtomicPath) {
+        Some(AtomicDestination::prepare()?)
+    } else {
+        None
+    };
     let process_before = process_metrics::Snapshot::read().ok();
     let region = allocation_metrics::begin();
     let start = Instant::now();
-    let (sink, reads, authored, replay) = {
+    let (sink, reads, authored, replay, timed_proof) = {
         let opened_input = input
             .map(|prepared| prepared.profile.open(&prepared.capability))
             .transpose()?;
@@ -2757,71 +3136,134 @@ fn run_iteration(
             ))
         };
         let package = source_backed::Package::from_read_at(Arc::clone(&source))?;
-        let mut output = HashingSink::new(sink_write_bytes)?;
-        let replay = if matches!(config.authored_provider, AuthoredProvider::Deterministic) {
-            let generated =
-                GeneratedParagraphSource::new(fixture.authored, Arc::clone(&authored_counters));
-            let edit = package.tail_append_plain_paragraphs(generated, limits);
-            let plan = edit.prepare()?;
-            let _publication = plan.write_to_stream(&mut output)?;
-            None
-        } else {
-            let producer = GeneratedParagraphProducer::new(
-                fixture.authored,
-                Arc::clone(&authored_counters),
-                Arc::clone(&replay_counters),
-            );
-            let store = match config.authored_provider {
-                AuthoredProvider::MemoryStore => {
-                    ReplayRouteStore::Memory(CountingReplayStore::new(
-                        MemoryReplayStore::new(limits.max_replay_bytes)?,
-                        Arc::clone(&replay_counters),
-                    ))
-                },
-                AuthoredProvider::FileStore => {
-                    let cleanup = file_cleanup
-                        .as_ref()
-                        .ok_or("file-store route has no cleanup owner")?;
-                    let path = file_path
-                        .as_ref()
-                        .ok_or("file-store route has no replay path")?;
-                    let monitor = file_monitor
-                        .as_ref()
-                        .ok_or("file-store route has no monitor")?;
-                    ReplayRouteStore::File(CountingReplayStore::new(
-                        FileReplayRouteStore::new(
-                            path.clone(),
-                            limits.max_replay_bytes,
-                            match config.replay_sync {
-                                ReplaySync::None => FileSyncPolicy::None,
-                                ReplaySync::Data => FileSyncPolicy::Data,
-                            },
-                            Arc::clone(cleanup),
-                            monitor,
-                        )?,
-                        Arc::clone(&replay_counters),
-                    ))
-                },
-                AuthoredProvider::Deterministic => {
-                    return Err("deterministic provider selected an explicit store route".into());
-                },
+        let atomic_path = atomic_destination.as_ref().map(AtomicDestination::path);
+        let (replay, sink, timed_proof) =
+            if matches!(config.authored_provider, AuthoredProvider::Deterministic) {
+                let generated =
+                    GeneratedParagraphSource::new(fixture.authored, Arc::clone(&authored_counters));
+                let edit = package.tail_append_plain_paragraphs(generated, limits);
+                let plan = edit.prepare()?;
+                if config.publication.is_default() {
+                    let mut output = HashingSink::new(sink_write_bytes)?;
+                    let _publication = plan.write_to_stream(&mut output)?;
+                    (None, output.finish(), None)
+                } else {
+                    let (output, proof) = publish_alternative_plan(
+                        plan,
+                        config.publication,
+                        sink_write_bytes,
+                        atomic_path,
+                    )?;
+                    (None, output, Some(proof))
+                }
+            } else {
+                let producer = GeneratedParagraphProducer::new(
+                    fixture.authored,
+                    Arc::clone(&authored_counters),
+                    Arc::clone(&replay_counters),
+                );
+                let store = match config.authored_provider {
+                    AuthoredProvider::MemoryStore => {
+                        ReplayRouteStore::Memory(CountingReplayStore::new(
+                            MemoryReplayStore::new(limits.max_replay_bytes)?,
+                            Arc::clone(&replay_counters),
+                        ))
+                    },
+                    AuthoredProvider::FileStore => {
+                        let cleanup = file_cleanup
+                            .as_ref()
+                            .ok_or("file-store route has no cleanup owner")?;
+                        let path = file_path
+                            .as_ref()
+                            .ok_or("file-store route has no replay path")?;
+                        let monitor = file_monitor
+                            .as_ref()
+                            .ok_or("file-store route has no monitor")?;
+                        ReplayRouteStore::File(CountingReplayStore::new(
+                            FileReplayRouteStore::new(
+                                path.clone(),
+                                limits.max_replay_bytes,
+                                match config.replay_sync {
+                                    ReplaySync::None => FileSyncPolicy::None,
+                                    ReplaySync::Data => FileSyncPolicy::Data,
+                                },
+                                Arc::clone(cleanup),
+                                monitor,
+                            )?,
+                            Arc::clone(&replay_counters),
+                        ))
+                    },
+                    AuthoredProvider::Deterministic => {
+                        return Err(
+                            "deterministic provider selected an explicit store route".into()
+                        );
+                    },
+                };
+                let edit =
+                    package.tail_append_plain_paragraphs_from_producer(producer, store, limits)?;
+                let plan = edit.prepare()?;
+                if config.publication.is_default() {
+                    let mut output = HashingSink::new(sink_write_bytes)?;
+                    let _publication = plan.write_to_stream(&mut output)?;
+                    (Some(replay_counters.snapshot()), output.finish(), None)
+                } else {
+                    let (output, proof) = publish_alternative_plan(
+                        plan,
+                        config.publication,
+                        sink_write_bytes,
+                        atomic_path,
+                    )?;
+                    (Some(replay_counters.snapshot()), output, Some(proof))
+                }
             };
-            let edit =
-                package.tail_append_plain_paragraphs_from_producer(producer, store, limits)?;
-            let plan = edit.prepare()?;
-            let _publication = plan.write_to_stream(&mut output)?;
-            Some(replay_counters.snapshot())
-        };
-        let sink = output.finish();
         let reads = source_counters.snapshot();
         let authored = authored_counters.snapshot();
-        (sink, reads, authored, replay)
+        (sink, reads, authored, replay, timed_proof)
     };
     let elapsed = elapsed_ns(start)?;
     let allocation = region.finish();
     let process = process_before
         .zip(process_metrics::Snapshot::read().ok())
         .map(|(before, after)| after.delta(before));
+    let publication = match (config.publication, timed_proof) {
+        (PublicationMode::HashingSink, None) => None,
+        (PublicationMode::CountingSink, Some(proof)) => Some(PublicationRecord {
+            schema: PUBLICATION_SCHEMA,
+            route: PublicationMode::CountingSink,
+            timing_scope: "source_admission_prepare_sequential_sink_publication_drop",
+            timed_candidate_artifact_bytes: proof.length,
+            timed_candidate_artifact_sha256: hex_digest(&proof.sha256),
+            timed_candidate_matches_oracle: proof.length
+                == u64::try_from(fixture.oracle.candidate_archive_bytes)?
+                && hex_digest(&proof.sha256) == fixture.oracle.candidate_archive_sha256,
+            verification_scope: "timed_production_artifact_proof_plus_untimed_candidate_oracle",
+            atomic: None,
+        }),
+        (PublicationMode::AtomicPath, Some(proof)) => {
+            let destination = atomic_destination
+                .as_mut()
+                .ok_or("atomic publication has no destination owner")?;
+            let atomic = destination.verify_and_cleanup(fixture, proof)?;
+            Some(PublicationRecord {
+                schema: PUBLICATION_SCHEMA,
+                route: PublicationMode::AtomicPath,
+                timing_scope: "source_admission_prepare_atomic_write_data_sync_rename_parent_directory_sync_publication_drop",
+                timed_candidate_artifact_bytes: proof.length,
+                timed_candidate_artifact_sha256: hex_digest(&proof.sha256),
+                timed_candidate_matches_oracle: proof.length
+                    == u64::try_from(fixture.oracle.candidate_archive_bytes)?
+                    && hex_digest(&proof.sha256) == fixture.oracle.candidate_archive_sha256,
+                verification_scope: "timed_production_artifact_proof_plus_post_timer_path_oracle",
+                atomic: Some(atomic),
+            })
+        },
+        (_, None) => {
+            return Err("publication route did not return its production artifact proof".into());
+        },
+        (PublicationMode::HashingSink, Some(_)) => {
+            return Err("historical hashing sink unexpectedly returned an alternate proof".into());
+        },
+    };
     let replay = match (replay, file_cleanup) {
         (Some(mut replay), Some(cleanup)) => {
             let file = cleanup_file_route(
@@ -2870,7 +3312,16 @@ fn run_iteration(
             None
         },
     };
-    Ok((elapsed, sink, reads, authored, replay, allocation, process))
+    Ok((
+        elapsed,
+        sink,
+        reads,
+        authored,
+        replay,
+        publication,
+        allocation,
+        process,
+    ))
 }
 
 fn check_authored_counters(
@@ -3003,11 +3454,53 @@ fn check_runtime(
     reads: ReadObservation,
     authored: AuthoredObservation,
     replay: Option<ReplayObservation>,
+    publication: Option<&PublicationRecord>,
 ) -> BenchResult<()> {
-    if sink.accepted_bytes != u64::try_from(fixture.oracle.candidate_archive_bytes)?
-        || sink.digest.as_slice() != Sha256::digest(fixture.candidate_archive.as_ref()).as_slice()
-    {
-        return Err("DOCX replay sink output differs from candidate archive oracle".into());
+    let expected_bytes = u64::try_from(fixture.oracle.candidate_archive_bytes)?;
+    let expected_sha256 = Sha256::digest(fixture.candidate_archive.as_ref());
+    if sink.observed {
+        if sink.accepted_bytes != expected_bytes {
+            return Err(
+                "DOCX replay sink output length differs from candidate archive oracle".into(),
+            );
+        }
+        if let Some(digest) = sink.digest {
+            if digest.as_slice() != expected_sha256.as_slice() {
+                return Err(
+                    "DOCX replay hashing sink output differs from candidate archive oracle".into(),
+                );
+            }
+        } else if publication.is_none_or(|value| !value.timed_candidate_matches_oracle) {
+            return Err(
+                "DOCX replay counting sink lacks a matching production artifact proof".into(),
+            );
+        }
+    } else {
+        let publication = publication.ok_or("DOCX replay publication route omitted its proof")?;
+        if !publication.timed_candidate_matches_oracle {
+            return Err(
+                "DOCX replay atomic publication proof differs from candidate archive oracle".into(),
+            );
+        }
+        let atomic = publication
+            .atomic
+            .as_ref()
+            .ok_or("DOCX replay atomic route omitted its post-timer path oracle")?;
+        if !atomic.output_bytes_exact
+            || !atomic.output_sha256_exact
+            || !atomic.post_timer_oracle.candidate_xml_exact
+            || !atomic.post_timer_oracle.candidate_semantic_exact
+            || !atomic.post_timer_oracle.untouched_member_metadata_exact
+            || !atomic.post_timer_oracle.untouched_raw_members_preserved
+            || !atomic.post_timer_oracle.physical_order_exact
+            || !atomic.post_timer_oracle.opaque_member_exact
+            || !atomic.post_timer_oracle.source_unchanged
+            || !atomic.post_timer_oracle.inverse_exact
+            || !atomic.cleanup.destination_removed
+            || !atomic.cleanup.parent_removed
+        {
+            return Err("DOCX replay atomic destination post-timer oracle failed".into());
+        }
     }
     if reads.calls == 0 || reads.returned_bytes == 0 {
         return Err("DOCX replay lifecycle performed no positional source reads".into());
@@ -3068,12 +3561,13 @@ fn run_case(
     drop(preflight_candidate);
     let mut samples = Vec::with_capacity(config.samples);
     for iteration in 0..config.warmups.saturating_add(config.samples) {
-        let (elapsed, sink, reads, authored, replay, allocation, process) = run_iteration(
-            &fixture,
-            config,
-            prepared_input.as_ref(),
-            config.sink_write_bytes,
-        )?;
+        let (elapsed, sink, reads, authored, replay, publication, allocation, process) =
+            run_iteration(
+                &fixture,
+                config,
+                prepared_input.as_ref(),
+                config.sink_write_bytes,
+            )?;
         if let Some(input) = prepared_input.as_ref()
             && input.capability.is_file()
         {
@@ -3090,6 +3584,7 @@ fn run_case(
             reads,
             authored,
             replay,
+            publication.as_ref(),
         )?;
         if iteration >= config.warmups {
             samples.push(Sample {
@@ -3105,6 +3600,7 @@ fn run_case(
                 sink: sink.record(),
                 allocation,
                 process,
+                publication,
             });
         }
     }
@@ -3244,6 +3740,7 @@ where
     let mut input_delay_us = 0_u64;
     let mut input_overhead_us = 0_u64;
     let mut input_bytes_per_second = None;
+    let mut publication = PublicationMode::HashingSink;
     let mut values = args.into_iter();
     while let Some(argument) = values.next() {
         let flag = argument.to_string_lossy();
@@ -3291,6 +3788,13 @@ where
                     )
                     .into());
                 }
+            },
+            "--publication" | "--publication-mode" => {
+                publication = PublicationMode::parse(
+                    next_value(&mut values, "--publication")?
+                        .to_str()
+                        .ok_or("--publication must be UTF-8")?,
+                )?
             },
             "--json" => json_path = Some(PathBuf::from(next_value(&mut values, "--json")?)),
             "--fixture-dir" => {
@@ -3431,11 +3935,12 @@ where
         input_delay_us,
         input_overhead_us,
         input_bytes_per_second,
+        publication,
     })
 }
 
 fn usage() -> &'static str {
-    "usage: docx_replayable_tail_append [--source-counts 64,8192,131072] [--authored-counts 64,256,4096,16384] [--chunks one,64,window] [--text empty,short,near] [--samples N] [--warmups N] [--sink-write 512|4096|65536] [--authored-provider deterministic|memory-store|file-store] [--replay-dir DIR] [--replay-max-bytes BYTES] [--replay-sync none|data] [--compression-mode current|store|deflate] [--input-mode owned|file|short-read|latency] [--input-file PATH] [--input-max-range BYTES] [--input-delay-us N] [--input-overhead-us N] [--input-bytes-per-second N] [--json PATH] [--fixture-dir DIR]"
+    "usage: docx_replayable_tail_append [--source-counts 64,8192,131072] [--authored-counts 64,256,4096,16384] [--chunks one,64,window] [--text empty,short,near] [--samples N] [--warmups N] [--sink-write 512|4096|65536] [--publication hashing-sink|counting-sink|atomic-path] [--authored-provider deterministic|memory-store|file-store] [--replay-dir DIR] [--replay-max-bytes BYTES] [--replay-sync none|data] [--compression-mode current|store|deflate] [--input-mode owned|file|short-read|latency] [--input-file PATH] [--input-max-range BYTES] [--input-delay-us N] [--input-overhead-us N] [--input-bytes-per-second N] [--json PATH] [--fixture-dir DIR]"
 }
 
 /// Run the replayable DOCX lifecycle benchmark using command-line arguments.
@@ -3515,11 +4020,22 @@ where
             input_delay_us: config.input_delay_us,
             input_overhead_us: config.input_overhead_us,
             input_bytes_per_second: config.input_bytes_per_second,
-            sink: "non_seek_hashing_sha256_short_write_no_archive_retention",
+            sink: match config.publication {
+                PublicationMode::HashingSink => {
+                    "non_seek_hashing_sha256_short_write_no_archive_retention"
+                },
+                PublicationMode::CountingSink => {
+                    "non_seek_counting_short_write_no_archive_retention_production_artifact_proof"
+                },
+                PublicationMode::AtomicPath => {
+                    "production_atomic_path_output_proof_post_timer_destination_oracle"
+                },
+            },
             fixture_dir: config
                 .fixture_dir
                 .as_ref()
                 .map(|path| path.display().to_string()),
+            publication: (!config.publication.is_default()).then_some(config.publication),
         },
         cases,
     };

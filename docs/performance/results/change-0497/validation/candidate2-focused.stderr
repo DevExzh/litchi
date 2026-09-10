@@ -1,0 +1,2 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.09s
+     Running tests/source_backed_tail_append_stream.rs (/home/zhuhe/.cache/litchi-goal-0497/target/release/deps/source_backed_tail_append_stream-61a772daea9b257a)

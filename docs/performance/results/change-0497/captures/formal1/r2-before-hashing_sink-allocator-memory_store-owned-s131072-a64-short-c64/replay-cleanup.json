@@ -1,0 +1,13 @@
+{
+  "inventory": [],
+  "preserved": false,
+  "remaining": [],
+  "removed": [
+    "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-allocator-memory_store-owned-s131072-a64-short-c64",
+    "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1",
+    "/home/zhuhe/.cache/litchi-goal-0497/runs"
+  ],
+  "root": "/home/zhuhe/.cache/litchi-goal-0497/runs/formal1/r2-before-hashing_sink-allocator-memory_store-owned-s131072-a64-short-c64",
+  "schema": "docx-replayable-tail-publication-private-cleanup-v1",
+  "status": "pass"
+}

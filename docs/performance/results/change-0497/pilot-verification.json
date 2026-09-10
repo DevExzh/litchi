@@ -1,0 +1,8 @@
+{
+  "schema": "docx-atomic-publication-pilot-verification-v1",
+  "children": 72,
+  "samples": 216,
+  "status": "pass",
+  "protocol_sha256": "c47939dcb7fb44fa1a8a3ffe9524f211ee1e671c5209ca6a4a5090d87268227d",
+  "scope": "Separate smoke lane; excluded from formal analysis."
+}

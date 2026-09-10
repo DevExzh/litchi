@@ -1,0 +1,9 @@
+{
+  "path": "/home/zhuhe/.cache/litchi-goal-0497/target",
+  "reason": "All root Cargo benchmark/gate builds terminal; four executables hash-verified; ASan uses separate fuzz-target/target. Disk pressure from shared activity.",
+  "allocated_bytes": 13417771008,
+  "free_before": 1769324544,
+  "free_after": 14605287424,
+  "completed_ns": 1789060193242372667,
+  "active_build_refs": []
+}
