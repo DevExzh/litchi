@@ -1,0 +1,3 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/litchi_opc-aa7f9505152f7479)
+error: test failed, to rerun pass `-p litchi-opc --lib`

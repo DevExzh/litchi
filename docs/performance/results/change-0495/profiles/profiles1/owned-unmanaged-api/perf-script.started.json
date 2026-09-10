@@ -1,0 +1,40 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/usr/bin/perf",
+    "script",
+    "--header",
+    "--demangle",
+    "-F",
+    "comm,pid,tid,time,period,event,ip,sym,dso",
+    "-i",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/owned-unmanaged-api/perf-record.data"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "LC_ALL": "C",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/managed/profiles1/owned-unmanaged-api/tmp"
+  },
+  "metadata": {
+    "input": {
+      "bytes": 10655232,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/owned-unmanaged-api/perf-record.data",
+      "sha256": "b58b2a49acace7b614d5e9aea09718a0b369d1efd141dc49d1962e6e5b39c8e1"
+    },
+    "scope": "perf-record periods are statistical whole-child samples; run_sample and publication markers are call-stack subsets and are not phase durations; bare symbols are accepted for this selected harness executable and may be ambiguous when DWARF symbolization is incomplete"
+  },
+  "new_session": true,
+  "role": "owned-perf-script",
+  "schema": "docx-edit-provider-profile-process-start-v1",
+  "scope": "perf/strace/perf-record observes one complete child process including process startup, fixture/preflight setup, warmups, the measured opened document edit/commit/publication, post-clock output hashing and semantic validation, and report serialization; counters are not operation-local",
+  "source_before": {
+    "files": 7198,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "started_utc": "2026-09-10T12:46:41.468571+00:00"
+}

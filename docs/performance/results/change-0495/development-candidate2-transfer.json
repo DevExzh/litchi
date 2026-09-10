@@ -1,0 +1,12 @@
+{
+  "crates/litchi-docx/src/document/transaction.rs": "ffa83cc4ed54f7a8c2558d5bebebda62b9576b4702e7a3fe31fcb64099e1fabf",
+  "crates/litchi-docx/src/document/transaction/durable.rs": "047ec051368de50b3478a6703acaeb62e2f4926fb35b406020ad0e8afe7681a6",
+  "crates/litchi-docx/src/paragraph/codec/inlines.rs": "a19bca50e417a2f89818683fd7c997325a47e76f5d233b2328499eb4042d8669",
+  "crates/litchi-docx/src/paragraph/codec/run_contents.rs": "ea19334aad2fd6882be8af735bf390494aa3dbcd91114084857f25069c807d23",
+  "crates/litchi-docx/src/paragraph/codec/runs.rs": "425e56aaca49efb45aa73bfa730dd9c6134b85e85f2d3c0158f17f168c671105",
+  "crates/litchi-docx/src/paragraph/model.rs": "e3d630dfec5d47de1b3e5e1a42807d4d6be04e53e30d9fda0ecbc34394023421",
+  "crates/litchi-docx/src/source_backed.rs": "f6ad9b93a88fb9e300085c3dd6b6f5f973a6d443ab67a3487341a503cb344448",
+  "crates/litchi-docx/src/source_backed/story_text.rs": "eac38974c5992ad501ce8908589f504940069e5c2e23ccd35c69229795fdb1e6",
+  "crates/litchi-docx/tests/source_backed_managed.rs": "bc87d4ba451901f66457eaf721c58cfaaa4487f11f023e3ce851c5b251f1c52a",
+  "crates/litchi-docx/tests/source_backed_managed_document_edit.rs": "38157734f32dfa65c273d9d0143ce1f2e4e8ffd93949ea86adf899d4f5fbe367"
+}

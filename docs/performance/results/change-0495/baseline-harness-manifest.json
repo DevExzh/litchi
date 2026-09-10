@@ -1,0 +1,6 @@
+{
+  "tools/perf-baseline/src/docx_managed_edit.rs": "4b1258a157f95935be1ea2d7011a47ed7d5af1ca617362554419f5d0f16cf5bd",
+  "tools/perf-baseline/src/lib.rs": "1920c807f2efd30dc39625beaa83a8186f153563c6b88967b308d3528eb82cb8",
+  "tools/perf-baseline/src/main.rs": "2327bc6430ec6ed125396823a0ce1a9315358cf861ad6458513ac7772ed0f54b",
+  "tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs": "d895986f85e12bec5a30d728bfda2985efd2b0b897e97970e9fa45b2568ae3db"
+}

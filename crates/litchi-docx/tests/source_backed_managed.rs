@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
-    Resource, SourceVersion,
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
+    OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
 use litchi_docx::{Error, ReadLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -14,6 +14,25 @@ use litchi_opc::{
 };
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const FINITE_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+const FINITE_OUTPUT_BYTES: u64 = 64 * 1024 * 1024;
+const FINITE_OBJECTS: u64 = 1_000_000;
+const FINITE_DEPTH: u64 = 1024;
+const FINITE_WORK: u64 = 1 << 30;
+const SOURCE_DOCUMENT_SCAN_WORKSPACE_BASE: u64 = 131_072;
+const SOURCE_DOCUMENT_SCAN_WORKSPACE_PER_BYTE: u64 = 32;
+
+fn source_document_scan_workspace(xml_len: usize) -> u64 {
+    (xml_len as u64)
+        .saturating_mul(SOURCE_DOCUMENT_SCAN_WORKSPACE_PER_BYTE)
+        .saturating_add(SOURCE_DOCUMENT_SCAN_WORKSPACE_BASE)
+}
+
+fn source_document_index_admission(xml_len: usize) -> u64 {
+    (xml_len as u64 / 4 + 1)
+        .saturating_mul(24)
+        .saturating_add(1024)
+}
 
 fn fixture() -> Vec<u8> {
     let document = format!(
@@ -142,7 +161,14 @@ fn payload_range(zip: &[u8], name: &str) -> std::ops::Range<usize> {
 fn context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
     let budget = Budget::root(
         "docx-managed-source-test",
-        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        Limits::new(
+            memory,
+            FINITE_INPUT_BYTES,
+            FINITE_OUTPUT_BYTES,
+            FINITE_OBJECTS,
+            FINITE_DEPTH,
+            FINITE_WORK,
+        ),
     );
     let (cancellation_source, cancellation) = CancellationSource::pair();
     let execution_limits = ExecutionLimits::new(
@@ -185,7 +211,7 @@ fn managed_bytes(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::
 
 #[test]
 fn managed_document_read_retains_budgeted_part_data_and_supports_selective_queries() {
-    let (budget, cancellation_source, package) = managed(fixture().len() as u64);
+    let (budget, cancellation_source, package) = managed(1 << 20);
     assert_eq!(budget.used(Resource::Memory), 0);
     assert!(package.cache_diagnostics().budget_managed);
 
@@ -238,8 +264,12 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
     package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
     let bytes = PackageWriter::to_bytes(&package).unwrap();
 
-    let budget_bytes = document_bytes.len() as u64;
-    let (budget, _source, exact_context) = context(budget_bytes);
+    let retained_payload_bytes = document_bytes.len() as u64;
+    let parser_workspace = source_document_scan_workspace(document_bytes.len());
+    let index_admission = source_document_index_admission(document_bytes.len());
+    let retained_memory = retained_payload_bytes.saturating_add(index_admission);
+    let exact_limit = retained_memory.saturating_add(parser_workspace);
+    let (budget, _source, exact_context) = context(exact_limit);
     let exact_source = Arc::new(CountingSource::new(bytes.clone()));
     let exact = source_backed::Package::from_read_at_with_execution_context(
         exact_source.clone(),
@@ -247,13 +277,19 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
         exact_context,
     )
     .unwrap();
-    assert_eq!(exact.document().unwrap().extract_text().unwrap(), "budget");
-    assert_eq!(budget.used(Resource::Memory), budget_bytes);
+    let document = exact.document().unwrap();
+    assert_eq!(document.extract_text().unwrap(), "budget");
+    assert_eq!(budget.used(Resource::Memory), retained_memory);
     assert!(exact_source.payload_reads() > 0);
+    let document_clone = document.clone();
     drop(exact);
+    assert_eq!(budget.used(Resource::Memory), retained_memory);
+    drop(document);
+    assert_eq!(budget.used(Resource::Memory), retained_memory);
+    drop(document_clone);
     assert_eq!(budget.used(Resource::Memory), 0);
 
-    let (budget, _source, one_under_context) = context(budget_bytes - 1);
+    let (budget, _source, one_under_context) = context(exact_limit - 1);
     let one_under_source = Arc::new(CountingSource::new(bytes));
     let one_under = source_backed::Package::from_read_at_with_execution_context(
         one_under_source.clone(),
@@ -264,13 +300,18 @@ fn managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication()
     let payload_reads_before = one_under_source.payload_reads();
     assert!(matches!(
         one_under.document(),
-        Err(Error::Opc(OpcError::Execution(_)))
+        Err(Error::Opc(OpcError::Execution(
+            ExecutionError::ResourceLimit(limit),
+        ))) if limit.resource == Resource::Memory
     ));
-    assert_eq!(
-        one_under_source.payload_reads() - payload_reads_before,
-        0,
-        "a rejected budget must not read the main-document payload"
+    assert!(
+        one_under_source.payload_reads() > payload_reads_before,
+        "the one-byte-short limit reaches the retained payload before parser workspace admission"
     );
+    // The failed lazy parse leaves the successfully read main Part cached by
+    // the package. Its payload remains charged until that package is dropped.
+    assert_eq!(budget.used(Resource::Memory), retained_payload_bytes);
+    drop(one_under);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -338,10 +379,10 @@ fn managed_document_variables_check_cancellation_before_relationship_metadata() 
 }
 
 #[test]
-fn managed_main_document_edits_refuse_with_typed_boundary_error() {
+fn managed_main_document_edits_retain_source_and_candidate_reservations() {
     let bytes = fixture();
-    let source = Arc::new(CountingSource::new(bytes));
-    let (budget, _cancellation_source, context) = context(fixture().len() as u64);
+    let source = Arc::new(CountingSource::new(bytes.clone()));
+    let (budget, _cancellation_source, context) = context(1 << 20);
     let package = source_backed::Package::from_read_at_with_execution_context(
         source.clone(),
         ReadLimits::default(),
@@ -349,19 +390,30 @@ fn managed_main_document_edits_refuse_with_typed_boundary_error() {
     )
     .unwrap();
     let payload_reads_before = source.payload_reads();
-    assert!(matches!(
-        package.document_snapshot(),
-        Err(litchi_docx::document::TransactionError::Document(
-            Error::UnsafeEdit {
-                operation: "document_snapshot",
-                ..
-            }
-        ))
-    ));
-    assert_eq!(
-        source.payload_reads() - payload_reads_before,
-        0,
-        "a refused managed edit must not read the main-document payload"
-    );
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let snapshot = package.document_snapshot().unwrap();
+    assert!(source.payload_reads() > payload_reads_before);
+    let source_reserved = budget.used(Resource::Memory);
+    assert!(source_reserved > 0);
+    let snapshot_clone = snapshot.clone();
+    assert_eq!(budget.used(Resource::Memory), source_reserved);
+
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "managed replacement")
+        .unwrap();
+    let candidate_reserved = budget.used(Resource::Memory);
+    assert!(candidate_reserved >= source_reserved);
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+
+    let mut output = Vec::new();
+    package
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert!(!output.is_empty());
+    drop(commit);
+    drop(snapshot_clone);
+    drop(snapshot);
     assert_eq!(budget.used(Resource::Memory), 0);
 }

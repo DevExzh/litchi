@@ -1,0 +1,61 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--lib",
+    "--features",
+    "allocator-metrics",
+    "real_owned_and_short_lifecycles_keep_the_edit_oracles",
+    "--",
+    "--test-threads=1"
+  ],
+  "artifacts": {
+    "candidate-harness-policy2.stderr": {
+      "bytes": 487,
+      "sha256": "afb3ce3063a7c91a23cb3eab8619d91cf56368e1de0c08d6db2ad24f08a92006"
+    },
+    "candidate-harness-policy2.stdout": {
+      "bytes": 300,
+      "sha256": "b0fb94d1cfed989b4a3a31390be8de151fbc84af94a53268ac3b72f64a113aca"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "029beb6ea92bc5a03244d4908cfba17370736fbee972906abb67513d533d9462",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T11:49:29.053344+00:00",
+  "label": "candidate-harness-policy2",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7198,
+    "path": "validation-sources/c8fd5e05570951dc499d72ccd22caf33006cce765620f42c2f7b7c2fe2beae9c.json",
+    "sha256": "c8fd5e05570951dc499d72ccd22caf33006cce765620f42c2f7b7c2fe2beae9c"
+  },
+  "source_before": {
+    "files": 7198,
+    "path": "validation-sources/c8fd5e05570951dc499d72ccd22caf33006cce765620f42c2f7b7c2fe2beae9c.json",
+    "sha256": "c8fd5e05570951dc499d72ccd22caf33006cce765620f42c2f7b7c2fe2beae9c"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T11:47:45.828400+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

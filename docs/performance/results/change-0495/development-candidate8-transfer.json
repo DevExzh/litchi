@@ -1,0 +1,4 @@
+{
+  "crates/litchi-docx/src/document/transaction.rs": "29838ac5cefedea03d1e51bef39ce6210ab559d3b3748c91cf556205a9fb5394",
+  "crates/litchi-docx/tests/source_backed_managed_document_edit.rs": "f1a5ff5fca262ee14fd879f93459b5066805bb1395218249f8dd929ba09a9fe6"
+}

@@ -1,0 +1,11 @@
+{
+  "path": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "base_head": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+  "removed": true,
+  "source_delta_preserved_in": "candidate-source.patch",
+  "reverse_apply_check": "passed before removal",
+  "protected_worktree_touched": false,
+  "dry_run_receipt": "/home/zhuhe/.cache/litchi-cleanup-0495-dry-run3.json",
+  "allocated_bytes_before_removal": 170639360,
+  "files_before_removal": 8561
+}

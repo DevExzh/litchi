@@ -1,0 +1,254 @@
+{
+  "test-data/libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx": {
+    "bytes": 26014,
+    "sha256": "9cefc8ebec5d518ef3e34e9ea8441b08e1087f701da3113cc0047d0cad36bf89"
+  },
+  "test-data/libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx": {
+    "bytes": 21260,
+    "sha256": "06644869dcf2a1b6d79631fb54c42857a04a566430452e75b4810f0c9ab8ed13"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx": {
+    "bytes": 55519,
+    "sha256": "ebb078d791b6deb4d0a2dae69a15a5274baf2ade815f07b336b394bb43af4c88"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/decimal-numbering-no-leveltext.docx": {
+    "bytes": 13517,
+    "sha256": "33d8229124a25622cf8c497564dab93d24e5047f42dba2feb6d06266430a99e4"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/listWithLgl.docx": {
+    "bytes": 3009,
+    "sha256": "13fd0f120e2c7ea578c098e03f2d5bf871d24f6494c7df73c0aaed3cf246f7b9"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx": {
+    "bytes": 32450,
+    "sha256": "c3d8821ad7c2a0bced52881dbb3d317f7aa29f4363349bc9b665d9dd03517ca0"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/mailmerge.docx": {
+    "bytes": 17580,
+    "sha256": "94f76ba6a717d33eb1bd48e122ca25fc3aedff3b87498165dc7ed78595535e19"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx": {
+    "bytes": 25636,
+    "sha256": "6e71a4d554ea90df1ddcc9b6fbbcc677a94c6617cb35f9e5b7d4ccab46f1a79e"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx": {
+    "bytes": 37437,
+    "sha256": "e20f4d711e482462ea2dc89a22d27c7cff2eb25133b1d841d8f9b76fd96f587d"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx": {
+    "bytes": 25741,
+    "sha256": "8ccd581d8f0ae102b220228ad26b3974821a7ce8e3ff7df4b78f7da8a0d06ed9"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/numbering-circle.docx": {
+    "bytes": 4952,
+    "sha256": "4c61fc7730baecf784d392e9ab50a83a1538c33df5b629a180da7dc2764e5467"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf108545_embeddedDocxIcon.docx": {
+    "bytes": 28843,
+    "sha256": "68e19d06420bfb93bd66c280b96f3095a40f753da4658634a778e474496148d3"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/ooxmlimport/data/tdf119039_bad_embedded_compound.docx": {
+    "bytes": 13876,
+    "sha256": "cf00dab76363981763545dce5cb62eefa84e24d77fc2abe28ae5163538f52607"
+  },
+  "test-data/libreoffice-core/sw/qa/extras/uiwriter/data/autotext-multiple.dotx": {
+    "bytes": 18470,
+    "sha256": "3cc1632cb7f51c345a3d4734c2f8b911024d1ac778ba9a45c137826582e6ca7f"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx": {
+    "bytes": 77621,
+    "sha256": "ee33b932a6c31f430bc8a6e450592970419b0bcc155e5c9884065602b9c733b8"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-html.docx": {
+    "bytes": 2344,
+    "sha256": "9f8577e6f7d2df07d198047960194949e27e8a2a710166ee1b447fad6e982ec8"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx": {
+    "bytes": 22007,
+    "sha256": "d5dbaac56f6b41108c473d725065490fa84419ecc7f997cd19e7b8d158784379"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx": {
+    "bytes": 66189,
+    "sha256": "4d273731897cb642d11062bf2b8ca8ec1b8f005843d51722172d1896e3a22cad"
+  },
+  "test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx": {
+    "bytes": 17713,
+    "sha256": "27f72a9f8f6f223900682a0627ea28c27923b2ae384cc35a0630a71f1f312d98"
+  },
+  "test-data/office-interop/libreoffice-resaved/document-properties-litchi.docx": {
+    "bytes": 6825,
+    "sha256": "0c10b6489e3b5c02d0470f213611e32fbaa0143746d69d0333bdca821d2c5e47"
+  },
+  "test-data/office-interop/litchi-changed/document-properties-litchi.docx": {
+    "bytes": 11143,
+    "sha256": "e4c76a4cd17a2cc5e66d52fe2109ec62f0a09aa510e97fd291b87073b84697f2"
+  },
+  "test-data/ooxml/docx/ComplexNumberedLists.docx": {
+    "bytes": 14458,
+    "sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6"
+  },
+  "test-data/ooxml/docx/FancyFoot.docx": {
+    "bytes": 12876,
+    "sha256": "1cfd2b4fb1f7233062671b0f58789e1b0b437fbf79deb7d62167cffb85191f7a"
+  },
+  "test-data/ooxml/docx/Headers.docx": {
+    "bytes": 13076,
+    "sha256": "bdf91038f9a5454355e6393b7b74fd819a4adc480b4a7011a86e878403952b5b"
+  },
+  "test-data/ooxml/docx/Hyperlink.docx": {
+    "bytes": 11478,
+    "sha256": "ebd1f0ae1a9d6ef35c4b301209b135a0bd2f8dfde9c44270bbbea1cd19b3fd66"
+  },
+  "test-data/ooxml/docx/comment.docx": {
+    "bytes": 4926,
+    "sha256": "23bbfe33e1acf7073253bd87552cbee5be0a07cbd08a479a4bf139f09b1dd6dc"
+  },
+  "test-data/ooxml/docx/documentProperties.docx": {
+    "bytes": 23503,
+    "sha256": "1cff7a0a94dfce307a70032d21070d26ae34b9fdf742cf70fa66d4a2078ec9d5"
+  },
+  "test-data/ooxml/docx/documentProtection_comments_no_password.docx": {
+    "bytes": 9868,
+    "sha256": "d15cd04edecf3489c2028864e70736494a1c5259b6e92097e50457efd934d78c"
+  },
+  "test-data/ooxml/docx/documentProtection_forms_no_password.docx": {
+    "bytes": 9924,
+    "sha256": "5c299d134577cb3a752548e6891701d2b3447570bd2bb0b38bf16efc026ee0a2"
+  },
+  "test-data/ooxml/docx/documentProtection_no_protection.docx": {
+    "bytes": 9884,
+    "sha256": "5d1cce05b576fc527981c56dd9844df3b6669967bcd9b981adfc043bd516f62c"
+  },
+  "test-data/ooxml/docx/documentProtection_readonly_no_password.docx": {
+    "bytes": 9856,
+    "sha256": "5d4c919f2e06b84fbe35cfaaa4012e8f469b811e1f643deb3e660b798bfe4544"
+  },
+  "test-data/ooxml/docx/drawing.docx": {
+    "bytes": 95247,
+    "sha256": "5e83462dd7ac3cf0a333fe09cf0837602dbd41775cdcec813a6e288b5d55dff8"
+  },
+  "test-data/ooxml/docx/endnotes.docx": {
+    "bytes": 13553,
+    "sha256": "6e2e1b2dabb0ae6b9b26ddd613dca446ba0710ecc8b4008722abc4ed592934e3"
+  },
+  "test-data/ooxml/docx/footnotes.docx": {
+    "bytes": 12823,
+    "sha256": "9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1"
+  },
+  "test-data/ooxml/docx/headerFooter.docx": {
+    "bytes": 28423,
+    "sha256": "0ad90c6ee8ec8b9fab1ae8219387eca8d934b739580918d76a1b6c911bc41913"
+  },
+  "test-data/ooxml/docx/headerPic.docx": {
+    "bytes": 16206,
+    "sha256": "50d9b17f7575c8a91129fd8a3e6a70feec886480ab9f089e29a7f8ac7e5ed51a"
+  },
+  "test-data/ooxml/docx/table-alignment.docx": {
+    "bytes": 15519,
+    "sha256": "ee36729e0d050e529fea0b444006a194bea72b35cf8958ae58c6624c26156b41"
+  },
+  "test-data/ooxml/docx/table-indent.docx": {
+    "bytes": 7639,
+    "sha256": "aaa3fd6a1c0d6ac222ccacad213257b9061be7d706396a36b3ffedacb3a56c9b"
+  },
+  "test-data/ooxml/docx/table_footnotes.docx": {
+    "bytes": 13177,
+    "sha256": "69666500a7dd00600da64cc7676f8939c84df8804967ec2fc75567fad41f21a9"
+  },
+  "test-data/ooxml/docx/testComment.docx": {
+    "bytes": 65298,
+    "sha256": "06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97"
+  },
+  "test-data/poi/test-data/document/61745.docx": {
+    "bytes": 37030,
+    "sha256": "ec54badce04b9fc3c4c327e31fbbd06c1bb556056df9cf04760db75c8913f8a2"
+  },
+  "test-data/poi/test-data/document/Bug54849.docx": {
+    "bytes": 27566,
+    "sha256": "f54182713ea5ce5d77b9593d3d9d24e645460043cec0b40ef59c932385f084d3"
+  },
+  "test-data/poi/test-data/document/ComplexNumberedLists.docx": {
+    "bytes": 14458,
+    "sha256": "297a085a7d433af2eeee7661e8db21539452cb585096484774a1e9f5f258b0b6"
+  },
+  "test-data/poi/test-data/document/EmbeddedDocument.docx": {
+    "bytes": 13268,
+    "sha256": "3cb521da0faab3b8a9e7c5d155961b4f5506fb2ceda8e69e0790d03ee01767f2"
+  },
+  "test-data/poi/test-data/document/Numbering.docx": {
+    "bytes": 13808,
+    "sha256": "776a59dcf0e290f1988602e6305e2d9cb2e31f631dc4aa751593c23cddbaad4d"
+  },
+  "test-data/poi/test-data/document/NumberingWOverrides.docx": {
+    "bytes": 15190,
+    "sha256": "3754dee43880ce4c9e962eca41ac78c353999888282c9ada528efbb826e2bee6"
+  },
+  "test-data/poi/test-data/document/NumberingWithOutOfOrderId.docx": {
+    "bytes": 12978,
+    "sha256": "fa2843a6297bb3e874f9c6dc8aac944704fba4d0d631b94627be7dbeaf12ed0f"
+  },
+  "test-data/poi/test-data/document/heading123.docx": {
+    "bytes": 74810,
+    "sha256": "dac67500b907811030ab2bdd5b1c65cda97a15651d6ec0d33592ef70d34a5550"
+  },
+  "test-data/poi/test-data/document/saut_page.docx": {
+    "bytes": 2959626,
+    "sha256": "748f34f3dc285f4d48474930758b2c37382d17965545a1729cb7400cada793da"
+  },
+  "test-data/poi/test-data/document/testComment.docx": {
+    "bytes": 65298,
+    "sha256": "06b63b13f0b78a7179151af52c2282557c1ed204899feee9fcef4ca575344f97"
+  },
+  "test-data/poi/test-data/integration/test_recursive_embedded.docx": {
+    "bytes": 27082,
+    "sha256": "c4b7fab030a8b6a9d6691f6699ac8e6f82bc53764a0f1430d134ae3b70c32654"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_AlternateTimezones.docx": {
+    "bytes": 13159,
+    "sha256": "2d1856ab17ee065074572a6d16f7823e5416a69d97863f5d7c91406b0d4628c3"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_DCTermsNamespaceLimitedUseFAIL.docx": {
+    "bytes": 9788,
+    "sha256": "133ccb353022ded1147dfed64416ca1ca6160cf918e89b5855ecd8e6565ee9bb"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_DoNotUseCompatibilityMarkupFAIL.docx": {
+    "bytes": 9801,
+    "sha256": "bf4183712d8611daa9ce9a3a837abed44d9c70d7e59ad708b1a479a8370a5328"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_NotPresentFAIL.docx": {
+    "bytes": 9786,
+    "sha256": "dc1b3ecc6bb5ee8b02762bad477a7a5dbcc2b56776f7d82b7b5f405438095fd0"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_LimitedXSITypeAttribute_PresentWithUnauthorizedValueFAIL.docx": {
+    "bytes": 9787,
+    "sha256": "c05b8865dafce506809953b6475504112d2cf9ef447c2e163376114e1f377581"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx": {
+    "bytes": 24250,
+    "sha256": "e47a11c96726d915f8ed51537123bf2de1c11aa4c2bb2f97d20eb5c7c62deda5"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx": {
+    "bytes": 10058,
+    "sha256": "e2e8b6c95a034bbcb6f9239ce1519b7814e45d165d261775ac2ff58eef0a2b60"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx": {
+    "bytes": 9814,
+    "sha256": "5266327422483db156b75ca5e9a0b2e76998bc40711adc831dadb2d5f6eed7d1"
+  },
+  "test-data/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx": {
+    "bytes": 24759,
+    "sha256": "a57fe168c5dcd49a877b4c41ec453571181c3a0644b5b305c76c6ff385b39c29"
+  },
+  "test-data/poi/test-data/xmldsign/hello-world-signed-twice.docx": {
+    "bytes": 16099,
+    "sha256": "e95ff2845328a023bb326f99c01a6acbe156a834aec4dd965944adbd03a5277a"
+  },
+  "test-data/poi/test-data/xmldsign/hello-world-signed.docx": {
+    "bytes": 13244,
+    "sha256": "9b29a40d57508d1f53d1066792c2da0064a4c36110949d1fad52119ede0ab05e"
+  },
+  "test-data/poi/test-data/xmldsign/ms-office-2010-signed.docx": {
+    "bytes": 16142,
+    "sha256": "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f"
+  }
+}

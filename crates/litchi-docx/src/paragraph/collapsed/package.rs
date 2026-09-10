@@ -22,7 +22,12 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn collapsed(&self) -> Result<Option<Collapsed>> {
-        codec::read(self.xml_bytes())
+        let source = self.xml_data.xml_ref()?;
+        let _parser_admission = source.parser_admission()?;
+        let resolver = source.namespace_resolver()?;
+        let result = codec::read_with_resolver(source.bytes(), &resolver);
+        resolver.check()?;
+        result
     }
 
     /// Replace or remove the direct Word 2012 collapse state.
@@ -34,6 +39,14 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn set_collapsed(&mut self, value: Option<Collapsed>) -> Result<&mut Self> {
+        if self.xml_data.is_managed() {
+            return Err(Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "paragraph.set_collapsed",
+                reason: "managed paragraph views cannot detach source-owned XML",
+            });
+        }
+        let _parser_admission = self.parser_admission()?;
         let original = self.xml_bytes();
         let rewritten = codec::rewrite(original, value)?;
         if rewritten.as_slice() != original {

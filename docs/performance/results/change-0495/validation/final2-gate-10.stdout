@@ -1,0 +1,84 @@
+
+running 16 tests
+test alt_chunk_overlay_refuses_non_body_anchor_layouts ... ok
+test alt_chunk_overlay_refuses_shared_targets_and_signed_changes_but_keeps_signed_noops_exact ... ok
+test alt_chunk_real_libreoffice_fixture_preserves_untouched_zip_members ... ok
+test alt_chunk_payload_overlay_is_one_edit_and_preserves_raw_unselected_members ... ok
+test alt_chunk_overlay_rejects_oversized_payload_before_reading_source ... ok
+test source_changes_remain_visible_before_the_first_payload_read ... ok
+test sequential_sink_failure_is_typed_as_incomplete_output ... ok
+test read_limits_are_returned_as_the_original_opc_error ... ok
+test opening_stays_cold_and_document_query_loads_only_main_document ... ok
+test markup_compatibility_branch_selection_is_refused_before_output ... ok
+test strict_main_document_relationship_uses_the_same_overlay_contract ... ok
+test exact_noop_reproduces_every_source_byte ... ok
+test rolled_back_document_operations_use_the_exact_signed_source_path ... ok
+test signed_changes_are_refused_but_signed_noops_are_exact ... ok
+test document_commit_edits_only_the_main_part_and_reopens ... ok
+test stale_commit_and_changed_source_fail_before_output ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+running 5 tests
+test managed_document_read_retains_budgeted_part_data_and_supports_selective_queries ... ok
+test managed_cancellation_is_checked_at_open_and_before_lazy_read ... ok
+test managed_exact_memory_budget_succeeds_and_one_under_fails_before_publication ... ok
+test managed_document_variables_check_cancellation_before_relationship_metadata ... ok
+test managed_main_document_edits_retain_source_and_candidate_reservations ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 36 tests
+test managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory ... ok
+test managed_changed_publication_rejects_mixed_settings_dialect_before_output ... ok
+test managed_cancellation_refuses_edit_and_publication_without_output ... ok
+test managed_candidate_budget_failure_happens_before_publication_output ... ok
+test managed_failed_second_edit_budget_leaves_first_projection_intact ... ok
+test changed_publication_preserves_standard_ignorable_settings_for_managed_and_unmanaged_sources ... ok
+test managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection ... ok
+test managed_changed_publication_rejects_settings_mce_and_dtd_before_output ... ok
+test changed_publication_rejects_unresolved_ignorable_and_active_mce_controls ... FAILED
+test managed_collapsed_and_symbols_reads_refuse_when_memory_is_held ... ok
+test managed_changed_publication_enforces_settings_protection_flags ... ok
+test managed_paragraph_and_nested_run_mutations_refuse_without_state_change ... ok
+test managed_four_disjoint_updates_release_scan_depth_and_restore_exact_artifact ... ok
+test managed_publication_reports_a_partial_sink_failure ... ok
+test managed_protected_settings_noop_preserves_relationship_and_payload_exactly ... ok
+test managed_reopened_inverse_rejects_source_mutation_before_output ... ok
+test managed_reverting_one_operation_preserves_the_other_and_inverse_artifact ... ok
+test managed_document_snapshot_and_edit_retain_source_and_candidate_reservations ... ok
+test managed_reopened_inverse_reports_partial_sink_failure ... ok
+test managed_revert_to_original_publishes_exact_noop_bytes ... ok
+test managed_failed_second_edit_cancellation_leaves_first_projection_intact ... ok
+test managed_hyperlink_nested_run_retains_source_after_package_drop_and_refuses_mutation ... ok
+test managed_retained_runs_resolve_inherited_symex_and_ignore_foreign_bindings ... ok
+test managed_source_document_rejects_mce_and_dtd_before_edit ... ok
+test managed_reopened_inverse_cancellation_and_output_budget_are_before_output ... ok
+test managed_signed_noop_and_equal_setter_preserve_exact_source ... ok
+test managed_repeated_position_keeps_final_value_and_collapses_equal_setter ... ok
+test managed_disjoint_updates_publish_in_arbitrary_order_and_inverse_exact ... ok
+test protected_track_revisions_with_ignorable_extension_remains_refused ... ok
+test managed_noop_inverse_and_changed_publication_preserve_untouched_media ... ok
+test managed_paragraph_views_refuse_parser_growth_at_memory_boundary ... ok
+test managed_file_source_pins_the_open_source_across_path_replacement ... ok
+test managed_reopened_inverse_restores_exact_artifact_and_rejects_foreign_member ... ok
+test unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_output ... ok
+test managed_source_change_refuses_publication_before_sink_output ... ok
+test managed_empty_text_slots_refuse_low_scan_memory_before_projection_change ... ok
+
+failures:
+
+---- changed_publication_rejects_unresolved_ignorable_and_active_mce_controls stdout ----
+
+thread 'changed_publication_rejects_unresolved_ignorable_and_active_mce_controls' (2892501) panicked at crates/litchi-docx/tests/source_backed_managed_document_edit.rs:1440:9:
+entity-escaped MCE namespace with ProcessContent must refuse changed publication: Some(Document(Opc(SourceBackedOverlayUnavailable { reason: "source XML requires literal namespace bindings" })))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    changed_publication_rejects_unresolved_ignorable_and_active_mce_controls
+
+test result: FAILED. 35 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

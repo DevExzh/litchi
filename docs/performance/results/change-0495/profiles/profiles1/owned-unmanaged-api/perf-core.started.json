@@ -1,0 +1,62 @@
+{
+  "argv": [
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/usr/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x,",
+    "-e",
+    "task-clock,cycles,instructions,branches,branch-misses,minor-faults,major-faults",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/owned-unmanaged-api/perf-core.csv",
+    "--",
+    "/home/zhuhe/.cache/litchi-goal-0495/retained/final1/after/normal/litchi-perf-baseline",
+    "docx-managed-edit",
+    "--edit-api",
+    "unmanaged-api",
+    "--provider",
+    "owned",
+    "--samples",
+    "3",
+    "--warmup",
+    "1",
+    "--source-revision",
+    "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/owned-unmanaged-api/perf-core.report.json"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "LC_ALL": "C",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/managed/profiles1/owned-unmanaged-api/tmp"
+  },
+  "metadata": {
+    "api": "unmanaged-api",
+    "events": [
+      "task-clock",
+      "cycles",
+      "instructions",
+      "branches",
+      "branch-misses",
+      "minor-faults",
+      "major-faults"
+    ],
+    "provider": "owned",
+    "samples": 3,
+    "warmup": 1
+  },
+  "new_session": true,
+  "role": "perf-perf-core",
+  "schema": "docx-edit-provider-profile-process-start-v1",
+  "scope": "perf/strace/perf-record observes one complete child process including process startup, fixture/preflight setup, warmups, the measured opened document edit/commit/publication, post-clock output hashing and semantic validation, and report serialization; counters are not operation-local",
+  "source_before": {
+    "files": 7198,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "started_utc": "2026-09-10T12:46:30.954547+00:00"
+}

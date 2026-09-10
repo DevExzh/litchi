@@ -1,0 +1,71 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--test",
+    "source_backed_managed_document_edit",
+    "--test",
+    "source_backed_managed",
+    "--test",
+    "source_backed",
+    "--test",
+    "source_backed_semantic",
+    "--test",
+    "source_backed_story_text",
+    "--test",
+    "source_backed_secondary_story_text",
+    "--test",
+    "source_backed_paragraph_copy",
+    "--test",
+    "source_backed_paragraph_removal"
+  ],
+  "artifacts": {
+    "candidate-tests14.stderr": {
+      "bytes": 965,
+      "sha256": "e8a29423aa95addfa448ffeaa8488aef7d7a97d446f36aeffa1fd025fa45cbaf"
+    },
+    "candidate-tests14.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "029beb6ea92bc5a03244d4908cfba17370736fbee972906abb67513d533d9462",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-10T11:25:10.984529+00:00",
+  "label": "candidate-tests14",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7196,
+    "path": "validation-sources/b9ac67ef1384d6e2e53840eb54c1ad391f752dc6514bd3cc68f59975425085bc.json",
+    "sha256": "b9ac67ef1384d6e2e53840eb54c1ad391f752dc6514bd3cc68f59975425085bc"
+  },
+  "source_before": {
+    "files": 7196,
+    "path": "validation-sources/b9ac67ef1384d6e2e53840eb54c1ad391f752dc6514bd3cc68f59975425085bc.json",
+    "sha256": "b9ac67ef1384d6e2e53840eb54c1ad391f752dc6514bd3cc68f59975425085bc"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T11:24:57.971695+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

@@ -1,0 +1,128 @@
+   Compiling typenum v1.20.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling cfg-if v1.0.4
+   Compiling zerofrom v0.1.4
+   Compiling serde_core v1.0.229
+   Compiling litemap v0.7.3
+   Compiling yoke v0.7.4
+   Compiling zerovec v0.10.4
+   Compiling writeable v0.5.5
+   Compiling icu_locid_transform_data v1.5.1
+   Compiling libc v0.2.189
+   Compiling generic-array v0.14.9
+   Compiling tinystr v0.7.6
+   Compiling hybrid-array v0.4.14
+   Compiling icu_locid v1.5.0
+   Compiling crossbeam-utils v0.8.22
+   Compiling smallvec v1.16.0
+   Compiling crossbeam-epoch v0.9.20
+   Compiling icu_provider v1.5.0
+   Compiling icu_collections v1.5.0
+   Compiling icu_properties_data v1.5.1
+   Compiling icu_locid_transform v1.5.0
+   Compiling rand_core v0.10.1
+   Compiling memchr v2.8.3
+   Compiling cpufeatures v0.3.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling icu_properties v1.5.1
+   Compiling icu_normalizer_data v1.5.1
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling const-oid v0.10.2
+   Compiling write16 v1.0.0
+   Compiling utf16_iter v1.0.5
+   Compiling utf8_iter v1.0.4
+   Compiling digest v0.11.3
+   Compiling digest v0.10.7
+   Compiling num-traits v0.2.19
+   Compiling rayon-core v1.13.0
+   Compiling serde v1.0.229
+   Compiling icu_normalizer v1.5.0
+   Compiling zmij v1.0.19
+   Compiling getrandom v0.4.3
+   Compiling chacha20 v0.10.2
+   Compiling bitflags v2.13.1
+   Compiling either v1.18.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling itoa v1.0.18
+   Compiling iana-time-zone v0.1.65
+   Compiling linux-raw-sys v0.12.1
+   Compiling cpufeatures v0.2.17
+   Compiling zlib-rs v0.6.7
+   Compiling once_cell v1.21.4
+   Compiling rustix v1.1.4
+   Compiling sha2 v0.10.9
+   Compiling chrono v0.4.45
+   Compiling serde_json v1.0.149
+   Compiling flate2 v1.1.10
+   Compiling rayon v1.12.0
+   Compiling tinyvec v1.12.0
+   Compiling rand v0.10.2
+   Compiling thiserror v2.0.18
+   Compiling idna_adapter v1.2.0
+   Compiling sha2 v0.11.0
+   Compiling getrandom v0.3.4
+   Compiling zerocopy v0.8.56
+   Compiling crc32fast v1.5.1
+   Compiling quick-xml v0.41.0
+   Compiling debug_unsafe v0.1.4
+   Compiling fastrand v2.5.0
+   Compiling percent-encoding v2.3.2
+   Compiling fast-float2 v0.2.4
+   Compiling base64 v0.22.1
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier)
+   Compiling form_urlencoded v1.2.2
+   Compiling tempfile v3.27.0
+   Compiling atoi_simd v0.18.1
+   Compiling idna v1.1.0
+   Compiling unicode-normalization v0.1.25
+   Compiling caseless v0.2.2
+   Compiling litchi-core v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-core)
+   Compiling url v2.5.8
+   Compiling ryu v1.0.22
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error: field `admission` is never read
+  --> crates/litchi-docx/src/document/transaction/durable.rs:33:9
+   |
+30 |     Managed {
+   |     ------- field in this variant
+...
+33 |         admission: Option<Arc<ManagedAdmission>>,
+   |         ^^^^^^^^^
+   |
+   = note: `Lineage` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+   = note: `-D dead-code` implied by `-D unused`
+   = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: method `start` is never used
+  --> crates/litchi-docx/src/paragraph/model.rs:83:25
+   |
+67 | impl XmlRef {
+   | ----------- method in this implementation
+...
+83 |     pub(super) const fn start(&self) -> u32 {
+   |                         ^^^^^
+
+error: associated function `from_arc_range` is never used
+   --> crates/litchi-docx/src/paragraph/model.rs:294:25
+    |
+293 | impl OpaqueInline {
+    | ----------------- associated function in this implementation
+294 |     pub(crate) const fn from_arc_range(
+    |                         ^^^^^^^^^^^^^^
+
+error: associated function `from_arc_range` is never used
+   --> crates/litchi-docx/src/paragraph/model.rs:332:25
+    |
+331 | impl OpaqueRunContent {
+    | --------------------- associated function in this implementation
+332 |     pub(crate) const fn from_arc_range(source: Arc<Vec<u8>>, start: u32, length: u32) -> Self {
+    |                         ^^^^^^^^^^^^^^
+
+error: could not compile `litchi-docx` (lib) due to 4 previous errors

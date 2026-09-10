@@ -1,0 +1,74 @@
+{
+  "argv": [
+    "/home/zhuhe/.cache/litchi-goal-0495-fuzz/target/x86_64-unknown-linux-gnu/release/parse_opc",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0495-fuzz/final-runs/parse_opc/corpus",
+    "-runs=1000",
+    "-seed=495004",
+    "-max_len=1048576",
+    "-timeout=60",
+    "-print_final_stats=1",
+    "-artifact_prefix=/home/zhuhe/code/litchi/docs/performance/results/change-0495-fuzz/final-runs/parse_opc/artifacts/"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+  "environment": {
+    "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
+    "LC_ALL": "C",
+    "DEBUGINFOD_URLS": ""
+  },
+  "binary": {
+    "bytes": 42770064,
+    "sha256": "89144715fa57c6ec413f568573e811448676de9c0fde144487d466360de8cb5a"
+  },
+  "initial_corpus": {
+    "strict-stored.docx": {
+      "bytes": 1491,
+      "sha256": "7b8b9326abf576dec2193904b0a2909f29189fe7c1b03fddc105ca44b2bc6b86"
+    },
+    "plain-stored.docx": {
+      "bytes": 1515,
+      "sha256": "031400401d43db54f8329435ea0ccec86b01fbd30ac8d3ba1da706ee72cbbdaa"
+    },
+    "empty-paragraph-stored.docx": {
+      "bytes": 1450,
+      "sha256": "48c3c79e5e642140e99ba945d201dbba235e909282baf9cb84bade4d1c3e0676"
+    },
+    "strict-deflate.docx": {
+      "bytes": 1185,
+      "sha256": "fb4b0438bb04e84f2bc4e0a0d2726003417ac995d8a910de3d1fd1f665c89d30"
+    },
+    "plain-deflate.docx": {
+      "bytes": 1188,
+      "sha256": "6ffe8de4972e8a81a5d69deab996611b965174b3ecd1957de6d84abcc688e3d7"
+    },
+    "default-namespace-stored.docx": {
+      "bytes": 1459,
+      "sha256": "f941631a8cc417cff162fcea50cc5bef47565b3b5e8dafd020328c98a5580f4a"
+    },
+    "default-namespace-deflate.docx": {
+      "bytes": 1157,
+      "sha256": "c07b5d08fd183f1306302daa085dbd2ac7d027e24e5176ec65dda01d2e7d64af"
+    },
+    "section-stored.docx": {
+      "bytes": 1593,
+      "sha256": "3de3456c64ae2f2dc304f23d2aa8ac96f440b1e4c25cd8260c199d62de7c77c2"
+    },
+    "section-deflate.docx": {
+      "bytes": 1236,
+      "sha256": "31c3100192e655b9afc324403dabe82138289ca6d80b59b4b7f2bfac7ab54e96"
+    }
+  },
+  "started_ns": 1789046671290810308,
+  "pid": 3292760,
+  "exit_code": 0,
+  "finished_ns": 1789046671686430553,
+  "executed_units": 1000,
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stderr": {
+    "bytes": 18051,
+    "sha256": "4750e276cd84c61e51803d3794a800974886811905a9277bab4b3a3c7b74b2bb"
+  },
+  "status": "pass"
+}

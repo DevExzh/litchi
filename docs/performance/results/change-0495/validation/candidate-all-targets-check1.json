@@ -1,0 +1,57 @@
+{
+  "argv": [
+    "cargo",
+    "check",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--all-features",
+    "--all-targets"
+  ],
+  "artifacts": {
+    "candidate-all-targets-check1.stderr": {
+      "bytes": 15688,
+      "sha256": "c2e30518e9864f259b8f208bae70c7911ad30e75790d4a720c396d6700333351"
+    },
+    "candidate-all-targets-check1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "66675085d48cde045c1521af153766521f5df36a7bbea6f9697a70b81fd53587",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-10T10:26:19.485699+00:00",
+  "label": "candidate-all-targets-check1",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7124,
+    "path": "validation-sources/e2eed662f196d9897a9ba0507760784edf095ed2ae553ac228a9b1bc7f7498c5.json",
+    "sha256": "e2eed662f196d9897a9ba0507760784edf095ed2ae553ac228a9b1bc7f7498c5"
+  },
+  "source_before": {
+    "files": 7124,
+    "path": "validation-sources/e2eed662f196d9897a9ba0507760784edf095ed2ae553ac228a9b1bc7f7498c5.json",
+    "sha256": "e2eed662f196d9897a9ba0507760784edf095ed2ae553ac228a9b1bc7f7498c5"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T10:25:47.723121+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

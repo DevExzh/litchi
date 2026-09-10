@@ -1,0 +1,60 @@
+    Checking zeroize v1.9.0
+    Checking libc v0.2.189
+    Checking const-oid v0.9.6
+    Checking subtle v2.6.1
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier-macros)
+    Checking generic-array v0.14.9
+    Checking der v0.7.10
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+    Checking hybrid-array v0.4.14
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking getrandom v0.2.17
+    Checking rand_core v0.6.4
+    Checking getrandom v0.4.3
+    Checking spki v0.7.3
+    Checking crypto-common v0.2.2
+    Checking ff v0.13.1
+    Checking crypto-bigint v0.5.5
+    Checking pkcs8 v0.10.2
+    Checking group v0.13.0
+    Checking sec1 v0.7.3
+    Checking block-buffer v0.12.1
+    Checking hmac v0.12.1
+    Checking num-traits v0.2.19
+    Checking either v1.18.0
+    Checking digest v0.11.3
+    Checking bitflags v2.13.1
+    Checking sha2 v0.11.0
+    Checking rustix v1.1.4
+    Checking chrono v0.4.45
+    Checking elliptic-curve v0.13.8
+    Checking rayon v1.12.0
+    Checking flate2 v1.1.10
+    Checking rfc6979 v0.4.0
+    Checking rand v0.10.2
+    Checking signature v2.2.0
+    Checking getrandom v0.3.4
+    Checking thiserror v2.0.18
+    Checking zerocopy v0.8.56
+    Checking smallvec v1.16.0
+    Checking tempfile v3.27.0
+    Checking xml-minifier v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier)
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking p256 v0.13.2
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-core)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+error: couldn't read `crates/litchi-opc/tests/../../../docs/performance/results/change-0416/corpus/opc-local-only-signed.zip`: No such file or directory (os error 2)
+  --> crates/litchi-opc/tests/python_zip64_source.rs:21:23
+   |
+21 |   const SOURCE: &[u8] = include_bytes!(
+   |  _______________________^
+22 | |     "../../../docs/performance/results/change-0416/corpus/opc-local-only-signed.zip"
+23 | | );
+   | |_^
+
+error: could not compile `litchi-opc` (test "python_zip64_source") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

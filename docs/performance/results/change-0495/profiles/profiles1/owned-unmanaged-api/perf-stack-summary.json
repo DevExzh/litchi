@@ -1,0 +1,910 @@
+{
+  "classes": [
+    {
+      "class": "preflight",
+      "period": 304137556,
+      "sample_count": 17,
+      "share_of_all_period": 0.012433179013598908,
+      "share_of_run_sample_period": 0.019785705005838497,
+      "top_leaf_symbols": [
+        {
+          "period": 205799226,
+          "symbol": "payload_bytes"
+        },
+        {
+          "period": 43574162,
+          "symbol": "_mm_shuffle_epi32<14>"
+        },
+        {
+          "period": 43528521,
+          "symbol": "_mm_add_epi32"
+        },
+        {
+          "period": 11235647,
+          "symbol": "add<litchi_ooxml_common::binding_tracker::Binding>"
+        }
+      ]
+    },
+    {
+      "class": "process_setup_or_unclassified",
+      "period": 8786051251,
+      "sample_count": 420,
+      "share_of_all_period": 0.35917480715974986,
+      "share_of_run_sample_period": 0.5715776127906554,
+      "top_leaf_symbols": [
+        {
+          "period": 2609957291,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "period": 679988162,
+          "symbol": "[unknown]"
+        },
+        {
+          "period": 588992934,
+          "symbol": "deflate_medium"
+        },
+        {
+          "period": 510639923,
+          "symbol": "_mm_xor_si128"
+        },
+        {
+          "period": 456528341,
+          "symbol": "_mm_add_epi32"
+        },
+        {
+          "period": 420481487,
+          "symbol": "_mm_clmulepi64_si128<17>"
+        },
+        {
+          "period": 283055425,
+          "symbol": "_mm_shuffle_epi32<14>"
+        },
+        {
+          "period": 273788540,
+          "symbol": "copy_nonoverlapping<u8>"
+        },
+        {
+          "period": 236975476,
+          "symbol": "_mm_clmulepi64_si128<0>"
+        },
+        {
+          "period": 234231791,
+          "symbol": "__memset_avx512_unaligned_erms"
+        },
+        {
+          "period": 220285548,
+          "symbol": "len<u8>"
+        },
+        {
+          "period": 177736376,
+          "symbol": "longest_match_help<false>"
+        },
+        {
+          "period": 175409445,
+          "symbol": "quick_insert_value"
+        },
+        {
+          "period": 174703689,
+          "symbol": "index<u8>"
+        },
+        {
+          "period": 156879221,
+          "symbol": "_mm_sha256msg1_epu32"
+        },
+        {
+          "period": 143130059,
+          "symbol": "_mm_sha256rnds2_epu32"
+        },
+        {
+          "period": 126481706,
+          "symbol": "get_offset_len_noubcheck<u8>"
+        },
+        {
+          "period": 109282781,
+          "symbol": "push_lit"
+        },
+        {
+          "period": 109189280,
+          "symbol": "pqdownheap"
+        },
+        {
+          "period": 107097645,
+          "symbol": "longest_match"
+        }
+      ]
+    },
+    {
+      "class": "run_sample_output_oracle",
+      "period": 14392947933,
+      "sample_count": 756,
+      "share_of_all_period": 0.5883854021119226,
+      "share_of_run_sample_period": 0.9363349456478532,
+      "top_leaf_symbols": [
+        {
+          "period": 9973304404,
+          "symbol": "payload_bytes"
+        },
+        {
+          "period": 1192349049,
+          "symbol": "_mm_add_epi32"
+        },
+        {
+          "period": 850605478,
+          "symbol": "_mm_shuffle_epi32<14>"
+        },
+        {
+          "period": 566402889,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "period": 560656716,
+          "symbol": "_mm_sha256rnds2_epu32"
+        },
+        {
+          "period": 464861260,
+          "symbol": "_mm_sha256msg1_epu32"
+        },
+        {
+          "period": 349258152,
+          "symbol": "_mm_alignr_epi8<4>"
+        },
+        {
+          "period": 105291288,
+          "symbol": "[unknown]"
+        },
+        {
+          "period": 61796565,
+          "symbol": "_mm_sha256msg2_epu32"
+        },
+        {
+          "period": 43173055,
+          "symbol": "resolve_event"
+        },
+        {
+          "period": 37064112,
+          "symbol": "_mm_shuffle_epi8"
+        },
+        {
+          "period": 22256908,
+          "symbol": "_int_free_merge_chunk"
+        },
+        {
+          "period": 21683192,
+          "symbol": "emit_end"
+        },
+        {
+          "period": 21674206,
+          "symbol": "_int_free_chunk"
+        },
+        {
+          "period": 21663079,
+          "symbol": "finish_grow<alloc::alloc::Global>"
+        },
+        {
+          "period": 21652470,
+          "symbol": "word_special_character"
+        },
+        {
+          "period": 21618787,
+          "symbol": "or"
+        },
+        {
+          "period": 21600476,
+          "symbol": "for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},"
+        },
+        {
+          "period": 19010728,
+          "symbol": "write<u8>"
+        },
+        {
+          "period": 17025119,
+          "symbol": "lt"
+        }
+      ]
+    },
+    {
+      "class": "run_sample_setup_or_teardown",
+      "period": 978632504,
+      "sample_count": 45,
+      "share_of_all_period": 0.040006611714728676,
+      "share_of_run_sample_period": 0.0636650543521467,
+      "top_leaf_symbols": [
+        {
+          "period": 327882603,
+          "symbol": "__memcmp_evex_movbe"
+        },
+        {
+          "period": 281399469,
+          "symbol": "__memmove_avx512_unaligned_erms"
+        },
+        {
+          "period": 108665763,
+          "symbol": "process_event<&[u8]>"
+        },
+        {
+          "period": 43511983,
+          "symbol": "map_err<quick_xml::events::Event,"
+        },
+        {
+          "period": 43351317,
+          "symbol": "scan_document_with_context"
+        },
+        {
+          "period": 21763657,
+          "symbol": "find_raw"
+        },
+        {
+          "period": 21761010,
+          "symbol": "search_chunk<core::core_arch::x86::__m256i,"
+        },
+        {
+          "period": 21751464,
+          "symbol": "next"
+        },
+        {
+          "period": 21732084,
+          "symbol": "resolve_event"
+        },
+        {
+          "period": 21726040,
+          "symbol": "resolve_prefix"
+        },
+        {
+          "period": 21725285,
+          "symbol": "into_owned"
+        },
+        {
+          "period": 21681207,
+          "symbol": "_mm256_movemask_epi8"
+        },
+        {
+          "period": 21680622,
+          "symbol": "__libc_free"
+        }
+      ]
+    }
+  ],
+  "folded_stack_count": 156,
+  "folded_stacks": [
+    {
+      "period": 9973304404,
+      "stack": "run_sample;verify_docx_source_edit_output;docx_source_media_payload;payload_bytes"
+    },
+    {
+      "period": 1051097075,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;fill_buf<soapberry_zip::accounting::CountingReader<&[u8]>>;read<&[u8]>;read;copy_from_slice<u8>;copy_from_slice_impl<u8>;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 850605478,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_shuffle_epi32<14>"
+    },
+    {
+      "period": 716323246,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_add_epi32"
+    },
+    {
+      "period": 560656716,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_sha256rnds2_epu32"
+    },
+    {
+      "period": 476025803,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_add_epi32"
+    },
+    {
+      "period": 464861260,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_sha256msg1_epu32"
+    },
+    {
+      "period": 355973290,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;ensure_init;write_bytes<core::mem::maybe_uninit::MaybeUninit<u8>>;__memset_avx512_unaligned_erms;[unknown];[unknown];[unknown];[unknown]"
+    },
+    {
+      "period": 349258152,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_alignr_epi8<4>"
+    },
+    {
+      "period": 335086903,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;reduce128;_mm_clmulepi64_si128<17>"
+    },
+    {
+      "period": 334474874,
+      "stack": "read_limited<core::io::cursor::Cursor<&[u8]>>;read<&[u8]>;read;copy_from_slice<u8>;copy_from_slice_impl<u8>;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 326394930,
+      "stack": "write_to_with_accounting<litchi_opc::source_backed::SourceReader,;write_prepared_local<litchi_opc::source_backed::SourceReader,;copy_range<litchi_opc::source_backed::SourceReader,;write_all_counted<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut;write<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut;write<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut;write<litchi_opc::source_backed::Counted<&mut;write<&mut;write<litchi_perf_baseline::docx_managed_edit::SequentialSink>;write;extend_from_slice<u8,;spec_extend<u8,;append_elements<u8,;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 319259703,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;reduce128;_mm_xor_si128"
+    },
+    {
+      "period": 316308148,
+      "stack": "current_executable_identity;update<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_add_epi32"
+    },
+    {
+      "period": 307359412,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium"
+    },
+    {
+      "period": 296726880,
+      "stack": "run_sample;verify_docx_source_edit_output;ne<[u8],;ne<[u8],;eq<u8,;equal_same_length<u8,;__memcmp_evex_movbe"
+    },
+    {
+      "period": 284423946,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;eq<u8,;eq<u8,;equal_same_length<u8,;__memcmp_evex_movbe"
+    },
+    {
+      "period": 281633522,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium"
+    },
+    {
+      "period": 259703260,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;provider;to_vec<u8>;to_vec_in<u8,;to_vec<u8,;copy_to_nonoverlapping<u8>;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 253377317,
+      "stack": "read_limited<core::io::cursor::Cursor<&[u8]>>;try_reserve_exact<u8,;try_reserve_exact<u8,;try_reserve_exact<alloc::alloc::Global>;grow_exact<alloc::alloc::Global>;finish_grow<alloc::alloc::Global>;grow;grow_impl;grow_impl_runtime;realloc_nonnull;__libc_realloc;_int_realloc;memcpy;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 235357853,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;dispatch;extend;copy_from_slice<core::mem::maybe_uninit::MaybeUninit<u8>>;copy_from_slice_impl<core::mem::maybe_uninit::MaybeUninit<u8>>;copy_nonoverlapping<core::mem::maybe_uninit::MaybeUninit<u8>>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 204702022,
+      "stack": "run_sample;verify_docx_source_edit_output;ne<u8,;ne<[u8],;eq<u8,;equal_same_length<u8,;__memcmp_evex_movbe"
+    },
+    {
+      "period": 197732930,
+      "stack": "current_executable_identity;update<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_shuffle_epi32<14>"
+    },
+    {
+      "period": 196198376,
+      "stack": "write_to_with_accounting<litchi_opc::source_backed::SourceReader,;write_prepared_local<litchi_opc::source_backed::SourceReader,;copy_range<litchi_opc::source_backed::SourceReader,;read_exact_at<litchi_opc::source_backed::SourceReader>;read_at;read_source_at_with_context;read_at;read_slice_at;copy_from_slice<u8>;copy_from_slice_impl<u8>;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 191380220,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;reduce128;_mm_xor_si128"
+    },
+    {
+      "period": 172576379,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;reduce128;_mm_clmulepi64_si128<0>"
+    },
+    {
+      "period": 156879221,
+      "stack": "current_executable_identity;update<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_sha256msg1_epu32"
+    },
+    {
+      "period": 147744043,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;get;_mm_loadu_si128;copy_nonoverlapping<u8>"
+    },
+    {
+      "period": 140220193,
+      "stack": "current_executable_identity;update<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_add_epi32"
+    },
+    {
+      "period": 128713616,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;ensure_init;write_bytes<core::mem::maybe_uninit::MaybeUninit<u8>>;__memset_avx512_unaligned_erms"
+    },
+    {
+      "period": 126044497,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;get;_mm_loadu_si128;copy_nonoverlapping<u8>"
+    },
+    {
+      "period": 109388004,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;quick_insert_value"
+    },
+    {
+      "period": 107990252,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;index<u8,;index<u8>;index<u8>"
+    },
+    {
+      "period": 107659479,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;extend;copy_from_slice<u8>;copy_from_slice_impl<u8>;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 106216379,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;get;index<u8,;index<u8>;get_offset_len_noubcheck<u8>"
+    },
+    {
+      "period": 103356323,
+      "stack": "prepare;verify_docx_source_edit_output;docx_source_media_payload;payload_bytes"
+    },
+    {
+      "period": 102442903,
+      "stack": "prepare;build_docx_source_edit_corpus;docx_source_media_payload;payload_bytes"
+    },
+    {
+      "period": 100575010,
+      "stack": "build_docx_source_edit_corpus;docx_source_edit_bytes;docx_source_media_payload;payload_bytes"
+    },
+    {
+      "period": 99363217,
+      "stack": "current_executable_identity;update<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_sha256rnds2_epu32"
+    },
+    {
+      "period": 89515820,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>"
+    },
+    {
+      "period": 88220556,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>"
+    },
+    {
+      "period": 87312848,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;emit_match;tally_lit_help;push_lit"
+    },
+    {
+      "period": 86118519,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;ensure_init;write_bytes<core::mem::maybe_uninit::MaybeUninit<u8>>;__memset_avx512_unaligned_erms;[unknown]"
+    },
+    {
+      "period": 85394584,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;reduce128;_mm_clmulepi64_si128<17>"
+    },
+    {
+      "period": 83891698,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;ensure_init;write_bytes<core::mem::maybe_uninit::MaybeUninit<u8>>;__memset_avx512_unaligned_erms"
+    },
+    {
+      "period": 83774902,
+      "stack": "read_limited<core::io::cursor::Cursor<&[u8]>>;extend_from_slice<u8,;spec_extend<u8,;append_elements<u8,;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 66180123,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;quick_insert_value;update_hash;hash_calc"
+    },
+    {
+      "period": 66179704,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;emit_match;tally_lit_help"
+    },
+    {
+      "period": 66176426,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;emit_match;filled;len<u8>"
+    },
+    {
+      "period": 66154360,
+      "stack": "write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;flush_block_only;zng_tr_flush_block;build_tree<573>;construct_huffman_tree;pqremove;pqdownheap"
+    },
+    {
+      "period": 66066114,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>;try_into<&[u8],;try_from<u8,;copied<[u8;"
+    },
+    {
+      "period": 66021441,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;quick_insert_value"
+    },
+    {
+      "period": 64909352,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;ensure_init;write_bytes<core::mem::maybe_uninit::MaybeUninit<u8>>;__memset_avx512_unaligned_erms;[unknown];[unknown];[unknown];[unknown];[unknown]"
+    },
+    {
+      "period": 64399097,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;reduce128;_mm_clmulepi64_si128<0>"
+    },
+    {
+      "period": 61796565,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_sha256msg2_epu32"
+    },
+    {
+      "period": 44667240,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;index<u8,;index<u8>;index<u8>"
+    },
+    {
+      "period": 44125622,
+      "stack": "build_docx_source_edit_corpus;docx_source_edit_bytes;restore_docx_source_edit_v1;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_shuffle_epi32<14>"
+    },
+    {
+      "period": 44008063,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;filled;len<u8>"
+    },
+    {
+      "period": 43995385,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match"
+    },
+    {
+      "period": 43992135,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;document;from_part;visible_document_xml;process_markup_compatibility;any<core::slice::iter::Windows<u8>,;try_fold<core::slice::iter::Windows<u8>,;{closure#0}<&[u8],;{closure#0};eq<[u8],;eq<u8,;equal_same_length<u8,;__memcmp_evex_movbe"
+    },
+    {
+      "period": 43942602,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>;filled;len<u8>"
+    },
+    {
+      "period": 43574162,
+      "stack": "prepare;build_docx_source_edit_corpus;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_shuffle_epi32<14>"
+    },
+    {
+      "period": 43351317,
+      "stack": "run_sample;execute_api;edit_document;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context"
+    },
+    {
+      "period": 43333147,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;__memset_avx512_unaligned_erms;[unknown]"
+    },
+    {
+      "period": 43187893,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;dispatch;len_and_friends;inflate_fast_help_avx2;inflate_fast_help_impl<1>"
+    },
+    {
+      "period": 43173055,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;document;from_part;from_xml;scan_word_element_ranges<litchi_docx::parts::document_part::{impl#0}::from_xml::{closure_env#0}>;read_resolved_event;resolve_event"
+    },
+    {
+      "period": 43113578,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;ensure_init;write_bytes<core::mem::maybe_uninit::MaybeUninit<u8>>;__memset_avx512_unaligned_erms;[unknown]"
+    },
+    {
+      "period": 43034920,
+      "stack": "write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;flush_block_only;zng_tr_flush_block;build_tree<573>;pqdownheap"
+    },
+    {
+      "period": 42727956,
+      "stack": "syscall;[unknown]"
+    },
+    {
+      "period": 41196873,
+      "stack": "_start;__libc_start_main_impl;__libc_start_call_main;main;lang_start_internal;catch_unwind<std::rt::lang_start_internal::{closure_env#0},;catch_unwind<isize,;do_call<std::rt::lang_start_internal::{closure_env#0},;{closure#0};catch_unwind<&(dyn;catch_unwind<i32,;do_call<&(dyn;call_once<(),;{closure#0}<core::result::Result<(),;__rust_begin_short_backtrace<fn();call_once<fn();main;run_from_args<std::env::ArgsOs>;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_shuffle_epi32<14>"
+    },
+    {
+      "period": 39387766,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;emit_match"
+    },
+    {
+      "period": 39331070,
+      "stack": "current_executable_identity;update<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_alignr_epi8<4>"
+    },
+    {
+      "period": 37411807,
+      "stack": "run_sample;verify_docx_source_edit_output;docx_source_media_payload;payload_bytes;[unknown]"
+    },
+    {
+      "period": 37064112,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_shuffle_epi8"
+    },
+    {
+      "period": 31357552,
+      "stack": "run_sample;verify_docx_source_edit_output;docx_source_media_payload;payload_bytes;push<u8,;push_mut<u8,;write<u8>;[unknown];[unknown];[unknown];[unknown]"
+    },
+    {
+      "period": 22256908,
+      "stack": "run_sample;verify_docx_source_edit_output;drop_glue<litchi_opc::package::OpcPackage>;drop_glue<std::collections::hash::map::HashMap<litchi_opc::packuri::PackURI,;drop_glue<hashbrown::map::HashMap<litchi_opc::packuri::PackURI,;drop_glue<hashbrown::raw::RawTable<(litchi_opc::packuri::PackURI,;drop<(litchi_opc::packuri::PackURI,;drop_inner_table<(litchi_opc::packuri::PackURI,;drop_elements<(litchi_opc::packuri::PackURI,;drop<(litchi_opc::packuri::PackURI,;drop_in_place<(litchi_opc::packuri::PackURI,;drop_in_place<(litchi_opc::packuri::PackURI,;drop_glue<(litchi_opc::packuri::PackURI,;drop_glue<alloc::boxed::Box<(dyn;drop_glue<litchi_opc::part::XmlPart>;drop_glue<litchi_opc::rel::Relationships>;drop_glue<core::option::Option<alloc::string::String>>;drop_glue<alloc::string::String>;drop_glue<alloc::vec::Vec<u8,;drop_glue<alloc::raw_vec::RawVec<u8,;drop<u8,;deallocate<alloc::alloc::Global>;deallocate;deallocate_impl;deallocate_impl_runtime;dealloc_nonnull;_int_free_chunk;_int_free_merge_chunk"
+    },
+    {
+      "period": 22076467,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>;try_into<&[u8],;try_from<u8,;copied<[u8;"
+    },
+    {
+      "period": 22074561,
+      "stack": "build_docx_source_edit_corpus;docx_source_edit_bytes;restore_docx_source_edit_v1;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_sha256rnds2_epu32"
+    },
+    {
+      "period": 22071990,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;filled;len<u8>"
+    },
+    {
+      "period": 22063829,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match"
+    },
+    {
+      "period": 22061798,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>;saturating_sub"
+    },
+    {
+      "period": 22058368,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;dump<&mut;write<soapberry_zip::office::LimitedEntryWriter<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<soapberry_zip::office::BoundedOutput<litchi_opc::pkgwriter::Counted<&mut;write<soapberry_zip::office::BoundedOutput<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<&mut;write<alloc::vec::Vec<u8,;write<alloc::alloc::Global>;extend_from_slice<u8,;spec_extend<u8,;append_elements<u8,;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms;[unknown];[unknown];[unknown];[unknown]"
+    },
+    {
+      "period": 22057356,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;finish<flate2::deflate::write::DeflateEncoder<&mut;flush<flate2::deflate::write::DeflateEncoder<&mut;flush<&mut;flush<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>;filled;len<u8>"
+    },
+    {
+      "period": 22048411,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;insert_match"
+    },
+    {
+      "period": 22046197,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;quick_insert_string;index<u8,;index<u8>"
+    },
+    {
+      "period": 22029111,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;emit_match;filled;len<u8>"
+    },
+    {
+      "period": 21969933,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;emit_match;tally_lit_help;push_lit"
+    },
+    {
+      "period": 21964528,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;longest_match"
+    },
+    {
+      "period": 21917697,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;insert_match"
+    },
+    {
+      "period": 21902832,
+      "stack": "run_from_args<std::env::ArgsOs>;prepare;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_add_epi32"
+    },
+    {
+      "period": 21890614,
+      "stack": "write_plain<&mut;catch_unwind<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;catch_unwind<core::result::Result<(),;do_call<core::panic::unwind_safe::AssertUnwindSafe<litchi_docx::package::codec::{impl#1}::write_plain::{closure_env#0}<&mut;call_once<core::result::Result<(),;{closure#0}<&mut;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>;max_dist"
+    },
+    {
+      "period": 21820217,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;classify_part_members<soapberry_zip::office::LazyArchiveReader>;get;get<alloc::string::String,;get<alloc::string::String,;make_hash<alloc::string::String,;hash_one<std::hash::random::RandomState,;hash<litchi_opc::packuri::PackURI,;hash<std::hash::random::DefaultHasher>;hash<std::hash::random::DefaultHasher>;hash<std::hash::random::DefaultHasher>;write_str;write_str;write_str<core::hash::sip::Sip13Rounds>;write_u8<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds>>;write<core::hash::sip::Sip13Rounds>"
+    },
+    {
+      "period": 21790535,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;update_fast_16;update_slow"
+    },
+    {
+      "period": 21789634,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;map_err<quick_xml::events::Event,"
+    },
+    {
+      "period": 21784546,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;validate_changed_document;validate_changed_document_inner;inspect_settings_source;inspect_source_policy;read_event;read_event_impl<&[u8],;process_event<&[u8]>"
+    },
+    {
+      "period": 21763657,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;validate_changed_document;validate_changed_document_inner;inspect_settings_source;guard_settings_source;reject_settings_mce;is_namespace_declaration;prefix;index;memchr;search_slice_with_raw<memchr::memchr::memchr::{closure_env#0}>;{closure#0};memchr_raw;memchr_raw;find_avx2;find_raw"
+    },
+    {
+      "period": 21763198,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;read_event_impl<&[u8],;read_until_close<&[u8],;emit_end;ne<[u8],;ne<[u8],;eq<u8,;equal_same_length<u8,;__memcmp_evex_movbe"
+    },
+    {
+      "period": 21761010,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;execute_api;replace_paragraph_text<&alloc::string::String>;with_rewritten_xml;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;read_event_impl<&[u8],;read_text;memchr2;search_slice_with_raw<memchr::memchr::memchr2::{closure_env#0}>;{closure#0};memchr2_raw;memchr2_raw;find_avx2;find_raw_avx2;find_raw<core::core_arch::x86::__m256i>;search_chunk<core::core_arch::x86::__m256i,"
+    },
+    {
+      "period": 21751464,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;process_event<&[u8]>;push;next<quick_xml::events::attributes::Attributes>;next"
+    },
+    {
+      "period": 21743824,
+      "stack": "from_read_at_inner;source_catalog<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read_structural_member<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read<litchi_opc::source_backed::SourceReader>;read<litchi_opc::source_backed::SourceReader>;read_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut;read_buf<soapberry_zip::archive::ZipVerifier<&mut;read_buf<soapberry_zip::archive::ZipVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>;read<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;dispatch;inflate_table"
+    },
+    {
+      "period": 21740554,
+      "stack": "run_sample;execute_api;edit_document;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;process_event<&[u8]>"
+    },
+    {
+      "period": 21734029,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;fill_buf<soapberry_zip::accounting::CountingReader<&[u8]>>;read<&[u8]>;read"
+    },
+    {
+      "period": 21732084,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;validate_changed_document;validate_changed_document_inner;inspect_settings_source;guard_settings_source;resolve_event"
+    },
+    {
+      "period": 21726040,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;execute_api;commit;with_rewritten_xml;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;resolve_prefix"
+    },
+    {
+      "period": 21725285,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;into_owned"
+    },
+    {
+      "period": 21722349,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;execute_api;commit;compact_changed_document_xml;map_err<quick_xml::events::Event,"
+    },
+    {
+      "period": 21720484,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;execute_api;commit;with_rewritten_xml;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;process_event<&[u8]>"
+    },
+    {
+      "period": 21719643,
+      "stack": "verify_authored;verify_with_policy;map_err<quick_xml::events::Event,"
+    },
+    {
+      "period": 21718057,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;execute_api;replace_paragraph_text<&alloc::string::String>;with_rewritten_xml;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;process_event<&[u8]>"
+    },
+    {
+      "period": 21703067,
+      "stack": "load_rels_lazy<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read_structural_member<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read<litchi_opc::source_backed::SourceReader>;read<litchi_opc::source_backed::SourceReader>;read_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut;read_buf<soapberry_zip::archive::ZipVerifier<&mut;read_buf<soapberry_zip::archive::ZipVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>;read<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;dispatch;len_and_friends;inflate_fast_help_avx2;inflate_fast_help_impl<1>"
+    },
+    {
+      "period": 21702122,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;process_event<&[u8]>"
+    },
+    {
+      "period": 21696209,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;execute_api;commit;compact_changed_document_xml;write_compact_start;push_utf8;push_str;extend_from_slice<u8,;spec_extend<u8,;append_elements<u8,;copy_nonoverlapping<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 21695459,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;execute_api;commit;with_rewritten_xml;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;resolve_event;resolve_prefix;find<core::slice::iter::Iter<quick_xml::name::NamespaceBinding>,;rfind<core::slice::iter::Iter<quick_xml::name::NamespaceBinding>,;try_rfold<core::slice::iter::Iter<quick_xml::name::NamespaceBinding>,;{closure#0}<&quick_xml::name::NamespaceBinding,;{closure#1};eq<quick_xml::name::Prefix>;eq;eq<[u8],;eq<u8,;equal_same_length<u8,;__memcmp_evex_movbe"
+    },
+    {
+      "period": 21692281,
+      "stack": "_start;__libc_start_main_impl;__libc_start_call_main;main;lang_start_internal;catch_unwind<std::rt::lang_start_internal::{closure_env#0},;catch_unwind<isize,;do_call<std::rt::lang_start_internal::{closure_env#0},;{closure#0};catch_unwind<&(dyn;catch_unwind<i32,;do_call<&(dyn;call_once<(),;{closure#0}<core::result::Result<(),;__rust_begin_short_backtrace<fn();call_once<fn();main;run_from_args<std::env::ArgsOs>;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_sha256rnds2_epu32"
+    },
+    {
+      "period": 21689413,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;longest_match;longest_match_help<false>;index<u16,;index<u16>;index<u16>"
+    },
+    {
+      "period": 21683192,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;text;extract_word_text;for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},;read_event;read_event_impl<&[u8],;read_until_close<&[u8],;emit_end"
+    },
+    {
+      "period": 21681207,
+      "stack": "run_sample;execute_api;edit_document;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;read_event;read_event_impl<&[u8],;read_event_impl<&[u8],;read_text;memchr2;search_slice_with_raw<memchr::memchr::memchr2::{closure_env#0}>;{closure#0};memchr2_raw;memchr2_raw;find_avx2;find_raw_avx2;find_raw<core::core_arch::x86::__m256i>;search_chunk<core::core_arch::x86::__m256i,;movemask;_mm256_movemask_epi8"
+    },
+    {
+      "period": 21680622,
+      "stack": "run_sample;execute_api;publish_document_commit_to_stream<&mut;main_document_snapshot;{closure#0};{closure#3};from_shared_xml_with_source_identity;from_owned_xml_with_identity;from_shared_xml;scan_document;scan_document_with_context;drop_glue<quick_xml::events::BytesEnd>;drop_glue<alloc::borrow::Cow<[u8]>>;drop_glue<alloc::vec::Vec<u8,;drop_glue<alloc::raw_vec::RawVec<u8,;drop<u8,;deallocate<alloc::alloc::Global>;deallocate;deallocate_impl;deallocate_impl_runtime;dealloc_nonnull;__libc_free"
+    },
+    {
+      "period": 21676319,
+      "stack": "load_rels_lazy<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read_structural_member<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read<litchi_opc::source_backed::SourceReader>;read<litchi_opc::source_backed::SourceReader>;read_with_accounting<litchi_opc::source_backed::SourceReader>;lookup_member_name;canonical_member_name;trim_end_matches<char>;next_reject_back<core::str::pattern::CharSearcher>;next_back;next_back;next_code_point_reverse<core::slice::iter::Iter<u8>>"
+    },
+    {
+      "period": 21674206,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;text;extract_word_text;for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},;drop_glue<core::option::Option<core::option::Option<alloc::vec::Vec<u8,;drop_glue<core::option::Option<alloc::vec::Vec<u8,;drop_glue<alloc::vec::Vec<u8,;drop_glue<alloc::raw_vec::RawVec<u8,;drop<u8,;deallocate<alloc::alloc::Global>;deallocate;deallocate_impl;deallocate_impl_runtime;dealloc_nonnull;_int_free_chunk"
+    },
+    {
+      "period": 21665602,
+      "stack": "source_catalog<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read_structural_member<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read<litchi_opc::source_backed::SourceReader>;read<litchi_opc::source_backed::SourceReader>;read_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;new<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>;new_with_buf<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>;new<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>;new;make;new;new;__rustc::__rust_no_alloc_shim_is_unstable_v2"
+    },
+    {
+      "period": 21663825,
+      "stack": "load_part_catalog<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;walk_relationship_graph<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;load_rels_lazy<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;parse_rels_xml_with_source;inspect_relationship_element;push<[litchi_opc::pkgreader::SerializedRelationship;;write<litchi_opc::pkgreader::SerializedRelationship>"
+    },
+    {
+      "period": 21663079,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;text;extract_word_text;for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},;new;extend_from_slice<u8,;spec_extend<u8,;append_elements<u8,;reserve<u8,;reserve<u8,;reserve<alloc::alloc::Global>;do_reserve_and_handle<alloc::alloc::Global>;grow_amortized<alloc::alloc::Global>;finish_grow<alloc::alloc::Global>"
+    },
+    {
+      "period": 21652470,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;extract_word_text;for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},;word_special_character"
+    },
+    {
+      "period": 21650322,
+      "stack": "_int_malloc;unlink_chunk"
+    },
+    {
+      "period": 21649054,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;ensure_init;write_bytes<core::mem::maybe_uninit::MaybeUninit<u8>>;__memset_avx512_unaligned_erms;[unknown];[unknown];[unknown];[unknown]"
+    },
+    {
+      "period": 21626477,
+      "stack": "source_catalog<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read_structural_member<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>;read<litchi_opc::source_backed::SourceReader>;read<litchi_opc::source_backed::SourceReader>;read_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;read_entry_with_accounting<litchi_opc::source_backed::SourceReader>;new<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>;new_with_buf<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>;new<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>;new;make;new;new;init;new;__memset_avx512_unaligned_erms"
+    },
+    {
+      "period": 21625689,
+      "stack": "run_from_args<std::env::ArgsOs>;prepare;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;_mm_add_epi32"
+    },
+    {
+      "period": 21622485,
+      "stack": "from_read_at_inner;from_reader_with_limits<litchi_opc::source_backed::SourceReader>;from_reader_with_limits_and_policy<litchi_opc::source_backed::SourceReader>;from_zip_archive_with_limits_and_policy<litchi_opc::source_backed::SourceReader>;next_entry<litchi_opc::source_backed::SourceReader>;copy_within<u8,;copy<u8>;__memmove_avx512_unaligned_erms"
+    },
+    {
+      "period": 21618787,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;extract_word_text;for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},;read_event;read_event_impl<&[u8],;read_text;memchr2;search_slice_with_raw<memchr::memchr::memchr2::{closure_env#0}>;{closure#0};memchr2_raw;memchr2_raw;find_avx2;find_raw;find_raw_avx2;find_raw<core::core_arch::x86::__m256i>;or"
+    },
+    {
+      "period": 21600476,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;text;extract_word_text;for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},"
+    },
+    {
+      "period": 21457388,
+      "stack": "verify_authored;verify_with_policy"
+    },
+    {
+      "period": 21253383,
+      "stack": "read_limited<core::io::cursor::Cursor<&[u8]>>;try_reserve_exact<u8,;try_reserve_exact<u8,;try_reserve_exact<alloc::alloc::Global>;grow_exact<alloc::alloc::Global>;finish_grow<alloc::alloc::Global>;grow;grow_impl;grow_impl_runtime;realloc_nonnull;__libc_realloc;_int_realloc;_int_free_chunk;_int_free_merge_chunk"
+    },
+    {
+      "period": 21151809,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;dispatch;need_bits;pull_byte"
+    },
+    {
+      "period": 20981852,
+      "stack": "run_sample;verify_docx_source_edit_output;verify_semantic_docx;document;from_part;from_xml;scan_word_element_ranges<litchi_docx::parts::document_part::{impl#0}::from_xml::{closure_env#0}>;read_resolved_event;resolve_event;resolve_prefix;find<core::slice::iter::Iter<quick_xml::name::NamespaceBinding>,;rfind<core::slice::iter::Iter<quick_xml::name::NamespaceBinding>,;try_rfold<core::slice::iter::Iter<quick_xml::name::NamespaceBinding>,;{closure#0}<&quick_xml::name::NamespaceBinding,;{closure#1};eq<quick_xml::name::Prefix>;eq;eq<[u8],;eq<u8,;equal_same_length<u8,;__memcmp_evex_movbe"
+    },
+    {
+      "period": 20523401,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;classify_part_members<soapberry_zip::office::LazyArchiveReader>;relationship_part_content_type;get;to_ascii_lowercase;make_ascii_lowercase;make_ascii_lowercase;make_ascii_lowercase;to_ascii_lowercase;is_ascii_uppercase"
+    },
+    {
+      "period": 20502732,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;classify_part_members<soapberry_zip::office::LazyArchiveReader>;drop_glue<litchi_opc::members::PartNameIndex>;drop_glue<alloc::vec::Vec<litchi_opc::packuri::PackURI,;drop<litchi_opc::packuri::PackURI,;drop_in_place<[litchi_opc::packuri::PackURI]>;drop_in_place<[litchi_opc::packuri::PackURI]>;drop_glue<[litchi_opc::packuri::PackURI]>;drop_glue<litchi_opc::packuri::PackURI>;drop_glue<alloc::string::String>;drop_glue<alloc::vec::Vec<u8,;drop_glue<alloc::raw_vec::RawVec<u8,;drop<u8,;deallocate<alloc::alloc::Global>;deallocate;deallocate_impl;deallocate_impl_runtime;dealloc_nonnull;_int_free_chunk"
+    },
+    {
+      "period": 20265327,
+      "stack": "from_owned_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;crc32_chunk;update;update;calculate;get;index<u8,;index<u8>;get_offset_len_noubcheck<u8>"
+    },
+    {
+      "period": 20218102,
+      "stack": "write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;deflate_medium;flush_block_only;zng_tr_flush_block;build_tree<61>"
+    },
+    {
+      "period": 20199324,
+      "stack": "_start;__libc_start_main_impl;__libc_start_call_main;main;lang_start_internal;catch_unwind<std::rt::lang_start_internal::{closure_env#0},;catch_unwind<isize,;do_call<std::rt::lang_start_internal::{closure_env#0},;{closure#0};catch_unwind<&(dyn;catch_unwind<i32,;do_call<&(dyn;call_once<(),;{closure#0}<core::result::Result<(),;__rust_begin_short_backtrace<fn();call_once<fn();main;run_from_args<std::env::ArgsOs>;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_alignr_epi8<4>"
+    },
+    {
+      "period": 19507250,
+      "stack": "current_executable_identity;update<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_sha256msg2_epu32"
+    },
+    {
+      "period": 19286758,
+      "stack": "run_from_args<std::env::ArgsOs>;run_sample;sha256_hex;digest<sha2::Sha256,;update;digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm,;{closure#0};update_blocks<sha2::block_api::Sha256VarCore,;update_blocks;compress;schedule;_mm_alignr_epi8<4>;[unknown]"
+    },
+    {
+      "period": 19073903,
+      "stack": "docx_source_edit_bytes;restore_docx_source_edit_v1;to_stream<&mut;write_to_stream<&mut;write_counted<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write<litchi_opc::pkgwriter::Counted<&mut;write_deflated<litchi_opc::pkgwriter::Counted<&mut;write_deflated_with_accounting<litchi_opc::pkgwriter::Counted<&mut;{closure#0}<litchi_opc::pkgwriter::Counted<&mut;write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut;write<flate2::deflate::write::DeflateEncoder<&mut;write<&mut;write<&mut;write_with_status<&mut;run_vec;compress_vec;write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status,;{closure#0};compress_uninit;compress_uninit<flate2::ffi::zlib_rs::Deflate>;compress;compress_uninit;deflate;longest_match"
+    },
+    {
+      "period": 19028524,
+      "stack": "from_bytes_with_limits;from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;remove<alloc::string::String,;remove<alloc::string::String,;remove_entry<alloc::string::String,;remove_entry<(alloc::string::String,;find<(alloc::string::String,;find_inner;match_tag;_mm_movemask_epi8"
+    },
+    {
+      "period": 19010728,
+      "stack": "run_sample;verify_docx_source_edit_output;docx_source_media_payload;payload_bytes;push<u8,;push_mut<u8,;write<u8>"
+    },
+    {
+      "period": 18871450,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;dispatch;inflate_table;next<core::iter::adapters::copied::Copied<core::slice::iter::Iter<u16>>>;next<core::slice::iter::Iter<u16>,;next<u16>;eq<u16>"
+    },
+    {
+      "period": 18743304,
+      "stack": "from_phys_reader;load_parts_eager<soapberry_zip::office::LazyArchiveReader,;{closure#2};read_many_serial_shared;collect<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;from_iter<(&str,;from_iter<(&str,;from_iter<(&str,;spec_extend<(&str,;extend_trusted<(&str,;for_each<core::iter::adapters::map::Map<core::slice::iter::Iter<&str>,;fold<(&str,;fold<&str,;{closure#0}<&&str,;{closure#0};read_shared_with_reader;read_with_accounting;read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;read_buf<soapberry_zip::archive::ZipSliceVerifier<&mut;default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;{closure#0}<soapberry_zip::archive::ZipSliceVerifier<&mut;read<&mut;read<soapberry_zip::accounting::CountingReader<&mut;read<&mut;read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<soapberry_zip::accounting::CountingReader<&[u8]>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>>;read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<&[u8]>>,;run;decompress;decompress;decompress;decompress_uninit;inflate;dispatch;inflate_table"
+    },
+    {
+      "period": 17235171,
+      "stack": "run_sample;verify_docx_source_edit_output;docx_source_media_payload;payload_bytes;push<u8,;push_mut<u8,;write<u8>;[unknown]"
+    },
+    {
+      "period": 17025119,
+      "stack": "run_sample;verify_docx_source_edit_output;docx_source_media_payload;payload_bytes;next<usize>;spec_next<usize>;lt"
+    },
+    {
+      "period": 11235647,
+      "stack": "prepare;build_docx_source_edit_corpus;verify_semantic_docx;text;extract_word_text;for_each_word_text_chunk<litchi_docx::paragraph::codec::text::extract_word_text::{closure_env#0},;new;push<litchi_ooxml_common::binding_tracker::Binding,;push_mut<litchi_ooxml_common::binding_tracker::Binding,;add<litchi_ooxml_common::binding_tracker::Binding>"
+    },
+    {
+      "period": 102853,
+      "stack": "[unknown]"
+    },
+    {
+      "period": 2007,
+      "stack": "_start;_dl_start;rtld_timer_start;[unknown]"
+    },
+    {
+      "period": 36,
+      "stack": "_start;_dl_start;[unknown]"
+    },
+    {
+      "period": 1,
+      "stack": "_start;[unknown]"
+    },
+    {
+      "period": 1,
+      "stack": "_start;_dl_start;elf_machine_load_address"
+    },
+    {
+      "period": 1,
+      "stack": "_start;_dl_start;elf_machine_load_address;[unknown]"
+    }
+  ],
+  "report_identity": {
+    "api": "unmanaged-api",
+    "binary_bytes": 478225064,
+    "binary_sha256": "d94d8cac8bc1628148f54de67531f003ec2d1180b5a81bbc1b7c0c47dc13a823",
+    "provider": "owned",
+    "samples": 100,
+    "source_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+    "warmup": 3
+  },
+  "run_sample_period": 15371580437,
+  "run_sample_publish_period": 0,
+  "sample_count": 1238,
+  "schema": "docx-edit-provider-perf-stacks-v1",
+  "scope": "perf-record periods are statistical whole-child samples; run_sample and publication markers are call-stack subsets and are not phase durations; bare symbols are accepted for this selected harness executable and may be ambiguous when DWARF symbolization is incomplete",
+  "total_period": 24461769244
+}

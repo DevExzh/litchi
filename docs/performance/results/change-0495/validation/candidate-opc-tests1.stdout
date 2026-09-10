@@ -1,0 +1,14 @@
+
+running 9 tests
+test xml_splice::tests::contextual_authored_audit_honors_cancellation_without_leaking_reservations ... ok
+test xml_splice::tests::contextual_authored_audit_charges_depth_from_markup_shape ... ok
+test xml_splice::tests::authored_classifier_keeps_compact_fast_path_and_requires_source_for_whitespace ... ok
+test xml_splice::tests::contextual_authored_audit_rejects_low_memory_before_wrapper_allocation ... ok
+test xml_splice::tests::insertion_and_replacement_ranges_touching_are_conflicts ... ok
+test xml_splice::tests::source_validator_allows_unprefixed_xml_and_utf8_declaration ... ok
+test xml_splice::tests::source_validator_rejects_namespace_and_lexical_ambiguities ... ok
+test xml_splice::tests::contextual_authored_audit_releases_temporary_resources_on_success_and_error ... ok
+test xml_splice::tests::empty_elements_obey_depth_and_attributes_are_limited_individually ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 379 filtered out; finished in 0.00s
+

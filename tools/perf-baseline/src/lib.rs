@@ -11,6 +11,7 @@ mod cold_verified;
 mod corpus_manifest;
 pub mod docx_bounded_tail_append_compare;
 pub mod docx_edit_provider;
+pub mod docx_managed_edit;
 pub mod docx_managed_read_ahead;
 pub mod docx_plain_paragraph_tail_append;
 pub mod docx_provider_lifecycle;

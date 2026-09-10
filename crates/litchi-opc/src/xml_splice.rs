@@ -11,7 +11,7 @@ use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::PackURI;
 use crate::pkgreader::is_xml_id;
 use crate::source_backed::{PartData, SourceLineage, SourceSnapshot};
-use litchi_core::{ExecutionError, Reservation, Resource, SourceVersion};
+use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource, SourceVersion};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesDecl, BytesStart, Event, attributes::Attribute};
 use quick_xml::name::ResolveResult;
@@ -35,6 +35,11 @@ const XML_MIN_NAMESPACE_DECLARATION_BYTES: usize = 7;
 const XML_MIN_OPEN_ELEMENT_BYTES: usize = 3;
 const XML_MIN_ATTRIBUTE_BYTES: usize = 4;
 const QUICK_XML_MAX_SAFE_DEPTH: usize = (u16::MAX as usize) - 1;
+// `verify_authored` parses a caller-owned slice, so it does not need the
+// streaming auditor's retained input windows. Keep a conservative envelope
+// for its temporary event/attribute scratch and state vectors anyway.
+const AUTHORED_AUDIT_WORKING_BYTES: usize = 4096;
+const AUTHORED_AUDIT_MEMORY_MULTIPLIER: usize = 32;
 const FRAGMENT_ROOT_OPEN: &[u8] = b"<litchi-opc-fragment>";
 const FRAGMENT_ROOT_CLOSE: &[u8] = b"</litchi-opc-fragment>";
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
@@ -358,6 +363,28 @@ impl AuthoredXmlFragment {
         Ok(Self { bytes })
     }
 
+    /// Audit compact authored markup while charging its temporary wrapper and
+    /// parser workspace to an explicit execution context before allocation.
+    ///
+    /// The ordinary [`Self::markup`] constructor remains unmanaged for
+    /// compatibility. Source-backed callers must use this constructor when
+    /// they already hold a managed execution context. The caller-owned input
+    /// vector and the returned fragment's retained bytes are outside this
+    /// temporary reservation; the caller admits that retained payload through
+    /// its surrounding operation budget.
+    pub fn markup_with_execution_context(
+        bytes: Vec<u8>,
+        context: &ExecutionContext,
+    ) -> Result<Self> {
+        if bytes.is_empty() || bytes.first() != Some(&b'<') {
+            return Err(invalid_source(
+                "authored XML markup fragment is unclassified",
+            ));
+        }
+        audit_wrapped_fragment_with_context(&bytes, context)?;
+        Ok(Self { bytes })
+    }
+
     /// Audit compact XML character data.
     pub fn text(bytes: impl Into<Vec<u8>>) -> Result<Self> {
         let bytes = bytes.into();
@@ -365,6 +392,18 @@ impl AuthoredXmlFragment {
             return Err(invalid_source("authored XML text fragment is unclassified"));
         }
         audit_wrapped_fragment(&bytes)?;
+        Ok(Self { bytes })
+    }
+
+    /// Audit compact XML character data while charging its temporary wrapper
+    /// and parser workspace to an explicit execution context before
+    /// allocation. The caller-owned input vector and returned fragment bytes
+    /// are outside this scoped temporary reservation.
+    pub fn text_with_execution_context(bytes: Vec<u8>, context: &ExecutionContext) -> Result<Self> {
+        if bytes.is_empty() || bytes.contains(&b'<') {
+            return Err(invalid_source("authored XML text fragment is unclassified"));
+        }
+        audit_wrapped_fragment_with_context(&bytes, context)?;
         Ok(Self { bytes })
     }
 }
@@ -603,7 +642,7 @@ fn consume_work(source: &SourceSnapshot, bytes: usize) -> Result<()> {
 }
 
 fn reserve_xml_validation_memory(
-    context: Option<&litchi_core::ExecutionContext>,
+    context: Option<&ExecutionContext>,
     bytes: usize,
 ) -> Result<Option<Arc<Reservation>>> {
     let Some(context) = context else {
@@ -666,11 +705,15 @@ fn audit_wrapped_fragment(fragment: &[u8]) -> Result<()> {
             "authored XML fragment exceeds the size limit",
         ));
     }
-    let length = FRAGMENT_ROOT_OPEN
-        .len()
-        .checked_add(fragment.len())
-        .and_then(|value| value.checked_add(FRAGMENT_ROOT_CLOSE.len()))
-        .ok_or_else(|| invalid_source("authored XML fragment size overflows"))?;
+    let length = wrapped_fragment_len(fragment.len())?;
+    audit_wrapped_fragment_with_limits(fragment, length, xml_minifier::audit::Limits::default())
+}
+
+fn audit_wrapped_fragment_with_limits(
+    fragment: &[u8],
+    length: usize,
+    limits: xml_minifier::audit::Limits,
+) -> Result<()> {
     let mut document = Vec::new();
     document
         .try_reserve_exact(length)
@@ -681,16 +724,125 @@ fn audit_wrapped_fragment(fragment: &[u8]) -> Result<()> {
     document.extend_from_slice(FRAGMENT_ROOT_OPEN);
     document.extend_from_slice(fragment);
     document.extend_from_slice(FRAGMENT_ROOT_CLOSE);
-    audit_document(&document)
+    audit_document_with_limits(&document, limits)
 }
 
-fn audit_document(document: &[u8]) -> Result<()> {
-    xml_minifier::audit::verify_authored(document, xml_minifier::audit::Limits::default())
+fn audit_wrapped_fragment_with_context(fragment: &[u8], context: &ExecutionContext) -> Result<()> {
+    if fragment.len() > MAX_FRAGMENT_BYTES {
+        return Err(invalid_source(
+            "authored XML fragment exceeds the size limit",
+        ));
+    }
+    let length = wrapped_fragment_len(fragment.len())?;
+    let limits = authored_fragment_audit_limits(fragment, length);
+    let _admission = reserve_fragment_audit(context, length, limits)?;
+    context.check().map_err(map_execution_error)?;
+    let result = audit_wrapped_fragment_with_limits(fragment, length, limits);
+    context.check().map_err(map_execution_error)?;
+    result
+}
+
+fn wrapped_fragment_len(fragment_len: usize) -> Result<usize> {
+    FRAGMENT_ROOT_OPEN
+        .len()
+        .checked_add(fragment_len)
+        .and_then(|value| value.checked_add(FRAGMENT_ROOT_CLOSE.len()))
+        .ok_or_else(|| invalid_source("authored XML fragment size overflows"))
+}
+
+fn authored_fragment_audit_limits(fragment: &[u8], bytes: usize) -> xml_minifier::audit::Limits {
+    let bytes = bytes.max(1);
+    // A valid element can only increase nesting at a `<` marker. Counting all
+    // markers, including closing tags and markup inside quoted values, is
+    // conservative while avoiding a byte-length-based depth charge for a
+    // large flat text node.
+    let depth = fragment
+        .iter()
+        .filter(|byte| **byte == b'<')
+        .count()
+        .saturating_add(1)
+        .min(xml_minifier::audit::Limits::ceiling(
+            xml_minifier::audit::Resource::Depth,
+        ))
+        .max(1);
+    xml_minifier::audit::Limits::default()
+        .narrow(xml_minifier::audit::Resource::Bytes, bytes)
+        .narrow(xml_minifier::audit::Resource::Depth, depth)
+        .narrow(
+            xml_minifier::audit::Resource::Events,
+            bytes.saturating_add(1),
+        )
+        .narrow(xml_minifier::audit::Resource::Attributes, bytes)
+        .narrow(xml_minifier::audit::Resource::TokenBytes, bytes)
+        .narrow(xml_minifier::audit::Resource::TextBytes, bytes)
+}
+
+fn reserve_fragment_audit(
+    context: &ExecutionContext,
+    bytes: usize,
+    limits: xml_minifier::audit::Limits,
+) -> Result<FragmentAuditAdmission> {
+    // `verify_authored` is the slice auditor, so it does not allocate the
+    // streaming reader's token windows. The wrapper Vec itself is retained
+    // only for this call. The multiplier covers parser scratch, the open-space
+    // stack, transient decoded attributes, and allocator capacity slack.
+    let parser_memory = bytes
+        .checked_mul(AUTHORED_AUDIT_MEMORY_MULTIPLIER)
+        .and_then(|amount| amount.checked_add(AUTHORED_AUDIT_WORKING_BYTES))
+        .ok_or_else(|| invalid_source("authored XML audit memory overflows"))?;
+    let memory = bytes
+        .checked_add(parser_memory)
+        .ok_or_else(|| invalid_source("authored XML audit memory overflows"))?;
+    // The XML audit profile maps aggregate attributes to Objects and events
+    // to cumulative Work. Add the retained open-element space stack and a
+    // small fixed allowance for the reader and State.
+    let objects = limits
+        .max_attributes()
+        .checked_add(limits.max_depth())
+        .and_then(|amount| amount.checked_add(8))
+        .ok_or_else(|| invalid_source("authored XML audit object count overflows"))?;
+    let depth = limits.max_depth();
+    let work = limits.max_events();
+    let memory = reserve_fragment_audit_resource(context, Resource::Memory, memory)?;
+    let objects = reserve_fragment_audit_resource(context, Resource::Objects, objects)?;
+    let depth = reserve_fragment_audit_resource(context, Resource::Depth, depth)?;
+    let work =
+        u64::try_from(work).map_err(|_| invalid_source("authored XML audit work exceeds u64"))?;
+    context
+        .consume(Resource::Work, work)
+        .map_err(map_execution_error)?;
+    Ok(FragmentAuditAdmission {
+        _memory: memory,
+        _objects: objects,
+        _depth: depth,
+    })
+}
+
+fn reserve_fragment_audit_resource(
+    context: &ExecutionContext,
+    resource: Resource,
+    amount: usize,
+) -> Result<Reservation> {
+    let amount = u64::try_from(amount)
+        .map_err(|_| invalid_source("authored XML audit resource amount exceeds u64"))?;
+    context
+        .reserve(resource, amount)
+        .map_err(map_execution_error)
+}
+
+fn audit_document_with_limits(document: &[u8], limits: xml_minifier::audit::Limits) -> Result<()> {
+    xml_minifier::audit::verify_authored(document, limits)
         .map(|_| ())
         .map_err(|source| OpcError::XmlPublication {
             part: "<source-backed XML fragment>".to_string(),
             source,
         })
+}
+
+struct FragmentAuditAdmission {
+    _memory: Reservation,
+    _objects: Reservation,
+    _depth: Reservation,
 }
 
 fn ranges_overlap_or_conflict(left: &Range<usize>, right: &Range<usize>) -> bool {
@@ -734,7 +886,7 @@ fn validate_source_xml(
     partname: &PackURI,
     bytes: &[u8],
     limits: ReadLimits,
-    context: Option<&litchi_core::ExecutionContext>,
+    context: Option<&ExecutionContext>,
 ) -> Result<()> {
     limits.check(
         ReadResource::PartBytes,
@@ -881,10 +1033,7 @@ fn validate_source_xml(
     Ok(())
 }
 
-fn consume_work_from_context(
-    context: Option<&litchi_core::ExecutionContext>,
-    bytes: usize,
-) -> Result<()> {
+fn consume_work_from_context(context: Option<&ExecutionContext>, bytes: usize) -> Result<()> {
     let Some(context) = context else {
         return Ok(());
     };
@@ -1268,6 +1417,32 @@ impl SourceXmlPart {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits as BudgetLimits};
+    use std::num::{NonZeroU64, NonZeroUsize};
+
+    fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+        managed_context_with_depth(memory, u64::MAX)
+    }
+
+    fn managed_context_with_depth(
+        memory: u64,
+        depth: u64,
+    ) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "xml-splice-test",
+            BudgetLimits::new(memory, u64::MAX, u64::MAX, u64::MAX, depth, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("non-zero worker count"),
+            NonZeroUsize::new(1).expect("non-zero task count"),
+            NonZeroU64::new(memory.max(1)).expect("non-zero in-flight bytes"),
+            0,
+        )
+        .expect("valid execution limits");
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        (budget, cancellation_source, context)
+    }
 
     fn test_partname() -> PackURI {
         PackURI::new("/word/document.xml").expect("valid test Part URI")
@@ -1378,5 +1553,104 @@ mod tests {
         assert!(ranges_overlap_or_conflict(&(4..8), &(4..4)));
         assert!(ranges_overlap_or_conflict(&(4..4), &(4..4)));
         assert!(!ranges_overlap_or_conflict(&(0..4), &(4..8)));
+    }
+
+    #[test]
+    fn contextual_authored_audit_releases_temporary_resources_on_success_and_error() {
+        let (budget, _cancellation, context) = managed_context(1024 * 1024);
+
+        AuthoredXmlFragment::markup_with_execution_context(b"<tag/>".to_vec(), &context)
+            .expect("compact markup should pass the managed audit");
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        assert_eq!(budget.used(Resource::Depth), 0);
+        assert!(budget.used(Resource::Work) > 0);
+
+        AuthoredXmlFragment::text_with_execution_context(b"text".to_vec(), &context)
+            .expect("compact text should pass the managed audit");
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        assert_eq!(budget.used(Resource::Depth), 0);
+
+        assert!(
+            AuthoredXmlFragment::markup_with_execution_context(b"<unclosed>".to_vec(), &context,)
+                .is_err()
+        );
+        assert!(
+            AuthoredXmlFragment::text_with_execution_context(b"a & b".to_vec(), &context,).is_err()
+        );
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        assert_eq!(budget.used(Resource::Depth), 0);
+    }
+
+    #[test]
+    fn contextual_authored_audit_rejects_low_memory_before_wrapper_allocation() {
+        let (budget, _cancellation, context) = managed_context(1);
+        let error =
+            AuthoredXmlFragment::markup_with_execution_context(b"<tag/>".to_vec(), &context)
+                .expect_err("the temporary audit envelope must exceed one byte");
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Memory
+        ));
+        let text_error =
+            AuthoredXmlFragment::text_with_execution_context(b"text".to_vec(), &context)
+                .expect_err("the temporary text audit envelope must exceed one byte");
+        assert!(matches!(
+            text_error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Memory
+        ));
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        assert_eq!(budget.used(Resource::Depth), 0);
+        assert_eq!(budget.used(Resource::Work), 0);
+    }
+
+    #[test]
+    fn contextual_authored_audit_honors_cancellation_without_leaking_reservations() {
+        let (budget, cancellation, context) = managed_context(1024 * 1024);
+        cancellation.cancel();
+
+        let markup =
+            AuthoredXmlFragment::markup_with_execution_context(b"<tag/>".to_vec(), &context);
+        assert!(matches!(markup, Err(OpcError::Cancelled)));
+        let text = AuthoredXmlFragment::text_with_execution_context(b"text".to_vec(), &context);
+        assert!(matches!(text, Err(OpcError::Cancelled)));
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        assert_eq!(budget.used(Resource::Depth), 0);
+        assert_eq!(budget.used(Resource::Work), 0);
+    }
+
+    #[test]
+    fn contextual_authored_audit_charges_depth_from_markup_shape() {
+        let (budget, _cancellation, context) = managed_context_with_depth(2 * 1024 * 1024, 64);
+        let flat_text = vec![b'x'; 10_000];
+        AuthoredXmlFragment::text_with_execution_context(flat_text, &context)
+            .expect("a large flat text node only needs the wrapper depth");
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        assert_eq!(budget.used(Resource::Depth), 0);
+
+        let mut nested = Vec::new();
+        for _ in 0..70 {
+            nested.extend_from_slice(b"<a>");
+        }
+        for _ in 0..70 {
+            nested.extend_from_slice(b"</a>");
+        }
+        let error = AuthoredXmlFragment::markup_with_execution_context(nested, &context)
+            .expect_err("nested markup must exceed the managed depth budget");
+        assert!(matches!(
+            error,
+            OpcError::Execution(ExecutionError::ResourceLimit(limit))
+                if limit.resource == Resource::Depth
+        ));
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+        assert_eq!(budget.used(Resource::Depth), 0);
     }
 }

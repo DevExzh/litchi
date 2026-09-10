@@ -1,0 +1,5 @@
+{
+  "reason": "Pilot1 rejects a successful managed child because historical cache snapshots and resource snapshots have different lifecycle phases; original helpers and frozen protocol retained. No timing from pilot1 is accepted. Production and retained binaries unchanged.",
+  "failed_capture": "captures/pilot1/pilot-r1-after-managed-api-normal-owned/terminal.json",
+  "protocol_sha256": "3d2375490a39d4ad76109bd3ab0eda04d061fc1782336655a3b26e0ba1b38b31"
+}

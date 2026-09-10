@@ -42,7 +42,14 @@ struct Layout {
 
 /// Read all direct `symEx` elements from one complete `w:r` fragment.
 pub(crate) fn read(xml: &[u8]) -> Result<Symbols> {
-    let (_, symbols) = locate(xml)?;
+    let (_, symbols) = locate(xml, None)?;
+    Ok(symbols)
+}
+
+/// Read a run fragment with the namespace bindings inherited by its retained
+/// source range.
+pub(crate) fn read_with_resolver(xml: &[u8], resolver: &NamespaceResolver) -> Result<Symbols> {
+    let (_, symbols) = locate(xml, Some(resolver))?;
     Ok(symbols)
 }
 
@@ -53,7 +60,7 @@ pub(crate) fn read(xml: &[u8]) -> Result<Symbols> {
 /// content, immediately before the root close.
 pub(crate) fn rewrite(xml: &[u8], next: &Symbols) -> Result<Vec<u8>> {
     validate_symbols(next)?;
-    let (layout, current) = locate(xml)?;
+    let (layout, current) = locate(xml, None)?;
     if current == *next {
         return Ok(xml.to_vec());
     }
@@ -107,7 +114,7 @@ pub(crate) fn write_symbol(value: &Symbol, output: &mut String) -> Result<()> {
     Ok(())
 }
 
-fn locate(xml: &[u8]) -> Result<(Layout, Symbols)> {
+fn locate(xml: &[u8], initial_resolver: Option<&NamespaceResolver>) -> Result<(Layout, Symbols)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::InvalidFormat(format!(
             "Word run XML exceeds {MAX_XML_BYTES} bytes"
@@ -115,6 +122,9 @@ fn locate(xml: &[u8]) -> Result<(Layout, Symbols)> {
     }
 
     let mut reader = NsReader::from_reader(xml);
+    if let Some(initial_resolver) = initial_resolver {
+        *reader.resolver_mut() = initial_resolver.clone();
+    }
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
 

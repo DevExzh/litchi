@@ -1,0 +1,23 @@
+{
+  "crates/litchi-docx/src/document/mod.rs": "12e727d40b76abfa46c4a208fe76e8f4a03caa6d1a43736d9ac9b8e7ad160b67",
+  "crates/litchi-docx/src/document/transaction.rs": "5121478e7b278dd479785ae4d6b1d6a2f6be31b5f78683036da0ca4529c7d892",
+  "crates/litchi-docx/src/document/transaction/durable.rs": "5c6edfd19bb6d4c0f1a3ca5672fc1d638868b771e27b46601c5e89330ecb2b99",
+  "crates/litchi-docx/src/paragraph/codec/content.rs": "057611839de3623324219bb1819c845659ac93be6ebecc851cbd98b87f3919c9",
+  "crates/litchi-docx/src/paragraph/codec/editing.rs": "97e014503d202abaaab689ffb330c0ff28112bcd6c6870343d50402a26f72cd1",
+  "crates/litchi-docx/src/paragraph/codec/inlines.rs": "c3d39714c616e2cbcca2259ae9b5566554e620549d4354701f77d4d2bf65a9ba",
+  "crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs": "61f03f2e39c1c818706faf56d3041f00b6116026a0e15c82db290e60818d5c2b",
+  "crates/litchi-docx/src/paragraph/codec/run.rs": "3c16685ca4b13ebdf8451c33b0e13b89047ec33316daaf33b32b88780b214336",
+  "crates/litchi-docx/src/paragraph/codec/run_contents.rs": "406940c61b36311cbd84f9249855f388fb2d3c9ca798daee314935f5b61b1f83",
+  "crates/litchi-docx/src/paragraph/codec/run_properties.rs": "f2181d9f0623ab246bb5a6406c5fb69fe46b7d318ea0de85064f7a0cccb79c3a",
+  "crates/litchi-docx/src/paragraph/codec/runs.rs": "e3bd38923096c50cb64d29e8c1a7073beaf1505e69b117065bae3f49aab719b7",
+  "crates/litchi-docx/src/paragraph/codec/text.rs": "37d8a449816f28c160fe12681c576bc3acc4746476f4843714583551d254ad02",
+  "crates/litchi-docx/src/paragraph/extensions/codec.rs": "05c317311bed42ded22ce6a0b342d6ac2e30d0a43bcef7c6482a1cae0d631687",
+  "crates/litchi-docx/src/paragraph/extensions/package.rs": "d461705e37bf834b4725e06bab23aa602cd1d9074a84e7071bb7efe1c592c036",
+  "crates/litchi-docx/src/paragraph/model.rs": "d705024ff2ced85a374b4c0dd77fffe70f69d4b22793c642b7655240f48bcea0",
+  "crates/litchi-docx/src/paragraph/package.rs": "d75672828ad42aec2e67a20f87f0155bb403f08718868bd5dab40a747f204b0d",
+  "crates/litchi-docx/src/source_backed.rs": "ea65fbb2becf988a79d39d50d456168874689a116fa96efac5b956a3010ab0f9",
+  "crates/litchi-docx/src/source_backed/story_text.rs": "5d8fdccad3b576c5d63dacdf725d59627651da39aac20f3c6d54d526502db819",
+  "crates/litchi-docx/tests/source_backed_managed.rs": "bc87d4ba451901f66457eaf721c58cfaaa4487f11f023e3ce851c5b251f1c52a",
+  "crates/litchi-docx/src/source_backed/document_policy.rs": "634a5e9f21089f1c39b64f947ad68dbc4b90620db34528a7adf95f81c31b11ee",
+  "crates/litchi-docx/tests/source_backed_managed_document_edit.rs": "2b41d2cf05b893470cef68c8ff3e6972e461decd56c2356de6df93346874332b"
+}

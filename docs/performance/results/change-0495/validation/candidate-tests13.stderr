@@ -1,0 +1,12 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 48.36s
+     Running tests/source_backed_managed.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_managed-626c2823f77cf34c)
+error: test failed, to rerun pass `-p litchi-docx --test source_backed_managed`
+     Running tests/source_backed_managed_document_edit.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_managed_document_edit-c782f9f186ad39d3)
+error: test failed, to rerun pass `-p litchi-docx --test source_backed_managed_document_edit`
+error: 2 targets failed:
+    `-p litchi-docx --test source_backed_managed`
+    `-p litchi-docx --test source_backed_managed_document_edit`

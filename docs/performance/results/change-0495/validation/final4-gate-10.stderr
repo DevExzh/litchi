@@ -1,0 +1,10 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+    Finished `release` profile [optimized + debuginfo] target(s) in 23.12s
+     Running tests/source_backed.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed-1402ccbbe91abf48)
+     Running tests/source_backed_managed.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_managed-626c2823f77cf34c)
+     Running tests/source_backed_managed_document_edit.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_managed_document_edit-c782f9f186ad39d3)
+     Running tests/source_backed_paragraph_copy.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_paragraph_copy-53660eb9a058bb6a)
+     Running tests/source_backed_paragraph_removal.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_paragraph_removal-f0e3b8f687464cb5)
+     Running tests/source_backed_secondary_story_text.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_secondary_story_text-ea6a9cc4d610f9f1)
+     Running tests/source_backed_semantic.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_semantic-bb468a04b95849af)
+     Running tests/source_backed_story_text.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/source_backed_story_text-a328273fd6a86151)

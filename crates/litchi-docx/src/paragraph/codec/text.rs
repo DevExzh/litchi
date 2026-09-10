@@ -1264,6 +1264,7 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
+        let _parser_admission = self.parser_admission()?;
         extract_word_text(self.xml_bytes())
     }
 }

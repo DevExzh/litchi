@@ -1,0 +1,14 @@
+{
+  "base": "de8ee88b0",
+  "worktree": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "sparse_paths": [
+    "crates",
+    "tools/perf-baseline",
+    ".cargo"
+  ],
+  "workspace_lock": {
+    "path": "workspace-Cargo.lock",
+    "sha256": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292"
+  },
+  "reason": "Build frozen owned changes without incorporating concurrent unrelated ODG edits. This checkout is disposable and will be removed after retained build verification."
+}

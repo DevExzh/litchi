@@ -1,5 +1,68 @@
 # Performance program phase report
 
+## 0495: verified ordinary managed DOCX edit/save enabler
+
+[0495](changes/0495-docx-managed-document-edits.md) implements and measures
+the owner-retained ordinary managed DOCX `Snapshot`/`Edit`/`Commit`/`Patch`
+path with source-authorized sequential publication and a complete-artifact
+inverse capability. It is a necessary measured enabler for the typed refusal
+recorded in 0494. The retained formal run has 72 processes and 2,160 samples;
+pilot2 has 36 processes and 108 samples. The six providers are `owned`,
+`instrumented`, `file-warm`, 4 KiB `short`, delayed 64 KiB `delayed`, and
+zero-fixed-delay `range-zero`, each in normal and allocator roles over the
+200-paragraph, 20-member, eight-2 MiB-media corpus.
+
+The normal managed p50 observations are:
+
+| Provider | Repeat 1 (ms) | Repeat 2 (ms) |
+| --- | ---: | ---: |
+| owned | 5.592 | 5.556 |
+| instrumented | 3.277 | 3.298 |
+| file-warm | 5.682 | 5.853 |
+| short (4 KiB) | 4.066 | 4.060 |
+| delayed (1 ms + 100 MiB/s) | 572.748 | 576.147 |
+| range-zero (0 ms + 100 MiB/s) | 182.327 | 181.990 |
+
+These values describe managed capability and finite-budget behavior. The
+protocol has no managed-before baseline, so they do not authorize a managed
+speed, RSS, allocation, or provider-ranking claim. Before/after performance
+review is limited to matched unmanaged rows. It retains eight whole-child RSS
+flags and three latency flags above the five-percent threshold. The flags are
+follow-up observations with unresolved causality; repeat instability is
+preserved rather than dismissed.
+
+All 720 managed formal rows produced the expected 16,793,048-byte output,
+passed source/sink/semantic/untouched-media checks, recorded zero reservation
+failures, and released resource memory, objects, and depth to baseline. The
+cache/resource phases must remain separate: `cache_before` is post-open,
+`cache_live` is post-edit/pre-publication, resource `live` is post-publication,
+and `after_drop` follows package consumption and returned-snapshot/commit
+release. The run has no post-publication cache snapshot.
+
+Allocator evidence is descriptive. Unmanaged before-to-after allocation calls
+change from 22,859 to 9,696 (-57.583%) and allocated bytes from 5,721,334 to
+1,623,696 (-71.620%), while peak live increment changes by +0.485%. Managed
+after versus unmanaged after changes calls by +111.788%, allocated bytes by
++162.992%, and peak live increment by +2.058%; there is no managed-before
+comparison.
+
+The profile bundle covers the whole child, including setup, output hashing,
+semantic verification, and report serialization. Its core counters, syscall
+traces, and owned stack captures do not attribute CPU or RSS to the timed edit
+operation; LLC events were unsupported. The measured follow-up is phase-local
+CPU and whole-child RSS attribution, repeats of the unstable file-warm and
+short/allocator arms, and a distinct post-publication cache observation if
+retention is part of a future claim. The final validation bundle records 478
+harness tests (one ignored), 937 DOCX unit tests, 119 integration tests, 388
+OPC unit tests, 79 doctests (31 ignored), and 58 Python helper tests.
+
+The full non-iWork goal remains open: genuine borrowed sources, atomic
+filesystem save, cold and independent-producer intersections, bounded
+parallel scaling, durable/history/composition support, broader mutators, and
+the remaining CRUD/security matrix require separate implementation and
+evidence. See the [formal results review](results/change-0495/results-review.md)
+and [profile review](results/change-0495/profile-review.md).
+
 ## 0494: opened DOCX edit/save provider baseline
 
 [0494](results/change-0494/README.md) measures one changed paragraph in an

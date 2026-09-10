@@ -1,0 +1,29 @@
+{
+  "schema": "litchi-0495-supplemental-fuzz-v1",
+  "status": "pass",
+  "final_executions": 4000,
+  "targets": [
+    {
+      "target": "parse_docx",
+      "executions": 1000,
+      "status": "pass"
+    },
+    {
+      "target": "parse_opc",
+      "executions": 1000,
+      "status": "pass"
+    },
+    {
+      "target": "source_backed_tail_append_stream",
+      "executions": 1000,
+      "status": "pass"
+    },
+    {
+      "target": "tail_append",
+      "executions": 1000,
+      "status": "pass"
+    }
+  ],
+  "scope": "existing fuzz targets; not direct coverage of every new managed edit API",
+  "preliminary_runs": "Preserved worker smoke, repeated for exact argv and binary custody."
+}

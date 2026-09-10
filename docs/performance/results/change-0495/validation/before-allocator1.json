@@ -1,0 +1,59 @@
+{
+  "argv": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "artifacts": {
+    "before-allocator1.stderr": {
+      "bytes": 181,
+      "sha256": "71313c96b2290bfdde0d441e6e9718b34413b1c02fe70510d0f77fa8aa4ae027"
+    },
+    "before-allocator1.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "66675085d48cde045c1521af153766521f5df36a7bbea6f9697a70b81fd53587",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "exit_code": 0,
+  "finished_utc": "2026-09-10T09:40:40.804040+00:00",
+  "label": "before-allocator1",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7122,
+    "path": "validation-sources/96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f.json",
+    "sha256": "96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f"
+  },
+  "source_before": {
+    "files": 7122,
+    "path": "validation-sources/96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f.json",
+    "sha256": "96d5c8bbcab21dd2f10fd992a96d90bd9ecb1f101bad1a8f5e9ece2c18f8651f"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T09:39:40.362119+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

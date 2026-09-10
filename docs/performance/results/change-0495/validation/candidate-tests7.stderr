@@ -1,0 +1,22 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error[E0382]: use of moved value: `edit`
+    --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:626:10
+     |
+ 599 |     let mut edit = package.edit_document().unwrap();
+     |         -------- move occurs because `edit` has type `litchi_docx::document::Edit`, which does not implement the `Copy` trait
+...
+ 614 |     let commit = edit.commit().unwrap();
+     |                       -------- `edit` moved due to this method call
+...
+ 626 |     drop(edit);
+     |          ^^^^ value used here after move
+     |
+note: `litchi_docx::document::Edit::commit` takes ownership of the receiver `self`, which moves `edit`
+    --> crates/litchi-docx/src/document/transaction.rs:3365:19
+     |
+3365 |     pub fn commit(self) -> TransactionResult<Commit> {
+     |                   ^^^^
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `litchi-docx` (test "source_backed_managed_document_edit") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

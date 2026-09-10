@@ -1,0 +1,59 @@
+{
+  "attempt": "final1",
+  "binary": {
+    "bytes": 478225064,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-goal-0495/retained/final1/after/normal/litchi-perf-baseline",
+    "sha256": "d94d8cac8bc1628148f54de67531f003ec2d1180b5a81bbc1b7c0c47dc13a823"
+  },
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline"
+  ],
+  "copied_utc": "2026-09-10T12:23:59.498300+00:00",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "gate": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation/final4-gate-7.json",
+    "sha256": "eec61140dffcf919351e97f35260cad904267c76fc1f499350a4e909132060ae"
+  },
+  "git_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+  "original_binary": {
+    "bytes": 478225064,
+    "executable": true,
+    "path": "/home/zhuhe/.cache/litchi-build-0495/release/litchi-perf-baseline",
+    "sha256": "d94d8cac8bc1628148f54de67531f003ec2d1180b5a81bbc1b7c0c47dc13a823"
+  },
+  "phase": "after",
+  "retainer_sha256": "506b4eb7166d29e979cd3043320b9bc5eca7058e37c6b9fbf20add723a86921a",
+  "role": "normal",
+  "schema": "docx-provider-managed-build-v1",
+  "source_after": {
+    "files": 7198,
+    "path": "validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "source_before": {
+    "files": 7198,
+    "path": "validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "source_unchanged": true,
+  "version": 1
+}

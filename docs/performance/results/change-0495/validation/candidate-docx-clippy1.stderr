@@ -1,0 +1,167 @@
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier-macros)
+    Checking litchi-core v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-core)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-codepage)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/xml-minifier)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-cfb)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-fonts)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-vba)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ole-common)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error: unnecessary closure used to substitute value for `Option::None`
+    --> crates/litchi-docx/src/document/transaction.rs:1731:23
+     |
+1731 |           let context = self.base.managed_context().ok_or_else(|| {
+     |  _______________________^
+1732 | |             TransactionError::Document(crate::Error::UnsafeEdit {
+1733 | |                 format: "DOCX",
+1734 | |                 operation: "replace_paragraph_text",
+1735 | |                 reason: "managed candidate is missing its execution admission",
+1736 | |             })
+1737 | |         })?;
+     | |__________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+     = note: `-D clippy::unnecessary-lazy-evaluations` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `ok_or` instead
+     |
+1731 ~         let context = self.base.managed_context().ok_or({
+1732 +             TransactionError::Document(crate::Error::UnsafeEdit {
+1733 +                 format: "DOCX",
+1734 +                 operation: "replace_paragraph_text",
+1735 +                 reason: "managed candidate is missing its execution admission",
+1736 +             })
+1737 ~         })?;
+     |
+
+error: unnecessary closure used to substitute value for `Option::None`
+    --> crates/litchi-docx/src/document/transaction.rs:1929:22
+     |
+1929 |           let source = self
+     |  ______________________^
+1930 | |             .base
+1931 | |             .source_xml()
+1932 | |             .ok_or_else(|| crate::Error::UnsafeEdit {
+...    |
+1935 | |                 reason: "managed paragraph source authorization is unavailable",
+1936 | |             })?;
+     | |______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+     |
+1932 ~             .ok_or(crate::Error::UnsafeEdit {
+1933 +                 format: "DOCX",
+1934 +                 operation: "replace_paragraph_text",
+1935 +                 reason: "managed paragraph source authorization is unavailable",
+1936 ~             })?;
+     |
+
+error: unnecessary closure used to substitute value for `Option::None`
+    --> crates/litchi-docx/src/document/transaction.rs:1937:24
+     |
+1937 |           let identity = self
+     |  ________________________^
+1938 | |             .base
+1939 | |             .source_identity()
+1940 | |             .ok_or_else(|| crate::Error::UnsafeEdit {
+...    |
+1943 | |                 reason: "managed paragraph source identity is unavailable",
+1944 | |             })?;
+     | |______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+     |
+1940 ~             .ok_or(crate::Error::UnsafeEdit {
+1941 +                 format: "DOCX",
+1942 +                 operation: "replace_paragraph_text",
+1943 +                 reason: "managed paragraph source identity is unavailable",
+1944 ~             })?;
+     |
+
+error: unnecessary closure used to substitute value for `Option::None`
+    --> crates/litchi-docx/src/document/transaction.rs:2057:34
+     |
+2057 |               let base_admission = self.base.admission.as_ref().ok_or_else(|| {
+     |  __________________________________^
+2058 | |                 TransactionError::Document(crate::Error::UnsafeEdit {
+2059 | |                     format: "DOCX",
+2060 | |                     operation: "replace_paragraph_text",
+2061 | |                     reason: "managed base snapshot is missing its execution admission",
+2062 | |                 })
+2063 | |             })?;
+     | |______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+     |
+2057 ~             let base_admission = self.base.admission.as_ref().ok_or({
+2058 +                 TransactionError::Document(crate::Error::UnsafeEdit {
+2059 +                     format: "DOCX",
+2060 +                     operation: "replace_paragraph_text",
+2061 +                     reason: "managed base snapshot is missing its execution admission",
+2062 +                 })
+2063 ~             })?;
+     |
+
+error: unnecessary closure used to substitute value for `Option::None`
+    --> crates/litchi-docx/src/document/transaction.rs:3900:25
+     |
+3900 |           let admission = self.projected.admission.as_ref().ok_or_else(|| {
+     |  _________________________^
+3901 | |             TransactionError::Document(crate::Error::UnsafeEdit {
+3902 | |                 format: "DOCX",
+3903 | |                 operation: "document.edit",
+3904 | |                 reason: "managed operation admission is unavailable",
+3905 | |             })
+3906 | |         })?;
+     | |__________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+     |
+3900 ~         let admission = self.projected.admission.as_ref().ok_or({
+3901 +             TransactionError::Document(crate::Error::UnsafeEdit {
+3902 +                 format: "DOCX",
+3903 +                 operation: "document.edit",
+3904 +                 reason: "managed operation admission is unavailable",
+3905 +             })
+3906 ~         })?;
+     |
+
+error: unnecessary closure used to substitute value for `Option::None`
+    --> crates/litchi-docx/src/document/transaction.rs:3924:25
+     |
+3924 |           let admission = self.projected.admission.as_ref().ok_or_else(|| {
+     |  _________________________^
+3925 | |             TransactionError::Document(crate::Error::UnsafeEdit {
+3926 | |                 format: "DOCX",
+3927 | |                 operation: "document.edit",
+3928 | |                 reason: "managed string admission is unavailable",
+3929 | |             })
+3930 | |         })?;
+     | |__________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#unnecessary_lazy_evaluations
+help: use `ok_or` instead
+     |
+3924 ~         let admission = self.projected.admission.as_ref().ok_or({
+3925 +             TransactionError::Document(crate::Error::UnsafeEdit {
+3926 +                 format: "DOCX",
+3927 +                 operation: "document.edit",
+3928 +                 reason: "managed string admission is unavailable",
+3929 +             })
+3930 ~         })?;
+     |
+
+error: could not compile `litchi-docx` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-docx` (lib) due to 6 previous errors
+error: could not compile `litchi-docx` (lib test) due to 6 previous errors

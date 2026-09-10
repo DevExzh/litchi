@@ -1,0 +1,60 @@
+{
+  "gate": {
+    "bytes": 1980,
+    "sha256": "ec0ef6661aa36cf83984a25952bf4426b5faaa0e2b9264f1a4a1182b8e540d6a"
+  },
+  "helpers": {
+    "cleanup.py": {
+      "bytes": 45272,
+      "sha256": "5a3e43d6ba125338e5b5419253307a50dafacd4c8edf704f09c5bd608a1081c0"
+    },
+    "gate.py": {
+      "bytes": 4268,
+      "sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd"
+    },
+    "measure.py": {
+      "bytes": 117035,
+      "sha256": "0cf5df18d6ac9cdf81f31e9d9fb198a0df36a9a4b6de24d6b58a31e8c49eaf90"
+    },
+    "profile.py": {
+      "bytes": 54539,
+      "sha256": "f8bc82f62e56deec6b60cd085c8695491402136c78e9b4b402dcccced20133e8"
+    },
+    "retain_build.py": {
+      "bytes": 3957,
+      "sha256": "506b4eb7166d29e979cd3043320b9bc5eca7058e37c6b9fbf20add723a86921a"
+    },
+    "support.py": {
+      "bytes": 5276,
+      "sha256": "029beb6ea92bc5a03244d4908cfba17370736fbee972906abb67513d533d9462"
+    },
+    "test_cleanup.py": {
+      "bytes": 11227,
+      "sha256": "c15af25096d87ec23253433ae3dc5f165148bee621a8609f8905bc8517da6ac4"
+    },
+    "test_measure.py": {
+      "bytes": 28338,
+      "sha256": "1a909ad095cc38e8ba5d70a508a3884903da30484ae4cb4ad07742c3100aca18"
+    },
+    "test_profile.py": {
+      "bytes": 9629,
+      "sha256": "c7742c5deba3496e5036193e3d87a1298f1891190e6bff8b9e446c0c883b5f77"
+    },
+    "test_verify.py": {
+      "bytes": 9406,
+      "sha256": "33a34c06bd7d3f9d2e9378061dfd97a2867c52ca6ca46afd4984b8a7f7fc5a33"
+    },
+    "verify.py": {
+      "bytes": 59202,
+      "sha256": "f4ce50f19d3798a0ca0c0a8d281289fca902c78e13ea8bcc28d3d3207e5b93bd"
+    }
+  },
+  "label": "final2-gate-6",
+  "schema": "docx-edit-provider-helper-custody-v1",
+  "source": {
+    "files": 7198,
+    "path": "validation-sources/bbf3d44f4d4c5c3a2edf66f59ea73d9195fd99766ba27efc94880d2dcc7eedad.json",
+    "sha256": "bbf3d44f4d4c5c3a2edf66f59ea73d9195fd99766ba27efc94880d2dcc7eedad"
+  },
+  "version": 1
+}

@@ -1,14 +1,11 @@
 //! Lossless direct paragraph-child traversal.
 
-use std::sync::Arc;
-
-use litchi_core::XmlSlice;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
 use crate::error::{Error, Result};
 
-use super::super::model::{Inline, OpaqueInline, Paragraph, Run};
+use super::super::model::{Inline, OpaqueInline, Paragraph, Run, XmlRef};
 use super::xml::is_fragment_word_name;
 
 const MAX_INLINE_DEPTH: usize = 128;
@@ -27,7 +24,8 @@ impl Paragraph {
     /// paragraph XML.
     pub fn inlines(&self) -> Result<Vec<Inline>> {
         let xml = self.xml_bytes();
-        let (source, base_offset) = self.xml_data.get_or_create_arc();
+        let source = self.xml_data.xml_ref()?;
+        let _parser_admission = source.parser_admission()?;
         let mut reader = NsReader::from_reader(xml);
         let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
         let mut paragraph_depth = None;
@@ -46,7 +44,7 @@ impl Paragraph {
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?
                 .into_owned();
-            let resolver = reader.resolver().clone();
+            let resolver = reader.resolver();
             let (namespace, event) = resolver.resolve_event(raw_event);
             let event_end =
                 usize::try_from(reader.buffer_position()).map_err(|_conversion_error| {
@@ -157,7 +155,6 @@ impl Paragraph {
                         push_inline(
                             &mut inlines,
                             &source,
-                            base_offset,
                             is_run,
                             is_hyperlink,
                             event_start,
@@ -172,7 +169,6 @@ impl Paragraph {
                         push_inline(
                             &mut inlines,
                             &source,
-                            base_offset,
                             is_run,
                             is_hyperlink,
                             start,
@@ -215,8 +211,7 @@ impl Paragraph {
 
 fn push_inline(
     inlines: &mut Vec<Inline>,
-    source: &Arc<Vec<u8>>,
-    base_offset: u32,
+    source: &XmlRef,
     is_run: bool,
     is_hyperlink: bool,
     start: usize,
@@ -230,22 +225,13 @@ fn push_inline(
             .ok_or_else(|| Error::InvalidFormat("invalid Word inline range".into()))?,
     )
     .map_err(|_conversion_error| Error::InvalidFormat("Word inline length exceeds u32".into()))?;
-    let absolute_start = base_offset
-        .checked_add(relative_start)
-        .ok_or_else(|| Error::InvalidFormat("Word inline absolute offset exceeds u32".into()))?;
+    let range = source.subrange(relative_start, length).ok_or_else(|| {
+        Error::InvalidFormat("Word inline absolute offset exceeds source range".into())
+    })?;
     inlines.push(if is_run {
-        Inline::Run(Box::new(Run::from_slice(XmlSlice::new(
-            Arc::clone(source),
-            absolute_start,
-            length,
-        ))))
+        Inline::Run(Box::new(Run::from_xml_ref(range)))
     } else {
-        Inline::Unknown(Box::new(OpaqueInline::from_arc_range(
-            Arc::clone(source),
-            absolute_start,
-            length,
-            is_hyperlink,
-        )))
+        Inline::Unknown(Box::new(OpaqueInline::from_xml_ref(range, is_hyperlink)))
     });
     Ok(())
 }

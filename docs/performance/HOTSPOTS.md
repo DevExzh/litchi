@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## 0495: managed ordinary DOCX edit is enabled; attribution remains open
+
+[0495](changes/0495-docx-managed-document-edits.md) measures the new finite
+owner-retained ordinary managed DOCX edit/save path across six provider arms,
+normal and allocator roles, and two reversed repeats. The formal run retains
+72 processes and 2,160 samples; pilot2 retains 36 processes and 108 samples.
+The normal managed p50s in milliseconds are 5.592/5.556 (owned), 3.277/3.298
+(instrumented), 5.682/5.853 (file-warm), 4.066/4.060 (short), 572.748/576.147
+(delayed), and 182.327/181.990 (range-zero).
+
+These are managed capability and finite-budget baselines, not managed-before
+speed or provider-ranking evidence. The paired performance review compares
+unmanaged before/after rows only and retains eight whole-child RSS flags plus
+three latency flags over five percent. Causality remains unresolved, and
+repeat instability remains visible. Every managed formal row passes output,
+source, semantic, media, and finite-budget checks, while allocator-role rows
+pass allocator conservation. Normal rows have no allocator counters, and
+unmanaged rows have no managed budget fields; managed resource
+memory/objects/depth return to baseline.
+
+The phase labels matter: `cache_before` is post-open, `cache_live` is
+post-edit/pre-publication, resource `live` is post-publication, and
+`after_drop` follows package consumption and returned-snapshot/commit release.
+There is no cache-after-drop gauge. Profiles cover whole-child setup,
+verification, and serialization, so the next hotspot work is phase-local CPU
+and whole-child RSS attribution, repeat capture of unstable file-warm and
+short/allocator arms, and a separate post-publication cache observation if
+retention is claimed. The full non-iWork goal remains open.
+
 ## 0494: opened DOCX edit/save exposes range-request cost
 
 The six-provider baseline records 377 nonempty reads for one paragraph edit and

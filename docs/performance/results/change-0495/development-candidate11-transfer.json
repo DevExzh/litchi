@@ -1,0 +1,5 @@
+{
+  "note": "Isolated compiler qualifier correction; OPC owner applying same main fix and audit tests.",
+  "path": "/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc/src/xml_splice.rs",
+  "sha256": "9fbdcbc7d67f8a61d0666452f92cb0a5baf1f405d4b6fbceea20a7b9ab1942aa"
+}

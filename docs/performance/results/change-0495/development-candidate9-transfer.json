@@ -1,0 +1,5 @@
+{
+  "note": "Development-only isolated test removes use-after-move; main testagent owns same fix and new multiparagraph tests.",
+  "path": "/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx/tests/source_backed_managed_document_edit.rs",
+  "sha256": "dd7df0bd73dc920a36ac39dc6a7d7b5931b1fbf27277909082fa73875695561b"
+}

@@ -1,0 +1,3 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+    Finished `release` profile [optimized + debuginfo] target(s) in 34.81s
+     Running unittests src/lib.rs (/home/zhuhe/.cache/litchi-build-0495/release/deps/litchi_opc-aa7f9505152f7479)

@@ -1,0 +1,12 @@
+{
+  "remaining": [],
+  "removed": [
+    "/home/zhuhe/.cache/litchi-goal-0495/managed/formal1/r1-after-unmanaged-api-allocator-range-zero/tmp",
+    "/home/zhuhe/.cache/litchi-goal-0495/managed/formal1/r1-after-unmanaged-api-allocator-range-zero",
+    "/home/zhuhe/.cache/litchi-goal-0495/managed/formal1"
+  ],
+  "root": "/home/zhuhe/.cache/litchi-goal-0495/managed/formal1/r1-after-unmanaged-api-allocator-range-zero",
+  "schema": "docx-edit-provider-private-cleanup-v1",
+  "status": "pass",
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0495/managed/formal1/r1-after-unmanaged-api-allocator-range-zero/tmp"
+}

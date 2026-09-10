@@ -1,5 +1,55 @@
 # Performance CRUD coverage
 
+## 0495: verified ordinary managed DOCX edit/save capability baseline
+
+[0495](changes/0495-docx-managed-document-edits.md) supplies the measured
+owner-retained ordinary managed DOCX edit enabler that was missing from 0494.
+The verified formal matrix retains 72 processes and 2,160 samples; pilot2
+retains 36 processes and 108 samples. It covers six explicit providers—owned,
+instrumented, warm `FileSource`, 4 KiB short reads, delayed 64 KiB ranges, and
+zero-fixed-delay ranges—in normal and allocator roles. The corpus has 200
+paragraphs, 20 archive members, and eight 2 MiB media members; every formal row
+produces the expected 16,793,048-byte output and passes source, sink, semantic,
+and untouched-media checks. Managed rows pass finite-budget checks;
+allocator-role rows pass allocator-conservation checks. Normal rows have no
+allocator counters, and unmanaged rows have no managed budget fields.
+
+Normal managed p50 observations (milliseconds, repeat 1 / repeat 2) are:
+
+| Provider | Managed p50 R1 / R2 |
+| --- | ---: |
+| owned | 5.592 / 5.556 |
+| instrumented | 3.277 / 3.298 |
+| file-warm | 5.682 / 5.853 |
+| short (4 KiB) | 4.066 / 4.060 |
+| delayed (1 ms + 100 MiB/s) | 572.748 / 576.147 |
+| range-zero (0 ms + 100 MiB/s) | 182.327 / 181.990 |
+
+These are managed capability and finite-budget observations, with no
+managed-before baseline. The only before/after performance review pairs
+unmanaged rows. It retains eight whole-child RSS flags and three latency flags
+above the five-percent threshold; causality is unresolved and repeat
+instability remains part of the evidence. The normal allocator delta from
+unmanaged before to after is -57.583% allocation calls and -71.620% allocated
+bytes, with a +0.485% peak-live change. Managed-after versus unmanaged-after is
+a descriptive API delta (+111.788% calls, +162.992% allocated bytes, +2.058%
+peak live), not a managed-before comparison.
+
+The lifecycle gauges are distinct: `cache_before` is post-open,
+`cache_live` is post-edit/pre-publication, resource `live` is post-publication,
+and `after_drop` follows package consumption plus returned-snapshot/commit
+release. No cache-after-drop observation exists. Whole-child profiles include
+setup and output verification, so the measured follow-up is phase-local CPU and
+whole-child RSS attribution, repeated unstable file-warm and short/allocator
+arms, and a separate post-publication cache gauge if cache retention is claimed.
+
+This is correctness and capability evidence, not a broad speedup, provider
+ranking, or new representative-index row. The final bundle records 478 harness
+tests (one ignored), 937 DOCX unit tests, 119 integration tests, 388 OPC unit
+tests, 79 doctests (31 ignored), and 58 Python helper tests. Genuine borrowed
+sources, atomic filesystem save, cold/independent-producer intersections,
+bounded scaling, and the wider CRUD matrix remain open.
+
 ## 0494: opened DOCX edit/save provider baseline
 
 [0494](results/change-0494/README.md) records a descriptive baseline for one

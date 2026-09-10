@@ -1,0 +1,10 @@
+{
+  "test-data/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml": {
+    "bytes": 11016,
+    "sha256": "52782d96e76f435265b36e2aab311689d6e370f4fec60a055c48f3102d5a6ef2"
+  },
+  "test-data/poi/test-data/openxml4j/50154.xlsx": {
+    "bytes": 13583,
+    "sha256": "7c3f5f0907f198561933d05eb7c4fea1a8298e39fa7855b16e10d0e83ee1c399"
+  }
+}

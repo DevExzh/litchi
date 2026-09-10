@@ -1,0 +1,71 @@
+{
+  "argv": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--test",
+    "source_backed_managed_document_edit",
+    "--test",
+    "source_backed_managed",
+    "--test",
+    "source_backed",
+    "--test",
+    "source_backed_semantic",
+    "--test",
+    "source_backed_story_text",
+    "--test",
+    "source_backed_secondary_story_text",
+    "--test",
+    "source_backed_paragraph_copy",
+    "--test",
+    "source_backed_paragraph_removal"
+  ],
+  "artifacts": {
+    "final2-gate-10.stderr": {
+      "bytes": 682,
+      "sha256": "63472befb5eddbb4fc6379216e94bf589ca31670960781b5a17fb5f6f92898d3"
+    },
+    "final2-gate-10.stdout": {
+      "bytes": 5495,
+      "sha256": "028ed747219c50d92b48b98da884f6829c3a1b1b114fd376041a7c142f6f6aa6"
+    }
+  },
+  "attempt": null,
+  "common_sha256": "029beb6ea92bc5a03244d4908cfba17370736fbee972906abb67513d533d9462",
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0495/source",
+  "driver_sha256": "3484663976b42d53e5f726914ed072026df32e09b0f171936e4e72322cb60afd",
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0495",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "LITCHI_MANAGED_EDIT_SOURCE_ROOT": "/home/zhuhe/.cache/litchi-goal-0495/source",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495/test-tmp"
+  },
+  "exit_code": 101,
+  "finished_utc": "2026-09-10T12:09:18.342280+00:00",
+  "label": "final2-gate-10",
+  "schema": "docx-edit-provider-gate-v1",
+  "source_after": {
+    "files": 7198,
+    "path": "validation-sources/bbf3d44f4d4c5c3a2edf66f59ea73d9195fd99766ba27efc94880d2dcc7eedad.json",
+    "sha256": "bbf3d44f4d4c5c3a2edf66f59ea73d9195fd99766ba27efc94880d2dcc7eedad"
+  },
+  "source_before": {
+    "files": 7198,
+    "path": "validation-sources/bbf3d44f4d4c5c3a2edf66f59ea73d9195fd99766ba27efc94880d2dcc7eedad.json",
+    "sha256": "bbf3d44f4d4c5c3a2edf66f59ea73d9195fd99766ba27efc94880d2dcc7eedad"
+  },
+  "source_unchanged": true,
+  "started_utc": "2026-09-10T12:08:08.486679+00:00",
+  "termination": null,
+  "timed_out": false,
+  "timeout_seconds": 1800
+}

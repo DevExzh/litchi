@@ -861,7 +861,7 @@ impl Snapshot {
 
     fn with_transaction_snapshot(&self, transaction: DocumentSnapshot) -> Result<Self> {
         let (raw, envelope) = if let Some(envelope) = self.envelope {
-            let wrapped = transaction.shared_xml();
+            let wrapped = transaction.shared_xml().map_err(Error::Transaction)?;
             let wrapped_end = wrapped
                 .len()
                 .checked_sub(envelope.wrapped_suffix_len)
@@ -919,7 +919,10 @@ impl Snapshot {
         } else {
             (
                 checked_story_output_clone(
-                    transaction.shared_xml().as_ref(),
+                    transaction
+                        .shared_xml()
+                        .map_err(Error::Transaction)?
+                        .as_ref(),
                     &self.limits,
                     "story transaction XML",
                 )?,
@@ -1021,7 +1024,7 @@ impl Edit {
         }
         validate_paragraph_text(position, authored_text).map_err(Error::Transaction)?;
         let text = checked_string_clone(authored_text, "story replacement text")?;
-        let mut candidate = self.projected.clone();
+        let mut candidate = self.projected.try_clone().map_err(Error::Transaction)?;
         candidate
             .replace_paragraph_text(position, text)
             .map_err(Error::Transaction)?;
@@ -5608,7 +5611,10 @@ fn project_batch_entry(
             .map_err(Error::Transaction)?;
     }
     base.check_execution()?;
-    let wrapped = projected.projected().shared_xml();
+    let wrapped = projected
+        .projected()
+        .shared_xml()
+        .map_err(Error::Transaction)?;
     let wrapped_end = wrapped
         .len()
         .checked_sub(envelope.wrapped_suffix_len)

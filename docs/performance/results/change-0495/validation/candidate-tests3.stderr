@@ -1,0 +1,74 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error: unnecessary qualification
+   --> crates/litchi-docx/src/source_backed/document_policy.rs:524:14
+    |
+524 |     decoder: quick_xml::encoding::Decoder,
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+524 -     decoder: quick_xml::encoding::Decoder,
+524 +     decoder: Decoder,
+    |
+
+error[E0599]: no method named `clone` found for mutable reference `&mut document::transaction::Edit` in the current scope
+    --> crates/litchi-docx/src/document/transaction.rs:1756:34
+     |
+1756 |         let mut candidate = self.clone();
+     |                                  ^^^^^ method not found in `&mut document::transaction::Edit`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the trait `Clone` defines an item `clone`, but is explicitly unimplemented
+
+error[E0614]: type `litchi_core::Position` cannot be dereferenced
+    --> crates/litchi-docx/src/document/transaction.rs:1820:28
+     |
+1820 |                 .paragraph(*position)
+     |                            ^^^^^^^^^ can't be dereferenced
+
+error[E0599]: no method named `clone` found for mutable reference `&mut document::transaction::Edit` in the current scope
+    --> crates/litchi-docx/src/document/transaction.rs:1941:34
+     |
+1941 |         let mut candidate = self.clone();
+     |                                  ^^^^^ method not found in `&mut document::transaction::Edit`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the trait `Clone` defines an item `clone`, but is explicitly unimplemented
+
+error[E0599]: no method named `clone` found for mutable reference `&mut document::transaction::Edit` in the current scope
+    --> crates/litchi-docx/src/document/transaction.rs:2372:34
+     |
+2372 |         let mut candidate = self.clone();
+     |                                  ^^^^^ method not found in `&mut document::transaction::Edit`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the trait `Clone` defines an item `clone`, but is explicitly unimplemented
+
+error[E0599]: no method named `clone` found for mutable reference `&mut document::transaction::Edit` in the current scope
+    --> crates/litchi-docx/src/document/transaction.rs:2635:34
+     |
+2635 |         let mut candidate = self.clone();
+     |                                  ^^^^^ method not found in `&mut document::transaction::Edit`
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the trait `Clone` defines an item `clone`, but is explicitly unimplemented
+
+error[E0599]: no method named `clone` found for struct `document::transaction::Edit` in the current scope
+    --> crates/litchi-docx/src/source_backed/story_text.rs:1027:44
+     |
+1027 |         let mut candidate = self.projected.clone();
+     |                                            ^^^^^ method not found in `document::transaction::Edit`
+     |
+    ::: crates/litchi-docx/src/document/transaction.rs:1459:1
+     |
+1459 | pub struct Edit {
+     | --------------- method `clone` not found for this struct
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `clone`, perhaps you need to implement it:
+             candidate #1: `Clone`
+
+Some errors have detailed explanations: E0599, E0614.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `litchi-docx` (lib) due to 7 previous errors

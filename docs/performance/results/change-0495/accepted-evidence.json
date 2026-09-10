@@ -1,0 +1,11 @@
+{
+  "claim_authorized": false,
+  "formal_attempt": "formal1",
+  "formal_samples": 2160,
+  "negative_attempt": "before-managed-refusal1",
+  "negative_reason": "Before managed ordinary edit returns a typed refusal; this is correctness evidence and supplies no successful managed timing baseline.",
+  "pilot_attempt": "pilot2",
+  "pilot_samples": 108,
+  "schema": "docx-edit-provider-accepted-v1",
+  "version": 1
+}

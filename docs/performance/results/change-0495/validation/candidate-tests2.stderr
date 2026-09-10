@@ -1,0 +1,21 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error[E0277]: the trait bound `Reservation: Clone` is not satisfied
+   --> crates/litchi-docx/src/document/transaction.rs:532:5
+    |
+530 | #[derive(Debug, Clone)]
+    |                 ----- in this derive macro expansion
+531 | struct OperationAdmission {
+532 |     _memory: Reservation,
+    |     ^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `Reservation`
+
+error[E0277]: the trait bound `Reservation: Clone` is not satisfied
+   --> crates/litchi-docx/src/document/transaction.rs:533:5
+    |
+530 | #[derive(Debug, Clone)]
+    |                 ----- in this derive macro expansion
+...
+533 |     _objects: Reservation,
+    |     ^^^^^^^^^^^^^^^^^^^^^ the trait `Clone` is not implemented for `Reservation`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `litchi-docx` (lib) due to 2 previous errors

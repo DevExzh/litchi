@@ -1,0 +1,86 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-drawingml)
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error[E0599]: no method named `unwrap` found for struct `litchi_docx::Paragraph` in the current scope
+   --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:578:71
+    |
+578 |     let mut paragraph = snapshot.paragraph(Position::new(0)).unwrap().unwrap();
+    |                                  ---------------------------          ^^^^^^ method not found in `litchi_docx::Paragraph`
+    |                                  |
+    |                                  method `unwrap` is available on `Option<litchi_docx::Paragraph>`
+
+error[E0599]: no method named `unwrap` found for struct `litchi_docx::Paragraph` in the current scope
+   --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:627:71
+    |
+627 |     let mut paragraph = snapshot.paragraph(Position::new(0)).unwrap().unwrap();
+    |                                  ---------------------------          ^^^^^^ method not found in `litchi_docx::Paragraph`
+    |                                  |
+    |                                  method `unwrap` is available on `Option<litchi_docx::Paragraph>`
+
+error[E0599]: no method named `unwrap` found for struct `litchi_docx::Paragraph` in the current scope
+   --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:670:67
+    |
+670 |     let paragraph = snapshot.paragraph(Position::new(0)).unwrap().unwrap();
+    |                              ---------------------------          ^^^^^^ method not found in `litchi_docx::Paragraph`
+    |                              |
+    |                              method `unwrap` is available on `Option<litchi_docx::Paragraph>`
+
+error[E0382]: use of moved value: `reopened`
+    --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:850:10
+     |
+ 826 |     let (inverse_budget, _cancellation_source, reopened) = managed(output, 1 << 20);
+     |                                                -------- move occurs because `reopened` has type `litchi_docx::source_backed::Package`, which does not implement the `Copy` trait
+...
+ 846 |         .publish_document_inverse_to_stream(&mut restored, &publication)
+     |          --------------------------------------------------------------- `reopened` moved due to this method call
+...
+ 850 |     drop(reopened);
+     |          ^^^^^^^^ value used here after move
+     |
+note: `litchi_docx::source_backed::Package::publish_document_inverse_to_stream` takes ownership of the receiver `self`, which moves `reopened`
+    --> crates/litchi-docx/src/source_backed.rs:1406:9
+     |
+1406 |         self,
+     |         ^^^^
+
+error[E0382]: use of moved value: `reopened`
+    --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:905:10
+     |
+ 899 |     let (inverse_budget, _cancellation_source, reopened) = managed(changed, 1 << 20);
+     |                                                -------- move occurs because `reopened` has type `litchi_docx::source_backed::Package`, which does not implement the `Copy` trait
+...
+ 902 |         .publish_document_inverse_to_stream(&mut restored, &publication)
+     |          --------------------------------------------------------------- `reopened` moved due to this method call
+...
+ 905 |     drop(reopened);
+     |          ^^^^^^^^ value used here after move
+     |
+note: `litchi_docx::source_backed::Package::publish_document_inverse_to_stream` takes ownership of the receiver `self`, which moves `reopened`
+    --> crates/litchi-docx/src/source_backed.rs:1406:9
+     |
+1406 |         self,
+     |         ^^^^
+
+error[E0382]: use of moved value: `reopened`
+    --> crates/litchi-docx/tests/source_backed_managed_document_edit.rs:998:10
+     |
+ 992 |     let (inverse_budget, _cancellation_source, reopened) = managed(changed, 1 << 20);
+     |                                                -------- move occurs because `reopened` has type `litchi_docx::source_backed::Package`, which does not implement the `Copy` trait
+...
+ 995 |         .publish_document_inverse_to_stream(&mut restored, &publication)
+     |          --------------------------------------------------------------- `reopened` moved due to this method call
+...
+ 998 |     drop(reopened);
+     |          ^^^^^^^^ value used here after move
+     |
+note: `litchi_docx::source_backed::Package::publish_document_inverse_to_stream` takes ownership of the receiver `self`, which moves `reopened`
+    --> crates/litchi-docx/src/source_backed.rs:1406:9
+     |
+1406 |         self,
+     |         ^^^^
+
+Some errors have detailed explanations: E0382, E0599.
+For more information about an error, try `rustc --explain E0382`.
+error: could not compile `litchi-docx` (test "source_backed_managed_document_edit") due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...

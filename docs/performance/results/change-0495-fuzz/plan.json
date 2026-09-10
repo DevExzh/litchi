@@ -1,0 +1,155 @@
+{
+  "base_revision": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+  "candidate_patch": {
+    "bytes": 405420,
+    "path": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/candidate-source.patch",
+    "sha256": "95d42dc2d139b55ecb0d5eeecce88423f0ba353bc6ad74034de016d2465fb057"
+  },
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8\n"
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--short"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "M  crates/litchi-docx/src/document/mod.rs\nM  crates/litchi-docx/src/document/transaction.rs\nM  crates/litchi-docx/src/document/transaction/durable.rs\nM  crates/litchi-docx/src/paragraph/codec/content.rs\nM  crates/litchi-docx/src/paragraph/codec/editing.rs\nM  crates/litchi-docx/src/paragraph/codec/inlines.rs\nM  crates/litchi-docx/src/paragraph/codec/paragraph_properties.rs\nM  crates/litchi-docx/src/paragraph/codec/run.rs\nM  crates/litchi-docx/src/paragraph/codec/run_contents.rs\nM  crates/litchi-docx/src/paragraph/codec/run_properties.rs\nM  crates/litchi-docx/src/paragraph/codec/runs.rs\nM  crates/litchi-docx/src/paragraph/codec/text.rs\nM  crates/litchi-docx/src/paragraph/collapsed/codec.rs\nM  crates/litchi-docx/src/paragraph/collapsed/package.rs\nM  crates/litchi-docx/src/paragraph/extensions/codec.rs\nM  crates/litchi-docx/src/paragraph/extensions/package.rs\nM  crates/litchi-docx/src/paragraph/model.rs\nM  crates/litchi-docx/src/paragraph/package.rs\nM  crates/litchi-docx/src/run_symbols/codec.rs\nM  crates/litchi-docx/src/run_symbols/package.rs\nM  crates/litchi-docx/src/source_backed.rs\nA  crates/litchi-docx/src/source_backed/document_policy.rs\nM  crates/litchi-docx/src/source_backed/story_text.rs\nM  crates/litchi-docx/tests/source_backed_managed.rs\nA  crates/litchi-docx/tests/source_backed_managed_document_edit.rs\nM  crates/litchi-docx/tests/source_backed_semantic.rs\nM  crates/litchi-opc/src/xml_splice.rs\nM  tools/perf-baseline/src/bin/litchi-perf-baseline-alloc.rs\nA  tools/perf-baseline/src/docx_managed_edit.rs\nM  tools/perf-baseline/src/lib.rs\nM  tools/perf-baseline/src/main.rs\n"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--cached",
+        "--stat"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": " crates/litchi-docx/src/document/mod.rs             |    1 +\n crates/litchi-docx/src/document/transaction.rs     | 1935 +++++++++++++++++-\n .../src/document/transaction/durable.rs            |  119 +-\n crates/litchi-docx/src/paragraph/codec/content.rs  |    6 +\n crates/litchi-docx/src/paragraph/codec/editing.rs  |   24 +-\n crates/litchi-docx/src/paragraph/codec/inlines.rs  |   34 +-\n .../src/paragraph/codec/paragraph_properties.rs    |    9 +-\n crates/litchi-docx/src/paragraph/codec/run.rs      |   22 +\n .../src/paragraph/codec/run_contents.rs            |   37 +-\n .../src/paragraph/codec/run_properties.rs          |    6 +-\n crates/litchi-docx/src/paragraph/codec/runs.rs     |   48 +-\n crates/litchi-docx/src/paragraph/codec/text.rs     |    1 +\n .../litchi-docx/src/paragraph/collapsed/codec.rs   |   22 +-\n .../litchi-docx/src/paragraph/collapsed/package.rs |   15 +-\n .../litchi-docx/src/paragraph/extensions/codec.rs  |    6 +-\n .../src/paragraph/extensions/package.rs            |    1 +\n crates/litchi-docx/src/paragraph/model.rs          |  473 ++++-\n crates/litchi-docx/src/paragraph/package.rs        |   32 +-\n crates/litchi-docx/src/run_symbols/codec.rs        |   16 +-\n crates/litchi-docx/src/run_symbols/package.rs      |   17 +-\n crates/litchi-docx/src/source_backed.rs            |  423 +++-\n .../src/source_backed/document_policy.rs           |  625 ++++++\n crates/litchi-docx/src/source_backed/story_text.rs |   14 +-\n crates/litchi-docx/tests/source_backed_managed.rs  |  114 +-\n .../tests/source_backed_managed_document_edit.rs   | 1873 ++++++++++++++++++\n crates/litchi-docx/tests/source_backed_semantic.rs |   15 +-\n crates/litchi-opc/src/xml_splice.rs                |  304 ++-\n .../src/bin/litchi-perf-baseline-alloc.rs          |    3 +\n tools/perf-baseline/src/docx_managed_edit.rs       | 2058 ++++++++++++++++++++\n tools/perf-baseline/src/lib.rs                     |    1 +\n tools/perf-baseline/src/main.rs                    |    3 +\n 31 files changed, 7885 insertions(+), 372 deletions(-)\n"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "-V"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "cargo 1.98.1 (797e8a9bc 2026-08-05)\n"
+    },
+    {
+      "argv": [
+        "rustc",
+        "+1.98.1",
+        "-vV"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n"
+    },
+    {
+      "argv": [
+        "clang",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "Ubuntu clang version 21.1.8 (6ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/lib/llvm-21/bin\n"
+    },
+    {
+      "argv": [
+        "llvm-symbolizer",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 127,
+      "stderr": "[Errno 2] No such file or directory: 'llvm-symbolizer'",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "uname",
+        "-a"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "Linux ip-172-31-39-190 7.0.0-1011-aws #11-Ubuntu SMP PREEMPT Thu Aug  6 15:41:35 UTC 2026 x86_64 GNU/Linux\n"
+    },
+    {
+      "argv": [
+        "git",
+        "--version"
+      ],
+      "cwd": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout": "git version 2.53.0\n"
+    }
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/target",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTC_BOOTSTRAP": "1",
+    "RUSTFLAGS": "-C passes=sancov-module -C llvm-args=-sanitizer-coverage-level=4 -C llvm-args=-sanitizer-coverage-inline-8bit-counters -C llvm-args=-sanitizer-coverage-pc-table -C llvm-args=-sanitizer-coverage-trace-compares -Z sanitizer=address --cfg fuzzing",
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/tmp"
+  },
+  "protected_worktree": "/home/zhuhe/code/litchi-spec-gaps",
+  "purpose": "supplemental deterministic address-sanitizer libFuzzer smoke for the sealed 0495 candidate",
+  "schema": "litchi-0495-fuzz-smoke-plan-v1",
+  "smoke_contract": {
+    "max_len_bytes": 1048576,
+    "runs_per_target": 1000,
+    "seed_values": {
+      "parse_docx": 495001,
+      "parse_opc": 495004,
+      "source_backed_tail_append_stream": 495003,
+      "tail_append": 495002
+    },
+    "timeout_seconds_per_target": 60
+  },
+  "source_root": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/source",
+  "sparse_paths": [
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/.cargo/",
+    "/crates/",
+    "/tools/perf-baseline/"
+  ],
+  "targets": {
+    "docx": [
+      "parse_docx",
+      "tail_append",
+      "source_backed_tail_append_stream"
+    ],
+    "opc": [
+      "parse_opc"
+    ]
+  },
+  "workspace_lock": {
+    "bytes": 138626,
+    "path": "/home/zhuhe/.cache/litchi-goal-0495-fuzz/workspace-Cargo.lock",
+    "sha256": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292"
+  }
+}

@@ -2,12 +2,259 @@
 
 use crate::UnderlineStyle;
 use crate::color::Theme;
+use crate::document::{ManagedAdmission, ManagedNamespaceAdmission, ManagedParserAdmission};
+use crate::error::{Error, Result};
 use crate::font::OpenType;
 use crate::hyperlink::Hyperlink;
 use crate::image::InlineImage;
 use crate::run_effects::Effects;
 use litchi_core::{VerticalPosition, XmlSlice};
+use litchi_opc::{PartData, SourceXmlPart};
+use quick_xml::name::NamespaceResolver;
+use quick_xml::reader::NsReader;
+use std::ops::Deref;
 use std::sync::Arc;
+
+/// Immutable XML storage retained by a semantic view.
+///
+/// The public [`XmlSlice`] API intentionally continues to expose only an
+/// `Arc<Vec<u8>>`.  Source-backed paragraphs use this private owner instead,
+/// keeping the managed cache handle or source-publication token alive for as
+/// long as any nested paragraph/run value is retained.
+#[derive(Debug, Clone)]
+pub(super) enum XmlOwner {
+    Unmanaged(Arc<Vec<u8>>),
+    Managed {
+        data: Arc<PartData>,
+        _admission: Arc<ManagedAdmission>,
+    },
+    Source {
+        source: Arc<SourceXmlPart>,
+        _admission: Arc<ManagedAdmission>,
+    },
+}
+
+impl XmlOwner {
+    #[inline]
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Unmanaged(bytes) => bytes.as_slice(),
+            Self::Managed { data, .. } => data.as_bytes(),
+            Self::Source { source, .. } => source.bytes(),
+        }
+    }
+
+    #[inline]
+    fn unmanaged_arc(&self) -> Option<Arc<Vec<u8>>> {
+        match self {
+            Self::Unmanaged(bytes) => Some(Arc::clone(bytes)),
+            Self::Managed { .. } | Self::Source { .. } => None,
+        }
+    }
+
+    #[inline]
+    fn parser_admission(&self, xml_len: usize) -> Result<Option<ManagedParserAdmission>> {
+        match self {
+            Self::Unmanaged(_) => Ok(None),
+            Self::Managed { _admission, .. } | Self::Source { _admission, .. } => {
+                _admission.parser_admission(xml_len).map(Some)
+            },
+        }
+    }
+
+    #[inline]
+    fn namespace_scan_admission(
+        &self,
+        fragment_len: usize,
+        owner_span_len: usize,
+    ) -> Result<Option<ManagedNamespaceAdmission>> {
+        match self {
+            Self::Unmanaged(_) => Ok(None),
+            Self::Managed { _admission, .. } | Self::Source { _admission, .. } => _admission
+                .namespace_scan_admission(fragment_len, owner_span_len)
+                .map(Some),
+        }
+    }
+
+    #[inline]
+    fn is_managed(&self) -> bool {
+        matches!(self, Self::Managed { .. } | Self::Source { .. })
+    }
+}
+
+fn range_bytes(bytes: &[u8], start: u32, length: u32) -> &[u8] {
+    let Ok(start) = usize::try_from(start) else {
+        return &[];
+    };
+    let Ok(length) = usize::try_from(length) else {
+        return &[];
+    };
+    let Some(end) = start.checked_add(length) else {
+        return &[];
+    };
+    bytes.get(start..end).unwrap_or_default()
+}
+
+/// A byte range whose owner remains attached to every cloned semantic value.
+#[derive(Debug, Clone)]
+pub(crate) struct XmlRef {
+    owner: XmlOwner,
+    start: u32,
+    length: u32,
+}
+
+pub(crate) struct NamespaceResolverLease {
+    resolver: NamespaceResolver,
+    _admission: Option<ManagedNamespaceAdmission>,
+}
+
+impl Deref for NamespaceResolverLease {
+    type Target = NamespaceResolver;
+
+    fn deref(&self) -> &Self::Target {
+        &self.resolver
+    }
+}
+
+impl NamespaceResolverLease {
+    /// Check the retained execution policy after a resolver-backed parse.
+    /// The lease keeps its namespace scan reservation alive until the caller
+    /// has finished consuming the resolver.
+    pub(crate) fn check(&self) -> Result<()> {
+        if let Some(admission) = self._admission.as_ref() {
+            admission.check()?;
+        }
+        Ok(())
+    }
+}
+
+impl XmlRef {
+    #[inline]
+    pub(super) const fn new(owner: XmlOwner, start: u32, length: u32) -> Self {
+        Self {
+            owner,
+            start,
+            length,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn bytes(&self) -> &[u8] {
+        range_bytes(self.owner.bytes(), self.start, self.length)
+    }
+
+    #[inline]
+    pub(super) fn subrange(&self, relative_start: u32, length: u32) -> Option<Self> {
+        let start = self.start.checked_add(relative_start)?;
+        let relative_end = relative_start.checked_add(length)?;
+        if relative_end > self.length {
+            return None;
+        }
+        Some(Self::new(self.owner.clone(), start, length))
+    }
+
+    #[inline]
+    pub(super) fn as_unmanaged_slice(&self) -> Option<XmlSlice> {
+        self.owner
+            .unmanaged_arc()
+            .map(|source| XmlSlice::new(source, self.start, self.length))
+    }
+
+    #[inline]
+    pub(crate) fn parser_admission(&self) -> Result<Option<ManagedParserAdmission>> {
+        self.owner.parser_admission(self.bytes().len())
+    }
+
+    /// Build a resolver for this retained fragment, including declarations
+    /// inherited from its owning full XML Part. The namespace scan admission
+    /// remains attached to the returned lease until its resolver is consumed.
+    pub(crate) fn namespace_resolver(&self) -> Result<NamespaceResolverLease> {
+        let start = usize::try_from(self.start)
+            .map_err(|_| Error::InvalidFormat("Word XML offset exceeds usize".into()))?;
+        let full = self.owner.bytes();
+        let fragment_len = usize::try_from(self.length)
+            .map_err(|_| Error::InvalidFormat("Word XML range length exceeds usize".into()))?;
+        let fragment_end = start
+            .checked_add(fragment_len)
+            .ok_or_else(|| Error::InvalidFormat("Word XML range overflows usize".into()))?;
+        full.get(start..fragment_end).ok_or_else(|| {
+            Error::InvalidFormat("Word XML retained range is outside its owner".into())
+        })?;
+        let admission = if start == 0 {
+            None
+        } else {
+            // The selected start event is read as part of the inherited scan
+            // so declarations attached to that event are included in the
+            // resolver.  Admit through the complete retained range before
+            // reading it; a large attribute list must be covered while the
+            // reader owns its event and resolver buffers.
+            self.owner
+                .namespace_scan_admission(fragment_len, fragment_end)?
+        };
+        let mut resolver = NamespaceResolver::default();
+        if start != 0 {
+            // Parse through the selected element itself.  Reading the element
+            // is necessary because `NsReader` applies namespace declarations
+            // on its start event; stopping at the byte immediately before the
+            // range would omit declarations placed on that element.  It also
+            // lets the reader perform its pending pop for a preceding sibling
+            // before resolving the selected element, so a sibling's local
+            // declaration cannot leak into this fragment.
+            let mut owner_reader = NsReader::from_reader(full);
+            loop {
+                if let Some(admission) = admission.as_ref() {
+                    admission.check()?;
+                }
+                let event_start =
+                    usize::try_from(owner_reader.buffer_position()).map_err(|_| {
+                        Error::InvalidFormat("Word XML namespace offset exceeds usize".into())
+                    })?;
+                if event_start > start {
+                    return Err(Error::InvalidFormat(
+                        "Word XML namespace range starts inside an event".into(),
+                    ));
+                }
+                let _event = owner_reader
+                    .read_event()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                let event_end = usize::try_from(owner_reader.buffer_position()).map_err(|_| {
+                    Error::InvalidFormat("Word XML namespace offset exceeds usize".into())
+                })?;
+                if event_end > full.len() {
+                    return Err(Error::InvalidFormat(
+                        "Word XML namespace scan ended outside its owner".into(),
+                    ));
+                }
+                if let Some(admission) = admission.as_ref() {
+                    let event_bytes = event_end.saturating_sub(event_start).max(1);
+                    let active_bindings =
+                        owner_reader.resolver().bindings().count().saturating_add(2);
+                    admission.consume_lookup_work(event_bytes, active_bindings)?;
+                }
+                if event_start == start {
+                    break;
+                }
+            }
+            for (prefix, namespace) in owner_reader.resolver().bindings() {
+                resolver
+                    .add(prefix, namespace)
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+            }
+        }
+        if let Some(admission) = admission.as_ref() {
+            admission.check()?;
+        }
+        Ok(NamespaceResolverLease {
+            resolver,
+            _admission: admission,
+        })
+    }
+
+    #[inline]
+    pub(crate) fn is_managed(&self) -> bool {
+        self.owner.is_managed()
+    }
+}
 
 /// Internal storage for paragraph XML data.
 /// Supports both owned data (for standalone parsing) and shared slices (for arena-based parsing).
@@ -17,6 +264,20 @@ pub(super) enum XmlData {
     Owned(Box<[u8]>),
     /// Shared slice into an arena for zero-copy batch parsing
     Shared(XmlSlice),
+    /// A range retained by a managed source-backed PartData handle.
+    Managed {
+        owner: Arc<PartData>,
+        admission: Arc<ManagedAdmission>,
+        start: u32,
+        length: u32,
+    },
+    /// A range retained by a source-authorized XML publication token.
+    Source {
+        owner: Arc<SourceXmlPart>,
+        admission: Arc<ManagedAdmission>,
+        start: u32,
+        length: u32,
+    },
 }
 
 impl XmlData {
@@ -25,18 +286,78 @@ impl XmlData {
         match self {
             XmlData::Owned(bytes) => bytes,
             XmlData::Shared(slice) => slice.as_bytes(),
+            XmlData::Managed {
+                owner,
+                start,
+                length,
+                ..
+            } => range_bytes(owner.as_bytes(), *start, *length),
+            XmlData::Source {
+                owner,
+                start,
+                length,
+                ..
+            } => range_bytes(owner.bytes(), *start, *length),
         }
     }
 
-    /// Get or create an Arc for this data.
-    /// If already shared, returns the existing Arc (cheap clone).
-    /// If owned, creates a new Arc (allocates once).
     #[inline]
-    pub(super) fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
+    pub(crate) fn xml_ref(&self) -> Result<XmlRef> {
         match self {
-            XmlData::Owned(bytes) => (Arc::new(bytes.to_vec()), 0),
-            XmlData::Shared(slice) => (slice.arc(), slice.start()),
+            XmlData::Owned(bytes) => Ok(XmlRef::new(
+                XmlOwner::Unmanaged(Arc::new(bytes.to_vec())),
+                0,
+                u32::try_from(bytes.len())
+                    .map_err(|_| Error::InvalidFormat("Word paragraph XML exceeds u32".into()))?,
+            )),
+            XmlData::Shared(slice) => Ok(XmlRef::new(
+                XmlOwner::Unmanaged(slice.arc()),
+                slice.start(),
+                u32::try_from(slice.len())
+                    .map_err(|_| Error::InvalidFormat("Word paragraph XML exceeds u32".into()))?,
+            )),
+            XmlData::Managed {
+                owner,
+                admission,
+                start,
+                length,
+            } => Ok(XmlRef::new(
+                XmlOwner::Managed {
+                    data: Arc::clone(owner),
+                    _admission: Arc::clone(admission),
+                },
+                *start,
+                *length,
+            )),
+            XmlData::Source {
+                owner,
+                admission,
+                start,
+                length,
+            } => Ok(XmlRef::new(
+                XmlOwner::Source {
+                    source: Arc::clone(owner),
+                    _admission: Arc::clone(admission),
+                },
+                *start,
+                *length,
+            )),
         }
+    }
+
+    #[inline]
+    pub(super) fn parser_admission(&self) -> Result<Option<ManagedParserAdmission>> {
+        match self {
+            XmlData::Owned(_) | XmlData::Shared(_) => Ok(None),
+            XmlData::Managed { admission, .. } | XmlData::Source { admission, .. } => {
+                admission.parser_admission(self.as_bytes().len()).map(Some)
+            },
+        }
+    }
+
+    #[inline]
+    pub(super) fn is_managed(&self) -> bool {
+        matches!(self, XmlData::Managed { .. } | XmlData::Source { .. })
     }
 }
 
@@ -152,23 +473,14 @@ impl InlineHyperlink {
 /// fields, apply revisions, activate controls, or execute embedded content.
 #[derive(Debug, Clone)]
 pub struct OpaqueInline {
-    source: Arc<Vec<u8>>,
-    start: u32,
-    length: u32,
+    source: XmlRef,
     word_hyperlink: bool,
 }
 
 impl OpaqueInline {
-    pub(crate) const fn from_arc_range(
-        source: Arc<Vec<u8>>,
-        start: u32,
-        length: u32,
-        word_hyperlink: bool,
-    ) -> Self {
+    pub(super) const fn from_xml_ref(source: XmlRef, word_hyperlink: bool) -> Self {
         Self {
             source,
-            start,
-            length,
             word_hyperlink,
         }
     }
@@ -177,53 +489,33 @@ impl OpaqueInline {
         self.word_hyperlink
     }
 
+    pub(super) const fn xml_ref(&self) -> &XmlRef {
+        &self.source
+    }
+
     /// Borrow the retained paragraph child exactly as it appeared in the
     /// active paragraph XML.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
-        let Ok(start) = usize::try_from(self.start) else {
-            return &[];
-        };
-        let Ok(length) = usize::try_from(self.length) else {
-            return &[];
-        };
-        let Some(end) = start.checked_add(length) else {
-            return &[];
-        };
-        self.source.get(start..end).unwrap_or_default()
+        self.source.bytes()
     }
 }
 
 /// A direct run child whose semantics are not modeled by [`RunContent`].
 #[derive(Debug, Clone)]
 pub struct OpaqueRunContent {
-    source: Arc<Vec<u8>>,
-    start: u32,
-    length: u32,
+    source: XmlRef,
 }
 
 impl OpaqueRunContent {
-    pub(crate) const fn from_arc_range(source: Arc<Vec<u8>>, start: u32, length: u32) -> Self {
-        Self {
-            source,
-            start,
-            length,
-        }
+    pub(super) const fn from_xml_ref(source: XmlRef) -> Self {
+        Self { source }
     }
 
     /// Borrow the retained run child exactly as it appeared in source XML.
     #[must_use]
     pub fn xml_bytes(&self) -> &[u8] {
-        let Ok(start) = usize::try_from(self.start) else {
-            return &[];
-        };
-        let Ok(length) = usize::try_from(self.length) else {
-            return &[];
-        };
-        let Some(end) = start.checked_add(length) else {
-            return &[];
-        };
-        self.source.get(start..end).unwrap_or_default()
+        self.source.bytes()
     }
 }
 
@@ -262,10 +554,46 @@ impl Paragraph {
         Self::from_slice(XmlSlice::new(arena, start, len))
     }
 
+    pub(crate) fn from_managed_range(
+        owner: Arc<PartData>,
+        admission: Arc<ManagedAdmission>,
+        start: u32,
+        len: u32,
+    ) -> Self {
+        Self {
+            xml_data: XmlData::Managed {
+                owner,
+                admission,
+                start,
+                length: len,
+            },
+        }
+    }
+
+    pub(crate) fn from_source_range(
+        owner: Arc<SourceXmlPart>,
+        admission: Arc<ManagedAdmission>,
+        start: u32,
+        len: u32,
+    ) -> Self {
+        Self {
+            xml_data: XmlData::Source {
+                owner,
+                admission,
+                start,
+                length: len,
+            },
+        }
+    }
+
     /// Get the raw XML bytes.
     #[inline]
     pub(crate) fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
+    }
+
+    pub(super) fn parser_admission(&self) -> Result<Option<ManagedParserAdmission>> {
+        self.xml_data.parser_admission()
     }
 }
 
@@ -386,6 +714,7 @@ pub struct RunUnderline {
 pub(super) enum RunXmlData {
     Owned(Vec<u8>),
     Shared(XmlSlice),
+    Retained(XmlRef),
 }
 
 impl RunXmlData {
@@ -394,14 +723,42 @@ impl RunXmlData {
         match self {
             RunXmlData::Owned(bytes) => bytes,
             RunXmlData::Shared(slice) => slice.as_bytes(),
+            RunXmlData::Retained(source) => source.bytes(),
         }
     }
 
     #[inline]
-    pub(super) fn get_or_create_arc(&self) -> (Arc<Vec<u8>>, u32) {
+    pub(super) fn xml_ref(&self) -> Result<XmlRef> {
         match self {
-            RunXmlData::Owned(bytes) => (Arc::new(bytes.clone()), 0),
-            RunXmlData::Shared(slice) => (slice.arc(), slice.start()),
+            RunXmlData::Owned(bytes) => Ok(XmlRef::new(
+                XmlOwner::Unmanaged(Arc::new(bytes.clone())),
+                0,
+                u32::try_from(bytes.len())
+                    .map_err(|_| Error::InvalidFormat("Word run XML exceeds u32".into()))?,
+            )),
+            RunXmlData::Shared(slice) => Ok(XmlRef::new(
+                XmlOwner::Unmanaged(slice.arc()),
+                slice.start(),
+                u32::try_from(slice.len())
+                    .map_err(|_| Error::InvalidFormat("Word run XML exceeds u32".into()))?,
+            )),
+            RunXmlData::Retained(source) => Ok(source.clone()),
+        }
+    }
+
+    #[inline]
+    pub(super) fn parser_admission(&self) -> Result<Option<ManagedParserAdmission>> {
+        match self {
+            RunXmlData::Owned(_) | RunXmlData::Shared(_) => Ok(None),
+            RunXmlData::Retained(source) => source.parser_admission(),
+        }
+    }
+
+    #[inline]
+    pub(super) fn is_managed(&self) -> bool {
+        match self {
+            RunXmlData::Owned(_) | RunXmlData::Shared(_) => false,
+            RunXmlData::Retained(source) => source.is_managed(),
         }
     }
 }
@@ -513,10 +870,28 @@ impl Run {
         }
     }
 
+    pub(super) fn from_xml_ref(source: XmlRef) -> Self {
+        Self {
+            xml_data: RunXmlData::Retained(source),
+        }
+    }
+
     /// Get the raw XML bytes.
     #[inline]
     pub(crate) fn xml_bytes(&self) -> &[u8] {
         self.xml_data.as_bytes()
+    }
+
+    pub(crate) fn xml_ref(&self) -> Result<XmlRef> {
+        self.xml_data.xml_ref()
+    }
+
+    pub(crate) fn parser_admission(&self) -> Result<Option<ManagedParserAdmission>> {
+        self.xml_data.parser_admission()
+    }
+
+    pub(crate) fn is_managed(&self) -> bool {
+        self.xml_data.is_managed()
     }
 
     pub(crate) fn replace_xml(&mut self, xml_bytes: Vec<u8>) {

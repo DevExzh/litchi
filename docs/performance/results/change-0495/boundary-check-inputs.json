@@ -1,0 +1,10 @@
+{
+  "tools/check_crate_boundaries.py": {
+    "bytes": 2666595,
+    "sha256": "75ca53760f5506dad053ef575ae50b44d9609ab1841456306be0e45965e6e12a"
+  },
+  "tools/crate_boundaries.json": {
+    "bytes": 13190,
+    "sha256": "501efd25ac1d70c68c8c1b5cba356b84e6425a24460d09cfde7bb58bdef96dfa"
+  }
+}

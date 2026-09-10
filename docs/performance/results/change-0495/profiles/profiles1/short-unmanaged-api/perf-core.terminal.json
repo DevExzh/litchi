@@ -1,0 +1,116 @@
+{
+  "artifacts": {
+    "perf-core.csv": {
+      "bytes": 329,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-core.csv",
+      "sha256": "cc199aed97527fb57a966218613b562c55f651b9da0cc5ccbbe21d51c15deb2c"
+    },
+    "perf-core.report.json": {
+      "bytes": 3230307,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-core.report.json",
+      "sha256": "58e5ad3157ba4d431621abbc946f50a33eebb98a6b0a48e0868bb7934c433c97"
+    },
+    "perf-core.started.json": {
+      "bytes": 2190,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-core.started.json",
+      "sha256": "a6193e341bc435f93306f8cf6ff8f2fd7735f0374a5c5edb113442d40bc07594"
+    },
+    "perf-core.stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-core.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-core.stdout": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-core.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-full.csv": {
+      "bytes": 608,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-full.csv",
+      "sha256": "0009ebb070e6b685ce1e97522815ab662a0b8e8da93fa6203c760dfc98a2aad0"
+    },
+    "perf-full.report.json": {
+      "bytes": 3230307,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-full.report.json",
+      "sha256": "6bbf67782f280211e226ba939a4893a9986a2371e0e4414742ae330dbe1ac91f"
+    },
+    "perf-full.started.json": {
+      "bytes": 2469,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-full.started.json",
+      "sha256": "702776f7389c3fa600a82868cebb7ffe6ed64a7eed0581d2e75666ce16519a5f"
+    },
+    "perf-full.stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-full.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-full.stdout": {
+      "bytes": 0,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-full.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf-full.terminal.json": {
+      "bytes": 3562,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-full.terminal.json",
+      "sha256": "e803e549a406c6c638cd057b1c0936a443f48530921ae5c4a98748364e688e5a"
+    }
+  },
+  "finished_utc": "2026-09-10T12:47:10.108997+00:00",
+  "process": {
+    "argv": [
+      "/usr/bin/taskset",
+      "-c",
+      "2",
+      "/usr/bin/perf",
+      "stat",
+      "--no-big-num",
+      "-x,",
+      "-e",
+      "task-clock,cycles,instructions,branches,branch-misses,minor-faults,major-faults",
+      "-o",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-core.csv",
+      "--",
+      "/home/zhuhe/.cache/litchi-goal-0495/retained/final1/after/normal/litchi-perf-baseline",
+      "docx-managed-edit",
+      "--edit-api",
+      "unmanaged-api",
+      "--provider",
+      "short",
+      "--max-range",
+      "4096",
+      "--trace-ranges",
+      "--samples",
+      "3",
+      "--warmup",
+      "1",
+      "--source-revision",
+      "de8ee88b0727ae59e4d2b4c8b8a6c24349724ae8",
+      "--output",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0495/profiles/profiles1/short-unmanaged-api/perf-core.report.json"
+    ],
+    "exit_code": 0,
+    "finished_utc": "2026-09-10T12:47:09.490596+00:00",
+    "new_session": true,
+    "pid": 2985867,
+    "process_group_id": 2985867,
+    "started_utc": "2026-09-10T12:47:08.074864+00:00",
+    "termination": null,
+    "timed_out": false
+  },
+  "reason": null,
+  "role": "perf-perf-core",
+  "schema": "docx-edit-provider-profile-process-terminal-v1",
+  "source_after": {
+    "files": 7198,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "source_before": {
+    "files": 7198,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0495/validation-sources/0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982.json",
+    "sha256": "0b52dcabee0edda63f06a1e28e8c3f70a80e7e41eed85e59299a024236953982"
+  },
+  "source_unchanged": true,
+  "status": "pass"
+}

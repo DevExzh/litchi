@@ -1,0 +1,14 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/.cache/litchi-goal-0495/source/crates/litchi-docx)
+error: method `reserve_operation_strings` is never used
+    --> crates/litchi-docx/src/document/transaction.rs:3481:8
+     |
+1468 | impl Edit {
+     | --------- method in this implementation
+...
+3481 |     fn reserve_operation_strings(&mut self, bytes: usize) -> TransactionResult<()> {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `-D dead-code` implied by `-D unused`
+     = help: to override `-D unused` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: could not compile `litchi-docx` (lib) due to 1 previous error
