@@ -1,5 +1,24 @@
 # Performance optimization ADR-compliance matrix
 
+## 0500: managed paragraph batching keeps source and ownership boundaries
+
+[0500](changes/0500-managed-paragraph-batches.md) extends the existing
+format-owned edit seam to a managed batch. One base-relative candidate keeps
+the immutable source proofs, operation ledger, canonical selectors, semantic
+readback, source-version and cancellation fences, finite owner reservations,
+and exact no-op/error atomicity. `Work` and `InputBytes` remain monotonic;
+memory, objects, and depth remain owner-released. The comparison uses an
+isolated warm synthetic example and does not promote the CRUD index. No global
+scheduler, ambient capability, unsafe code, or package-ownership crossing is
+introduced. The final 36-child comparison has 2,160 measured samples and 216
+warmups with matching output/source/budget/preservation oracles. Same-final
+batch-versus-repeated lifecycle p50 improves 6.947–7.138x at K=32 and
+2.324–2.346x at K=8; edit p50 improves 12.640–13.456x at K=32. The batch
+comparison retains p128 K=1 owned lifecycle/throughput flags and p512 K=8
+warm-file RSS +5.77%; historical scalar-tail and cross-route RSS flags remain
+separate. Charged `Work` is accounting, not CPU evidence, and whole-child
+profiles do not provide operation-local attribution.
+
 ## 0499: operation-local worker reuse preserves bounded ownership
 
 [0499](changes/0499-operation-local-part-workers.md) keeps the accepted 0498

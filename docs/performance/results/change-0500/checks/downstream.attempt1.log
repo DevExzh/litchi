@@ -1,0 +1,94 @@
+   Compiling getrandom v0.3.4
+    Checking libc v0.2.189
+   Compiling num-traits v0.2.19
+    Checking zerofrom v0.1.4
+    Checking yoke v0.7.4
+    Checking zerovec v0.10.4
+    Checking zerocopy v0.8.56
+    Checking tinystr v0.7.6
+    Checking icu_locid v1.5.0
+    Checking icu_provider v1.5.0
+    Checking icu_locid_transform v1.5.0
+    Checking icu_collections v1.5.0
+   Compiling lock_api v0.4.13
+   Compiling parking_lot_core v0.9.11
+    Checking icu_properties v1.5.1
+    Checking icu_normalizer v1.5.0
+    Checking tempfile v3.27.0
+    Checking getrandom v0.4.3
+    Checking chrono v0.4.45
+    Checking idna_adapter v1.2.0
+    Checking rand v0.10.2
+    Checking thiserror v2.0.18
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking idna v1.1.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling clap_derive v4.4.7
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking url v2.5.8
+    Checking rand_core v0.9.5
+   Compiling tokio-macros v2.5.0
+    Checking utf8parse v0.2.2
+    Checking anstyle-parse v0.2.7
+    Checking colorchoice v1.0.5
+    Checking anstyle-query v1.1.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle v1.0.14
+    Checking scopeguard v1.2.0
+    Checking anstream v0.6.21
+    Checking ppv-lite86 v0.2.21
+    Checking wait-timeout v0.2.1
+    Checking errno v0.3.14
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking simd-adler32 v0.3.10
+    Checking log v0.4.29
+    Checking strsim v0.10.0
+    Checking equivalent v1.0.2
+    Checking hashbrown v0.16.1
+    Checking bit-vec v0.8.0
+    Checking clap_lex v0.6.0
+    Checking quick-error v1.2.3
+    Checking bumpalo v3.20.3
+    Checking fnv v1.0.7
+    Checking rusty-fork v0.3.1
+    Checking zopfli v0.8.3
+    Checking clap_builder v4.4.18
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking bit-set v0.8.0
+    Checking indexmap v2.11.4
+    Checking signal-hook-registry v1.4.8
+    Checking parking_lot v0.12.4
+    Checking rand_chacha v0.9.0
+    Checking rand_xorshift v0.4.0
+    Checking rand v0.9.5
+    Checking socket2 v0.6.5
+    Checking mio v1.0.4
+    Checking lazy_static v1.5.0
+    Checking unarray v0.1.4
+    Checking pin-project-lite v0.2.17
+    Checking typed-path v0.12.3
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking bytes v1.12.1
+    Checking regex-syntax v0.8.11
+    Checking proptest v1.7.0
+    Checking tokio v1.47.5
+    Checking zip v8.6.0
+    Checking clap v4.4.18
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+error[E0432]: unresolved import `litchi::ooxml_common`
+   --> crates/litchi/examples/comprehensive_docx_test.rs:20:13
+    |
+ 20 | use litchi::ooxml_common::Props;
+    |             ^^^^^^^^^^^^ could not find `ooxml_common` in `litchi`
+    |
+note: found an item that was configured out
+   --> crates/litchi/src/lib.rs:388:9
+    |
+387 | #[cfg(feature = "ooxml-common")]
+    |       ------------------------ the item is gated behind the `ooxml-common` feature
+388 | pub mod ooxml_common {
+    |         ^^^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `litchi` (example "comprehensive_docx_test") due to 1 previous error

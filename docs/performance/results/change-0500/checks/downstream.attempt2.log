@@ -1,0 +1,27 @@
+    Checking litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+error[E0432]: unresolved imports `litchi::pptx`, `litchi::xlsx`
+   --> crates/litchi/examples/core_props_office.rs:5:41
+    |
+  5 | use litchi::{docx, ooxml_common::Props, pptx, xlsx};
+    |                                         ^^^^  ^^^^ no `xlsx` in the root
+    |                                         |
+    |                                         no `pptx` in the root
+    |
+note: found an item that was configured out
+   --> crates/litchi/src/lib.rs:364:9
+    |
+363 | #[cfg(feature = "pptx")]
+    |       ---------------- the item is gated behind the `pptx` feature
+364 | pub mod pptx {
+    |         ^^^^
+note: found an item that was configured out
+   --> crates/litchi/src/lib.rs:370:9
+    |
+369 | #[cfg(feature = "xlsx")]
+    |       ---------------- the item is gated behind the `xlsx` feature
+370 | pub mod xlsx {
+    |         ^^^^
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `litchi` (example "core_props_office") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

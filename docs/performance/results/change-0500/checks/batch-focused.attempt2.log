@@ -1,0 +1,29 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized] target(s) in 39.93s
+     Running tests/source_backed_managed_paragraph_batch.rs (/home/zhuhe/.cache/litchi-goal-0500/target/release/deps/source_backed_managed_paragraph_batch-7c12519f999b129b)
+
+running 8 tests
+test managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_owners ... ok
+test managed_batch_composes_with_scalar_edits_in_either_order ... ok
+test managed_batch_forward_and_inverse_are_source_checked ... ok
+test managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged ... ok
+test managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members ... FAILED
+test managed_batch_noop_and_revert_restore_the_exact_source_owner ... ok
+test managed_batch_rejects_empty_duplicate_and_unsorted_selectors_atomically ... ok
+test managed_signed_batch_noop_is_exact_and_change_is_refused ... ok
+
+failures:
+
+---- managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members stdout ----
+
+thread 'managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members' (3216396) panicked at crates/litchi-docx/tests/source_backed_managed_paragraph_batch.rs:282:5:
+assertion failed: changed.contains("first changed")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-docx --test source_backed_managed_paragraph_batch`

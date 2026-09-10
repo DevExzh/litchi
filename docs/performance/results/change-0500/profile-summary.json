@@ -1,0 +1,269 @@
+{
+  "scope": "Separate whole-child measurements include fixture setup, managed and unmanaged route-specific preflights, and output verification; no operation-local CPU attribution or isolation claim.",
+  "profiles": {
+    "profiles/after/p512-k1-owned-batch.perf.csv": {
+      "sha256": "4901b32c793c24b4a7304a6c38df9708d6d03f426072b22d891eb66ac6c9c00a",
+      "events": {
+        "cycles": 943079927,
+        "instructions": 3575910951,
+        "branches": 692290223,
+        "branch-misses": 1245453,
+        "cache-misses": 3561519,
+        "context-switches": 0,
+        "cpu-migrations": 0,
+        "page-faults": 21167
+      }
+    },
+    "profiles/after/p512-k1-owned-repeated.perf.csv": {
+      "sha256": "3f3988b8dcd109c1af0b096993293993ba112d636dd12bf9aa7bb608ae85a448",
+      "events": {
+        "cycles": 942953300,
+        "instructions": 3586532150,
+        "branches": 694352039,
+        "branch-misses": 1274230,
+        "cache-misses": 3196928,
+        "context-switches": 0,
+        "cpu-migrations": 0,
+        "page-faults": 21176
+      }
+    },
+    "profiles/after/p512-k32-owned-batch.perf.csv": {
+      "sha256": "3143c51f3f3eaa35106d1d225ae5749731c9912ed1035854234f49f0970c0cb5",
+      "events": {
+        "cycles": 982059874,
+        "instructions": 3709299195,
+        "branches": 719855425,
+        "branch-misses": 1479330,
+        "cache-misses": 3544464,
+        "context-switches": 1,
+        "cpu-migrations": 0,
+        "page-faults": 20594
+      }
+    },
+    "profiles/after/p512-k32-owned-repeated.perf.csv": {
+      "sha256": "ea9fe63d21696ad4b0bae8f8fc93696f0ae8f62e8c2e4c55a47977e165c55ec3",
+      "events": {
+        "cycles": 5353042350,
+        "instructions": 21755232669,
+        "branches": 4300521301,
+        "branch-misses": 9398182,
+        "cache-misses": 3930631,
+        "context-switches": 6,
+        "cpu-migrations": 0,
+        "page-faults": 18409
+      }
+    },
+    "profiles/before/p512-k1-owned-repeated.perf.csv": {
+      "sha256": "a05f72ae97af3dc1ba9f93905eb69de66ab95f31326b1e87bb38bd083bd76ed6",
+      "events": {
+        "cycles": 943814295,
+        "instructions": 3577876733,
+        "branches": 691732060,
+        "branch-misses": 1326887,
+        "cache-misses": 2871789,
+        "context-switches": 3,
+        "cpu-migrations": 0,
+        "page-faults": 21164
+      }
+    },
+    "profiles/before/p512-k32-owned-repeated.perf.csv": {
+      "sha256": "1ce6f8994f840d0196ce0f4c26f90966b6c8c23736bf6d449b5d2dc3db0e8d95",
+      "events": {
+        "cycles": 5323937316,
+        "instructions": 21720634797,
+        "branches": 4285358294,
+        "branch-misses": 9343718,
+        "cache-misses": 2993669,
+        "context-switches": 16,
+        "cpu-migrations": 0,
+        "page-faults": 20531
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "replacements": 1,
+      "kind": "scalar_before_after",
+      "events": {
+        "cycles": {
+          "before": 943814295,
+          "after": 942953300,
+          "delta_pct": -0.09122504337572002
+        },
+        "instructions": {
+          "before": 3577876733,
+          "after": 3586532150,
+          "delta_pct": 0.24191490221472378
+        },
+        "branches": {
+          "before": 691732060,
+          "after": 694352039,
+          "delta_pct": 0.3787563352203094
+        },
+        "branch-misses": {
+          "before": 1326887,
+          "after": 1274230,
+          "delta_pct": -3.9684615193305794
+        },
+        "cache-misses": {
+          "before": 2871789,
+          "after": 3196928,
+          "delta_pct": 11.321827613379675
+        },
+        "context-switches": {
+          "before": 3,
+          "after": 0,
+          "delta_pct": -100.0
+        },
+        "cpu-migrations": {
+          "before": 0,
+          "after": 0,
+          "delta_pct": null
+        },
+        "page-faults": {
+          "before": 21164,
+          "after": 21176,
+          "delta_pct": 0.05670005670006528
+        }
+      }
+    },
+    {
+      "replacements": 1,
+      "kind": "after_batch_vs_scalar",
+      "events": {
+        "cycles": {
+          "before": 942953300,
+          "after": 943079927,
+          "delta_pct": 0.013428766832879191
+        },
+        "instructions": {
+          "before": 3586532150,
+          "after": 3575910951,
+          "delta_pct": -0.2961411903138811
+        },
+        "branches": {
+          "before": 694352039,
+          "after": 692290223,
+          "delta_pct": -0.2969410161118624
+        },
+        "branch-misses": {
+          "before": 1274230,
+          "after": 1245453,
+          "delta_pct": -2.258383494345606
+        },
+        "cache-misses": {
+          "before": 3196928,
+          "after": 3561519,
+          "delta_pct": 11.404416990310695
+        },
+        "context-switches": {
+          "before": 0,
+          "after": 0,
+          "delta_pct": null
+        },
+        "cpu-migrations": {
+          "before": 0,
+          "after": 0,
+          "delta_pct": null
+        },
+        "page-faults": {
+          "before": 21176,
+          "after": 21167,
+          "delta_pct": -0.04250094446542896
+        }
+      }
+    },
+    {
+      "replacements": 32,
+      "kind": "scalar_before_after",
+      "events": {
+        "cycles": {
+          "before": 5323937316,
+          "after": 5353042350,
+          "delta_pct": 0.5466825071837489
+        },
+        "instructions": {
+          "before": 21720634797,
+          "after": 21755232669,
+          "delta_pct": 0.1592857313948315
+        },
+        "branches": {
+          "before": 4285358294,
+          "after": 4300521301,
+          "delta_pct": 0.3538328877011221
+        },
+        "branch-misses": {
+          "before": 9343718,
+          "after": 9398182,
+          "delta_pct": 0.5828943039590806
+        },
+        "cache-misses": {
+          "before": 2993669,
+          "after": 3930631,
+          "delta_pct": 31.298116124394504
+        },
+        "context-switches": {
+          "before": 16,
+          "after": 6,
+          "delta_pct": -62.5
+        },
+        "cpu-migrations": {
+          "before": 0,
+          "after": 0,
+          "delta_pct": null
+        },
+        "page-faults": {
+          "before": 20531,
+          "after": 18409,
+          "delta_pct": -10.335590083288682
+        }
+      }
+    },
+    {
+      "replacements": 32,
+      "kind": "after_batch_vs_scalar",
+      "events": {
+        "cycles": {
+          "before": 5353042350,
+          "after": 982059874,
+          "delta_pct": -81.65417327587554
+        },
+        "instructions": {
+          "before": 21755232669,
+          "after": 3709299195,
+          "delta_pct": -82.94985279433234
+        },
+        "branches": {
+          "before": 4300521301,
+          "after": 719855425,
+          "delta_pct": -83.26120545356648
+        },
+        "branch-misses": {
+          "before": 9398182,
+          "after": 1479330,
+          "delta_pct": -84.2594025099748
+        },
+        "cache-misses": {
+          "before": 3930631,
+          "after": 3544464,
+          "delta_pct": -9.824554886988878
+        },
+        "context-switches": {
+          "before": 6,
+          "after": 1,
+          "delta_pct": -83.33333333333334
+        },
+        "cpu-migrations": {
+          "before": 0,
+          "after": 0,
+          "delta_pct": null
+        },
+        "page-faults": {
+          "before": 18409,
+          "after": 20594,
+          "delta_pct": 11.869194415774897
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Finished `release` profile [optimized] target(s) in 1m 27s
+     Running unittests src/lib.rs (/home/zhuhe/.cache/litchi-goal-0500/target/release/deps/litchi_docx-6a8f67418bc985ef)
+
+running 17 tests
+test document::transaction::tests::composite_nested_hyperlinks_preserve_relationship_ownership ... ok
+test document::transaction::tests::composition_owner_effects_refuse_ancestor_overlaps_and_cap_atomically ... ok
+test document::transaction::tests::cross_paragraph_hyperlink_batches_are_atomic_durable_and_non_crossing ... ok
+test document::transaction::tests::disjoint_composition_and_bounded_history_are_deterministic ... ok
+test document::transaction::tests::durable_patch_is_deterministic_stale_checked_and_reversible ... ok
+test document::transaction::tests::exact_noop_shares_snapshot_bytes_and_records_no_operation ... ok
+test document::transaction::tests::insertion_uses_projected_checked_positions_and_strict_namespace ... ok
+test document::transaction::tests::length_changing_text_edit_preserves_formatting_and_is_reversible ... ok
+test document::transaction::tests::multi_run_hyperlink_and_cell_edits_preserve_formatting_and_unknown_xml ... ok
+test document::transaction::tests::nested_controls_and_tables_are_durable_exact_and_path_checked ... ok
+test document::transaction::tests::paragraph_text_batch_is_canonical_atomic_and_reversible ... ok
+test document::transaction::tests::refuses_complex_content_and_stale_patch_sources ... ok
+test document::transaction::tests::rich_owner_edits_are_compact_durable_and_exactly_reversible ... ok
+test document::transaction::tests::source_backed_overlay_classification_refuses_transfer_operations ... ok
+test document::transaction::tests::source_backed_snapshot_reuses_the_exact_raw_xml_allocation ... ok
+test document::transaction::tests::structural_run_text_is_native_and_complex_cells_remain_atomic_refusals ... ok
+test document::transaction::tests::three_way_planning_keeps_disjoint_rich_owners_and_resolves_overlap ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 920 filtered out; finished in 0.00s
+

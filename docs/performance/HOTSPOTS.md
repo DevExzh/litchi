@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0500: repeated managed reconstruction is the measured hotspot
+
+[0500](changes/0500-managed-paragraph-batches.md) targets the existing managed
+scalar paragraph path, which reconstructs and validates a source-backed
+candidate for each selected paragraph. The repeated baseline spends about 93%
+of lifecycle time in edit at 32 selected paragraphs. The same-final-executable
+batch route reduces K=32 lifecycle p50 by 6.947–7.138x and edit p50 by
+12.640–13.456x; K=8 lifecycle improves 2.324–2.346x. The p128 K=1 owned
+lifecycle rises 7.34%, with publication p50 up 15.23% while edit p50 falls
+0.35%; this phase association is descriptive. Whole-child RSS and perf
+counters include setup and verification, and the warm synthetic corpus does
+not establish cold-source or native-producer behavior.
+
 ## 0499: worker creation is reduced, but local batch overhead remains
 
 [0499](changes/0499-operation-local-part-workers.md) reuses operation-local

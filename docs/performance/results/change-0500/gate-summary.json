@@ -1,0 +1,149 @@
+{
+  "scope": "Per-gate counts; focused and broad suites overlap and are not additive. Compile-only checks have no executed test count.",
+  "gates": {
+    "before-lib": {
+      "exit_code": 0,
+      "receipt_sha256": "5aef39bdec0782633dbd5302dadd99197d01ab7172d587277638d272920c44e3",
+      "log_sha256": "b672b49d8e11c8cf78c81bb843bff6f249219fe65c7e5855c807d37f415c0f19",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "benchmark-build": {
+      "exit_code": 0,
+      "receipt_sha256": "d786d324f1c0eb28eedc7f6c06e1d118d0a60f9863d9fead0b2160a20a3ce916",
+      "log_sha256": "37436be2af1259b4ab4063f07315c9fbd0d468635cc326b67376f8931c7d1529",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "focused": {
+      "exit_code": 0,
+      "receipt_sha256": "25b3a03ff237f5a11858560760282af5aaaf8cfc0167eccb7d5f99ea0dbfb11a",
+      "log_sha256": "9c6c38f17a07ba947e29be63d362e6aa8f3f14146fd7265c302310877406fb9b",
+      "suite_summaries": 1,
+      "passed": 36,
+      "failed": 0,
+      "ignored": 0
+    },
+    "transaction": {
+      "exit_code": 0,
+      "receipt_sha256": "3a041d88aad02516c3c8e9413c5476de5f9edf74df7c7ec166f17663c9543b3e",
+      "log_sha256": "695318bc3f0fc912fd2d766222886be00e7d89abdfeda97de55c81b3aa7adcf2",
+      "suite_summaries": 1,
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0
+    },
+    "clippy": {
+      "exit_code": 0,
+      "receipt_sha256": "48b42c47538d3e658548701c0cf062eac2c8562e286f318ea18181caa9e9480f",
+      "log_sha256": "0b5fe2277fd2b29cc111b76604c482f8ec516047dbc0954657203c5614f4e4db",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "fmt": {
+      "exit_code": 0,
+      "receipt_sha256": "32bd975487da8102259755be3f1e5f21d780c6e244ee0ea2cbcdea8a328535da",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "rustdoc": {
+      "exit_code": 0,
+      "receipt_sha256": "c0743b76a9ecaf40ab495bb35adaefd828349a2e9c98f80b74b7f609b6c36d5a",
+      "log_sha256": "c9520dda6a4554682f0652759ad6b34e7e61a5c7ebf3b5742dd6aeb695663e0a",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "doctests": {
+      "exit_code": 0,
+      "receipt_sha256": "5c1335d69fd4603a29fd8d2a2382655745d229dfe2b6dc6b4b6cd11a14c37621",
+      "log_sha256": "8ef4b7c4f8074f974cbe53d93385f1c8b945faaf4f9cecd0813f19184f01285c",
+      "suite_summaries": 1,
+      "passed": 74,
+      "failed": 0,
+      "ignored": 31
+    },
+    "boundaries": {
+      "exit_code": 0,
+      "receipt_sha256": "f3f24fa51d9e6f318edf3541115ef437d44801de4e6011d4a9ee5a2d3805fc24",
+      "log_sha256": "6141948b1724bb5582ee484fa594adea74ba9ce03c955c1d774de43b424c6d56",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "before-focused": {
+      "exit_code": 0,
+      "receipt_sha256": "371230caa459337d5eb50bd1a225a2d81e6ce9dcfe0fff78ccf169d2737b9c23",
+      "log_sha256": "dcc265330bc4d7c565bcc55a0e576665407ccf69d564685fcc71f7acdd117bd3",
+      "suite_summaries": 1,
+      "passed": 36,
+      "failed": 0,
+      "ignored": 0
+    },
+    "batch-focused": {
+      "exit_code": 0,
+      "receipt_sha256": "53fd1fa59b7904903ad5cdc9d7ae85e775759fff6ad2dc102769ff3534b223a7",
+      "log_sha256": "47722ee44a6b2e2adf16eb5ed9f1115391c85b118f9d436dbb716b26cd40556d",
+      "suite_summaries": 1,
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0
+    },
+    "batch-test-build": {
+      "exit_code": 0,
+      "receipt_sha256": "c263febc60943cdab433e65d1c89e7db65e95ede8858b863d0846e23479712c4",
+      "log_sha256": "cb96cbc63551c69c23da93890129b35b34b9d1701e75c8dee1436e93e98719bc",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "docx-default": {
+      "exit_code": 0,
+      "receipt_sha256": "f707ad06e4296954ac1304b17e3ab2b1d1fe126206f4f231284899c8b0e6331b",
+      "log_sha256": "ec6872d82b37b5b3228f61f6c959d10722be059a44e0335434fb22b394798569",
+      "suite_summaries": 56,
+      "passed": 1371,
+      "failed": 0,
+      "ignored": 0
+    },
+    "docx-features": {
+      "exit_code": 0,
+      "receipt_sha256": "47689f606a6adcdd0f1513ca1cb4ea265416ee089a0a6cdfe86daa48713b8a7c",
+      "log_sha256": "845253e42e9325a6e8efc7e675a15331cb06ac32dbf7e1c1eb0536187bad6f17",
+      "suite_summaries": 1,
+      "passed": 946,
+      "failed": 0,
+      "ignored": 0
+    },
+    "downstream": {
+      "exit_code": 0,
+      "receipt_sha256": "c0dca459d547e497c9b5dd67f95119dae04c7ceedd5845871a4068416e7864e2",
+      "log_sha256": "be928718187c6eed9af74aae0b8ac8c2c868e25651c3aac6cf95265a87b913d7",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "harness-clippy": {
+      "exit_code": 0,
+      "receipt_sha256": "4cddecd2f31b2eaeabc1200d300195e92b9da21380c1289f28e62fb9c0329520",
+      "log_sha256": "69aee363eeebeb878e099b728b1a27cc6f2bc269007a629cc807ab22a11361b0",
+      "suite_summaries": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    }
+  }
+}

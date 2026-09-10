@@ -2153,6 +2153,38 @@ impl Edit {
         }
         drop((authored_text, base_scan_admission));
         debug_assert_eq!(planned_operations.len(), final_count);
+        self.reconstruct_managed_paragraph_operations(
+            planned_operations,
+            operation_admission,
+            operation_string_admission,
+            "replace_paragraph_text",
+            (source, identity),
+            (
+                input_admission,
+                input_capacity_admission,
+                text_scan_admission,
+            ),
+        )
+    }
+
+    fn reconstruct_managed_paragraph_operations(
+        &mut self,
+        planned_operations: Vec<Operation>,
+        operation_admission: Arc<OperationAdmission>,
+        operation_string_admission: Option<Arc<StringAdmission>>,
+        operation: &'static str,
+        (source, identity): (SourceXmlPart, Arc<SourceIdentity>),
+        _temporary_admissions: impl Sized,
+    ) -> TransactionResult<&mut Self> {
+        let context = self.base.managed_context().ok_or({
+            TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation,
+                reason: "managed candidate is missing its execution admission",
+            })
+        })?;
+        context.check().map_err(managed_execution)?;
+        debug_assert!(!planned_operations.is_empty());
         let replacement_text_bytes = managed_replacement_text_bytes(&planned_operations)?;
 
         let plan_memory = planned_operations
@@ -2175,16 +2207,16 @@ impl Edit {
             })?;
         let mut fragment_bytes = 0usize;
         let mut fragment_count = 0usize;
-        for (operation_index, operation) in planned_operations.iter().enumerate() {
+        for (operation_index, planned_operation) in planned_operations.iter().enumerate() {
             let Operation::ReplaceParagraphText {
                 position: operation_position,
                 before,
                 after,
-            } = operation
+            } = planned_operation
             else {
                 return Err(TransactionError::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
-                    operation: "replace_paragraph_text",
+                    operation,
                     reason: "managed transactions only support direct paragraph text operations",
                 }));
             };
@@ -2200,7 +2232,7 @@ impl Edit {
             let base_admission = self.base.admission.as_ref().ok_or({
                 TransactionError::Document(crate::Error::UnsafeEdit {
                     format: "DOCX",
-                    operation: "replace_paragraph_text",
+                    operation,
                     reason: "managed base snapshot is missing its execution admission",
                 })
             })?;
@@ -2410,11 +2442,6 @@ impl Edit {
         self.operation_string_admission = operation_string_admission;
         self.replacement_text_bytes = replacement_text_bytes;
         self.projected = candidate;
-        drop((
-            input_admission,
-            input_capacity_admission,
-            text_scan_admission,
-        ));
         Ok(self)
     }
 
@@ -2433,6 +2460,10 @@ impl Edit {
         &mut self,
         replacements: &[ParagraphTextReplacement],
     ) -> TransactionResult<&mut Self> {
+        if self.projected.is_managed() {
+            validate_paragraph_replacements(replacements)?;
+            return self.replace_managed_body_paragraph_texts(replacements);
+        }
         self.ensure_unmanaged("replace_body_paragraph_texts")?;
         validate_paragraph_replacements(replacements)?;
         let mut candidate = self.try_clone()?;
@@ -2516,6 +2547,387 @@ impl Edit {
         candidate.projected = projected;
         *self = candidate;
         Ok(self)
+    }
+
+    fn replace_managed_body_paragraph_texts(
+        &mut self,
+        replacements: &[ParagraphTextReplacement],
+    ) -> TransactionResult<&mut Self> {
+        let context = self.base.managed_context().ok_or({
+            TransactionError::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "replace_body_paragraph_texts",
+                reason: "managed candidate is missing its execution admission",
+            })
+        })?;
+        context.check().map_err(managed_execution)?;
+
+        // The caller owns the replacement strings, but the managed operation
+        // must still admit every borrowed length and excess capacity before
+        // any decision or operation vector can grow. Keep each token live
+        // until the shared reconstruction either publishes or fails.
+        let input_token_capacity =
+            replacements
+                .len()
+                .checked_mul(2)
+                .ok_or(TransactionError::Limit {
+                    resource: "managed batch input admission capacity",
+                    max: usize::MAX,
+                    actual: usize::MAX,
+                })?;
+        let input_vector_memory = input_token_capacity
+            .checked_mul(size_of::<Arc<StringAdmission>>())
+            .and_then(|bytes| bytes.checked_add(size_of::<Vec<Arc<StringAdmission>>>()))
+            .ok_or(TransactionError::Limit {
+                resource: "managed batch input admission metadata",
+                max: usize::MAX,
+                actual: usize::MAX,
+            })?;
+        let _input_vector_memory =
+            reserve_managed(&context, Resource::Memory, input_vector_memory)?;
+        let mut input_admissions = Vec::new();
+        input_admissions
+            .try_reserve_exact(input_token_capacity)
+            .map_err(|source| crate::Error::Allocation {
+                resource: "managed batch input admissions",
+                source,
+            })?;
+        for replacement in replacements {
+            input_admissions.push(self.reserve_string_admission(replacement.text.len())?);
+            if replacement.text.capacity() > replacement.text.len() {
+                input_admissions.push(self.reserve_string_admission(
+                    replacement.text.capacity() - replacement.text.len(),
+                )?);
+            }
+        }
+        for replacement in replacements {
+            validate_authored_text(replacement.text.as_str()).map_err(|reason| {
+                TransactionError::Refused {
+                    position: replacement.position.get(),
+                    reason,
+                }
+            })?;
+        }
+
+        // Decisions retain the immutable-base text and its scan admission
+        // until the final ledger is built. Admit that bounded vector before
+        // retaining either the scan result or its owned text.
+        let decision_memory = replacements
+            .len()
+            .checked_mul(size_of::<ManagedBatchDecision<'_>>())
+            .and_then(|bytes| bytes.checked_add(size_of::<Vec<ManagedBatchDecision<'_>>>()))
+            .ok_or(TransactionError::Limit {
+                resource: "managed paragraph batch decision metadata",
+                max: usize::MAX,
+                actual: usize::MAX,
+            })?;
+        let _decision_memory = reserve_managed(&context, Resource::Memory, decision_memory)?;
+        let _decision_objects = reserve_managed(&context, Resource::Objects, replacements.len())?;
+        let mut decisions = Vec::new();
+        decisions
+            .try_reserve_exact(replacements.len())
+            .map_err(|source| crate::Error::Allocation {
+                resource: "managed paragraph batch decisions",
+                source,
+            })?;
+
+        for replacement in replacements {
+            context.check().map_err(managed_execution)?;
+            let range = self.range(replacement.position)?;
+            let paragraph_start = checked_start(range, "paragraph")?;
+            let paragraph_end = checked_end(range, "paragraph")?;
+            let paragraph = checked_slice(
+                self.projected.xml_bytes(),
+                paragraph_start,
+                paragraph_end,
+                "paragraph",
+            )?;
+            let (owner, _projected_scan) = {
+                let admission = self.projected.admission.as_ref().ok_or({
+                    TransactionError::Document(crate::Error::UnsafeEdit {
+                        format: "DOCX",
+                        operation: "replace_body_paragraph_texts",
+                        reason: "managed projected snapshot is missing its execution admission",
+                    })
+                })?;
+                let mut scan = admission.owner_scan(paragraph.len())?;
+                let owner = scan_text_owner(paragraph, b"p").map_err(|reason| {
+                    TransactionError::Refused {
+                        position: replacement.position.get(),
+                        reason,
+                    }
+                })?;
+                scan.release_depth();
+                (owner, scan)
+            };
+            if owner.text == replacement.text {
+                continue;
+            }
+
+            let base_range = self.base.range(replacement.position)?;
+            let base_start = checked_start(base_range, "base paragraph")?;
+            let base_end = checked_end(base_range, "base paragraph")?;
+            let base_paragraph = checked_slice(
+                self.base.xml_bytes(),
+                base_start,
+                base_end,
+                "base paragraph",
+            )?;
+            let base_admission = self.base.admission.as_ref().ok_or({
+                TransactionError::Document(crate::Error::UnsafeEdit {
+                    format: "DOCX",
+                    operation: "replace_body_paragraph_texts",
+                    reason: "managed base snapshot is missing its execution admission",
+                })
+            })?;
+            let mut base_scan = base_admission.owner_scan(base_paragraph.len())?;
+            let base_owner = scan_text_owner(base_paragraph, b"p").map_err(|reason| {
+                TransactionError::Refused {
+                    position: replacement.position.get(),
+                    reason,
+                }
+            })?;
+            base_scan.release_depth();
+            let base_text = base_owner.text;
+
+            let mut existing_index = None;
+            for (index, operation) in self.operations.iter().enumerate() {
+                let Operation::ReplaceParagraphText {
+                    position: operation_position,
+                    before,
+                    ..
+                } = operation
+                else {
+                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                        format: "DOCX",
+                        operation: "replace_body_paragraph_texts",
+                        reason: "managed transactions only support direct paragraph text operations",
+                    }));
+                };
+                if *operation_position == replacement.position {
+                    if existing_index.replace(index).is_some() {
+                        return Err(crate::Error::InvalidFormat(
+                            "managed paragraph replacement plan contains a duplicate position"
+                                .into(),
+                        )
+                        .into());
+                    }
+                    if before != &base_text {
+                        return Err(TransactionError::StaleSource);
+                    }
+                }
+            }
+            if existing_index.is_none() && owner.text != base_text {
+                return Err(crate::Error::InvalidFormat(
+                    "managed paragraph replacement plan lost its base operation".into(),
+                )
+                .into());
+            }
+
+            let remove_existing = existing_index.is_some() && replacement.text == base_text;
+            let add_new = existing_index.is_none() && replacement.text != base_text;
+            decisions.push(ManagedBatchDecision {
+                replacement,
+                base_text,
+                existing_index,
+                remove_existing,
+                add_new,
+                _scan: base_scan,
+            });
+        }
+
+        if decisions.is_empty() {
+            drop((decisions, input_admissions));
+            return Ok(self);
+        }
+
+        let remove_count = decisions
+            .iter()
+            .filter(|decision| decision.remove_existing)
+            .count();
+        let add_count = decisions.iter().filter(|decision| decision.add_new).count();
+        let final_count = self
+            .operations
+            .len()
+            .checked_sub(remove_count)
+            .and_then(|count| count.checked_add(add_count))
+            .ok_or(TransactionError::Limit {
+                resource: "managed paragraph operation count",
+                max: MAX_OPERATIONS,
+                actual: usize::MAX,
+            })?;
+        if final_count > MAX_OPERATIONS {
+            return Err(TransactionError::Limit {
+                resource: "managed paragraph operation count",
+                max: MAX_OPERATIONS,
+                actual: final_count,
+            });
+        }
+
+        if final_count == 0 {
+            drop((decisions, input_admissions));
+            self.operations = Vec::new();
+            self.operation_admission = None;
+            self.operation_string_admission = None;
+            self.replacement_text_bytes = 0;
+            self.projected = self.base.clone();
+            return Ok(self);
+        }
+
+        let source = self.base.source_xml().ok_or(crate::Error::UnsafeEdit {
+            format: "DOCX",
+            operation: "replace_body_paragraph_texts",
+            reason: "managed paragraph source authorization is unavailable",
+        })?;
+        let identity = self
+            .base
+            .source_identity()
+            .ok_or(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "replace_body_paragraph_texts",
+                reason: "managed paragraph source identity is unavailable",
+            })?;
+
+        // Existing edits may have been staged in arbitrary scalar order. Map
+        // each retained operation to its batch decision once so final-ledger
+        // planning stays linear in the prior ledger and selected positions.
+        let decision_map_memory = self
+            .operations
+            .len()
+            .checked_mul(size_of::<Option<usize>>())
+            .and_then(|bytes| bytes.checked_add(size_of::<Vec<Option<usize>>>()))
+            .ok_or(TransactionError::Limit {
+                resource: "managed paragraph batch decision map metadata",
+                max: usize::MAX,
+                actual: usize::MAX,
+            })?;
+        let _decision_map_memory =
+            reserve_managed(&context, Resource::Memory, decision_map_memory)?;
+        let mut decision_by_operation = Vec::new();
+        decision_by_operation
+            .try_reserve_exact(self.operations.len())
+            .map_err(|source| crate::Error::Allocation {
+                resource: "managed paragraph batch decision map",
+                source,
+            })?;
+        decision_by_operation.resize(self.operations.len(), None);
+        for (decision_index, decision) in decisions.iter().enumerate() {
+            if let Some(operation_index) = decision.existing_index {
+                if decision_by_operation[operation_index]
+                    .replace(decision_index)
+                    .is_some()
+                {
+                    return Err(crate::Error::InvalidFormat(
+                        "managed paragraph replacement plan contains a duplicate operation".into(),
+                    )
+                    .into());
+                }
+            }
+        }
+
+        let mut planned_string_bytes = 0usize;
+        for (index, operation) in self.operations.iter().enumerate() {
+            let decision = decision_by_operation[index]
+                .and_then(|decision_index| decisions.get(decision_index));
+            if let Some(decision) = decision {
+                if decision.remove_existing {
+                    continue;
+                }
+                let Operation::ReplaceParagraphText { before, .. } = operation else {
+                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                        format: "DOCX",
+                        operation: "replace_body_paragraph_texts",
+                        reason: "managed transactions only support direct paragraph text operations",
+                    }));
+                };
+                planned_string_bytes = planned_string_bytes
+                    .checked_add(before.capacity())
+                    .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
+                    .ok_or(TransactionError::Limit {
+                        resource: "managed operation string bytes",
+                        max: MAX_REPLACEMENT_TEXT_BYTES,
+                        actual: usize::MAX,
+                    })?;
+            } else {
+                planned_string_bytes = planned_string_bytes
+                    .checked_add(operation_string_bytes(operation))
+                    .ok_or(TransactionError::Limit {
+                        resource: "managed operation string bytes",
+                        max: MAX_REPLACEMENT_TEXT_BYTES,
+                        actual: usize::MAX,
+                    })?;
+            }
+        }
+        for decision in decisions.iter().filter(|decision| decision.add_new) {
+            planned_string_bytes = planned_string_bytes
+                .checked_add(decision.base_text.capacity())
+                .and_then(|bytes| bytes.checked_add(decision.replacement.text.capacity()))
+                .ok_or(TransactionError::Limit {
+                    resource: "managed operation string bytes",
+                    max: MAX_REPLACEMENT_TEXT_BYTES,
+                    actual: usize::MAX,
+                })?;
+        }
+
+        let operation_admission = self.reserve_managed_operation_admission(final_count)?;
+        let operation_string_admission = if planned_string_bytes == 0 {
+            None
+        } else {
+            Some(self.reserve_string_admission(planned_string_bytes)?)
+        };
+        let mut planned_operations = Vec::new();
+        planned_operations
+            .try_reserve_exact(final_count)
+            .map_err(|source| crate::Error::Allocation {
+                resource: "managed document operation metadata",
+                source,
+            })?;
+        for (index, operation) in self.operations.iter().enumerate() {
+            let decision = decision_by_operation[index]
+                .and_then(|decision_index| decisions.get(decision_index));
+            if let Some(decision) = decision {
+                if decision.remove_existing {
+                    continue;
+                }
+                let Operation::ReplaceParagraphText {
+                    position, before, ..
+                } = operation
+                else {
+                    return Err(TransactionError::Document(crate::Error::UnsafeEdit {
+                        format: "DOCX",
+                        operation: "replace_body_paragraph_texts",
+                        reason: "managed transactions only support direct paragraph text operations",
+                    }));
+                };
+                planned_operations.push(Operation::ReplaceParagraphText {
+                    position: *position,
+                    before: before.clone(),
+                    after: decision.replacement.text.clone(),
+                });
+            } else {
+                planned_operations.push(operation.clone());
+            }
+        }
+        for decision in decisions.iter_mut().filter(|decision| decision.add_new) {
+            let before = std::mem::take(&mut decision.base_text);
+            planned_operations.push(Operation::ReplaceParagraphText {
+                position: decision.replacement.position,
+                before,
+                after: decision.replacement.text.clone(),
+            });
+        }
+        drop(decisions);
+        drop(decision_by_operation);
+        debug_assert_eq!(planned_operations.len(), final_count);
+
+        self.reconstruct_managed_paragraph_operations(
+            planned_operations,
+            operation_admission,
+            operation_string_admission,
+            "replace_body_paragraph_texts",
+            (source, identity),
+            input_admissions,
+        )
     }
 
     /// Replace all text in one direct paragraph hyperlink while leaving its
@@ -4447,6 +4859,15 @@ struct ManagedParagraphPlan {
     range: Range,
     operation_index: usize,
     owner: TextOwner,
+    _scan: ScanAdmission,
+}
+
+struct ManagedBatchDecision<'a> {
+    replacement: &'a ParagraphTextReplacement,
+    base_text: String,
+    existing_index: Option<usize>,
+    remove_existing: bool,
+    add_new: bool,
     _scan: ScanAdmission,
 }
 

@@ -1,5 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0500: managed paragraph batch matched comparison
+
+[0500](changes/0500-managed-paragraph-batches.md) adds the managed
+source-backed `Edit::replace_body_paragraph_texts` capability under test. The
+fresh repeated-scalar control has 12 children, 720 measured samples, and 72
+warmups over 128/512-paragraph documents, 1/8/32 selected paragraphs, and
+owned/warm-file providers. The completed 36-child comparison has 2,160
+measurements and 216 warmups, with all matched output/source/budget and
+preservation oracles passing. In the same final executable, batch versus
+repeated-scalar lifecycle p50 improves 2.346/2.324/2.341/2.342x at K=8 and
+6.997/6.947/7.088/7.138x at K=32 for p128 owned/file and p512 owned/file;
+edit-phase K=32 improves 12.640/12.737/13.363/13.456x. K=1 p128 owned has a
+7.34% lifecycle p50 increase and remains a retained small-input flag.
+
 ## 0499: operation-local worker reuse matched capture
 
 [0499](changes/0499-operation-local-part-workers.md) keeps the 0498 ordered

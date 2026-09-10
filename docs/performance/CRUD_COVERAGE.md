@@ -1,5 +1,17 @@
 # Performance CRUD coverage
 
+## 0500: managed paragraph batch capability; no index promotion
+
+[0500](changes/0500-managed-paragraph-batches.md) exercises a new managed
+source-backed paragraph batch through the format-owned `Edit` API. The isolated
+example uses fixed 128/512-paragraph synthetic documents, owned/warm-file
+providers, and 1/8/32 selected paragraphs. It adds no CRUD index selector or
+native-producer round trip. The completed repeated-versus-batch comparison
+passes its output/source/budget and preservation oracles. It does not close
+the one-percent, cold-source, native-producer, or broader CRUD requirements.
+The validator's contract-only mapped selectors remain separate from this
+isolated timing report.
+
 ## 0499: scheduler reuse only; no new CRUD row
 
 [0499](changes/0499-operation-local-part-workers.md) changes the lifetime of

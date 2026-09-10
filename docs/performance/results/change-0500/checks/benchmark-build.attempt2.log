@@ -1,0 +1,53 @@
+   Compiling litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+error[E0560]: struct `Sample` has no field named `raw_untouched_ok`
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:724:9
+    |
+724 |         raw_untouched_ok,
+    |         ^^^^^^^^^^^^^^^^ `Sample` does not have this field
+    |
+    = note: available fields are: `raw_untouched_member_payloads_ok`, `managed_preflight_forward_ok`, `managed_preflight_inverse_ok`
+
+error[E0560]: struct `Sample` has no field named `forward_ok`
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:728:9
+    |
+728 |         forward_ok: preflight.forward_ok,
+    |         ^^^^^^^^^^ `Sample` does not have this field
+    |
+    = note: available fields are: `raw_untouched_member_payloads_ok`, `managed_preflight_forward_ok`, `managed_preflight_inverse_ok`
+
+error[E0609]: no field `forward_ok` on type `&Preflight`
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:728:31
+    |
+728 |         forward_ok: preflight.forward_ok,
+    |                               ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `expected_output`, `expected_output_sha256`, `unmanaged_forward_ok`, `unmanaged_inverse_ok`, `managed_forward_ok` ... and 2 others
+
+error[E0560]: struct `Sample` has no field named `inverse_ok`
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:729:9
+    |
+729 |         inverse_ok: preflight.inverse_ok,
+    |         ^^^^^^^^^^ `Sample` does not have this field
+    |
+    = note: available fields are: `raw_untouched_member_payloads_ok`, `managed_preflight_forward_ok`, `managed_preflight_inverse_ok`
+
+error[E0609]: no field `inverse_ok` on type `&Preflight`
+   --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:729:31
+    |
+729 |         inverse_ok: preflight.inverse_ok,
+    |                               ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `expected_output`, `expected_output_sha256`, `unmanaged_forward_ok`, `unmanaged_inverse_ok`, `managed_forward_ok` ... and 2 others
+
+error: unused import: `Part`
+  --> crates/litchi-docx/examples/managed_paragraph_batch_perf.rs:35:39
+   |
+35 | use litchi_opc::{OpcPackage, PackURI, Part, SourceCacheDiagnostics, SourceCacheLimits};
+   |                                       ^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+Some errors have detailed explanations: E0560, E0609.
+For more information about an error, try `rustc --explain E0560`.
+error: could not compile `litchi-docx` (example "managed_paragraph_batch_perf") due to 6 previous errors
