@@ -15,6 +15,10 @@ const TEXT_NAMESPACE_STRING: &str = "urn:oasis:names:tc:opendocument:xmlns:text:
 
 /// A complete point or range bookmark target.
 #[derive(Debug, Clone)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the public target variants preserve their existing value-shaped API"
+)]
 pub enum BookmarkTarget {
     Point(Bookmark),
     Range(BookmarkRange),

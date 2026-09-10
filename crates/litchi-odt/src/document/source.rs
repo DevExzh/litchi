@@ -314,6 +314,28 @@ impl SourceBackedDocument {
         Ok(value)
     }
 
+    /// Inspect in-content RDFa and inline `text:meta` metadata from the
+    /// retained XML projections without materializing the package.
+    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
+        self.check_source()?;
+        let result = {
+            let mut parts = vec![(self.content.xml_content(), crate::MetadataPart::Content)];
+            if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
+                parts.push((styles, crate::MetadataPart::Styles));
+            }
+            crate::content_metadata::parse_parts(&parts)
+        };
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
+    /// Inspect inert XForms model declarations without materializing the
+    /// source package.
+    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
+        self.check_source()?;
+        let result = crate::xforms::parse_models(self.content.xml_content());
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
     /// Borrow the optional validated `meta.xml` snapshot.
     pub fn meta_xml(&self) -> Result<Option<&str>> {
         self.check_source()?;

@@ -129,6 +129,117 @@ impl FlatDocument {
         crate::form::parse_form_parts(&[(self.xml(), crate::form::Part::Flat)])
     }
 
+    /// Inspect in-content RDFa and inline `text:meta` values in the flat XML.
+    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
+        crate::content_metadata::parse_parts(&[(self.xml(), crate::MetadataPart::Content)])
+    }
+
+    /// Inspect inert XForms model declarations in the flat XML.
+    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
+        crate::xforms::parse_models(self.xml())
+    }
+
+    /// Set or clear RDFa on one paragraph in the flat XML.
+    pub fn set_paragraph_rdfa(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::RdfaAttributes,
+    ) -> Result<()> {
+        let updated = crate::content_metadata::set_paragraph_rdfa(&self.xml, position, value)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::content_metadata::parse_parts(&[(updated.as_str(), crate::MetadataPart::Content)])?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Set or clear RDFa on a uniquely named bookmark start.
+    pub fn set_bookmark_rdfa(&mut self, name: &str, value: &crate::RdfaAttributes) -> Result<()> {
+        let updated = crate::content_metadata::set_bookmark_rdfa(&self.xml, name, value)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::content_metadata::parse_parts(&[(updated.as_str(), crate::MetadataPart::Content)])?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Set or clear RDFa on one inline `text:meta` occurrence.
+    pub fn set_text_meta_rdfa(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::RdfaAttributes,
+    ) -> Result<()> {
+        let updated = crate::content_metadata::set_text_meta_rdfa(&self.xml, position, value)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::content_metadata::parse_parts(&[(updated.as_str(), crate::MetadataPart::Content)])?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Insert an inline `text:meta` into one paragraph in the flat XML.
+    pub fn insert_text_meta(
+        &mut self,
+        paragraph: litchi_core::Position,
+        value: &crate::TextMeta,
+    ) -> Result<()> {
+        let updated = crate::content_metadata::insert_text_meta(&self.xml, paragraph, value)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::content_metadata::parse_parts(&[(updated.as_str(), crate::MetadataPart::Content)])?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Replace one inline `text:meta` in the flat XML.
+    pub fn replace_text_meta(
+        &mut self,
+        position: litchi_core::Position,
+        value: &crate::TextMeta,
+    ) -> Result<()> {
+        let updated = crate::content_metadata::replace_text_meta(&self.xml, position, value)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::content_metadata::parse_parts(&[(updated.as_str(), crate::MetadataPart::Content)])?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Remove one inline `text:meta` from the flat XML.
+    pub fn remove_text_meta(&mut self, position: litchi_core::Position) -> Result<()> {
+        let updated = crate::content_metadata::remove_text_meta(&self.xml, position)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::content_metadata::parse_parts(&[(updated.as_str(), crate::MetadataPart::Content)])?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Replace one inert XForms model in the flat XML.
+    pub fn replace_xforms_model(
+        &mut self,
+        position: litchi_core::Position,
+        model: &crate::xforms::Model,
+    ) -> Result<()> {
+        let updated = crate::xforms::replace_model(&self.xml, position.get(), model)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::xforms::parse_models(&updated)?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Insert an inert XForms model into the existing `office:forms` container.
+    pub fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> Result<()> {
+        let updated = crate::xforms::insert_model(&self.xml, model)?;
+        validate_flat_document(&updated, self.family)?;
+        crate::xforms::parse_models(&updated)?;
+        self.xml = updated;
+        Ok(())
+    }
+
+    /// Remove one inert XForms model from `office:forms`.
+    pub fn remove_xforms_model(&mut self, position: litchi_core::Position) -> Result<()> {
+        let updated = crate::xforms::remove_model(&self.xml, position.get())?;
+        validate_flat_document(&updated, self.family)?;
+        crate::xforms::parse_models(&updated)?;
+        self.xml = updated;
+        Ok(())
+    }
+
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
     pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
         crate::variable_declaration::parse_parts(&[(

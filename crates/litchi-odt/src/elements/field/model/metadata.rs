@@ -195,6 +195,12 @@ impl MetaFieldContent {
     }
 
     pub(super) fn write_xml(&self, output: &mut String) {
+        self.write_xml_to(output);
+    }
+
+    /// Serialize the validated mixed-content projection for a sibling ODF
+    /// owner such as `text:meta`.
+    pub(crate) fn write_xml_to(&self, output: &mut String) {
         for node in &self.nodes {
             write_meta_node(node, output);
         }
