@@ -142,13 +142,18 @@ impl Region {
     /// Returns the inclusive last row.
     #[must_use]
     pub const fn end_row(self) -> u32 {
-        self.row() + self.row_count() - 1
+        // `Region::new` validates this exact checked expression. Keep the
+        // subtraction grouped so a valid region starting at `u32::MAX` with
+        // a single row does not overflow the intermediate `start + span`.
+        self.row() + (self.row_count() - 1)
     }
 
     /// Returns the inclusive last column.
     #[must_use]
     pub const fn end_column(self) -> u32 {
-        self.column() + self.column_count() - 1
+        // See `end_row`: the compact representation only contains regions
+        // whose inclusive endpoint was accepted by `Region::new`.
+        self.column() + (self.column_count() - 1)
     }
 
     /// Returns the covered area when it fits in `usize`.
@@ -361,6 +366,68 @@ mod tests {
         assert!(region.contains_position(CellPosition::new(2, 3)));
         assert!(region.overlaps(Region::new(3, 5, 2, 1).unwrap()));
         assert!(!region.overlaps(Region::new(4, 3, 1, 2).unwrap()));
+    }
+
+    #[test]
+    fn maximum_coordinates_preserve_closed_geometry() {
+        let last_row = Region::new(u32::MAX, 7, 1, 2).unwrap();
+        assert_eq!(last_row.end(), CellPosition::new(u32::MAX, 8));
+        assert_eq!(last_row.end_row(), u32::MAX);
+        assert_eq!(last_row.end_column(), 8);
+        assert!(last_row.contains(u32::MAX, 8));
+        assert!(!last_row.contains(u32::MAX - 1, 8));
+        assert!(last_row.overlaps(Region::new(u32::MAX - 1, 7, 2, 2).unwrap()));
+
+        let last_column = Region::new(7, u32::MAX, 2, 1).unwrap();
+        assert_eq!(last_column.end(), CellPosition::new(8, u32::MAX));
+        assert_eq!(last_column.end_row(), 8);
+        assert_eq!(last_column.end_column(), u32::MAX);
+        assert!(last_column.contains(8, u32::MAX));
+        assert!(!last_column.contains(8, u32::MAX - 1));
+        assert!(last_column.overlaps(Region::new(7, u32::MAX - 1, 2, 2).unwrap()));
+    }
+
+    #[test]
+    fn maximum_coordinates_fail_transformations_without_panicking() {
+        let last_row = Region::new(u32::MAX, 7, 1, 2).unwrap();
+        assert_eq!(
+            after_insertion(last_row, Axis::Row, u32::MAX),
+            Err(Error::CoordinateOverflow { axis: Axis::Row })
+        );
+        assert_eq!(
+            after_deletion(last_row, Axis::Row, u32::MAX),
+            Ok(Deletion::Remove)
+        );
+        assert_eq!(
+            after_deletion(last_row, Axis::Row, u32::MAX - 1),
+            Ok(Deletion::Retain(
+                Region::new(u32::MAX - 1, 7, 1, 2).unwrap()
+            ))
+        );
+        assert_eq!(
+            anchor_relocation_after_deletion(last_row, Axis::Row, u32::MAX),
+            Ok(None)
+        );
+
+        let last_column = Region::new(7, u32::MAX, 2, 1).unwrap();
+        assert_eq!(
+            after_insertion(last_column, Axis::Column, u32::MAX),
+            Err(Error::CoordinateOverflow { axis: Axis::Column })
+        );
+        assert_eq!(
+            after_deletion(last_column, Axis::Column, u32::MAX),
+            Ok(Deletion::Remove)
+        );
+        assert_eq!(
+            after_deletion(last_column, Axis::Column, u32::MAX - 1),
+            Ok(Deletion::Retain(
+                Region::new(7, u32::MAX - 1, 2, 1).unwrap()
+            ))
+        );
+        assert_eq!(
+            anchor_relocation_after_deletion(last_column, Axis::Column, u32::MAX),
+            Ok(None)
+        );
     }
 
     #[test]

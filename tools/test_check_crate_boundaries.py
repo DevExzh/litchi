@@ -47956,6 +47956,7 @@ fn rewrite_movie_title_operation(
         )
         self.assertEqual(boundaries.audit_pages_table_merge_source_topology(), [])
         self.assertEqual(boundaries.audit_keynote_table_merge_source_topology(), [])
+        self.assertEqual(boundaries.audit_numbers_table_merge_source_topology(), [])
         self.assertEqual(
             boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(), []
         )
@@ -48242,6 +48243,96 @@ impl KeynoteEditor {
                 )
             self.assertEqual(boundaries.audit_pages_table_merge_source_topology(root), [])
             self.assertEqual(boundaries.audit_keynote_table_merge_source_topology(root), [])
+
+            numbers_paths = (
+                boundaries.NUMBERS_TABLE_MERGE_SOURCE,
+                boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-numbers/src/table.rs"),
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+            )
+            for relative in numbers_paths:
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            self.assertEqual(boundaries.audit_numbers_table_merge_source_topology(root), [])
+
+    def test_numbers_table_merge_boundary_rejects_bnc_and_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.NUMBERS_TABLE_MERGE_SOURCE,
+                boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-numbers/src/table.rs"),
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            owner = root / boundaries.NUMBERS_TABLE_MERGE_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "\nuse litchi_iwa::Archive;\n"
+                + "pub fn leaked_bnc() -> BncCellView {}\n"
+                + "pub fn leaked_proto(_: FormulaArchive) {}\n"
+                + "pub fn leaked_identity(table_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_source_topology(root)
+            self.assertTrue(
+                any("format/archive or generated AST import" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("private wire/BNC type BncCellView" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated AST projection FormulaArchive" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+
+    def test_numbers_table_merge_boundary_rejects_public_module_and_preserves_host_reader(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.NUMBERS_TABLE_MERGE_SOURCE,
+                boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-numbers/src/table.rs"),
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+                Path("crates/litchi-iwa/src/numbers/editor/cell_merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            package = root / boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE
+            package_source = package.read_text(encoding="utf-8")
+            package.write_text(
+                package_source + "\npub mod table_merges;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+            # The focused ratchet intentionally does not retire the legacy
+            # raw-ID mutation/read helper that still serves host compatibility.
+            legacy_source = (
+                root / Path("crates/litchi-iwa/src/numbers/editor/cell_merge.rs")
+            ).read_text(encoding="utf-8")
+            self.assertRegex(
+                legacy_source,
+                r"pub\(crate\)\s+fn\s+\w+\([^)]*table_id:\s*u64",
+            )
+            self.assertFalse(any("cell_merge.rs" in item for item in violations), violations)
 
     def test_focused_table_merge_boundaries_reject_raw_bytes_and_generated_ast(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -49291,6 +49382,7 @@ impl KeynoteEditor {
             "audit_iwa_numbers_wire_table_merges_source_topology",
             "audit_pages_table_merge_source_topology",
             "audit_keynote_table_merge_source_topology",
+            "audit_numbers_table_merge_source_topology",
             "audit_iwa_table_merge_host_read_delegation_source_topology",
         ):
             self.assertIn(f"+ {name}()", main_source)

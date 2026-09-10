@@ -376,7 +376,7 @@ pub use package::{
     SheetImageAdjustmentsDiagnostics, SheetImageAdjustmentsEdit, SheetImageAdjustmentsError,
     SheetImageAdjustmentsLimitKind, SheetImageAdjustmentsPatch, TableLockCommit,
     TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
-    WriteError,
+    TableMergesError, TableMergesLimitKind, WriteError,
     comments::{
         Comment as TableCellComment, CommentAuthor as TableCellCommentAuthor,
         CommentReply as TableCellCommentReply, CommentReplyCommit as TableCellCommentReplyCommit,

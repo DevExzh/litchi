@@ -2,7 +2,11 @@
 
 use std::error::Error;
 
-use litchi_iwa::{keynote::KeynoteEditor, pages::PagesEditor};
+use litchi_iwa::{
+    keynote::KeynoteEditor,
+    numbers::{NumbersDocumentBuilder, NumbersEditor},
+    pages::PagesEditor,
+};
 use litchi_iwa_common::table::merge::Region;
 
 const PAGES: &[u8] = include_bytes!(concat!(
@@ -13,8 +17,73 @@ const KEYNOTE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../test-data/iwork/keynote/slide-table-merges-native.key"
 ));
+const NUMBERS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../test-data/iwork/numbers/table-merges-native.numbers"
+));
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+#[test]
+fn numbers_merge_selectors_keep_distinct_table_geometry() -> TestResult {
+    let mut host = NumbersDocumentBuilder::new()
+        .sheet_name("Merges")
+        .table_name("Original")
+        .table_dimensions(4, 4)
+        .build()?;
+    let original = host.tables()?[0].id();
+    let duplicate = host.duplicate_table(litchi_numbers::TableSelector::index(0))?;
+    let first = Region::new(1, 0, 1, 2)?;
+    let second = Region::new(2, 1, 2, 2)?;
+    host.merge_cells(original, first)?;
+    host.merge_cells(duplicate.id(), second)?;
+    let bytes = host.to_bytes()?;
+    let focused = litchi_numbers::Package::from_bytes(&bytes)?;
+    assert_eq!(focused.table_merges("Merges", "Original")?, [first]);
+    assert_eq!(
+        focused.table_merges("Merges", duplicate.name.as_str())?,
+        [second]
+    );
+    assert_eq!(focused.table_merges(0usize, 0usize)?, [first]);
+    assert_eq!(focused.table_merges(0usize, 1usize)?, [second]);
+    let mut output = Vec::new();
+    focused.write_to(&mut output)?;
+    assert_eq!(output, bytes);
+    Ok(())
+}
+
+#[test]
+fn native_numbers_merge_reads_match_and_preserve_source() -> TestResult {
+    let expected = vec![Region::new(10, 1, 2, 2)?];
+    let focused = litchi_numbers::Package::from_bytes(NUMBERS)?;
+    assert_eq!(focused.table_merges("Sheet 1", "shared-model")?, expected);
+    assert_eq!(focused.table_merges(0usize, 0usize)?, expected);
+    let mut output = Vec::new();
+    focused.write_to(&mut output)?;
+    assert_eq!(output, NUMBERS);
+
+    let host = NumbersEditor::from_bytes(NUMBERS)?;
+    // Select the native model in this test oracle without invoking the host's
+    // appearance catalog, whose formatting profile excludes this CSV-imported
+    // table. The retained merge reader proves attached ownership itself.
+    let mut model_ids = Vec::new();
+    for name in host.package().iwa_entry_names() {
+        for object in host.package().archive(name)?.objects {
+            if object.messages.iter().any(|message| message.type_ == 6_001) {
+                model_ids.push(
+                    object
+                        .archive_info
+                        .identifier
+                        .ok_or("missing table identity")?,
+                );
+            }
+        }
+    }
+    assert_eq!(model_ids.len(), 1);
+    assert_eq!(host.table_cell_merges(model_ids[0])?, expected);
+    assert_eq!(host.to_bytes()?, NUMBERS);
+    Ok(())
+}
 
 #[test]
 fn native_pages_merge_reads_match_and_preserve_source() -> TestResult {

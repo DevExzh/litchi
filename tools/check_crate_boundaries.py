@@ -69780,6 +69780,23 @@ PAGES_TABLE_MERGE_PUBLIC_METHOD = "body_table_merges"
 KEYNOTE_TABLE_MERGE_PUBLIC_METHOD = "slide_table_merges"
 PAGES_TABLE_MERGE_SELECTOR_TYPES = frozenset({"BodyTableSelector"})
 KEYNOTE_TABLE_MERGE_SELECTOR_TYPES = frozenset({"SlideSelector", "TableSelector"})
+# Numbers uses the same focused merge reader shape, but its package owns both
+# selectors.  Keep the native BNC vocabulary private to the wire adapter even
+# while the package retains its raw-ID compatibility reader elsewhere.
+NUMBERS_TABLE_MERGE_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_merges.rs"
+)
+NUMBERS_TABLE_MERGE_PACKAGE_SOURCE = Path("crates/litchi-numbers/src/package.rs")
+NUMBERS_TABLE_MERGE_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?table_merges\b[ \t]*(?:;|\{)"
+)
+NUMBERS_TABLE_MERGE_PUBLIC_METHOD = "table_merges"
+NUMBERS_TABLE_MERGE_SELECTOR_TYPES = frozenset({"SheetSelector", "TableSelector"})
+NUMBERS_TABLE_MERGE_FORBIDDEN_PUBLIC_BNC = re.compile(
+    r"(?<![A-Za-z0-9_])(?:BncCell|BncCellView|PreBncCellView|"
+    r"StoredValue|CachedScalar)(?![A-Za-z0-9_])"
+)
 PAGES_TABLE_MERGE_FORBIDDEN_MODULES = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
     r"litchi_iwa_protos|litchi_iwa|prost|buffa|"
@@ -70968,8 +70985,9 @@ def _audit_focused_table_merge_source_topology(
     table_module_pattern: re.Pattern[str],
     public_method: str,
     selector_types: frozenset[str],
+    forbidden_public_types: re.Pattern[str] | None = None,
 ) -> list[str]:
-    """Protect a selector-first focused Pages/Keynote merged-cell reader."""
+    """Protect a selector-first focused merged-cell reader."""
 
     owner_absolute = root / owner_path
     package_absolute = root / package_path
@@ -71074,6 +71092,14 @@ def _audit_focused_table_merge_source_topology(
                 f"{format_name} table-merge focused owner exposes a raw ID parameter "
                 f"{raw_id.group(0).strip()}: {relative_owner}:{line_number}"
             )
+        if forbidden_public_types is not None:
+            for match in forbidden_public_types.finditer(declaration):
+                type_line = line_number + declaration.count("\n", 0, match.start())
+                violations.append(
+                    f"{format_name} table-merge focused owner exposes a private "
+                    f"wire/BNC type {match.group(0)}: "
+                    f"{relative_owner}:{type_line}"
+                )
 
     duplicate_type = re.compile(
         r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?"
@@ -71173,6 +71199,15 @@ def _audit_focused_table_merge_source_topology(
                     f"{format_name} Package::{public_method} exposes a raw ID parameter "
                     f"{raw_id.group(0).strip()}: {path}:{line_number}"
                 )
+            if forbidden_public_types is not None:
+                for match in forbidden_public_types.finditer(declaration):
+                    type_line = line_number + declaration.count(
+                        "\n", 0, match.start()
+                    )
+                    violations.append(
+                        f"{format_name} Package::{public_method} exposes a private "
+                        f"wire/BNC type {match.group(0)}: {path}:{type_line}"
+                    )
             generated = IWA_FOCUSED_TABLE_MERGES_GENERATED_AST.search(body)
             if generated is not None:
                 violations.append(
@@ -71214,6 +71249,30 @@ def audit_keynote_table_merge_source_topology(root: Path = ROOT) -> list[str]:
         table_module_pattern=KEYNOTE_TABLE_MERGE_COMMON_TABLE_MODULE,
         public_method=KEYNOTE_TABLE_MERGE_PUBLIC_METHOD,
         selector_types=KEYNOTE_TABLE_MERGE_SELECTOR_TYPES,
+    )
+
+
+def audit_numbers_table_merge_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep Numbers merged-cell reads selector-first and archive-free.
+
+    The package owns sheet/table selection and delegates native merge storage
+    to the bounded Numbers wire reader.  Its old raw-ID compatibility reader
+    remains in the migration host; this guard covers only the new focused
+    package owner and keeps BNC/pre-BNC views private to the wire layer.
+    """
+
+    return _audit_focused_table_merge_source_topology(
+        root,
+        format_name="Numbers",
+        owner_path=NUMBERS_TABLE_MERGE_SOURCE,
+        package_path=NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+        module_pattern=NUMBERS_TABLE_MERGE_MODULE,
+        table_module_path=Path("crates/litchi-numbers/src/table.rs"),
+        table_merge_path=Path("crates/litchi-numbers/src/table/merge.rs"),
+        table_module_pattern=PAGES_TABLE_MERGE_COMMON_TABLE_MODULE,
+        public_method=NUMBERS_TABLE_MERGE_PUBLIC_METHOD,
+        selector_types=NUMBERS_TABLE_MERGE_SELECTOR_TYPES,
+        forbidden_public_types=NUMBERS_TABLE_MERGE_FORBIDDEN_PUBLIC_BNC,
     )
 
 
@@ -73852,6 +73911,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_wire_table_merges_source_topology()
         + audit_pages_table_merge_source_topology()
         + audit_keynote_table_merge_source_topology()
+        + audit_numbers_table_merge_source_topology()
         + audit_iwa_table_merge_host_read_delegation_source_topology()
         + audit_pages_table_cells_source_topology()
         + audit_keynote_table_cells_source_topology()

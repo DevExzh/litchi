@@ -11864,3 +11864,42 @@ fixtures and their native creation receipts remain unchanged.
 This read-only delegation does not transfer merge mutations, Numbers axis
 operations, or the remaining Numbers internal merge reader. The manifest debt
 count and monolith deletion gates remain unchanged.
+
+## 2026-09-11 Focused Numbers merged-cell reader
+
+The Numbers package now owns `table_merges(sheet, table)`, returning common
+merged-cell rectangles through name or position selectors and a format-owned
+error boundary. Selection follows rooted sheet/table order and excludes
+orphan models. The shared borrowed Buffa merge codec validates formula
+identity, bounds, duplicate formula indices, and overlap without exposing
+native identifiers or generated values through the format facade. Selected
+ownership edges must agree with archive reference declarations; synthetic
+order/orphan tests supply those declarations without changing model order or
+payloads. Compatibility envelopes that omit the declarations remain outside
+this focused read profile and are still handled by the host.
+
+Computer Use created `test-data/iwork/numbers/table-merges-native.numbers`
+in Numbers 14.4 from the existing native table-data-list control. The table
+was extended to twelve rows, B11:C12 was selected and merged through the
+Table menu, and the file was saved, closed, reopened at its exact path,
+visually verified, and closed. The adjacent receipt records its hash and
+geometry. Focused tests compare name and position reads, malformed merge
+variants, rooted order/orphan selection, and source preservation; the host
+native regression provides differential readback of the same fixture. Its
+test-only model lookup bypasses the host appearance catalog, which rejects
+this imported table; the retained merge reader independently proves attached
+ownership. Expanding that appearance profile remains separate work.
+
+The existing package constructor's semantic cell materialization is unchanged.
+The new read performs no additional BNC or generated table-model decode.
+Numbers host merge mutations and its archive-wide compatibility selection
+remain separate migration work, so this slice does not remove a dependency
+debt item or close the monolith deletion gate.
+
+The malformed-range oracle also exposed an intermediate overflow in common
+`Region` endpoint accessors: the constructor allowed an inclusive endpoint of
+`u32::MAX`, but `start + span - 1` overflowed before subtraction. Both accessors
+now evaluate `start + (span - 1)`, matching the constructor's checked invariant.
+Maximum-coordinate tests cover endpoints, containment, overlap, insertion,
+deletion, and anchor relocation; malformed native ranges are refused without
+panicking.

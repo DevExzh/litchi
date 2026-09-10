@@ -76,6 +76,7 @@ pub(crate) mod table_cells;
 pub(crate) mod table_dimension;
 pub(crate) mod table_headers;
 mod table_lock;
+mod table_merges;
 pub(crate) mod table_relocation;
 #[cfg(feature = "internal-iwork-source")]
 #[allow(
@@ -152,6 +153,7 @@ pub use table_lock::{
     TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind,
     TableLockPatch,
 };
+pub use table_merges::{TableMergesError, TableMergesLimitKind};
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHEET_MESSAGE_TYPE: u32 = 2;

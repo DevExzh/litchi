@@ -4641,3 +4641,17 @@ remain errors.
 Merge creation, removal, and axis transformations remain host debt. Numbers
 still uses its internal merge reader for native table operations. This change
 does not remove a manifest dependency or close a monolith deletion gate.
+
+## 2026-09-11 Focused Numbers merged-cell reads
+
+The Numbers package exposes merged-cell geometry through sheet and table
+selectors with `table_merges`. The package owns rooted selection and typed
+errors; `litchi-numbers-wire::table_merges` owns the shared borrowed Buffa
+formula projection, and the common table model owns `Region` geometry.
+The read preserves package bytes and does not add a generated model or cell
+storage decode after package construction.
+
+The existing Numbers package constructor still materializes its semantic
+cell projection. The host's archive-wide raw-ID merge compatibility reader
+and merge mutations remain migration debt; the new rooted API does not
+silently replace their broader selection contract.
