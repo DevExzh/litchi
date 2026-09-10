@@ -21,6 +21,12 @@ pub const FMLA_ERROR: Kind = Kind(0x000B);
 // Shared string table
 pub const SST_ITEM: Kind = Kind(0x0013);
 
+// Worksheet binary index records ([MS-XLSB] 2.4.696, 2.4.698, 2.4.699).
+// These low record numbers are shared by worksheet and macro-sheet indexes.
+pub const INDEX_ROW_BLOCK: Kind = Kind(40);
+pub const INDEX_BLOCK: Kind = Kind(42);
+pub const INDEX_PART_END: Kind = Kind(277);
+
 // Format and style records
 pub const FONT: Kind = Kind(0x002B);
 pub const FMT: Kind = Kind(0x002C);

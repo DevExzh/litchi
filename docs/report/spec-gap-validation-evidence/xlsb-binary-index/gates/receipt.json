@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "kind": "xlsb_binary_index_final_library_gates",
+  "status": "complete",
+  "toolchain": "1.95.0",
+  "rustup_home": "/tmp/litchi-spec-gap-rustup",
+  "target_dir": "/var/tmp/litchi-xlsb-drawing-current-target-20260910",
+  "profiles": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "offline_locked": true,
+  "commands": {
+    "tests": {
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--all-targets",
+        "--offline",
+        "--locked",
+        "--no-fail-fast"
+      ],
+      "result": {
+        "targets": 22,
+        "passed": 847,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "log": "gates/xlsb-all-features-all-targets-incremental0.log",
+      "sha256": "9f81b71258fe27c0821ab13f74a4faeb64240f476ed84b1666f54fd6a3cbeba7"
+    },
+    "doctests": {
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "test",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--doc",
+        "--offline",
+        "--locked",
+        "--no-fail-fast"
+      ],
+      "result": {
+        "targets": 2,
+        "passed": 10,
+        "failed": 0,
+        "ignored": 11,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "log": "gates/xlsb-all-features-doctests-incremental0.log",
+      "sha256": "b9627e426dc9dbf960c965179786f88d48a753b10056f93e9f08b9c9d6858280"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "clippy",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--all-targets",
+        "--offline",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "result": "pass",
+      "log": "gates/xlsb-clippy-all-features-all-targets-incremental0.log",
+      "sha256": "1ae34a060bee54317a4ea8a474a0adf00a9e1dbb49fbf93a7e477f85752c0b0a"
+    },
+    "rustdoc": {
+      "command": [
+        "env",
+        "RUSTDOCFLAGS=-Dwarnings",
+        "cargo",
+        "+1.95.0",
+        "doc",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--no-deps",
+        "--offline",
+        "--locked"
+      ],
+      "result": "pass",
+      "log": "gates/xlsb-rustdoc-all-features.log",
+      "sha256": "236e3778df35462a87d32058e3bb875b1664489e719e7a6bd3b8708e9ab67595"
+    },
+    "format": {
+      "command": [
+        "cargo",
+        "+1.95.0",
+        "fmt",
+        "-p",
+        "litchi-xlsb",
+        "--",
+        "--check"
+      ],
+      "result": "pass",
+      "log": "gates/xlsb-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "diff": {
+      "command": [
+        "git",
+        "diff",
+        "HEAD",
+        "--check"
+      ],
+      "result": "pass",
+      "log": "gates/diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "source": {
+    "before": "gates/source-hashes-before.txt",
+    "after": "gates/source-hashes-after.txt",
+    "before_sha256": "e3eaf1d31211d7318a4148d1276dd132c031a2d824591387dd290bdbdea7784f",
+    "after_sha256": "e3eaf1d31211d7318a4148d1276dd132c031a2d824591387dd290bdbdea7784f",
+    "source_unchanged": true,
+    "git_head_before": "973a70c504950735e0f8cff7eece09364516892c",
+    "git_head_after": "973a70c504950735e0f8cff7eece09364516892c",
+    "git_head_unchanged": true,
+    "paths": [
+      "crates/litchi-xlsb/src/binary_index.rs",
+      "crates/litchi-xlsb/src/worksheet_index.rs",
+      "crates/litchi-xlsb/src/lib.rs",
+      "crates/litchi-xlsb/src/cell_values/drawing_transfer.rs",
+      "crates/litchi-xlsb/src/cell_values/root.rs",
+      "crates/litchi-xlsb/src/cell_values/workbook.rs",
+      "crates/litchi-xlsb/src/cell_watches/workbook.rs",
+      "crates/litchi-xlsb/src/raw/kind.rs",
+      "crates/litchi-xlsb/src/slicer/package.rs",
+      "crates/litchi-xlsb/src/sparkline/workbook.rs",
+      "crates/litchi-xlsb/src/timeline/package.rs",
+      "crates/litchi-xlsb/src/workbook/codec/package.rs",
+      "crates/litchi-xlsb/src/workbook/source.rs",
+      "crates/litchi-xlsb/src/workbook/package.rs",
+      "crates/litchi-xlsb/src/workbook/mod.rs",
+      "crates/litchi-xlsb/src/cell_values/worksheet.rs",
+      "crates/litchi-xlsb/src/writer/workbook/package.rs",
+      "crates/litchi-xlsb/src/writer/workbook/model.rs",
+      "crates/litchi-xlsb/src/xml_maps/patch.rs",
+      "crates/litchi-xlsb/tests/worksheet_binary_index.rs",
+      "crates/litchi-xlsb/examples/binary_index_profile.rs"
+    ]
+  },
+  "workspace_lock": {
+    "path": "gates/workspace-Cargo.lock",
+    "sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b",
+    "hash_log": "gates/workspace-Cargo.lock.sha256"
+  },
+  "environment": {
+    "path": "gates/gate-environment.txt",
+    "sha256": "f314339a31b730bc089c30eef48564c6cc6a352863ddda74285e9081d6594c5b"
+  },
+  "commands_log": {
+    "path": "gates/commands.txt",
+    "sha256": "1dac047ccb86f421093c4e14be52dcdcf82baf56fb91d9682c53b5b7c9aeaebb"
+  },
+  "owned_test": {
+    "path": "crates/litchi-xlsb/tests/worksheet_binary_index.rs",
+    "sha256": "b50668f4fdd98790970a516ea62de94220adf117f7337639cf00cea0e6e20ac3",
+    "focused_result": "18 passed, 0 failed, 0 ignored",
+    "coverage": [
+      "indexed cached scalar lookup, formula cache, absent cells, and grid boundaries",
+      "selected shared-string raw string-unit ceiling and numeric unaffected by string refusal",
+      "real zero-column row masks and formatting-only row-mask preservation through topology change",
+      "writer sparse and empty-sheet index generation with one or two end markers",
+      "offset maintenance, no-op byte identity, opaque-record atomic refusal, malformed structure, stale/cancelled handles, and source-byte preflight"
+    ]
+  }
+}

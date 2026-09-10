@@ -1,0 +1,85 @@
+{
+  "baseline_commit": "973a70c504950735e0f8cff7eece09364516892c",
+  "groups": {
+    "large/indexed_cold": {
+      "median_allocated_bytes": 868943.0,
+      "median_peak_extra_requested_live_bytes": 135699.0,
+      "median_process_p50_ns": 114271
+    },
+    "large/indexed_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 260
+    },
+    "large/materialize_cold": {
+      "median_allocated_bytes": 1349201.0,
+      "median_peak_extra_requested_live_bytes": 259882.0,
+      "median_process_p50_ns": 332211
+    },
+    "large/materialize_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 100
+    },
+    "sparse/indexed_cold": {
+      "median_allocated_bytes": 1096894.0,
+      "median_peak_extra_requested_live_bytes": 140109.0,
+      "median_process_p50_ns": 117111
+    },
+    "sparse/indexed_warm": {
+      "median_allocated_bytes": 21.0,
+      "median_peak_extra_requested_live_bytes": 8.0,
+      "median_process_p50_ns": 340
+    },
+    "sparse/materialize_cold": {
+      "median_allocated_bytes": 1227095.0,
+      "median_peak_extra_requested_live_bytes": 148454.0,
+      "median_process_p50_ns": 136491
+    },
+    "sparse/materialize_warm": {
+      "median_allocated_bytes": 21.0,
+      "median_peak_extra_requested_live_bytes": 8.0,
+      "median_process_p50_ns": 190
+    },
+    "synthetic-131072/indexed_cold": {
+      "median_allocated_bytes": 4296310.0,
+      "median_peak_extra_requested_live_bytes": 3290357.0,
+      "median_process_p50_ns": 3086792
+    },
+    "synthetic-131072/indexed_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 650
+    },
+    "synthetic-131072/materialize_cold": {
+      "median_allocated_bytes": 71714427.0,
+      "median_peak_extra_requested_live_bytes": 70706641.0,
+      "median_process_p50_ns": 18002467
+    },
+    "synthetic-131072/materialize_warm": {
+      "median_allocated_bytes": 0.0,
+      "median_peak_extra_requested_live_bytes": 0.0,
+      "median_process_p50_ns": 130
+    }
+  },
+  "independent_wire_oracle_cell_counts": {
+    "large": 282,
+    "sparse": 48,
+    "synthetic-131072": 131072
+  },
+  "release_binary_sha256": "316d0d0d90ebec49978c9a9a08b6a60db82fd3bbb0d3b97d7ec194b49b3f5490",
+  "release_build_manifest_sha256": "0be82f304edd4f17915fce9aaee79ca7d474e3fd7437f8c162e20c653baf38c7",
+  "reports_verified": 36,
+  "source_files_verified": 21,
+  "tests": {
+    "xlsb-all-features-all-targets-incremental0.log": {
+      "ignored": 1,
+      "passed": 847
+    },
+    "xlsb-all-features-doctests-incremental0.log": {
+      "ignored": 11,
+      "passed": 10
+    }
+  },
+  "timed_samples_verified": 1080
+}

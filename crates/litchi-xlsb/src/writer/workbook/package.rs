@@ -6,7 +6,7 @@
 
 //! OPC package assembly for XLSB workbooks.
 
-use super::model::{SheetSlot, WorkbookWriter, XLSB_WORKSHEET_BINARY_INDEX_EMPTY};
+use super::model::{SheetSlot, WorkbookWriter};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{
     CompilationContext, Context, DefinedName, ExternalSheet, SupportingLink,
@@ -562,10 +562,10 @@ impl WorkbookWriter {
                 let binary_index_name = format!("binaryIndex{}.bin", i + 1);
                 let binary_index_uri =
                     PackURI::new(format!("/xl/worksheets/{}", binary_index_name))?;
-                let binary_index_part = BlobPart::new(
+                let mut binary_index_part = BlobPart::new(
                     binary_index_uri,
                     "application/vnd.ms-excel.binIndexWs".to_string(),
-                    XLSB_WORKSHEET_BINARY_INDEX_EMPTY.to_vec(),
+                    Vec::new(),
                 );
 
                 {
@@ -788,6 +788,16 @@ impl WorkbookWriter {
                 };
                 worksheet_write_result?;
                 sheet_part.set_blob(sheet_data);
+                let binary_index = crate::binary_index::encode_for_worksheet(
+                    sheet_part.blob(),
+                    crate::binary_index::Limits::publication_default(),
+                )
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "unable to generate worksheet binary index: {error}"
+                    ))
+                })?;
+                binary_index_part.set_blob(binary_index);
 
                 package.add_part(Box::new(sheet_part));
                 package.add_part(Box::new(binary_index_part));

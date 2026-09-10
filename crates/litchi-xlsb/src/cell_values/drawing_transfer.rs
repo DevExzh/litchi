@@ -1751,6 +1751,7 @@ fn attach_drawing_to_worksheet(
             "worksheet has no safe BrtDrawing insertion boundary".to_string(),
         ));
     }
+    crate::worksheet_index::maintain(package, &worksheet_uri, &worksheet_source, &output)?;
     package.get_part_mut(&worksheet_uri)?.set_blob(output);
     Ok(())
 }

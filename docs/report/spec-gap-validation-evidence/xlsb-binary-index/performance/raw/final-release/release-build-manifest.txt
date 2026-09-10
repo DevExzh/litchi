@@ -1,0 +1,12 @@
+manifest_schema xlsb-binary-index-release-build-v1
+profile_binary /var/tmp/litchi-xlsb-binary-index-final-target/release/examples/binary_index_profile
+profile_binary_sha256 316d0d0d90ebec49978c9a9a08b6a60db82fd3bbb0d3b97d7ec194b49b3f5490
+build_command cargo +1.95.0 build --release --locked --offline --target-dir /var/tmp/litchi-xlsb-binary-index-final-target --jobs 2 -p litchi-xlsb --example binary_index_profile  
+build_log_sha256 ac30612a60b1544db40cdd16ccdb66f981ff27b23747f76e8e43c99878465031
+source_state_sha256 97596cf13262da189cf0ba293a0aae3c9835dea0f56b62c2e7517bbe82b76707
+git_head 973a70c504950735e0f8cff7eece09364516892c
+rust_toolchain 1.95.0
+rustup_home /tmp/litchi-spec-gap-rustup
+cargo_incremental 0
+cargo_target_dir /var/tmp/litchi-xlsb-binary-index-final-target
+cargo_build_jobs 2
