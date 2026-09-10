@@ -330,7 +330,8 @@ mod native {
         DocumentHyphenation, MAX_HYPHENATION_CONSECUTIVE_LINES, MAX_HYPHENATION_HOT_ZONE_TWIPS,
     };
     pub use info::{
-        DocumentInfo, DocumentProtection, ProtectionLevel, ProtectionType, RtfTimestamp,
+        DocumentInfo, DocumentProtection, MAX_PASSWORD_HASH_BYTES, PasswordHash, ProtectionLevel,
+        ProtectionType, RtfTimestamp,
     };
     pub use kinsoku::DocumentKinsoku;
     pub use language::{DocumentLanguageDefaults, LanguageId};

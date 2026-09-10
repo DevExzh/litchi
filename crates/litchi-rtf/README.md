@@ -10,8 +10,8 @@ paragraphs, runs, and structural breaks without first flattening the retained
 document. Borrowed font catalogs and color palettes resolve run formatting
 without exposing numeric RTF table IDs. The advanced retained model covers
 tables, lists, sections, fields, pictures, shapes, stylesheets, positioned
-paragraph frames, and bounded inert SmartTag/factoid and move-bookmark ranges.
-The crate
+paragraph frames, inert SmartTag/factoid and move-bookmark ranges, and modern
+protection password-hash records. The crate
 also handles the compressed RTF transport used inside MAPI messages.
 
 ## Usage
@@ -48,7 +48,7 @@ ordinary transaction limits, retained-model support, and explicit semantic gaps.
 - Lexer + parser covering control words, groups, and binary data
 - Document model: paragraphs, runs, tables, lists, sections, fields, pictures, shapes
 - Typed positioned paragraph frames, bounded inert SmartTag/factoid and
-  move-bookmark metadata with source-bound edits
+  move-bookmark metadata, and bounded inert `\\passwordhash` records
 - Stylesheet, font table, and color table handling
 - Compressed RTF (`MS-OXRTFCP`) encode/decode
 - Immutable, cheap-to-share `Document` snapshots for ordinary reads

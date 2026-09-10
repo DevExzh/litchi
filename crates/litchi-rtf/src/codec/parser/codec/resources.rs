@@ -1016,9 +1016,25 @@ impl<'a> Parser<'a> {
                         {
                             self.parse_info_password()?;
                         },
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                            if matches!(
+                                self.tokens.get(self.pos + 1),
+                                Some(Token::Control(ControlWord::PasswordHash))
+                            ) =>
+                        {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF passwordhash destination must occur in the root header"
+                                    .to_string(),
+                            ));
+                        },
                         Some(Token::Control(ControlWord::Password)) => {
                             return Err(RtfError::MalformedDocument(
                                 "RTF password hash destination must be starred".to_string(),
+                            ));
+                        },
+                        Some(Token::Control(ControlWord::PasswordHash)) => {
+                            return Err(RtfError::MalformedDocument(
+                                "RTF passwordhash destination must be starred".to_string(),
                             ));
                         },
                         _ => self.skip_open_info_group()?,

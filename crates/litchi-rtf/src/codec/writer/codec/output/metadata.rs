@@ -15,6 +15,61 @@ use super::super::{
 
 const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 
+fn write_password_hash_hex<W: Write>(writer: &mut RtfWriter<W>, bytes: &[u8]) -> io::Result<()> {
+    let mut chunk = [0_u8; 512];
+    let mut used = 0usize;
+    for byte in bytes {
+        let Some([high, low]) = chunk.get_mut(used..used.saturating_add(2)) else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF passwordhash hex chunk overflow",
+            ));
+        };
+        let high_digit = HEX_DIGITS
+            .get(usize::from(byte >> 4))
+            .copied()
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF passwordhash nibble overflow",
+                )
+            })?;
+        let low_digit = HEX_DIGITS
+            .get(usize::from(byte & 0x0f))
+            .copied()
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "RTF passwordhash nibble overflow",
+                )
+            })?;
+        *high = high_digit;
+        *low = low_digit;
+        used += 2;
+        if used == chunk.len() {
+            let text = std::str::from_utf8(&chunk).map_err(|_error| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "invalid passwordhash hex chunk",
+                )
+            })?;
+            writer.write_str(text)?;
+            used = 0;
+        }
+    }
+    if used != 0 {
+        let text =
+            std::str::from_utf8(chunk.get(..used).unwrap_or_default()).map_err(|_error| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "invalid passwordhash hex chunk",
+                )
+            })?;
+        writer.write_str(text)?;
+    }
+    Ok(())
+}
+
 impl<W: Write> RtfWriter<W> {
     /// Write the standard RTF document-information destination.
     ///
@@ -93,6 +148,13 @@ impl<W: Write> RtfWriter<W> {
                 self.write_str(hash)?;
                 self.write_str("}")?;
             }
+            self.write_str("}")?;
+        }
+        // Modern read-only protection is a root-header destination, distinct
+        // from the legacy `\\password` field nested in `\\info`.
+        if let Some(hash) = info.protection.password_hash_data.as_ref() {
+            self.write_str("{\\*\\passwordhash ")?;
+            write_password_hash_hex(self, hash.bytes())?;
             self.write_str("}")?;
         }
         self.write_protection_controls(&info.protection)

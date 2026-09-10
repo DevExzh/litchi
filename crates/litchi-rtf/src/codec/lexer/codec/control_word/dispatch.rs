@@ -708,6 +708,10 @@ pub(in crate::codec::lexer::codec) fn match_control_word(
         "enforceprot" => ControlWord::EnforceProtection(param),
         "protlevel" => ControlWord::ProtectionLevel(param),
         "password" => ControlWord::Password,
+        "passwordhash" => {
+            reject_numeric_parameter("passwordhash", param)?;
+            ControlWord::PasswordHash
+        },
         "protusertbl" => ControlWord::ProtectionUserTable,
         "hyphauto" => ControlWord::HyphenateAutomatically(param),
         "hyphcaps" => ControlWord::HyphenateCapitalizedWords(param),

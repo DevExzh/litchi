@@ -1,0 +1,244 @@
+{
+  "schema": "rtf-passwordhash-current-head-integration/v1",
+  "created_utc": "2026-09-10T10:32:43.337930+00:00",
+  "base_commit": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "candidate_head": "ff954779e7619dd0a708ae0617e07c6ff0fa51bd",
+  "candidate_root": "/var/tmp/litchi-rtf-passwordhash-integration-validation-20260910-git",
+  "source_v3_manifest": "/var/tmp/litchi-rtf-passwordhash-validation-20260910-v3-manifest.json",
+  "source_v3_manifest_sha256": "5fbf7982b214be1ee8ad0712ab4e5adf4adb11ba41b1911eeb52a4c655ecec22",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "primary_preflight": "/var/tmp/litchi-rtf-passwordhash-primary-integration-preflight-20260910.json",
+  "primary_preflight_sha256": "3790d6b192b4addd8ad4111f9fb3ddadf755938211a48857a9c2d2f49585ebe2",
+  "path_count": 15,
+  "candidate_status_paths": [
+    "crates/litchi-rtf/README.md",
+    "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+    "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs",
+    "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/controls.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/groups.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/info.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/resources.rs",
+    "crates/litchi-rtf/src/codec/writer/codec/output/metadata.rs",
+    "crates/litchi-rtf/src/lib.rs",
+    "crates/litchi-rtf/src/metadata/info.rs",
+    "crates/litchi-rtf/src/metadata/mod.rs",
+    "crates/litchi-rtf/src/redact.rs",
+    "crates/litchi-rtf/tests/document_protection.rs"
+  ],
+  "candidate_status_clean_scope": true,
+  "candidate_staged_path_count": 0,
+  "candidate_untracked_path_count": 0,
+  "candidate_diff_bytes": 51121,
+  "candidate_diff_sha256": "bde990f0ea52d8003aee0d48c118aa4b8159f4b102b73325894cf66885946685",
+  "frozen_v3_diff_sha256": "bde990f0ea52d8003aee0d48c118aa4b8159f4b102b73325894cf66885946685",
+  "diff_matches_frozen_v3": true,
+  "feature_paths": [
+    {
+      "path": "crates/litchi-rtf/README.md",
+      "base_blob_oid": "79946ed86ea89646dae58aacb0ba8ac628f760dd",
+      "base_file_sha256": "8d43364b597748e39da97ff0f68fb01a742068b821acd99de81a8e5ea23d6813",
+      "candidate_file_sha256": "e860c248dff1dff0f901e77927a03ee983267b2c1cbdfb3ec26d69b78c450dc2",
+      "v3_candidate_file_sha256": "e860c248dff1dff0f901e77927a03ee983267b2c1cbdfb3ec26d69b78c450dc2",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+      "base_blob_oid": "ce6a96bebd5db2fa79e724087c4d11dd4ae355f5",
+      "base_file_sha256": "20cb640396d3938f7af104537d3d61480754cc4ff16351ba639ef067dce65c7f",
+      "candidate_file_sha256": "ec38d5e195d1792ecae7b3105d97b6d9bd30dc4faacfa418f15ac83292a8e686",
+      "v3_candidate_file_sha256": "ec38d5e195d1792ecae7b3105d97b6d9bd30dc4faacfa418f15ac83292a8e686",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs",
+      "base_blob_oid": "5a21e4813405abcea37b56ec048a20491adb514b",
+      "base_file_sha256": "99df02f14ac4375cdecb18ef4fe07da3f61aa09c24ccb4166707aaec7f53ddb5",
+      "candidate_file_sha256": "5ea45c4b5005964dfa275416669653025e95dee0ddc0b59be5b0d9a1665546a5",
+      "v3_candidate_file_sha256": "5ea45c4b5005964dfa275416669653025e95dee0ddc0b59be5b0d9a1665546a5",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs",
+      "base_blob_oid": "f38427573617122b60e542d88ecb6efd7f939db6",
+      "base_file_sha256": "b224ea96e14d11336a9523fdd9a739336e166c2cb5969dd4b788ab4a3919b458",
+      "candidate_file_sha256": "33266b36133d6ff45766c4f2e59faeb3cd833496c357a8210cfaf8847bd61aca",
+      "v3_candidate_file_sha256": "33266b36133d6ff45766c4f2e59faeb3cd833496c357a8210cfaf8847bd61aca",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/controls.rs",
+      "base_blob_oid": "e7c6d5536b2946ce8d76bab0a6cdab951fb67f75",
+      "base_file_sha256": "a49cb1a95bb9c944b5293fd99777561a9fb6d4b8e84faa8f301411ab27c3734a",
+      "candidate_file_sha256": "a096cc0204d14e6bada2c47c38605f9cded2ffa6eb844773ae383aad5608c87b",
+      "v3_candidate_file_sha256": "a096cc0204d14e6bada2c47c38605f9cded2ffa6eb844773ae383aad5608c87b",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs",
+      "base_blob_oid": "8b5616989d03cd9d0f945a8261fafb6ff25f7c9f",
+      "base_file_sha256": "473e1ca5152104cae6ce47445e77b06457b90b6f53a5a0a26df3ab323c6cf859",
+      "candidate_file_sha256": "b9066092d4027b4aaf10edf0cfa6510c0017573744081daed8fa3160344f3826",
+      "v3_candidate_file_sha256": "b9066092d4027b4aaf10edf0cfa6510c0017573744081daed8fa3160344f3826",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/groups.rs",
+      "base_blob_oid": "a69806e419d22b6d1c12735ff757d2a3e21fd7b9",
+      "base_file_sha256": "9a0e80fb7715a558f2dac870f9f4a70421af92017bfe98ba1c1b35ebd0cdd621",
+      "candidate_file_sha256": "2c9634ea1d520048452a2fd22e3055f012b6ffd793289e246743724f2a13a6c8",
+      "v3_candidate_file_sha256": "2c9634ea1d520048452a2fd22e3055f012b6ffd793289e246743724f2a13a6c8",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/info.rs",
+      "base_blob_oid": "281714549869d059c047d3d0866bd9e9f019b5bb",
+      "base_file_sha256": "96ed0fe89edb8bbebfe71508d5c354647f8527066574c959e6bca15b06b04ac6",
+      "candidate_file_sha256": "43f01c74dbe7ebe19a9a51cbdc6afe48a9f13e056c15bfb15cb6cfd96d5c56a3",
+      "v3_candidate_file_sha256": "43f01c74dbe7ebe19a9a51cbdc6afe48a9f13e056c15bfb15cb6cfd96d5c56a3",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/resources.rs",
+      "base_blob_oid": "f8201ea35a15320e577db522264f8e68229019bd",
+      "base_file_sha256": "73972c3cd373c48dba10019c51ae5fd7edf95dd3a2c37f858f68555a437ed374",
+      "candidate_file_sha256": "b34cbe847647e4065233e09bb3d377b253eb590234a2f49e739035ba741744e3",
+      "v3_candidate_file_sha256": "b34cbe847647e4065233e09bb3d377b253eb590234a2f49e739035ba741744e3",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/output/metadata.rs",
+      "base_blob_oid": "f8b44656b00026f694772142af1d0422a35f20eb",
+      "base_file_sha256": "8d1d229c2d74806c0aad631d6c3fe59c4b01b61bb4d9f5f78dee81d1d3fa1894",
+      "candidate_file_sha256": "b0da40ba0c930c33c571ae60f909a1222404747a03a34902b8dbe8721189bc8d",
+      "v3_candidate_file_sha256": "b0da40ba0c930c33c571ae60f909a1222404747a03a34902b8dbe8721189bc8d",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/lib.rs",
+      "base_blob_oid": "5c9c296818e0d16c59480b1fc711d07a865e96c1",
+      "base_file_sha256": "99f9e8e172f356cbd562df5a77ee568394b15ef1fb12b16fbd532529ad9e86fa",
+      "candidate_file_sha256": "a35784da56ff00767dc46159a80f8c42fefb80a08c21ccbd57d9c32be5d2b018",
+      "v3_candidate_file_sha256": "a35784da56ff00767dc46159a80f8c42fefb80a08c21ccbd57d9c32be5d2b018",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/info.rs",
+      "base_blob_oid": "7cd7b4314bc26067f79418b6a9e0dc4eab574cbe",
+      "base_file_sha256": "ca0e291153114775ada68f224c29ff94ef9d6df0540d84d41d736d7609abca0c",
+      "candidate_file_sha256": "edea715ce9a73a90529d420f4a3fc2c29a3f34aa658b7845e1a123cfbfa68af3",
+      "v3_candidate_file_sha256": "edea715ce9a73a90529d420f4a3fc2c29a3f34aa658b7845e1a123cfbfa68af3",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/mod.rs",
+      "base_blob_oid": "bffcf624ba476886a239ae195c22e3d789e4f2f7",
+      "base_file_sha256": "6fe617be94bca3623a4a14fd32ba91efeb47b41a260e69659a9fa418a1644b4f",
+      "candidate_file_sha256": "1263dcdc83e69562215d178d79839daa7a3b136abc58b5675a9acc8eff8cce3b",
+      "v3_candidate_file_sha256": "1263dcdc83e69562215d178d79839daa7a3b136abc58b5675a9acc8eff8cce3b",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/src/redact.rs",
+      "base_blob_oid": "0a359d65d313a9c8a80b79c4dd31e16febb8846c",
+      "base_file_sha256": "891a596d2962edfb5ed48a97c06cc9cca5961925abaaa745f09537bea61ddbfc",
+      "candidate_file_sha256": "b7029f1fbe78aeb9a8d28453e12c87aa401a721f9cbe80ce8ae7480bfd805456",
+      "v3_candidate_file_sha256": "b7029f1fbe78aeb9a8d28453e12c87aa401a721f9cbe80ce8ae7480bfd805456",
+      "matches_v3": true
+    },
+    {
+      "path": "crates/litchi-rtf/tests/document_protection.rs",
+      "base_blob_oid": "48d4ab75ac81d040a3ba80c8e9167aa412fccf4d",
+      "base_file_sha256": "083a350873667cca929c9b92bd1ac1be7315a4638edcd61139a72f01bc2892b0",
+      "candidate_file_sha256": "df41cb5030c5d52c2e55201b43ab960de799acb0e41dc8196e2c05015be1143a",
+      "v3_candidate_file_sha256": "df41cb5030c5d52c2e55201b43ab960de799acb0e41dc8196e2c05015be1143a",
+      "matches_v3": true
+    }
+  ],
+  "committed_features_preserved": {
+    "smarttag_movebookmark_commit": "c1dc6ad16",
+    "commit_is_ancestor": true,
+    "paths": [
+      {
+        "path": "crates/litchi-rtf/src/metadata/smart_tag.rs",
+        "head_file_sha256": "3d562e60f6c0a703109e082ca82ccde566a6ddc88bea4dfe1a704bfe8589fe34",
+        "exists_in_candidate": true
+      },
+      {
+        "path": "crates/litchi-rtf/src/review/move_bookmark.rs",
+        "head_file_sha256": "b555b72c35bd27d4fdea1419defd7d17a6f3cd093ff959e11455f86268842137",
+        "exists_in_candidate": true
+      },
+      {
+        "path": "crates/litchi-rtf/tests/smart_tags_move_bookmarks.rs",
+        "head_file_sha256": "3fdb978ca7930f91d72f24f3d5661a4bc5e8ed5f7f15b85d3890d1c29f815c8b",
+        "exists_in_candidate": true
+      },
+      {
+        "path": "crates/litchi-rtf/src/codec/parser/codec/markup.rs",
+        "head_file_sha256": "ba5dfb236ff4b423aa7fcc327e6854d742d09a7cea356eab62f87192cf50cf82",
+        "exists_in_candidate": true
+      }
+    ]
+  },
+  "primary_pending_classification": {
+    "docs-evidence": 4146,
+    "docx": 4,
+    "iwork": 5,
+    "odb": 10,
+    "odg": 12,
+    "odp": 9,
+    "odt": 14,
+    "opc": 1,
+    "rtf-passwordhash-owned-dirty": 14,
+    "tooling": 3,
+    "vba": 5,
+    "xls": 12,
+    "xlsx": 3
+  },
+  "primary_owned_dirty_count": 14,
+  "clean_overlay_scope": "Only the 15 PasswordHash paths are overlaid; all unrelated primary work is excluded from this clean integration candidate.",
+  "mixed_overlay": {
+    "root": "/var/tmp/litchi-rtf-passwordhash-primary-reconcile-20260910-v1",
+    "manifest": "/var/tmp/litchi-rtf-passwordhash-primary-reconcile-20260910-v1-manifest.json",
+    "purpose": "Review/reference copy of primary source with the same 15 V3 paths overlaid while preserving unrelated pending primary files."
+  },
+  "constraints": [
+    "no primary edits, staging, or commits",
+    "clean candidate is detached at current primary HEAD",
+    "SmartTag/MoveBookmark committed implementation remains from HEAD",
+    "V3 source and tests are unchanged"
+  ],
+  "verification": {
+    "toolchain": "1.95.0",
+    "cargo_target_dir": "/var/tmp/litchi-rtf-passwordhash-integration-target",
+    "document_protection": {
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/var/tmp/litchi-rtf-passwordhash-integration-logs/document-protection.txt"
+    },
+    "smart_tags_move_bookmarks": {
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/var/tmp/litchi-rtf-passwordhash-integration-logs/smart-tags-move-bookmarks.txt"
+    },
+    "fmt": "passed with pinned rustfmt --check",
+    "diff_check": "passed",
+    "full_root_gate": "pending"
+  },
+  "logs": {
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "document-protection.txt": "04e61a136dca257ec5f8018ce8f114292da504546478ad3d5e76437414b54c57",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "smart-tags-move-bookmarks.txt": "782b293742a18a8dcedac1fef621048d1c7eb4e2d3cf4cb7411129186eba6514"
+  },
+  "commands": {
+    "document_protection": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-passwordhash-integration-target CARGO_BUILD_JOBS=24 rustup run 1.95.0 cargo test --manifest-path Cargo.toml -p litchi-rtf --all-features --test document_protection",
+    "smart_tags_move_bookmarks": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-passwordhash-integration-target CARGO_BUILD_JOBS=24 rustup run 1.95.0 cargo test --manifest-path Cargo.toml -p litchi-rtf --all-features --test smart_tags_move_bookmarks",
+    "fmt": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup rustup run 1.95.0 rustfmt --edition 2024 --config skip_children=true --check [15 changed Rust files]",
+    "diff_check": "git diff --check"
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "schema": "rtf-passwordhash-candidate-v3",
+  "base_commit": "c44a1ac0cee56c180862d75069ec6d8d5b7fb5e9",
+  "candidate_head": "c44a1ac0cee56c180862d75069ec6d8d5b7fb5e9",
+  "candidate_root": "/var/tmp/litchi-rtf-passwordhash-validation-20260910-v3-git",
+  "primary_root": "/home/zhuhe/code/litchi-spec-gaps",
+  "path_count": 15,
+  "candidate_status_paths": [
+    "crates/litchi-rtf/README.md",
+    "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+    "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs",
+    "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/controls.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/groups.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/info.rs",
+    "crates/litchi-rtf/src/codec/parser/codec/resources.rs",
+    "crates/litchi-rtf/src/codec/writer/codec/output/metadata.rs",
+    "crates/litchi-rtf/src/lib.rs",
+    "crates/litchi-rtf/src/metadata/info.rs",
+    "crates/litchi-rtf/src/metadata/mod.rs",
+    "crates/litchi-rtf/src/redact.rs",
+    "crates/litchi-rtf/tests/document_protection.rs"
+  ],
+  "candidate_diff_bytes": 51121,
+  "candidate_diff_sha256": "bde990f0ea52d8003aee0d48c118aa4b8159f4b102b73325894cf66885946685",
+  "feature_paths": [
+    {
+      "path": "crates/litchi-rtf/README.md",
+      "base_blob_oid": "79946ed86ea89646dae58aacb0ba8ac628f760dd",
+      "base_file_sha256": "8d43364b597748e39da97ff0f68fb01a742068b821acd99de81a8e5ea23d6813",
+      "candidate_file_sha256": "e860c248dff1dff0f901e77927a03ee983267b2c1cbdfb3ec26d69b78c450dc2",
+      "primary_preimage_sha256": "e860c248dff1dff0f901e77927a03ee983267b2c1cbdfb3ec26d69b78c450dc2",
+      "candidate_sha256_v3": "e860c248dff1dff0f901e77927a03ee983267b2c1cbdfb3ec26d69b78c450dc2"
+    },
+    {
+      "path": "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+      "base_blob_oid": "ce6a96bebd5db2fa79e724087c4d11dd4ae355f5",
+      "base_file_sha256": "20cb640396d3938f7af104537d3d61480754cc4ff16351ba639ef067dce65c7f",
+      "candidate_file_sha256": "ec38d5e195d1792ecae7b3105d97b6d9bd30dc4faacfa418f15ac83292a8e686",
+      "primary_preimage_sha256": "e0bcf7ebc1f3c2d529b84e1082bad8621359f882ac79062eff330ff950cb6af0",
+      "candidate_sha256_v3": "ec38d5e195d1792ecae7b3105d97b6d9bd30dc4faacfa418f15ac83292a8e686"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs",
+      "base_blob_oid": "5a21e4813405abcea37b56ec048a20491adb514b",
+      "base_file_sha256": "99df02f14ac4375cdecb18ef4fe07da3f61aa09c24ccb4166707aaec7f53ddb5",
+      "candidate_file_sha256": "5ea45c4b5005964dfa275416669653025e95dee0ddc0b59be5b0d9a1665546a5",
+      "primary_preimage_sha256": "97eaf74b1e3fa302fcb06dddc83b9d5fe08600c8bf1b1b27cf59843eccf78068",
+      "candidate_sha256_v3": "5ea45c4b5005964dfa275416669653025e95dee0ddc0b59be5b0d9a1665546a5"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs",
+      "base_blob_oid": "f38427573617122b60e542d88ecb6efd7f939db6",
+      "base_file_sha256": "b224ea96e14d11336a9523fdd9a739336e166c2cb5969dd4b788ab4a3919b458",
+      "candidate_file_sha256": "33266b36133d6ff45766c4f2e59faeb3cd833496c357a8210cfaf8847bd61aca",
+      "primary_preimage_sha256": "33266b36133d6ff45766c4f2e59faeb3cd833496c357a8210cfaf8847bd61aca",
+      "candidate_sha256_v3": "33266b36133d6ff45766c4f2e59faeb3cd833496c357a8210cfaf8847bd61aca"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/controls.rs",
+      "base_blob_oid": "e7c6d5536b2946ce8d76bab0a6cdab951fb67f75",
+      "base_file_sha256": "a49cb1a95bb9c944b5293fd99777561a9fb6d4b8e84faa8f301411ab27c3734a",
+      "candidate_file_sha256": "a096cc0204d14e6bada2c47c38605f9cded2ffa6eb844773ae383aad5608c87b",
+      "primary_preimage_sha256": "a096cc0204d14e6bada2c47c38605f9cded2ffa6eb844773ae383aad5608c87b",
+      "candidate_sha256_v3": "a096cc0204d14e6bada2c47c38605f9cded2ffa6eb844773ae383aad5608c87b"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs",
+      "base_blob_oid": "8b5616989d03cd9d0f945a8261fafb6ff25f7c9f",
+      "base_file_sha256": "473e1ca5152104cae6ce47445e77b06457b90b6f53a5a0a26df3ab323c6cf859",
+      "candidate_file_sha256": "b9066092d4027b4aaf10edf0cfa6510c0017573744081daed8fa3160344f3826",
+      "primary_preimage_sha256": "a4f1740bb058e1290832558cdfd49b432507ea8e3d3a409bc17b9bf98ef1d1ab",
+      "candidate_sha256_v3": "b9066092d4027b4aaf10edf0cfa6510c0017573744081daed8fa3160344f3826"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/groups.rs",
+      "base_blob_oid": "a69806e419d22b6d1c12735ff757d2a3e21fd7b9",
+      "base_file_sha256": "9a0e80fb7715a558f2dac870f9f4a70421af92017bfe98ba1c1b35ebd0cdd621",
+      "candidate_file_sha256": "2c9634ea1d520048452a2fd22e3055f012b6ffd793289e246743724f2a13a6c8",
+      "primary_preimage_sha256": "9a0e80fb7715a558f2dac870f9f4a70421af92017bfe98ba1c1b35ebd0cdd621",
+      "candidate_sha256_v3": "2c9634ea1d520048452a2fd22e3055f012b6ffd793289e246743724f2a13a6c8"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/info.rs",
+      "base_blob_oid": "281714549869d059c047d3d0866bd9e9f019b5bb",
+      "base_file_sha256": "96ed0fe89edb8bbebfe71508d5c354647f8527066574c959e6bca15b06b04ac6",
+      "candidate_file_sha256": "43f01c74dbe7ebe19a9a51cbdc6afe48a9f13e056c15bfb15cb6cfd96d5c56a3",
+      "primary_preimage_sha256": "d1977df3642e251675be918e22728ceb201602d3e8edc655804a7a4a12e90f27",
+      "candidate_sha256_v3": "43f01c74dbe7ebe19a9a51cbdc6afe48a9f13e056c15bfb15cb6cfd96d5c56a3"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/resources.rs",
+      "base_blob_oid": "f8201ea35a15320e577db522264f8e68229019bd",
+      "base_file_sha256": "73972c3cd373c48dba10019c51ae5fd7edf95dd3a2c37f858f68555a437ed374",
+      "candidate_file_sha256": "b34cbe847647e4065233e09bb3d377b253eb590234a2f49e739035ba741744e3",
+      "primary_preimage_sha256": "129b7943bb232a4c2ab02aefe873f9806c852a77caf50c0939e55409a1ca479c",
+      "candidate_sha256_v3": "b34cbe847647e4065233e09bb3d377b253eb590234a2f49e739035ba741744e3"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/output/metadata.rs",
+      "base_blob_oid": "f8b44656b00026f694772142af1d0422a35f20eb",
+      "base_file_sha256": "8d1d229c2d74806c0aad631d6c3fe59c4b01b61bb4d9f5f78dee81d1d3fa1894",
+      "candidate_file_sha256": "b0da40ba0c930c33c571ae60f909a1222404747a03a34902b8dbe8721189bc8d",
+      "primary_preimage_sha256": "b0da40ba0c930c33c571ae60f909a1222404747a03a34902b8dbe8721189bc8d",
+      "candidate_sha256_v3": "b0da40ba0c930c33c571ae60f909a1222404747a03a34902b8dbe8721189bc8d"
+    },
+    {
+      "path": "crates/litchi-rtf/src/lib.rs",
+      "base_blob_oid": "5c9c296818e0d16c59480b1fc711d07a865e96c1",
+      "base_file_sha256": "99f9e8e172f356cbd562df5a77ee568394b15ef1fb12b16fbd532529ad9e86fa",
+      "candidate_file_sha256": "a35784da56ff00767dc46159a80f8c42fefb80a08c21ccbd57d9c32be5d2b018",
+      "primary_preimage_sha256": "a35784da56ff00767dc46159a80f8c42fefb80a08c21ccbd57d9c32be5d2b018",
+      "candidate_sha256_v3": "a35784da56ff00767dc46159a80f8c42fefb80a08c21ccbd57d9c32be5d2b018"
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/info.rs",
+      "base_blob_oid": "7cd7b4314bc26067f79418b6a9e0dc4eab574cbe",
+      "base_file_sha256": "ca0e291153114775ada68f224c29ff94ef9d6df0540d84d41d736d7609abca0c",
+      "candidate_file_sha256": "edea715ce9a73a90529d420f4a3fc2c29a3f34aa658b7845e1a123cfbfa68af3",
+      "primary_preimage_sha256": "c9a0361d76a9c1b35b35ede62fd6d29dae8ac4894d1e3f5743cb9abe8ff6da69",
+      "candidate_sha256_v3": "edea715ce9a73a90529d420f4a3fc2c29a3f34aa658b7845e1a123cfbfa68af3"
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/mod.rs",
+      "base_blob_oid": "bffcf624ba476886a239ae195c22e3d789e4f2f7",
+      "base_file_sha256": "6fe617be94bca3623a4a14fd32ba91efeb47b41a260e69659a9fa418a1644b4f",
+      "candidate_file_sha256": "1263dcdc83e69562215d178d79839daa7a3b136abc58b5675a9acc8eff8cce3b",
+      "primary_preimage_sha256": "1263dcdc83e69562215d178d79839daa7a3b136abc58b5675a9acc8eff8cce3b",
+      "candidate_sha256_v3": "1263dcdc83e69562215d178d79839daa7a3b136abc58b5675a9acc8eff8cce3b"
+    },
+    {
+      "path": "crates/litchi-rtf/src/redact.rs",
+      "base_blob_oid": "0a359d65d313a9c8a80b79c4dd31e16febb8846c",
+      "base_file_sha256": "891a596d2962edfb5ed48a97c06cc9cca5961925abaaa745f09537bea61ddbfc",
+      "candidate_file_sha256": "b7029f1fbe78aeb9a8d28453e12c87aa401a721f9cbe80ce8ae7480bfd805456",
+      "primary_preimage_sha256": "b7029f1fbe78aeb9a8d28453e12c87aa401a721f9cbe80ce8ae7480bfd805456",
+      "candidate_sha256_v3": "b7029f1fbe78aeb9a8d28453e12c87aa401a721f9cbe80ce8ae7480bfd805456"
+    },
+    {
+      "path": "crates/litchi-rtf/tests/document_protection.rs",
+      "base_blob_oid": "48d4ab75ac81d040a3ba80c8e9167aa412fccf4d",
+      "base_file_sha256": "083a350873667cca929c9b92bd1ac1be7315a4638edcd61139a72f01bc2892b0",
+      "candidate_file_sha256": "df41cb5030c5d52c2e55201b43ab960de799acb0e41dc8196e2c05015be1143a",
+      "primary_preimage_sha256": "1686149fb64b4b0a2cc6cf2051276d48cd91e8f6905771688531f2e40e34ef78",
+      "candidate_sha256_v3": "df41cb5030c5d52c2e55201b43ab960de799acb0e41dc8196e2c05015be1143a"
+    }
+  ],
+  "outside_feature_paths_clean": true,
+  "primary_status_line_count_before": 4263,
+  "primary_status_sha256_before": "982d3570399827b35fd043083ddfe86f658156c096625d050205cdf28216bbb8",
+  "primary_passwordhash_paths_unchanged": true,
+  "primary_preimage_manifest": "/var/tmp/litchi-rtf-passwordhash-primary-preimage-20260910.json",
+  "source_spec": {
+    "pages": "40-41",
+    "path": "3rdparty/specs/rtf-specs-1.9.1.pdf",
+    "sha256": "15717dd5b2a9ed795f0e5f5442aaf34b5fdf07a4e8bc12dbe2c9ae792c6ec117"
+  },
+  "constraints": [
+    "detached candidate; no staging or commit",
+    "candidate source paths only; primary untouched",
+    "local RTF 1.9.1 specification used; no online material"
+  ],
+  "unsupported_boundaries": [
+    "PasswordHash is inert metadata: no password verification, authentication, decryption, key derivation, or security decision",
+    "canonical raw-model writing normalizes root-header destination placement and hex case; immutable Document writing preserves original source bytes for unchanged documents",
+    "the modern destination is accepted only as a starred root-header group; legacy \\password and \\writereservhash remain separate",
+    "the observed fixed header and logical salt/hash ranges are exposed; unknown/trailing bytes remain opaque and authored records require caller-supplied tail/layout values"
+  ],
+  "verification": {
+    "toolchain": "1.95.0",
+    "cargo_target_dir": "/var/tmp/litchi-rtf-passwordhash-v3-target",
+    "focused_tests": {
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "log": "/var/tmp/litchi-rtf-passwordhash-v3-logs/focused.txt"
+    },
+    "full_package_tests": {
+      "passed": 1387,
+      "failed": 0,
+      "ignored": 0,
+      "successful_result_groups": 173,
+      "log": "/var/tmp/litchi-rtf-passwordhash-v3-logs/all-tests.txt"
+    },
+    "clippy": "passed with -D warnings",
+    "rustdoc": "passed with RUSTDOCFLAGS=-Dwarnings",
+    "fmt": "passed with pinned rustfmt --check",
+    "diff_check": "passed"
+  },
+  "logs": {
+    "all-tests.txt": "89a029baecb2d6f4464ac9b8b4978926005d811e1e8986d42fbcf640e263df44",
+    "clippy.txt": "8c9143a6f27a32f5ccbcee1861feb8fd1f9c7f9ee0a8739737031fa49560c0c4",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused.txt": "f737c1a2a6937fc6f91415bb1ea156056d3457ccb1522a2aed989e26a2a52dd5",
+    "rustdoc.txt": "e8b02650a3b5eee482d8069a8749e82d805bd259c52564ffa1a99008e60283b5"
+  },
+  "commands": {
+    "focused": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-passwordhash-v3-target CARGO_BUILD_JOBS=24 rustup run 1.95.0 cargo test --manifest-path Cargo.toml -p litchi-rtf --all-features --test document_protection",
+    "full": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-passwordhash-v3-target CARGO_BUILD_JOBS=24 rustup run 1.95.0 cargo test --manifest-path Cargo.toml -p litchi-rtf --all-features",
+    "clippy": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup CARGO_TARGET_DIR=/var/tmp/litchi-rtf-passwordhash-v3-target CARGO_BUILD_JOBS=24 rustup run 1.95.0 cargo clippy --manifest-path Cargo.toml -p litchi-rtf --all-targets --all-features -- -D warnings",
+    "rustdoc": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup RUSTDOCFLAGS=-Dwarnings CARGO_TARGET_DIR=/var/tmp/litchi-rtf-passwordhash-v3-target CARGO_BUILD_JOBS=24 rustup run 1.95.0 cargo doc --manifest-path Cargo.toml -p litchi-rtf --all-features --no-deps",
+    "fmt": "RUSTUP_HOME=/tmp/litchi-spec-gap-rustup rustup run 1.95.0 rustfmt --edition 2024 --config skip_children=true --check [all changed Rust files]",
+    "diff_check": "git diff --check"
+  },
+  "review_notes": [
+    "V3 is a narrow allocation-admission correction layered on the frozen V2 15-path candidate; V2 remains untouched.",
+    "The declared-size guard runs only when a complete byte is available. An extra half-byte still reaches the established odd-hex error at group close.",
+    "The guard is before bytes.push and therefore before any Vec growth on a complete byte beyond a valid declared total.",
+    "No crypto, verifier, canonical-layout, source-preservation, or placement semantics changed from V2."
+  ],
+  "primary_snapshot_captured_utc": "not recorded; preimage/status values were captured before later shared-primary edits",
+  "primary_head_at_snapshot": "07fdb2f8a79e6b3f75d4572280de7ea264f1399e",
+  "primary_current_head_observed_after_snapshot": "a487f5cad7978133fb313ae471863de298e500a5",
+  "primary_current_status_sha256_observed_after_snapshot": "d86b6a1bcc6674d18ba3dac3ccd6d4e60e3d2b884aa4aeee4972a7ac76b164fe",
+  "primary_current_status_line_count_observed_after_snapshot": 4238,
+  "primary_worktree_drifted_after_snapshot": true,
+  "primary_owned_preimages_still_match_after_snapshot": true,
+  "supersedes": "/var/tmp/litchi-rtf-passwordhash-validation-20260910-v2-manifest.json",
+  "v3_delta": {
+    "path": "crates/litchi-rtf/src/codec/parser/codec/info.rs",
+    "purpose": "check declared payload length before pushing a complete byte, preventing a reallocation on an overrun",
+    "regression_path": "crates/litchi-rtf/tests/document_protection.rs",
+    "regression": "28-byte declared payload rejects a complete extra byte and an odd trailing nibble"
+  },
+  "primary_preimage_status": "The primary snapshot/preimage fields are retained from V2. The shared primary is not edited by this V3 run; current primary-wide status is intentionally not recaptured here because it is moving independently."
+}
