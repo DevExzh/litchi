@@ -303,6 +303,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "chart_metadata_codec"
+path = "fuzz_targets/chart_metadata_codec.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

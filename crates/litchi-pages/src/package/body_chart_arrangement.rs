@@ -395,26 +395,26 @@ impl BodyChartArrangementCommit {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct ChartTarget {
-    position: Position,
-    character_index: u32,
-    body_identifier: NonZeroU64,
-    body_component_index: usize,
-    body_object_index: usize,
-    body_message_index: usize,
-    body_message_type: u32,
-    attachment_identifier: NonZeroU64,
-    attachment_component_index: usize,
-    attachment_object_index: usize,
-    attachment_message_index: usize,
-    drawable_identifier: NonZeroU64,
-    component_index: usize,
-    component_name: Arc<str>,
-    drawable_object_index: usize,
-    drawable_message_index: usize,
-    drawable_message_type: u32,
-    drawable_order_identifier: NonZeroU64,
-    before: ChartArrangement,
+pub(super) struct ChartTarget {
+    pub(super) position: Position,
+    pub(super) character_index: u32,
+    pub(super) body_identifier: NonZeroU64,
+    pub(super) body_component_index: usize,
+    pub(super) body_object_index: usize,
+    pub(super) body_message_index: usize,
+    pub(super) body_message_type: u32,
+    pub(super) attachment_identifier: NonZeroU64,
+    pub(super) attachment_component_index: usize,
+    pub(super) attachment_object_index: usize,
+    pub(super) attachment_message_index: usize,
+    pub(super) drawable_identifier: NonZeroU64,
+    pub(super) component_index: usize,
+    pub(super) component_name: Arc<str>,
+    pub(super) drawable_object_index: usize,
+    pub(super) drawable_message_index: usize,
+    pub(super) drawable_message_type: u32,
+    pub(super) drawable_order_identifier: NonZeroU64,
+    pub(super) before: ChartArrangement,
 }
 
 impl ChartTarget {
@@ -446,10 +446,10 @@ impl ChartTarget {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct LocatedObject<'a> {
-    component_index: usize,
-    object_index: usize,
-    object: &'a ArchiveObject,
+pub(super) struct LocatedObject<'a> {
+    pub(super) component_index: usize,
+    pub(super) object_index: usize,
+    pub(super) object: &'a ArchiveObject,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -461,7 +461,7 @@ struct BodyEntry {
 /// Bounds focused graph projections, codec work, and physical rewrite staging.
 /// Package reconstruction retains its separate physical and semantic ingress limits.
 #[derive(Debug, Clone, Copy)]
-struct ArrangementBudget {
+pub(super) struct ArrangementBudget {
     limits: WireLimits,
     max_input: usize,
     max_output: usize,
@@ -481,7 +481,7 @@ struct ArrangementBudget {
 }
 
 impl ArrangementBudget {
-    fn new(package: &Package) -> Result<Self, BodyChartArrangementError> {
+    pub(super) fn new(package: &Package) -> Result<Self, BodyChartArrangementError> {
         let physical = package.state.source.limits();
         let archive = physical
             .effective_archive_limits()
@@ -545,7 +545,7 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    fn input(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn input(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
         Self::add(
             &mut self.input,
             amount,
@@ -563,7 +563,7 @@ impl ArrangementBudget {
         )
     }
 
-    fn fields(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn fields(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
         Self::add(
             &mut self.fields,
             amount,
@@ -572,7 +572,7 @@ impl ArrangementBudget {
         )
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn work(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
         Self::add(
             &mut self.work,
             amount,
@@ -581,7 +581,7 @@ impl ArrangementBudget {
         )
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn references(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
         Self::add(
             &mut self.references,
             amount,
@@ -590,7 +590,7 @@ impl ArrangementBudget {
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn allocations(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
         Self::add(
             &mut self.allocations,
             amount,
@@ -599,7 +599,7 @@ impl ArrangementBudget {
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn retained(&mut self, amount: usize) -> Result<(), BodyChartArrangementError> {
         Self::add(
             &mut self.retained,
             amount,
@@ -608,7 +608,7 @@ impl ArrangementBudget {
         )
     }
 
-    fn parse<'a>(
+    pub(super) fn parse<'a>(
         &mut self,
         source: &'a [u8],
         depth: usize,
@@ -647,7 +647,7 @@ impl ArrangementBudget {
         Ok(view)
     }
 
-    fn residual_wire_limits(&self) -> Result<WireLimits, BodyChartArrangementError> {
+    pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, BodyChartArrangementError> {
         let input = self
             .max_input
             .checked_sub(self.input)
@@ -818,7 +818,10 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    fn preflight_allocations(&self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn preflight_allocations(
+        &self,
+        amount: usize,
+    ) -> Result<(), BodyChartArrangementError> {
         let observed = self
             .allocations
             .checked_add(amount)
@@ -833,7 +836,10 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    fn preflight_retained(&self, amount: usize) -> Result<(), BodyChartArrangementError> {
+    pub(super) fn preflight_retained(
+        &self,
+        amount: usize,
+    ) -> Result<(), BodyChartArrangementError> {
         let observed = self
             .retained
             .checked_add(amount)
@@ -1067,7 +1073,7 @@ fn commit_edit(
     })
 }
 
-fn resolve_target(
+pub(super) fn resolve_target(
     package: &Package,
     selector: BodyChartSelector,
     budget: &mut ArrangementBudget,
@@ -1081,7 +1087,7 @@ fn resolve_target(
         })
 }
 
-fn resolve_targets(
+pub(super) fn resolve_targets(
     package: &Package,
     budget: &mut ArrangementBudget,
 ) -> Result<Vec<ChartTarget>, BodyChartArrangementError> {
@@ -1523,7 +1529,7 @@ fn decode_arrangement(
     ))
 }
 
-fn locate_unique_object<'a>(
+pub(super) fn locate_unique_object<'a>(
     package: &'a Package,
     identifier: NonZeroU64,
     budget: &mut ArrangementBudget,
@@ -1575,7 +1581,7 @@ fn unique_message(
     selected.ok_or(BodyChartArrangementError::InvalidSource)
 }
 
-fn unique_optional_message(
+pub(super) fn unique_optional_message(
     object: &ArchiveObject,
     message_type: u32,
 ) -> Result<Option<(usize, &RawMessage)>, BodyChartArrangementError> {
@@ -1643,7 +1649,7 @@ fn unique_field_payload<'a>(
         .ok_or(BodyChartArrangementError::InvalidSource)
 }
 
-fn validate_message_metadata(
+pub(super) fn validate_message_metadata(
     object: &ArchiveObject,
     message_index: usize,
 ) -> Result<(), BodyChartArrangementError> {
@@ -1664,7 +1670,7 @@ fn validate_message_metadata(
     Ok(())
 }
 
-fn object_metadata_is_owned(
+pub(super) fn object_metadata_is_owned(
     object: &ArchiveObject,
     message_index: usize,
     identifier: NonZeroU64,
@@ -1938,7 +1944,7 @@ fn rewrite_arrangement(
         .map_err(map_codec_error)
 }
 
-fn selected_chart_payload<'source>(
+pub(super) fn selected_chart_payload<'source>(
     package: &'source Package,
     target: &ChartTarget,
 ) -> Result<&'source [u8], BodyChartArrangementError> {

@@ -31,6 +31,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/keynote_chart_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_legend_codec.rs");
     println!("cargo:rerun-if-changed=src/chart_arrangement_codec.rs");
+    println!("cargo:rerun-if-changed=src/chart_metadata_codec.rs");
+    println!("cargo:rerun-if-changed=src/buffa-projections/TSCHChartMetadataArchive.proto");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_title_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_chart_axis_value_settings_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_show_codec.rs");
@@ -180,6 +182,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_chart_arrangement_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_chart_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_chart_axis_title_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -616,6 +619,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_chart_arrangement_projection_budget(&buffa_chart_arrangement_out_directory)?;
+
+    // Chart metadata reads retain only the selected modern/legacy scalar,
+    // reference, label, and row-count messages.  Outer extension bytes and
+    // unknown fields stay with the handwritten source-preserving codec.
+    let buffa_chart_metadata_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-chart-metadata");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSCHChartMetadataArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_chart_metadata_out_directory)
+        .include_file("iwa_chart_metadata_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_chart_metadata_projection_budget(&buffa_chart_metadata_out_directory)?;
 
     // Keynote chart-axis-title reads need only the four scalar fields from
     // the generated ChartAxisNonStyleArchive extension. Keep the outer
@@ -1647,6 +1670,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "8faaf5b5fd30a2a73e34e73aa003cff591c4f2aa3e32dfca58cc1c5fce09f10a",
         ),
         (
+            "TSCHChartMetadataArchive.proto",
+            1346,
+            "afc942459e9e469a9c10fa8790fcc2740cf8d5587cdfb8e75ddd497a4c61ae7c",
+        ),
+        (
             "TSCHChartLegendArchive.proto",
             440,
             "8c81e0862ee6f01742f1689207b81cc8ccc0ea37f027b338dc86996b1d9a92ba",
@@ -1964,6 +1992,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/chart_arrangement_codec.rs",
             "crate::buffa_chart_arrangement_generated::",
             "mod buffa_chart_arrangement_generated {",
+        ),
+        (
+            "src/chart_metadata_codec.rs",
+            "crate::buffa_chart_metadata_generated::",
+            "mod buffa_chart_metadata_generated {",
         ),
         (
             "src/keynote_chart_axis_title_codec.rs",
@@ -4013,6 +4046,111 @@ optional .LitchiIwaProjection.DrawableArchive super = 1;\n\
     {
         return Err(
             "derived chart-arrangement projection/router drifted from TSCH.ChartDrawableArchive.super and TSD.DrawableArchive fields 5/7, exposed generated ownership, or introduced production encoding".into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_chart_metadata_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const PROJECTION_SCHEMA: &str =
+        include_str!("src/buffa-projections/TSCHChartMetadataArchive.proto");
+    const REQUIRED_SOURCE_MARKERS: [&str; 24] = [
+        "message ChartDrawableArchive {",
+        "optional .TSCH.ChartArchive unity = 10000;",
+        "message ChartArchive {",
+        "optional .TSCH.ChartType chart_type = 1;",
+        "optional bool contains_default_data = 6;",
+        "optional .TSCH.ChartGridArchive grid = 7;",
+        "optional .TSP.Reference chart_non_style = 10;",
+        "message ChartGridArchive {",
+        "repeated string row_name = 1;",
+        "repeated string column_name = 2;",
+        "repeated .TSCH.GridRow grid_row = 3;",
+        "message ChartInfoArchive {",
+        "required .TSCH.PreUFF.ChartModelArchive chart_model = 2;",
+        "required .TSCH.ChartType chart_type = 4;",
+        "optional .TSP.Reference non_style = 14;",
+        "message ChartModelArchive {",
+        "required .TSP.Reference grid = 2;",
+        "optional .TSCH.PreUFF.ChartGridArchive inline_grid = 5;",
+        "message ChartGridArchive {",
+        "required int32 direction = 1;",
+        "repeated .TSCH.PreUFF.ChartGridArchive.ValueRow value_row = 4;",
+        "required bool dirty = 6;",
+        "optional int32 deprecated_type = 2;",
+        "optional bool deprecated_is_external = 3;",
+    ];
+    // TSPMessages.proto contains several identifier fields.  Keep this
+    // provenance check scoped to the actual Reference declaration instead of
+    // accepting an unrelated message that happens to use field 1.
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const ROUTER_MARKERS: [&str; 10] = [
+        "pub const MODERN_CHART_DRAWABLE_MESSAGE_TYPE: u32 = 5021;",
+        "pub const LEGACY_CHART_INFO_MESSAGE_TYPE: u32 = 5000;",
+        "pub const CHART_NON_STYLE_MESSAGE_TYPE: u32 = 5023;",
+        "pub struct ChartMetadataSnapshot<'source>",
+        "pub fn decode_modern<'source>(",
+        "pub fn decode_modern_with_report<'source>(",
+        "pub fn decode_legacy<'source>(",
+        "pub fn decode_legacy_with_report<'source>(",
+        "fn preflight_modern<'source>(",
+        "fn preflight_legacy<'source>(",
+    ];
+    const PRIVATE_MODULE_MARKERS: [&str; 2] = [
+        "mod buffa_chart_metadata_generated {",
+        "/buffa-chart-metadata/iwa_chart_metadata_buffa_protos.rs",
+    ];
+
+    let modern = fs::read_to_string(proto_directory.join("TSCHArchives.proto"))?;
+    let modern_generated = fs::read_to_string(proto_directory.join("TSCHArchives.GEN.proto"))?;
+    let common = fs::read_to_string(proto_directory.join("TSCHArchives.Common.proto"))?;
+    let legacy = fs::read_to_string(proto_directory.join("TSCHPreUFFArchives.proto"))?;
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSCHChartMetadataArchive.proto"))?;
+    let codec = fs::read_to_string("src/chart_metadata_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let source_has = |source: &str, marker: &str| source.contains(marker);
+    let source_has_all = REQUIRED_SOURCE_MARKERS.iter().all(|marker| {
+        source_has(&modern, marker)
+            || source_has(&modern_generated, marker)
+            || source_has(&common, marker)
+            || source_has(&legacy, marker)
+            || source_has(&tsp, marker)
+    });
+    let schema_matches = normalize(&projection) == normalize(PROJECTION_SCHEMA);
+    if !source_has_all
+        || tsp.matches(TSP_REFERENCE).count() != 1
+        || !schema_matches
+        || projection.len() > 8 * 1024
+        || !ROUTER_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || !PRIVATE_MODULE_MARKERS
+            .iter()
+            .all(|marker| lib.matches(marker).count() == 1)
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+        || production_codec.contains("IWorkPackage")
+    {
+        return Err(
+            "derived chart-metadata projection/router drifted from canonical TSCH modern/legacy chart messages or introduced generated production encoding".into(),
         );
     }
     Ok(())
@@ -10065,6 +10203,35 @@ fn enforce_chart_arrangement_projection_budget(directory: &Path) -> Result<(), B
     {
         return Err(format!(
             "chart-arrangement projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_chart_metadata_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    // The metadata projection intentionally includes bounded repeated label
+    // and row views.  Keep the generated sidecar finite while allowing the
+    // schema's lazy repeated accessors to evolve without a digest ratchet.
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 192 * 1024;
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("generated byte count overflow")?;
+    }
+    if files != EXPECTED_FILES || bytes > MAX_GENERATED_BYTES {
+        return Err(format!(
+            "chart-metadata projection generated {files} files/{bytes} bytes; expected {EXPECTED_FILES} files and at most {MAX_GENERATED_BYTES} bytes"
         )
         .into());
     }

@@ -69969,6 +69969,139 @@ IWA_FOCUSED_TABLE_CELLS_BUDGET_IMPL = re.compile(
     r"\s+for\s+(?P<owner>[A-Za-z_][A-Za-z0-9_]*)\b"
 )
 
+# Chart metadata is a read-only semantic value shared by all three concrete
+# format crates.  Keep the common value archive-free, the strict Buffa
+# projection private to the protos crate, and the focused package methods
+# selector-first.  This audit deliberately checks source/import/public-seam
+# invariants rather than implementation helper names so the host can be
+# removed later without weakening the format boundary.
+IWA_COMMON_CHART_METADATA_SOURCE = Path(
+    "crates/litchi-iwa-common/src/chart/metadata.rs"
+)
+IWA_COMMON_CHART_METADATA_MODULE_SOURCE = Path(
+    "crates/litchi-iwa-common/src/chart.rs"
+)
+IWA_COMMON_CHART_METADATA_MODULE = re.compile(
+    r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?metadata\b"
+)
+IWA_COMMON_CHART_METADATA_FORBIDDEN_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"litchi_iwa(?:_(?:archive|core|protos|structured|text_wire))?|"
+    r"litchi_numbers(?:_wire)?|litchi_pages|litchi_keynote|"
+    r"buffa|prost(?:_types)?|archive|protobuf|proto|wire"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_CHART_METADATA_PUBLIC_PHYSICAL_TYPES = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"Archive(?:Object)?|RawMessage|IWorkPackage|Native(?:Id|Object)|"
+    r"(?:Object|Package|Chart|Drawable|Message|Component)Id|"
+    r"(?:Chart|Drawable|Message|Component)Archive|"
+    r"DecodeOptions|DecodeReport|Wire(?:View|Limits|FieldView|Descent)|"
+    r"FormulaArchive|prost(?:_types)?|buffa|litchi_iwa_protos"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_CHART_METADATA_RAW_ID_PARAMETER = re.compile(
+    r"\b(?:table|model|drawable|object|native|slide|sheet|chart|"
+    r"component|archive|message|source|package|metadata)?"
+    r"_?(?:id|identifier)\b[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:NonZero(?:U|I)(?:8|16|32|64|128)|u8|u16|u32|u64|u128|"
+    r"usize|i8|i16|i32|i64|i128|isize|Option[ \t\r\n]*<[^>]*\b(?:u|i)[0-9]+\b)"
+    r"\b"
+)
+
+IWA_CHART_METADATA_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/chart_metadata_codec.rs"
+)
+IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE = IWA_PROTOS_FACADE_SOURCE
+IWA_CHART_METADATA_CODEC_MODULE = "chart_metadata_codec"
+IWA_CHART_METADATA_CODEC_GENERATED_MODULE = "buffa_chart_metadata_generated"
+IWA_CHART_METADATA_CODEC_HIDDEN_MODULE = re.compile(
+    rf"(?m)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+    rf"pub\s+mod\s+{re.escape(IWA_CHART_METADATA_CODEC_MODULE)}\b"
+)
+IWA_CHART_METADATA_CODEC_REQUIRED_TYPES = (
+    "ChartMetadataSnapshot",
+    "DecodeOptions",
+    "DecodeReport",
+)
+IWA_CHART_METADATA_CODEC_REQUIRED_MARKER_GROUPS = {
+    "Buffa lazy ingress": ("buffa", "decode_lazy_view"),
+    "modern and legacy decode routes": (
+        "decode_modern",
+        "decode_modern_with_report",
+        "decode_legacy",
+        "decode_legacy_with_report",
+    ),
+    "strict preflight": ("preflight_modern", "preflight_legacy"),
+}
+IWA_CHART_METADATA_CODEC_PROST = re.compile(
+    r"(?<![A-Za-z0-9_])prost(?:_types)?(?![A-Za-z0-9_])"
+)
+
+IWA_CHART_METADATA_FOCUSED_OWNERS = {
+    "Pages": Path("crates/litchi-pages/src/package/body_chart_metadata.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/package/chart_metadata.rs"),
+    "Keynote": Path("crates/litchi-keynote/src/package/slide_chart_metadata.rs"),
+}
+IWA_CHART_METADATA_FOCUSED_PACKAGES = {
+    "Pages": Path("crates/litchi-pages/src/package.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/package.rs"),
+    "Keynote": Path("crates/litchi-keynote/src/package.rs"),
+}
+IWA_CHART_METADATA_FOCUSED_MODULES = {
+    "Pages": "body_chart_metadata",
+    "Numbers": "chart_metadata",
+    "Keynote": "slide_chart_metadata",
+}
+IWA_CHART_METADATA_FOCUSED_METHODS = {
+    "Pages": "body_chart_metadata",
+    "Numbers": "sheet_chart_metadata",
+    "Keynote": "slide_chart_metadata",
+}
+IWA_CHART_METADATA_COMMON_IMPORT = re.compile(
+    r"(?:\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*chart"
+    r"[ \t\r\n]*::[ \t\r\n]*metadata\b|"
+    r"\blitchi_iwa_common[ \t\r\n]*::[ \t\r\n]*chart"
+    r"[ \t\r\n]*::[ \t\r\n]*\{[^{};]*\bmetadata\b)"
+)
+IWA_CHART_METADATA_CODEC_IMPORT = re.compile(
+    r"\blitchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*chart_metadata_codec\b"
+)
+IWA_CHART_METADATA_CODEC_CALL = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+    r"chart_metadata_codec[ \t\r\n]*::"
+)
+IWA_CHART_METADATA_FOCUSED_MODULE = re.compile(
+    r"(?m)^[ \t]*(?P<visibility>pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t]+(?:r#)?(?P<name>body_chart_metadata|"
+    r"chart_metadata|sheet_chart_metadata|slide_chart_metadata)\b[ \t]*(?:;|\{)"
+)
+IWA_CHART_METADATA_FOCUSED_FORBIDDEN_PROST = re.compile(
+    r"(?<![A-Za-z0-9_])(?:prost|prost_types|"
+    r"(?:Chart|ChartInfo|ChartDrawable|ChartGrid)Archive[ \t\r\n]*::[ \t\r\n]*decode)"
+    r"(?![A-Za-z0-9_])"
+)
+IWA_CHART_METADATA_HOST_SOURCE = Path(
+    "crates/litchi-iwa/src/charts/metadata_extractor.rs"
+)
+IWA_CHART_METADATA_HOST_MODULE_SOURCE = Path("crates/litchi-iwa/src/charts/mod.rs")
+IWA_CHART_METADATA_HOST_LOCAL_TYPE = re.compile(
+    r"(?m)^[ \t]*pub[ \t]+(?:struct|enum|type)[ \t]+"
+    r"(?:r#)?ChartMetadata\b"
+)
+IWA_CHART_METADATA_HOST_OLD_IMPORT = re.compile(
+    r"\b(?:crate|self|super)[ \t\r\n]*::[ \t\r\n]*protobuf"
+    r"[ \t\r\n]*::[ \t\r\n]*tsch\b|\bprost[ \t\r\n]*::[ \t\r\n]*Message\b"
+)
+IWA_CHART_METADATA_HOST_GENERATED_DECODE = re.compile(
+    r"\b(?:Chart|ChartInfo|ChartDrawable|ChartGrid)Archive[ \t\r\n]*::"
+    r"[ \t\r\n]*decode\s*\("
+)
+IWA_CHART_METADATA_HOST_CODEC_CALL = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
+    r"chart_metadata_codec[ \t\r\n]*::"
+)
+
 
 def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]:
     """Keep the cell-border value in common and the old path compatibility-only."""
@@ -71164,6 +71297,460 @@ def audit_keynote_table_cells_source_topology(root: Path = ROOT) -> list[str]:
     )
 
 
+def _chart_metadata_boundary_active(root: Path) -> bool:
+    """Return whether the chart-metadata migration has a production owner."""
+
+    if (root / IWA_CHART_METADATA_CODEC_SOURCE).is_file():
+        return True
+    codec_public = root / IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE
+    if codec_public.is_file():
+        codec_source = _mask_rust_cfg_test_items(
+            codec_public.read_text(encoding="utf-8")
+        )
+        if re.search(
+            rf"(?m)^\s*(?:pub\s+)?mod\s+"
+            rf"(?:r#)?{re.escape(IWA_CHART_METADATA_CODEC_MODULE)}\b",
+            codec_source,
+        ):
+            return True
+    for format_name, owner_path in IWA_CHART_METADATA_FOCUSED_OWNERS.items():
+        if (root / owner_path).is_file():
+            return True
+        package_path = root / IWA_CHART_METADATA_FOCUSED_PACKAGES[format_name]
+        if not package_path.is_file():
+            continue
+        package_source = _mask_rust_cfg_test_items(
+            package_path.read_text(encoding="utf-8")
+        )
+        module_name = IWA_CHART_METADATA_FOCUSED_MODULES[format_name]
+        if re.search(
+            rf"(?m)^\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+"
+            rf"(?:r#)?{re.escape(module_name)}\b",
+            package_source,
+        ):
+            return True
+    return False
+
+
+def _chart_metadata_external_public_declaration(declaration: str) -> bool:
+    """Return whether a Rust declaration is externally public."""
+
+    return re.match(r"\s*pub(?!\s*\()", declaration) is not None
+
+
+def _chart_metadata_check_common_source(root: Path) -> list[str]:
+    """Check the archive-free common chart metadata value."""
+
+    source_path = root / IWA_COMMON_CHART_METADATA_SOURCE
+    module_path = root / IWA_COMMON_CHART_METADATA_MODULE_SOURCE
+    violations: list[str] = []
+    if not source_path.is_file():
+        return [
+            "common chart-metadata semantic owner is missing: "
+            f"{IWA_COMMON_CHART_METADATA_SOURCE}"
+        ]
+
+    raw_source = source_path.read_text(encoding="utf-8")
+    code = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+    if not module_path.is_file():
+        violations.append(
+            "common chart-metadata module export source is missing: "
+            f"{IWA_COMMON_CHART_METADATA_MODULE_SOURCE}"
+        )
+    else:
+        module_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(module_path.read_text(encoding="utf-8"))
+        )
+        if IWA_COMMON_CHART_METADATA_MODULE.search(module_code) is None:
+            violations.append(
+                "common chart module is missing public chart-metadata export: "
+                f"{IWA_COMMON_CHART_METADATA_MODULE_SOURCE}"
+            )
+
+    if re.search(r"(?m)^\s*pub\s+struct\s+ChartMetadata\b", code) is None:
+        violations.append(
+            "common chart-metadata semantic owner is missing public ChartMetadata: "
+            f"{IWA_COMMON_CHART_METADATA_SOURCE}"
+        )
+    if re.search(r"\bpub\s+fn\s+from_owned\b", code) is None:
+        violations.append(
+            "common chart-metadata semantic owner is missing its owned constructor: "
+            f"{IWA_COMMON_CHART_METADATA_SOURCE}"
+        )
+
+    import_statement = re.compile(
+        r"(?ms)^[ \t]*(?:pub(?:\([^()\r\n]*\))?[ \t]+)?"
+        r"(?:use|extern[ \t]+crate)\b.*?;"
+    )
+    for statement in import_statement.finditer(code):
+        forbidden = IWA_COMMON_CHART_METADATA_FORBIDDEN_IMPORT.search(statement.group())
+        if forbidden is None:
+            continue
+        line_number = code.count("\n", 0, statement.start() + forbidden.start()) + 1
+        violations.append(
+            "common chart-metadata semantic owner imports a concrete format, wire, "
+            f"or protobuf crate ({forbidden.group()}): "
+            f"{IWA_COMMON_CHART_METADATA_SOURCE}:{line_number}"
+        )
+
+    for declaration, line_number in _rust_public_declarations(
+        _mask_rust_cfg_test_items(raw_source)
+    ):
+        if not _chart_metadata_external_public_declaration(declaration):
+            continue
+        physical = IWA_CHART_METADATA_PUBLIC_PHYSICAL_TYPES.search(declaration)
+        if physical is not None:
+            physical_line = line_number + declaration.count("\n", 0, physical.start())
+            violations.append(
+                "common chart-metadata semantic owner exposes a physical or generated "
+                f"type {physical.group()}: {IWA_COMMON_CHART_METADATA_SOURCE}:{physical_line}"
+            )
+        if RUST_BYTE_SLICE.search(declaration) is not None:
+            violations.append(
+                "common chart-metadata semantic owner exposes raw bytes: "
+                f"{IWA_COMMON_CHART_METADATA_SOURCE}:{line_number}"
+            )
+        raw_id = IWA_CHART_METADATA_RAW_ID_PARAMETER.search(declaration)
+        if raw_id is not None:
+            raw_id_line = line_number + declaration.count("\n", 0, raw_id.start())
+            violations.append(
+                "common chart-metadata semantic owner exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: "
+                f"{IWA_COMMON_CHART_METADATA_SOURCE}:{raw_id_line}"
+            )
+    return sorted(set(violations))
+
+
+def _chart_metadata_check_codec_source(root: Path) -> list[str]:
+    """Check the private Buffa chart-metadata projection and codec seam."""
+
+    codec_path = root / IWA_CHART_METADATA_CODEC_SOURCE
+    public_path = root / IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE
+    violations: list[str] = []
+    if not codec_path.is_file():
+        return [
+            "neutral chart-metadata codec source is missing: "
+            f"{IWA_CHART_METADATA_CODEC_SOURCE}"
+        ]
+
+    raw_codec = codec_path.read_text(encoding="utf-8")
+    codec = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_codec))
+    for name in IWA_CHART_METADATA_CODEC_REQUIRED_TYPES:
+        if re.search(
+            rf"\b(?:pub\s+)?(?:struct|enum|type)\s+{re.escape(name)}\b",
+            codec,
+        ) is None:
+            violations.append(
+                "neutral chart-metadata codec is missing strict API "
+                f"{name}: {IWA_CHART_METADATA_CODEC_SOURCE}"
+            )
+
+    def marker_present(marker: str | tuple[str, ...]) -> bool:
+        if isinstance(marker, tuple):
+            return any(marker_present(item) for item in marker)
+        return re.search(rf"\b{re.escape(marker)}\b", codec) is not None
+
+    for label, markers in IWA_CHART_METADATA_CODEC_REQUIRED_MARKER_GROUPS.items():
+        if not all(marker_present(marker) for marker in markers):
+            violations.append(
+                "neutral chart-metadata codec is missing "
+                f"{label} marker: {IWA_CHART_METADATA_CODEC_SOURCE}"
+            )
+
+    if IWA_CHART_METADATA_CODEC_PROST.search(codec) is not None:
+        violations.append(
+            "neutral chart-metadata codec must use Buffa rather than Prost: "
+            f"{IWA_CHART_METADATA_CODEC_SOURCE}"
+        )
+    for declaration, line_number in _rust_public_declarations(
+        _mask_rust_cfg_test_items(raw_codec)
+    ):
+        if not _chart_metadata_external_public_declaration(declaration):
+            continue
+        if re.search(
+            rf"\b{re.escape(IWA_CHART_METADATA_CODEC_GENERATED_MODULE)}\b|"
+            r"\bprojection\s*::",
+            declaration,
+        ):
+            violations.append(
+                "neutral chart-metadata codec must not expose Buffa generated "
+                f"types: {IWA_CHART_METADATA_CODEC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        codec,
+        frozenset({IWA_CHART_METADATA_CODEC_GENERATED_MODULE}),
+    ):
+        violations.append(
+            "neutral chart-metadata codec must not expose Buffa generated aliases: "
+            f"{IWA_CHART_METADATA_CODEC_SOURCE}"
+        )
+
+    if not public_path.is_file():
+        violations.append(
+            "neutral chart-metadata codec public module source is missing: "
+            f"{IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE}"
+        )
+        return sorted(set(violations))
+
+    raw_public = public_path.read_text(encoding="utf-8")
+    public = _mask_rust_cfg_test_items(raw_public)
+    if _rust_root_level_matches(public, IWA_CHART_METADATA_CODEC_HIDDEN_MODULE) == ():
+        violations.append(
+            "neutral chart-metadata codec module must be hidden: "
+            f"{IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE}"
+        )
+    generated_declarations = _rust_root_level_module_declarations(
+        public,
+        frozenset({IWA_CHART_METADATA_CODEC_GENERATED_MODULE}),
+    )
+    if not generated_declarations:
+        violations.append(
+            "neutral chart-metadata codec is missing its private Buffa generated "
+            f"module: {IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE}"
+        )
+    for _, visibility, shape, body, line_number in generated_declarations:
+        if visibility is not None:
+            violations.append(
+                "neutral chart-metadata codec generated module must remain private: "
+                f"{IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "neutral chart-metadata codec generated module has invalid include "
+                f"shape: {IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        public,
+        frozenset({IWA_CHART_METADATA_CODEC_GENERATED_MODULE}),
+    ):
+        violations.append(
+            "neutral chart-metadata codec must not re-export Buffa generated types: "
+            f"{IWA_CHART_METADATA_CODEC_PUBLIC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def _audit_focused_chart_metadata_owner(
+    root: Path,
+    *,
+    format_name: str,
+    owner_path: Path,
+    package_path: Path,
+    module_name: str,
+    public_method: str,
+) -> list[str]:
+    """Check one selector-first chart metadata package owner."""
+
+    owner_absolute = root / owner_path
+    package_absolute = root / package_path
+    package_source = (
+        package_absolute.read_text(encoding="utf-8")
+        if package_absolute.is_file()
+        else ""
+    )
+    package_code = _mask_rust_non_code(_mask_rust_cfg_test_items(package_source))
+    module_match = re.search(
+        rf"(?m)^[ \t]*(?P<visibility>pub(?:\([^()]*\))?[ \t]+)?"
+        rf"mod[ \t]+(?:r#)?{re.escape(module_name)}\b[ \t]*(?:;|\{{)",
+        package_code,
+    )
+    owner_source = (
+        owner_absolute.read_text(encoding="utf-8")
+        if owner_absolute.is_file()
+        else package_source
+    )
+    owner_code = _mask_rust_non_code(_mask_rust_cfg_test_items(owner_source))
+    method_evidence = _rust_public_method_bodies(owner_source, public_method)
+    if not owner_absolute.is_file() and module_match is None and not method_evidence:
+        return []
+
+    violations: list[str] = []
+    if not owner_absolute.is_file():
+        violations.append(
+            f"focused {format_name} chart-metadata owner is missing: {owner_path}"
+        )
+    if module_match is None:
+        violations.append(
+            f"focused {format_name} chart-metadata package is missing its private "
+            f"module: {package_path}"
+        )
+    elif module_match.group("visibility") and not module_match.group("visibility").startswith(
+        "pub("
+    ):
+        line_number = package_code.count("\n", 0, module_match.start()) + 1
+        violations.append(
+            f"focused {format_name} chart-metadata module must remain private: "
+            f"{package_path}:{line_number}"
+        )
+
+    if IWA_CHART_METADATA_COMMON_IMPORT.search(owner_code) is None:
+        violations.append(
+            f"focused {format_name} chart-metadata owner is missing its common "
+            f"ChartMetadata import: {owner_path}"
+        )
+    if "chart_metadata_codec" not in owner_code:
+        violations.append(
+            f"focused {format_name} chart-metadata owner must delegate to the shared "
+            f"codec: {owner_path}"
+        )
+    if IWA_CHART_METADATA_FOCUSED_FORBIDDEN_PROST.search(owner_code) is not None:
+        violations.append(
+            f"focused {format_name} chart-metadata owner retains production Prost or "
+            f"generated metadata decoding: {owner_path}"
+        )
+
+    relative_owner = owner_path if owner_absolute.is_file() else package_path
+    for declaration, line_number in _rust_public_declarations(
+        _mask_rust_cfg_test_items(owner_source)
+    ):
+        if not _chart_metadata_external_public_declaration(declaration):
+            continue
+        physical = IWA_CHART_METADATA_PUBLIC_PHYSICAL_TYPES.search(declaration)
+        if physical is not None:
+            physical_line = line_number + declaration.count("\n", 0, physical.start())
+            violations.append(
+                f"focused {format_name} chart-metadata public API exposes generated or "
+                f"wire type {physical.group()}: {relative_owner}:{physical_line}"
+            )
+        if RUST_BYTE_SLICE.search(declaration) is not None:
+            violations.append(
+                f"focused {format_name} chart-metadata public API exposes raw bytes: "
+                f"{relative_owner}:{line_number}"
+            )
+        raw_id = IWA_CHART_METADATA_RAW_ID_PARAMETER.search(declaration)
+        if raw_id is not None:
+            raw_id_line = line_number + declaration.count("\n", 0, raw_id.start())
+            violations.append(
+                f"focused {format_name} chart-metadata public API exposes a raw ID "
+                f"parameter {raw_id.group(0).strip()}: {relative_owner}:{raw_id_line}"
+            )
+
+    if not method_evidence:
+        violations.append(
+            f"focused {format_name} chart-metadata owner is missing public "
+            f"Package::{public_method}: {owner_path}"
+        )
+    else:
+        for declaration, _body, line_number in method_evidence:
+            if re.search(r"\bChartMetadata\b", declaration) is None:
+                violations.append(
+                    f"focused {format_name} Package::{public_method} must return common "
+                    f"ChartMetadata values: {owner_path}:{line_number}"
+                )
+            if re.search(r"\b[A-Za-z_][A-Za-z0-9_]*Selector\b", declaration) is None:
+                violations.append(
+                    f"focused {format_name} Package::{public_method} must accept a "
+                    f"semantic selector: {owner_path}:{line_number}"
+                )
+            if RUST_BYTE_SLICE.search(declaration) is not None:
+                violations.append(
+                    f"focused {format_name} Package::{public_method} exposes raw bytes: "
+                    f"{owner_path}:{line_number}"
+                )
+            raw_id = IWA_CHART_METADATA_RAW_ID_PARAMETER.search(declaration)
+            if raw_id is not None:
+                violations.append(
+                    f"focused {format_name} Package::{public_method} exposes a raw ID "
+                    f"parameter {raw_id.group(0).strip()}: {owner_path}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_chart_metadata_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep chart metadata common, private-wire, and focused seams separated."""
+
+    if not _chart_metadata_boundary_active(root):
+        return []
+
+    violations = _chart_metadata_check_common_source(root)
+    violations.extend(_chart_metadata_check_codec_source(root))
+    for format_name, owner_path in IWA_CHART_METADATA_FOCUSED_OWNERS.items():
+        violations.extend(
+            _audit_focused_chart_metadata_owner(
+                root,
+                format_name=format_name,
+                owner_path=owner_path,
+                package_path=IWA_CHART_METADATA_FOCUSED_PACKAGES[format_name],
+                module_name=IWA_CHART_METADATA_FOCUSED_MODULES[format_name],
+                public_method=IWA_CHART_METADATA_FOCUSED_METHODS[format_name],
+            )
+        )
+
+    host_path = root / IWA_CHART_METADATA_HOST_SOURCE
+    host_module_path = root / IWA_CHART_METADATA_HOST_MODULE_SOURCE
+    if host_path.is_file():
+        host_source = _mask_rust_cfg_test_items(host_path.read_text(encoding="utf-8"))
+        host_code = _mask_rust_non_code(host_source)
+        if IWA_CHART_METADATA_HOST_LOCAL_TYPE.search(host_code) is not None:
+            violations.append(
+                "litchi-iwa chart metadata host must use the common ChartMetadata "
+                f"type rather than defining a duplicate: {IWA_CHART_METADATA_HOST_SOURCE}"
+            )
+        if IWA_CHART_METADATA_HOST_OLD_IMPORT.search(host_code) is not None:
+            violations.append(
+                "litchi-iwa chart metadata host retains production Prost/generated "
+                f"metadata ingress: {IWA_CHART_METADATA_HOST_SOURCE}"
+            )
+        if IWA_CHART_METADATA_HOST_GENERATED_DECODE.search(host_code) is not None:
+            violations.append(
+                "litchi-iwa chart metadata host directly decodes generated metadata "
+                f"instead of the shared codec: {IWA_CHART_METADATA_HOST_SOURCE}"
+            )
+        if IWA_CHART_METADATA_HOST_CODEC_CALL.search(host_code) is None:
+            violations.append(
+                "litchi-iwa chart metadata host is missing the shared codec route: "
+                f"{IWA_CHART_METADATA_HOST_SOURCE}"
+            )
+        if re.search(r"\bChartMetadata\b", host_code) is None:
+            violations.append(
+                "litchi-iwa chart metadata host is missing the common ChartMetadata "
+                f"route: {IWA_CHART_METADATA_HOST_SOURCE}"
+            )
+    elif host_module_path.is_file():
+        module_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(host_module_path.read_text(encoding="utf-8"))
+        )
+        if re.search(r"(?m)^\s*(?:pub\s+)?mod\s+metadata_extractor\s*;", module_code):
+            violations.append(
+                "litchi-iwa chart metadata host module remains wired without its "
+                f"source: {IWA_CHART_METADATA_HOST_MODULE_SOURCE}"
+            )
+
+    if not host_module_path.is_file():
+        violations.append(
+            "litchi-iwa chart metadata host module source is missing: "
+            f"{IWA_CHART_METADATA_HOST_MODULE_SOURCE}"
+        )
+    else:
+        module_source = _mask_rust_cfg_test_items(
+            host_module_path.read_text(encoding="utf-8")
+        )
+        module_code = _mask_rust_non_code(module_source)
+        if re.search(
+            r"\bpub\s+use\s+litchi_iwa_common[ \t\r\n]*::[ \t\r\n]*chart"
+            r"[ \t\r\n]*::[ \t\r\n]*metadata[ \t\r\n]*::[ \t\r\n]*ChartMetadata\b",
+            module_code,
+        ) is None:
+            violations.append(
+                "litchi-iwa charts facade must re-export common ChartMetadata: "
+                f"{IWA_CHART_METADATA_HOST_MODULE_SOURCE}"
+            )
+        if re.search(
+            r"\bpub\s+use\s+(?:(?:crate|self|super)[ \t\r\n]*::[ \t\r\n]*)?"
+            r"metadata_extractor[ \t\r\n]*::[ \t\r\n]*ChartMetadata\b",
+            module_code,
+        ) is not None:
+            violations.append(
+                "litchi-iwa charts facade must not re-export a host-owned "
+                f"ChartMetadata duplicate: {IWA_CHART_METADATA_HOST_MODULE_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
     """Reject retired XLSX implementation paths from the XLSB crate."""
 
@@ -71460,6 +72047,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_shared_chart_arrangement_retirement_source_topology()
         + audit_iwa_chart_arrangement_host_public_method_retirement_source_topology()
         + audit_iwa_keynote_chart_arrangement_source_topology()
+        + audit_iwa_chart_metadata_source_topology()
         + audit_keynote_chart_axis_title_legacy_calls()
         + audit_iwa_keynote_chart_axis_title_source_topology()
         + audit_keynote_chart_axis_title_facade_source_topology()

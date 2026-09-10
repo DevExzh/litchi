@@ -983,7 +983,7 @@ fn chart_graph_error(error: ChartTitleError) -> AxisSupportError {
     chart_axis_support::map_chart_title_error(error)
 }
 
-fn map_axis_support_error(error: AxisSupportError) -> ChartTitleError {
+pub(super) fn map_axis_support_error(error: AxisSupportError) -> ChartTitleError {
     match error {
         AxisSupportError::Selector(selector) => match selector {
             chart_axis_support::AxisSupportSelectorError::UnsupportedSource => {
@@ -1687,14 +1687,14 @@ fn exactly_one_message_with_index(
     selected.ok_or(ChartTitleError::InvalidSource)
 }
 
-struct ChartGraphScanBudget {
+pub(super) struct ChartGraphScanBudget {
     limits: WireLimits,
     maximum_work: usize,
     work: usize,
 }
 
 impl ChartGraphScanBudget {
-    fn new(package: &Package) -> Result<Self, ChartTitleError> {
+    pub(super) fn new(package: &Package) -> Result<Self, ChartTitleError> {
         let limits = package.wire_limits().map_err(map_wire_error)?;
         Ok(Self {
             maximum_work: limits
@@ -1720,6 +1720,28 @@ impl ChartGraphScanBudget {
         }
         self.work = observed;
         Ok(())
+    }
+
+    pub(super) fn charge_chart_metadata_report(
+        &mut self,
+        report: litchi_iwa_protos::chart_metadata_codec::DecodeReport,
+    ) -> Result<(), ChartTitleError> {
+        let amount = report
+            .source_bytes()
+            .checked_add(report.fields())
+            .and_then(|value| value.checked_add(report.work_bytes()))
+            .and_then(|value| value.checked_add(report.failure_work_bytes()))
+            .and_then(|value| value.checked_add(report.max_depth() as usize))
+            .and_then(|value| value.checked_add(report.label_count()))
+            .and_then(|value| value.checked_add(report.text_bytes()))
+            .and_then(|value| value.checked_add(report.allocations()))
+            .and_then(|value| value.checked_add(report.retained_bytes()))
+            .ok_or(ChartTitleError::InvalidSource)?;
+        self.charge(amount)
+    }
+
+    pub(super) fn chart_metadata_residual_limits(&self) -> (WireLimits, usize) {
+        (self.limits, self.maximum_work.saturating_sub(self.work))
     }
 
     fn parse(&mut self, payload: &[u8]) -> Result<Vec<WireField>, ChartTitleError> {

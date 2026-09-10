@@ -36,6 +36,7 @@ pub(crate) mod font;
 pub(crate) mod gaps;
 pub(crate) mod hidden_data;
 pub use litchi_iwa_common::chart::kind::Kind;
+pub use litchi_iwa_common::chart::metadata::ChartMetadata;
 pub(crate) mod legend_fill;
 pub(crate) mod legend_font;
 pub(crate) mod legend_frame;
@@ -111,7 +112,6 @@ pub use litchi_iwa_common::chart::pie::{
 pub use litchi_iwa_common::chart::series_labels::{Index, Visibility};
 pub use litchi_iwa_common::chart::{Direction, DirectionKind};
 pub use litchi_iwa_common::chart3d::BarShape;
-pub use metadata_extractor::ChartMetadata;
 pub use pie_label_distance::ChartPieLabelDistance;
 pub use pie_start_angle::ChartPieStartAngle;
 pub use pie_wedge_explosion::{ChartPieWedgeExplosion, ChartPieWedgeIndex};

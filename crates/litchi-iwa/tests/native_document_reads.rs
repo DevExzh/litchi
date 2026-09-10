@@ -14,12 +14,22 @@ fn assert_native_reads(
     let charts = document.charts().expect("native chart metadata");
     assert_eq!(charts.len(), 1);
     let chart = &charts[0];
-    assert_eq!(chart.title.as_deref(), title);
-    assert_eq!(chart.row_names, rows);
-    assert_eq!(chart.column_names, ["April", "May", "June", "July"]);
-    assert_eq!(chart.series_count, 2);
-    assert_eq!(chart.chart_type, Kind::Column2d);
-    assert!(!chart.contains_default_data);
+    assert_eq!(chart.title(), title);
+    let row_names = chart
+        .row_names()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(row_names.as_slice(), rows);
+    let column_names = chart
+        .column_names()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(column_names.as_slice(), ["April", "May", "June", "July"]);
+    assert_eq!(chart.series_count(), 2);
+    assert_eq!(chart.kind(), Kind::Column2d);
+    assert!(!chart.contains_default_data());
 
     let stats = document.stats().expect("physical document statistics");
     assert_eq!(stats.application, application);

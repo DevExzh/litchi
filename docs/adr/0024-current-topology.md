@@ -4568,3 +4568,19 @@ Generic graph behavior remains owned by `litchi-iwa-index` and
 owners and their bounded wire codecs; the host no longer scans unrelated
 payloads merely to construct a graph with no consumer. Document text, chart
 metadata decoding, and the remaining mutation paths still require migration.
+
+## 2026-09-10 Focused chart metadata readers
+
+Chart metadata now has an archive-free semantic owner in
+`litchi-iwa-common::chart::metadata::ChartMetadata`. Pages, Numbers, and Keynote
+expose selected-chart readers through their existing body, sheet, and slide
+selectors. Concrete packages retain rooted selection, ownership validation,
+title-reference resolution, and aggregate resource accounting.
+
+The shared `chart_metadata_codec` uses private Buffa projections for modern
+chart extensions and legacy inline chart grids. Labels remain borrowed until
+the format owner materializes the semantic result. The host chart extractor
+uses the same projection and common result while retaining its historical
+global inventory, including unrooted chart objects. This temporary host
+inventory is not equivalent to the focused rooted APIs and remains migration
+debt; the monolithic crate is not yet removed.

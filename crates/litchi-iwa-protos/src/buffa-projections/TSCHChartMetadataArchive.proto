@@ -1,0 +1,37 @@
+// Wire-only projections for the semantic chart metadata selected by the
+// focused Pages and Keynote readers.  The generated ChartArchive extension
+// envelope is scanned by the handwritten codec; Buffa only views the
+// canonical selected messages after the outer field has been isolated.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message ModernChartArchive {
+  optional int32 chart_type = 1;
+  optional bool contains_default_data = 6;
+  // The strict router validates this embedded ChartGridArchive. Keeping the
+  // generated projection as bytes avoids Buffa repeated-field allocations.
+  optional bytes grid = 7;
+  optional Reference chart_non_style = 10;
+}
+
+message LegacyChartInfoArchive {
+  required LegacyChartModelArchive chart_model = 2;
+  required int32 chart_type = 4;
+  optional Reference non_style = 14;
+}
+
+message LegacyChartModelArchive {
+  // The external grid reference is not selected by this metadata reader;
+  // retain its wire bytes without forcing a generated nested view.
+  optional bytes grid = 2;
+  // As with modern grid, strict code validates the embedded bytes and keeps
+  // repeated labels/rows borrowed from the original source.
+  optional bytes inline_grid = 5;
+}
