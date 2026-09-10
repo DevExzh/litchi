@@ -119,6 +119,14 @@ pub use actions::{Jump, Kind, Setting, Target, Trigger};
 pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use chart::{Chart, Info as ChartInfo, Series as ChartSeries, Type as ChartType};
+pub use comments::collaboration::{
+    AuthorPresenceCommit, AuthorPresencePatch, AuthorPresenceSnapshot, AuthorPresenceTransaction,
+    CommentThreadingCommit, CommentThreadingPatch, CommentThreadingSnapshot,
+    CommentThreadingTransaction, ParentComment, PresenceInfo, ThreadingInfo, apply_presence_commit,
+    apply_presence_patch, apply_threading_commit, apply_threading_patch, load_presence,
+    load_presence_snapshot, load_threading, load_threading_snapshot, put_presence, put_threading,
+    remove_presence, remove_threading,
+};
 pub use comments::{
     Author, Comment, Comments, Conformance, List, add_presentation_comment,
     add_presentation_comment_author, find_presentation_comment, find_presentation_comment_author,

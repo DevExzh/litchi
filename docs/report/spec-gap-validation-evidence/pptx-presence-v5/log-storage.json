@@ -1,0 +1,71 @@
+{
+  "format": "gzip; decompress for exact raw logs referenced by gate receipts",
+  "files": [
+    {
+      "raw_name": "clippy.log",
+      "raw_sha256": "15965daadf7ba0539e8e82f990e8362ec27bc11f6a06f0b9451cb284b26122af",
+      "stored_name": "clippy.log.gz",
+      "stored_sha256": "0fcd6076af876439f9ba96ee328558fd34b4c66dc28d7e8dc24814dae21b464f"
+    },
+    {
+      "raw_name": "doctests.log",
+      "raw_sha256": "c6937641073382d857e52b06471e44df83608d6df2b693ce3d35f44f9b2b0f6a",
+      "stored_name": "doctests.log.gz",
+      "stored_sha256": "5ab2e2867b5c6932fe8d54b21dffec02767976b0d7f361c87c06323eac8c8533"
+    },
+    {
+      "raw_name": "fmt.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stored_name": "fmt.log.gz",
+      "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "raw_name": "independent-harness.log",
+      "raw_sha256": "8b37eba300a4cfbd44951c1dfbf7750e6539b2ab0a3adbc520a060b177222dff",
+      "stored_name": "independent-harness.log.gz",
+      "stored_sha256": "b706ff57fe35155dba983e59c6512da305784840576b6d6ecd95949248f5756f"
+    },
+    {
+      "raw_name": "independent-tests.log",
+      "raw_sha256": "f9b005e6c817a09dd82c6377c11488646d6938730b8a7370574a797e78ea2c3e",
+      "stored_name": "independent-tests.log.gz",
+      "stored_sha256": "6c55ebcaf4bc70e2814a6a236e89a12399d89c6496a749b7a5f42faaa0a0d6b0"
+    },
+    {
+      "raw_name": "integration-clippy.log",
+      "raw_sha256": "f740c0942df0e33eb2d36c1a98aae19d2f01cb252f0068f3ef9f2f8b45634e29",
+      "stored_name": "integration-clippy.log.gz",
+      "stored_sha256": "b8e7a0de83569d19638fb45a9f96c1fca356899081bdedd392c2ebb0a2f7d174"
+    },
+    {
+      "raw_name": "integration-doctests.log",
+      "raw_sha256": "bdb408c0c953b116bd1674b8fee9321fa15a3e2fa05a1d8844352a07af25eddb",
+      "stored_name": "integration-doctests.log.gz",
+      "stored_sha256": "2db63d6df2a18c44dd684214fc2b09a26d12b699c60f8c1208d7fe9395660728"
+    },
+    {
+      "raw_name": "integration-rustdoc.log",
+      "raw_sha256": "d5ba8c51b4f759d7264fa79bd99dbba25f2e845500ac826a4bebd79a5ca0bb3c",
+      "stored_name": "integration-rustdoc.log.gz",
+      "stored_sha256": "7aa32284679d1fdf27cef3905d95c543d012bf8ab11963df44d59b2263527410"
+    },
+    {
+      "raw_name": "integration-tests.log",
+      "raw_sha256": "21d2ebfbbeb7b841871a54384cdda669fc439a012c4c3baf5b5e7c3a490e832a",
+      "stored_name": "integration-tests.log.gz",
+      "stored_sha256": "2c5c107112f18e5873d5f66c12369f1e10f1a76bb257583796c8f6fd7d2fe1f7"
+    },
+    {
+      "raw_name": "rustdoc.log",
+      "raw_sha256": "5483353462ce292409444f4c89e126e3e06bb992ee4eb80144837d90f8e1814f",
+      "stored_name": "rustdoc.log.gz",
+      "stored_sha256": "4f3a2ce53f991f1474f14d0e7cb6c0b47f9f67797c250a63d142bd480cb76903"
+    },
+    {
+      "raw_name": "tests.log",
+      "raw_sha256": "3545d4b921580c12c06b9da5bd4522dc0f1987280623db3683ed4c9b577f0524",
+      "stored_name": "tests.log.gz",
+      "stored_sha256": "b729b69714fd7277bb73aa51d0cb0ada1f8480e771b3710bed0cc174ec471d78"
+    }
+  ]
+}
