@@ -1,0 +1,155 @@
+{
+  "base": "159ff704c2912265bc00efdd970fd5db45a1ab77",
+  "source_sha256": {
+    "crates/litchi-odp/docs/FEATURE_MATRIX.md": "d4341fbc7037f609e5c61e24adf550451571a4e6022a2d729b9435bdde70919c",
+    "crates/litchi-odp/src/authoring/edit.rs": "b6217dfc9ad9c5ef250a1230b07a59eb5b1cb0675ff45c35c07858e4dedc51b0",
+    "crates/litchi-odp/src/authoring/layer.rs": "19c5c578fab1ff097a5bd5f2ce5236d811be2965eae801d4b5db9651aaa68e0d",
+    "crates/litchi-odp/src/authoring/mod.rs": "d723c073bde58574c22a02fb88e5f72d3a098c71022d8ba662cada3329d93e0f",
+    "crates/litchi-odp/src/facade.rs": "191403c3a4d31828c8c6ad667a7f8f1b4941209749baac80e856e89c8e19ff87",
+    "crates/litchi-odp/src/lib.rs": "713f8d4f8cd5821911ef9112f58cfdb6d47102e697dc34c1d2cf5301aba2442d",
+    "crates/litchi-odp/src/model/layer.rs": "10f3f9583ac7f5655158813b6fb328422a3269a1017c10e3c8df1ffa3d1d48ed",
+    "crates/litchi-odp/src/model/mod.rs": "b6968f4003a2021e7390ec80e4d2b233c7b39050fbd21c745f48a236ed950a12",
+    "crates/litchi-odp/src/package/presentation.rs": "dbcab8411b1e73b02d32487f2ea23b5dcecc28be765f096840d469621f83b75b",
+    "crates/litchi-odp/tests/odp_layers.rs": "0493a2a152f436044c7d9dc18f0896d36b260b8948711218e1f97a3df33d138e"
+  },
+  "artifacts": [
+    {
+      "artifact": "root-gates.json.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/gates.json",
+      "raw_sha256": "56af0ae126bad543d23a73ba27cf674fc2fbffc87b38b9888c3b45a5dae96867",
+      "gzip_sha256": "0bbfcd90867baaf90dcd079e300da23c2d4168e451b5b25ed5e63e6012f64739"
+    },
+    {
+      "artifact": "root-test-counts.json.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/test-counts.json",
+      "raw_sha256": "f73754f0f0f8a8612123159728e3fe847e3141844ea486347f7ff09f561e24a4",
+      "gzip_sha256": "d8c0c0c5fd887f6b2437a819c6ef15ae8826899c4f185ad8f99febed45ca5b48"
+    },
+    {
+      "artifact": "root-clippy.log.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/clippy.log",
+      "raw_sha256": "b5d55d1077d662093a0206f0c8f66269ac4c95007e165b4581172f22d50aef3a",
+      "gzip_sha256": "61b288b142abc6c62910189ec33a2e06402f2400b6035a88d868aaaa78762456"
+    },
+    {
+      "artifact": "root-source-after.json.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/source-after.json",
+      "raw_sha256": "ffdeb370cc120793063aa07bd9460ba46e2181236a155767b16c1e8eca7d925c",
+      "gzip_sha256": "7eb6c4ac58deba0ed160d2c9872547f22261acd82eba486f849f8517a496d0dc"
+    },
+    {
+      "artifact": "root-integration.json.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/integration.json",
+      "raw_sha256": "2764babb3ae04cf7fff23b93bbd5f4fc5bf768220480ee16cb6b06b27ae08578",
+      "gzip_sha256": "a331758669a97f9e68a23bc8ca438f24bff4a69795109b70118d31a4aa926926"
+    },
+    {
+      "artifact": "root-rustfmt.log.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/rustfmt.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "artifact": "root-test.log.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/test.log",
+      "raw_sha256": "4c86d16244cf611b28ac4d3b250f51cfcad608f74f0b6284405a6cee41aff276",
+      "gzip_sha256": "3b3bee6509b249b11819f349ed6ff76c3660aaa9b5f6cb6a5265840a6bb19857"
+    },
+    {
+      "artifact": "root-rustdoc.log.gz",
+      "original_path": "/var/tmp/litchi-odp-v5-root-159-20260910/rustdoc.log",
+      "raw_sha256": "4e4d1e8e459e304bb9eb332d247b6cc91197f52065d01f6b4cb52381a8cb7830",
+      "gzip_sha256": "ac50597c8b1fda04f6bed3a9b4fbc0db2adf63b8fef51948d68063d32bc25c08"
+    },
+    {
+      "artifact": "author-full-package.log.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/full-package.log",
+      "raw_sha256": "d27a01192af622bdcb4a84fa48f5d04a977331a3ebd79dee061d8993bad24cda",
+      "gzip_sha256": "54d818f812523dd727605929b27e9b374332c6360bbf8f6906da2daf02c8a48f"
+    },
+    {
+      "artifact": "author-clippy.log.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/clippy.log",
+      "raw_sha256": "7dcec04cc59975671dd8d9fe3d9c9d18410162f016c84d0be8f62c2979a31095",
+      "gzip_sha256": "c54604dec983e608d124bc6c13512a16288d3adcd6403fd37215f7368bbd26f7"
+    },
+    {
+      "artifact": "author-scanner-unit.log.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/scanner-unit.log",
+      "raw_sha256": "f23eb02379521acc3c30f7a7b433c4e98888e762ab8dd881b294ff7bc86f1048",
+      "gzip_sha256": "a6a40779e1b2d314b449e5edac8e2dac8a55bf0e5114c90f82fcecf45accdb96"
+    },
+    {
+      "artifact": "author-v4-to-v5-layer.patch.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/v4-to-v5-layer.patch",
+      "raw_sha256": "8b111092888a8c8a1b1843700ab5ce6c29e7c06ca017216fe20178bc490251c9",
+      "gzip_sha256": "9d87fb0033b8dcd50c6c728550bdf864f8590a6dfa28a2979b6bffe0e5069a39"
+    },
+    {
+      "artifact": "author-candidate-manifest-v5.json.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/candidate-manifest-v5.json",
+      "raw_sha256": "bbb1adb184908d47f26cbfe1b3ef9c62ebb0d9ba5650a668204280efbede6d9a",
+      "gzip_sha256": "4ebfa920ba943a5ebd75ac4b70830ba494eb54b1eef3437c176361871bd6252d"
+    },
+    {
+      "artifact": "author-focused-layers.log.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/focused-layers.log",
+      "raw_sha256": "269b9cb24f18fbcc015d8a0cbefb138aea2b6b38c726f9ce85a6cd0e69db2743",
+      "gzip_sha256": "2a69e16d1883a9c88b7a9cbb26c878c45d7839079c3043fe273a2f36a81d6f71"
+    },
+    {
+      "artifact": "author-docs.log.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/docs.log",
+      "raw_sha256": "8089c80d94add4704a3697953fcc4ab4b692743ee91f75e52acda83aa9ee5196",
+      "gzip_sha256": "26da28cab078ff9f0386558253c7c96d26e4723c715d39d60283a5e2c9ef41c0"
+    },
+    {
+      "artifact": "author-v4-to-v5.patch.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/v4-to-v5.patch",
+      "raw_sha256": "d3f51110b08c568f2ec4c7283fa656e53c91501c86472e7040cd482ce9ff94e8",
+      "gzip_sha256": "03c74fbb5240537e3ba95c70809fe726d3b818da5b6486c908eb20685fa6f246"
+    },
+    {
+      "artifact": "author-v4-to-v5-matrix.patch.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/v4-to-v5-matrix.patch",
+      "raw_sha256": "ae34a321d70ebd3d388c52632f436f660a87f9bfc7f2881f673d56092c3b7472",
+      "gzip_sha256": "249e1fd84f0c1c7384a474091be90ddf56fa3f71e30255fc4c9cde4e012e826d"
+    },
+    {
+      "artifact": "author-fmt.log.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/fmt.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    },
+    {
+      "artifact": "author-v4-v5-preservation.json.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/v4-v5-preservation.json",
+      "raw_sha256": "8c7132ee968fde28940da8f251db647fa12206c8fe71e133b6822bbef50c29fa",
+      "gzip_sha256": "5eadced08b3e581376f0a9f82d9a60b339a23bfb76e87c3fa362a9b881723c71"
+    },
+    {
+      "artifact": "author-v4-to-v5-tests.patch.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-clean-v5-evidence-20260910/v4-to-v5-tests.patch",
+      "raw_sha256": "8a6c0ebe82ffb447b7ef511cae3b4fd5e2223390ca9aeeb2ff6591dcf5bbddcd",
+      "gzip_sha256": "db82720cad8d24f2edb03400b78a863398dae4ee2c1a7d564c0d7f49b821861e"
+    },
+    {
+      "artifact": "independent-review.json.gz",
+      "original_path": "/var/tmp/litchi-odp-layer-independent-review-v5-20260910.json",
+      "raw_sha256": "309432ba56120294b56983265ca5ea9ae94546b8d55eb89dfe2d9c80385968e7",
+      "gzip_sha256": "71f7eb52087f7c3651c273a1ff24a353ca3a91e26a7579fd89d6c3e6a8c1f3de"
+    },
+    {
+      "artifact": "primary-preimages.tar.gz",
+      "raw_sha256": "b75d23c25573010a3585f06aaffaa915ca230b8b9a9de30abe9f831e07866114",
+      "gzip_sha256": "b5cfbfb3ded4faa596816c0d375b3da7e7b9ad4d68d174b8f40ab9ef0e47d297"
+    }
+  ],
+  "validation": {
+    "passed": 404,
+    "failed": 0,
+    "ignored": 0,
+    "targets": 29
+  },
+  "independent_status": "CLEAR"
+}
