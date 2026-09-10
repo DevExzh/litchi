@@ -23,6 +23,16 @@ V2_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 
 
 def _refresh_hashes(catalog: dict) -> None:
+    def binding_projection(binding: dict) -> dict:
+        projected = {
+            "case": binding["case"],
+            "corpus_id": binding["corpus_id"],
+            "role": binding["role"],
+        }
+        if binding.get("dimensions"):
+            projected["dimensions"] = binding["dimensions"]
+        return projected
+
     content_set = {
         "corpora": [
             {
@@ -39,14 +49,7 @@ def _refresh_hashes(catalog: dict) -> None:
             }
             for corpus in catalog["corpora"]
         ],
-        "case_bindings": [
-            {
-                "case": binding["case"],
-                "corpus_id": binding["corpus_id"],
-                "role": binding["role"],
-            }
-            for binding in catalog["case_bindings"]
-        ],
+        "case_bindings": [binding_projection(binding) for binding in catalog["case_bindings"]],
     }
     catalog["content_set_sha256"] = hashlib.sha256(
         canonical_bytes(content_set)
@@ -183,6 +186,69 @@ class PerfCorpusBindingTests(unittest.TestCase):
             validate_binding(report, catalog),
             (len(catalog["corpora"]), len(catalog["case_bindings"])),
         )
+
+    def test_warm_and_cold_rows_share_corpus_with_distinct_dimensions(self) -> None:
+        catalog = copy.deepcopy(self.catalog)
+        binding = catalog["case_bindings"][0]
+        cold = copy.deepcopy(binding)
+        cold["dimensions"] = {"cache_state": "cold-requested"}
+        warm = copy.deepcopy(binding)
+        warm["dimensions"] = {"cache_state": "warm"}
+        catalog["case_bindings"] = [cold, warm]
+        _refresh_hashes(catalog)
+        report = copy.deepcopy(self.report)
+        report["results"] = [
+            {"case": self.case, "cache_state": "warm", "corpus": self.corpus},
+            {
+                "case": self.case,
+                "cache_state": "cold-requested",
+                "corpus": self.corpus,
+            },
+        ]
+        report["corpus_catalog"].update(
+            {
+                "catalog_sha256": catalog["catalog_sha256"],
+                "content_set_sha256": catalog["content_set_sha256"],
+            }
+        )
+
+        self.assertEqual(validate_binding(report, catalog), (len(catalog["corpora"]), 2))
+        self.assertEqual(len(catalog["corpora"]), 31)
+
+    def test_duplicate_cache_dimension_binding_is_rejected(self) -> None:
+        catalog = copy.deepcopy(self.catalog)
+        first = copy.deepcopy(catalog["case_bindings"][0])
+        first["dimensions"] = {"cache_state": "warm"}
+        second = copy.deepcopy(first)
+        catalog["case_bindings"] = [first, second]
+        _refresh_hashes(catalog)
+        report = copy.deepcopy(self.report)
+        report["results"] = [
+            {"case": self.case, "cache_state": "warm", "corpus": self.corpus},
+            {"case": self.case, "cache_state": "warm", "corpus": self.corpus},
+        ]
+        report["corpus_catalog"].update(
+            {
+                "catalog_sha256": catalog["catalog_sha256"],
+                "content_set_sha256": catalog["content_set_sha256"],
+            }
+        )
+        with self.assertRaises(ValidationError):
+            validate_binding(report, catalog)
+
+    def test_unknown_binding_dimension_is_rejected(self) -> None:
+        catalog = copy.deepcopy(self.catalog)
+        catalog["case_bindings"][0]["dimensions"] = {"host": "runner-1"}
+        _refresh_hashes(catalog)
+        report = copy.deepcopy(self.report)
+        report["corpus_catalog"].update(
+            {
+                "catalog_sha256": catalog["catalog_sha256"],
+                "content_set_sha256": catalog["content_set_sha256"],
+            }
+        )
+        with self.assertRaisesRegex(ValidationError, "unsupported dimension"):
+            validate_binding(report, catalog)
 
 
 if __name__ == "__main__":
