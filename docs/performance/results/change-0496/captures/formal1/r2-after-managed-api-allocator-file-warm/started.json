@@ -1,0 +1,100 @@
+{
+  "argv": [
+    "/usr/bin/time",
+    "-v",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-allocator-file-warm/resource.txt",
+    "/usr/bin/taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/.cache/litchi-goal-0496/retained/after/allocator/litchi-perf-baseline-alloc",
+    "docx-managed-edit",
+    "--edit-api",
+    "managed-api",
+    "--provider",
+    "file",
+    "--phase-diagnostics",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--source-revision",
+    "44a4710699ef17041d5969240c30984dffbc3319",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0496/captures/formal1/r2-after-managed-api-allocator-file-warm/report.json"
+  ],
+  "attempt": "formal1",
+  "binary": {
+    "bytes": 477930104,
+    "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/allocator/litchi-perf-baseline-alloc",
+    "sha256": "b68062c0bc036f7bac7efefd1b0730596610f64cf7896d0a09eb1c3b18c09cde"
+  },
+  "build": {
+    "binary": {
+      "bytes": 477930104,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/retained/after/allocator/litchi-perf-baseline-alloc",
+      "sha256": "b68062c0bc036f7bac7efefd1b0730596610f64cf7896d0a09eb1c3b18c09cde"
+    },
+    "gate": {
+      "bytes": 1780,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-allocator.json",
+      "sha256": "07eee264fbdff773bb9ed70e2c293287ae7c285458aa4c7eb26da36789323c78"
+    },
+    "git_revision": "44a4710699ef17041d5969240c30984dffbc3319",
+    "key": "after/allocator",
+    "phase": "after",
+    "role": "allocator",
+    "source_manifest": {
+      "bytes": 1929846,
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+      "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+    }
+  },
+  "cwd": "/home/zhuhe/code/litchi",
+  "driver": {
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/capture.py",
+    "sha256": "4fb29fd12079330ac6557cebc8632d8ef3a35ed303eb69f4e398907b3b68554c"
+  },
+  "environment": {
+    "DEBUGINFOD_URLS": "https://debuginfod.ubuntu.com ",
+    "HOME": "/home/zhuhe",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PATH": "/home/zhuhe/.moon/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.153.4-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0/codex-arg0zE9DQX:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188393_1788453686398/bin:/home/zhuhe/.local/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/188133_1788453557664/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin",
+    "TMPDIR": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-allocator-file-warm/file",
+    "USER": "zhuhe"
+  },
+  "file_root": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-allocator-file-warm/file",
+  "machine": {
+    "bytes": 1235,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/machine.json",
+    "sha256": "4938b17fc6764cb76f7a099c3b1ede6a3e2945c7003cfaa6e90141d1871e525b"
+  },
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "0f47e734991e9dc7491581b630fc4edcd7882458fec94d0d604ddf1756cd3545"
+  },
+  "run": {
+    "api": "managed-api",
+    "arm": "file-warm",
+    "label": "r2-after-managed-api-allocator-file-warm",
+    "ordinal": 17,
+    "phase": "after",
+    "provider": "file",
+    "repeat": 2,
+    "role": "allocator",
+    "samples": 30,
+    "warmups": 3
+  },
+  "schema": "docx-phase-diagnostic-capture-v1",
+  "source_manifest": {
+    "bytes": 1929846,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final1-source.json",
+    "sha256": "1d60b3b9c0acd26dec5732a56164d252855cf1b798ecebaa4b0256f747b2d0ab"
+  },
+  "started_utc": "2026-09-10T14:21:54.461207Z",
+  "status": "running",
+  "timeout_seconds": 180,
+  "tmpdir": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r2-after-managed-api-allocator-file-warm/file",
+  "version": 1
+}

@@ -1,0 +1,12 @@
+{
+  "attempt": "formal1",
+  "children": 32,
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "0f47e734991e9dc7491581b630fc4edcd7882458fec94d0d604ddf1756cd3545"
+  },
+  "samples": 960,
+  "schema": "docx-phase-diagnostic-verification-v1",
+  "status": "pass",
+  "version": 1
+}

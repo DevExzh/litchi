@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## 0496: verified diagnostic phase attribution preserves ownership and measurement boundaries
+
+[0496](changes/0496-docx-edit-phase-attribution.md) is a harness-only,
+opt-in diagnostic over the existing 0495 DOCX lifecycle. Its verified matrix
+has 32 processes and 960 samples, and its analysis keeps the following ADR
+boundaries explicit. The paired unmanaged review contains 294 comparison cells,
+with 74 threshold flags retained under the same custody and scope rules:
+
+| ADR | 0496 mapping |
+| --- | --- |
+| 0001 — priorities and API layers | No production API or format-layer priority changes; the diagnostic remains in `tools/perf-baseline`. |
+| 0002 — crate topology and dependency direction | The before/after source revisions use the existing crate graph; the harness adds no archive or format dependency. |
+| 0003 — snapshots, edits, patches, and concurrency | Existing ownership, commit/drop ordering, source identity, and replay/inverse/stale/foreign oracles remain in the sample path; phase checkpoints observe lifecycle boundaries. |
+| 0005 — I/O, memory, and measured performance | Phase values are wall-clock `Instant` intervals, not CPU measurements. Full-lifecycle allocator counters and whole-child RSS remain separate, with no nested phase allocation region. |
+| 0006 — validation, security, and compatibility | The default report schema and existing output, semantic, source, sink, media, and refusal oracles remain unchanged; the optional phase field is validated separately. |
+| 0008 — migration and verification | Source manifests, patches, lockfile, build receipts, environment, binary identities, and the two-repeat 32-process/960-sample capture are retained and verified. |
+| 0011 — physical package ownership | OPC publication remains the measured lifecycle phase; package ownership and sequential sink behavior are unchanged. |
+| 0024 — current post-migration workspace topology | The diagnostic uses the current `litchi-docx`/`litchi-opc` path and does not touch legacy or protected worktrees. |
+
+The 74 retained threshold rows comprise 60 phase, 9 allocator-reallocation, 4
+whole-child RSS, and 1 lifecycle-latency rows. Phase values are wall-clock
+`Instant` measurements rather than CPU attribution; allocation is one
+full-lifecycle region and RSS is whole-child evidence. The eight 0495 RSS flags
+and three latency flags retain unresolved causality, the full non-iWork goal
+remains open, and no broad phase performance claim is authorized.
+
 ## 0495: ordinary managed DOCX edit ownership and measured custody
 
 [0495](changes/0495-docx-managed-document-edits.md) applies the architectural

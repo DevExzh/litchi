@@ -1,0 +1,110 @@
+{
+  "status": "pass",
+  "independent_scalar_method": "Python statistics.median over unchanged raw rows; no capture.py metric helpers",
+  "children": 32,
+  "samples": 960,
+  "normal_publication_largest": [
+    {
+      "label": "r1-before-unmanaged-api-normal-owned",
+      "publication_median_ns": 1470995.5,
+      "lifecycle_median_ns": 2221133.5,
+      "median_ratio": 0.6622724388245912
+    },
+    {
+      "label": "r1-before-unmanaged-api-normal-file-warm",
+      "publication_median_ns": 4080485.5,
+      "lifecycle_median_ns": 4794493.5,
+      "median_ratio": 0.8510774912928759
+    },
+    {
+      "label": "r1-before-unmanaged-api-normal-short",
+      "publication_median_ns": 4628212.0,
+      "lifecycle_median_ns": 5358640.5,
+      "median_ratio": 0.8636914530840425
+    },
+    {
+      "label": "r1-after-unmanaged-api-normal-owned",
+      "publication_median_ns": 1480450.5,
+      "lifecycle_median_ns": 2152983.0,
+      "median_ratio": 0.687627584611676
+    },
+    {
+      "label": "r1-after-unmanaged-api-normal-file-warm",
+      "publication_median_ns": 1625851.5,
+      "lifecycle_median_ns": 2301803.5,
+      "median_ratio": 0.7063380953239492
+    },
+    {
+      "label": "r1-after-unmanaged-api-normal-short",
+      "publication_median_ns": 4661987.5,
+      "lifecycle_median_ns": 5339840.0,
+      "median_ratio": 0.8730575260681968
+    },
+    {
+      "label": "r1-after-managed-api-normal-file-warm",
+      "publication_median_ns": 2465129.0,
+      "lifecycle_median_ns": 3562963.5,
+      "median_ratio": 0.6918760183762758
+    },
+    {
+      "label": "r1-after-managed-api-normal-short",
+      "publication_median_ns": 5406055.5,
+      "lifecycle_median_ns": 6508769.5,
+      "median_ratio": 0.8305802655939806
+    },
+    {
+      "label": "r2-after-managed-api-normal-short",
+      "publication_median_ns": 2992522.0,
+      "lifecycle_median_ns": 4092416.0,
+      "median_ratio": 0.7312360229263105
+    },
+    {
+      "label": "r2-after-managed-api-normal-file-warm",
+      "publication_median_ns": 2452965.0,
+      "lifecycle_median_ns": 3553344.0,
+      "median_ratio": 0.69032578889069
+    },
+    {
+      "label": "r2-after-unmanaged-api-normal-short",
+      "publication_median_ns": 4729843.5,
+      "lifecycle_median_ns": 5418846.0,
+      "median_ratio": 0.8728506955170898
+    },
+    {
+      "label": "r2-after-unmanaged-api-normal-file-warm",
+      "publication_median_ns": 1650286.5,
+      "lifecycle_median_ns": 2326039.0,
+      "median_ratio": 0.7094835899140126
+    },
+    {
+      "label": "r2-after-unmanaged-api-normal-owned",
+      "publication_median_ns": 1500576.0,
+      "lifecycle_median_ns": 2175994.0,
+      "median_ratio": 0.6896048426604118
+    },
+    {
+      "label": "r2-before-unmanaged-api-normal-short",
+      "publication_median_ns": 4517188.0,
+      "lifecycle_median_ns": 5237510.5,
+      "median_ratio": 0.8624685334759711
+    },
+    {
+      "label": "r2-before-unmanaged-api-normal-file-warm",
+      "publication_median_ns": 1560451.0,
+      "lifecycle_median_ns": 2279154.0,
+      "median_ratio": 0.6846623791108455
+    },
+    {
+      "label": "r2-before-unmanaged-api-normal-owned",
+      "publication_median_ns": 1411943.0,
+      "lifecycle_median_ns": 2125608.0,
+      "median_ratio": 0.6642537099973278
+    }
+  ],
+  "flag_family_counts": {
+    "phase": 60,
+    "allocation": 9,
+    "rss_bytes": 4,
+    "latency_ns": 1
+  }
+}

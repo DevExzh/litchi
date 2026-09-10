@@ -1,0 +1,44 @@
+{
+  "finished_ns": 1789050379639621179,
+  "free_after": 428925751296,
+  "free_before": 418577182720,
+  "patches_reverse_checked": true,
+  "protected_files_unchanged": true,
+  "removed": [
+    {
+      "allocated_bytes": 243339264,
+      "files": 9807,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/before"
+    },
+    {
+      "allocated_bytes": 246951936,
+      "files": 9839,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/after"
+    },
+    {
+      "allocated_bytes": 11008610304,
+      "files": 5294,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/target"
+    },
+    {
+      "allocated_bytes": 0,
+      "files": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/tmp"
+    },
+    {
+      "allocated_bytes": 0,
+      "files": 0,
+      "path": "/home/zhuhe/.cache/litchi-goal-0496/projections"
+    }
+  ],
+  "retained_builds": [
+    "before/normal",
+    "before/allocator",
+    "after/normal",
+    "after/allocator"
+  ],
+  "schema": "docx-phase-cleanup-v1",
+  "scope": "Owned standalone clones, Cargo target and private scratch only; retained executables preserved.",
+  "source_manifests_verified": true,
+  "status": "pass"
+}

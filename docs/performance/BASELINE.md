@@ -1,5 +1,36 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0496: verified DOCX edit phase-attribution baseline
+
+[0496](changes/0496-docx-edit-phase-attribution.md) records an opt-in,
+harness-only diagnostic over the 0495 managed/unmanaged opened-edit lifecycle.
+The verified formal run has 32 processes and 960 samples across before/after
+unmanaged owned, warm-file, and short-range providers plus after-managed
+warm-file and short-range roles, with normal and allocator observations.
+The paired unmanaged review contains 294 comparison cells, with 74 threshold
+flags retained for the descriptive analysis.
+
+Normal unmanaged lifecycle p50 latency is milliseconds:
+
+| Arm | Before R1 | After R1 | Before R2 | After R2 |
+| --- | ---: | ---: | ---: | ---: |
+| owned | 2.221 | 2.153 | 2.126 | 2.176 |
+| file-warm | 4.794 | 2.302 | 2.279 | 2.326 |
+| short | 5.359 | 5.340 | 5.238 | 5.419 |
+
+Publication is the largest named phase in all 16 normal children. After-managed
+file-warm lifecycle/publication p50s are 3.563/2.465 ms and 3.553/2.453 ms;
+short is 6.509/5.406 ms and 4.092/2.993 ms. The 74 threshold rows comprise
+60 phase, 9 allocator-reallocation, 4 whole-child RSS, and 1 lifecycle-latency
+row. Phase values are wall-clock `Instant` intervals, not CPU measurements.
+
+Full-lifecycle allocation p50s before-unmanaged, after-unmanaged, and
+after-managed are respectively 22,859/5,721,334/+606,959, 9,696/1,623,696/
++609,903, and 20,535/4,270,196/+622,454 for calls, allocated bytes, and peak
+increment. The allocator observer remains one full-lifecycle region, so there
+are no nested phase allocation values; whole-child RSS remains separate. The
+0495 flags remain unresolved, and the full non-iWork goal stays open.
+
 ## 0495: ordinary managed DOCX edit/save capability baseline
 
 [0495](changes/0495-docx-managed-document-edits.md) records the verified

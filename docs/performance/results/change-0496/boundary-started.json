@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0496/after",
+  "started_ns": 1789047482936724555,
+  "checker_sha256": "75ca53760f5506dad053ef575ae50b44d9609ab1841456306be0e45965e6e12a"
+}

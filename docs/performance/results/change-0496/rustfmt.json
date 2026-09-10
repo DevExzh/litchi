@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustfmt",
+    "--check",
+    "tools/perf-baseline/src/docx_managed_edit.rs"
+  ],
+  "cwd": "/home/zhuhe/.cache/litchi-goal-0496/after",
+  "started_ns": 1789047956434014199,
+  "finished_ns": 1789047956452597786,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "source_sha256": "e3732d932356018dff0bd7a17b8eb38e60e177ee7d83992e9a04dbe82fe26c94"
+}

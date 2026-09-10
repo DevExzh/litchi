@@ -74,6 +74,10 @@ const RANGE_SCOPE: &str = "logical ReadAt calls and adapter calls observed by ha
 const ZERO_LENGTH_SCOPE: &str = "zero-length caller ReadAt calls are delegated to the wrapped provider, preserve its return/error behavior, and are counted separately from nonempty range totals";
 const MEDIA_SCOPE: &str = "source compressed ranges for word/media members; exact output and OPC semantic checks additionally prove unchanged media payloads";
 const BUDGET_SCOPE: &str = "managed budget gauges are sampled before package open, after publication while the commit remains live, and after package/document/commit drops; cumulative input/output/work counters are not release gauges";
+const PHASE_TIMING_SCOPE: &str = "opt-in wall-clock Instant intervals nested inside the full lifecycle clock: open, edit staging, commit, diagnostics/XML identity, publication, published snapshot drop, and commit drop; these are not CPU-time measurements";
+const PHASE_RESIDUAL_SCOPE: &str = "full lifecycle time minus the listed phase intervals; includes phase-boundary arithmetic, budget evidence, result handling, and any package work not assigned to a named phase";
+const PHASE_INSTRUMENTATION_SCOPE: &str = "phase-clock overhead is included in the full lifecycle and is not isolated by a second control clock; phase fields are absent unless --phase-diagnostics is enabled";
+const PHASE_ALLOCATION_SCOPE: &str = "no nested phase allocation regions are reported: the shared allocator region is non-reentrant, so allocation remains one full-lifecycle sample";
 const UNMANAGED_BUDGET_REASON: &str =
     "unmanaged-api uses the compatibility constructor without an ExecutionContext";
 const BUDGET_MEMORY_BYTES: u64 = 64 * 1024 * 1024;
@@ -133,6 +137,7 @@ impl ProviderKind {
 struct Config {
     api: ApiMode,
     provider: ProviderKind,
+    phase_diagnostics: bool,
     max_range_bytes: Option<usize>,
     delay_us: Option<u64>,
     transfer_bytes_per_second: Option<NonZeroU64>,
@@ -927,6 +932,72 @@ struct SampleRecord {
     budget: BudgetEvidence,
     #[serde(skip_serializing_if = "Option::is_none")]
     allocation: Option<crate::allocation_metrics::Sample>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    phase_diagnostics: Option<PhaseDiagnostics>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PhaseTimings {
+    open_ns: u64,
+    edit_staging_ns: u64,
+    commit_ns: u64,
+    diagnostics_xml_identity_ns: u64,
+    publication_ns: u64,
+    published_snapshot_drop_ns: u64,
+    commit_drop_ns: u64,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+struct PhaseDiagnostics {
+    schema: &'static str,
+    timing_scope: &'static str,
+    open_ns: u64,
+    edit_staging_ns: u64,
+    commit_ns: u64,
+    diagnostics_xml_identity_ns: u64,
+    publication_ns: u64,
+    published_snapshot_drop_ns: u64,
+    commit_drop_ns: u64,
+    phase_sum_ns: u64,
+    lifecycle_residual_ns: u64,
+    residual_scope: &'static str,
+    instrumentation_overhead_ns: Option<u64>,
+    instrumentation_scope: &'static str,
+    allocation_scope: &'static str,
+}
+
+impl PhaseTimings {
+    fn finish(self, lifecycle_ns: u64) -> Result<PhaseDiagnostics, Box<dyn Error>> {
+        let phase_sum_ns = self
+            .open_ns
+            .checked_add(self.edit_staging_ns)
+            .and_then(|value| value.checked_add(self.commit_ns))
+            .and_then(|value| value.checked_add(self.diagnostics_xml_identity_ns))
+            .and_then(|value| value.checked_add(self.publication_ns))
+            .and_then(|value| value.checked_add(self.published_snapshot_drop_ns))
+            .and_then(|value| value.checked_add(self.commit_drop_ns))
+            .ok_or("DOCX phase timing sum overflows nanoseconds")?;
+        let lifecycle_residual_ns = lifecycle_ns
+            .checked_sub(phase_sum_ns)
+            .ok_or("DOCX phase intervals exceed the full lifecycle clock")?;
+        Ok(PhaseDiagnostics {
+            schema: "docx_managed_edit_phase_diagnostics_v1",
+            timing_scope: PHASE_TIMING_SCOPE,
+            open_ns: self.open_ns,
+            edit_staging_ns: self.edit_staging_ns,
+            commit_ns: self.commit_ns,
+            diagnostics_xml_identity_ns: self.diagnostics_xml_identity_ns,
+            publication_ns: self.publication_ns,
+            published_snapshot_drop_ns: self.published_snapshot_drop_ns,
+            commit_drop_ns: self.commit_drop_ns,
+            phase_sum_ns,
+            lifecycle_residual_ns,
+            residual_scope: PHASE_RESIDUAL_SCOPE,
+            instrumentation_overhead_ns: None,
+            instrumentation_scope: PHASE_INSTRUMENTATION_SCOPE,
+            allocation_scope: PHASE_ALLOCATION_SCOPE,
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1113,6 +1184,7 @@ struct TimedOperation {
     commit_operations: usize,
     commit_identity_verified: bool,
     budget: BudgetEvidence,
+    phase_timings: Option<PhaseTimings>,
 }
 
 fn finite_context() -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
@@ -1148,6 +1220,21 @@ fn is_managed_boundary_refusal(error: &(dyn Error + 'static)) -> bool {
     )
 }
 
+#[inline]
+fn phase_start(enabled: bool) -> Option<Instant> {
+    enabled.then(Instant::now)
+}
+
+#[inline]
+fn phase_elapsed(started: Option<Instant>) -> Result<Option<u64>, Box<dyn Error>> {
+    started
+        .map(|started| {
+            u64::try_from(started.elapsed().as_nanos())
+                .map_err(|_| "DOCX phase duration does not fit u64 nanoseconds".into())
+        })
+        .transpose()
+}
+
 fn execute_api(
     config: &Config,
     source: Arc<dyn ReadAt>,
@@ -1155,6 +1242,7 @@ fn execute_api(
     prepared: &Prepared,
     budget: Option<(&Budget, &ExecutionContext, ResourceSnapshot)>,
 ) -> Result<TimedOperation, Box<dyn Error>> {
+    let open_started = phase_start(config.phase_diagnostics);
     let package = match budget {
         Some((_budget, context, _before)) => {
             source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
@@ -1167,12 +1255,21 @@ fn execute_api(
         None => source_backed::Package::from_read_at(source)?,
     };
     let cache_before = package.cache_diagnostics();
+    let open_ns = phase_elapsed(open_started)?;
+
+    let edit_staging_started = phase_start(config.phase_diagnostics);
     let mut edit = package.edit_document()?;
     edit.replace_paragraph_text(
         Position::new(prepared.target_position),
         &prepared.replacement_text,
     )?;
+    let edit_staging_ns = phase_elapsed(edit_staging_started)?;
+
+    let commit_started = phase_start(config.phase_diagnostics);
     let commit = edit.commit()?;
+    let commit_ns = phase_elapsed(commit_started)?;
+
+    let diagnostics_xml_identity_started = phase_start(config.phase_diagnostics);
     let commit_changed = commit.patch().changed();
     let commit_operations = commit.diagnostics().operations();
     let commit_identity_verified = commit.patch().source().xml_bytes()
@@ -1183,32 +1280,49 @@ fn execute_api(
         .successful_loads
         .checked_sub(cache_before.successful_loads)
         .ok_or("DOCX source cache successful-load counter moved backwards")?;
+    let diagnostics_xml_identity_ns = phase_elapsed(diagnostics_xml_identity_started)?;
+
+    let publication_started = phase_start(config.phase_diagnostics);
     let published = package.publish_document_commit_to_stream(sink, &commit)?;
+    let publication_ns = phase_elapsed(publication_started)?;
+
+    let published_snapshot_drop_started = phase_start(config.phase_diagnostics);
     drop(published);
-    let budget_evidence = if let Some((budget, _context, resource_before)) = budget {
-        let resource_live = ResourceSnapshot::from_budget(budget);
-        drop(commit);
-        let resource_after_drop = ResourceSnapshot::from_budget(budget);
-        let memory_released_to_baseline =
-            resource_after_drop.memory_used == resource_before.memory_used;
-        let objects_released_to_baseline =
-            resource_after_drop.objects_used == resource_before.objects_used;
-        let reservation_failures = Some(cache_live.budget_reservation_failures);
-        BudgetEvidence {
-            scope: BUDGET_SCOPE,
-            before: resource_before,
-            live: resource_live,
-            after_drop: resource_after_drop,
-            cache_before: CacheBudgetSnapshot::from_diagnostics(cache_before),
-            cache_live: CacheBudgetSnapshot::from_diagnostics(cache_live),
-            memory_released_to_baseline: Some(memory_released_to_baseline),
-            objects_released_to_baseline: Some(objects_released_to_baseline),
-            reservation_failures,
-        }
-    } else {
-        drop(commit);
-        BudgetEvidence::unmanaged()
-    };
+    let published_snapshot_drop_ns = phase_elapsed(published_snapshot_drop_started)?;
+
+    let (budget_evidence, commit_drop_ns) =
+        if let Some((budget, _context, resource_before)) = budget {
+            let resource_live = ResourceSnapshot::from_budget(budget);
+
+            let commit_drop_started = phase_start(config.phase_diagnostics);
+            drop(commit);
+            let commit_drop_ns = phase_elapsed(commit_drop_started)?;
+            let resource_after_drop = ResourceSnapshot::from_budget(budget);
+            let memory_released_to_baseline =
+                resource_after_drop.memory_used == resource_before.memory_used;
+            let objects_released_to_baseline =
+                resource_after_drop.objects_used == resource_before.objects_used;
+            let reservation_failures = Some(cache_live.budget_reservation_failures);
+            (
+                BudgetEvidence {
+                    scope: BUDGET_SCOPE,
+                    before: resource_before,
+                    live: resource_live,
+                    after_drop: resource_after_drop,
+                    cache_before: CacheBudgetSnapshot::from_diagnostics(cache_before),
+                    cache_live: CacheBudgetSnapshot::from_diagnostics(cache_live),
+                    memory_released_to_baseline: Some(memory_released_to_baseline),
+                    objects_released_to_baseline: Some(objects_released_to_baseline),
+                    reservation_failures,
+                },
+                commit_drop_ns,
+            )
+        } else {
+            let commit_drop_started = phase_start(config.phase_diagnostics);
+            drop(commit);
+            let commit_drop_ns = phase_elapsed(commit_drop_started)?;
+            (BudgetEvidence::unmanaged(), commit_drop_ns)
+        };
     if config.api.managed() && !budget_evidence.before.managed {
         return Err("managed-api did not construct a managed execution budget".into());
     }
@@ -1218,6 +1332,24 @@ fn execute_api(
         commit_operations,
         commit_identity_verified,
         budget: budget_evidence,
+        phase_timings: if config.phase_diagnostics {
+            Some(PhaseTimings {
+                open_ns: open_ns.ok_or("enabled phase diagnostics did not record open")?,
+                edit_staging_ns: edit_staging_ns
+                    .ok_or("enabled phase diagnostics did not record edit staging")?,
+                commit_ns: commit_ns.ok_or("enabled phase diagnostics did not record commit")?,
+                diagnostics_xml_identity_ns: diagnostics_xml_identity_ns
+                    .ok_or("enabled phase diagnostics did not record diagnostics")?,
+                publication_ns: publication_ns
+                    .ok_or("enabled phase diagnostics did not record publication")?,
+                published_snapshot_drop_ns: published_snapshot_drop_ns
+                    .ok_or("enabled phase diagnostics did not record snapshot drop")?,
+                commit_drop_ns: commit_drop_ns
+                    .ok_or("enabled phase diagnostics did not record commit drop")?,
+            })
+        } else {
+            None
+        },
     })
 }
 
@@ -1264,6 +1396,11 @@ fn run_sample(
         },
         Err(error) => return Err(error),
     };
+    let latency_ns = u64::try_from(elapsed.as_nanos())?;
+    let phase_diagnostics = operation
+        .phase_timings
+        .map(|timings| timings.finish(latency_ns))
+        .transpose()?;
     let after = provider.source.version()?;
     let source_version_unchanged = before == after;
     let logical = snapshot_record(
@@ -1289,7 +1426,6 @@ fn run_sample(
         media_scope: MEDIA_SCOPE,
     };
     drop(provider);
-    let latency_ns = u64::try_from(elapsed.as_nanos())?;
     let output_exact_bytes = sink.bytes == prepared.expected_output;
     if !output_exact_bytes {
         return Err(format!("DOCX provider output mismatch in sample {sample_index}").into());
@@ -1358,6 +1494,7 @@ fn run_sample(
         oracles: oracle,
         budget: operation.budget,
         allocation,
+        phase_diagnostics,
     })
 }
 
@@ -1430,6 +1567,7 @@ fn need_value(args: &[OsString], index: &mut usize, flag: &str) -> Result<String
 fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     let mut api = None;
     let mut provider = None;
+    let mut phase_diagnostics = false;
     let mut max_range_bytes = None;
     let mut delay_us = None;
     let mut transfer_bytes_per_second = None;
@@ -1471,6 +1609,12 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
                         );
                     },
                 });
+            },
+            "--phase-diagnostics" => {
+                if phase_diagnostics {
+                    return Err("--phase-diagnostics was specified more than once".into());
+                }
+                phase_diagnostics = true;
             },
             "--short-range" | "--short-read-bytes" | "--max-range" => {
                 if max_range_bytes.is_some() {
@@ -1619,6 +1763,7 @@ fn parse_config(args: &[OsString]) -> Result<Config, Box<dyn Error>> {
     Ok(Config {
         api,
         provider,
+        phase_diagnostics,
         max_range_bytes,
         delay_us,
         transfer_bytes_per_second,
@@ -1658,7 +1803,7 @@ fn current_executable_identity() -> Result<(String, u64), Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "docx-managed-edit [--edit-api <unmanaged-api|managed-api>] --provider <owned|instrumented|short|delayed|file> [--short-range N|--short-read-bytes N|--max-range N] [--delay-us N --transfer-bytes-per-second N --transfer-delay-policy separate-sleeps|minimum-service] --samples N --warmup N --source-revision <40 hex chars> --output PATH"
+    "docx-managed-edit [--edit-api <unmanaged-api|managed-api>] --provider <owned|instrumented|short|delayed|file> [--phase-diagnostics] [--short-range N|--short-read-bytes N|--max-range N] [--delay-us N --transfer-bytes-per-second N --transfer-delay-policy separate-sleeps|minimum-service] --samples N --warmup N --source-revision <40 hex chars> --output PATH"
 }
 
 /// Runs the benchmark from arguments following the `docx-edit-provider`
@@ -1785,6 +1930,35 @@ mod tests {
             .expect("valid provider configuration");
             assert_eq!(config.provider.name(), provider);
         }
+        let default = parse_config(&args(&[
+            "--provider",
+            "owned",
+            "--samples",
+            "1",
+            "--warmup",
+            "0",
+            "--source-revision",
+            "0123456789012345678901234567890123456789",
+            "--output",
+            "result.json",
+        ]))
+        .expect("default phase diagnostics configuration");
+        assert!(!default.phase_diagnostics);
+        let enabled = parse_config(&args(&[
+            "--provider",
+            "owned",
+            "--phase-diagnostics",
+            "--samples",
+            "1",
+            "--warmup",
+            "0",
+            "--source-revision",
+            "0123456789012345678901234567890123456789",
+            "--output",
+            "result.json",
+        ]))
+        .expect("opt-in phase diagnostics configuration");
+        assert!(enabled.phase_diagnostics);
         let short = parse_config(&args(&[
             "--provider",
             "short",
@@ -1928,6 +2102,24 @@ mod tests {
     }
 
     #[test]
+    fn phase_diagnostics_reports_named_intervals_and_rejects_nonconservation() {
+        let timings = PhaseTimings {
+            open_ns: 10,
+            edit_staging_ns: 10,
+            commit_ns: 10,
+            diagnostics_xml_identity_ns: 10,
+            publication_ns: 10,
+            published_snapshot_drop_ns: 10,
+            commit_drop_ns: 10,
+        };
+        let diagnostics = timings.finish(100).expect("conserved phase intervals");
+        assert_eq!(diagnostics.phase_sum_ns, 70);
+        assert_eq!(diagnostics.lifecycle_residual_ns, 30);
+        assert!(timings.finish(69).is_err());
+        assert!(diagnostics.instrumentation_overhead_ns.is_none());
+    }
+
+    #[test]
     fn counting_source_rejects_impossible_range_trace() {
         let stats = Arc::new(ReadStats::new().expect("range stats"));
         assert!(stats.record(u64::MAX, 2, 2).is_err());
@@ -2015,6 +2207,7 @@ mod tests {
         let owned = Config {
             api: ApiMode::UnmanagedApi,
             provider: ProviderKind::Owned,
+            phase_diagnostics: false,
             max_range_bytes: None,
             delay_us: None,
             transfer_bytes_per_second: None,
@@ -2033,10 +2226,14 @@ mod tests {
         assert!(owned_row.cache.exactly_one_main_part_materialization);
         assert!(owned_row.oracles.commit_identity_verified);
         assert!(owned_row.oracles.semantic_reopen);
+        assert!(owned_row.phase_diagnostics.is_none());
+        let serialized_owned = serde_json::to_value(&owned_row).expect("serialize default row");
+        assert!(serialized_owned.get("phase_diagnostics").is_none());
 
         let short = Config {
             api: ApiMode::UnmanagedApi,
             provider: ProviderKind::Short,
+            phase_diagnostics: true,
             max_range_bytes: Some(4096),
             delay_us: None,
             transfer_bytes_per_second: None,
@@ -2054,5 +2251,15 @@ mod tests {
         assert!(short_row.source_version_unchanged);
         assert_eq!(short_row.reads.logical.availability, "available");
         assert!(short_row.oracles.patch_oracles.foreign_source_refused);
+        let phases = short_row
+            .phase_diagnostics
+            .expect("enabled lifecycle phase diagnostics");
+        assert_eq!(
+            phases
+                .phase_sum_ns
+                .checked_add(phases.lifecycle_residual_ns)
+                .expect("phase interval sum"),
+            short_row.latency_ns
+        );
     }
 }

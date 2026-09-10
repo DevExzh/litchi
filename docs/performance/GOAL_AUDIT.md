@@ -1,5 +1,59 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0496 verifies descriptive phase attribution; the full goal remains open
+
+[0496](changes/0496-docx-edit-phase-attribution.md) is a harness-only,
+opt-in diagnostic follow-up to the unresolved 0495 whole-child RSS and latency
+flags. Its verified formal run has 32 children and 960 samples: 12
+before-unmanaged, 12 after-unmanaged, and 8 after-managed, with two reversed
+repeats, three warmups, and 30 measured samples per child. The default report
+schema and existing correctness oracles remain unchanged. The claims scope is
+descriptive phase latency, whole-child RSS, and full-lifecycle allocation;
+managed-after rows remain capability observations and no CPU, optimization, or
+causal claim is authorized.
+
+The paired unmanaged review contains 294 comparison cells, with 74 threshold
+flags retained and classified by evidence scope.
+
+Normal unmanaged lifecycle p50 latency is milliseconds, paired by repeat:
+
+| Arm | Before R1 | After R1 | Before R2 | After R2 |
+| --- | ---: | ---: | ---: | ---: |
+| owned | 2.221 | 2.153 | 2.126 | 2.176 |
+| file-warm | 4.794 | 2.302 | 2.279 | 2.326 |
+| short | 5.359 | 5.340 | 5.238 | 5.419 |
+
+Publication is the largest named normal phase in all 16 normal children. The
+after-managed file-warm lifecycle/publication p50s are 3.563/2.465 ms and
+3.553/2.453 ms; short is 6.509/5.406 ms and 4.092/2.993 ms, showing repeat
+instability. Phase clocks are wall time, not CPU time; allocator and RSS remain
+full-lifecycle/separate scopes.
+
+The 74 retained threshold flags are 60 phase rows (18 commit-drop, 18
+published-snapshot-drop, 10 diagnostics/XML identity, 7 open, 6 publication,
+1 phase-sum), 9 allocator reallocation rows, 4 whole-child RSS rows, and 1
+full-lifecycle latency row. The allocator p50s are 22,859 calls/5,721,334
+bytes/+606,959 peak increment before-unmanaged, 9,696/1,623,696/+609,903
+after-unmanaged, and 20,535/4,270,196/+622,454 after-managed. These rows are
+descriptive flags, not independent regressions; `historical_flags_resolved` is
+false and causality remains unresolved.
+
+Formal verification passes all 32 children and 960 samples. The final helper
+gate passes 8/8 seal-helper tests; the evidence seal remains a separate custody
+gate. Cleanup passes source-manifest and protected-file checks after removing
+10.709 GiB of disposable custody data and retaining four replay binaries. The
+full non-iWork goal remains open: borrowed input, atomic save, independent
+producers, cold intersections, scaling, durable history/composition, and
+broader CRUD/security evidence still require separate work.
+
+| Goal area | 0496 evidence | Audit status and boundary |
+| --- | --- | --- |
+| Opened-document edit/save | Verified descriptive phase/lifecycle capture over the 0495 path | No optimization or causal claim |
+| CPU/RSS attribution | Wall-clock phase vectors and whole-child RSS | Wall time is not CPU attribution; RSS is not phase-local |
+| Allocation attribution | Full-lifecycle calls, bytes, reallocations, and peak increments | No nested phase allocation region; managed-after remains descriptive |
+| Existing 0495 flags | 0496 retains 74 flagged comparison rows alongside unresolved historical flags | No flag is dismissed or deleted |
+| Complete non-iWork goal | No new CRUD selector or production capability | Open |
+
 ## Current audit: 0495 enables and measures ordinary managed DOCX edit/save; the full goal remains open
 
 [0495](changes/0495-docx-managed-document-edits.md) closes the finite-owner

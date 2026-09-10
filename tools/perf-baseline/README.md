@@ -28,6 +28,26 @@ Use `--mode lifecycle` for the unsegmented comparison. Shape accepts `tiny`,
 Allocation counters are omitted in normal reports. Phase peak live bytes use
 each phase's own entry baseline and must not be added.
 
+The opt-in `docx-managed-edit` selector has an optional
+`--phase-diagnostics` field for the 0495 opened-document edit/save lifecycle.
+Its named intervals are wall-clock `Instant` measurements nested in the full
+lifecycle, not CPU-time measurements. The allocator observer remains a single
+full-lifecycle region, so phase allocation peaks are not reported; whole-child
+RSS is separate. Without the flag, the default report schema omits the phase
+field. For the frozen 0496 diagnostic scope, a representative invocation is:
+
+```sh
+litchi-perf-baseline docx-managed-edit --edit-api managed-api --provider file \
+  --phase-diagnostics --samples 30 --warmup 3 \
+  --source-revision <40-hex-source-revision> --output phase-report.json
+```
+
+The [0496 record](../../docs/performance/changes/0496-docx-edit-phase-attribution.md)
+defines the before/after custody, provider matrix, lifecycle boundaries, and
+verified descriptive analysis. It does not authorize a CPU, optimization,
+speed, provider-ranking, or causal claim; allocation remains full-lifecycle and
+RSS remains whole-child evidence.
+
 The opt-in `odp_source_tail_append_lifecycle` selector added in
 [0457](../../docs/performance/results/change-0457/README.md) measures source-backed
 ODP opening, bounded tail-insertion planning, and sequential replay publication.

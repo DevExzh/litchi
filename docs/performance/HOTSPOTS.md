@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## 0496: publication dominates named normal phases; attribution remains descriptive
+
+[0496](changes/0496-docx-edit-phase-attribution.md) targets the unresolved
+0495 eight whole-child RSS and three latency flags with an opt-in diagnostic
+overlay. The verified run has 32 processes and 960 samples across before/after
+unmanaged owned, warm-file, and short-range providers plus after-managed
+warm-file and short-range roles, in normal and allocator binaries.
+The paired unmanaged review contains 294 comparison cells, with 74 threshold
+flags retained; those flags remain descriptive and do not establish causality.
+
+Publication is the largest named phase in all 16 normal children. After-managed
+file-warm lifecycle/publication p50s are 3.563/2.465 ms and 3.553/2.453 ms;
+short is 6.509/5.406 ms and 4.092/2.993 ms, so the short arm is unstable.
+The 74 flagged rows separate into 60 phase, 9 allocator-reallocation, 4
+whole-child RSS, and 1 lifecycle-latency rows. Named phase values are wall-clock
+`Instant` intervals, not CPU attribution. Full-lifecycle allocation counters
+and whole-child RSS remain separate; the non-reentrant allocator observer
+provides no nested phase allocations. Existing flags retain unresolved
+causality, and the full non-iWork goal remains open.
+
 ## 0495: managed ordinary DOCX edit is enabled; attribution remains open
 
 [0495](changes/0495-docx-managed-document-edits.md) measures the new finite

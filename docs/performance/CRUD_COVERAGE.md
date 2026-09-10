@@ -1,5 +1,33 @@
 # Performance CRUD coverage
 
+## 0496: verified phase attribution; no new CRUD row
+
+[0496](changes/0496-docx-edit-phase-attribution.md) overlays opt-in wall-clock
+phase diagnostics on the existing 0495 opened DOCX edit/save harness. It adds
+no production operation and no representative CRUD selector. The verified
+matrix has 32 processes and 960 samples across before/after unmanaged owned,
+warm-file, and short-range providers plus after-managed warm-file and
+short-range roles, with normal and allocator binaries and two reversed repeats.
+The paired unmanaged review contains 294 comparison cells, with 74 threshold
+flags retained for phase, allocation, RSS, and lifecycle evidence.
+
+Publication is the largest named phase in all 16 normal children. After-managed
+normal file-warm lifecycle/publication p50s are 3.563/2.465 ms and
+3.553/2.453 ms; short is 6.509/5.406 ms and 4.092/2.993 ms. The 74 retained
+flags break down into 60 phase, 9 allocator-reallocation, 4 whole-child RSS,
+and 1 lifecycle-latency row. Full-lifecycle allocator p50s are
+22,859/5,721,334/+606,959 before-unmanaged, 9,696/1,623,696/+609,903
+after-unmanaged, and 20,535/4,270,196/+622,454 after-managed for calls,
+allocated bytes, and peak increment.
+
+The phase fields cover open, edit staging, commit, diagnostics/XML identity,
+publication, published-snapshot drop, and commit drop. They are nested wall
+clock intervals, not CPU measurements. Full-lifecycle allocation counters and
+whole-child RSS remain separate, and the non-reentrant allocator observer does
+not provide nested phase allocations. The CRUD index is unchanged; managed
+after is capability evidence only, historical 0495 flags remain unresolved,
+and the full non-iWork goal remains open.
+
 ## 0495: verified ordinary managed DOCX edit/save capability baseline
 
 [0495](changes/0495-docx-managed-document-edits.md) supplies the measured

@@ -1,0 +1,97 @@
+{
+  "schema": "docx-phase-provenance-v1",
+  "inputs": {
+    "plan.md": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/plan.md",
+      "sha256": "23bceb39f09aaa2f482c32d13cf14237877e1e5f5126a96e84906ada1757421d",
+      "bytes": 3658
+    },
+    "build.py": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/build.py",
+      "sha256": "a3e5b68bc5ae8489c1c1816b317c3aed8ae43f56ca198321093016f063ec0d80",
+      "bytes": 5025
+    },
+    "adr-refresh.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/adr-refresh.json",
+      "sha256": "3aa075ec010f0254a172da18119126028ff9d0a41bdfce828d3415ddffd93234",
+      "bytes": 3598
+    },
+    "harness-source.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/harness-source.json",
+      "sha256": "bcd39cc7f38d2cc470b5aa0987e54dc0d4c0234211487961535422d7f3edefb2",
+      "bytes": 460
+    },
+    "before-harness.patch": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/before-harness.patch",
+      "sha256": "be40f6ae121e252dff79c08ce463daf5756065915ca62ba8b6f97b3e67f1406f",
+      "bytes": 90102
+    },
+    "after-harness.patch": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/after-harness.patch",
+      "sha256": "36748d26c67db489842f54101e303da42802fc040f58e53901fa74f3470bd763",
+      "bytes": 19072
+    },
+    "workspace-Cargo.lock": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/workspace-Cargo.lock",
+      "sha256": "763b9bc2f91465c3a7c8d255e39a2c701e66e6187a52306b1d2f701339762292",
+      "bytes": 138626
+    },
+    "boundary.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/boundary.json",
+      "sha256": "eef9038d01806edefec53a7fc963e43f5086ad4c77221007576c7033f41fc942",
+      "bytes": 335
+    },
+    "boundary.stdout": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/boundary.stdout",
+      "sha256": "6141948b1724bb5582ee484fa594adea74ba9ce03c955c1d774de43b424c6d56",
+      "bytes": 565
+    },
+    "boundary.stderr": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/boundary.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "gates.py": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/gates.py",
+      "bytes": 2562,
+      "sha256": "10fdb0020f105cb6a740502cc1cc60bf55c6f21937fb3599193dd58164291fef"
+    },
+    "rustfmt.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/rustfmt.json",
+      "bytes": 405,
+      "sha256": "6d161a76d584e226e3deec5517c9d5cf68b1ff0dc39a790a122e95c32215040f"
+    },
+    "builds/after-final2-test.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final2-test.json",
+      "bytes": 1978,
+      "sha256": "5eada1d21875b80620398cb744d625ae567589c98f5468671916d34fa60e093c"
+    },
+    "builds/after-final2-clippy.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final2-clippy.json",
+      "bytes": 1991,
+      "sha256": "e8085951cb5f7add22b179da392b8d268939b44c231a2d6d8103e28209f53348"
+    },
+    "builds/after-final2-rustdoc.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/builds/after-final2-rustdoc.json",
+      "bytes": 1962,
+      "sha256": "f4357c1003bb1d66e29e90f375b8fae41058f447a84399107c6b509afb036c25"
+    },
+    "development/debug-gate-interruption.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/development/debug-gate-interruption.json",
+      "bytes": 337,
+      "sha256": "e54a9e879349e7e323d932bc95fed056aaefac1d25f4c48628bff738f4d3ce4c"
+    },
+    "capture-host-before.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/capture-host-before.json",
+      "sha256": "e0c2e3b133ce7d6221024d460b32134958138d71db760d9cc0fdd44e10337c65",
+      "bytes": 567
+    },
+    "helper-tests-final2.json": {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0496/helper-tests-final2.json",
+      "bytes": 601,
+      "sha256": "eb78030b1ae680c489386d67ed038168269c249a67ed2800cf6396b9e388fead"
+    }
+  },
+  "production_change": "none; same0495before/after production with identical diagnostic harness",
+  "historical_evidence": "../change-0495/seal.json"
+}

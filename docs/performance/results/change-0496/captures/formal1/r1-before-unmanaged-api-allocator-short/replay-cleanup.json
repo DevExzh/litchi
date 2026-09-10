@@ -1,0 +1,11 @@
+{
+  "remaining": [],
+  "removed": [
+    "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r1-before-unmanaged-api-allocator-short",
+    "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1",
+    "/home/zhuhe/.cache/litchi-goal-0496/runs"
+  ],
+  "root": "/home/zhuhe/.cache/litchi-goal-0496/runs/formal1/r1-before-unmanaged-api-allocator-short",
+  "schema": "docx-phase-private-cleanup-v1",
+  "status": "pass"
+}
