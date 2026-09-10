@@ -79,6 +79,7 @@ pub mod connections;
 pub mod custom;
 pub mod custom_data;
 pub mod data_consolidation;
+pub mod data_type_icons;
 pub mod data_validation;
 pub mod defined_names;
 pub mod drawing;
@@ -193,6 +194,12 @@ pub use custom_data::{
 pub use data_consolidation::{
     DataConsolidation, Function, RangeReference, Reference, ReferenceSource, References,
     parse_worksheet_data_consolidation, write_worksheet_data_consolidation,
+};
+pub use data_type_icons::{
+    Commit as DataTypeIconsCommit, Patch as DataTypeIconsPatch, SHOW_DATA_TYPE_ICONS_NAMESPACE,
+    ShowDataTypeIcons, Snapshot as DataTypeIconsSnapshot, Transaction as DataTypeIconsTransaction,
+    apply_patch as apply_data_type_icons_patch, edit as edit_data_type_icons,
+    load as load_data_type_icons,
 };
 pub use data_validation::{
     Collection, Conformance, ListSource, Range, Source, Sqref, Validation, ValidationErrorStyle,

@@ -13,6 +13,7 @@ use super::codec::{
     validate_name, view_has_filter_payload, write_named_sheet_views,
 };
 use super::{CORE, MAX_COLUMNS, MAX_FILTERS, MAX_VIEWS, NSV, invalid};
+use crate::data_type_icons::ShowDataTypeIcons;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Guid(pub(crate) String);
@@ -671,6 +672,7 @@ pub struct View {
     pub(crate) id: Guid,
     pub(crate) filters: Vec<Filter>,
     pub(crate) extensions: Vec<Extension>,
+    pub(crate) show_data_type_icons_custom_sheet_view: Option<ShowDataTypeIcons>,
 }
 impl View {
     /// Create an empty Named Sheet View with a fresh identifier.
@@ -691,6 +693,7 @@ impl View {
             id,
             filters: Vec::new(),
             extensions: Vec::new(),
+            show_data_type_icons_custom_sheet_view: None,
         })
     }
 
@@ -709,6 +712,73 @@ impl View {
     #[must_use]
     pub fn extensions(&self) -> &[Extension] {
         &self.extensions
+    }
+    /// The inert `showDataTypeIconsCustomSheetView` value owned by this view.
+    #[must_use]
+    pub const fn show_data_type_icons_custom_sheet_view(&self) -> Option<ShowDataTypeIcons> {
+        self.show_data_type_icons_custom_sheet_view
+    }
+
+    /// Stage the custom-sheet-view visibility value on an existing extension.
+    ///
+    /// A new `ext` owner is not synthesized because [MS-XLSX] leaves its URI
+    /// producer-owned.  Callers can construct an explicit extension through
+    /// [`Extension::new`] when they own that URI.
+    pub fn set_show_data_type_icons_custom_sheet_view(
+        &mut self,
+        value: Option<ShowDataTypeIcons>,
+    ) -> Result<bool> {
+        let current = self.show_data_type_icons_custom_sheet_view;
+        if current == value {
+            return Ok(false);
+        }
+        let mut candidates = Vec::new();
+        for (index, extension) in self.extensions.iter().enumerate() {
+            if crate::data_type_icons::codec::inspect_extension(
+                extension.markup.xml(),
+                crate::data_type_icons::Target::CustomSheetView,
+            )?
+            .is_some()
+            {
+                candidates.push(index);
+            }
+        }
+        let index = if let Some(index) = candidates.first().copied() {
+            if candidates.len() > 1 {
+                return Err(invalid(
+                    "multiple custom-sheet-view data-type-icon payloads are ambiguous",
+                ));
+            }
+            index
+        } else {
+            if current.is_some() {
+                return Err(invalid(
+                    "existing inherited data-type-icon namespace requires a source-bound edit",
+                ));
+            }
+            if value.is_none() {
+                self.show_data_type_icons_custom_sheet_view = None;
+                return Ok(true);
+            }
+            if self.extensions.len() != 1 {
+                return Err(invalid(
+                    "cannot add custom-sheet-view data-type-icon without one extension owner",
+                ));
+            }
+            0
+        };
+        let extension = self
+            .extensions
+            .get_mut(index)
+            .ok_or_else(|| invalid("custom-sheet-view extension index is out of range"))?;
+        let rewritten = crate::data_type_icons::codec::rewrite_extension(
+            extension.markup.xml(),
+            crate::data_type_icons::Target::CustomSheetView,
+            value,
+        )?;
+        extension.markup = Markup(rewritten);
+        self.show_data_type_icons_custom_sheet_view = value;
+        Ok(true)
     }
 
     pub fn add_filter(&mut self, filter: Filter) -> Result<&mut Self> {
