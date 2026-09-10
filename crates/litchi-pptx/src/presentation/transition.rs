@@ -131,18 +131,8 @@ pub(super) fn stage(
         });
     }
 
-    let replacement = match (layout.owner, target) {
-        (Some(OwnerKind::AlternateContent), Some(value)) => {
-            Some(alternate_fragment(xml, &layout, value, operation)?)
-        },
-        (Some(OwnerKind::AlternateContent), None) => {
-            Some(clear_alternate_fragment(xml, &layout, operation)?)
-        },
-        (_, Some(value)) => Some(direct_fragment(value, &layout.prefix, operation)?),
-        (_, None) => None,
-    };
     let replaced_len = layout.transition.as_ref().map_or(0, Range::len);
-    let replacement_len = replacement.as_ref().map_or(0, Vec::len);
+    let replacement_len = preflight_replacement_len(xml, &layout, target, operation)?;
     let output_len = xml
         .len()
         .checked_sub(replaced_len)
@@ -154,6 +144,17 @@ pub(super) fn stage(
             limit: max_output_bytes,
         });
     }
+
+    let replacement = match (layout.owner, target) {
+        (Some(OwnerKind::AlternateContent), Some(value)) => {
+            Some(alternate_fragment(xml, &layout, value, operation)?)
+        },
+        (Some(OwnerKind::AlternateContent), None) => {
+            Some(clear_alternate_fragment(xml, &layout, operation)?)
+        },
+        (_, Some(value)) => Some(direct_fragment(value, &layout.prefix, operation)?),
+        (_, None) => None,
+    };
 
     let at = layout
         .transition
@@ -195,6 +196,25 @@ pub(super) fn stage(
     // placement; re-running shape MCE preprocessing would copy the whole
     // slide without adding a new safety guarantee.
     Ok((Some(output), true))
+}
+
+fn preflight_replacement_len(
+    xml: &[u8],
+    layout: &Layout,
+    target: Option<&Transition>,
+    operation: &'static str,
+) -> Result<usize> {
+    match (layout.owner, target) {
+        (Some(OwnerKind::AlternateContent), Some(value)) => {
+            alternate_fragment_len(xml, layout, value, operation)
+        },
+        (Some(OwnerKind::AlternateContent), None) => clear_alternate_fragment_len(xml, layout),
+        (_, Some(value)) => {
+            let canonical = crate::transition::write(value)?;
+            rewrite_pml_qnames_len(canonical.as_bytes(), &layout.prefix)
+        },
+        (_, None) => Ok(0),
+    }
 }
 
 fn same_semantics(current: Option<&Transition>, target: Option<&Transition>) -> bool {
@@ -285,7 +305,14 @@ fn validate_active_transition(xml: &[u8], operation: &'static str) -> Result<()>
         &active_layout.prefix,
         &active_layout.namespace,
         true,
-    )
+    )?;
+    // The structural validator above deliberately knows only source-edit
+    // placement and attribute names. Run the bounded typed reader as well so
+    // token/boolean domains, duplicate attributes, and exact p14 timing are
+    // checked before a destructive branch splice.
+    let _ = crate::transition::read(processed.as_ref())?
+        .ok_or_else(|| invalid("active transition disappeared during typed validation"))?;
+    Ok(())
 }
 
 fn remove_owner(xml: &[u8], range: &Range<usize>) -> Result<Vec<u8>> {
@@ -392,22 +419,107 @@ fn alternate_fragment(
     Ok(output)
 }
 
+fn alternate_fragment_len(
+    xml: &[u8],
+    layout: &Layout,
+    target: &Transition,
+    operation: &'static str,
+) -> Result<usize> {
+    let owner = layout
+        .transition
+        .as_ref()
+        .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
+    let active = active_transition_range(xml, owner, operation)?.ok_or(Error::UnsafeEdit {
+        operation,
+        reason: "source-backed transition edit cannot insert into an AlternateContent owner without an active transition",
+    })?;
+    let canonical = crate::transition::write(target)?;
+    let canonical_range = first_transition_range(&canonical)?;
+    let fragment = canonical
+        .as_bytes()
+        .get(canonical_range)
+        .ok_or_else(|| invalid("canonical transition range is outside its output"))?;
+    let fragment_len = rewrite_pml_qnames_len(fragment, &layout.prefix)?;
+    let owner_start = owner.start;
+    let relative_start = active
+        .start
+        .checked_sub(owner_start)
+        .ok_or_else(|| invalid("active transition precedes its AlternateContent owner"))?;
+    let relative_end = active
+        .end
+        .checked_sub(owner_start)
+        .ok_or_else(|| invalid("active transition end precedes its owner"))?;
+    let owner_bytes = xml
+        .get(owner.clone())
+        .ok_or_else(|| invalid("AlternateContent owner range is outside its slide"))?;
+    if relative_start > relative_end || relative_end > owner_bytes.len() {
+        return Err(invalid("active transition range is outside its owner"));
+    }
+    let mut output_len = owner_bytes
+        .len()
+        .checked_sub(relative_end - relative_start)
+        .and_then(|length| length.checked_add(fragment_len))
+        .ok_or_else(|| invalid("AlternateContent replacement size overflow"))?;
+    if let Some(requires) = transition_requirements(target) {
+        let choice = active_choice(xml, owner, &active, requires)?.ok_or(Error::UnsafeEdit {
+            operation,
+            reason: "an extension transition requires an active Choice branch",
+        })?;
+        let opening = owner_bytes
+            .get(choice.opening.clone())
+            .ok_or_else(|| invalid("Choice opening range is outside its owner"))?;
+        let additions = extension_namespace_additions_len(opening, Some(requires))?;
+        let replacement_opening_len = opening
+            .len()
+            .checked_sub(choice.requires.end - choice.requires.start)
+            .and_then(|length| length.checked_add(requires.len()))
+            .and_then(|length| length.checked_add(additions))
+            .ok_or_else(|| invalid("Choice opening replacement size overflow"))?;
+        output_len = output_len
+            .checked_sub(choice.opening.end - choice.opening.start)
+            .and_then(|length| length.checked_add(replacement_opening_len))
+            .ok_or_else(|| invalid("AlternateContent replacement size overflow"))?;
+    }
+    Ok(output_len)
+}
+
 fn transition_requirements(value: &Transition) -> Option<&'static str> {
-    if matches!(value.kind(), Kind::Ripple(_)) {
+    if matches!(
+        value.kind(),
+        Kind::Ripple(_)
+            | Kind::Conveyor(_)
+            | Kind::Doors(_)
+            | Kind::Ferris(_)
+            | Kind::Flash
+            | Kind::Flip(_)
+            | Kind::FlyThrough(_)
+            | Kind::Gallery(_)
+            | Kind::Glitter(_)
+            | Kind::Honeycomb
+            | Kind::Pan(_)
+            | Kind::Prism(_)
+            | Kind::Reveal(_)
+            | Kind::Shred(_)
+            | Kind::Switch(_)
+            | Kind::Vortex(_)
+            | Kind::Warp(_)
+            | Kind::WheelReverse(_)
+            | Kind::Window(_)
+    ) {
         Some("p14")
     } else if matches!(value.kind(), Kind::Morph(_)) {
-        if value.duration().is_some() {
+        if value.duration_offset().is_some() {
             Some("p14 p159")
         } else {
             Some("p159")
         }
     } else if matches!(value.kind(), Kind::Preset(_)) {
-        if value.duration().is_some() {
+        if value.duration_offset().is_some() {
             Some("p14 p15")
         } else {
             Some("p15")
         }
-    } else if value.duration().is_some() {
+    } else if value.duration_offset().is_some() {
         Some("p14")
     } else {
         None
@@ -496,6 +608,38 @@ fn ensure_extension_namespaces(xml: &mut Vec<u8>, requirements: Option<&str>) ->
     Ok(())
 }
 
+fn extension_namespace_additions_len(root: &[u8], requirements: Option<&str>) -> Result<usize> {
+    let Some(requirements) = requirements else {
+        return Ok(0);
+    };
+    let root_end = find_tag_end(root, 0)?;
+    let root = root
+        .get(..root_end)
+        .ok_or_else(|| invalid("namespace root range is outside its opening tag"))?;
+    let mut additions = 0usize;
+    for token in requirements.split_ascii_whitespace() {
+        let uri = match token {
+            "p14" => "http://schemas.microsoft.com/office/powerpoint/2010/main",
+            "p15" => "http://schemas.microsoft.com/office/powerpoint/2012/main",
+            "p159" => "http://schemas.microsoft.com/office/powerpoint/2015/09/main",
+            _ => continue,
+        };
+        if !root_has_namespace(root, token, uri)? {
+            let declaration_len = 1usize
+                .checked_add("xmlns:".len())
+                .and_then(|length| length.checked_add(token.len()))
+                .and_then(|length| length.checked_add(2))
+                .and_then(|length| length.checked_add(uri.len()))
+                .and_then(|length| length.checked_add(1))
+                .ok_or_else(|| invalid("namespace declaration size overflow"))?;
+            additions = additions
+                .checked_add(declaration_len)
+                .ok_or_else(|| invalid("namespace declaration size overflow"))?;
+        }
+    }
+    Ok(additions)
+}
+
 fn root_has_namespace(root: &[u8], prefix: &str, expected: &str) -> Result<bool> {
     let mut reader = NsReader::from_reader(root);
     let event = reader
@@ -563,6 +707,37 @@ fn clear_alternate_fragment(
     output.extend_from_slice(&owner_bytes[..relative_start]);
     output.extend_from_slice(&owner_bytes[relative_end..]);
     Ok(output)
+}
+
+fn clear_alternate_fragment_len(xml: &[u8], layout: &Layout) -> Result<usize> {
+    let owner = layout
+        .transition
+        .as_ref()
+        .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
+    let Some(active) = active_transition_range(xml, owner, "clear_transition")? else {
+        return Ok(xml
+            .get(owner.clone())
+            .ok_or_else(|| invalid("AlternateContent owner range is outside its slide"))?
+            .len());
+    };
+    let relative_start = active
+        .start
+        .checked_sub(owner.start)
+        .ok_or_else(|| invalid("active transition precedes its AlternateContent owner"))?;
+    let relative_end = active
+        .end
+        .checked_sub(owner.start)
+        .ok_or_else(|| invalid("active transition end precedes its owner"))?;
+    let owner_bytes = xml
+        .get(owner.clone())
+        .ok_or_else(|| invalid("AlternateContent owner range is outside its slide"))?;
+    if relative_start > relative_end || relative_end > owner_bytes.len() {
+        return Err(invalid("active transition range is outside its owner"));
+    }
+    owner_bytes
+        .len()
+        .checked_sub(relative_end - relative_start)
+        .ok_or_else(|| invalid("AlternateContent replacement size underflow"))
 }
 
 #[derive(Clone)]
@@ -969,6 +1144,110 @@ fn rewrite_pml_qnames(xml: &[u8], prefix: &str) -> Result<String> {
     }
     String::from_utf8(output)
         .map_err(|error| Error::Xml(format!("transition QName rewrite is not UTF-8: {error}")))
+}
+
+fn rewrite_pml_qnames_len(xml: &[u8], prefix: &str) -> Result<usize> {
+    let mut output_len = 0usize;
+    let mut cursor = 0usize;
+    while cursor < xml.len() {
+        let Some(relative) = xml[cursor..].iter().position(|byte| *byte == b'<') else {
+            output_len = output_len
+                .checked_add(xml.len() - cursor)
+                .ok_or_else(|| invalid("transition QName rewrite size overflow"))?;
+            break;
+        };
+        let tag_start = cursor + relative;
+        output_len = output_len
+            .checked_add(tag_start - cursor)
+            .ok_or_else(|| invalid("transition QName rewrite size overflow"))?;
+        if let Some(end) = markup_passthrough_end(xml, tag_start)? {
+            output_len = output_len
+                .checked_add(end - tag_start)
+                .ok_or_else(|| invalid("transition QName rewrite size overflow"))?;
+            cursor = end;
+            continue;
+        }
+        let tag_end = find_tag_end(xml, tag_start)?;
+        output_len = output_len
+            .checked_add(rewrite_tag_len(&xml[tag_start..tag_end], prefix)?)
+            .ok_or_else(|| invalid("transition QName rewrite size overflow"))?;
+        cursor = tag_end;
+    }
+    Ok(output_len)
+}
+
+fn rewrite_tag_len(tag: &[u8], prefix: &str) -> Result<usize> {
+    if tag.len() < 2 || tag[0] != b'<' {
+        return Err(invalid("transition QName rewrite saw an invalid tag"));
+    }
+    let mut output_len = tag.len();
+    let mut cursor = 1usize;
+    if tag.get(cursor) == Some(&b'/') {
+        cursor += 1;
+    }
+    let name_end = tag[cursor..]
+        .iter()
+        .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
+        .map_or(tag.len(), |offset| cursor + offset);
+    output_len = rewritten_qname_len(output_len, &tag[cursor..name_end], prefix)?;
+    cursor = name_end;
+    let mut quote = None;
+    while cursor < tag.len() {
+        let byte = tag[cursor];
+        if quote.is_none() {
+            if byte == b'>' {
+                cursor += 1;
+                break;
+            }
+            if byte == b'"' || byte == b'\'' {
+                quote = Some(byte);
+                cursor += 1;
+                continue;
+            }
+            if byte.is_ascii_whitespace() || byte == b'/' || byte == b'=' {
+                cursor += 1;
+                continue;
+            }
+            let attr_end = tag[cursor..]
+                .iter()
+                .position(|value| {
+                    value.is_ascii_whitespace() || matches!(value, b'=' | b'/' | b'>')
+                })
+                .map_or(tag.len(), |offset| cursor + offset);
+            output_len = rewritten_qname_len(output_len, &tag[cursor..attr_end], prefix)?;
+            cursor = attr_end;
+        } else {
+            if byte == quote.unwrap() {
+                quote = None;
+            }
+            cursor += 1;
+        }
+    }
+    if cursor != tag.len() {
+        return Err(invalid("transition QName rewrite stopped before tag end"));
+    }
+    Ok(output_len)
+}
+
+fn rewritten_qname_len(current: usize, name: &[u8], prefix: &str) -> Result<usize> {
+    if !name.starts_with(b"p:") {
+        return Ok(current);
+    }
+    let replacement = if prefix.is_empty() {
+        name.len()
+            .checked_sub(2)
+            .ok_or_else(|| invalid("transition QName is shorter than its prefix"))?
+    } else {
+        prefix
+            .len()
+            .checked_add(1)
+            .and_then(|length| length.checked_add(name.len().checked_sub(2)?))
+            .ok_or_else(|| invalid("transition QName replacement size overflow"))?
+    };
+    current
+        .checked_sub(name.len())
+        .and_then(|length| length.checked_add(replacement))
+        .ok_or_else(|| invalid("transition QName rewrite size underflow"))
 }
 
 fn markup_passthrough_end(xml: &[u8], start: usize) -> Result<Option<usize>> {
@@ -1460,6 +1739,7 @@ fn validate_transition_element(
     } else {
         return Err(unsupported_transition());
     };
+    let mut seen = Vec::<Vec<u8>>::new();
     for attribute in element.attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_ref() == b"xmlns"
@@ -1482,6 +1762,18 @@ fn validate_transition_element(
         {
             return Err(unsupported_transition());
         }
+        if extension_duration
+            || attribute.key.prefix().is_none()
+                && allowed
+                    .iter()
+                    .any(|name| *name == attribute.key.local_name().as_ref())
+        {
+            let local = attribute.key.local_name().as_ref().to_vec();
+            if seen.iter().any(|previous| previous.as_slice() == local) {
+                return Err(invalid("transition contains a duplicate typed attribute"));
+            }
+            seen.push(local);
+        }
     }
     Ok(())
 }
@@ -1493,10 +1785,20 @@ fn extension_effect_attributes(
     let local = name.local_name();
     match resolved {
         ResolveResult::Bound(Namespace(value))
-            if *value == b"http://schemas.microsoft.com/office/powerpoint/2010/main"
-                && local.as_ref() == b"ripple" =>
+            if *value == b"http://schemas.microsoft.com/office/powerpoint/2010/main" =>
         {
-            Some(&[b"dir"])
+            match local.as_ref() {
+                b"ripple" | b"conveyor" | b"ferris" | b"flip" | b"gallery" | b"switch"
+                | b"doors" | b"window" | b"pan" | b"vortex" | b"warp" => Some(&[b"dir"]),
+                b"flash" | b"honeycomb" => Some(&[]),
+                b"flythrough" => Some(&[b"dir", b"hasBounce"]),
+                b"glitter" => Some(&[b"dir", b"pattern"]),
+                b"prism" => Some(&[b"dir", b"isContent", b"isInverted"]),
+                b"reveal" => Some(&[b"thruBlk", b"dir"]),
+                b"shred" => Some(&[b"pattern", b"dir"]),
+                b"wheelReverse" => Some(&[b"spokes"]),
+                _ => None,
+            }
         },
         ResolveResult::Bound(Namespace(value))
             if *value == b"http://schemas.microsoft.com/office/powerpoint/2012/main"
