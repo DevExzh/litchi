@@ -6,10 +6,16 @@
 )]
 
 use std::fs;
+use std::io::Cursor;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 
+use litchi_opc::{
+    AuthoredXmlFragment, OpcError, OpcPackage, PackURI, ReadLimits, ReadResource,
+    SourceBackedPackage, SourceTopologyPlan, probe_package_catalog_from_reader_with_limits,
+};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+use soapberry_zip::{ZipArchive, ZipArchiveWriter};
 
 #[path = "opc_harness.rs"]
 mod opc_harness;
@@ -46,6 +52,36 @@ fn archive_bytes(content_types: &[u8], root_rels: &[u8], document_rels: &[u8]) -
         .write_stored("custom/data.bin", DATA_PAYLOAD)
         .expect("deterministic binary member");
     writer.finish_to_bytes().expect("deterministic OPC archive")
+}
+
+fn archive_bytes_with_directory(
+    content_types: &[u8],
+    root_rels: &[u8],
+    document_rels: &[u8],
+) -> Vec<u8> {
+    let mut output = Cursor::new(Vec::new());
+    let mut writer = ZipArchiveWriter::new(&mut output);
+    writer
+        .new_dir("unused/")
+        .create()
+        .expect("deterministic directory member");
+    writer
+        .write_stored_file("[Content_Types].xml", content_types)
+        .expect("deterministic content types member");
+    writer
+        .write_stored_file("_rels/.rels", root_rels)
+        .expect("deterministic root relationships member");
+    writer
+        .write_stored_file("word/_rels/document.xml.rels", document_rels)
+        .expect("deterministic document relationships member");
+    writer
+        .write_stored_file("word/document.xml", DOCUMENT_PAYLOAD)
+        .expect("deterministic document member");
+    writer
+        .write_stored_file("custom/data.bin", DATA_PAYLOAD)
+        .expect("deterministic binary member");
+    writer.finish().expect("deterministic directory archive");
+    output.into_inner()
 }
 
 struct ValidFixture {
@@ -172,6 +208,288 @@ fn malformed_seeds(valid: &[u8]) -> Vec<Vec<u8>> {
     seeds
 }
 
+fn assert_ingress_admits(data: &[u8], limits: ReadLimits, label: &str) {
+    assert!(
+        SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits).is_ok(),
+        "source-backed ingress must admit {label}"
+    );
+    assert!(
+        OpcPackage::from_bytes_with_limits(data, limits).is_ok(),
+        "eager ingress must admit {label}"
+    );
+    let mut reader = Cursor::new(data);
+    assert!(
+        probe_package_catalog_from_reader_with_limits(&mut reader, limits).is_ok(),
+        "metadata probe ingress must admit {label}"
+    );
+}
+
+fn assert_ingress_rejects(data: &[u8], limits: ReadLimits, resource: ReadResource, label: &str) {
+    let source_error = match SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) {
+        Ok(_) => panic!("source-backed ingress unexpectedly admitted boundary input for {label}"),
+        Err(error) => error,
+    };
+    assert_read_limit(source_error, resource, label, "source-backed");
+
+    let eager_error = match OpcPackage::from_bytes_with_limits(data, limits) {
+        Ok(_) => panic!("eager ingress unexpectedly admitted boundary input"),
+        Err(error) => error,
+    };
+    assert_read_limit(eager_error, resource, label, "eager");
+
+    let mut reader = Cursor::new(data);
+    let probe_error = match probe_package_catalog_from_reader_with_limits(&mut reader, limits) {
+        Ok(_) => panic!("metadata probe unexpectedly admitted boundary input"),
+        Err(error) => error,
+    };
+    assert_read_limit(probe_error, resource, label, "metadata probe");
+}
+
+fn assert_read_limit(error: OpcError, resource: ReadResource, label: &str, ingress: &str) {
+    assert!(
+        matches!(error, OpcError::ReadLimit { resource: actual, .. } if actual == resource),
+        "{ingress} ingress returned {error:?}, expected {resource:?} for {label}"
+    );
+}
+
+fn boundary_manifest() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    let content_types = format!(
+        r#"<Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="{DOCUMENT_CONTENT_TYPE}"/><Override PartName="/custom/data.bin" ContentType="application/octet-stream"/></Types>"#
+    );
+    let root_rels = format!(
+        r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/></Relationships>"#
+    );
+    let document_rels = format!(
+        r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rIdExternal" Type="{HYPERLINK_REL}" Target="{EXTERNAL_TARGET}" TargetMode="External"/><Relationship Id="rIdData" Type="{DATA_REL}" Target="{DATA_TARGET}"/></Relationships>"#
+    );
+    (
+        content_types.into_bytes(),
+        root_rels.into_bytes(),
+        document_rels.into_bytes(),
+    )
+}
+
+fn xml_depth_fixture() -> Vec<u8> {
+    let (content_types, _, document_rels) = boundary_manifest();
+    let root_rels = format!(
+        r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"></Relationship></Relationships>"#
+    );
+    archive_bytes(&content_types, root_rels.as_bytes(), &document_rels)
+}
+
+fn archive_total_entries_fixture() -> Vec<u8> {
+    let (content_types, root_rels, document_rels) = boundary_manifest();
+    let bytes = archive_bytes_with_directory(&content_types, &root_rels, &document_rels);
+    let archive = ZipArchive::from_slice(&bytes).expect("directory fixture must be a ZIP");
+    assert_eq!(
+        archive.entries_hint(),
+        6,
+        "five OPC members plus one directory must be counted physically"
+    );
+    let reader = ArchiveReader::new(&bytes).expect("directory fixture must be readable");
+    assert_eq!(reader.len(), 5, "directory is not an OPC member");
+    assert!(
+        reader
+            .metadata("unused/")
+            .expect("directory metadata must be indexed")
+            .is_directory(),
+        "directory fixture must retain its central-directory classification"
+    );
+    bytes
+}
+
+fn limits_for_xml_depth(maximum: usize) -> ReadLimits {
+    ReadLimits::builder()
+        .max_xml_depth(maximum)
+        .expect("positive XML-depth boundary")
+        .build()
+        .expect("XML-depth profile must remain consistent")
+}
+
+fn limits_for_archive_total_entries(maximum: usize) -> ReadLimits {
+    ReadLimits::builder()
+        .max_archive_members(5)
+        .expect("five non-directory members is a valid ceiling")
+        .max_parts(5)
+        .expect("five admitted parts is a valid ceiling")
+        .max_relationship_parts(5)
+        .expect("five relationship parts is a valid ceiling")
+        .max_archive_total_entries(maximum)
+        .expect("positive total-entry boundary")
+        .build()
+        .expect("directory-aware archive profile must remain consistent")
+}
+
+fn assert_builder_constraints() {
+    assert!(matches!(
+        ReadLimits::builder().max_xml_depth(0),
+        Err(OpcError::InvalidReadLimit {
+            resource: ReadResource::XmlDepth,
+            value: 0,
+        })
+    ));
+    assert!(matches!(
+        ReadLimits::builder().max_archive_total_entries(0),
+        Err(OpcError::InvalidReadLimit {
+            resource: ReadResource::ArchiveTotalEntries,
+            value: 0,
+        })
+    ));
+    assert!(matches!(
+        ReadLimits::builder()
+            .max_archive_members(6)
+            .expect("positive archive-member ceiling")
+            .max_parts(6)
+            .expect("positive parts ceiling")
+            .max_relationship_parts(6)
+            .expect("positive relationship-parts ceiling")
+            .max_archive_total_entries(5)
+            .expect("positive total-entry ceiling")
+            .build(),
+        Err(OpcError::InvalidReadLimit {
+            resource: ReadResource::ArchiveTotalEntries,
+            value: 5,
+        })
+    ));
+}
+
+fn exercise_v4_limit_boundaries() {
+    let depth = xml_depth_fixture();
+    assert_ingress_admits(&depth, limits_for_xml_depth(2), "XML depth exact ceiling");
+    assert_ingress_admits(
+        &depth,
+        limits_for_xml_depth(3),
+        "XML depth one-over ceiling",
+    );
+    assert_ingress_rejects(
+        &depth,
+        limits_for_xml_depth(1),
+        ReadResource::XmlDepth,
+        "XML depth one-under ceiling",
+    );
+
+    let entries = archive_total_entries_fixture();
+    assert_ingress_admits(
+        &entries,
+        limits_for_archive_total_entries(6),
+        "archive total entries exact ceiling",
+    );
+    assert_ingress_admits(
+        &entries,
+        limits_for_archive_total_entries(7),
+        "archive total entries one-over ceiling",
+    );
+    assert_ingress_rejects(
+        &entries,
+        limits_for_archive_total_entries(5),
+        ReadResource::ArchiveTotalEntries,
+        "archive total entries one-under ceiling",
+    );
+    assert_builder_constraints();
+}
+
+fn assert_reopened_xml_payloads() {
+    let (content_types, root_rels, document_rels) = boundary_manifest();
+    let input = archive_bytes(&content_types, &root_rels, &document_rels);
+    let limits = opc_harness::tight_limits();
+    let package = SourceBackedPackage::from_vec_with_limits(input, limits)
+        .expect("source payload fixture must open");
+    let document_uri = PackURI::new("/word/document.xml").expect("document URI is valid");
+    let copy_uri = PackURI::new("/litchi-fuzz-source-copy.xml").expect("copy URI is valid");
+    let source = package
+        .part(&document_uri)
+        .expect("source document must exist")
+        .source_xml()
+        .expect("source document must be XML-authorized");
+    assert_eq!(source.bytes(), DOCUMENT_PAYLOAD);
+    let insertion = source
+        .bytes()
+        .windows(2)
+        .rposition(|window| window == b"</")
+        .expect("document close tag must provide an insertion point");
+    let proof = source
+        .checked_range(insertion..insertion, &[])
+        .expect("insertion point must be source-authorized");
+    let mut expected = source.bytes().to_vec();
+    expected.splice(insertion..insertion, b"<litchi-v4/>".iter().copied());
+    let mut publication = source
+        .into_publication()
+        .expect("source document must enter an edit transaction");
+    publication
+        .replace(
+            proof,
+            AuthoredXmlFragment::markup(b"<litchi-v4/>".to_vec())
+                .expect("authored XML fragment must pass its audit"),
+        )
+        .expect("source replacement must be accepted");
+    let edited = publication
+        .finish()
+        .expect("source replacement must remain XML");
+    assert_eq!(edited.bytes(), expected.as_slice());
+
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_source_xml_part(document_uri.clone(), edited.clone())
+        .expect("source replacement must enter topology plan");
+    plan.try_add_source_xml_part(copy_uri.clone(), edited)
+        .expect("source XML copy must enter topology plan");
+    let mut output = Vec::new();
+    package
+        .write_topology_to_stream(&mut output, plan)
+        .expect("source replacement and copy must publish");
+
+    let source_reopened = SourceBackedPackage::from_vec_with_limits(output.clone(), limits)
+        .expect("source publication must reopen");
+    assert_eq!(
+        source_reopened
+            .part(&document_uri)
+            .expect("reopened source document must exist")
+            .data()
+            .expect("reopened source document must decode")
+            .as_bytes(),
+        expected.as_slice()
+    );
+    assert_eq!(
+        source_reopened
+            .part(&copy_uri)
+            .expect("reopened source copy must exist")
+            .data()
+            .expect("reopened source copy must decode")
+            .as_bytes(),
+        expected.as_slice()
+    );
+
+    let eager_reopened =
+        OpcPackage::from_bytes_with_limits(&output, limits).expect("eager publication must reopen");
+    assert_eq!(
+        eager_reopened
+            .get_part(&document_uri)
+            .expect("eager document must exist")
+            .blob(),
+        expected.as_slice()
+    );
+    assert_eq!(
+        eager_reopened
+            .get_part(&copy_uri)
+            .expect("eager source copy must exist")
+            .blob(),
+        expected.as_slice()
+    );
+
+    let archive = ArchiveReader::new(&output).expect("published ZIP must reopen");
+    assert_eq!(
+        archive
+            .read("word/document.xml")
+            .expect("published document member must decode"),
+        expected
+    );
+    assert_eq!(
+        archive
+            .read("litchi-fuzz-source-copy.xml")
+            .expect("published copy member must decode"),
+        expected
+    );
+}
+
 fn seed_files(valid: &[u8], malformed: &[Vec<u8>]) -> Vec<(String, Vec<u8>)> {
     let mut files = vec![("valid-opc.zip".to_owned(), valid.to_vec())];
     files.extend(
@@ -237,8 +555,10 @@ fn main() {
     // Exact, one-over, and one-under values for the deterministic fixture's
     // relevant OPC resource ceilings are checked through every ingress path.
     opc_harness::exercise_boundaries(valid, fixture.boundaries);
+    exercise_v4_limit_boundaries();
+    assert_reopened_xml_payloads();
     println!(
-        "bounded OPC smoke passed: valid=1 malformed={} boundaries=22 bytes={}",
+        "bounded OPC smoke passed: valid=1 malformed={} boundaries=22 v4_boundaries=6 payload_reopen=2 bytes={}",
         malformed.len(),
         valid.len()
     );

@@ -23,6 +23,41 @@ use std::collections::{HashMap, HashSet, TryReserveError};
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
+/// Locate and index a positional ZIP archive after admitting its complete
+/// central-directory entry count.
+///
+/// `ArchiveLimits::max_files` intentionally counts non-directory members, so
+/// it cannot enforce the OPC `ArchiveTotalEntries` policy by itself. Locate
+/// the EOCD first, check its physical entry count, and only then let the
+/// indexed reader reserve its per-entry maps and layout vectors. The fixed
+/// locator scratch is the same bounded allocation used by the ordinary
+/// indexed-reader constructor; no central-directory ownership is allocated
+/// before the policy check.
+pub(crate) fn indexed_archive_with_limits<R: soapberry_zip::ReaderAt>(
+    reader: R,
+    end_offset: u64,
+    limits: ReadLimits,
+) -> Result<soapberry_zip::office::IndexedArchive<R>> {
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
+        .map_err(|source| allocation("OPC ZIP locator scratch", source))?;
+    buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+    let archive = soapberry_zip::ZipLocator::new()
+        .locate_in_reader(reader, &mut buffer, end_offset)
+        .map_err(|(_, error)| OpcError::from(error))?;
+    limits.check(
+        ReadResource::ArchiveTotalEntries,
+        archive.entries_hint(),
+        limits.max_archive_total_entries() as u64,
+    )?;
+    soapberry_zip::office::IndexedArchive::from_zip_archive_with_limits(
+        archive,
+        limits.zip_limits(),
+    )
+    .map_err(OpcError::from)
+}
+
 /// The small ZIP surface needed by the structural OPC reader.
 ///
 /// Keeping this behind a private trait lets the eager byte-slice ingress and
@@ -323,12 +358,8 @@ pub fn probe_package_catalog_from_reader_with_limits<R: Read + Seek + ?Sized>(
     let probe_result = (|| {
         let input_length = reader.seek(SeekFrom::End(0))?;
         limits.check_input_bytes(input_length)?;
-        let archive = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
-            BorrowedReaderAt::new(reader),
-            input_length,
-            limits.zip_limits(),
-        )
-        .map_err(OpcError::from)?;
+        let archive =
+            indexed_archive_with_limits(BorrowedReaderAt::new(reader), input_length, limits)?;
         let source = PackageReader::source_catalog(&archive, limits)?;
         Ok(PackageCatalog { source })
     })();
