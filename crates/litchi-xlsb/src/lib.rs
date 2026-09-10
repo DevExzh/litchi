@@ -131,6 +131,7 @@ pub mod sheet;
 pub mod slicer;
 pub mod sparkline;
 pub mod styles;
+pub mod theme;
 pub mod timeline;
 pub mod volatile_dependencies;
 pub mod workbook;

@@ -57,6 +57,9 @@ pub struct WorkbookWriter {
     pub(super) pivot_caches: Vec<AuthoredPivotCache>,
     pub(super) xml_maps: Option<crate::xml_maps::XmlMapInfo>,
     pub(super) data_model: Option<crate::data_model::Model>,
+    /// Optional typed DrawingML theme; `None` uses the writer's Office
+    /// template as an authoring policy.
+    pub(super) theme: Option<crate::theme::Theme>,
     #[cfg(feature = "vba-inspection")]
     pub(super) vba: Option<Arc<Vec<u8>>>,
 }
@@ -90,6 +93,7 @@ impl WorkbookWriter {
             pivot_caches: Vec::new(),
             xml_maps: None,
             data_model: None,
+            theme: None,
             #[cfg(feature = "vba-inspection")]
             vba: None,
         }
@@ -102,6 +106,16 @@ impl WorkbookWriter {
     /// * `is_1904` - `true` for 1904 date system (Mac), `false` for 1900 (Windows, default)
     pub fn set_date_system(&mut self, is_1904: bool) {
         self.is_1904 = is_1904;
+    }
+
+    /// Set the typed DrawingML Theme used by the generated workbook.
+    ///
+    /// The Theme is validated and encoded only after the complete typed model
+    /// is supplied; failed validation leaves the writer unchanged.
+    pub fn set_theme(&mut self, theme: crate::theme::Theme) -> Result<&mut Self> {
+        litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?;
+        self.theme = Some(theme);
+        Ok(self)
     }
 
     /// Validated workbook formula calculation policy written to `BrtCalcProp`.

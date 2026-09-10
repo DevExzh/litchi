@@ -1,0 +1,244 @@
+{
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "reports": [
+    {
+      "path": "test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "part": "xl/theme/theme1.xml",
+      "bytes": 8390,
+      "sha256": "50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59",
+      "valid": true,
+      "semantic": {
+        "name": "Office Theme",
+        "palette_name": "Office",
+        "colors": {
+          "dk1": [
+            {
+              "kind": "sysClr",
+              "attributes": {
+                "val": "windowText",
+                "lastClr": "000000"
+              }
+            }
+          ],
+          "lt1": [
+            {
+              "kind": "sysClr",
+              "attributes": {
+                "val": "window",
+                "lastClr": "FFFFFF"
+              }
+            }
+          ],
+          "dk2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "44546A"
+              }
+            }
+          ],
+          "lt2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "E7E6E6"
+              }
+            }
+          ],
+          "accent1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "5B9BD5"
+              }
+            }
+          ],
+          "accent2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "ED7D31"
+              }
+            }
+          ],
+          "accent3": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "A5A5A5"
+              }
+            }
+          ],
+          "accent4": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "FFC000"
+              }
+            }
+          ],
+          "accent5": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4472C4"
+              }
+            }
+          ],
+          "accent6": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "70AD47"
+              }
+            }
+          ],
+          "hlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "0563C1"
+              }
+            }
+          ],
+          "folHlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "954F72"
+              }
+            }
+          ]
+        },
+        "font_scheme_name": "Office",
+        "major_latin": "Calibri Light",
+        "minor_latin": "Calibri"
+      },
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "test-data/ooxml/xlsb/62815.xlsb",
+      "part": "xl/theme/theme1.xml",
+      "bytes": 7646,
+      "sha256": "af2fb29aa44e18757cbc03afd5c6ddf60deef78419009b6d07367fff46136fb1",
+      "valid": true,
+      "semantic": {
+        "name": "Office Theme",
+        "palette_name": "Office",
+        "colors": {
+          "dk1": [
+            {
+              "kind": "sysClr",
+              "attributes": {
+                "val": "windowText",
+                "lastClr": "000000"
+              }
+            }
+          ],
+          "lt1": [
+            {
+              "kind": "sysClr",
+              "attributes": {
+                "val": "window",
+                "lastClr": "FFFFFF"
+              }
+            }
+          ],
+          "dk2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "1F497D"
+              }
+            }
+          ],
+          "lt2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "EEECE1"
+              }
+            }
+          ],
+          "accent1": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4F81BD"
+              }
+            }
+          ],
+          "accent2": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "C0504D"
+              }
+            }
+          ],
+          "accent3": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "9BBB59"
+              }
+            }
+          ],
+          "accent4": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "8064A2"
+              }
+            }
+          ],
+          "accent5": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "4BACC6"
+              }
+            }
+          ],
+          "accent6": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "F79646"
+              }
+            }
+          ],
+          "hlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "0000FF"
+              }
+            }
+          ],
+          "folHlink": [
+            {
+              "kind": "srgbClr",
+              "attributes": {
+                "val": "800080"
+              }
+            }
+          ]
+        },
+        "font_scheme_name": "Office",
+        "major_latin": "Cambria",
+        "minor_latin": "Calibri"
+      },
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    }
+  ]
+}

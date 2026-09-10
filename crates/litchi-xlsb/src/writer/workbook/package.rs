@@ -56,7 +56,9 @@ impl WorkbookWriter {
         // Add document properties (required by Excel)
         self.add_doc_props(&mut package)?;
 
-        // Add theme (REQUIRED by Excel)
+        // Add the writer's default Theme template.  The package grammar
+        // permits zero or one Theme part; this writer keeps the template as a
+        // producer policy and replaces it when `set_theme` supplied one.
         self.add_theme(&mut package)?;
 
         // Add worksheets first so that shared_strings is fully populated before we
@@ -239,15 +241,18 @@ impl WorkbookWriter {
         crate::package::template::core()
     }
 
-    /// Add theme (REQUIRED by Excel to open file)
+    /// Add the writer-selected Theme part.
     fn add_theme(&self, package: &mut OpcPackage) -> Result<()> {
-        // Create minimal Office theme
-        let theme_xml = self.create_minimal_theme();
+        let theme_xml = if let Some(theme) = self.theme.as_ref() {
+            litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?
+        } else {
+            self.create_minimal_theme().as_bytes().to_vec()
+        };
         let theme_uri = PackURI::new("/xl/theme/theme1.xml")?;
         let theme_part = BlobPart::new(
             theme_uri,
             "application/vnd.openxmlformats-officedocument.theme+xml".to_string(),
-            theme_xml.as_bytes().to_vec(),
+            theme_xml,
         );
         package.add_part(Box::new(theme_part));
 

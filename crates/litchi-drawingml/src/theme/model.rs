@@ -91,12 +91,48 @@ pub enum System {
     MenuHighlight,
     MenuText,
     ScrollBar,
+    ThreeDDarkShadow,
+    ThreeDLight,
     Window,
     WindowFrame,
     WindowText,
 }
 
 impl System {
+    /// Every value admitted by DrawingML `ST_SystemColorVal`.
+    pub const ALL: [Self; 30] = [
+        Self::ScrollBar,
+        Self::Background,
+        Self::ActiveCaption,
+        Self::InactiveCaption,
+        Self::Menu,
+        Self::Window,
+        Self::WindowFrame,
+        Self::MenuText,
+        Self::WindowText,
+        Self::CaptionText,
+        Self::ActiveBorder,
+        Self::InactiveBorder,
+        Self::AppWorkspace,
+        Self::Highlight,
+        Self::HighlightText,
+        Self::ButtonFace,
+        Self::ButtonShadow,
+        Self::GrayText,
+        Self::ButtonText,
+        Self::InactiveCaptionText,
+        Self::ButtonHighlight,
+        Self::ThreeDDarkShadow,
+        Self::ThreeDLight,
+        Self::InfoText,
+        Self::InfoBackground,
+        Self::HotLight,
+        Self::GradientActiveCaption,
+        Self::GradientInactiveCaption,
+        Self::MenuHighlight,
+        Self::MenuBar,
+    ];
+
     #[must_use]
     pub const fn token(self) -> &'static str {
         match self {
@@ -125,6 +161,8 @@ impl System {
             Self::MenuHighlight => "menuHighlight",
             Self::MenuText => "menuText",
             Self::ScrollBar => "scrollBar",
+            Self::ThreeDDarkShadow => "3dDkShadow",
+            Self::ThreeDLight => "3dLight",
             Self::Window => "window",
             Self::WindowFrame => "windowFrame",
             Self::WindowText => "windowText",
@@ -159,6 +197,8 @@ impl System {
             "menuHighlight" => Self::MenuHighlight,
             "menuText" => Self::MenuText,
             "scrollBar" => Self::ScrollBar,
+            "3dDkShadow" => Self::ThreeDDarkShadow,
+            "3dLight" => Self::ThreeDLight,
             "window" => Self::Window,
             "windowFrame" => Self::WindowFrame,
             "windowText" => Self::WindowText,
@@ -361,7 +401,25 @@ pub(crate) fn validate_name(kind: &str, value: &str) -> Result<()> {
             "{kind} name is empty or exceeds {MAX_NAME_CHARS} characters"
         )));
     }
+    validate_xml_text(kind, value)?;
     Ok(())
+}
+
+pub(crate) fn validate_xml_text(kind: &str, value: &str) -> Result<()> {
+    if let Some(character) = value.chars().find(|character| !is_xml_1_0(*character)) {
+        return Err(invalid(format!(
+            "{kind} contains an XML 1.0 forbidden character U+{:04X}",
+            u32::from(character)
+        )));
+    }
+    Ok(())
+}
+
+fn is_xml_1_0(character: char) -> bool {
+    matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+        || matches!(character, '\u{20}'..='\u{D7FF}')
+        || matches!(character, '\u{E000}'..='\u{FFFD}')
+        || matches!(character, '\u{10000}'..='\u{10FFFF}')
 }
 
 pub(crate) fn validate_palette(value: &Palette) -> Result<()> {
@@ -391,6 +449,11 @@ pub(crate) fn validate_fonts(value: &FontSet) -> Result<()> {
     validate_name("font set", value.name())?;
     for (kind, face) in [("major", value.major()), ("minor", value.minor())] {
         validate_name(kind, &face.latin)?;
+        validate_xml_text(&format!("{kind} east Asian typeface"), &face.east_asian)?;
+        validate_xml_text(
+            &format!("{kind} complex script typeface"),
+            &face.complex_script,
+        )?;
         if face.east_asian.chars().count() > MAX_NAME_CHARS
             || face.complex_script.chars().count() > MAX_NAME_CHARS
         {

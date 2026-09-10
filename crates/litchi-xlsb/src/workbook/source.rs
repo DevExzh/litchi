@@ -897,6 +897,30 @@ impl SourceBackedWorkbook {
         Ok(version)
     }
 
+    /// Read the workbook's optional theme without materializing worksheets.
+    ///
+    /// This loads the selected theme XML and returns an immutable metadata
+    /// view. Image relationships remain inert; their payloads are not read.
+    /// Source freshness and cancellation are checked around the operation.
+    /// Retain the returned view for repeated color and font queries.
+    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
+        self.theme_with_limits(crate::theme::Limits::default())
+    }
+
+    /// Read the optional theme with explicit resource ceilings.
+    ///
+    /// The selected part's declared size is checked before payload loading;
+    /// decoded XML and publication bounds remain enforced by the theme owner.
+    pub fn theme_with_limits(
+        &self,
+        limits: crate::theme::Limits,
+    ) -> Result<Option<crate::theme::View>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let theme = crate::theme::read_source(&self.inner.package, limits);
+        postflight_package(&self.inner.package)?;
+        theme
+    }
+
     /// Inventory embedded-object and embedded-package relationships without
     /// materializing the OPC package or any payload bytes.
     ///

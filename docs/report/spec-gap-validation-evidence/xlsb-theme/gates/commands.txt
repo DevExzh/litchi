@@ -1,0 +1,13 @@
+toolchain: cargo +1.95.0
+target: /tmp/litchi-xlsb-theme-target-20260910
+environment: CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2 RUSTUP_HOME=/tmp/litchi-spec-gap-rustup
+tests: cargo +1.95.0 test -p litchi-xlsb -p litchi-drawingml --all-features --all-targets --offline --locked --no-fail-fast
+doctests: cargo +1.95.0 test -p litchi-xlsb -p litchi-drawingml --all-features --doc --offline --locked --no-fail-fast
+pptx-consumer-unit: cargo +1.95.0 test -p litchi-pptx --lib shape::theme --offline --locked
+pptx-consumer-integration: cargo +1.95.0 test -p litchi-pptx --test pptx_master_themes --offline --locked
+schema-fixtures: LITCHI_THEME_SCHEMA_OUTPUT_DIR=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/gates/../generated-xml cargo +1.95.0 test -p litchi-xlsb --all-features --lib theme::splice_tests --offline --locked
+schema-validation: python3 /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/gates/../verify-theme-schema.py /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/gates/../generated-xml/*.xml
+clippy: cargo +1.95.0 clippy -p litchi-xlsb -p litchi-drawingml --all-features --all-targets --offline --locked -- -D warnings
+rustdoc: RUSTDOCFLAGS=-Dwarnings cargo +1.95.0 doc -p litchi-xlsb -p litchi-drawingml --all-features --no-deps --offline --locked
+format: cargo +1.95.0 fmt -p litchi-xlsb -p litchi-drawingml -- --check
+diff: git diff HEAD --check

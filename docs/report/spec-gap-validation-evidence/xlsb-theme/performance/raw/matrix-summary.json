@@ -1,0 +1,1130 @@
+{
+  "comparison_scope": "No equivalent-work speedup inferred; source-backed, eager, and transaction API scopes differ.",
+  "contract": {
+    "cases_per_fixture": 6,
+    "fixtures": 3,
+    "process_reports": 54,
+    "samples_per_report": 30,
+    "warmup_per_report": 3
+  },
+  "groups": {
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb/change_inverse": {
+      "case": "change_inverse",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb",
+      "median_process_p50_ns": 13493319,
+      "median_process_p95_ns": 13521829,
+      "median_process_p99_ns": 13549789,
+      "process_count": 3,
+      "process_mean_ns": [
+        13513220,
+        13495935,
+        13486412
+      ],
+      "process_p50_ns": [
+        13507329,
+        13493319,
+        13483889
+      ],
+      "process_p95_ns": [
+        13557329,
+        13521829,
+        13502248
+      ],
+      "process_p99_ns": [
+        13559219,
+        13522959,
+        13549789
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "typed theme color change, readback, inverse publication, and exact restoration"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb/eager_cold": {
+      "case": "eager_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb",
+      "median_process_p50_ns": 3824854,
+      "median_process_p95_ns": 3853494,
+      "median_process_p99_ns": 4067584,
+      "process_count": 3,
+      "process_mean_ns": [
+        3842350,
+        3828727,
+        3836464
+      ],
+      "process_p50_ns": [
+        3842264,
+        3799193,
+        3824854
+      ],
+      "process_p95_ns": [
+        3853494,
+        4057995,
+        3849744
+      ],
+      "process_p99_ns": [
+        3859334,
+        4067584,
+        4311486
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "owned XLSB package open + typed theme read + typed snapshot construction"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb/eager_warm": {
+      "case": "eager_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb",
+      "median_process_p50_ns": 60,
+      "median_process_p95_ns": 70,
+      "median_process_p99_ns": 70,
+      "process_count": 3,
+      "process_mean_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p50_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p95_ns": [
+        70,
+        70,
+        70
+      ],
+      "process_p99_ns": [
+        70,
+        70,
+        70
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 2946160,
+          "calls": 8996,
+          "dealloc_calls": 8779,
+          "deallocated_bytes": 1880573,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 2143841,
+          "live_before": 1078254,
+          "peak_after": 2419826,
+          "peak_before": 1078254,
+          "realloc_calls": 1608
+        },
+        {
+          "allocated_bytes": 2946160,
+          "calls": 8996,
+          "dealloc_calls": 8779,
+          "deallocated_bytes": 1880573,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 2143841,
+          "live_before": 1078254,
+          "peak_after": 2419826,
+          "peak_before": 1078254,
+          "realloc_calls": 1608
+        },
+        {
+          "allocated_bytes": 2946160,
+          "calls": 8996,
+          "dealloc_calls": 8779,
+          "deallocated_bytes": 1880573,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 2143841,
+          "live_before": 1078254,
+          "peak_after": 2419826,
+          "peak_before": 1078254,
+          "realloc_calls": 1608
+        }
+      ],
+      "setup_reads": [
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        },
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        },
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        }
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "repeated typed theme metadata lookups on one owned package handle"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb/noop": {
+      "case": "noop",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb",
+      "median_process_p50_ns": 6930515,
+      "median_process_p95_ns": 6945705,
+      "median_process_p99_ns": 6954635,
+      "process_count": 3,
+      "process_mean_ns": [
+        7738938,
+        6922843,
+        6931511
+      ],
+      "process_p50_ns": [
+        8336460,
+        6923416,
+        6930515
+      ],
+      "process_p95_ns": [
+        8371150,
+        6942235,
+        6945705
+      ],
+      "process_p99_ns": [
+        8373891,
+        6943995,
+        6954635
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "typed theme transaction no-op commit and source-checked publication"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb/source_cold": {
+      "case": "source_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb",
+      "median_process_p50_ns": 2652330,
+      "median_process_p95_ns": 2671190,
+      "median_process_p99_ns": 2702549,
+      "process_count": 3,
+      "process_mean_ns": [
+        2651049,
+        2653051,
+        2888284
+      ],
+      "process_p50_ns": [
+        2648930,
+        2652330,
+        2886951
+      ],
+      "process_p95_ns": [
+        2669230,
+        2671190,
+        2905491
+      ],
+      "process_p99_ns": [
+        2702549,
+        2679370,
+        2914131
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 27,
+        "requested_bytes": 6859,
+        "returned_bytes": 6859
+      },
+      "timing_scopes": [
+        "source-backed workbook open + typed theme read + source-view construction"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb/source_warm": {
+      "case": "source_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release/generated/theme-control-1048576.xlsb",
+      "median_process_p50_ns": 60,
+      "median_process_p95_ns": 70,
+      "median_process_p99_ns": 70,
+      "process_count": 3,
+      "process_mean_ns": [
+        61,
+        60,
+        60
+      ],
+      "process_p50_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p95_ns": [
+        70,
+        70,
+        60
+      ],
+      "process_p99_ns": [
+        70,
+        70,
+        70
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 2035358,
+          "calls": 1747,
+          "dealloc_calls": 1529,
+          "deallocated_bytes": 969731,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 2143881,
+          "live_before": 1078254,
+          "peak_after": 2261457,
+          "peak_before": 1078254,
+          "realloc_calls": 166
+        },
+        {
+          "allocated_bytes": 2035358,
+          "calls": 1747,
+          "dealloc_calls": 1529,
+          "deallocated_bytes": 969731,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 2143881,
+          "live_before": 1078254,
+          "peak_after": 2261457,
+          "peak_before": 1078254,
+          "realloc_calls": 166
+        },
+        {
+          "allocated_bytes": 2035358,
+          "calls": 1747,
+          "dealloc_calls": 1529,
+          "deallocated_bytes": 969731,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 2143881,
+          "live_before": 1078254,
+          "peak_after": 2261457,
+          "peak_before": 1078254,
+          "realloc_calls": 166
+        }
+      ],
+      "setup_reads": [
+        {
+          "calls": 27,
+          "requested_bytes": 6859,
+          "returned_bytes": 6859
+        },
+        {
+          "calls": 27,
+          "requested_bytes": 6859,
+          "returned_bytes": 6859
+        },
+        {
+          "calls": 27,
+          "requested_bytes": 6859,
+          "returned_bytes": 6859
+        }
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "repeated typed theme metadata lookups on one source-backed handle"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/change_inverse": {
+      "case": "change_inverse",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 833513,
+      "median_process_p95_ns": 851063,
+      "median_process_p99_ns": 855523,
+      "process_count": 3,
+      "process_mean_ns": [
+        834678,
+        836278,
+        836428
+      ],
+      "process_p50_ns": [
+        833513,
+        834623,
+        833203
+      ],
+      "process_p95_ns": [
+        851063,
+        849793,
+        857853
+      ],
+      "process_p99_ns": [
+        855523,
+        855233,
+        876573
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "typed theme color change, readback, inverse publication, and exact restoration"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/eager_cold": {
+      "case": "eager_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 201170,
+      "median_process_p95_ns": 225221,
+      "median_process_p99_ns": 233891,
+      "process_count": 3,
+      "process_mean_ns": [
+        204989,
+        205241,
+        205536
+      ],
+      "process_p50_ns": [
+        200300,
+        201170,
+        201700
+      ],
+      "process_p95_ns": [
+        225221,
+        224051,
+        225421
+      ],
+      "process_p99_ns": [
+        233891,
+        235891,
+        233861
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "owned XLSB package open + typed theme read + typed snapshot construction"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/eager_warm": {
+      "case": "eager_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 50,
+      "median_process_p95_ns": 60,
+      "median_process_p99_ns": 60,
+      "process_count": 3,
+      "process_mean_ns": [
+        55,
+        55,
+        54
+      ],
+      "process_p50_ns": [
+        60,
+        50,
+        50
+      ],
+      "process_p95_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p99_ns": [
+        60,
+        60,
+        60
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 581859,
+          "calls": 1470,
+          "dealloc_calls": 1321,
+          "deallocated_bytes": 569208,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 31640,
+          "live_before": 18989,
+          "peak_after": 188974,
+          "peak_before": 18989,
+          "realloc_calls": 122
+        },
+        {
+          "allocated_bytes": 581859,
+          "calls": 1470,
+          "dealloc_calls": 1321,
+          "deallocated_bytes": 569208,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 31640,
+          "live_before": 18989,
+          "peak_after": 188974,
+          "peak_before": 18989,
+          "realloc_calls": 122
+        },
+        {
+          "allocated_bytes": 581859,
+          "calls": 1470,
+          "dealloc_calls": 1321,
+          "deallocated_bytes": 569208,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 31640,
+          "live_before": 18989,
+          "peak_after": 188974,
+          "peak_before": 18989,
+          "realloc_calls": 122
+        }
+      ],
+      "setup_reads": [
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        },
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        },
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        }
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "repeated typed theme metadata lookups on one owned package handle"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/noop": {
+      "case": "noop",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 405282,
+      "median_process_p95_ns": 429342,
+      "median_process_p99_ns": 433931,
+      "process_count": 3,
+      "process_mean_ns": [
+        404972,
+        407176,
+        408567
+      ],
+      "process_p50_ns": [
+        400341,
+        405282,
+        406572
+      ],
+      "process_p95_ns": [
+        429342,
+        427702,
+        432631
+      ],
+      "process_p99_ns": [
+        463311,
+        433931,
+        433432
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "typed theme transaction no-op commit and source-checked publication"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/source_cold": {
+      "case": "source_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 153241,
+      "median_process_p95_ns": 163120,
+      "median_process_p99_ns": 165761,
+      "process_count": 3,
+      "process_mean_ns": [
+        155677,
+        154532,
+        155338
+      ],
+      "process_p50_ns": [
+        153620,
+        152711,
+        153241
+      ],
+      "process_p95_ns": [
+        163081,
+        163120,
+        164670
+      ],
+      "process_p99_ns": [
+        165761,
+        168331,
+        165420
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 21,
+        "requested_bytes": 4187,
+        "returned_bytes": 4187
+      },
+      "timing_scopes": [
+        "source-backed workbook open + typed theme read + source-view construction"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb/source_warm": {
+      "case": "source_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/62815.xlsb",
+      "median_process_p50_ns": 60,
+      "median_process_p95_ns": 60,
+      "median_process_p99_ns": 60,
+      "process_count": 3,
+      "process_mean_ns": [
+        55,
+        54,
+        58
+      ],
+      "process_p50_ns": [
+        60,
+        50,
+        60
+      ],
+      "process_p95_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p99_ns": [
+        60,
+        60,
+        60
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 727961,
+          "calls": 1181,
+          "dealloc_calls": 1031,
+          "deallocated_bytes": 715270,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 31680,
+          "live_before": 18989,
+          "peak_after": 165481,
+          "peak_before": 18989,
+          "realloc_calls": 95
+        },
+        {
+          "allocated_bytes": 727961,
+          "calls": 1181,
+          "dealloc_calls": 1031,
+          "deallocated_bytes": 715270,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 31680,
+          "live_before": 18989,
+          "peak_after": 165481,
+          "peak_before": 18989,
+          "realloc_calls": 95
+        },
+        {
+          "allocated_bytes": 727961,
+          "calls": 1181,
+          "dealloc_calls": 1031,
+          "deallocated_bytes": 715270,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 31680,
+          "live_before": 18989,
+          "peak_after": 165481,
+          "peak_before": 18989,
+          "realloc_calls": 95
+        }
+      ],
+      "setup_reads": [
+        {
+          "calls": 21,
+          "requested_bytes": 4187,
+          "returned_bytes": 4187
+        },
+        {
+          "calls": 21,
+          "requested_bytes": 4187,
+          "returned_bytes": 4187
+        },
+        {
+          "calls": 21,
+          "requested_bytes": 4187,
+          "returned_bytes": 4187
+        }
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "repeated typed theme metadata lookups on one source-backed handle"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/change_inverse": {
+      "case": "change_inverse",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 2151278,
+      "median_process_p95_ns": 2184468,
+      "median_process_p99_ns": 2191868,
+      "process_count": 3,
+      "process_mean_ns": [
+        2157961,
+        2153233,
+        2154983
+      ],
+      "process_p50_ns": [
+        2156748,
+        2151278,
+        2144838
+      ],
+      "process_p95_ns": [
+        2184468,
+        2177438,
+        2198218
+      ],
+      "process_p99_ns": [
+        2191868,
+        2187478,
+        2223148
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "typed theme color change, readback, inverse publication, and exact restoration"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/eager_cold": {
+      "case": "eager_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 1390536,
+      "median_process_p95_ns": 1412285,
+      "median_process_p99_ns": 1417505,
+      "process_count": 3,
+      "process_mean_ns": [
+        1378726,
+        1394589,
+        1394233
+      ],
+      "process_p50_ns": [
+        1375545,
+        1393185,
+        1390536
+      ],
+      "process_p95_ns": [
+        1410445,
+        1412285,
+        1431215
+      ],
+      "process_p99_ns": [
+        1412915,
+        1417505,
+        1431275
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "owned XLSB package open + typed theme read + typed snapshot construction"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/eager_warm": {
+      "case": "eager_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 60,
+      "median_process_p95_ns": 60,
+      "median_process_p99_ns": 60,
+      "process_count": 3,
+      "process_mean_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p50_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p95_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p99_ns": [
+        70,
+        60,
+        60
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 1902142,
+          "calls": 8996,
+          "dealloc_calls": 8779,
+          "deallocated_bytes": 1885131,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 48836,
+          "live_before": 31825,
+          "peak_after": 327100,
+          "peak_before": 31825,
+          "realloc_calls": 1608
+        },
+        {
+          "allocated_bytes": 1902142,
+          "calls": 8996,
+          "dealloc_calls": 8779,
+          "deallocated_bytes": 1885131,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 48836,
+          "live_before": 31825,
+          "peak_after": 327100,
+          "peak_before": 31825,
+          "realloc_calls": 1608
+        },
+        {
+          "allocated_bytes": 1902142,
+          "calls": 8996,
+          "dealloc_calls": 8779,
+          "deallocated_bytes": 1885131,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 48836,
+          "live_before": 31825,
+          "peak_after": 327100,
+          "peak_before": 31825,
+          "realloc_calls": 1608
+        }
+      ],
+      "setup_reads": [
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        },
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        },
+        {
+          "calls": 0,
+          "requested_bytes": 0,
+          "returned_bytes": 0
+        }
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "repeated typed theme metadata lookups on one owned package handle"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/noop": {
+      "case": "noop",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 1641696,
+      "median_process_p95_ns": 1673016,
+      "median_process_p99_ns": 1673816,
+      "process_count": 3,
+      "process_mean_ns": [
+        1646294,
+        1642157,
+        1633952
+      ],
+      "process_p50_ns": [
+        1641696,
+        1642746,
+        1633146
+      ],
+      "process_p95_ns": [
+        1682176,
+        1673016,
+        1658656
+      ],
+      "process_p99_ns": [
+        1691876,
+        1673816,
+        1673606
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "typed theme transaction no-op commit and source-checked publication"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/source_cold": {
+      "case": "source_cold",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 216141,
+      "median_process_p95_ns": 236931,
+      "median_process_p99_ns": 240281,
+      "process_count": 3,
+      "process_mean_ns": [
+        218954,
+        220987,
+        219128
+      ],
+      "process_p50_ns": [
+        216141,
+        216441,
+        215311
+      ],
+      "process_p95_ns": [
+        234571,
+        239520,
+        236931
+      ],
+      "process_p99_ns": [
+        239050,
+        240281,
+        242011
+      ],
+      "setup_allocation": [
+        null,
+        null,
+        null
+      ],
+      "setup_reads": [
+        null,
+        null,
+        null
+      ],
+      "source_observation": {
+        "calls": 27,
+        "requested_bytes": 5960,
+        "returned_bytes": 5960
+      },
+      "timing_scopes": [
+        "source-backed workbook open + typed theme read + source-view construction"
+      ]
+    },
+    "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb/source_warm": {
+      "case": "source_warm",
+      "fixture": "/home/zhuhe/code/litchi-spec-gaps/test-data/poi/test-data/spreadsheet/testVarious.xlsb",
+      "median_process_p50_ns": 60,
+      "median_process_p95_ns": 60,
+      "median_process_p99_ns": 70,
+      "process_count": 3,
+      "process_mean_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p50_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p95_ns": [
+        60,
+        60,
+        60
+      ],
+      "process_p99_ns": [
+        70,
+        70,
+        60
+      ],
+      "setup_allocation": [
+        {
+          "allocated_bytes": 989061,
+          "calls": 1747,
+          "dealloc_calls": 1529,
+          "deallocated_bytes": 972010,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 48876,
+          "live_before": 31825,
+          "peak_after": 194777,
+          "peak_before": 31825,
+          "realloc_calls": 166
+        },
+        {
+          "allocated_bytes": 989061,
+          "calls": 1747,
+          "dealloc_calls": 1529,
+          "deallocated_bytes": 972010,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 48876,
+          "live_before": 31825,
+          "peak_after": 194777,
+          "peak_before": 31825,
+          "realloc_calls": 166
+        },
+        {
+          "allocated_bytes": 989061,
+          "calls": 1747,
+          "dealloc_calls": 1529,
+          "deallocated_bytes": 972010,
+          "failed": 0,
+          "invalid": false,
+          "live_after": 48876,
+          "live_before": 31825,
+          "peak_after": 194777,
+          "peak_before": 31825,
+          "realloc_calls": 166
+        }
+      ],
+      "setup_reads": [
+        {
+          "calls": 27,
+          "requested_bytes": 5960,
+          "returned_bytes": 5960
+        },
+        {
+          "calls": 27,
+          "requested_bytes": 5960,
+          "returned_bytes": 5960
+        },
+        {
+          "calls": 27,
+          "requested_bytes": 5960,
+          "returned_bytes": 5960
+        }
+      ],
+      "source_observation": {
+        "calls": 0,
+        "requested_bytes": 0,
+        "returned_bytes": 0
+      },
+      "timing_scopes": [
+        "repeated typed theme metadata lookups on one source-backed handle"
+      ]
+    }
+  },
+  "raw_run_directory": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsb-theme/performance/raw/final-release",
+  "schema": "xlsb-theme-profile-matrix-v1"
+}
