@@ -1,0 +1,119 @@
+{
+  "candidate_root": "/var/tmp/litchi-xlsx-model-v1-validation-20260910",
+  "candidate_base_commit": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "current_workspace_head": "ce0be842b60a28db142b795389e24be5bde8ae07",
+  "owner_path_count": 10,
+  "owner_paths": [
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "crates/litchi-xlsx/src/lib.rs",
+    "crates/litchi-xlsx/src/package.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/codec.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/mod.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/model.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/package.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/removal.rs",
+    "crates/litchi-xlsx/tests/data_model_native.rs",
+    "crates/litchi-xlsx/tests/data_model_opaque_context.rs"
+  ],
+  "owner_hash_failures": [],
+  "owner_hashes_match_root_manifest": true,
+  "source_changed_vs_current_head": [
+    "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "crates/litchi-xlsx/src/lib.rs",
+    "crates/litchi-xlsx/src/package.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/codec.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/mod.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/model.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/package.rs",
+    "crates/litchi-xlsx/src/workbook/data_model/removal.rs",
+    "crates/litchi-xlsx/tests/data_model_native.rs",
+    "crates/litchi-xlsx/tests/data_model_opaque_context.rs"
+  ],
+  "unexpected_source_changes": [],
+  "tracked_xlsx_file_count_at_current_head": 542,
+  "tracked_xlsx_files_missing_from_candidate": [],
+  "tracked_source_diffs_outside_owner_paths": [],
+  "custom_prerequisite": {
+    "source_manifest": "custom-source-manifest-v7.json",
+    "source_count": 17,
+    "current_head_matches_all": true,
+    "candidate_nonoverlap_paths_preserved": true,
+    "candidate_nonoverlap_preserved_count": 14,
+    "owner_overlap_paths_integrated": [
+      "crates/litchi-xlsx/src/lib.rs",
+      "crates/litchi-xlsx/src/package.rs",
+      "crates/litchi-xlsx/docs/FEATURE_MATRIX.md"
+    ]
+  },
+  "survey_paths": {
+    "crates/litchi-xlsx/src/survey.rs": {
+      "current_head": {
+        "bytes": 233045,
+        "sha256": "62502b977885a0ac731a648de7d332e37074cbc5cf6389243a8055d84b448c11"
+      },
+      "candidate_final": {
+        "bytes": 233045,
+        "sha256": "62502b977885a0ac731a648de7d332e37074cbc5cf6389243a8055d84b448c11"
+      },
+      "matches_current_head": true
+    },
+    "crates/litchi-xlsx/src/survey/source.rs": {
+      "current_head": {
+        "bytes": 15769,
+        "sha256": "08529bc8d7c99b8f5a99d23cca67a00ee4ae1d72d9074920e30415f07bcbff45"
+      },
+      "candidate_final": {
+        "bytes": 15769,
+        "sha256": "08529bc8d7c99b8f5a99d23cca67a00ee4ae1d72d9074920e30415f07bcbff45"
+      },
+      "matches_current_head": true
+    },
+    "crates/litchi-xlsx/src/survey/source/properties.rs": {
+      "current_head": {
+        "bytes": 11194,
+        "sha256": "418a7b659a3953d96c7c1a9c9ecd84f6a74ffce4dc35356527985b90f6902344"
+      },
+      "candidate_final": {
+        "bytes": 11194,
+        "sha256": "418a7b659a3953d96c7c1a9c9ecd84f6a74ffce4dc35356527985b90f6902344"
+      },
+      "matches_current_head": true
+    },
+    "crates/litchi-xlsx/src/survey/source/questions.rs": {
+      "current_head": {
+        "bytes": 8105,
+        "sha256": "62550d406a920ef6a524df6c52b6866ef695df5d0cddfe64d3664c75cb28077f"
+      },
+      "candidate_final": {
+        "bytes": 8105,
+        "sha256": "62550d406a920ef6a524df6c52b6866ef695df5d0cddfe64d3664c75cb28077f"
+      },
+      "matches_current_head": true
+    }
+  },
+  "survey_paths_all_byte_identical_to_current_head": true,
+  "api_marker_checks": {
+    "custom_data_module": true,
+    "custom_data_snapshot_export": true,
+    "custom_data_package_api": true,
+    "survey_module": true,
+    "survey_snapshot_export": true,
+    "survey_package_api": true,
+    "custom_feature_matrix_row": true,
+    "survey_feature_matrix_row": true,
+    "unrelated_xlfn_documentation_absent": true
+  },
+  "root_gate_candidate_equivalence": {
+    "root_gate_candidate": "/var/tmp/litchi-xlsx-model-final-validation-v7-20260910-a",
+    "package_relative_file_count": 545,
+    "candidate_package_tree_byte_identical": true,
+    "different_package_relative_paths": [],
+    "root_receipt": "root-final-gates-receipt.json"
+  },
+  "deletion_hazard": {
+    "status": "none_detected",
+    "every_current_head_tracked_xlsx_file_present": true,
+    "no_unexpected_source_changes": true,
+    "survey_preserved": true
+  }
+}

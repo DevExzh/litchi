@@ -7,10 +7,11 @@
 mod codec;
 mod model;
 mod package;
+mod removal;
 
 pub use codec::{parse_data_model, write_data_model};
-pub use model::{Definition, Model, OpaqueXml, Payload, Relationship, Table};
-pub use package::{load_data_model, store_data_model};
+pub use model::{Definition, Model, ModelView, OpaqueXml, Payload, Relationship, Table};
+pub use package::{Commit, Patch, Snapshot, Transaction, load_data_model, store_data_model};
 
 /// OPC content type for an MS-XLDM payload.
 pub const DATA_MODEL_CONTENT_TYPE: &str =
