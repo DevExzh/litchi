@@ -247,6 +247,38 @@ fn map_wire_limit_kind(kind: impl IntoWireLimitKind) -> Option<LimitKind> {
     kind.into_wire_limit_kind()
 }
 
+fn focused_body_table_source(
+    editor: &PagesEditor,
+    model_object_id: u64,
+) -> Result<(FocusedPagesPackage, usize, PagesTableInfo)> {
+    let tables = editor.tables()?;
+    let (table_position, info) = tables
+        .into_iter()
+        .enumerate()
+        .find(|(_position, table)| table.model_object_id == model_object_id)
+        .ok_or_else(|| {
+            Error::ParseError(format!(
+                "Pages table model {model_object_id} is not attached to the body"
+            ))
+        })?;
+    let bytes = editor.package().to_bytes()?;
+    let package_limits = editor.package().limits();
+    let archive_limits = package_limits.effective_archive_limits()?;
+    let focused_limits = litchi_pages::Limits::new(
+        package_limits.max_input_bytes(),
+        package_limits.max_entries(),
+        package_limits.max_entry_bytes(),
+        package_limits.max_total_bytes(),
+        package_limits.max_iwa_stream_bytes(),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Pages table limits: {error}")))?
+    .with_archive_limits(archive_limits)
+    .map_err(|error| Error::InvalidFormat(format!("Pages table archive limits: {error}")))?;
+    let focused = FocusedPagesPackage::from_bytes_with_limits(&bytes, focused_limits)
+        .map_err(|error| Error::InvalidFormat(format!("focused Pages table source: {error}")))?;
+    Ok((focused, table_position, info))
+}
+
 impl PagesEditor {
     /// List native tables anchored in the main body in document order.
     pub fn tables(&self) -> Result<Vec<PagesTableInfo>> {
@@ -258,32 +290,7 @@ impl PagesEditor {
 
     /// Read all materialized cell values from one reachable body table.
     pub fn table(&self, model_object_id: u64) -> Result<PagesTable> {
-        let tables = self.tables()?;
-        let (table_position, info) = tables
-            .into_iter()
-            .enumerate()
-            .find(|(_position, table)| table.model_object_id == model_object_id)
-            .ok_or_else(|| {
-                Error::ParseError(format!(
-                    "Pages table model {model_object_id} is not attached to the body"
-                ))
-            })?;
-        let bytes = self.package().to_bytes()?;
-        let package_limits = self.package().limits();
-        let archive_limits = package_limits.effective_archive_limits()?;
-        let focused_limits = litchi_pages::Limits::new(
-            package_limits.max_input_bytes(),
-            package_limits.max_entries(),
-            package_limits.max_entry_bytes(),
-            package_limits.max_total_bytes(),
-            package_limits.max_iwa_stream_bytes(),
-        )
-        .map_err(|error| Error::InvalidFormat(format!("Pages table limits: {error}")))?
-        .with_archive_limits(archive_limits)
-        .map_err(|error| Error::InvalidFormat(format!("Pages table archive limits: {error}")))?;
-        let focused = FocusedPagesPackage::from_bytes_with_limits(&bytes, focused_limits).map_err(
-            |error| Error::InvalidFormat(format!("focused Pages table source: {error}")),
-        )?;
+        let (focused, table_position, info) = focused_body_table_source(self, model_object_id)?;
         let table_read = focused
             .body_table_cells(BodyTableSelector::index(table_position))
             .map_err(map_focused_cells_error)?;
@@ -3451,8 +3458,10 @@ impl PagesEditor {
 
     /// List native merged-cell rectangles in one reachable body table.
     pub fn table_cell_merges(&self, model_object_id: u64) -> Result<Vec<Region>> {
-        self.require_body_table(model_object_id)?;
-        crate::numbers::editor::table_cell_merges_in_package(self.package(), model_object_id)
+        let (focused, table_position, _) = focused_body_table_source(self, model_object_id)?;
+        focused
+            .body_table_merges(BodyTableSelector::index(table_position))
+            .map_err(map_focused_merges_error)
     }
 
     /// Merge one non-overlapping body-table rectangle transactionally.

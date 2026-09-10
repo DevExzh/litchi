@@ -11837,3 +11837,30 @@ archive regressions, and the six native goldens. The isolated ASan fuzz target
 completed 100 runs without a finding. Codec ownership accounting covers one
 output allocation and logical request/output retention; it does not claim that
 the remaining host archive and package publication stages allocate nothing.
+
+## 2026-09-11 Standalone merged-cell read delegation
+
+The Pages and Keynote compatibility editors now resolve standalone merged-cell
+reads through their existing rooted table catalogs and focused selector APIs.
+They use the same package conversion, limits, and error mapping as full-table
+readback. Pages shares its conversion helper between both entry points;
+Keynote retains exact-source sharing. Its standalone reader preserves the
+bounded host read path for unsupported dependencies, including valid legacy
+type-6000 models and the native merge-region map. Other focused failures remain
+errors. The shared bounded Buffa merge codec remains the
+wire owner, with no new generated-message or raw-ID facade API.
+
+Native regression coverage compares focused, standalone host, and full-table
+results, including an unmerged Pages table, rejected unknown model identities,
+an invalid Keynote slide, and exact source preservation. A legacy type-6000
+regression proves the focused dependency refusal and byte-preserving host
+fallback. Existing host merge,
+unmerge, and axis transformation regressions exercise the new readback route.
+Disposable copies of the checked-in native merge controls were opened in
+Pages and Keynote on September 11; visual inspection confirmed C4:D4 and
+B4:C5 respectively, and both copies were saved and closed. The existing
+fixtures and their native creation receipts remain unchanged.
+
+This read-only delegation does not transfer merge mutations, Numbers axis
+operations, or the remaining Numbers internal merge reader. The manifest debt
+count and monolith deletion gates remain unchanged.

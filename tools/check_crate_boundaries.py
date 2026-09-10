@@ -69789,6 +69789,48 @@ PAGES_TABLE_MERGE_FORBIDDEN_MODULES = re.compile(
 )
 KEYNOTE_TABLE_MERGE_FORBIDDEN_MODULES = PAGES_TABLE_MERGE_FORBIDDEN_MODULES
 
+# The compatibility editors retain their raw-ID table methods for callers that
+# have not moved yet, but merged-cell reads have a complete focused owner. Keep
+# this ratchet scoped to the two read methods: Numbers still owns the shared
+# low-level reader and the host mutation helpers continue to use it. Requiring
+# the same typed selectors as the host's full-table adapters prevents a future
+# replacement from calling a focused method with a raw model identifier.
+IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
+    {
+        "format_name": "Pages",
+        "source": Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs"),
+        "impl_type": "PagesEditor",
+        "method": "table_cell_merges",
+        "focused_method": "body_table_merges",
+        "selectors": (
+            ("BodyTableSelector", re.compile(r"\bBodyTableSelector\s*::\s*index\s*\(")),
+        ),
+        "error_mapper": "map_focused_merges_error",
+    },
+    {
+        "format_name": "Keynote",
+        "source": Path("crates/litchi-iwa/src/keynote/editor/slide_tables.rs"),
+        "impl_type": "KeynoteEditor",
+        "method": "slide_table_cell_merges",
+        "focused_method": "slide_table_merges",
+        "selectors": (
+            ("SlideSelector", re.compile(r"\bSlideSelector\s*::\s*index\s*\(")),
+            ("TableSelector", re.compile(r"\bTableSelector\s*::\s*index\s*\(")),
+        ),
+        "error_mapper": "map_focused_keynote_merges_error",
+    },
+)
+IWA_TABLE_MERGE_HOST_LEGACY_READ = re.compile(
+    r"\btable_cell_merges_in_package\s*\("
+)
+IWA_TABLE_MERGE_HOST_FOCUSED_CALL = re.compile(
+    r"\b(?P<method>body_table_merges|slide_table_merges)\s*\("
+)
+IWA_KEYNOTE_TABLE_MERGE_ALLOWED_FALLBACK_ARM = re.compile(
+    r"\bErr\s*\(\s*litchi_keynote\s*::\s*SlideTableMergesError"
+    r"\s*::\s*UnsupportedDependency\s*\)\s*=>"
+)
+
 # Selected table-cell reads share the same three-layer boundary as merged
 # geometry: the common crate publishes only archive-free semantic results, the
 # Numbers wire crate owns borrowed storage/sidecar traversal, and each focused
@@ -70868,13 +70910,13 @@ def audit_iwa_numbers_wire_table_merges_source_topology(
 
 
 def _rust_public_method_bodies(
-    source: str, method_name: str
+    source: str, method_name: str, *, type_name: str = "Package"
 ) -> list[tuple[str, str, int]]:
-    """Return declarations and bodies for one public ``impl Package`` method."""
+    """Return declarations and bodies for one public inherent method."""
 
     masked_source = _mask_rust_cfg_test_items(source)
     code = _mask_rust_non_code(masked_source)
-    methods = _rust_public_methods_in_impl(masked_source, "Package")
+    methods = _rust_public_methods_in_impl(masked_source, type_name)
     if not methods:
         return []
 
@@ -71173,6 +71215,150 @@ def audit_keynote_table_merge_source_topology(root: Path = ROOT) -> list[str]:
         public_method=KEYNOTE_TABLE_MERGE_PUBLIC_METHOD,
         selector_types=KEYNOTE_TABLE_MERGE_SELECTOR_TYPES,
     )
+
+
+def _rust_match_arm_contains_offset(
+    code: str, arm: re.Match[str], offset: int
+) -> bool:
+    """Return whether a match arm expression contains ``offset``.
+
+    This is intentionally a small delimiter walker rather than a Rust parser.
+    It is used only to scope the one reviewed Keynote compatibility fallback to
+    its exact ``UnsupportedDependency`` arm; commas inside a fallback call do
+    not terminate the arm, while the comma separating the next arm does.
+    """
+
+    arrow = arm.end() - 1
+    if arrow < 1 or arrow >= offset or code[arrow] != ">" or code[arrow - 1] != "=":
+        return False
+    cursor = arrow + 1
+    while cursor < len(code) and code[cursor].isspace():
+        cursor += 1
+    if cursor >= offset:
+        return False
+    if code[cursor] == "{":
+        end = _rust_balanced_delimited_end(code, cursor)
+        return end is not None and cursor < offset < end
+
+    parentheses = 0
+    brackets = 0
+    braces = 0
+    while cursor < len(code):
+        character = code[cursor]
+        if character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif character == "[":
+            brackets += 1
+        elif character == "]" and brackets:
+            brackets -= 1
+        elif character == "{":
+            braces += 1
+        elif character == "}" and braces:
+            braces -= 1
+        elif character == "," and not parentheses and not brackets and not braces:
+            return cursor > offset
+        cursor += 1
+    return offset < cursor
+
+
+def _keynote_table_merge_legacy_fallback_is_allowed(
+    code: str, call: re.Match[str]
+) -> bool:
+    """Allow a legacy read only in Keynote's reviewed unsupported arm."""
+
+    return any(
+        _rust_match_arm_contains_offset(code, arm, call.start())
+        for arm in IWA_KEYNOTE_TABLE_MERGE_ALLOWED_FALLBACK_ARM.finditer(code)
+    )
+
+
+def audit_iwa_table_merge_host_read_delegation_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep compatibility merged-cell reads on the focused selector APIs.
+
+    The host editors still own the compatibility method signatures and all
+    mutation paths. Their read methods must resolve the host model to the
+    same positional selectors used by the focused full-table adapters before
+    calling the format package. This leaves the Numbers wire reader available
+    to the Numbers editor while preventing a raw-ID compatibility helper from
+    becoming an accidental read route again. Keynote has one reviewed
+    compatibility exception: only its exact
+    ``SlideTableMergesError::UnsupportedDependency`` arm may use that helper
+    for legacy sources that the focused reader cannot represent.
+    """
+
+    violations: list[str] = []
+    for delegation in IWA_TABLE_MERGE_HOST_READ_DELEGATIONS:
+        relative_path = delegation["source"]
+        path = root / relative_path
+        if not path.is_file():
+            # A deleted host editor is a valid later exit state. The focused
+            # package audits continue to enforce the owner while it exists.
+            continue
+
+        source = path.read_text(encoding="utf-8")
+        method_evidence = _rust_public_method_bodies(
+            source,
+            delegation["method"],
+            type_name=delegation["impl_type"],
+        )
+        if not method_evidence:
+            # The compatibility method may have been retired together with its
+            # editor module. Do not turn that deletion into a false finding.
+            continue
+
+        for _declaration, body, line_number in method_evidence:
+            code = _mask_rust_non_code(body)
+            method_label = (
+                f"{delegation['impl_type']}::{delegation['method']}"
+            )
+            for legacy_call in IWA_TABLE_MERGE_HOST_LEGACY_READ.finditer(code):
+                allowed_keynote_fallback = (
+                    delegation["format_name"] == "Keynote"
+                    and _keynote_table_merge_legacy_fallback_is_allowed(
+                        code, legacy_call
+                    )
+                )
+                if allowed_keynote_fallback:
+                    continue
+                violations.append(
+                    f"litchi-iwa {delegation['format_name']} {method_label} must not "
+                    "call the monolith Numbers table-merge reader: "
+                    f"{relative_path}:{line_number}"
+                )
+
+            focused_call = IWA_TABLE_MERGE_HOST_FOCUSED_CALL.search(code)
+            if focused_call is None or focused_call.group("method") != delegation[
+                "focused_method"
+            ]:
+                violations.append(
+                    f"litchi-iwa {delegation['format_name']} {method_label} must "
+                    f"route through focused {delegation['focused_method']} selector "
+                    f"reader: {relative_path}:{line_number}"
+                )
+
+            for selector_name, selector_pattern in delegation["selectors"]:
+                if selector_pattern.search(code) is not None:
+                    continue
+                violations.append(
+                    f"litchi-iwa {delegation['format_name']} {method_label} must "
+                    f"forward {selector_name}::index to the focused merge reader: "
+                    f"{relative_path}:{line_number}"
+                )
+
+            if re.search(
+                rf"\b{re.escape(delegation['error_mapper'])}\b", code
+            ) is None:
+                violations.append(
+                    f"litchi-iwa {delegation['format_name']} {method_label} must "
+                    f"map focused merge errors through {delegation['error_mapper']}: "
+                    f"{relative_path}:{line_number}"
+                )
+
+    return sorted(set(violations))
 
 
 def audit_iwa_common_table_read_source_topology(root: Path = ROOT) -> list[str]:
@@ -73666,6 +73852,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_wire_table_merges_source_topology()
         + audit_pages_table_merge_source_topology()
         + audit_keynote_table_merge_source_topology()
+        + audit_iwa_table_merge_host_read_delegation_source_topology()
         + audit_pages_table_cells_source_topology()
         + audit_keynote_table_cells_source_topology()
         + audit_xlsb_source_topology()

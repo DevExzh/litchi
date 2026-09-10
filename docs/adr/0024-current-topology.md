@@ -4626,3 +4626,18 @@ Chart envelope, style, mediator, and series graph authoring remain host debt.
 Focused same-shape transactions retain their existing contract. Native fresh
 and expanded-grid controls for all three formats passed save/close/reopen and
 focused exact-value readback; the dependency-debt count remains unchanged.
+
+## 2026-09-11 Standalone Pages and Keynote merge read adapters
+
+The migration host's standalone Pages and Keynote merged-cell readers now
+resolve their existing table identities to focused table selectors and call
+the same concrete package readers used by full-table readback. Pages shares
+the existing source conversion and physical-limit mapping between both
+adapters; Keynote retains its shared exact-source path. Keynote preserves a
+bounded host fallback for dependencies outside the focused reader contract,
+including sole legacy type-6000 models. Malformed-source and limit failures
+remain errors.
+
+Merge creation, removal, and axis transformations remain host debt. Numbers
+still uses its internal merge reader for native table operations. This change
+does not remove a manifest dependency or close a monolith deletion gate.
