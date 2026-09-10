@@ -1,0 +1,35 @@
+{
+  "source_manifest": "/var/tmp/litchi-docx-ink-profile-root-source-v1-20260910.json",
+  "source_manifest_sha256": "6e1d65b39dae3befe2672865c30d03f2631d04f1e0dd1ee435699ba184ae922b",
+  "source_paths_verified": 7,
+  "logs": {
+    "tests": {
+      "path": "/var/tmp/litchi-docx-ink-profile-root-tests-v1.log",
+      "sha256": "17e217610895df98f85e40c78be30c5698527f80dfbcc2a2dab1363deea1cdc1",
+      "exit_code": 0
+    },
+    "clippy": {
+      "path": "/var/tmp/litchi-docx-ink-profile-root-clippy-v1.log",
+      "sha256": "60f0c481624215419b50456e88a80e1b7a69b77c009fe0f1f27a0533d3b493bd",
+      "exit_code": 0
+    },
+    "rustdoc": {
+      "path": "/var/tmp/litchi-docx-ink-profile-root-rustdoc-v1.log",
+      "sha256": "033270f311b365f9a2800205c340229cbf121c1097317e633180a561a3d5b95f",
+      "exit_code": 0
+    }
+  },
+  "format_and_diff": "pass",
+  "commands": [
+    "cargo +1.95.0 test -p litchi-docx -p litchi-drawingml --all-features --no-fail-fast",
+    "cargo +1.95.0 clippy -p litchi-docx -p litchi-drawingml --all-features --all-targets -- -D warnings",
+    "RUSTDOCFLAGS='-D warnings' cargo +1.95.0 doc -p litchi-docx -p litchi-drawingml --all-features --no-deps"
+  ],
+  "environment": {
+    "affinity": "8-31",
+    "RUSTUP_HOME": "/tmp/litchi-spec-gap-rustup",
+    "TMPDIR": "/var/tmp/litchi-spec-gap-gate-tmp",
+    "CARGO_TARGET_DIR": "/var/tmp/litchi-docx-ink-profile-root-target-195",
+    "CARGO_BUILD_JOBS": "4"
+  }
+}

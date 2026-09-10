@@ -7,7 +7,7 @@
 //! the canonical finite X/Y integer-pair profile emitted by this writer; it
 //! is never treated as caller supplied XML.
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use litchi_ooxml_common::xml_name::is_ncname;
 use quick_xml::{
@@ -526,8 +526,12 @@ impl Draft {
             .zip(metadata.brush_properties())
         {
             if actual.name() != &expected.name
-                || actual.value() != expected.value.as_ref()
                 || actual.units() != expected.units.as_deref()
+                || !authored_brush_value_matches(
+                    &expected.name,
+                    expected.value.as_ref(),
+                    actual.value(),
+                )
             {
                 return Err(invalid("InkML brush metadata readback mismatch"));
             }
@@ -549,6 +553,27 @@ impl Draft {
             }
         }
         Ok(())
+    }
+}
+
+fn authored_brush_value_matches(name: &BrushPropertyName, expected: &str, actual: &str) -> bool {
+    match name {
+        BrushPropertyName::Width
+        | BrushPropertyName::Height
+        | BrushPropertyName::AnchorX
+        | BrushPropertyName::AnchorY
+        | BrushPropertyName::ScaleFactor
+        | BrushPropertyName::Transparency
+        | BrushPropertyName::AntiAliased
+        | BrushPropertyName::FitToCurve
+        | BrushPropertyName::IgnorePressure => {
+            collapse_xsd_whitespace(expected).as_ref() == collapse_xsd_whitespace(actual).as_ref()
+        },
+        BrushPropertyName::Color
+        | BrushPropertyName::Tip
+        | BrushPropertyName::RasterOp
+        | BrushPropertyName::InkEffects
+        | BrushPropertyName::Custom(_) => expected == actual,
     }
 }
 
@@ -2152,6 +2177,8 @@ fn validate_brush_property_value(
 }
 
 fn is_xsd_decimal(value: &str) -> bool {
+    let collapsed = collapse_xsd_whitespace(value);
+    let value = collapsed.as_ref();
     let value = value.strip_prefix(['+', '-']).unwrap_or(value);
     if value.is_empty() {
         return false;
@@ -2171,10 +2198,13 @@ fn is_xsd_decimal(value: &str) -> bool {
 }
 
 fn is_xsd_boolean(value: &str) -> bool {
-    matches!(value, "true" | "false" | "1" | "0")
+    let collapsed = collapse_xsd_whitespace(value);
+    matches!(collapsed.as_ref(), "true" | "false" | "1" | "0")
 }
 
 fn is_bounded_integer(value: &str, minimum: i32, maximum: i32) -> bool {
+    let collapsed = collapse_xsd_whitespace(value);
+    let value = collapsed.as_ref();
     let digits = value.strip_prefix(['+', '-']).unwrap_or(value);
     !digits.is_empty()
         && digits.chars().all(|character| character.is_ascii_digit())
@@ -2192,7 +2222,32 @@ fn is_rgb_hex(value: &str) -> bool {
 }
 
 fn is_length_unit(value: &str) -> bool {
-    matches!(value, "cm" | "mm" | "in" | "pt" | "pc" | "px" | "em" | "ex")
+    matches!(value, "m" | "cm" | "mm" | "in" | "pt" | "pc" | "em" | "ex")
+}
+
+fn collapse_xsd_whitespace(value: &str) -> Cow<'_, str> {
+    if !value.chars().any(is_xsd_whitespace) {
+        return Cow::Borrowed(value);
+    }
+
+    let mut collapsed = String::with_capacity(value.len());
+    let mut pending_space = false;
+    for character in value.chars() {
+        if is_xsd_whitespace(character) {
+            pending_space = true;
+            continue;
+        }
+        if pending_space && !collapsed.is_empty() {
+            collapsed.push(' ');
+        }
+        collapsed.push(character);
+        pending_space = false;
+    }
+    Cow::Owned(collapsed)
+}
+
+const fn is_xsd_whitespace(character: char) -> bool {
+    matches!(character, ' ' | '\t' | '\r' | '\n')
 }
 
 fn own_identifier(value: impl AsRef<str>, field: &'static str, maximum: usize) -> Result<Box<str>> {
@@ -2534,6 +2589,71 @@ mod tests {
     }
 
     #[test]
+    fn finish_reopens_schema_whitespace_values_without_rewriting_source() {
+        let raw_decimal = " \t1.2\r\n";
+        let raw_integer = "\n42\t";
+        let raw_boolean = " \t1\r\n";
+        let brush = BrushDraft::new("whitespace")
+            .expect("brush")
+            .property(
+                BrushPropertyDraft::new(BrushPropertyName::Width, raw_decimal)
+                    .expect("decimal")
+                    .with_units("m")
+                    .expect("metre unit"),
+            )
+            .expect("width property")
+            .property(
+                BrushPropertyDraft::new(BrushPropertyName::Transparency, raw_integer)
+                    .expect("integer"),
+            )
+            .expect("transparency property")
+            .property(
+                BrushPropertyDraft::new(BrushPropertyName::AntiAliased, raw_boolean)
+                    .expect("boolean"),
+            )
+            .expect("boolean property");
+        let prepared = Draft::default()
+            .brush(brush)
+            .expect("brush")
+            .finish()
+            .expect("schema whitespace is semantically equivalent on readback");
+        let document = prepared.readback().expect("prepared readback");
+
+        assert_eq!(document.source(), prepared.as_bytes());
+        for raw in [raw_decimal, raw_integer, raw_boolean] {
+            let attribute = format!("value=\"{raw}\"");
+            assert!(
+                prepared
+                    .as_bytes()
+                    .windows(attribute.len())
+                    .any(|window| window == attribute.as_bytes()),
+                "emitted source retained raw value {raw:?}"
+            );
+        }
+
+        let width = document.brush_properties()[0]
+            .effective()
+            .expect("effective width");
+        assert_eq!(width.value(), "1.2");
+        assert_eq!(width.units(), Some("m"));
+        assert!(!width.defaulted());
+        assert_eq!(
+            document.brush_properties()[1]
+                .effective()
+                .expect("effective transparency")
+                .value(),
+            "42"
+        );
+        assert_eq!(
+            document.brush_properties()[2]
+                .effective()
+                .expect("effective anti-aliased")
+                .value(),
+            "true"
+        );
+    }
+
+    #[test]
     fn canonical_bytes_import_with_all_typed_fields() {
         let prepared = all_typed_fields_draft().finish().expect("canonical InkML");
         let imported = Prepared::from_bytes(prepared.as_bytes()).expect("canonical import");
@@ -2756,6 +2876,19 @@ mod tests {
                 .with_units("not-a-length")
                 .is_err()
         );
+        assert!(
+            BrushPropertyDraft::new(BrushPropertyName::Width, " \t1.2\r\n")
+                .expect("schema-whitespace decimal")
+                .with_units("m")
+                .is_ok()
+        );
+        assert!(
+            BrushPropertyDraft::new(BrushPropertyName::Width, "1.2")
+                .expect("width")
+                .with_units("px")
+                .is_err()
+        );
+        assert!(BrushPropertyDraft::new(BrushPropertyName::AntiAliased, " \t1\r\n").is_ok());
         let width_without_units = BrushDraft::new("brush")
             .expect("brush")
             .property(BrushPropertyDraft::new(BrushPropertyName::Width, "1.2").expect("width"))

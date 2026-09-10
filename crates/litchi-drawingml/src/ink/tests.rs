@@ -38,6 +38,61 @@ fn reads_typed_context_trace_and_extended_brush_property() {
 }
 
 #[test]
+fn effective_brush_properties_apply_profile_defaults_without_changing_source() {
+    let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:brush><i:brushProperty name="width" value="bad" units="bogus"/><i:brushProperty name="height"/><i:brushProperty name="color" value="red" units="cm"/><i:brushProperty name="transparency" value="256"/><i:brushProperty name="tip" value="bad"/><i:brushProperty name="rasterOp" value="bad"/><i:brushProperty name="antiAliased" value="maybe"/><i:brushProperty name="fitToCurve" value="maybe"/><i:brushProperty name="ignorePressure"/><i:brushProperty name="inkEffects" value="future"/><i:brushProperty name="anchorX" value="bad"/><i:brushProperty name="anchorY" value="1" units="cm"/><i:brushProperty name="scaleFactor" value="2"/><i:brushProperty name="future" value="opaque"/></i:brush></i:definitions></i:ink>"##;
+    let document = read(source).expect("generic InkML reader retains source lexicals");
+    assert_eq!(document.brush_property_count(), 14);
+    let effective: Vec<_> = document
+        .brush_properties()
+        .iter()
+        .map(|property| property.effective())
+        .collect();
+    assert_eq!(effective[0].as_ref().unwrap().value(), ".053");
+    assert_eq!(effective[0].as_ref().unwrap().units(), Some("cm"));
+    assert!(effective[0].as_ref().unwrap().defaulted());
+    assert_eq!(effective[1].as_ref().unwrap().value(), ".001");
+    assert_eq!(effective[2].as_ref().unwrap().value(), "#000000");
+    assert_eq!(effective[3].as_ref().unwrap().value(), "0");
+    assert_eq!(effective[4].as_ref().unwrap().value(), "ellipse");
+    assert_eq!(effective[5].as_ref().unwrap().value(), "copyPen");
+    assert_eq!(effective[6].as_ref().unwrap().value(), "true");
+    assert_eq!(effective[7].as_ref().unwrap().value(), "false");
+    assert_eq!(effective[8].as_ref().unwrap().value(), "false");
+    assert_eq!(effective[9].as_ref().unwrap().value(), "none");
+    assert_eq!(effective[10].as_ref().unwrap().value(), "0");
+    assert_eq!(effective[11].as_ref().unwrap().value(), "0");
+    assert_eq!(effective[12].as_ref().unwrap().value(), "2");
+    assert!(!effective[12].as_ref().unwrap().defaulted());
+    assert!(effective[13].is_none());
+    assert_eq!(document.brush_properties()[0].value(), "bad");
+    assert_eq!(document.brush_properties()[0].units(), Some("bogus"));
+    assert_eq!(document.source(), source);
+}
+
+#[test]
+fn effective_brush_properties_use_normative_units_and_xsd_whitespace() {
+    let source = br##"<i:ink xmlns:i="http://www.w3.org/2003/InkML"><i:definitions><i:brush><i:brushProperty name="width" value="&#x20;1.25&#x9;" units="m"/><i:brushProperty name="height" value="1" units="px"/><i:brushProperty name="transparency" value="&#xA;42&#xD;"/><i:brushProperty name="antiAliased" value="&#x20;&#x31;&#x9;"/></i:brush></i:definitions></i:ink>"##;
+    let document = read(source).expect("schema whitespace fixture must parse");
+    let effective: Vec<_> = document
+        .brush_properties()
+        .iter()
+        .map(|property| property.effective())
+        .collect();
+
+    assert_eq!(effective[0].as_ref().unwrap().value(), "1.25");
+    assert_eq!(effective[0].as_ref().unwrap().units(), Some("m"));
+    assert!(!effective[0].as_ref().unwrap().defaulted());
+    assert_eq!(effective[1].as_ref().unwrap().value(), ".001");
+    assert_eq!(effective[1].as_ref().unwrap().units(), Some("cm"));
+    assert!(effective[1].as_ref().unwrap().defaulted());
+    assert_eq!(effective[2].as_ref().unwrap().value(), "42");
+    assert!(!effective[2].as_ref().unwrap().defaulted());
+    assert_eq!(effective[3].as_ref().unwrap().value(), "true");
+    assert!(!effective[3].as_ref().unwrap().defaulted());
+    assert_eq!(document.source(), source);
+}
+
+#[test]
 fn source_backed_write_is_byte_exact() {
     let document = read(INK).expect("InkML fixture must parse");
     assert_eq!(write(&document).expect("source-backed write"), INK);

@@ -24,8 +24,8 @@ pub use codec::{
     read_shared_with_source_spans, write, write_to,
 };
 pub use model::{
-    BrushProperty, BrushPropertyName, Context, ContextKind, Document, Guid, InkEffect, Metadata,
-    SemanticType, SourceSpan, Trace, ValueError,
+    BrushProperty, BrushPropertyName, Context, ContextKind, Document, EffectiveBrushProperty, Guid,
+    InkEffect, Metadata, SemanticType, SourceSpan, Trace, ValueError,
 };
 
 /// InkML namespace used by the content part and ink actions.

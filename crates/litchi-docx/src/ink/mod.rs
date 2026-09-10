@@ -52,7 +52,7 @@ pub use authoring::{
 };
 pub use litchi_drawingml::ink::{
     AuthoringLimits, BrushDraft, BrushPropertyDraft, BrushPropertyName, ContextDraft, ContextKind,
-    Draft, Guid, InkEffect, Prepared, SemanticType, TraceDraft,
+    Draft, EffectiveBrushProperty, Guid, InkEffect, Prepared, SemanticType, TraceDraft,
 };
 pub use model::{Annotation, BrushProperty, Context, Limits, Location, Snapshot};
 pub use transaction::{Commit, Destination, Edit, EditLimits, Patch};
