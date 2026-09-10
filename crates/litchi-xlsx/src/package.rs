@@ -266,6 +266,91 @@ impl Package {
         crate::survey::Snapshot::load_with_limits(&self.0, limits)
     }
 
+    /// Read the source-bound Custom Data and Custom Data Properties catalog.
+    pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load(&self.0)
+    }
+
+    /// Read Custom Data with explicit payload and storage limits.
+    pub fn custom_data_with_limits(
+        &self,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits(&self.0, limits)
+    }
+
+    /// Alias emphasizing that the catalog includes Custom Data Properties.
+    pub fn custom_data_properties(&self) -> Result<crate::custom_data::Snapshot> {
+        self.custom_data()
+    }
+
+    /// Start a source-bound Custom Data transaction.
+    pub fn edit_custom_data(&mut self) -> Result<crate::custom_data::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_custom_data")?;
+        crate::custom_data::Transaction::new(&mut self.0)
+    }
+
+    /// Start a Custom Data transaction with explicit limits.
+    pub fn edit_custom_data_with_limits(
+        &mut self,
+        limits: &crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Transaction<'_>> {
+        self.ensure_mutation_allowed("edit_custom_data_with_limits")?;
+        crate::custom_data::Transaction::with_limits(&mut self.0, limits)
+    }
+
+    /// Atomically insert or replace one inert Custom Data storage.
+    pub fn put_custom_data(&mut self, value: crate::custom_data::CustomData) -> Result<()> {
+        self.ensure_mutation_allowed("put_custom_data")?;
+        let mut transaction = crate::custom_data::Transaction::new(&mut self.0)?;
+        transaction.upsert(value)?;
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Atomically remove a Custom Data storage by UID.  Missing UIDs are an
+    /// idempotent no-op. Referenced storages require an explicit disposition.
+    pub fn remove_custom_data(&mut self, id: &str) -> Result<()> {
+        self.remove_custom_data_with(id, crate::custom_data::RemovalDisposition::RejectReferenced)
+    }
+
+    /// Rename a Custom Data storage and its recognized connection references.
+    pub fn rename_custom_data(&mut self, id: &str, new_id: impl Into<String>) -> Result<bool> {
+        self.ensure_mutation_allowed("rename_custom_data")?;
+        let mut transaction = crate::custom_data::Transaction::new(&mut self.0)?;
+        let index = transaction
+            .entries()
+            .iter()
+            .position(|entry| entry.id() == id)
+            .ok_or_else(|| crate::Error::Invalid("Custom Data storage UID is absent".into()))?;
+        let changed = transaction.rename(index, new_id)?;
+        transaction.commit()?;
+        Ok(changed)
+    }
+
+    /// Remove a Custom Data storage with an explicit connection disposition.
+    pub fn remove_custom_data_with(
+        &mut self,
+        id: &str,
+        disposition: crate::custom_data::RemovalDisposition,
+    ) -> Result<()> {
+        self.ensure_mutation_allowed("remove_custom_data")?;
+        let mut transaction = crate::custom_data::Transaction::new(&mut self.0)?;
+        if let Some(index) = transaction
+            .entries()
+            .iter()
+            .position(|entry| entry.id() == id)
+        {
+            transaction.remove_with(index, disposition)?;
+        }
+        transaction.commit().map(|_commit| ())
+    }
+
+    /// Apply an exact source-bound Custom Data patch.
+    pub fn apply_custom_data_patch(&mut self, patch: &crate::custom_data::Patch) -> Result<()> {
+        self.ensure_mutation_allowed("apply_custom_data_patch")?;
+        patch.apply(&mut self.0)
+    }
+
     /// Start a source-bound Survey transaction.
     pub fn edit_surveys(&mut self) -> Result<crate::survey::Transaction<'_>> {
         self.ensure_mutation_allowed("edit_surveys")?;

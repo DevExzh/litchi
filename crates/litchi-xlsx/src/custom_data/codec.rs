@@ -7,6 +7,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::{BTreeMap, HashMap};
+use std::ops::Range;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -40,7 +41,7 @@ pub fn parse_properties(xml: &[u8]) -> Result<Properties> {
         })
         .transpose()?;
     let value = Properties {
-        id: required(&root, "", "id")?.to_owned(),
+        id: crate::raw::strings::decode_spreadsheet_text(required(&root, "", "id")?)?,
         extension_list,
     };
     validate_properties(&value, true)?;
@@ -54,7 +55,9 @@ pub fn write_properties(value: &Properties) -> Result<Vec<u8>> {
     output.extend_from_slice(b"<x14:datastoreItem xmlns:x14=\"");
     escape_attr(&mut output, X14);
     output.push(b'\"');
-    attr(&mut output, "id", &value.id);
+    output.extend_from_slice(b" id=\"");
+    output.extend_from_slice(&crate::source_attributes::escaped_xstring(&value.id));
+    output.push(b'"');
     if let Some(extension) = &value.extension_list {
         output.push(b'>');
         output.extend_from_slice(&extension.xml);
@@ -68,6 +71,168 @@ pub fn write_properties(value: &Properties) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Splice a storage UID into an already validated properties source.
+pub(crate) fn rewrite_id(
+    source: &litchi_opc::OwnedXmlPart,
+    id: &str,
+) -> Result<litchi_opc::OwnedXmlPart> {
+    // Callers retain an already validated properties source; only the root
+    // attribute is changed, so extension subtrees keep their source namespaces.
+    let xml = source.bytes();
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        match reader.read_event().map_err(xml_error)? {
+            Event::Start(element) | Event::Empty(element) => {
+                if element.local_name().as_ref() != b"datastoreItem"
+                    || resolved(reader.resolver().resolve_element(element.name()).0)? != X14
+                {
+                    return Err(invalid("expected Custom Data Properties root"));
+                }
+                for attribute in element.attributes().with_checks(true) {
+                    let attribute = attribute.map_err(xml_error)?;
+                    if attribute.key.as_ref() == b"id" {
+                        let range =
+                            crate::source_attributes::value_span(xml, attribute.value.as_ref())?;
+                        let value = crate::source_attributes::escaped_xstring(id);
+                        let result = source.replace_attributes(&[(range, value)])?;
+                        if result.bytes().len() > MAX_PROPERTIES_XML_BYTES {
+                            return Err(limit("properties XML output"));
+                        }
+                        return Ok(result);
+                    }
+                }
+                return Err(invalid("Custom Data storage ID attribute is absent"));
+            },
+            Event::Eof => return Err(invalid("missing Custom Data Properties root")),
+            _ => {},
+        }
+    }
+}
+
+/// Replace only the direct `extLst` child of a retained `datastoreItem`.
+///
+/// The properties model intentionally projects extension markup into one
+/// bounded subtree.  Publishing that projection through `write_properties`
+/// would also rewrite the root prefix, declarations, comments, and any
+/// processing instructions surrounding the subtree.  Addressing the exact
+/// source element keeps those bytes intact while still sending the new
+/// extension through the owned XML publication checks.
+pub(crate) fn rewrite_extension_list(
+    source: &litchi_opc::OwnedXmlPart,
+    extension: Option<&ExtensionList>,
+) -> Result<litchi_opc::OwnedXmlPart> {
+    let (root_tag, extension_tag) = property_element_ranges(source.bytes())?;
+    let Some(extension) = extension else {
+        return if let Some(tag) = extension_tag {
+            Ok(source.remove_element(tag)?)
+        } else {
+            Ok(source.clone())
+        };
+    };
+    validate_properties(
+        &Properties {
+            id: String::new(),
+            extension_list: Some(extension.clone()),
+        },
+        false,
+    )?;
+    match extension_tag {
+        Some(tag) => Ok(source.replace_element(tag, &extension.xml)?),
+        None => Ok(source.append_element(root_tag, &extension.xml)?),
+    }
+}
+
+/// Canonicalize an extension projection for publication verification.
+///
+/// Callers may provide a different prefix spelling or insignificant comments
+/// in a staged extension.  The reader's projection intentionally canonicalizes
+/// those details; the source-preserving publisher can therefore verify the
+/// parsed result without requiring the staged bytes to be canonical already.
+pub(crate) fn canonical_extension(extension: Option<&ExtensionList>) -> Result<Option<Vec<u8>>> {
+    extension
+        .map(|extension| {
+            let root = parse_document(&extension.xml)?;
+            require(&root, X14, "extLst")?;
+            let xml = serialize_node(&root)?;
+            if xml.len() > MAX_EXTENSION_XML_BYTES {
+                return Err(limit("extension XML bytes"));
+            }
+            Ok(xml)
+        })
+        .transpose()
+}
+
+fn property_element_ranges(xml: &[u8]) -> Result<(Range<usize>, Option<Range<usize>>)> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut root = None;
+    let mut extension = None;
+    loop {
+        let start = reader.buffer_position() as usize;
+        let event = reader.read_event().map_err(xml_error)?;
+        let end = reader.buffer_position() as usize;
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    if root.is_some()
+                        || element.local_name().as_ref() != b"datastoreItem"
+                        || resolved(reader.resolver().resolve_element(element.name()).0)? != X14
+                    {
+                        return Err(invalid("expected one Custom Data Properties root"));
+                    }
+                    root = Some(start..end);
+                } else if depth == 1
+                    && element.local_name().as_ref() == b"extLst"
+                    && resolved(reader.resolver().resolve_element(element.name()).0)? == X14
+                {
+                    if extension.is_some() {
+                        return Err(invalid(
+                            "Custom Data Properties has multiple extLst children",
+                        ));
+                    }
+                    extension = Some(start..end);
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("Custom Data Properties XML depth overflow"))?;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    if root.is_some()
+                        || element.local_name().as_ref() != b"datastoreItem"
+                        || resolved(reader.resolver().resolve_element(element.name()).0)? != X14
+                    {
+                        return Err(invalid("expected one Custom Data Properties root"));
+                    }
+                    root = Some(start..end);
+                } else if depth == 1
+                    && element.local_name().as_ref() == b"extLst"
+                    && resolved(reader.resolver().resolve_element(element.name()).0)? == X14
+                {
+                    if extension.is_some() {
+                        return Err(invalid(
+                            "Custom Data Properties has multiple extLst children",
+                        ));
+                    }
+                    extension = Some(start..end);
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unexpected Custom Data Properties closing element"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 {
+        return Err(invalid("unterminated Custom Data Properties XML"));
+    }
+    root.map(|tag| (tag, extension))
+        .ok_or_else(|| invalid("missing Custom Data Properties root"))
+}
+
 /// Validate that XML belongs to a `SpreadsheetML` workbook part.
 //
 // The host calls this while retaining ownership of package graph traversal.
@@ -79,9 +244,6 @@ pub fn validate_workbook_root(xml: &[u8]) -> Result<()> {
 }
 
 fn validate_properties(value: &Properties, extension_already_parsed: bool) -> Result<()> {
-    if value.id.is_empty() {
-        return Err(invalid("Custom Data storage id cannot be empty"));
-    }
     if value.id.chars().count() >= 65_536 {
         return Err(invalid(
             "Custom Data storage id must contain fewer than 65536 characters",
@@ -121,6 +283,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
         return Err(limit("properties XML bytes"));
     }
     std::str::from_utf8(xml).map_err(xml_error)?;
+    crate::source_attributes::validate_xml_characters(xml)?;
     let mut reader = NsReader::from_reader(xml);
     let mut stack = Vec::new();
     let mut root = None;
@@ -183,9 +346,11 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
             Event::CData(_) => {
                 return Err(invalid("CDATA is rejected in Custom Data Properties XML"));
             },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("DTDs and processing instructions are rejected"));
-            },
+            Event::DocType(_) => return Err(invalid("DTDs are rejected")),
+            // Processing instructions are legal XML source markup.  They are
+            // deliberately omitted from the typed projection and retained by
+            // source-bound publication when an unrelated field changes.
+            Event::PI(_) => {},
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
         }
@@ -223,6 +388,7 @@ fn make_node(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
+        crate::source_attributes::validate_xml_characters(value.as_bytes())?;
         add_strings(strings, namespace.len() + name.len() + value.len())?;
         if attributes
             .iter()
@@ -363,7 +529,6 @@ fn optional<'a>(node: &'a Node, namespace: &str, name: &str) -> Option<&'a str> 
 
 fn required<'a>(node: &'a Node, namespace: &str, name: &str) -> Result<&'a str> {
     optional(node, namespace, name)
-        .filter(|value| !value.is_empty())
         .ok_or_else(|| invalid(format!("{} is missing attribute '{name}'", node.name)))
 }
 
@@ -418,14 +583,6 @@ fn resolved(value: ResolveResult<'_>) -> Result<String> {
             String::from_utf8_lossy(prefix.as_ref())
         ))),
     }
-}
-
-fn attr(output: &mut Vec<u8>, name: &str, value: &str) {
-    output.push(b' ');
-    output.extend_from_slice(name.as_bytes());
-    output.extend_from_slice(b"=\"");
-    escape_attr(output, value);
-    output.push(b'\"');
 }
 
 fn escape_attr(output: &mut Vec<u8>, value: &str) {
@@ -514,5 +671,29 @@ mod tests {
     fn validates_workbook_namespace() {
         assert!(validate_workbook_root(format!(r#"<workbook xmlns="{SML}"/>"#).as_bytes()).is_ok());
         assert!(validate_workbook_root(b"<workbook xmlns=\"urn:not-spreadsheetml\"/>").is_err());
+    }
+
+    #[test]
+    fn storage_ids_obey_spreadsheet_string_escaping_and_preserve_empty_values() {
+        for id in [
+            "",
+            "A & 'B'",
+            "_x0041_",
+            "\u{0}\u{1}\u{fffe}\u{ffff}😀",
+            "\t\n\r",
+        ] {
+            let value = Properties {
+                id: id.into(),
+                extension_list: None,
+            };
+            assert_eq!(
+                parse_properties(&write_properties(&value).unwrap()).unwrap(),
+                value
+            );
+        }
+        for lexical in ["&#x0;", "_xD800_", "_xDC00_"] {
+            let xml = format!(r#"<datastoreItem xmlns="{X14}" id="{lexical}"/>"#);
+            assert!(parse_properties(xml.as_bytes()).is_err());
+        }
     }
 }

@@ -208,6 +208,9 @@ pub enum Error {
     /// behavior such as recalculation, refresh, or rendering.
     #[error("unsupported XLSX operation: {feature}")]
     Unsupported { feature: &'static str },
+    /// Removing this storage requires an explicit connection disposition.
+    #[error("Custom Data storage '{id}' is referenced by {connections} connections")]
+    CustomDataReferenced { id: String, connections: usize },
 }
 
 impl From<std::convert::Infallible> for Error {

@@ -1,12 +1,30 @@
 //! Checked source spans and bounded attribute-value edits for SpreadsheetML.
 
+use std::ops::Range;
+
 use crate::error::{Error, Result};
 
 fn invalid(value: impl std::fmt::Display) -> Error {
     crate::error::invalid(value.to_string())
 }
 
-#[cfg(test)]
+pub(crate) fn value_span(xml: &[u8], raw: &[u8]) -> Result<Range<usize>> {
+    let start = (raw.as_ptr() as usize)
+        .checked_sub(xml.as_ptr() as usize)
+        .ok_or_else(|| invalid("XML attribute value is not source-backed"))?;
+    let end = start
+        .checked_add(raw.len())
+        .ok_or_else(|| invalid("XML attribute source range overflow"))?;
+    let quote = start.checked_sub(1).and_then(|at| xml.get(at));
+    if xml.get(start..end) != Some(raw)
+        || !matches!(quote, Some(b'\'' | b'"'))
+        || xml.get(end) != quote
+    {
+        return Err(invalid("invalid XML attribute source range"));
+    }
+    Ok(start..end)
+}
+
 pub(crate) fn escaped_xstring(value: &str) -> Vec<u8> {
     let encoded = crate::raw::strings::encode_spreadsheet_text(value);
     let mut output = Vec::with_capacity(encoded.len());

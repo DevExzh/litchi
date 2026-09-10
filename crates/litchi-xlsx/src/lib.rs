@@ -185,7 +185,10 @@ pub use conditional_formatting::{
     parse_conditional_formattings, parse_differential_formats,
 };
 pub use custom_data::{
-    ExtensionList, Properties, parse_properties, validate_workbook_root, write_properties,
+    Commit as CustomDataCommit, CustomData, ExtensionList, Limits as CustomDataLimits,
+    Part as CustomDataPart, Patch as CustomDataPatch, Properties, Snapshot as CustomDataSnapshot,
+    Store, Transaction as CustomDataTransaction, parse_properties, validate_workbook_root,
+    write_properties,
 };
 pub use data_consolidation::{
     DataConsolidation, Function, RangeReference, Reference, ReferenceSource, References,

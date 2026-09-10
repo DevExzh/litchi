@@ -1,0 +1,85 @@
+{
+  "validation_base_commit": "b2e2ff8e1fdabd4ab16a67ddf077e6968bf5e668",
+  "candidate_git_head": "b2e2ff8e1fdabd4ab16a67ddf077e6968bf5e668",
+  "workspace_head_at_audit": "463ab2a5989bba49ffd95277dc29422a363de7f8",
+  "final_publication_commit": null,
+  "final_publication_commit_note": "The containing Git commit identifies publication; this field is unset to avoid a self-referential commit hash.",
+  "toolchain": "1.95.0",
+  "independent_final_review": "clear",
+  "source_manifest": {
+    "file": "source-manifest-v7.json",
+    "sha256": "0448b5aba5e18f3b3c9939294f7dfa400c56a3a05d04a5f968d975d5f8896d2c",
+    "source_count": 17,
+    "base_commit": "b2e2ff8e1fdabd4ab16a67ddf077e6968bf5e668"
+  },
+  "source_audit": {
+    "file": "source-audit.json",
+    "sha256": "1f15faa22297ca13cfefd9c133470c380fd95728ea0a9c5dbcb9f65af3195cee",
+    "status": "none_detected",
+    "tracked_xlsx_files_checked": 538,
+    "missing_current_head_tracked_xlsx_paths": [],
+    "base_to_current_xlsx_changes": 0,
+    "survey_paths_checked": 4
+  },
+  "environment": {
+    "target_dir": "/var/tmp/litchi-xlsx-custom-v7-root-target-195",
+    "test_log_source": "/var/tmp/litchi-xlsx-custom-v7-root-tests.log",
+    "clippy_log_source": "/var/tmp/litchi-xlsx-custom-v7-root-clippy.log",
+    "rustdoc_log_source": "/var/tmp/litchi-xlsx-custom-v7-root-rustdoc.log"
+  },
+  "commands_executed_by_root": [
+    "cargo +1.95.0 test -p litchi-xlsx --all-features",
+    "cargo +1.95.0 clippy -p litchi-xlsx --all-targets --all-features -- -D warnings",
+    "RUSTDOCFLAGS=\"-D warnings\" cargo +1.95.0 doc -p litchi-xlsx --all-features --no-deps",
+    "rustfmt --edition 2024 --config skip_children=true --check <the 16 Rust paths in source-manifest-v7.json>",
+    "git diff --check"
+  ],
+  "results": {
+    "unit_integration_passed": 1378,
+    "doctests_passed": 2,
+    "failed": 0,
+    "ignored": 0,
+    "clippy": "pass",
+    "rustdoc_warning_denied": "pass",
+    "format": "pass",
+    "whitespace": "pass"
+  },
+  "artifacts": {
+    "README.md": {
+      "sha256": "8fd9bd11b2e7327ca91d13f0a4f60c8ed571844780a93987deaacc14692f8736",
+      "bytes": 4780
+    },
+    "source-manifest-v7.json": {
+      "sha256": "0448b5aba5e18f3b3c9939294f7dfa400c56a3a05d04a5f968d975d5f8896d2c",
+      "bytes": 2101
+    },
+    "source-audit.json": {
+      "sha256": "1f15faa22297ca13cfefd9c133470c380fd95728ea0a9c5dbcb9f65af3195cee",
+      "bytes": 8928
+    },
+    "Cargo.lock.gz": {
+      "sha256": "a109aa8637ce83bba19ad4a5b78c6b0fd14ac76c35c383bbb2d84d513a58a28f",
+      "bytes": 33529
+    },
+    "tests.log.gz": {
+      "sha256": "2a2fe17219d41a2781e7d515840ea9e574f2f85fa9747e96517297bba344e85b",
+      "bytes": 28179,
+      "raw_sha256": "c4340c5409c726cf7c1d2c7396485df2e188865f90f5f9ed405fd870d6676764",
+      "raw_bytes": 142211
+    },
+    "clippy.log.gz": {
+      "sha256": "689c0947e4e17e2ffee18bc97cc074ccee9b22afda259eaae5a8a74a0d45f87c",
+      "bytes": 1224,
+      "raw_sha256": "62794706512b56b3eb95f6a5557c45de9254effdc41aeff7597ac2895359461e",
+      "raw_bytes": 4910
+    },
+    "rustdoc.log.gz": {
+      "sha256": "1a62556836e32573b2116b8b6e3ce5e7f04e301a6706bcb9d224a61057e35679",
+      "bytes": 379,
+      "raw_sha256": "0e915784cc0451a9ad7c63e07e26f2c9f1a8dce4f085377c048e37ad9a5696c8",
+      "raw_bytes": 1863
+    }
+  },
+  "cargo_lock_sha256": "b5a7e7c78d8211439da193dfc56967df23321e53d96e44350b54769efb01d83a",
+  "scope": "Bounded Custom Data and Connections source-preservation correctness evidence; payloads remain inert; no native interoperability, evaluation, rendering, latency, peak-memory, or performance-improvement claim."
+}
