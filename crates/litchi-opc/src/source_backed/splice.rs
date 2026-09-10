@@ -581,12 +581,12 @@ impl<'package> SourcePartSplicePlan<'package> {
         mut accounting: Option<&mut OpcOperationAccounting>,
         charge_output: bool,
     ) -> Result<SourcePartSplicePublication> {
+        self.package.disable_read_ahead_for_publication()?;
         self.package.source.ensure_current()?;
         self.package
             .cache
             .check_context()
             .map_err(map_execution_error)?;
-
         if self.is_noop() {
             // A zero-byte insertion is byte-identical by construction. This
             // branch intentionally bypasses XML and signature checks so a
@@ -1143,6 +1143,7 @@ impl SourceBackedPackage {
         replay: SourcePartSpliceReplayHandle,
         limits: SourcePartSpliceLimits,
     ) -> Result<SourcePartSplicePlan<'_>> {
+        self.disable_read_ahead_for_publication()?;
         limits.validate()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -1290,6 +1291,7 @@ impl SourceBackedPackage {
         fragment_preallocated: bool,
         reservation: Option<Arc<Reservation>>,
     ) -> Result<SourcePartSplicePlan<'_>> {
+        self.disable_read_ahead_for_publication()?;
         limits.validate()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -1498,6 +1500,7 @@ impl SourcePartSplicePublication {
         current: &SourceBackedPackage,
         writer: W,
     ) -> Result<()> {
+        current.disable_read_ahead_for_publication()?;
         current.source.ensure_current()?;
         current.cache.check_context().map_err(map_execution_error)?;
         let retained = &self.source_artifact.snapshot;

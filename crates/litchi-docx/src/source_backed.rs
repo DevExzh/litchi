@@ -14,6 +14,8 @@ pub mod story_text;
 pub mod tail_append;
 pub mod tail_append_stream;
 
+pub use litchi_opc::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError};
+
 pub use story_text::{
     Commit as StoryTextCommit, Edit as StoryTextEdit, Error as StoryTextError, GlossaryBatchCommit,
     GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchPublication, GlossaryBatchSelector,
@@ -489,6 +491,46 @@ impl Package {
         Self::with_execution(package, Some(package_context))
     }
 
+    /// Open with an explicit bounded source-read policy and payload cache.
+    ///
+    /// Read-ahead can fetch adjacent compressed bytes. Publication or mutable
+    /// materialization permanently returns the underlying package to exact
+    /// reads. Existing constructors remain exact.
+    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+        source: Arc<dyn ReadAt>,
+        limits: litchi_opc::ReadLimits,
+        cache_limits: SourceCacheLimits,
+        source_read_policy: SourceReadPolicy,
+    ) -> Result<Self> {
+        Self::from_source_backed(
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+                source,
+                limits,
+                cache_limits,
+                source_read_policy,
+            )?,
+        )
+    }
+
+    /// Open with explicit read-ahead, payload-cache, and execution policies.
+    ///
+    /// Physical reads, including overfetch, consume input bytes; the retained
+    /// window holds a memory reservation until publication disables it or the
+    /// package is dropped. The same context bounds deferred semantic reads.
+    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: litchi_opc::ReadLimits,
+        cache_limits: SourceCacheLimits,
+        source_read_policy: SourceReadPolicy,
+        context: ExecutionContext,
+    ) -> Result<Self> {
+        let package_context = context.clone();
+        let package = SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+            source, limits, cache_limits, source_read_policy, context,
+        )?;
+        Self::with_execution(package, Some(package_context))
+    }
+
     fn from_source_backed(package: SourceBackedPackage) -> Result<Self> {
         Self::with_execution(package, None)
     }
@@ -542,8 +584,9 @@ impl Package {
 
     /// Load and pin the main document for read-only semantic queries.
     ///
-    /// The first call reads only the main-document part. The returned document
-    /// owns its validated visible XML bytes, so repeated text and selective
+    /// The first call materializes only the main-document part. An explicit
+    /// source-read policy may also prefetch adjacent compressed bytes. The
+    /// returned document owns its validated visible XML bytes, so repeated text and selective
     /// queries do not revisit the positional source. Managed opens retain the
     /// budgeted [`PartData`] handle instead of detaching an `Arc`.
     pub fn document(&self) -> Result<Document> {
@@ -759,6 +802,11 @@ impl Package {
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
         self.package.cache_diagnostics()
+    }
+
+    /// Inspect the opt-in source-read window; exact constructors return `None`.
+    pub fn source_read_diagnostics(&self) -> Result<Option<SourceReadDiagnostics>> {
+        Ok(self.package.source_read_diagnostics()?)
     }
 
     /// Return the exact source identity and revision captured at open.

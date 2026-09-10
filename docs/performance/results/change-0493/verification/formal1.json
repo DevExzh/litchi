@@ -1,0 +1,92 @@
+{
+  "attempt": "formal1",
+  "pilot": false,
+  "protocol_sha256": "d611d0b637952e21b5ba7ea5f3b1ae0575dfd96b2aeb7a76a5c0ec70ec183cb2",
+  "raw_receipts": [
+    {
+      "label": "r1-normal-exact-0us",
+      "report_sha256": "0d4529765560e90b4015e8797234da0cead91290f9796eda2e89e26dafa836f0",
+      "terminal_sha256": "ebb851bd3f3cfce1d194d482067621de1bac0d2e9dde3ebde1591b2381751321"
+    },
+    {
+      "label": "r1-normal-managed-4096-0us",
+      "report_sha256": "f1bbebe0f558a83cf4967b2953337392686d34e391c1da69dc1c4cc939e1bda2",
+      "terminal_sha256": "aafa698682ab3f5171c46a2e24b8bbd772b674914db7a39074b786614f3e0314"
+    },
+    {
+      "label": "r1-normal-exact-1000us-104857600bps",
+      "report_sha256": "07db62fea021d0c790c1160ae84e646f2f883b9b7155499f096aa9101bc31fcd",
+      "terminal_sha256": "5f0ba8d255c4e5d726c1bd4c3cd53ccc0295794a565a938434d55e90e73f0e2b"
+    },
+    {
+      "label": "r1-normal-managed-4096-1000us-104857600bps",
+      "report_sha256": "ba9c696a6c5866ed4fba1dfad7a9c5e0d0af5762260755037ec7a432c03c6022",
+      "terminal_sha256": "a0bed2ff887867701996fc00e9cee890d335a1ca11f4f8088f8406d2933827f5"
+    },
+    {
+      "label": "r1-allocator-exact-0us",
+      "report_sha256": "a5acffb1d2b25dc0b974176fccda4b9a6b162a6fd766677eee17e2025f7117ea",
+      "terminal_sha256": "9169fe20363b6206e6047b05a56df1ac515bff90ae40cff2c7f3d359b463efb0"
+    },
+    {
+      "label": "r1-allocator-managed-4096-0us",
+      "report_sha256": "31da83d437264a39f64e3c390d252c221f88e26d607d559b451a1ffc40adcd7c",
+      "terminal_sha256": "53656d5fc2ea7e8a840f5648173ae1214c9479afbe6170e7036ae5cf12688cd9"
+    },
+    {
+      "label": "r1-allocator-exact-1000us-104857600bps",
+      "report_sha256": "e920946527462b059c0a4020d4b64b4ba7cc457704382c8f50bfcdce3c4a4124",
+      "terminal_sha256": "7428eac209148ec58fe9f382d674274e557bbabf5ead5c3764cfcf7339a95ffa"
+    },
+    {
+      "label": "r1-allocator-managed-4096-1000us-104857600bps",
+      "report_sha256": "d8a84eb92c829b08a4de645612b1c9343f97d06e4aef3e9d0ba55246653501d9",
+      "terminal_sha256": "c73cf2c1c48b35359eabd92039df6520c12cd8f5477e019131446c81967ee56b"
+    },
+    {
+      "label": "r2-allocator-managed-4096-1000us-104857600bps",
+      "report_sha256": "f18a96e17f781afec88d602e4c3572a0e6c2ff3b82670c4f050fa51a3c6783e1",
+      "terminal_sha256": "b8e928b5008ac58049419120113e358505b6377d5db875564ac4e7458b09b1a6"
+    },
+    {
+      "label": "r2-allocator-exact-1000us-104857600bps",
+      "report_sha256": "d48eb1f3e165642076843bdf0bf4128a32bd4f8979ee79a737f134956f500aca",
+      "terminal_sha256": "8b3b0ecf284cbca24f4830197d989fe2c152d0976e0e7a716b274f0312a144ca"
+    },
+    {
+      "label": "r2-allocator-managed-4096-0us",
+      "report_sha256": "82a5f32c9999ec8e023e526b19ac468377e7ebf427e46871ad727de1e41ac6f8",
+      "terminal_sha256": "b6a6f13520c4d6ae3d906279f6c3da90a9f9244d6847956e1aba7a68c532332a"
+    },
+    {
+      "label": "r2-allocator-exact-0us",
+      "report_sha256": "be84f2bdae02824d649b753d08aff43d42b9932eee5bdf4652b8d97994aef614",
+      "terminal_sha256": "ac8148e7c4479a7ae18b03ba9d08d62bec8657f0b2b968ed47e9a9afde627a97"
+    },
+    {
+      "label": "r2-normal-managed-4096-1000us-104857600bps",
+      "report_sha256": "e77e33978e7f6a42523447b06bef62f05524de8b8f7d9433ac7779fd78910893",
+      "terminal_sha256": "43b157f19100e207d212f00dbc8048293bf1d8d405dba1c80bb1ac4d001426a4"
+    },
+    {
+      "label": "r2-normal-exact-1000us-104857600bps",
+      "report_sha256": "6f3255db672e5fd0c788fb521e591e37d633298b2c3c00691e9ecad79929ced4",
+      "terminal_sha256": "c8e88e684af8ed3406b4add3ec98eb0b1177ebf0d511709a335c567b076836ee"
+    },
+    {
+      "label": "r2-normal-managed-4096-0us",
+      "report_sha256": "652df6026f2a60107b79622e2238f8d74edb64d4bdf58ac69ea03ec2cc837037",
+      "terminal_sha256": "19abe391e7b54894c31e2247790ce5620aa427d4e5ce29aaf5de9b1abdc96656"
+    },
+    {
+      "label": "r2-normal-exact-0us",
+      "report_sha256": "ad8159a92849f6d6b30a77493d3fd7697f07b05249aa155cbfd65eac6b310d91",
+      "terminal_sha256": "d737abd46637e7f3cc76b9c10b40f56f5800c09b2767d36e28ca9bb280ff55f4"
+    }
+  ],
+  "schema": "docx-managed-read-ahead-verification-v1",
+  "status": "pass",
+  "summary_sha256": "98b1665802b83d2191d24de1d024a37e8c026600906b8bd7cd2e8c4b57258b0e",
+  "verified_utc": "2026-09-10T06:36:45.330671+00:00",
+  "version": 1
+}

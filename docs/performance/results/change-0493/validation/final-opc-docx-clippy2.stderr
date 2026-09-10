@@ -1,0 +1,143 @@
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking icu_normalizer v1.5.0
+    Checking form_urlencoded v1.2.2
+    Checking pathfinder_geometry v0.5.1
+    Checking dirs-sys v0.5.0
+    Checking dlib v0.5.3
+    Checking unicode-normalization v0.1.25
+    Checking static_assertions v1.1.0
+    Checking aliasable v0.1.3
+    Checking same-file v1.0.6
+    Checking idna_adapter v1.2.0
+    Checking walkdir v2.5.0
+    Checking idna v1.1.0
+    Checking caseless v0.2.2
+    Checking ouroboros v0.18.5
+    Checking yeslogic-fontconfig-sys v6.0.1
+    Checking dirs v6.0.0
+    Checking brotli-decompressor v5.0.3
+    Checking url v2.5.8
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking enumflags2 v0.7.12
+    Checking unicode-joining-type v1.0.0
+    Checking unicode-canonical-combining-class v1.0.0
+    Checking unicode-general-category v1.1.0
+    Checking freetype-sys v0.20.1
+    Checking itertools v0.14.0
+    Checking bitreader v0.3.11
+    Checking cpubits v0.1.1
+    Checking float-ord v0.3.2
+    Checking ucd-trie v0.1.7
+    Checking bytemuck v1.25.2
+    Checking rustc-hash v2.1.3
+    Checking glyph-names v0.2.0
+    Checking ryu v1.0.22
+    Checking roaring v0.11.1
+    Checking font-kit v0.14.3
+    Checking aes v0.9.3
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking allsorts v0.17.0
+    Checking cbc v0.2.1
+    Checking rc4 v0.2.0
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking hmac v0.13.0
+    Checking sha1 v0.11.0
+    Checking libc v0.2.189
+    Checking hybrid-array v0.4.14
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+    Checking getrandom v0.2.17
+    Checking num-traits v0.2.19
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking rand_core v0.6.4
+    Checking smallvec v1.16.0
+    Checking cmov v0.5.4
+    Checking der v0.7.10
+    Checking ctutils v0.4.2
+    Checking digest v0.11.3
+    Checking either v1.18.0
+    Checking getrandom v0.4.3
+    Checking chrono v0.4.45
+    Checking spki v0.7.3
+    Checking pkcs8 v0.10.2
+    Checking rand v0.10.2
+    Checking sha2 v0.11.0
+    Checking zerofrom v0.1.4
+    Checking thiserror v2.0.18
+    Checking stable_deref_trait v1.2.1
+    Checking yoke v0.7.4
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking rayon v1.12.0
+    Checking ff v0.13.1
+    Checking sec1 v0.7.3
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking group v0.13.0
+    Checking zerovec v0.10.4
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking crypto-bigint v0.5.5
+    Checking bitflags v2.13.1
+    Checking rand_chacha v0.3.1
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking signature v2.2.0
+    Checking num-integer v0.1.47
+    Checking libz-sys v1.1.29
+    Checking elliptic-curve v0.13.8
+    Checking flate2 v1.1.10
+    Checking num-iter v0.1.46
+    Checking rand v0.8.8
+    Checking tinystr v0.7.6
+    Checking litemap v0.7.3
+    Checking writeable v0.5.5
+    Checking num-bigint-dig v0.8.6
+    Checking icu_locid v1.5.0
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking pkcs1 v0.7.5
+    Checking rustix v1.1.4
+    Checking p256 v0.13.2
+    Checking rsa v0.9.10
+    Checking icu_provider v1.5.0
+    Checking x509-cert v0.2.5
+    Checking getrandom v0.3.4
+    Checking encoding_rs v0.8.35
+    Checking icu_locid_transform_data v1.5.1
+    Checking tempfile v3.27.0
+    Checking icu_locid_transform v1.5.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking icu_collections v1.5.0
+    Checking icu_properties_data v1.5.1
+    Checking tinyvec_macros v0.1.1
+    Checking tinyvec v1.12.0
+    Checking icu_properties v1.5.1
+    Checking block-padding v0.4.2
+    Checking icu_normalizer_data v1.5.1
+    Checking utf16_iter v1.0.5
+    Checking utf8_iter v1.0.4
+    Checking write16 v1.0.0
+    Checking inout v0.2.2
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking cipher v0.5.2
+    Checking libloading v0.8.8
+    Checking pathfinder_simd v0.5.6
+    Checking alloc-no-stdlib v2.0.4
+    Checking log v0.4.29
+    Checking option-ext v0.2.0
+    Checking percent-encoding v2.3.2
+    Checking byteorder v1.5.0
+    Checking alloc-stdlib v0.2.4
+error: useless conversion to the same type: `u64`
+   --> crates/litchi-opc/tests/source_read_ahead.rs:629:9
+    |
+629 |         u64::try_from(after.returned_bytes).expect("byte counter fits u64"),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider removing `u64::try_from()`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#useless_conversion
+    = note: `-D clippy::useless-conversion` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::useless_conversion)]`
+
+error: could not compile `litchi-opc` (test "source_read_ahead") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,52 @@
+{
+  "attempt": "pilot1",
+  "pilot": true,
+  "protocol_sha256": "d611d0b637952e21b5ba7ea5f3b1ae0575dfd96b2aeb7a76a5c0ec70ec183cb2",
+  "raw_receipts": [
+    {
+      "label": "pilot-r1-normal-exact-0us",
+      "report_sha256": "f64dc70a0de8ee592a426bb4989bab06acb180084bb694700548c1a442a61655",
+      "terminal_sha256": "d74ba23cac69cc97499dd93ec3f8573d5bdc4bbfcfca3f8468a9bdeba4fecc1f"
+    },
+    {
+      "label": "pilot-r1-normal-managed-4096-0us",
+      "report_sha256": "f33e4acbb1f791aed6ffc721a299cfd8849b1a52ed67763bcc17fc1d03305df2",
+      "terminal_sha256": "63596f5a41c0fc04a732449c322f2b658ed175c75c289703227212050b3467ce"
+    },
+    {
+      "label": "pilot-r1-normal-exact-1000us-104857600bps",
+      "report_sha256": "219af1627d7e40cd7429631c4ab5dba930a91da8954385b3fd56c93f50404f21",
+      "terminal_sha256": "006307331d7a7ae5162d66f05e9f53fa6e687301682808680433f48961e75daa"
+    },
+    {
+      "label": "pilot-r1-normal-managed-4096-1000us-104857600bps",
+      "report_sha256": "5716e6ce01aeecf28b411ab08079dd5e1b3dc1a193127b6d54b5bb75c7684e88",
+      "terminal_sha256": "af59d36fb4b4314cc56ad9507c761c8bebc50a37161bd083c03ae631b1cb54eb"
+    },
+    {
+      "label": "pilot-r1-allocator-exact-0us",
+      "report_sha256": "42539bf90c4315d66ae1f3648be4024b773cd2d5ea8aa49a964af8e9c4c5183a",
+      "terminal_sha256": "05a8683996a77019c716d20e386e617cdeac99962dbf1cc4f7085d030ac7e67f"
+    },
+    {
+      "label": "pilot-r1-allocator-managed-4096-0us",
+      "report_sha256": "01c36b4a96f872e6b83f837fd1a844198655cacef97c5f7a7cfe7d8d037cec21",
+      "terminal_sha256": "f25d11542f4ee93ab704ee19ac8f72b4a1353f54556147ffc6d38ad96d8ee991"
+    },
+    {
+      "label": "pilot-r1-allocator-exact-1000us-104857600bps",
+      "report_sha256": "088b5de7c9b644f619ed6f6b8269ca8decd5b807eb08f52a0ea053b06a3e5212",
+      "terminal_sha256": "49d023d74a2c97af0e6c56076dbf33e8d13035d724a0686ea16cc5a90b3e3f8f"
+    },
+    {
+      "label": "pilot-r1-allocator-managed-4096-1000us-104857600bps",
+      "report_sha256": "35fb24fbf3bcef2257749ceb3ad7682943f60dd8b18e3c31cd9c2285b4a3a475",
+      "terminal_sha256": "96bee43c62d50212af41707a3d57c3589662ec2d2145eac0c4abb4f52cdd8529"
+    }
+  ],
+  "schema": "docx-managed-read-ahead-verification-v1",
+  "status": "pass",
+  "summary_sha256": "41277d2725ef7fd1532e7ce0d950b164f4763dab50dab333fe91dcca48c6c3e7",
+  "verified_utc": "2026-09-10T06:34:26.604866+00:00",
+  "version": 1
+}

@@ -1,0 +1,4095 @@
+{
+  "schema": "docx_managed_read_ahead_v1",
+  "version": 1,
+  "case_name": "docx_managed_source_open_document_extract_text",
+  "provider_scope": "managed litchi-docx source-backed owner through litchi-opc; the source adapter is a deterministic in-memory range transport and is not disk or network I/O evidence",
+  "timing_scope": "SourceBackedPackage managed open (including read-ahead window construction) + cache snapshot after open + document + extract_text + source-read and cache snapshots after text + package/document drop; returned text remains live after the clock; hashing, oracle comparison, source-version checks, physical traces, and post-drop budget checks are outside",
+  "setup_scope": "deterministic corpus generation, source/provider construction, bounded physical-trace capacity reservation, range transport construction, finite limits and ExecutionContext construction are outside the operation clock; the production read-ahead window is constructed inside the clock by the managed DOCX owner",
+  "allocation_scope": "operation-scoped global-system-allocator region surrounds the timing scope and includes managed package open, read-ahead window allocation, document materialization, text extraction, cache/source-read diagnostics, and package/document drop; normal binaries report unavailable and allocator binaries report the separate region sample",
+  "corpus_version": "source-edit-media-v1",
+  "corpus_generator": "litchi-docx-source-edit-media-v1",
+  "corpus": {
+    "name": "docx-source-backed-media",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "package_format": "DOCX/OPC/ZIP",
+    "shape": "media-rich",
+    "payload_kind": "deterministic-incompressible-media",
+    "compression": "deflate",
+    "entry_count": 17,
+    "archive_member_count": 20,
+    "entry_bytes": 2097152,
+    "uncompressed_payload_bytes": 16833643,
+    "archive_bytes": 16793036,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "target_entry": "paragraph:100",
+    "target_payload_bytes": 50,
+    "target_payload_sha256": "08ea83c6e3287e74125f5a70c3ce3a4bdb6de13b7930312a5059060e24e56c14",
+    "xlsx": null
+  },
+  "source_bytes": 16793036,
+  "source_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+  "expected_text_bytes": 10000,
+  "expected_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+  "expected_archive_members": 20,
+  "media_ranges": [
+    {
+      "start": 4027,
+      "end": 2101824
+    },
+    {
+      "start": 2101891,
+      "end": 4199688
+    },
+    {
+      "start": 4199755,
+      "end": 6297552
+    },
+    {
+      "start": 6297619,
+      "end": 8395416
+    },
+    {
+      "start": 8395483,
+      "end": 10493280
+    },
+    {
+      "start": 10493347,
+      "end": 12591144
+    },
+    {
+      "start": 12591211,
+      "end": 14689008
+    },
+    {
+      "start": 14689075,
+      "end": 16786872
+    }
+  ],
+  "expected_exact_ranges": [
+    {
+      "offset": 16793014,
+      "requested": 22,
+      "returned": 22
+    },
+    {
+      "offset": 16791709,
+      "requested": 46,
+      "returned": 46
+    },
+    {
+      "offset": 16791709,
+      "requested": 1305,
+      "returned": 1305
+    },
+    {
+      "offset": 0,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 49,
+      "requested": 363,
+      "returned": 363
+    },
+    {
+      "offset": 412,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 412,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 428,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 469,
+      "requested": 234,
+      "returned": 234
+    },
+    {
+      "offset": 703,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 703,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 2907,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 2965,
+      "requested": 324,
+      "returned": 324
+    },
+    {
+      "offset": 3289,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 3289,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 1420,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 1467,
+      "requested": 1424,
+      "returned": 1424
+    },
+    {
+      "offset": 2891,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 2891,
+      "requested": 16,
+      "returned": 16
+    }
+  ],
+  "expected_exact_physical_calls": 19,
+  "expected_exact_physical_bytes": 3966,
+  "requested_source_revision": "e8ee19b063285cb0bb73dea819f1be1ac5e82133",
+  "limits": {
+    "read_limits": {
+      "max_input_bytes": 536870912,
+      "max_archive_members": 100000,
+      "max_archive_member_name_bytes": 4096,
+      "max_archive_metadata_bytes": 67108864,
+      "max_archive_compressed_bytes": 536870912,
+      "max_archive_entry_bytes": 536870912,
+      "max_archive_total_bytes": 2147483648,
+      "max_parts": 100000,
+      "max_part_bytes": 536870912,
+      "max_total_part_bytes": 536870912,
+      "max_content_types_bytes": 8388608,
+      "max_content_type_mappings": 100000,
+      "max_relationship_parts": 100000,
+      "max_relationship_xml_bytes": 8388608,
+      "max_total_relationship_xml_bytes": 67108864,
+      "max_relationships_per_part": 100000,
+      "max_total_relationships": 1000000,
+      "max_relationship_graph_nodes": 100000,
+      "max_xml_events": 1000000,
+      "max_total_relationship_xml_events": 8000000,
+      "max_xml_depth": 256,
+      "max_xml_attribute_bytes": 65536,
+      "max_relationship_target_bytes": 4096
+    },
+    "cache_max_bytes": 8388608,
+    "cache_max_entries": 128,
+    "budget_memory_bytes": 67108864,
+    "budget_input_bytes": 67108864,
+    "budget_output_bytes": 67108864,
+    "budget_objects": 1000000,
+    "budget_depth": 1024,
+    "budget_work": 2147483648,
+    "execution_workers": 1,
+    "execution_max_in_flight_tasks": 1,
+    "execution_max_in_flight_bytes": 67108864,
+    "execution_min_parallel_bytes": 0
+  },
+  "provider": {
+    "name": "PptxRangeSource",
+    "max_range_bytes": 65536,
+    "delay_us": 1000,
+    "transfer_bytes_per_second": 104857600,
+    "transfer_delay_policy": "minimum-service",
+    "physical_scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+    "range_scope": "PptxRangeSource logical adapter counters; fixed delay and transfer pacing describe the configured synthetic transport, not a filesystem or network service-level measurement"
+  },
+  "policy": {
+    "name": "forward_start",
+    "enabled": true,
+    "configured_window_bytes": 4096
+  },
+  "warmup": 3,
+  "samples": 30,
+  "rows": [
+    {
+      "sample_index": 3,
+      "elapsed_ns": 3688408,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 4,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 4,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18985408,
+          "live_bytes_after": 18998184,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19128963
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 4,
+      "elapsed_ns": 3717079,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 5,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 5,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18985544,
+          "live_bytes_after": 18998320,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19129099
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 5,
+      "elapsed_ns": 3668798,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 6,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 6,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18985680,
+          "live_bytes_after": 18998456,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19129235
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 6,
+      "elapsed_ns": 3670938,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 7,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 7,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18985816,
+          "live_bytes_after": 18998592,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19129371
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 7,
+      "elapsed_ns": 3713488,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 8,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 8,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18985952,
+          "live_bytes_after": 18998728,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19129507
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 8,
+      "elapsed_ns": 3665499,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 9,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 9,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18986088,
+          "live_bytes_after": 18998864,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19129643
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 9,
+      "elapsed_ns": 3697218,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 10,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 10,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18986224,
+          "live_bytes_after": 18999000,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19129779
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 10,
+      "elapsed_ns": 3678228,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 11,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 11,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18986360,
+          "live_bytes_after": 18999136,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19129915
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 11,
+      "elapsed_ns": 9510047,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 12,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 12,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18986496,
+          "live_bytes_after": 18999272,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19130051
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 12,
+      "elapsed_ns": 3848399,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 13,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 13,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18986632,
+          "live_bytes_after": 18999408,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19130187
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 13,
+      "elapsed_ns": 3857289,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 14,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 14,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18986768,
+          "live_bytes_after": 18999544,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19130323
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 14,
+      "elapsed_ns": 3839439,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 15,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 15,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18986904,
+          "live_bytes_after": 18999680,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19130459
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 15,
+      "elapsed_ns": 3819919,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 16,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 16,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987040,
+          "live_bytes_after": 18999816,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19130595
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 16,
+      "elapsed_ns": 3796229,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 17,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 17,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987176,
+          "live_bytes_after": 18999952,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19130731
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 17,
+      "elapsed_ns": 3799389,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 18,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 18,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987312,
+          "live_bytes_after": 19000088,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19130867
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 18,
+      "elapsed_ns": 3818338,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 19,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 19,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987448,
+          "live_bytes_after": 19000224,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131003
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 19,
+      "elapsed_ns": 3844449,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 20,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 20,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987584,
+          "live_bytes_after": 19000360,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131139
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 20,
+      "elapsed_ns": 3817138,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 21,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 21,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987720,
+          "live_bytes_after": 19000496,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131275
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 21,
+      "elapsed_ns": 3805899,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 22,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 22,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987856,
+          "live_bytes_after": 19000632,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131411
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 22,
+      "elapsed_ns": 3804659,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 23,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 23,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18987992,
+          "live_bytes_after": 19000768,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131547
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 23,
+      "elapsed_ns": 3848749,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 24,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 24,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18988128,
+          "live_bytes_after": 19000904,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131683
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 24,
+      "elapsed_ns": 3815349,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 25,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 25,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18988264,
+          "live_bytes_after": 19001040,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131819
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 25,
+      "elapsed_ns": 3832379,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 26,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 26,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18988400,
+          "live_bytes_after": 19001176,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19131955
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 26,
+      "elapsed_ns": 3723668,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 27,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 27,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18988536,
+          "live_bytes_after": 19001312,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19132091
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 27,
+      "elapsed_ns": 3674658,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 28,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 28,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18988672,
+          "live_bytes_after": 19001448,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19132227
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 28,
+      "elapsed_ns": 3708379,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 29,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 29,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18988808,
+          "live_bytes_after": 19001584,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19132363
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 29,
+      "elapsed_ns": 3689708,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 30,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 30,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18988944,
+          "live_bytes_after": 19001720,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19132499
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 30,
+      "elapsed_ns": 6396472,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 31,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 31,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18989080,
+          "live_bytes_after": 19001856,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19132635
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 31,
+      "elapsed_ns": 3746978,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 32,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 32,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18989216,
+          "live_bytes_after": 19001992,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19132771
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    },
+    {
+      "sample_index": 32,
+      "elapsed_ns": 3753559,
+      "actual_text_verified": true,
+      "actual_text_bytes": 10000,
+      "actual_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+      "source_version_before": {
+        "id": 33,
+        "revision": 0
+      },
+      "source_version_after": {
+        "id": 33,
+        "revision": 0
+      },
+      "source_version_unchanged": true,
+      "policy": {
+        "name": "forward_start",
+        "enabled": true,
+        "configured_window_bytes": 4096
+      },
+      "source_read": {
+        "enabled": true,
+        "configured_window_bytes": 4096,
+        "retained_window_bytes": 4096,
+        "requests": 19,
+        "hits": 16,
+        "misses": 3,
+        "fills": 3,
+        "requested_bytes": 3966,
+        "returned_bytes": 5445
+      },
+      "cache": {
+        "open_successful_loads": 0,
+        "successful_loads": 1,
+        "failed_loads": 0,
+        "retained_bytes": 29027,
+        "retained_entries": 1,
+        "budget_managed": true
+      },
+      "physical": {
+        "scope": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+        "calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "short_reads": 0,
+        "ranges": [
+          {
+            "offset": 16793014,
+            "requested": 22,
+            "returned": 22
+          },
+          {
+            "offset": 16791709,
+            "requested": 1327,
+            "returned": 1327
+          },
+          {
+            "offset": 0,
+            "requested": 4096,
+            "returned": 4096
+          }
+        ]
+      },
+      "transport": {
+        "logical_calls": 3,
+        "requested_bytes": 5445,
+        "returned_bytes": 5445,
+        "min_request_bytes": 22,
+        "max_request_bytes": 4096,
+        "short_reads": 0,
+        "delayed_calls": 3,
+        "transfer_paced_calls": 3,
+        "transfer_delay_ns": 51929,
+        "request_size_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "budget": {
+        "memory_before": 0,
+        "memory_live": 33123,
+        "memory_after_drop": 0,
+        "memory_released": 33123,
+        "input_bytes_before": 0,
+        "input_bytes_after_drop": 5445,
+        "input_bytes_delta": 5445,
+        "objects_before": 0,
+        "objects_live": 22,
+        "objects_after_drop": 0,
+        "objects_released": 22,
+        "managed": true,
+        "memory_released_to_baseline": true,
+        "input_bytes_match_physical_returned": true
+      },
+      "allocation": {
+        "sample": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "allocation_calls": 5330,
+          "deallocation_calls": 5202,
+          "reallocation_calls": 128,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 1760365,
+          "deallocated_bytes": 1747589,
+          "live_bytes_before": 18989352,
+          "live_bytes_after": 19002128,
+          "peak_live_bytes_before": 89282028,
+          "peak_live_bytes_after": 89282028,
+          "region_peak_live_bytes": 19132907
+        },
+        "region_peak_increment_bytes": 143555
+      }
+    }
+  ]
+}

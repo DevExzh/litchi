@@ -1,0 +1,649 @@
+{
+  "arms": [
+    {
+      "delay_us": 0,
+      "max_range_bytes": 65536,
+      "name": "exact-0us",
+      "policy": "exact",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps",
+      "window_bytes": null
+    },
+    {
+      "delay_us": 0,
+      "max_range_bytes": 65536,
+      "name": "managed-4096-0us",
+      "policy": "forward_start",
+      "transfer_bytes_per_second": null,
+      "transfer_delay_policy": "separate-sleeps",
+      "window_bytes": 4096
+    },
+    {
+      "delay_us": 1000,
+      "max_range_bytes": 65536,
+      "name": "exact-1000us-104857600bps",
+      "policy": "exact",
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum-service",
+      "window_bytes": null
+    },
+    {
+      "delay_us": 1000,
+      "max_range_bytes": 65536,
+      "name": "managed-4096-1000us-104857600bps",
+      "policy": "forward_start",
+      "transfer_bytes_per_second": 104857600,
+      "transfer_delay_policy": "minimum-service",
+      "window_bytes": 4096
+    }
+  ],
+  "builds": {
+    "allocator": {
+      "binary": {
+        "bytes": 474817392,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0493/final1/allocator/litchi-perf-baseline-alloc",
+        "sha256": "8b1830c9c75fe10a103adef99f988df86ece980a819d7fa6d6982b8f657423d6"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--bin",
+        "litchi-perf-baseline-alloc"
+      ],
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0493",
+        "DEBUGINFOD_URLS": "",
+        "LC_ALL": "C",
+        "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "RUSTUP_TOOLCHAIN": "1.98.1"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--features",
+          "allocator-metrics",
+          "--bin",
+          "litchi-perf-baseline-alloc"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation/build-allocator1.json",
+        "sha256": "941bf830e44dab1b4bd8fb98f429195614a10cc2afd17d6eeda2f7af144e336c",
+        "source": {
+          "files": 7163,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation-sources/5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f.json",
+          "sha256": "5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f"
+        }
+      },
+      "git_revision": "e8ee19b063285cb0bb73dea819f1be1ac5e82133",
+      "receipt_sha256": "e8c03b3e3f5b848b194c696b135d2367fa180e0d0688e35b26665e0be934c9a9",
+      "source": {
+        "files": 7163,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation-sources/5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f.json",
+        "sha256": "5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f"
+      }
+    },
+    "normal": {
+      "binary": {
+        "bytes": 475090432,
+        "executable": true,
+        "path": "/home/zhuhe/.cache/litchi-goal-0493/final1/normal/litchi-perf-baseline",
+        "sha256": "810361e33a59b399e5637e87d9d20456b35636e26516c8205932f7c75503c3d7"
+      },
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--bin",
+        "litchi-perf-baseline"
+      ],
+      "environment": {
+        "CARGO_BUILD_JOBS": "4",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "1",
+        "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0493",
+        "DEBUGINFOD_URLS": "",
+        "LC_ALL": "C",
+        "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "RUSTUP_TOOLCHAIN": "1.98.1"
+      },
+      "gate": {
+        "argv": [
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline"
+        ],
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation/build-normal2.json",
+        "sha256": "1ff22b628e0082906f0465f61db65ff01cd1d7f87790204a98f9b8ee1e98ea82",
+        "source": {
+          "files": 7163,
+          "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation-sources/5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f.json",
+          "sha256": "5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f"
+        }
+      },
+      "git_revision": "e8ee19b063285cb0bb73dea819f1be1ac5e82133",
+      "receipt_sha256": "24362b7a5b77b90b3d1256317690328891e3001d3244f2edd1fb066639d1bbea",
+      "source": {
+        "files": 7163,
+        "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation-sources/5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f.json",
+        "sha256": "5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f"
+      }
+    }
+  },
+  "case": "docx_managed_source_open_document_extract_text",
+  "change": 493,
+  "claim_authorized": false,
+  "corpus": {
+    "archive_bytes": 16793036,
+    "archive_member_count": 20,
+    "archive_sha256": "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4",
+    "expected_text_bytes": 10000,
+    "expected_text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af",
+    "generator": "litchi-docx-source-edit-media-v1",
+    "media_member_bytes": 2097152,
+    "media_member_count": 8,
+    "paragraph_count": 200,
+    "shape": "200 paragraphs + eight 2 MiB PNG-signature media members",
+    "version": "0188-media-v1"
+  },
+  "cpu": 2,
+  "cpu_lock": "/home/zhuhe/.cache/litchi-goal-0484/cpu.lock",
+  "driver": {
+    "gate.py": "2bd9d7baa5182317755f2df0c41beb001dc2004ae777ca6a331368faa2892e31",
+    "measure.py": "1b4965504f8ecf85cb8c5ea2265d487432c27055da7ddc3e3c0d24112b80692b",
+    "retain_build.py": "4c1ab6583251d0d61a41bf0c9027537bd29077f5988466d0ea12bf59dc5c2b48",
+    "support.py": "52a29757295396f91bdadf8400fce688003303cdd024a81e41adaad62848efb6",
+    "test_measure.py": "e7b666fe6f89f1c6b7445986a1fccfaba8baaae159e7fed2fecf8e17d5e90259"
+  },
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/home/zhuhe/.cache/litchi-build-0493",
+    "DEBUGINFOD_URLS": "",
+    "LC_ALL": "C",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "environment_artifact": {
+    "path": "environment.json",
+    "sha256": "d5b912865d54f9593a7f97bc4939bd70eb8696b7c7206728fbcab8b9129a80b9"
+  },
+  "expected_formal_processes": 16,
+  "expected_measured_samples": 480,
+  "formal_runs": [
+    {
+      "arm": "exact-0us",
+      "kind": "formal",
+      "label": "r1-normal-exact-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-0us",
+      "kind": "formal",
+      "label": "r1-normal-managed-4096-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "exact-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r1-normal-exact-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r1-normal-managed-4096-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "exact-0us",
+      "kind": "formal",
+      "label": "r1-allocator-exact-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-0us",
+      "kind": "formal",
+      "label": "r1-allocator-managed-4096-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "exact-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r1-allocator-exact-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r1-allocator-managed-4096-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r2-allocator-managed-4096-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "exact-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r2-allocator-exact-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-0us",
+      "kind": "formal",
+      "label": "r2-allocator-managed-4096-0us",
+      "provider": "range",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "exact-0us",
+      "kind": "formal",
+      "label": "r2-allocator-exact-0us",
+      "provider": "range",
+      "repeat": 2,
+      "role": "allocator",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r2-normal-managed-4096-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "exact-1000us-104857600bps",
+      "kind": "formal",
+      "label": "r2-normal-exact-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "managed-4096-0us",
+      "kind": "formal",
+      "label": "r2-normal-managed-4096-0us",
+      "provider": "range",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    },
+    {
+      "arm": "exact-0us",
+      "kind": "formal",
+      "label": "r2-normal-exact-0us",
+      "provider": "range",
+      "repeat": 2,
+      "role": "normal",
+      "samples": 30,
+      "warmups": 3
+    }
+  ],
+  "limits": {
+    "budget_depth": 1024,
+    "budget_input_bytes": 67108864,
+    "budget_memory_bytes": 67108864,
+    "budget_objects": 1000000,
+    "budget_output_bytes": 67108864,
+    "budget_work": 2147483648,
+    "cache_max_bytes": 8388608,
+    "cache_max_entries": 128,
+    "execution_max_in_flight_bytes": 67108864,
+    "execution_max_in_flight_tasks": 1,
+    "execution_min_parallel_bytes": 0,
+    "execution_workers": 1,
+    "read_limits": {
+      "max_archive_compressed_bytes": 536870912,
+      "max_archive_entry_bytes": 536870912,
+      "max_archive_member_name_bytes": 4096,
+      "max_archive_members": 100000,
+      "max_archive_metadata_bytes": 67108864,
+      "max_archive_total_bytes": 2147483648,
+      "max_content_type_mappings": 100000,
+      "max_content_types_bytes": 8388608,
+      "max_input_bytes": 536870912,
+      "max_part_bytes": 536870912,
+      "max_parts": 100000,
+      "max_relationship_graph_nodes": 100000,
+      "max_relationship_parts": 100000,
+      "max_relationship_target_bytes": 4096,
+      "max_relationship_xml_bytes": 8388608,
+      "max_relationships_per_part": 100000,
+      "max_total_part_bytes": 536870912,
+      "max_total_relationship_xml_bytes": 67108864,
+      "max_total_relationship_xml_events": 8000000,
+      "max_total_relationships": 1000000,
+      "max_xml_attribute_bytes": 65536,
+      "max_xml_depth": 256,
+      "max_xml_events": 1000000
+    }
+  },
+  "logical_ranges": [
+    {
+      "offset": 16793014,
+      "requested": 22,
+      "returned": 22
+    },
+    {
+      "offset": 16791709,
+      "requested": 46,
+      "returned": 46
+    },
+    {
+      "offset": 16791709,
+      "requested": 1305,
+      "returned": 1305
+    },
+    {
+      "offset": 0,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 49,
+      "requested": 363,
+      "returned": 363
+    },
+    {
+      "offset": 412,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 412,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 428,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 469,
+      "requested": 234,
+      "returned": 234
+    },
+    {
+      "offset": 703,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 703,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 2907,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 2965,
+      "requested": 324,
+      "returned": 324
+    },
+    {
+      "offset": 3289,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 3289,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 1420,
+      "requested": 30,
+      "returned": 30
+    },
+    {
+      "offset": 1467,
+      "requested": 1424,
+      "returned": 1424
+    },
+    {
+      "offset": 2891,
+      "requested": 16,
+      "returned": 16
+    },
+    {
+      "offset": 2891,
+      "requested": 16,
+      "returned": 16
+    }
+  ],
+  "media_ranges": [
+    {
+      "end": 2101824,
+      "start": 4027
+    },
+    {
+      "end": 4199688,
+      "start": 2101891
+    },
+    {
+      "end": 6297552,
+      "start": 4199755
+    },
+    {
+      "end": 8395416,
+      "start": 6297619
+    },
+    {
+      "end": 10493280,
+      "start": 8395483
+    },
+    {
+      "end": 12591144,
+      "start": 10493347
+    },
+    {
+      "end": 14689008,
+      "start": 12591211
+    },
+    {
+      "end": 16786872,
+      "start": 14689075
+    }
+  ],
+  "oracle": {
+    "text_bytes": 10000,
+    "text_sha256": "ad4fe690f0ef2281ad8e64a78d1f4d64e7c8625d672b3ac2f7e9fbc28a82f4af"
+  },
+  "performance_claim": "descriptive managed policy evidence; no cross-format or cross-arm optimization claim",
+  "physical_observation": {
+    "baseline": {
+      "calls": 19,
+      "returned_bytes": 3966
+    },
+    "candidate": {
+      "calls": 3,
+      "returned_bytes": 5445
+    }
+  },
+  "pilot_runs": [
+    {
+      "arm": "exact-0us",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-exact-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "managed-4096-0us",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-managed-4096-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "exact-1000us-104857600bps",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-exact-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "managed-4096-1000us-104857600bps",
+      "kind": "pilot",
+      "label": "pilot-r1-normal-managed-4096-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "normal",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "exact-0us",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-exact-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "managed-4096-0us",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-managed-4096-0us",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "exact-1000us-104857600bps",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-exact-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    },
+    {
+      "arm": "managed-4096-1000us-104857600bps",
+      "kind": "pilot",
+      "label": "pilot-r1-allocator-managed-4096-1000us-104857600bps",
+      "provider": "range",
+      "repeat": 1,
+      "role": "allocator",
+      "samples": 3,
+      "warmups": 1
+    }
+  ],
+  "repeats": [
+    1,
+    2
+  ],
+  "roles": [
+    "normal",
+    "allocator"
+  ],
+  "samples": 30,
+  "schema": "docx-managed-read-ahead-protocol-v1",
+  "scopes": {
+    "allocation": "operation-scoped global-system-allocator region surrounds the timing scope and includes managed package open, read-ahead window allocation, document materialization, text extraction, cache/source-read diagnostics, and package/document drop; normal binaries report unavailable and allocator binaries report the separate region sample",
+    "physical": "CountingReadAt calls below PptxRangeSource and below the production SourceReader read-ahead policy; requested and returned ranges are physical transport observations for this synthetic adapter",
+    "provider": "managed litchi-docx source-backed owner through litchi-opc; the source adapter is a deterministic in-memory range transport and is not disk or network I/O evidence",
+    "range": "PptxRangeSource logical adapter counters; fixed delay and transfer pacing describe the configured synthetic transport, not a filesystem or network service-level measurement",
+    "setup": "deterministic corpus generation, source/provider construction, bounded physical-trace capacity reservation, range transport construction, finite limits and ExecutionContext construction are outside the operation clock; the production read-ahead window is constructed inside the clock by the managed DOCX owner",
+    "timing": "SourceBackedPackage managed open (including read-ahead window construction) + cache snapshot after open + document + extract_text + source-read and cache snapshots after text + package/document drop; returned text remains live after the clock; hashing, oracle comparison, source-version checks, physical traces, and post-drop budget checks are outside"
+  },
+  "source": {
+    "files": 7163,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0493/validation-sources/5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f.json",
+    "sha256": "5db38f164ac6f461f1b92ae8f97f05419fccfada944ee55359b0056fe317aa1f"
+  },
+  "version": 1,
+  "warmups": 3
+}
