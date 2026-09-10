@@ -9,7 +9,7 @@ mod stylesheet;
 
 pub(crate) use build::source_chart_objects;
 pub(crate) use data::{
-    chart_data_from_source, chart_geometry, chart_grid, drawable_geometry, geometry_archive,
+    chart_data_from_source, chart_geometry, chart_grid_bytes, drawable_geometry, geometry_archive,
     reference, require_creatable_kind,
 };
 pub(crate) use ids::SourceChartObjectIds;

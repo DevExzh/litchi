@@ -64,8 +64,8 @@ use crate::charts::source::{
     CHART_NON_STYLE_MESSAGE_TYPE, CHART_PRESET_MESSAGE_TYPE, CHART_STYLE_MESSAGE_TYPE,
     ChartApplicationProfile, LEGEND_NON_STYLE_MESSAGE_TYPE, LEGEND_STYLE_MESSAGE_TYPE,
     SERIES_NON_STYLE_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE, STANDIN_MESSAGE_TYPE,
-    SourceChartObjectIds, chart_data_from_source, chart_geometry, chart_grid, drawable_geometry,
-    geometry_archive, local_chart_style_ids, reference, register_chart_styles,
+    SourceChartObjectIds, chart_data_from_source, chart_geometry, chart_grid_bytes,
+    drawable_geometry, geometry_archive, local_chart_style_ids, reference, register_chart_styles,
     require_creatable_kind, single_message_index, source_chart_objects, unregister_chart_styles,
     validate_chart_styles_registered,
 };
@@ -347,40 +347,38 @@ impl KeynoteEditor {
         self.set_slide_chart_data_full_replace(slide_index, drawable_object_id, data)
     }
 
-    /// Replace the complete inline data grid through the legacy generated
-    /// archive path when labels or dimensions change.
+    /// Replace the complete inline data grid through the bounded shared
+    /// creation codec when labels or dimensions change.
     fn set_slide_chart_data_full_replace(
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
         data: ChartData,
     ) -> Result<()> {
-        self.update_slide_chart(
-            slide_index,
+        let source = chart_graph(self, slide_index, drawable_object_id)?;
+        let encoded_grid = chart_grid_bytes(drawable_object_id, &data)?;
+        let mut staged = self.package().clone();
+        update_chart_payload_with_grid(
+            &mut staged,
+            &source.archive_name,
             drawable_object_id,
-            |chart| {
-                let payload = chart.chart.as_mut().ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "Keynote chart {drawable_object_id} has no chart payload"
-                    ))
-                })?;
-                payload.grid = Some(chart_grid(drawable_object_id, data.clone())?);
+            &encoded_grid,
+            |payload| {
                 payload.is_dirty = Some(false);
                 Ok(())
             },
-            |verified| {
-                if chart_graph(verified, slide_index, drawable_object_id)?
-                    .info
-                    .data
-                    != data
-                {
-                    return Err(Error::InvalidFormat(
-                        "Keynote chart data update failed validation".to_owned(),
-                    ));
-                }
-                Ok(())
-            },
         )?;
+        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        if !chart_graph(&verified, slide_index, drawable_object_id)?
+            .info
+            .data
+            .bitwise_eq(&data)
+        {
+            return Err(Error::InvalidFormat(
+                "Keynote chart data update failed validation".to_owned(),
+            ));
+        }
+        *self = verified;
         Ok(())
     }
 
@@ -872,6 +870,38 @@ fn update_chart_payload(
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,
+            },
+        )?;
+        Ok(())
+    })
+}
+
+fn update_chart_payload_with_grid(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    drawable_object_id: u64,
+    encoded_grid: &litchi_iwa_protos::chart_grid_creation_codec::EncodeOutput,
+    update: impl FnOnce(&mut tsch::ChartArchive) -> Result<()>,
+) -> Result<()> {
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote chart {drawable_object_id} is missing"))
+        })?;
+        let Some(message_index) = single_message_index(&object.messages, CHART_MESSAGE_TYPE) else {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote chart {drawable_object_id} must contain exactly one chart payload"
+            )));
+        };
+        let data = IWorkChartArchive::rewrite_chart_grid(
+            &object.messages[message_index].data,
+            encoded_grid,
+            update,
+        )?;
+        object.replace_message(
+            message_index,
+            RawMessage {
+                type_: CHART_MESSAGE_TYPE,
+                data,
             },
         )?;
         Ok(())

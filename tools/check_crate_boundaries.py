@@ -70283,6 +70283,144 @@ IWA_CHART_DATA_HOST_COMPAT_REEXPORT = re.compile(
     r"(?:r#)?ChartData\b"
 )
 
+# Wave102 moves fresh chart-grid authoring out of the compatibility host's
+# generated model.  The read/rewrite chart-data codec above intentionally
+# remains a separate owner: fresh grids have no source payload to rewrite and
+# therefore need a bounded, borrowed encoder that emits the native wire
+# representation directly.  Keep this boundary source-local so unrelated
+# chart-property mutations in the host can continue to use their compatibility
+# graph while the authoring seam is migrated.
+IWA_CHART_GRID_CREATION_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/chart_grid_creation_codec.rs"
+)
+IWA_CHART_GRID_CREATION_CODEC_PUBLIC_SOURCE = IWA_PROTOS_FACADE_SOURCE
+IWA_CHART_GRID_CREATION_CODEC_MODULE = "chart_grid_creation_codec"
+IWA_CHART_GRID_CREATION_CODEC_REQUIRED_TYPES = (
+    "ChartGridCreationRequest",
+    "PreparedChartGridCreation",
+    "ExecutionRequirements",
+    "ExecutionLimits",
+    "EncodeError",
+    "EncodeOutput",
+)
+IWA_CHART_GRID_CREATION_CODEC_REQUIRED_FUNCTIONS = (
+    "prepare_chart_grid_creation",
+    "encode_chart_grid",
+)
+IWA_CHART_GRID_CREATION_CODEC_REQUIRED_MARKER_GROUPS = {
+    # The request must borrow the caller's semantic labels and values.  The
+    # exact field layout is intentionally left to the Rust implementation;
+    # these markers prove that the API does not take an eager generated grid.
+    "borrowed semantic input": (("row_labels", "column_labels", "Option<f64>"),),
+    "borrowed lifetime": (
+        ("&'a",),
+        ("&'source",),
+        ("&[",),
+        ("borrowed",),
+    ),
+    # A production encoder must preflight output and use the Buffa view seam;
+    # a plain `Vec<u8>` builder is not sufficient evidence of this boundary.
+    "bounded Buffa encoding": (
+        "buffa",
+        ("ViewEncode", "try_encode_bounded", "encode_bounded"),
+        ("try_encoded_len", "encoded_len"),
+    ),
+    # Grid identity generation is part of the shared owner.  Keeping these
+    # markers here prevents a host helper from silently rebuilding row/column
+    # identity maps after the generated archive is removed from the host.
+    "deterministic row-column identity": (
+        ("ID_MAP_ROW_FIELD", "ID_MAP_COLUMN_FIELD", "seed"),
+        ("row_id_map", "column_id_map", "seed"),
+        ("seed", "identifier", "uuid"),
+    ),
+    "fallible shape validation": (
+        ("plan_request", "row_labels", "column_labels"),
+        ("validate", ("row_names", "row_labels"), ("column_names", "column_labels")),
+    ),
+}
+IWA_CHART_GRID_CREATION_CODEC_PROST = re.compile(
+    r"(?<![A-Za-z0-9_])prost(?:_types)?(?![A-Za-z0-9_])"
+)
+IWA_CHART_GRID_CREATION_CODEC_GENERATED_CONSTRUCTION = re.compile(
+    r"\b(?:ChartGridArchive|GridRow|GridValue|ChartGridRowColumnIdMap)\s*\{"
+)
+IWA_CHART_GRID_CREATION_CODEC_GENERATED_OPERATION = re.compile(
+    r"\b(?:ChartGridArchive|GridRow|GridValue|ChartGridRowColumnIdMap)\s*::\s*"
+    r"(?:decode|encode|encode_to_vec)\b"
+)
+IWA_CHART_GRID_CREATION_CODEC_GENERATED_REFERENCE = re.compile(
+    r"\b(?:ChartGridArchive|GridRow|GridValue|ChartGridRowColumnIdMap)\b"
+)
+IWA_CHART_GRID_CREATION_CODEC_EAGER_GENERATED_VECTOR = re.compile(
+    r"\b(?:Vec|SmallVec|ArrayVec)\s*<[^>]*\b"
+    r"(?:ChartGridArchive|GridRow|GridValue|ChartGridRowColumnIdMap)\b"
+)
+IWA_CHART_GRID_CREATION_CODEC_HIDDEN_MODULE = re.compile(
+    rf"(?m)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+    rf"pub\s+mod\s+{re.escape(IWA_CHART_GRID_CREATION_CODEC_MODULE)}\b"
+)
+IWA_CHART_GRID_CREATION_SOURCE_DATA = Path(
+    "crates/litchi-iwa/src/charts/source/data.rs"
+)
+IWA_CHART_GRID_CREATION_SOURCE_DATA_ROUTE = re.compile(
+    r"\b(?:chart_grid_creation_codec|grid_creation_codec)\b"
+)
+IWA_CHART_GRID_CREATION_SOURCE_DATA_CALL = re.compile(
+    r"\b(?:prepare_chart_grid_creation|encode_chart_grid)\s*\("
+)
+IWA_CHART_GRID_CREATION_SOURCE_DATA_GENERATED = re.compile(
+    r"\b(?:ChartGridArchive|GridRow|GridValue|ChartGridRowColumnIdMap)\b"
+)
+IWA_CHART_GRID_CREATION_SOURCE_DATA_ID_MAP = re.compile(
+    r"\b(?:row_id_map|column_id_map|grid_id_entry|ChartGridRowColumnIdMap|"
+    r"GridAxis)\b"
+)
+IWA_CHART_GRID_CREATION_HOST_AUTHORING_SOURCES = (
+    Path("crates/litchi-iwa/src/charts/source/build.rs"),
+    Path("crates/litchi-iwa/src/pages/editor/charts.rs"),
+    Path("crates/litchi-iwa/src/numbers/editor/sheet_charts.rs"),
+    Path("crates/litchi-iwa/src/keynote/editor/slide_charts.rs"),
+)
+IWA_CHART_GRID_CREATION_FULL_REPLACE_METHODS = (
+    "set_body_chart_data_full_replace",
+    "set_sheet_chart_data_full_replace",
+    "set_slide_chart_data_full_replace",
+)
+IWA_CHART_GRID_CREATION_FULL_REPLACE_METHOD = re.compile(
+    r"\bfn\s+(?:set_body_chart_data_full_replace|"
+    r"set_sheet_chart_data_full_replace|set_slide_chart_data_full_replace)\b"
+)
+IWA_CHART_GRID_CREATION_HOST_GENERATED_GRID = re.compile(
+    r"\b(?:ChartGridArchive|GridRow|GridValue|ChartGridRowColumnIdMap)\b"
+)
+IWA_CHART_GRID_CREATION_HOST_GRID_ASSIGNMENT = re.compile(
+    r"(?:\.|\b)grid\s*=\s*Some\s*\("
+)
+IWA_CHART_GRID_CREATION_HOST_GRID_FIELD = re.compile(
+    r"\bgrid\s*:\s*Some\s*\("
+)
+IWA_CHART_GRID_CREATION_HOST_FULL_GRAPH_DECODE = re.compile(
+    r"\b(?:IWorkChartArchive|ChartArchive|ChartDrawableArchive)\s*::\s*decode\s*\("
+)
+IWA_CHART_GRID_CREATION_HOST_GENERIC_UPDATE = re.compile(
+    r"\b(?:self\s*\.\s*)?update_(?:body|sheet|slide)_chart\s*\("
+)
+IWA_CHART_GRID_CREATION_HOST_ENCODED_ROUTE = re.compile(
+    r"\b(?:chart_grid_creation_codec|grid_creation_codec|"
+    r"(?:encode|prepare|replace|rewrite|update|write|patch|splice|set)[A-Za-z0-9_]*"
+    r"(?:grid|chart_grid|inline_grid)[A-Za-z0-9_]*"
+    r"(?:bytes|encoded|payload|wire|source)?|"
+    r"(?:grid|chart_grid|inline_grid)[A-Za-z0-9_]*"
+    r"(?:bytes|encoded|payload|wire)[A-Za-z0-9_]*)\s*\("
+)
+IWA_CHART_GRID_CREATION_HOST_BYTE_VALUE = re.compile(
+    r"\b(?:grid_bytes|encoded_grid|encoded_chart_grid|grid_payload|"
+    r"encoded_payload|grid_wire|encoded)\b"
+)
+IWA_CHART_GRID_CREATION_HOST_SOURCE_GRID_CALL = re.compile(
+    r"\bchart_grid(?:_bytes)?\s*\("
+)
+
 
 def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]:
     """Keep the cell-border value in common and the old path compatibility-only."""
@@ -72456,6 +72594,329 @@ def audit_iwa_chart_data_write_source_topology(root: Path = ROOT) -> list[str]:
     return sorted(set(violations))
 
 
+def _chart_grid_creation_boundary_active(root: Path) -> bool:
+    """Return whether the fresh chart-grid authoring seam has landed."""
+
+    codec_path = root / IWA_CHART_GRID_CREATION_CODEC_SOURCE
+    if codec_path.is_file():
+        return True
+
+    # Keep the guard dormant for the old generated builder, but fail closed if
+    # a host starts routing around the not-yet-present shared codec.  This
+    # makes a half-migration visible without penalizing older checkouts that
+    # have not begun this wave.
+    candidates = [root / IWA_CHART_GRID_CREATION_SOURCE_DATA]
+    candidates.extend(
+        root / path for path in IWA_CHART_GRID_CREATION_HOST_AUTHORING_SOURCES
+    )
+    for path in candidates:
+        if not path.is_file():
+            continue
+        source = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        if IWA_CHART_GRID_CREATION_SOURCE_DATA_ROUTE.search(source) is not None:
+            return True
+    return False
+
+
+def _chart_grid_creation_marker_present(code: str, marker: str | tuple[str, ...]) -> bool:
+    """Match an identifier marker or a punctuation-bearing Rust marker."""
+
+    if isinstance(marker, tuple):
+        return any(_chart_grid_creation_marker_present(code, item) for item in marker)
+    if not marker:
+        return True
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", marker) is None:
+        return marker in code
+    return re.search(rf"\b{re.escape(marker)}\b", code) is not None
+
+
+def _chart_grid_creation_marker_group_present(
+    code: str, markers: tuple[str | tuple[str, ...], ...]
+) -> bool:
+    """Match required markers with nested tuples representing alternatives."""
+
+    if not markers:
+        return True
+    if all(isinstance(marker, tuple) for marker in markers):
+        return any(
+            all(_chart_grid_creation_marker_present(code, item) for item in alternative)
+            for alternative in markers
+        )
+    return all(_chart_grid_creation_marker_present(code, marker) for marker in markers)
+
+
+def _chart_grid_creation_check_codec_source(root: Path) -> list[str]:
+    """Require a private, bounded Buffa encoder for fresh chart grids."""
+
+    codec_path = root / IWA_CHART_GRID_CREATION_CODEC_SOURCE
+    if not codec_path.is_file():
+        return [
+            "neutral chart-grid creation codec source is missing: "
+            f"{IWA_CHART_GRID_CREATION_CODEC_SOURCE}"
+        ]
+
+    raw_source = codec_path.read_text(encoding="utf-8")
+    production_source = _mask_rust_cfg_test_items(raw_source)
+    code = _mask_rust_non_code(production_source)
+    violations: list[str] = []
+
+    for name in IWA_CHART_GRID_CREATION_CODEC_REQUIRED_TYPES:
+        if re.search(
+            rf"\bpub[ \t]+"
+            rf"(?:struct|enum|type)\s+{re.escape(name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "neutral chart-grid creation codec is missing strict API "
+                f"{name}: {IWA_CHART_GRID_CREATION_CODEC_SOURCE}"
+            )
+
+    for name in IWA_CHART_GRID_CREATION_CODEC_REQUIRED_FUNCTIONS:
+        if re.search(
+            rf"\bpub[ \t]+fn\s+"
+            rf"{re.escape(name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                "neutral chart-grid creation codec is missing strict API "
+                f"{name}: {IWA_CHART_GRID_CREATION_CODEC_SOURCE}"
+            )
+
+    for label, markers in IWA_CHART_GRID_CREATION_CODEC_REQUIRED_MARKER_GROUPS.items():
+        if not _chart_grid_creation_marker_group_present(code, markers):
+            violations.append(
+                "neutral chart-grid creation codec is missing "
+                f"{label} marker: {IWA_CHART_GRID_CREATION_CODEC_SOURCE}"
+            )
+
+    if IWA_CHART_GRID_CREATION_CODEC_PROST.search(code) is not None:
+        violations.append(
+            "neutral chart-grid creation codec must use Buffa rather than Prost: "
+            f"{IWA_CHART_GRID_CREATION_CODEC_SOURCE}"
+        )
+
+    for pattern, message in (
+        (
+            IWA_CHART_GRID_CREATION_CODEC_GENERATED_CONSTRUCTION,
+            "generated ChartGridArchive/GridRow/GridValue construction",
+        ),
+        (
+            IWA_CHART_GRID_CREATION_CODEC_GENERATED_OPERATION,
+            "generated chart-grid encode/decode operation",
+        ),
+        (
+            IWA_CHART_GRID_CREATION_CODEC_EAGER_GENERATED_VECTOR,
+            "eager vector of generated chart-grid values",
+        ),
+    ):
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "neutral chart-grid creation codec retains "
+                f"{message}: {IWA_CHART_GRID_CREATION_CODEC_SOURCE}:{line_number}"
+            )
+
+    for match in IWA_CHART_GRID_CREATION_CODEC_GENERATED_REFERENCE.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "neutral chart-grid creation codec retains a generated chart-grid "
+            f"type reference {match.group(0)}: "
+            f"{IWA_CHART_GRID_CREATION_CODEC_SOURCE}:{line_number}"
+        )
+
+    for declaration, line_number in _rust_public_declarations(production_source):
+        if re.search(
+            r"\b(?:ChartGridArchive|GridRow|GridValue|"
+            r"ChartGridRowColumnIdMap)\b|"
+            r"\b(?:projection|buffa_[A-Za-z0-9_]*generated)\s*::",
+            declaration,
+        ):
+            violations.append(
+                "neutral chart-grid creation codec must not expose generated "
+                f"types: {IWA_CHART_GRID_CREATION_CODEC_SOURCE}:{line_number}"
+            )
+
+    public_path = root / IWA_CHART_GRID_CREATION_CODEC_PUBLIC_SOURCE
+    if not public_path.is_file():
+        violations.append(
+            "neutral chart-grid creation codec public module source is missing: "
+            f"{IWA_CHART_GRID_CREATION_CODEC_PUBLIC_SOURCE}"
+        )
+    else:
+        public_source = _mask_rust_cfg_test_items(
+            public_path.read_text(encoding="utf-8")
+        )
+        if IWA_CHART_GRID_CREATION_CODEC_HIDDEN_MODULE.search(public_source) is None:
+            violations.append(
+                "neutral chart-grid creation codec module must be hidden: "
+                f"{IWA_CHART_GRID_CREATION_CODEC_PUBLIC_SOURCE}"
+            )
+
+    return sorted(set(violations))
+
+
+def _chart_grid_creation_check_source_data(root: Path) -> list[str]:
+    """Keep the compatibility source helper free of generated grid values."""
+
+    path = root / IWA_CHART_GRID_CREATION_SOURCE_DATA
+    if not path.is_file():
+        return []
+
+    raw_source = path.read_text(encoding="utf-8")
+    production_source = _mask_rust_cfg_test_items(raw_source)
+    code = _mask_rust_non_code(production_source)
+    violations: list[str] = []
+
+    for match in IWA_CHART_GRID_CREATION_SOURCE_DATA_GENERATED.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa chart source/data must not mention generated chart-grid "
+            f"type {match.group(0)}: {IWA_CHART_GRID_CREATION_SOURCE_DATA}:{line_number}"
+        )
+    for match in IWA_CHART_GRID_CREATION_SOURCE_DATA_ID_MAP.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa chart source/data must delegate row/column identity "
+            "generation to the shared codec: "
+            f"{IWA_CHART_GRID_CREATION_SOURCE_DATA}:{line_number}"
+        )
+
+    if IWA_CHART_GRID_CREATION_SOURCE_DATA_ROUTE.search(code) is None:
+        violations.append(
+            "litchi-iwa chart source/data is missing the shared chart-grid "
+            f"creation codec import: {IWA_CHART_GRID_CREATION_SOURCE_DATA}"
+        )
+    if IWA_CHART_GRID_CREATION_SOURCE_DATA_CALL.search(code) is None:
+        violations.append(
+            "litchi-iwa chart source/data is missing the shared chart-grid "
+            f"creation codec call: {IWA_CHART_GRID_CREATION_SOURCE_DATA}"
+        )
+    if re.search(r"->[^\n{]*\bChartGridArchive\b", code) is not None:
+        violations.append(
+            "litchi-iwa chart source/data must return encoded grid bytes rather "
+            f"than ChartGridArchive: {IWA_CHART_GRID_CREATION_SOURCE_DATA}"
+        )
+
+    return sorted(set(violations))
+
+
+def _audit_chart_grid_creation_host_body(
+    root: Path,
+    path: Path,
+    function_name: str,
+    body: str,
+    *,
+    source_builder: bool,
+) -> list[str]:
+    """Reject generated-grid construction in one host authoring function."""
+
+    body_code = _mask_rust_non_code(body)
+    violations: list[str] = []
+    relative = path
+
+    for match in IWA_CHART_GRID_CREATION_HOST_GENERATED_GRID.finditer(body_code):
+        line_number = body_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa chart authoring function retains generated chart-grid "
+            f"operation {match.group(0).strip()}: {relative}:{line_number}"
+        )
+
+    assignment_pattern = (
+        IWA_CHART_GRID_CREATION_HOST_GRID_FIELD
+        if source_builder
+        else IWA_CHART_GRID_CREATION_HOST_GRID_ASSIGNMENT
+    )
+    for match in assignment_pattern.finditer(body_code):
+        line_number = body_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa chart authoring function must consume encoded grid bytes "
+            f"without assigning a generated grid field: {relative}:{line_number}"
+        )
+
+    if IWA_CHART_GRID_CREATION_HOST_FULL_GRAPH_DECODE.search(body_code) is not None:
+        violations.append(
+            "litchi-iwa chart-grid authoring function must not decode a generated "
+            f"chart graph: {relative}"
+        )
+    if IWA_CHART_GRID_CREATION_HOST_GENERIC_UPDATE.search(body_code) is not None:
+        violations.append(
+            "litchi-iwa chart-grid authoring function must use the generated-free "
+            f"grid bridge instead of the generic chart update: {relative}"
+        )
+
+    has_source_grid = (
+        IWA_CHART_GRID_CREATION_HOST_SOURCE_GRID_CALL.search(body_code) is not None
+    )
+    has_codec_call = (
+        IWA_CHART_GRID_CREATION_SOURCE_DATA_CALL.search(body_code) is not None
+        or IWA_CHART_GRID_CREATION_SOURCE_DATA_ROUTE.search(body_code) is not None
+    )
+    has_bridge = (
+        IWA_CHART_GRID_CREATION_HOST_ENCODED_ROUTE.search(body_code) is not None
+    )
+    has_bytes = IWA_CHART_GRID_CREATION_HOST_BYTE_VALUE.search(body_code) is not None
+    if not (has_source_grid or has_codec_call):
+        violations.append(
+            "litchi-iwa chart-grid authoring function is missing the shared "
+            f"encoded-grid preparation route: {relative}"
+        )
+    if not has_bridge or not (has_bytes or has_source_grid):
+        violations.append(
+            "litchi-iwa chart-grid authoring function must pass encoded grid "
+            f"bytes through a generated-free bridge: {relative}"
+        )
+
+    return violations
+
+
+def _chart_grid_creation_check_host_authoring(root: Path) -> list[str]:
+    """Check source-built charts and all legacy full-grid replacements."""
+
+    violations: list[str] = []
+    for relative in IWA_CHART_GRID_CREATION_HOST_AUTHORING_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            continue
+        production_source = _mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        if path == root / Path("crates/litchi-iwa/src/charts/source/build.rs"):
+            function_names = ("source_chart_objects",)
+            source_builder = True
+        else:
+            function_names = IWA_CHART_GRID_CREATION_FULL_REPLACE_METHODS
+            source_builder = False
+
+        for function_name in function_names:
+            body = _rust_any_function_body(production_source, function_name)
+            if body is None:
+                continue
+            violations.extend(
+                _audit_chart_grid_creation_host_body(
+                    root,
+                    relative,
+                    function_name,
+                    body,
+                    source_builder=source_builder,
+                )
+            )
+    return sorted(set(violations))
+
+
+def audit_iwa_chart_grid_creation_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep fresh chart-grid authoring on the bounded shared wire seam."""
+
+    if not _chart_grid_creation_boundary_active(root):
+        return []
+
+    violations = _chart_grid_creation_check_codec_source(root)
+    violations.extend(_chart_grid_creation_check_source_data(root))
+    violations.extend(_chart_grid_creation_check_host_authoring(root))
+    return sorted(set(violations))
+
+
 def _audit_focused_chart_data_owner(
     root: Path,
     *,
@@ -72969,6 +73430,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_chart_metadata_source_topology()
         + audit_iwa_chart_data_source_topology()
         + audit_iwa_chart_data_write_source_topology()
+        + audit_iwa_chart_grid_creation_source_topology()
         + audit_keynote_chart_axis_title_legacy_calls()
         + audit_iwa_keynote_chart_axis_title_source_topology()
         + audit_keynote_chart_axis_title_facade_source_topology()

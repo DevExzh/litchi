@@ -11786,3 +11786,54 @@ and host numeric delegation with complete-grid compatibility fallback. The
 codec uses one owned output allocation even for its byte-exact no-op result;
 the package no-op path shares the existing artifact instead. Logical ownership
 uses vector/string slot and payload lengths, not allocator capacity rounding.
+
+## 2026-09-10 Shared chart grid authoring
+
+Fresh inline-grid serialization belongs to `litchi-iwa-protos`, alongside the
+borrowed grid reader and numeric rewrite codec. Its request borrows row labels,
+column labels, and optional finite numeric values. It must validate dimensions
+and admit traversal and output resources before allocation. Scalar Buffa views
+and streamed repeated framing avoid a generated message tree per grid cell or
+identity-map entry.
+
+The identity recipe remains byte-compatible with the previous source builder:
+row seeds add the row index, column seeds add `1 << 47` and the column index,
+and the UUID suffix uses the low 48 bits after intentional wrapping addition.
+Dimension, index conversion, encoded length, and resource accounting arithmetic
+remain checked. Overflow refusal must not replace the intentional UUID wrapping
+rule and silently narrow the existing authoring contract.
+
+The host consumes the encoded grid for fresh chart creation and complete-grid
+replacement. It must not decode this output into generated grid messages to
+bridge the migration. An existing grid may be omitted from a scoped replacement
+decode only when publication requires an explicit replacement; an ordinary
+encoder must not accidentally publish that incomplete intermediate value.
+
+This transfers grid serialization ownership. Chart envelope, style, mediator,
+and dependent series graph construction remain host debt. The focused numeric
+transactions still require unchanged dimensions and labels; complete-grid
+replacement is not yet a focused format transaction. Broader graph migration
+and native topology proofs remain necessary before deleting the host.
+
+The scoped host bridge accepts the codec's validated `EncodeOutput`, inserts
+field 7 in tag order without a temporary full-grid copy, and preserves the
+ordinary generated archive path for other compatibility operations. All three
+complete replacements stage, reopen, and verify values bitwise before assigning
+the candidate to the editor.
+
+Native verification completed on 2026-09-11 with Pages, Numbers, and Keynote
+14.4. Each format has a fresh 2x3 chart and a complete replacement with new
+category labels and a 2x4 grid. The replacement contains a missing value and
+12.75, which native chart accessibility displays as 12.8. All six files were
+saved, closed, reopened at their exact paths, checked for chart title, labels,
+and displayed values, and closed. The focused golden tests confirm exact
+12.75, missing-cell presence, titles, and byte-preserving reads. The artifacts
+and adjacent receipts are named `chart-grid-authored-native` and
+`chart-grid-replaced-native`.
+
+Validation includes 14 shared encoder tests (10 independently maintained
+oracle and budget cases), 21 production-codec guard tests, two scoped host
+archive regressions, and the six native goldens. The isolated ASan fuzz target
+completed 100 runs without a finding. Codec ownership accounting covers one
+output allocation and logical request/output retention; it does not claim that
+the remaining host archive and package publication stages allocate nothing.

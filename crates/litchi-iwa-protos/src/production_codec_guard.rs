@@ -743,6 +743,10 @@ mod tests {
             include_str!("chart_data_codec/rewrite.rs"),
         ),
         (
+            "chart_grid_creation",
+            include_str!("chart_grid_creation_codec.rs"),
+        ),
+        (
             "keynote_chart_title",
             include_str!("keynote_chart_title_codec.rs"),
         ),
@@ -1236,6 +1240,7 @@ mod oracle {
         for (name, _) in FOCUSED_CODECS {
             let source_path = match *name {
                 "chart_data_rewrite" => "chart_data_codec/rewrite.rs".to_owned(),
+                "chart_grid_creation" => "chart_grid_creation_codec.rs".to_owned(),
                 "comment_storage_lifecycle" => "comment_storage_codec/lifecycle.rs".to_owned(),
                 "keynote_media_lifecycle_node_cache" => {
                     "keynote_media_lifecycle_codec/node_cache.rs".to_owned()

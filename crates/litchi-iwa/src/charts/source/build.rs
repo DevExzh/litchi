@@ -42,6 +42,7 @@ pub(crate) fn source_chart_objects(
     let paragraph_styles = repeated_references(profile.paragraph_style_count(), paragraph_style_id);
     let series_count =
         chart_series_count(kind, Direction::Rows, &data, "source-built", ids.drawable)?;
+    let encoded_grid = chart_grid_bytes(ids.drawable, &data)?;
     let mut chart = IWorkChartArchive::new(
         tsch::ChartDrawableArchive {
             super_: Some(tsd::DrawableArchive {
@@ -70,7 +71,7 @@ pub(crate) fn source_chart_objects(
             preset: Some(reference(ids.preset)),
             series_direction: Some(tsch::SeriesDirection::ByRow as i32),
             contains_default_data: None,
-            grid: Some(chart_grid(ids.drawable, data)?),
+            grid: None,
             mediator: ids.mediator.map(reference),
             chart_style: Some(reference(ids.chart_style)),
             chart_non_style: Some(reference(ids.chart_non_style)),
@@ -133,7 +134,7 @@ pub(crate) fn source_chart_objects(
     objects.push(chart_object(
         ids.drawable,
         CHART_MESSAGE_TYPE,
-        chart.encode()?,
+        chart.encode_with_chart_grid(&encoded_grid)?,
         STANDARD_MESSAGE_VERSION,
         &chart_references,
     )?);

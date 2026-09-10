@@ -8107,6 +8107,97 @@ def add_iwa_chart_data_scaffold(root: Path, *, include_focus: bool = True) -> No
         )
 
 
+def add_iwa_chart_grid_creation_scaffold(root: Path) -> None:
+    """Install a complete generated-free fresh-grid authoring topology."""
+
+    add_iwa_chart_data_scaffold(root, include_focus=False)
+
+    codec = root / boundaries.IWA_CHART_GRID_CREATION_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::ViewEncode;\n"
+        "pub struct ChartGridCreationRequest<'a> {\n"
+        "    row_labels: &'a [String],\n"
+        "    column_labels: &'a [String],\n"
+        "    values: &'a [Vec<Option<f64>>],\n"
+        "    seed: u64,\n"
+        "}\n"
+        "pub struct PreparedChartGridCreation<'a> { request: ChartGridCreationRequest<'a> }\n"
+        "pub struct ExecutionRequirements;\n"
+        "pub struct ExecutionLimits;\n"
+        "pub enum EncodeError;\n"
+        "pub struct EncodeOutput { bytes: Vec<u8> }\n"
+        "pub fn prepare_chart_grid_creation<'a>(\n"
+        "    request: ChartGridCreationRequest<'a>,\n"
+        ") -> Result<PreparedChartGridCreation<'a>, EncodeError> { todo!() }\n"
+        "pub fn encode_chart_grid<'a>(\n"
+        "    request: ChartGridCreationRequest<'a>,\n"
+        ") -> Result<Vec<u8>, EncodeError> { todo!() }\n"
+        "fn try_encoded_len() {}\n"
+        "fn try_encode_bounded(_: &impl ViewEncode) {}\n"
+        "fn plan_request() {}\n"
+        "const ID_MAP_ROW_FIELD: u32 = 1;\n"
+        "const ID_MAP_COLUMN_FIELD: u32 = 2;\n"
+        "#[cfg(test)]\n"
+        "mod tests {\n"
+        "    use prost::Message;\n"
+        "    fn native_oracle() {\n"
+        "        let _: Vec<tsch::GridRow> = Vec::new();\n"
+        "        let _: tsch::ChartGridArchive = Default::default();\n"
+        "    }\n"
+        "    #[test] fn borrowed_encoder_round_trip() {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    proto_lib = root / boundaries.IWA_CHART_GRID_CREATION_CODEC_PUBLIC_SOURCE
+    proto_lib.write_text(
+        "#[doc(hidden)]\n"
+        "pub mod chart_grid_creation_codec;\n",
+        encoding="utf-8",
+    )
+
+    source_data = root / boundaries.IWA_CHART_GRID_CREATION_SOURCE_DATA
+    source_data.parent.mkdir(parents=True, exist_ok=True)
+    source_data.write_text(
+        "use litchi_iwa_common::chart::data::ChartData;\n"
+        "use litchi_iwa_protos::chart_grid_creation_codec;\n"
+        "fn chart_grid(seed: u64, data: ChartData) -> Result<Vec<u8>, Error> {\n"
+        "    let request = chart_grid_creation_codec::ChartGridCreationRequest {\n"
+        "        row_labels: data.row_names(), column_labels: data.column_names(),\n"
+        "        values: data.values(), seed,\n"
+        "    };\n"
+        "    chart_grid_creation_codec::encode_chart_grid(request)\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    build = root / "crates/litchi-iwa/src/charts/source/build.rs"
+    build.parent.mkdir(parents=True, exist_ok=True)
+    build.write_text(
+        "fn source_chart_objects(seed: u64, data: ChartData) {\n"
+        "    let grid_bytes = chart_grid(seed, data);\n"
+        "    encode_chart_grid_with_grid_bytes(grid_bytes);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    host_sources = {
+        "pages/editor/charts.rs": "set_body_chart_data_full_replace",
+        "numbers/editor/sheet_charts.rs": "set_sheet_chart_data_full_replace",
+        "keynote/editor/slide_charts.rs": "set_slide_chart_data_full_replace",
+    }
+    for relative, function_name in host_sources.items():
+        path = root / "crates/litchi-iwa/src" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            f"fn {function_name}(seed: u64, data: ChartData) {{\n"
+            "    let grid_bytes = chart_grid(seed, data);\n"
+            "    replace_chart_grid_payload(grid_bytes);\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+
 def add_iwa_object_index_reference_extraction_retirement_scaffold(
     root: Path,
     *,
@@ -48760,6 +48851,105 @@ fn rewrite_movie_title_operation(
                 encoding="utf-8",
             )
             self.assertEqual(boundaries.audit_iwa_chart_data_write_source_topology(root), [])
+
+    def test_chart_grid_creation_boundary_accepts_borrowed_codec_and_host_bridge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_grid_creation_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_chart_grid_creation_source_topology(root), []
+            )
+
+    def test_chart_grid_creation_codec_rejects_prost_and_generated_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_grid_creation_scaffold(root)
+            codec = root / boundaries.IWA_CHART_GRID_CREATION_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "use prost::Message;\n"
+                + "fn eager() {\n"
+                + "    let _: Vec<tsch::GridValue> = Vec::new();\n"
+                + "    let _ = tsch::GridRow { value: Vec::new() };\n"
+                + "    let _: tsch::ChartGridArchive = Default::default();\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_grid_creation_source_topology(root)
+            self.assertTrue(any("rather than Prost" in item for item in violations), violations)
+            self.assertTrue(any("eager vector" in item for item in violations), violations)
+            self.assertTrue(any("generated ChartGridArchive/GridRow/GridValue" in item for item in violations), violations)
+            self.assertTrue(any("generated chart-grid type reference" in item for item in violations), violations)
+
+    def test_chart_grid_creation_source_data_rejects_generated_grid_and_id_map(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_grid_creation_scaffold(root)
+            source_data = root / boundaries.IWA_CHART_GRID_CREATION_SOURCE_DATA
+            source_data.write_text(
+                source_data.read_text(encoding="utf-8")
+                + "fn legacy() {\n"
+                + "    let row_id_map = grid_id_entry(1, 0);\n"
+                + "    let _ = tsch::ChartGridArchive { grid_row: Vec::new() };\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_grid_creation_source_topology(root)
+            self.assertTrue(any("generated chart-grid type" in item for item in violations), violations)
+            self.assertTrue(any("row/column identity" in item for item in violations), violations)
+
+    def test_chart_grid_creation_full_replace_rejects_generated_graph_update(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_chart_grid_creation_scaffold(root)
+            host = root / "crates/litchi-iwa/src/pages/editor/charts.rs"
+            function_name = "set_body_chart_data_full_replace"
+            host.write_text(
+                host.read_text(encoding="utf-8").replace(
+                    "let grid_bytes = chart_grid(seed, data);\n"
+                    "    replace_chart_grid_payload(grid_bytes);",
+                    "self.update_body_chart(seed, |chart| {\n"
+                    "        let payload = chart.chart.as_mut().unwrap();\n"
+                    "        payload.grid = Some(chart_grid(seed, data));\n"
+                    "    });",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_grid_creation_source_topology(root)
+            self.assertTrue(any("generic chart update" in item for item in violations), violations)
+            self.assertTrue(any("generated grid field" in item for item in violations), violations)
+            self.assertTrue(any("generated-free bridge" in item for item in violations), violations)
+
+            # A full graph decode is independently rejected even when a
+            # caller happens to keep the encoded-grid variable name.
+            host.write_text(
+                f"fn {function_name}(seed: u64, data: ChartData) {{\n"
+                "    let grid_bytes = chart_grid(seed, data);\n"
+                "    let _ = IWorkChartArchive::decode(bytes);\n"
+                "    replace_chart_grid_payload(grid_bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_chart_grid_creation_source_topology(root)
+            self.assertTrue(any("must not decode a generated chart graph" in item for item in violations), violations)
+
+    def test_chart_grid_creation_boundary_is_dormant_before_codec_lands_and_dispatched(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_data = root / boundaries.IWA_CHART_GRID_CREATION_SOURCE_DATA
+            source_data.parent.mkdir(parents=True, exist_ok=True)
+            source_data.write_text(
+                "fn chart_grid() { let _ = ChartGridArchive { grid_row: Vec::new() }; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_chart_grid_creation_source_topology(root), []
+            )
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_chart_grid_creation_source_topology()",
+            main_source,
+        )
 
     def test_chart_data_boundary_rejects_common_physical_or_raw_id_leaks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
