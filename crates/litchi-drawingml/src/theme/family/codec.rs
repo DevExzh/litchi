@@ -18,7 +18,7 @@ use super::model::{Family, Guid, Source, checked_name, validate_xml_text};
 use super::{
     DRAWINGML_NAMESPACE, DRAWINGML_NAMESPACE_STRICT, MAX_ATTRIBUTE_VALUE_BYTES, MAX_ATTRIBUTES,
     MAX_DEPTH, MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_NODES, MAX_XML_BYTES,
-    NAMESPACE,
+    NAMESPACE, XML_NAMESPACE, XMLNS_NAMESPACE,
 };
 
 /// Read one complete `themeFamily` fragment while retaining its source bytes.
@@ -217,7 +217,7 @@ fn is_xml_whitespace_character(character: char) -> bool {
     matches!(character, ' ' | '\t' | '\r' | '\n')
 }
 
-fn validate_general_ref(reference: &BytesRef<'_>) -> Result<Option<char>> {
+pub(crate) fn validate_general_ref(reference: &BytesRef<'_>) -> Result<Option<char>> {
     if reference.len() > MAX_ATTRIBUTE_VALUE_BYTES {
         return Err(limit(
             "theme family general reference bytes",
@@ -390,7 +390,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                 }
             },
             Event::Text(text) => {
-                validate_event_text(text.as_ref(), "theme family text")?;
+                validate_text_node(text.as_ref(), "theme family text")?;
                 if (!root_seen || root_closed) && !is_xml_whitespace(text.as_ref()) {
                     return Err(invalid("theme family has text outside its root"));
                 }
@@ -531,6 +531,14 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
                 ));
             }
             let value = decode_attribute(&attribute, reader.decoder())?;
+            validate_namespace_binding(
+                attribute
+                    .key
+                    .as_ref()
+                    .strip_prefix(b"xmlns:")
+                    .unwrap_or(&[]),
+                &value,
+            )?;
             if value.len() > MAX_NAMESPACE_BYTES {
                 return Err(limit("theme family namespace bytes", MAX_NAMESPACE_BYTES));
             }
@@ -594,6 +602,7 @@ fn decode_attribute(
     // XML 1.0 attribute-value normalization applies before the schema type is
     // interpreted. Literal tabs, CR, and LF therefore become spaces even for
     // xsd:string; character references retain their represented characters.
+    validate_raw_attribute_value(attribute.value.as_ref(), "theme family attribute")?;
     let value = attribute
         .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
         .map_err(xml_error)?
@@ -611,7 +620,7 @@ fn require_root(local: &[u8], namespace: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
+pub(crate) fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
     let source = declaration.as_ref();
     if !source.starts_with(b"xml") {
         return Err(invalid("theme family XML declaration name is invalid"));
@@ -755,9 +764,49 @@ fn is_namespace_attribute(key: QName<'_>) -> bool {
     key.as_ref() == b"xmlns" || key.as_ref().starts_with(b"xmlns:")
 }
 
-fn validate_event_text(value: &[u8], field: &str) -> Result<()> {
+pub(crate) fn validate_event_text(value: &[u8], field: &str) -> Result<()> {
     let value = std::str::from_utf8(value).map_err(xml_error)?;
     validate_xml_text(value, field)
+}
+
+fn validate_text_node(value: &[u8], field: &str) -> Result<()> {
+    validate_event_text(value, field)?;
+    if value.windows(3).any(|window| window == b"]]>") {
+        return Err(invalid(format!(
+            "{field} contains the forbidden raw ']]>' delimiter"
+        )));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_raw_attribute_value(value: &[u8], field: &str) -> Result<()> {
+    if value.contains(&b'<') {
+        return Err(invalid(format!("{field} contains a raw '<' delimiter")));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_namespace_binding(prefix: &[u8], value: &str) -> Result<()> {
+    if prefix == b"xmlns" {
+        return Err(invalid("theme family rebinds the reserved xmlns prefix"));
+    }
+    if value == XMLNS_NAMESPACE {
+        return Err(invalid("theme family binds the reserved XMLNS namespace"));
+    }
+    if value == XML_NAMESPACE && prefix != b"xml" {
+        return Err(invalid(
+            "theme family binds the reserved XML namespace to another prefix",
+        ));
+    }
+    if !prefix.is_empty() && value.is_empty() {
+        return Err(invalid(
+            "theme family uses an empty prefixed namespace binding",
+        ));
+    }
+    if prefix == b"xml" && value != XML_NAMESPACE {
+        return Err(invalid("theme family rebinds the xml namespace"));
+    }
+    Ok(())
 }
 
 fn write_detached(value: &Family) -> Result<Vec<u8>> {

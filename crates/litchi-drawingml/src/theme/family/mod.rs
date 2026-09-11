@@ -8,6 +8,7 @@
 
 pub mod codec;
 mod model;
+pub mod part;
 mod transaction;
 
 pub use codec::{read, read_shared, write, write_to};

@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "argv": [
+    "git",
+    "-c",
+    "core.whitespace=trailing-space,space-before-tab,cr-at-eol",
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":!docs/report/spec-gap-validation-evidence/xlsb-theme-family/performance/results/perf-opaque-update.csv"
+  ],
+  "output": "",
+  "native_crlf_retained": true,
+  "excluded_raw_artifact": {
+    "path": "docs/report/spec-gap-validation-evidence/xlsb-theme-family/performance/results/perf-opaque-update.csv",
+    "reason": "Unmodified perf failure output contains a final blank line; retain exact tool output.",
+    "sha256": "aa0a7052372a07df4e9e49e9a0562e4928f97c5a5e091e5600e218b0f334aedf"
+  }
+}

@@ -1,0 +1,23 @@
+source_manifest_before_sha256=5afedc6a14bc1f363526640a242f33c453103412bc968437b55868e18a03ddd7
+source_manifest_after_sha256=5afedc6a14bc1f363526640a242f33c453103412bc968437b55868e18a03ddd7
+source_manifest_match=true
+git_head=e7c82d0774ee3bd59a2de53f3080e98e2c7f945f
+git_status_relevant= M crates/litchi-drawingml/src/theme/family/codec.rs| M crates/litchi-drawingml/src/theme/family/mod.rs| M crates/litchi-xlsb/src/theme.rs| M crates/litchi-xlsb/src/theme/lifecycle.rs| M crates/litchi-xlsb/src/writer/workbook/model.rs| M crates/litchi-xlsb/src/writer/workbook/package.rs|?? crates/litchi-drawingml/src/theme/family/part.rs|?? docs/report/spec-gap-validation-evidence/xlsb-theme-family/performance/|
+fixture_sha256:
+fbb969989aabed2e057b2ddfc4cfd10ef1f6ebe9b7697c3755283515158d5b09  /home/zhuhe/code/litchi-spec-gaps/test-data/ooxml/xlsb/date.xlsb
+dirty_source_sha256:
+6d8d469883abb520605b0d4412755fc8c14fc84369f099986bdaa4f738ad0ca3  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/mod.rs
+9193d579c2951940b4943b396fd6249a35a0c1743dff183e168f3556a5a0a8f8  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb/src/theme.rs
+c663b8cde2191539a554cadf78987c3f2d51a9faddbc2bd5813aecbad685dd70  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb/src/theme/lifecycle.rs
+20e10f11b1e42bfdf407163a9796940360c822d50249131287a2c54af8a1b6da  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb/src/writer/workbook/model.rs
+f12e276b253e3a4a64c4f9685849d83ec594a9a6857656349cf43a6586f19925  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb/src/writer/workbook/package.rs
+f75ef3876f7699622b773fd87aa7dae2530acbf78e61f6ab8b5436a01f19cec0  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/codec.rs
+33557a195ba76b1eb793fa3bfca1b00ecec842c4016446ea969dd0da2932ace1  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/mod.rs
+62243e4f33d5c6996609ac46b84741915556a2e50ba8ef0f8440e9ca2fd7f635  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/model.rs
+a2677bf496d94f8b05de5a34ba3d6b85841378d74b3baf3cfd24550b7419689a  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/part.rs
+006472620192f0561529a2f38809381fef45c4ba07080501f40bb5a40c52b1cf  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/theme/family/transaction.rs
+validation_source_sha256:
+b07eb2f5005d294284b4394b4525e1882b22fbb1f712d3482e0911369074f6e4  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/theme_part.rs
+50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/fixtures/theme-part-native.xml
+a965896143d5e1c92ca3a32a0601534f54bd23da096dfac5ffa3abbb85ec441a  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/fixtures/theme-part-native.provenance
+05d23b0feb48ff03ef23acb58b925750c6403ec2d1a55370748f48d02861f670  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb/tests/theme_family.rs
