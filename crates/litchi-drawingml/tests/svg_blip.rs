@@ -1,6 +1,7 @@
 use litchi_drawingml::svg_blip::{
-    Attribute, MAX_RELATIONSHIP_ID_BYTES, NAMESPACE, Namespace, Reference, RelationshipId, SvgBlip,
-    XML_NAMESPACE, read, write,
+    Attribute, MAX_CONTEXT_DEPTH, MAX_NAMESPACE_DECLARATIONS, MAX_RELATIONSHIP_ID_BYTES, NAMESPACE,
+    Namespace, NamespaceContext, RELATIONSHIP_NAMESPACE, Reference, RelationshipId, SvgBlip,
+    XML_NAMESPACE, read, read_contextual, write, write_contextual, write_contextual_to,
 };
 
 const SVG_BLIP: &[u8] = br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:future="urn:example:future" r:embed="rIdSvg" future:mode="preserve"><future:payload data="x"/></asvg:svgBlip>"#;
@@ -28,6 +29,15 @@ fn reads_typed_relationship_and_preserves_unknown_markup() {
         br#"<future:payload data="x"/>"#
     );
     assert_eq!(write(&value).expect("source-backed write"), SVG_BLIP);
+}
+
+#[test]
+fn standalone_reads_keep_source_equality_and_exact_write() {
+    let first = read(SVG_BLIP).expect("first standalone SVG blip");
+    let second = read(SVG_BLIP).expect("second standalone SVG blip");
+    assert_eq!(first, second);
+    assert_eq!(first.source(), Some(SVG_BLIP));
+    assert_eq!(write(&first).unwrap(), SVG_BLIP);
 }
 
 #[test]
@@ -135,6 +145,177 @@ fn rejects_non_xml_content_after_the_root() {
     assert!(read(&trailing_cdata).is_err());
     let trailing_reference = [SVG_BLIP, b"&future;"].concat();
     assert!(read(&trailing_reference).is_err());
+}
+
+#[test]
+fn contextual_read_shares_scope_and_keeps_raw_source_distinct() {
+    let context = NamespaceContext::empty()
+        .child([
+            Namespace::new(Some("asvg"), NAMESPACE).unwrap(),
+            Namespace::new(Some("r"), RELATIONSHIP_NAMESPACE).unwrap(),
+            Namespace::new(Some("future"), "urn:example:future").unwrap(),
+            Namespace::new(Some("opaque"), "urn:example:opaque").unwrap(),
+        ])
+        .unwrap();
+    let source = br#"<asvg:svgBlip r:embed="rIdSvg" future:marker="opaque:value"><future:payload data="future:value"/></asvg:svgBlip>"#;
+    let first = read_contextual(source, &context).expect("contextual SVG blip");
+    let second = read_contextual(source, &context).expect("second contextual SVG blip");
+
+    assert_eq!(first.source(), None);
+    assert_eq!(first.raw_source(), Some(source.as_slice()));
+    assert_eq!(first.namespace_context(), Some(&context));
+    assert_eq!(first.namespace_context().unwrap().binding_count(), 4);
+    assert!(
+        first
+            .namespace_context()
+            .unwrap()
+            .shares_storage(second.namespace_context().unwrap())
+    );
+
+    let exported = write_contextual(&first, 4096).expect("standalone contextual export");
+    assert!(
+        exported
+            .windows(b"xmlns:opaque=\"urn:example:opaque\"".len())
+            .any(|window| window == b"xmlns:opaque=\"urn:example:opaque\"")
+    );
+    assert!(
+        exported
+            .windows(b"future:marker=\"opaque:value\"".len())
+            .any(|window| window == b"future:marker=\"opaque:value\"")
+    );
+    assert_eq!(
+        read(&exported).unwrap().embedded().unwrap().as_str(),
+        "rIdSvg"
+    );
+
+    let mut sink = Vec::new();
+    assert!(write_contextual_to(&mut sink, &first, source.len()).is_err());
+    assert!(sink.is_empty(), "cap refusal must precede sink writes");
+}
+
+#[test]
+fn contextual_edits_preserve_opaque_qnames_shadowing_and_undeclarations() {
+    let context = NamespaceContext::empty()
+        .child([
+            Namespace::new(Some("asvg"), NAMESPACE).unwrap(),
+            Namespace::new(Some("r"), RELATIONSHIP_NAMESPACE).unwrap(),
+            Namespace::new(Some("future"), "urn:outer").unwrap(),
+            Namespace::new(None, "urn:outer-default").unwrap(),
+        ])
+        .unwrap()
+        .child([
+            Namespace::new(Some("future"), "urn:inner").unwrap(),
+            Namespace::new(None, "").unwrap(),
+        ])
+        .unwrap();
+    let source = br#"<asvg:svgBlip r:embed="rIdSvg" future:marker="future:value"><future:payload data="future:value"/></asvg:svgBlip>"#;
+    let mut value = read_contextual(source, &context).expect("contextual SVG blip");
+    value
+        .set_reference(Reference::linked("rIdExternal").unwrap())
+        .unwrap();
+    assert_eq!(value.source(), None);
+    assert_eq!(value.raw_source(), Some(source.as_slice()));
+
+    let exported = write(&value).expect("edited contextual export");
+    let text = String::from_utf8(exported.clone()).unwrap();
+    assert!(text.contains("xmlns:future=\"urn:inner\""));
+    assert!(text.contains("xmlns=\"\""));
+    assert!(text.contains("future:marker=\"future:value\""));
+    assert!(text.contains("<future:payload data=\"future:value\"/>"));
+    assert!(text.contains("r:link=\"rIdExternal\""));
+    assert_eq!(
+        read(&exported).unwrap().linked().unwrap().as_str(),
+        "rIdExternal"
+    );
+}
+
+#[test]
+fn contextual_rejects_unbound_opaque_descendant_prefixes() {
+    let context = NamespaceContext::empty()
+        .child([Namespace::new(Some("asvg"), NAMESPACE).unwrap()])
+        .unwrap();
+    let source = br#"<asvg:svgBlip><future:payload/></asvg:svgBlip>"#;
+    assert!(read_contextual(source, &context).is_err());
+}
+
+#[test]
+fn contextual_does_not_apply_default_namespace_to_unprefixed_attributes() {
+    let context = NamespaceContext::empty()
+        .child([
+            Namespace::new(Some("asvg"), NAMESPACE).unwrap(),
+            Namespace::new(None, RELATIONSHIP_NAMESPACE).unwrap(),
+        ])
+        .unwrap();
+    let source = br#"<asvg:svgBlip embed="not-a-relationship"/>"#;
+    let value = read_contextual(source, &context).expect("unprefixed attribute is opaque");
+    assert!(value.embedded().is_none());
+    assert_eq!(value.attributes()[0].name(), "embed");
+}
+
+#[test]
+fn contextual_shadowed_relationship_prefix_is_not_redeclared() {
+    let context = NamespaceContext::empty()
+        .child([
+            Namespace::new(Some("asvg"), NAMESPACE).unwrap(),
+            Namespace::new(Some("r"), RELATIONSHIP_NAMESPACE).unwrap(),
+            Namespace::new(Some("rel"), RELATIONSHIP_NAMESPACE).unwrap(),
+            Namespace::new(Some("future"), "urn:future").unwrap(),
+        ])
+        .unwrap();
+    let source = br#"<asvg:svgBlip xmlns:r="urn:foreign" rel:embed="rIdSvg"><future:payload/></asvg:svgBlip>"#;
+    let mut value = read_contextual(source, &context).expect("shadowed contextual SVG blip");
+    value
+        .set_reference(Reference::linked("rIdExternal").unwrap())
+        .unwrap();
+    let output = String::from_utf8(write(&value).unwrap()).unwrap();
+    assert_eq!(output.matches("xmlns:r=").count(), 1);
+    assert!(output.contains("xmlns:rel="));
+    assert!(output.contains("rel:link=\"rIdExternal\""));
+    assert!(!output.contains("r:link="));
+    assert!(read(output.as_bytes()).is_ok());
+}
+
+#[test]
+fn contextual_export_refuses_too_many_root_declarations() {
+    let mut context = NamespaceContext::empty();
+    context = context
+        .child([Namespace::new(Some("asvg"), NAMESPACE).unwrap()])
+        .unwrap();
+    for index in 0..MAX_NAMESPACE_DECLARATIONS {
+        let prefix = format!("p{index}");
+        context = context
+            .child([Namespace::new(Some(&prefix), format!("urn:{index}")).unwrap()])
+            .unwrap();
+    }
+    let source = br#"<asvg:svgBlip/>"#;
+    let value = read_contextual(source, &context).expect("contextual SVG blip");
+    assert!(write_contextual(&value, usize::MAX).is_err());
+}
+
+#[test]
+fn contextual_context_depth_is_bounded() {
+    let mut context = NamespaceContext::empty();
+    for index in 0..MAX_CONTEXT_DEPTH {
+        let prefix = format!("p{index}");
+        context = context
+            .child([Namespace::new(Some(&prefix), format!("urn:{index}")).unwrap()])
+            .unwrap();
+    }
+    assert!(context.depth() <= MAX_CONTEXT_DEPTH);
+    let prefix = format!("p{MAX_CONTEXT_DEPTH}");
+    assert!(
+        context
+            .child([Namespace::new(Some(&prefix), "urn:overflow").unwrap()])
+            .is_err()
+    );
+}
+
+#[test]
+fn contextual_sink_fallback_checks_cap_before_source_write() {
+    let value = read(SVG_BLIP).expect("standalone SVG blip");
+    let mut sink = Vec::new();
+    assert!(write_contextual_to(&mut sink, &value, SVG_BLIP.len() - 1).is_err());
+    assert!(sink.is_empty());
 }
 
 #[test]
