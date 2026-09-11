@@ -9,3 +9,7 @@ This is a prerequisite for host integration. It does not provide action authorin
 Source, attribute, node, depth, action, and group caps bound retained work. Namespace comparison can perform repeated decoding across attribute pairs; the attribute limits bound this cost, but no linear-time or benchmark claim is made.
 
 `verification.json` binds the production and test sources to retained compressed logs. The broad DrawingML tests passed, including 166 library tests. After a test-only Clippy correction, the 16 public profile tests, all-target Clippy with warnings denied, and rustdoc with warnings denied passed. The original lint failure is retained alongside the successful final logs.
+
+The XML-character follow-up is recorded in `xml-characters-verification.json`. It admits numeric references to XML whitespace between element-only children, enforces empty property content, and rejects raw XML delimiters and CDATA outside the document element. The 20 public profile tests and full DrawingML tests pass, along with all-target Clippy. Legal escaped delimiters, comments, and opaque CDATA remain lossless. The original verification receipt above is historical to its recorded source hashes.
+
+The same follow-up validates decoded namespace declarations, including reserved XML/XMLNS bindings inside opaque payloads. It reuses the existing bounded attribute pass and keeps ordinary default namespace undeclaration valid.

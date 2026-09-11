@@ -1,0 +1,68 @@
+{
+  "baseline_head": "2913e62c2abf2ab92f50a2bfe0ecde24c8d05f27",
+  "source_sha256": {
+    "crates/litchi-drawingml/src/ink/actions.rs": "830eaa9acb92cf679c0ab8b0a17f2bb8ee9d76e9f5a084e79d1fa62ba4200cb8",
+    "crates/litchi-drawingml/tests/ink_action_profile.rs": "f787c549f272c6c2a266503dbf1fae9645194d0556a4e8a3a75e4d008df4bcd5"
+  },
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-q",
+        "-p",
+        "litchi-drawingml"
+      ],
+      "exit_code": 0,
+      "log": "final-0.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "litchi-drawingml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "final-1.log"
+    },
+    {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/litchi-drawingml/src/ink/actions.rs",
+        "crates/litchi-drawingml/tests/ink_action_profile.rs"
+      ],
+      "exit_code": 0,
+      "log": "final-2.log"
+    }
+  ],
+  "logs": {
+    "xml-characters-final-0.log.gz": {
+      "raw_sha256": "48e6f6bf9fbf65ae922478c42512da209686b11e9f23f90696ba6ccd088ab170",
+      "gzip_sha256": "307e9259b6f11d29bb55f5f187f5555ea40e408ce3b36b40b0afd53fdec8c03f"
+    },
+    "xml-characters-final-1.log.gz": {
+      "raw_sha256": "e67af0534b51e4f4ccf1a3d02ccc506336be68313e685b4e84035a36a05c2f1c",
+      "gzip_sha256": "260de3df9a7842e50976615cbcb234e802a75b5287c0cf7ad856ff63c46f8d83"
+    },
+    "xml-characters-final-2.log.gz": {
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzip_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  },
+  "scope": "Strict read_profile only; legacy opaque read unchanged. Numeric XML whitespace references preserved except empty properties; nonempty property character content, raw attribute less-than, raw Text CDATA terminators, and any outer CDATA refused. Opaque legal CDATA/comments and escaped delimiters remain preserved. Decoded XML/XMLNS reserved namespace bindings are validated in the existing bounded attribute pass, including opaque payload descendants and escaped URI aliases. Default namespace undeclaration remains accepted.",
+  "regression_evidence": "Whitespace-reference positive failed before the correction with recognized element-only text error. Independent temporary probe reproduced raw delimiters and outer CDATA acceptance before their correction; probe was removed. Final focused suite has 20 tests; full DrawingML test run and all-target Clippy passed. A further independent probe reproduced default reserved bindings and escaped prefixed reserved aliases; the final regression rejects both literal and escaped forms.",
+  "initial_invocation_note": "An earlier direct rustfmt check omitted --edition 2024 and failed on preexisting let chains. Corrected final edition-specific check passed; no formatting source change was needed.",
+  "review": "Independent spec reviewer and original profile coder approved source SHA 830eaa9acb92cf679c0ab8b0a17f2bb8ee9d76e9f5a084e79d1fa62ba4200cb8 for this XML-correction slice. No full InkML payload or host lifecycle claim."
+}

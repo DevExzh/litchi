@@ -47,6 +47,85 @@ fn assert_limit(xml: &[u8], resource: &'static str, limit: usize) {
 }
 
 #[test]
+fn profile_preserves_character_reference_whitespace_in_element_only_containers() {
+    let body = r#"&#32;<iact:actionGroup type="add" startTime="0">&#x9;<iact:action type="add" startTime="0">&#10;<iact:property name="style"/>&#xD;<iact:actionDataGroup>&#00032;<iact:actionData>&#x000020;</iact:actionData></iact:actionDataGroup></iact:action></iact:actionGroup>"#;
+    let source = root(body, "m", "s");
+    let profile = actions::read_profile(source.as_bytes()).unwrap();
+    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    for reference in ["&#65;", "&#xA0;", "&amp;", "&#0;", "&unknown;"] {
+        assert_rejected(root(reference, "m", "s").as_bytes());
+    }
+    for source in [format!("&#32;{source}"), format!("{source}&#32;")] {
+        assert_rejected(source.as_bytes());
+    }
+}
+
+#[test]
+fn profile_empty_property_content_rejects_whitespace_but_preserves_comments() {
+    for body in [" ", "&#32;", "<![CDATA[ ]]>", "text"] {
+        let action = format!(
+            r#"<iact:action type="add" startTime="0"><iact:property name="style">{body}</iact:property></iact:action>"#
+        );
+        assert_rejected(root(&action, "m", "s").as_bytes());
+    }
+    let source = root(
+        r#"<iact:action type="add" startTime="0"><iact:property name="style"><!--keep--></iact:property></iact:action>"#,
+        "m",
+        "s",
+    );
+    let profile = actions::read_profile(source.as_bytes()).unwrap();
+    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+}
+
+#[test]
+fn profile_rejects_raw_xml_delimiters_and_all_cdata_outside_root() {
+    let property = r#"<iact:action type="add" startTime="0"><iact:property name="style" value="<"/></iact:action>"#;
+    assert_rejected(root(property, "m", "s").as_bytes());
+    let trace = format!(
+        r#"<iact:action type="add" startTime="0"><iact:actionData><i:trace xmlns:i="{INKML_NAMESPACE}">bad]]&gt;</i:trace></iact:actionData></iact:action>"#
+    );
+    let valid = root(&trace, "m", "s");
+    let profile = actions::read_profile(valid.as_bytes()).unwrap();
+    assert_eq!(actions::write_profile(&profile).unwrap(), valid.as_bytes());
+    assert_rejected(valid.replace("]]&gt;", "]]>").as_bytes());
+    let valid = root(&trace.replace("bad]]&gt;", "<![CDATA[<?x]]>"), "m", "s");
+    let profile = actions::read_profile(valid.as_bytes()).unwrap();
+    assert_eq!(actions::write_profile(&profile).unwrap(), valid.as_bytes());
+    for cdata in ["<![CDATA[]]>", "<![CDATA[ ]]>"] {
+        assert_rejected(format!("{cdata}{valid}").as_bytes());
+        assert_rejected(format!("{valid}{cdata}").as_bytes());
+    }
+    let valid = root(&property.replace("value=\"<\"", "value=\"&lt;\""), "m", "s");
+    assert!(actions::read_profile(valid.as_bytes()).is_ok());
+}
+
+#[test]
+fn profile_rejects_reserved_namespace_aliases_inside_opaque_payloads() {
+    for namespace in [
+        "http://www.w3.org/XML/1998/namespace",
+        "http://www.w3.org/2000/xmlns/",
+    ] {
+        for namespace in [namespace.to_owned(), namespace.replace('/', "&#x2F;")] {
+            for declaration in [
+                format!(r#"xmlns="{namespace}""#),
+                format!(r#"xmlns:p="{namespace}" p:future="z""#),
+            ] {
+                let body = format!(
+                    r#"<i:definitions xmlns:i="{INKML_NAMESPACE}"><i:trace {declaration}/></i:definitions>"#
+                );
+                assert_rejected(root(&body, "m", "s").as_bytes());
+            }
+        }
+    }
+    let body = format!(
+        r#"<i:definitions xmlns:i="{INKML_NAMESPACE}"><future xmlns="" xmlns:p="urn:ordinary" p:value="z"/></i:definitions>"#
+    );
+    let source = root(&body, "m", "s");
+    let profile = actions::read_profile(source.as_bytes()).unwrap();
+    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+}
+
+#[test]
 fn profile_replays_exact_source_and_exposes_typed_children_in_schema_order() {
     let source = br###"<?xml version="1.0" encoding="UTF-8"?><!--before--><iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:inkml="http://www.w3.org/2003/InkML" xml:id="root" lengthUnit="cm" timeUnit="ms"><inkml:definitions><inkml:future><inkml:payload>opaque</inkml:payload></inkml:future></inkml:definitions><iact:action xml:id="a0" type="add" startTime="+0.25"><iact:property name="dataType"/><iact:property name="style" value="instant"/><iact:property name="vendor" value="opaque-value"/><iact:actionDataGroup xml:id="g0" name="path"><iact:actionData xml:id="d0" name="target" ref="#stroke"><iact:transform/><inkml:trace><inkml:future><inkml:payload>opaque</inkml:payload></inkml:future></inkml:trace><inkml:traceView/></iact:actionData></iact:actionDataGroup></iact:action><iact:actionGroup xml:id="ag0" type="transform" startTime="1.0"><iact:action type="remove" startTime="2"><iact:actionData/></iact:action></iact:actionGroup></iact:actions><!--after-->"###;
 
