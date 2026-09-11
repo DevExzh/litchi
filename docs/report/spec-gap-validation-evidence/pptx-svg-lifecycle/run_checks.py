@@ -44,9 +44,10 @@ def inputs():
     paths.extend(p for p in (ROOT / "docs/adr").glob("*.md"))
     paths.extend(HERE / name for name in (
         "run_checks.py", "run_probe.py", "validate_schema.py", "verify.py",
-        "requirements.md", "corpus-scan.json", "scan_corpus.py",
+        "requirements.md", "README.md", "corpus-scan.json", "scan_corpus.py", "worktree-input.patch",
         "harness/Cargo.toml", "harness/Cargo.lock", "harness/main.rs",
     ))
+    paths.append(ROOT / "crates/litchi-pptx/docs/FEATURE_MATRIX.md")
     corpus = json.loads((HERE / "corpus-scan.json").read_text())
     paths.extend(ROOT / row[0] for report in corpus["reports"] for row in report["hits"])
     paths.extend(ROOT / name for name in ["tools/check_crate_boundaries.py", "tools/crate_boundaries.json", "tools/test_check_crate_boundaries.py"])
@@ -81,11 +82,15 @@ def main():
         if result.returncode:
             break
     receipt["source_unchanged"] = before == inputs()
+    executed_names = {row["name"] for row in receipt["commands"]}
     test_path = directory / "tests.log"
-    test_log = test_path.read_text() if test_path.is_file() else ""
+    test_log = test_path.read_text() if "tests" in executed_names else ""
     totals = re.findall(r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored", test_log)
     receipt["test_totals_including_doctests"] = dict(zip(["passed", "failed", "ignored"], [sum(int(row[i]) for row in totals) for i in range(3)]))
-    receipt["logs"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(directory.glob("*.log"))}
+    receipt["logs"] = {
+        f"{name}.log": hashlib.sha256((directory / f"{name}.log").read_bytes()).hexdigest()
+        for name in sorted(executed_names)
+    }
     receipt["passed"] = len(receipt["commands"]) == len(commands) and all(row["exit_code"] == 0 for row in receipt["commands"]) and receipt["source_unchanged"]
     (directory / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
     if not receipt["passed"]:
