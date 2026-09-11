@@ -1,0 +1,30 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0511/after/litchi-perf-baseline",
+    "--case",
+    "xls_semantic_open,xls_eager_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open,xls_source_backed_open_list_worksheets,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+    "--samples",
+    "1000",
+    "--warmup",
+    "20",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/xls-r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/xls-r1-catalog.json"
+  ],
+  "started_utc": "2026-09-11T19:54:34.687968+00:00",
+  "elapsed_seconds": 6.621975096000824,
+  "exit_code": 0,
+  "binary_sha256": "575edf83f86566350faf206b7a0449f8b4950938f4bbed40be58d831c6beccc3",
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "source_unchanged": true,
+  "artifacts": {
+    "xls-r1.log": "db41ccbae5caf98bf88f3c82a9fcd717d99cc57b29085f647915a49cfcabdb39",
+    "xls-r1-report.json": "edadf0539cef96a5faf8d28e1aa6630357b146b70e3dbab903007c094047d317",
+    "xls-r1-catalog.json": "65a4767c08f662181536ced93fc86e9692c9d4357b76d5750e0a9d4b1dc3ac45"
+  },
+  "scope": "existing matched operation clocks; whole-child RSS includes setup, copies and oracles"
+}

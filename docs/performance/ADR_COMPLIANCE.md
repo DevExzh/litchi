@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0511: FAT sector extension preserves checked capacity and errors
+
+[0511](changes/0511-cfb-fat-entry-reservation.md) keeps the exact fallible FAT
+reservation and all source, geometry, marker, ownership and publication checks.
+The complete four-byte iterator preserves little-endian values and cannot grow
+past reserved capacity. No public API, dependency or unsafe-code change occurs.
+All 29 accepted ADRs and the README are unchanged under the fresh
+[review and manifest](results/change-0511/adr-review.md); no exception is needed.
+Measured benefits are scoped to the retained corpus, with mixed source rows,
+unchanged allocations and positive whole-child hardware-cycle changes disclosed.
+
 ## 0510: first-CR search preserves XML normalization and charging
 
 [0510](changes/0510-odt-crlf-length-fast-path.md) preserves full UTF-8

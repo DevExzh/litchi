@@ -1,0 +1,4 @@
+000000000268e820 T litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at
+000000000268ef70 T litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits
+000000000253ee00 T litchi_xlsx::workbook::source::SourceBackedWorkbook::from_read_at
+0000000002540860 T litchi_xlsx::workbook::source::SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context

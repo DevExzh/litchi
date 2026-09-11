@@ -1,0 +1,299 @@
+{
+  "samples": 1080,
+  "operation_allocation_deltas_identical_across_all_four_captures": true,
+  "constant_operation_values": {
+    "xls_semantic_open": {
+      "allocation_calls": 7260,
+      "deallocation_calls": 3801,
+      "reallocation_calls": 307,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 1015869,
+      "deallocated_bytes": 671607
+    },
+    "xls_eager_open_list_worksheets": {
+      "allocation_calls": 7263,
+      "deallocation_calls": 3801,
+      "reallocation_calls": 307,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 1015982,
+      "deallocated_bytes": 671607
+    },
+    "xls_eager_open_one_cell": {
+      "allocation_calls": 7260,
+      "deallocation_calls": 3801,
+      "reallocation_calls": 307,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 1015869,
+      "deallocated_bytes": 671607
+    },
+    "xls_source_backed_open": {
+      "allocation_calls": 124,
+      "deallocation_calls": 57,
+      "reallocation_calls": 25,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 223742,
+      "deallocated_bytes": 82550
+    },
+    "xls_source_backed_open_list_worksheets": {
+      "allocation_calls": 127,
+      "deallocation_calls": 57,
+      "reallocation_calls": 25,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 223807,
+      "deallocated_bytes": 82550
+    },
+    "xls_source_backed_open_one_cell": {
+      "allocation_calls": 126,
+      "deallocation_calls": 59,
+      "reallocation_calls": 25,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 223774,
+      "deallocated_bytes": 82582
+    },
+    "xls_owned_source_open": {
+      "allocation_calls": 124,
+      "deallocation_calls": 57,
+      "reallocation_calls": 25,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 223742,
+      "deallocated_bytes": 82550
+    },
+    "xls_owned_source_open_list_worksheets": {
+      "allocation_calls": 127,
+      "deallocation_calls": 57,
+      "reallocation_calls": 25,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 223807,
+      "deallocated_bytes": 82550
+    },
+    "xls_owned_source_open_one_cell": {
+      "allocation_calls": 126,
+      "deallocation_calls": 59,
+      "reallocation_calls": 25,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": 223774,
+      "deallocated_bytes": 82582
+    }
+  },
+  "incremental_region_peaks": [
+    {
+      "repeat": "r1",
+      "case": "xls_eager_open_list_worksheets",
+      "before_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_eager_open_one_cell",
+      "before_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_owned_source_open",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_owned_source_open_list_worksheets",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_owned_source_open_one_cell",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_semantic_open",
+      "before_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_source_backed_open",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_source_backed_open_list_worksheets",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r1",
+      "case": "xls_source_backed_open_one_cell",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_eager_open_list_worksheets",
+      "before_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_eager_open_one_cell",
+      "before_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_owned_source_open",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_owned_source_open_list_worksheets",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_owned_source_open_one_cell",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_semantic_open",
+      "before_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        698237,
+        698237
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_source_backed_open",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_source_backed_open_list_worksheets",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    },
+    {
+      "repeat": "r2",
+      "case": "xls_source_backed_open_one_cell",
+      "before_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ],
+      "after_incremental_region_peak_range_bytes": [
+        191084,
+        191084
+      ]
+    }
+  ],
+  "scope": "Global allocator deltas bracket the existing operation; region peak minus starting live bytes is incremental operation demand, not standalone document/process peak; callbacks and temporary caller values follow existing timer scope",
+  "collection_note": "Captured from frozen binaries while all-feature test compilation ran; instrumented elapsed and RSS excluded from native comparisons",
+  "cfb_guard_allocation_metrics": "unavailable, not zero"
+}

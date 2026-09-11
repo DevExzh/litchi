@@ -1,0 +1,39 @@
+{
+  "command": [
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*run_cfb_open",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/cfb-profile.out",
+    "/tmp/litchi-goal-0511/after/litchi-perf-baseline",
+    "--case",
+    "cfb_open",
+    "--samples",
+    "5",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/cfb-profile-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/cfb-profile-catalog.json",
+    "--shape",
+    "few-large",
+    "--payload",
+    "incompressible"
+  ],
+  "started_utc": "2026-09-11T19:56:35.255941+00:00",
+  "elapsed_seconds": 2.6073437990053208,
+  "exit_code": 0,
+  "binary_sha256": "575edf83f86566350faf206b7a0449f8b4950938f4bbed40be58d831c6beccc3",
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "source_unchanged": true,
+  "artifacts": {
+    "cfb-profile.log": "c656d8d76bb5fc533892af9ca28cc409b50f58096d699d392b5fdab5107ab45d",
+    "cfb-profile-report.json": "9446d93809b8b60a394a6546d6c057c3345090ca4eaaec0c5e756ae0511ff806",
+    "cfb-profile-catalog.json": "048e2caff66d91030e202bc43ddd935b4070191a69f8174904fc65748c714e4a",
+    "cfb-profile.out": "d9343cafa392cbc03bbbf9f70e49b40a93e0da1a1a8d53735b52078a0dcd3c85",
+    "cfb-profile-exclusive.txt": "99401d1798279b5db0e19b0eeaf5b0b368dfa061b1cb71a6f507df6410f2cc89",
+    "cfb-profile-inclusive.txt": "00838d6c5a2fb9935b98201f0a88f84e9d36524697992668e347db43039d11bf"
+  },
+  "scope": "CFB guard runner including five opens, timers, file-size oracles, drops and result construction; fixture generation excluded"
+}

@@ -1,0 +1,184 @@
+{
+  "samples": 4000,
+  "scope": "whole child including fixture creation, input clones, open/query, oracles, drops and JSON reporting; not operation-local IPC or counters",
+  "instrumented_timings_excluded": true,
+  "cache_events": "not collected; prior broad probe was unreliable",
+  "pairs": [
+    {
+      "repeat": "r1",
+      "before": {
+        "cycles": {
+          "count": 3586075101,
+          "runtime_ns": 832575050,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 6002669882,
+          "runtime_ns": 832575050,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 1130360540,
+          "runtime_ns": 832575050,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 2362092,
+          "runtime_ns": 832575050,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 65744,
+          "runtime_ns": 832575050,
+          "running_percent": 100.0
+        },
+        "context-switches": {
+          "count": 68,
+          "runtime_ns": 832575050,
+          "running_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0,
+          "runtime_ns": 832575050,
+          "running_percent": 100.0
+        }
+      },
+      "after": {
+        "cycles": {
+          "count": 3602613991,
+          "runtime_ns": 809191091,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 5749367049,
+          "runtime_ns": 809191091,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 1065221479,
+          "runtime_ns": 809191091,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 2301233,
+          "runtime_ns": 809191091,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 65729,
+          "runtime_ns": 809191091,
+          "running_percent": 100.0
+        },
+        "context-switches": {
+          "count": 68,
+          "runtime_ns": 809191091,
+          "running_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0,
+          "runtime_ns": 809191091,
+          "running_percent": 100.0
+        }
+      },
+      "change_percent": {
+        "cycles": 0.46119753586275625,
+        "instructions": -4.219836139241484,
+        "branches": -5.762680020659605,
+        "branch-misses": -2.5764872833064945,
+        "page-faults": -0.022815770260409263,
+        "context-switches": 0.0,
+        "cpu-migrations": null
+      },
+      "before_ipc": 1.6738829257441143,
+      "after_ipc": 1.5958876147605567
+    },
+    {
+      "repeat": "r2",
+      "before": {
+        "cycles": {
+          "count": 3471674265,
+          "runtime_ns": 779209041,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 5999875295,
+          "runtime_ns": 779209041,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 1129879440,
+          "runtime_ns": 779209041,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 2329395,
+          "runtime_ns": 779209041,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 65731,
+          "runtime_ns": 779209041,
+          "running_percent": 100.0
+        },
+        "context-switches": {
+          "count": 71,
+          "runtime_ns": 779209041,
+          "running_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0,
+          "runtime_ns": 779209041,
+          "running_percent": 100.0
+        }
+      },
+      "after": {
+        "cycles": {
+          "count": 3598004040,
+          "runtime_ns": 807571569,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "count": 5751720053,
+          "runtime_ns": 807571569,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "count": 1065598509,
+          "runtime_ns": 807571569,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "count": 2304045,
+          "runtime_ns": 807571569,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "count": 65746,
+          "runtime_ns": 807571569,
+          "running_percent": 100.0
+        },
+        "context-switches": {
+          "count": 61,
+          "runtime_ns": 807571569,
+          "running_percent": 100.0
+        },
+        "cpu-migrations": {
+          "count": 0,
+          "runtime_ns": 807571569,
+          "running_percent": 100.0
+        }
+      },
+      "change_percent": {
+        "cycles": 3.6388717764683554,
+        "instructions": -4.13600666345183,
+        "branches": -5.689184945253977,
+        "branch-misses": -1.0882654079707343,
+        "page-faults": 0.022820282667224134,
+        "context-switches": -14.084507042253524,
+        "cpu-migrations": null
+      },
+      "before_ipc": 1.7282368209161467,
+      "after_ipc": 1.5985863242666065
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x",
+    ",",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/hardware-r1.csv",
+    "-e",
+    "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "--",
+    "/tmp/litchi-goal-0511/after/litchi-perf-baseline",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--samples",
+    "1000",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/hardware-r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/hardware-r1-catalog.json"
+  ],
+  "started_utc": "2026-09-11T19:55:15.666916+00:00",
+  "elapsed_seconds": 1.0254484269971726,
+  "exit_code": 0,
+  "binary_sha256": "575edf83f86566350faf206b7a0449f8b4950938f4bbed40be58d831c6beccc3",
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "source_unchanged": true,
+  "artifacts": {
+    "hardware-r1.log": "3cf65699f8a15c13a5660f6222b1b0545bd73b0ddd0395ea974a0458cc0a3ed0",
+    "hardware-r1-report.json": "f0086385a969e66f22941efed73a9d1f795ebd12421e4c3ed6919d52a9ae16c8",
+    "hardware-r1-catalog.json": "8be2964303ed69d951027ba41d9a76c1d326038bd212d56413b7a6eef7b4e393",
+    "hardware-r1.csv": "4a058a262de758bc166f0576e139040fd526f96e11edad10ba41218abc1d32e1"
+  },
+  "scope": "whole-child hardware counters including setup, copies, queries and oracles; instrumented timings excluded"
+}

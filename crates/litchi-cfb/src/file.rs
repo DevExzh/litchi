@@ -851,11 +851,16 @@ impl<R: Read + Seek> OleFile<R> {
         for &sector_id in &fat_sectors {
             self.read_sector_into(sector_id, sector_data)?;
 
-            // Parse sector as array of u32 (little-endian) - use chunks for efficiency
-            for chunk in sector_data.as_chunks::<4>().0.iter() {
-                let entry = read_u32_le(chunk, "FAT entry")?;
-                try_push(&mut fat, entry, "FAT entries")?;
-            }
+            // Every chunk is a complete entry, and the exact fallible
+            // reservation covers this sector's entire extension.
+            fat.extend(
+                sector_data
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .copied()
+                    .map(u32::from_le_bytes),
+            );
         }
 
         for sector in fat_sectors {

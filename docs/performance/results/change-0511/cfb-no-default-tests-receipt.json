@@ -1,0 +1,27 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-cfb",
+    "--no-default-features"
+  ],
+  "started_utc": "2026-09-11T20:21:16.858110+00:00",
+  "elapsed_seconds": 28.27134133099753,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "log_sha256": "a3d96bddd83b21c044c9c4e6930683e5355991bd2a9f732bf8cb4453679b4eca",
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0511/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0511",
+    "RUSTDOCFLAGS": "-D warnings"
+  }
+}

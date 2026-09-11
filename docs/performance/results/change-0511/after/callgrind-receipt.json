@@ -1,0 +1,35 @@
+{
+  "command": [
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*SourceBackedWorkbook::from_read_at_with_limits",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/callgrind.out",
+    "/tmp/litchi-goal-0511/after/litchi-perf-baseline",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--samples",
+    "5",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/callgrind-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/callgrind-catalog.json"
+  ],
+  "started_utc": "2026-09-11T19:54:10.227022+00:00",
+  "elapsed_seconds": 3.165856450999854,
+  "exit_code": 0,
+  "binary_sha256": "575edf83f86566350faf206b7a0449f8b4950938f4bbed40be58d831c6beccc3",
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "source_unchanged": true,
+  "artifacts": {
+    "callgrind.log": "83bb0b237693ed26c0244c8b775aefbddac328e1a886c5bc08c5a77e2c9b760a",
+    "callgrind-report.json": "16410e1f659874475536cf8895f37522a0a3c8d27b9dec942e4d190d2ff26c57",
+    "callgrind-catalog.json": "8be2964303ed69d951027ba41d9a76c1d326038bd212d56413b7a6eef7b4e393",
+    "callgrind.out": "961853b8cd0efe474e2a92697dc0827fa31bc9858669d1fb90d798623475613c",
+    "callgrind-exclusive.txt": "2577a31a0efd111f47568b04575a363b4d88037a78fc82e07c94e8a70dd4e6e0",
+    "callgrind-inclusive.txt": "f4e3b0de63ec2aaeb56b8d6f5d034925ceb146e827766db021ec337d0e36a9dc"
+  },
+  "scope": "SourceBackedWorkbook::from_read_at_with_limits only; excludes selected-cell query and setup; simulated instruction references"
+}

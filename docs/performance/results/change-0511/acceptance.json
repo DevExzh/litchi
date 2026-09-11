@@ -1,0 +1,27 @@
+{
+  "decision": "retain_with_explicit_scope_limits",
+  "native_samples": 44000,
+  "allocator_samples_excluded": 1080,
+  "hardware_samples_excluded": 4000,
+  "callgrind_samples_excluded": 25,
+  "disposition": {
+    "native": "Eager XLS p50 improves 14.87\u201317.25%, tiny CFB 8.85\u201311.99%, few-large CFB 45.78\u201346.30%; 22 pairs have no >5% latency/throughput/RSS adverse flags or same-role drift flags.",
+    "source": "Plain OwnedSource results are small and mixed, including R2 open +1.35% and one-cell +0.52%; no blanket source workflow or tail improvement.",
+    "allocation": "Operation call and byte deltas identical in 1080 samples; 18 incremental region-peak range pairs unchanged; no memory reduction claim.",
+    "hardware": "Whole-child instructions decrease 4.22%/4.14%, but cycles increase 0.46%/3.64%; no cycle or operation-local hardware improvement claim.",
+    "initial_variant": "Push-only variant rejected for +2.21% scoped simulated instructions; no formal native result for that variant.",
+    "correctness": "Existing exact fallible reservation, source reads, structural validation, reachable error order and publication preserved; full OLE2 all-feature tests and doctests plus CFB no-default, lint and rustdoc pass.",
+    "coverage": "Fixed synthetic in-memory corpora; broader FileSource/cold/provider/scaling requirements remain open; default matrix and registry unchanged."
+  },
+  "tests": {
+    "passed_executions": 4372,
+    "ignored_executions": 28,
+    "note": "Includes repeated CFB coverage under no-default features; not a unique-test count."
+  },
+  "priority": "OLE2/OOXML first until their full optimization goal is complete; further ODF optimization deferred; iWork excluded.",
+  "all_native_guardrail_flags": {
+    "pairs": [],
+    "drift": [],
+    "rss": []
+  }
+}

@@ -1,6 +1,6 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current priority after 0510: OLE2 and OOXML
+## Current priority after 0511: OLE2 and OOXML
 
 Per the user's September 11 instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
@@ -10,6 +10,20 @@ XLSX commit/save costs, then DOCX provider and publication costs. These three
 investigations are not a completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
+
+## 0511: CFB FAT helper work reduced; broader goal remains open
+
+[0511](changes/0511-cfb-fat-entry-reservation.md) removes repeated FAT-entry
+helper work using the proven exact reservation. Eager XLS and CFB native
+opening improve; plain OwnedSource results are mixed. Required chain,
+sector-ownership and physical-layout checks retain their work and dominate
+the remaining source-constructor profile. FileSource, cold/provider behavior,
+operation-local hardware scope and broader scaling coverage remain open.
+Continue the OLE2/OOXML investigation queue with dense XLSX commit/save and
+DOCX provider/publication costs, revisiting CFB only with fresh attribution
+and an exact safety proof. This batch does not complete the full optimization
+goal or unlock deferred ODF work. Default coverage remains 41 cases, 213 rows,
+43 corpora and 18 mapped correctness-only selectors; iWork remains excluded.
 
 ## 0509: profiled ODT export allocation reduction
 

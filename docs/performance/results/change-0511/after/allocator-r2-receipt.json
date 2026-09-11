@@ -1,0 +1,30 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0511/after/litchi-perf-baseline-alloc",
+    "--case",
+    "xls_semantic_open,xls_eager_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open,xls_source_backed_open_list_worksheets,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/allocator-r2-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/allocator-r2-catalog.json"
+  ],
+  "started_utc": "2026-09-11T20:06:35.622667+00:00",
+  "elapsed_seconds": 0.7270519140001852,
+  "exit_code": 0,
+  "binary_sha256": "68c1379ba04a75215aa252e00a3232ee9a5573cc9d6f2870e2abc09f7f287068",
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "source_unchanged": true,
+  "artifacts": {
+    "allocator-r2.log": "12c26177f3b361dd135ffbfd768b5ea12f69f79c3be48a357d4448ea9bb1253c",
+    "allocator-r2-report.json": "c7d9d5416dfdee78e238fb1e1ec9c84640bc0d605960453651b89b82f37e60f1",
+    "allocator-r2-catalog.json": "65a4767c08f662181536ced93fc86e9692c9d4357b76d5750e0a9d4b1dc3ac45"
+  },
+  "scope": "instrumented operation allocation deltas; timings excluded from native comparisons"
+}

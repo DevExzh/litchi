@@ -1,0 +1,15 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 35d551123..a330ef828 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -854,7 +854,9 @@ impl<R: Read + Seek> OleFile<R> {
+             // Parse sector as array of u32 (little-endian) - use chunks for efficiency
+             for chunk in sector_data.as_chunks::<4>().0.iter() {
+                 let entry = read_u32_le(chunk, "FAT entry")?;
+-                try_push(&mut fat, entry, "FAT entries")?;
++                // The exact fallible reservation covers every sector's
++                // `fat_entries_per_sector` entries, so this cannot grow.
++                fat.push(entry);
+             }
+         }
+ 
