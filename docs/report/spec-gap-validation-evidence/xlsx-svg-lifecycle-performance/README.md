@@ -18,7 +18,7 @@ embedded `asvg:svgBlip` owner, source-backed capture, snapshot cloning,
 source splice and graph-planning work, candidate publication, and package
 reopen. The matrix exercises `twoCellAnchor`, `oneCellAnchor`, and
 `absoluteAnchor` pictures. A picture is selected by the ordinary semantic
-worksheet / drawing / picture selector once that API exists; the harness must
+worksheet / drawing / picture selector from the current settled public API; the harness must
 not require callers to provide relationship IDs, package paths, or XML
 offsets.
 
@@ -38,7 +38,8 @@ measurements while production semantic checks are still being reviewed.
 The deterministic synthetic corpus is recorded in
 [`corpus-manifest.json`](corpus-manifest.json). It describes small and large
 opaque payloads, 256/1,024-picture inventory cases, shared and distinct SVG
-targets, inherited namespace pressure, three anchor forms, and refusal cases.
+targets, inherited namespace pressure, three anchor forms, strict-host and
+incoming-edge lifecycle cases, captured-owner clone cases, and refusal cases.
 Each raw receipt records both the legacy FNV-1a identity and a SHA-256 digest
 of the exact bounded input identity; the verifier requires those identities to
 remain stable across fresh processes.
@@ -56,7 +57,7 @@ claim. `source_copy_bytes` and `staged_bytes` remain explicitly unavailable
 in receipts because the public API does not expose those stage counters;
 allocator totals are not used as a substitute.
 
-The 60-lane acceptance matrix also includes
+The 65-lane acceptance matrix also includes
 `inverse_attach_detach_{anchor}_{size}` for exact in-memory inverse restoration
 and replay refusal across all three anchors and both payload sizes, plus the
 composite `mixed_caps_rejection` lane. The latter exercises the retained part,
@@ -64,14 +65,39 @@ aggregate bytes, relationship count/XML bytes/XML events, and content-type
 mapping ceilings against one shared detach+attach transaction; it is an
 atomic refusal gate rather than a per-cap performance comparison.
 
+The acceptance matrix also contains a strict-host attach lane, a strict-host
+final-owner detach lane, and an incoming-edge final-owner lane. The strict
+lanes check worksheet and drawing relationship dialects after publication; the
+incoming-edge fixture is built with a separate opaque package relationship so
+the retained SVG leaf cannot be removed solely because the selected drawing
+owner disappeared; it also asserts that the selected drawing-to-SVG
+relationship itself was removed. Shared-final fixtures are assembled directly in the corpus
+generator and never call production detach to prepare their input.
+
+`clone_captured_owner_{small,large}` scans and validates one source drawing
+before warm-up and measurement, then times only a clone of the already
+captured `PictureSource`. It is kept separate from the workbook open/save
+clone lanes so its receipt scope does not imply a workbook snapshot or capture
+parse cost. The namespace refusal fixture derives and records the first
+refused active-binding boundary by probing the admitted host policy. Its
+receipt records `namespace_generated_bindings` for pressure-fragment
+declarations, `namespace_active_bindings` including the seven fixed drawing
+root bindings, and `namespace_active_limit`; the first refusal is
+`active_limit + 1` and the preceding generated count is accepted.
+Opaque extension and descendant checks compare exact bytes and occurrence
+counts after lifecycle operations. Its allocator snapshot intentionally keeps
+the cloned owner live until after the snapshot; byte/owner/reference validation
+and clone cleanup happen after the timed region.
+
 The six exploratory detach lanes,
 `multi_picture_same_drawing_detach_{shared,distinct}_{16,64,256}`, use the
 same bounded picture counts and exercise the fallback path with shared and
-distinct SVG targets. They live outside the 60-lane acceptance list.
+distinct SVG targets. They live outside the 65-lane acceptance list.
 
 The exploratory `inventory_shared_root_namespace_32` lane inventories 32
 distinct SVG owners under 128 large inherited root bindings. Its source-shape
-receipt is paired with the retained scope probe at
+checks require raw SVG source and namespace context projections for all 32
+owners. Its source-shape receipt is paired with the retained scope probe at
 [`../xlsx-svg-source/retained-scope-probe.rs`](../xlsx-svg-source/retained-scope-probe.rs),
 which records retained owner source bytes only. Neither artifact is a timing,
 peak-memory, or final performance result.

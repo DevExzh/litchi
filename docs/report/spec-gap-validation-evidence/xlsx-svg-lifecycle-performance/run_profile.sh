@@ -41,12 +41,14 @@ LANES=(
     capture_attached_absolute_small capture_attached_absolute_large
     clone_raster_small clone_raster_large
     clone_attached_small clone_attached_large
+    clone_captured_owner_small clone_captured_owner_large
     inventory_shared_256 inventory_shared_1024
     inventory_distinct_256 inventory_distinct_1024
     namespace_heavy namespace_limit_refusal
     attach_end_to_end_two_cell_small attach_end_to_end_two_cell_large
     attach_end_to_end_one_cell_small attach_end_to_end_one_cell_large
     attach_end_to_end_absolute_small attach_end_to_end_absolute_large
+    strict_attach_end_to_end_two_cell_small
     inverse_attach_detach_two_cell_small inverse_attach_detach_two_cell_large
     inverse_attach_detach_one_cell_small inverse_attach_detach_one_cell_large
     inverse_attach_detach_absolute_small inverse_attach_detach_absolute_large
@@ -56,6 +58,8 @@ LANES=(
     detach_end_to_end_shared_final_two_cell
     detach_end_to_end_shared_final_one_cell
     detach_end_to_end_shared_final_absolute
+    strict_detach_end_to_end_shared_final_two_cell
+    incoming_edge_shared_final_two_cell
     detach_end_to_end_distinct_two_cell_small
     detach_end_to_end_distinct_two_cell_large
     detach_end_to_end_distinct_one_cell_small

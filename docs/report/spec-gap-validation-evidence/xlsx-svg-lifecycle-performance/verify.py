@@ -20,6 +20,10 @@ REFUSAL_LANES = {
     "mixed_caps_rejection": "mixed_limit",
 }
 
+# The synthetic namespace fixture declares these seven root bindings before
+# adding the generated declarations; keep aligned with its Rust constructor.
+FIXED_ROOT_NAMESPACE_BINDINGS = 7
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -113,6 +117,25 @@ def verify_sample(sample: dict[str, object], expected_success: bool, path: Path)
         require(error.get("class") == REFUSAL_LANES[path.stem.rsplit("-p", 1)[0]], f"refusal class mismatch: {path}")
 
 
+def verify_namespace_boundary(value: dict[str, object], lane: str, path: Path) -> tuple[int, int, int] | None:
+    fields = ("namespace_generated_bindings", "namespace_active_bindings", "namespace_active_limit")
+    values = tuple(value.get(field) for field in fields)
+    if lane != "namespace_limit_refusal":
+        require(all(item is None for item in values), f"unexpected namespace boundary: {path}")
+        return None
+    require(
+        all(type(item) is int and item > 0 for item in values),
+        f"namespace boundary missing or malformed: {path}",
+    )
+    generated, active, limit = values
+    require(
+        active == generated + FIXED_ROOT_NAMESPACE_BINDINGS,
+        f"namespace boundary does not include the fixture's inherited bindings: {path}",
+    )
+    require(active == limit + 1, f"namespace boundary is not first refused active count: {path}")
+    return generated, active, limit
+
+
 def verify_lanes(results: Path) -> None:
     for lane in LANES:
         paths = sorted(results.glob(f"{lane}-p*.json"))
@@ -124,11 +147,13 @@ def verify_lanes(results: Path) -> None:
         input_hashes = set()
         input_sha256s = set()
         input_sizes = set()
+        namespace_boundaries = set()
         for path in paths:
             verify_process_output(path)
             value = json.loads(path.read_text())
             require(value["schema"] == "xlsx-svg-lifecycle-profile-v1", f"schema mismatch: {path}")
             require(value["lane"] == lane, f"lane mismatch: {path}")
+            namespace_boundaries.add(verify_namespace_boundary(value, lane, path))
             require(int(value["warmup"]) >= 2, f"warm-up count below minimum: {path}")
             require(
                 int(value["sample_count"]) == len(value["samples"]) >= 20,
@@ -148,6 +173,7 @@ def verify_lanes(results: Path) -> None:
         require(len(input_hashes) == 1, f"fixture hash changed across processes for {lane}")
         require(len(input_sha256s) == 1, f"fixture SHA-256 changed across processes for {lane}")
         require(len(input_sizes) == 1, f"fixture size changed across processes for {lane}")
+        require(len(namespace_boundaries) == 1, f"namespace boundary changed across processes for {lane}")
 
 
 def verify_process_output(path: Path) -> None:
