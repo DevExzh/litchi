@@ -1,0 +1,12 @@
+{
+  "status": "rejected",
+  "candidate_kept": false,
+  "production_change_retained": false,
+  "reason": "Cold semantic no-op pilot p50 regresses64.43..84.64% across six rows; repeated allocation data shows unnecessary speculative Layout cost, including dense incremental peak increases27.04%/18.64%. Main changed-edit pilot is mixed. Do not admit full candidate native lanes.",
+  "decision_utc": "2026-09-11T22:28:06.123727+00:00",
+  "performance_claim": "none",
+  "claim_authorized": false,
+  "full_after_native": "not run; rejected at predeclared pilot admission gate",
+  "control_r2": "retain final control repeat per frozen evidence protocol",
+  "remaining_goal": "Full OLE2/OOXML optimization remains active; ODF deferred; iWork excluded."
+}

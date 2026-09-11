@@ -1,0 +1,26 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-xlsx",
+    "--lib"
+  ],
+  "started_utc": "2026-09-11T22:11:33.375307+00:00",
+  "elapsed_seconds": 10.020016202004626,
+  "exit_code": 101,
+  "source_unchanged": true,
+  "source_manifest_sha256": "cfc3c2055525fef4f84c371245e76200604d163ec1fc6b69adcfa663d11b3b93",
+  "log_sha256": "dbefe2fe0e98a60f2cc37f7b75aca2c1955ae4ab1aacd49a6b972c24796180b0",
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0514/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0514",
+    "RUSTDOCFLAGS": "-D warnings"
+  }
+}

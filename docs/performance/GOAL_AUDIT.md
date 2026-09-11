@@ -1,15 +1,37 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current priority after 0513: OLE2 and OOXML
+## Current priority after 0514: OLE2 and OOXML
 
 Per the user's September 11 instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
 deferred until then. This overrides the ordering of older entries below.
-The initial investigation order is CFB/OLE2 chain and validation costs, dense
-XLSX commit/save costs, then DOCX provider and publication costs. These three
-investigations are not a completion checklist. The broader requirements and
+CFB profiling and FAT batching are complete in 0511; the 0514 speculative
+XLSX source-pass fusion is rejected. Larger changed-output XLSX work and DOCX
+publication attribution remain open. This investigation queue is not a
+completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
+
+## 0514: reject speculative XLSX parser/layout fusion
+
+[0514](changes/0514-xlsx-fusion-rejection.md) evaluates a shared-event source
+parser and lossless rewrite layout. The candidate passes all 966 XLSX owner
+unit tests, including 17 new differential/concurrency tests, but fails the
+predeclared admission gate: cold same-value pilot p50 increases 64.43–84.64%
+across all six size/update rows. Repeated dense no-op allocation observations
+show incremental peak live demand rising 27.04% for one-cell edits and 18.64%
+for one-percent edits. A 6.30% reduction in scoped save Callgrind instructions
+does not justify that extra work. Changed-edit pilot results are mixed; no
+full candidate native comparison or accepted speedup is claimed.
+
+Production and candidate tests are restored exactly to the control revision.
+The verified candidate patch, source-bound evidence and reusable public no-op
+and cold-read guard remain available. Next work should investigate the larger
+changed-output XLSX validation/compaction path or DOCX publication CPU cost;
+0511's completed CFB profiling and FAT batching should not be repeated as an
+unstarted item. See the [conditional follow-up](results/change-0514/follow-up-options.md).
+The full OLE2/OOXML goal remains active, ODF stays deferred, and iWork remains
+excluded.
 
 ## 0513: XLSX operation allocation baseline
 

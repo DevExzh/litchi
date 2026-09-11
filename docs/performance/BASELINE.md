@@ -1,5 +1,26 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0514: reject speculative XLSX parser/layout fusion
+
+[0514](changes/0514-xlsx-fusion-rejection.md) evaluates a shared-event source
+parser and lossless rewrite layout. The candidate passes all 966 XLSX owner
+unit tests, including 17 new differential/concurrency tests, but fails the
+predeclared admission gate: cold same-value pilot p50 increases 64.43–84.64%
+across all six size/update rows. Repeated dense no-op allocation observations
+show incremental peak live demand rising 27.04% for one-cell edits and 18.64%
+for one-percent edits. A 6.30% reduction in scoped save Callgrind instructions
+does not justify that extra work. Changed-edit pilot results are mixed; no
+full candidate native comparison or accepted speedup is claimed.
+
+Production and candidate tests are restored exactly to the control revision.
+The verified candidate patch, source-bound evidence and reusable public no-op
+and cold-read guard remain available. Next work should investigate the larger
+changed-output XLSX validation/compaction path or DOCX publication CPU cost;
+0511's completed CFB profiling and FAT batching should not be repeated as an
+unstarted item. See the [conditional follow-up](results/change-0514/follow-up-options.md).
+The full OLE2/OOXML goal remains active, ODF stays deferred, and iWork remains
+excluded.
+
 ## 0513: XLSX operation allocation baseline
 
 [0513](changes/0513-xlsx-operation-allocation.md) adds allocation observations

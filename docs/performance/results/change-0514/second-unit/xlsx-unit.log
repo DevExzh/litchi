@@ -1,0 +1,19 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error[E0502]: cannot borrow `deferred` as mutable because it is also borrowed as immutable
+   --> crates/litchi-xlsx/src/raw/worksheet/fusion.rs:193:25
+    |
+185 |       let error = deferred
+    |  _________________-
+186 | |         .snapshot_error
+    | |_______________________- immutable borrow occurs here
+...
+193 |       let rewrite_error = deferred
+    |  _________________________^
+194 | |         .rewrite(source.as_slice(), "Sheet1", cell_plan("A1", 2))
+    | |_________________________________________________________________^ mutable borrow occurs here
+195 |           .expect_err("the deferred error must surface at the rewrite boundary");
+196 |       assert_eq!(rewrite_error.to_string(), error.to_string());
+    |                                             ----- immutable borrow later used here
+
+For more information about this error, try `rustc --explain E0502`.
+error: could not compile `litchi-xlsx` (lib test) due to 1 previous error

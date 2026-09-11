@@ -1,0 +1,12 @@
+{
+  "scope": "owned /tmp/litchi-goal-0514 only",
+  "removed": true,
+  "removed_utc": "2026-09-11T22:46:22.609589+00:00",
+  "file_count": 68787,
+  "unique_inode_allocated_bytes": 7330279424,
+  "process_references_before_removal": [],
+  "removed_owned_registered_worktrees": [
+    "/tmp/litchi-goal-0514/worktree"
+  ],
+  "retained_evidence": "docs/performance/results/change-0514; source/binary hashes, raw durations/profiles/logs retained; executable and target files removed"
+}

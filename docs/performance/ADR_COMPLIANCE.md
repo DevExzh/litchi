@@ -1,5 +1,20 @@
 # Performance optimization ADR-compliance matrix
 
+## 0514: preserve no-op cost and memory admission boundaries
+
+[0514](changes/0514-xlsx-fusion-rejection.md) retains a rejected prototype as
+an exact replayable patch; production sources are restored to the control.
+All 29 accepted ADRs and the README remain hash-identical. The prototype keeps
+semantic/style/projection errors ahead of deferred snapshot failures, checks
+original source identity, shares only the semantic Store, and preserves MCE,
+limits, exact no-op bytes and patch inversion. The owner suite passes, but
+measured speculative no-op work and temporary memory overlap reject retention
+under ADRs 0001/0005/0006. No safety, preservation or admission exception is
+used to keep an otherwise faster instruction profile. The
+[design](results/change-0514/design-review.md) and
+[implementation review](results/change-0514/implementation-review.md) record
+these boundaries; the standalone guard remains separate from production.
+
 ## 0513: operation observations in the XLSX harness
 
 [0513](changes/0513-xlsx-operation-allocation.md) changes only the performance
