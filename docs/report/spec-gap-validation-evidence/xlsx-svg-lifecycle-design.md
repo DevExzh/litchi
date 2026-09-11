@@ -100,7 +100,7 @@ The current ordinary worksheet reader is intentionally small:
   stages worksheet bytes and drawing graph changes for cell transfers.
   [`workbook/edit/model.rs`](../../../crates/litchi-xlsx/src/workbook/edit/model.rs)
   has source-checked `PartChange`, relationship deltas, and `GraphChange`.
-  The existing `GraphChange::Remove` removes both a relationship and its part;
+  The existing `GraphChange` with `GraphAction::Remove` removes both a relationship and its part;
   it cannot be used blindly for a shared SVG target.
 - [`crates/litchi-drawingml/src/svg_blip.rs`](../../../crates/litchi-drawingml/src/svg_blip.rs)
   already supplies the bounded, namespace-aware, source-preserving
@@ -220,12 +220,23 @@ opaque or refused according to operation:
   second effective owner; and
 - detach refuses unless the selected direct owner is unambiguous.
 
-The host must choose a relationship dialect. For a changed source, the
-default policy is to match the source's transitional or strict DrawingML and
-relationship namespaces. The shared `svg_blip` writer currently has a
-transitional default, so using it without a host dialect decision is a
-conformance bug. Exact no-op and untouched source paths replay their original
-bytes regardless of dialect.
+Keep the core drawing and package relationship dialect separate from the
+Microsoft extension vocabulary. Core DrawingML and raster relationship
+attributes follow the source's Transitional or Strict dialect; physical image
+relationship types follow that same host dialect. Newly authored
+`asvg:svgBlip@r:embed` uses the Transitional relationship attribute namespace
+required by the unmodified MS-ODRAWXML §5.24 schema in either host dialect.
+The schema imports Transitional `a:AG_Blob`, so changing this extension
+attribute to the Strict namespace fails that schema. A Strict core drawing
+with the Microsoft extension retaining Transitional attributes validates
+against both the Strict drawing schema and the unmodified extension schema.
+
+The shared codec's acceptance of both attribute namespaces is a read
+compatibility capability, not permission to author either vocabulary while
+claiming the MS schema. Preserve existing source-only/no-op bytes; do not
+silently normalize a legacy extension merely while reading it. Use local
+namespace declarations or collision-free prefixes when the host's `r` prefix
+is already bound to the Strict namespace.
 
 When attaching, splice the selected `a:blip` without normalizing unrelated
 attributes, namespace declarations, comments, processing instructions, or
@@ -254,7 +265,7 @@ the target and its content type remain. A shared relationship ID in one drawing
 is also handled as a reference-counted graph edge, not as an unconditional
 part deletion.
 
-The existing `GraphChange::Remove` couples edge removal to part removal and is
+The existing `GraphChange` with `GraphAction::Remove` couples edge removal to part removal and is
 therefore insufficient for this shared-target case. The implementation needs
 either a relationship-only graph delta plus a separately guarded part-removal
 delta, or an owner-specific graph planner that validates reachability before

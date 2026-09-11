@@ -14,7 +14,6 @@ use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::{NsReader, Reader};
 
-use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{AuthoredXmlFragment, PackURI, Part, SourceTopologyPlan, TargetMode};
 
 use super::{
@@ -28,7 +27,6 @@ mod owner;
 use owner::{ByteRange, ElementRange, PictureLayout};
 
 const RELATIONSHIP_NAMESPACE: &[u8] = litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE;
-const STRICT_RELATIONSHIP_NAMESPACE: &[u8] = litchi_ooxml_common::relationships::STRICT_NAMESPACE;
 const MAX_GENERATED_NAME_ATTEMPTS: usize = 100_000;
 
 /// A caller-owned SVG payload and optional advanced package identity.
@@ -343,7 +341,7 @@ impl<'a> SourceBackedSvgAttachmentEdit<'a> {
         let rewritten = rewrite_picture_svg(
             self.slide.xml.as_bytes(),
             &layout,
-            Some((&relationship_id, &self.source.raster_relationship_type)),
+            Some(&relationship_id),
             &self.source.limits,
         )?;
         self.slide.xml = SourcePayload::Edited(Arc::new(rewritten));
@@ -927,7 +925,7 @@ fn allocate_svg_identity(
 fn rewrite_picture_svg(
     slide_xml: &[u8],
     layout: &PictureLayout,
-    attachment: Option<(&str, &str)>,
+    attachment: Option<&str>,
     limits: &litchi_opc::ReadLimits,
 ) -> Result<Vec<u8>> {
     // Keep an unprefixed DrawingML owner unprefixed. A synthetic `a:` name
@@ -942,7 +940,7 @@ fn rewrite_picture_svg(
             source,
         })?;
     match attachment {
-        Some((relationship_id, relationship_type)) => {
+        Some(relationship_id) => {
             if layout.svg_extension.is_some() {
                 return Err(Error::Relationship(
                     "selected picture already has an SVG extension".into(),
@@ -959,8 +957,7 @@ fn rewrite_picture_svg(
                 .map_or(drawing_prefix.as_slice(), |ext_list| {
                     ext_list.prefix.as_slice()
                 });
-            let ext_len =
-                generated_svg_extension_len(extension_prefix, relationship_id, relationship_type)?;
+            let ext_len = generated_svg_extension_len(extension_prefix, relationship_id)?;
             let ext_list_len = generated_ext_list_len(&drawing_prefix, ext_len)?;
             let output_len = if let Some(ext_list) = layout.ext_list.as_ref() {
                 if ext_list.close_start.is_some() {
@@ -1008,8 +1005,7 @@ fn rewrite_picture_svg(
                     .ok_or_else(|| Error::Invalid("SVG slide output size overflows".into()))?
             };
             check_slide_output_len(output_len, limits)?;
-            let ext =
-                generated_svg_extension(extension_prefix, relationship_id, relationship_type)?;
+            let ext = generated_svg_extension(extension_prefix, relationship_id)?;
             if let Some(ext_list) = layout.ext_list.as_ref() {
                 if let Some(close_start) = ext_list.close_start {
                     replacements.push((
@@ -1066,18 +1062,9 @@ fn rewrite_picture_svg(
     splice_checked(slide_xml, replacements, limits)
 }
 
-fn generated_svg_extension(
-    drawing_prefix: &[u8],
-    relationship_id: &str,
-    relationship_type: &str,
-) -> Result<Vec<u8>> {
+fn generated_svg_extension(drawing_prefix: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
     validate_relationship_id(relationship_id)?;
-    let relation_namespace = if relationship_type == rt::STRICT_IMAGE {
-        STRICT_RELATIONSHIP_NAMESPACE
-    } else {
-        RELATIONSHIP_NAMESPACE
-    };
-    let capacity = generated_svg_extension_len(drawing_prefix, relationship_id, relationship_type)?;
+    let capacity = generated_svg_extension_len(drawing_prefix, relationship_id)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(capacity)
@@ -1087,7 +1074,7 @@ fn generated_svg_extension(
         })?;
     push_open_qname(&mut output, drawing_prefix, b"ext");
     output.extend_from_slice(b" uri=\"{96DAC541-7B7A-43D3-8B79-37D633B846F1}\"><asvg:svgBlip xmlns:asvg=\"http://schemas.microsoft.com/office/drawing/2016/SVG/main\" xmlns:r=\"");
-    output.extend_from_slice(relation_namespace);
+    output.extend_from_slice(RELATIONSHIP_NAMESPACE);
     output.extend_from_slice(b"\" r:embed=\"");
     output.extend_from_slice(relationship_id.as_bytes());
     output.extend_from_slice(b"\"/></");
@@ -1104,22 +1091,13 @@ fn qname_len(prefix: &[u8], local: &[u8]) -> Result<usize> {
         .ok_or_else(|| Error::Invalid("generated XML qualified name size overflows".into()))
 }
 
-fn generated_svg_extension_len(
-    drawing_prefix: &[u8],
-    relationship_id: &str,
-    relationship_type: &str,
-) -> Result<usize> {
+fn generated_svg_extension_len(drawing_prefix: &[u8], relationship_id: &str) -> Result<usize> {
     validate_relationship_id(relationship_id)?;
-    let relation_namespace = if relationship_type == rt::STRICT_IMAGE {
-        STRICT_RELATIONSHIP_NAMESPACE
-    } else {
-        RELATIONSHIP_NAMESPACE
-    };
     let ext_qname_len = qname_len(drawing_prefix, b"ext")?;
     1usize
         .checked_add(ext_qname_len)
         .and_then(|length| length.checked_add(b" uri=\"{96DAC541-7B7A-43D3-8B79-37D633B846F1}\"><asvg:svgBlip xmlns:asvg=\"http://schemas.microsoft.com/office/drawing/2016/SVG/main\" xmlns:r=\"".len()))
-        .and_then(|length| length.checked_add(relation_namespace.len()))
+        .and_then(|length| length.checked_add(RELATIONSHIP_NAMESPACE.len()))
         .and_then(|length| length.checked_add(b"\" r:embed=\"".len()))
         .and_then(|length| length.checked_add(relationship_id.len()))
         .and_then(|length| length.checked_add(b"\"/></".len()))

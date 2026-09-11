@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "compile_first_receipt_sha256": "9c73eab1fe4d28fbd948fd2d1e6ab15d44f6fbda34c01d28884b1688925b74b9",
+  "probe_receipt_sha256": "f1fc369d12650e7a9230b56ad0ea02c865ebe5a80e184ea3a1decb0e36c81ad4",
+  "schema_validation_sha256": "fa2cfdc83f48a5dae37bfd393ad3d163c82ce473aff7c88bacc4464ad59c2a26",
+  "source_files_checked": 26,
+  "generated_outputs": 12,
+  "scope": "Recomputed bounded Strict/Transitional namespace receipts; no final feature approval"
+}

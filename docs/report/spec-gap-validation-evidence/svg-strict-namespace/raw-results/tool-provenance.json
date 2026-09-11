@@ -1,0 +1,42 @@
+{
+  "revision": "9324e8d5167b3c1a5dd28a63082f405f179a2070",
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "source_fixture": "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.pptx",
+  "source_fixture_sha256": "62d4a7ee57f5f9cd87eb70d8d93f84f58f86525dad90d3ccfec4fa7f91941bce",
+  "harness_binary": "target/debug/svg-strict-namespace-evidence",
+  "harness_binary_sha256": "30eb9cd2dab3ede4c66df7e24cc0dbfedc485bbecfe6b013eec51294f4eb65fc",
+  "validator_sha256": "a71e0c979902aa2dd9db1d568cfa4aef344dbed42077b1936295694da705b58b",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/harness/Cargo.toml",
+        "--",
+        "docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.pptx",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs"
+      ],
+      "exit_code": 0,
+      "output": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/raw-results/harness.log"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/validate_schema.py",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-source.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-attached.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-detached.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-transitional-valid.xml",
+        "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-strict-invalid.xml"
+      ],
+      "exit_code": 0,
+      "output": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/raw-results/schema-validation.json"
+    }
+  ],
+  "source_hashes_sha256": "a92448ad9cbf5174637e7956a55a8d7e8ceef006d7663504ea034c771da949e4"
+}
