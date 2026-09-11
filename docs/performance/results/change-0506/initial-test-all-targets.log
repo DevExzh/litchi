@@ -1,0 +1,12 @@
+   Compiling litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+error: unused import: `std::fmt::Write`
+ --> crates/litchi-odg/src/package/attribute_span_tests.rs:9:5
+  |
+9 | use std::fmt::Write as _;
+  |     ^^^^^^^^^^^^^^^
+  |
+  = note: `-D unused-imports` implied by `-D unused`
+  = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: could not compile `litchi-odg` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

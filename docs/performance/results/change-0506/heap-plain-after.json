@@ -1,0 +1,28 @@
+{
+  "schema": "litchi.odg.open-probe.v1",
+  "probe": "owned-bytes-open-and-semantic-traversal",
+  "revision": null,
+  "corpus": "plain-large",
+  "rich_metadata": false,
+  "pages": 32,
+  "shapes_per_page": 256,
+  "input_bytes": 49143,
+  "input_sha256": "1c8ba0a184b37a0b3cb5ed1c0a2ba987d665b25b21feffc46c3e6e6466e4bb84",
+  "binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+  "binary_bytes": 3301048,
+  "warmups": 0,
+  "samples": 1,
+  "elapsed_ns": [
+    141137228
+  ],
+  "statistics": {
+    "min_ns": 141137228,
+    "mean_ns": 141137228.0,
+    "p50_ns": 141137228,
+    "p95_ns": 141137228,
+    "p99_ns": 141137228,
+    "max_ns": 141137228,
+    "throughput_input_bytes_per_second_p50": 348193.0366380726
+  },
+  "semantic_checksum": 184694
+}

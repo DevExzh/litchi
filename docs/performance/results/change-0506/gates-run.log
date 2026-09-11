@@ -1,0 +1,7 @@
+test-all-targets 0
+fmt 0
+clippy 0
+doctests 0
+rustdoc 0
+downstream 0
+boundaries 0

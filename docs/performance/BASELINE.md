@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0506: matched ODG shape-span baseline
+
+[0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.
+The clean `56e396d05` baseline is byte-identical to 0505’s accepted candidate.
+Four deterministic corpora have p50 pairs of 1.933/1.940, 59.906/60.206,
+1.598/1.596 and 22.509/22.398 ms. A1/B1/B2/A2 capture retains 3,200 samples,
+whole-child RSS, hashes and raw profiles. The candidate improves timings but
+retains two adverse plain-large RSS flags.
+
 ## 0505: ODG attribute-filter baseline
 
 [0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.

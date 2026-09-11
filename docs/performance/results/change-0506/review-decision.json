@@ -1,0 +1,23 @@
+{
+  "decision": "retain candidate with explicitly accepted plain-large RSS regression",
+  "review_trigger": "docs/GOAL.md flags >5% adverse change for review rather than automatic rejection",
+  "adverse_pairs": [
+    {
+      "corpus": "plain-large",
+      "repeat": "r1",
+      "rss_change_percent": 10.146627565982413,
+      "rss_extra_kib": 2076
+    },
+    {
+      "corpus": "plain-large",
+      "repeat": "r2",
+      "rss_change_percent": 9.86328125,
+      "rss_extra_kib": 2020
+    }
+  ],
+  "reason": "All four synthetic open/traversal corpora show material 17\u201328% median improvements and lower whole-child allocation counts on both profiled large corpora. Fixed transient storage and unchanged semantic/resource boundaries were independently reviewed. The ~2 MiB uninstrumented RSS cost remains a limitation, not dismissed by profiler measurements.",
+  "remaining_uncertainty": "Exact allocator/working-set cause of RSS increase is unproven; broader CRUD/provider and host variability coverage remains open.",
+  "correctness_review": "No blocking correctness or resource-boundary finding; full checked iterator and ordered error fallback retained. Eight private differential tests and four public integration tests supplement existing suite.",
+  "initial_test_failure": "A redundant private-test std::fmt::Write import failed unused-import lint; removed before successful final suite, without changing timed production source.",
+  "scope": "No public API, dependency, ownership, configured-budget, concurrency or unsafe changes; no strict-registry promotion"
+}

@@ -1,0 +1,183 @@
+diff --git a/crates/litchi-odg/src/package/snapshot.rs b/crates/litchi-odg/src/package/snapshot.rs
+index beeed91e2..df93b0964 100644
+--- a/crates/litchi-odg/src/package/snapshot.rs
++++ b/crates/litchi-odg/src/package/snapshot.rs
+@@ -97,6 +97,11 @@ type PointsSpans = Vec<Vec<[Option<Range<usize>>; 2]>>;
+ type PathSpans = Vec<Vec<Option<Range<usize>>>>;
+ type ControlSpans = Vec<Vec<Option<Range<usize>>>>;
+ type PageAttributeSpans = Vec<[Option<Range<usize>>; 2]>;
++type ShapeAttributeSpans = [Option<Range<usize>>; 16];
++
++#[cfg(test)]
++#[path = "attribute_span_tests.rs"]
++mod attribute_span_tests;
+ 
+ struct State {
+     package: Package,
+@@ -5437,48 +5442,33 @@ impl Scanner {
+                 frame,
+             ));
+             self.text_spans[page].push(Vec::new());
+-            self.control_spans[page].push(attribute_source_span(
+-                reader, element, tag, tag_start, DRAW, b"control",
+-            )?);
+-            self.name_spans[page].push(shape_name_span(reader, element, tag, tag_start)?);
+-            self.layer_spans[page].push(attribute_source_span(
+-                reader, element, tag, tag_start, DRAW, b"layer",
+-            )?);
+-            self.geometry_spans[page].push([
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"x")?,
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"y")?,
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"width")?,
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"height")?,
+-            ]);
+-            self.line_geometry_spans[page].push([
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"x1")?,
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"y1")?,
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"x2")?,
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"y2")?,
+-            ]);
+-            self.points_spans[page].push([
+-                attribute_source_span(reader, element, tag, tag_start, SVG, b"viewBox")?,
+-                attribute_source_span(reader, element, tag, tag_start, DRAW, b"points")?,
+-            ]);
+-            self.transform_spans[page].push(attribute_source_span(
+-                reader,
+-                element,
+-                tag,
+-                tag_start,
+-                DRAW,
+-                b"transform",
+-            )?);
+-            self.path_spans[page].push(attribute_source_span(
+-                reader, element, tag, tag_start, SVG, b"d",
+-            )?);
+-            self.style_name_spans[page].push(attribute_source_span(
+-                reader,
+-                element,
+-                tag,
+-                tag_start,
+-                DRAW,
+-                b"style-name",
+-            )?);
++            let [
++                control_span,
++                name_span,
++                layer_span,
++                x_span,
++                y_span,
++                width_span,
++                height_span,
++                x1_span,
++                y1_span,
++                x2_span,
++                y2_span,
++                view_box_span,
++                points_span,
++                transform_span,
++                path_span,
++                style_name_span,
++            ] = shape_attribute_source_spans(reader, element, tag, tag_start)?;
++            self.control_spans[page].push(control_span);
++            self.name_spans[page].push(name_span);
++            self.layer_spans[page].push(layer_span);
++            self.geometry_spans[page].push([x_span, y_span, width_span, height_span]);
++            self.line_geometry_spans[page].push([x1_span, y1_span, x2_span, y2_span]);
++            self.points_spans[page].push([view_box_span, points_span]);
++            self.transform_spans[page].push(transform_span);
++            self.path_spans[page].push(path_span);
++            self.style_name_spans[page].push(style_name_span);
+             self.shape_spans[page].push(empty.then_some(tag_start..tag_start + tag.len()));
+             if !empty {
+                 self.active_shapes.push(ActiveShape {
+@@ -11396,6 +11386,90 @@ fn shape_name_span(
+     attribute_source_span(reader, element, tag, tag_start, DRAW, b"name")
+ }
+ 
++fn shape_attribute_source_spans(
++    reader: &NsReader<&[u8]>,
++    element: &BytesStart<'_>,
++    tag: &[u8],
++    tag_start: usize,
++) -> Result<ShapeAttributeSpans> {
++    // The legacy ordered helpers remain the error oracle for malformed spans,
++    // raw attributes, and duplicate targets, so their precedence is unchanged.
++    match shape_attribute_source_spans_batch(reader, element, tag, tag_start) {
++        Ok(spans) => Ok(spans),
++        Err(_) => Ok([
++            attribute_source_span(reader, element, tag, tag_start, DRAW, b"control")?,
++            shape_name_span(reader, element, tag, tag_start)?,
++            attribute_source_span(reader, element, tag, tag_start, DRAW, b"layer")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"x")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"y")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"width")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"height")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"x1")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"y1")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"x2")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"y2")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"viewBox")?,
++            attribute_source_span(reader, element, tag, tag_start, DRAW, b"points")?,
++            attribute_source_span(reader, element, tag, tag_start, DRAW, b"transform")?,
++            attribute_source_span(reader, element, tag, tag_start, SVG, b"d")?,
++            attribute_source_span(reader, element, tag, tag_start, DRAW, b"style-name")?,
++        ]),
++    }
++}
++
++fn shape_attribute_source_spans_batch(
++    reader: &NsReader<&[u8]>,
++    element: &BytesStart<'_>,
++    tag: &[u8],
++    tag_start: usize,
++) -> Result<ShapeAttributeSpans> {
++    const REQUESTS: [(&[u8], &[u8]); 16] = [
++        (DRAW, b"control"),
++        (DRAW, b"name"),
++        (DRAW, b"layer"),
++        (SVG, b"x"),
++        (SVG, b"y"),
++        (SVG, b"width"),
++        (SVG, b"height"),
++        (SVG, b"x1"),
++        (SVG, b"y1"),
++        (SVG, b"x2"),
++        (SVG, b"y2"),
++        (SVG, b"viewBox"),
++        (DRAW, b"points"),
++        (DRAW, b"transform"),
++        (SVG, b"d"),
++        (DRAW, b"style-name"),
++    ];
++    let mut keys: [Option<QName<'_>>; REQUESTS.len()] = [None; REQUESTS.len()];
++    for raw_attribute in element.attributes() {
++        let parsed_attribute = raw_attribute
++            .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute: {error}")))?;
++        let parsed_local = parsed_attribute.key.local_name();
++        let Some(slot) = REQUESTS
++            .iter()
++            .position(|(_, wanted)| parsed_local.as_ref() == *wanted)
++        else {
++            continue;
++        };
++        let (expected, _) = REQUESTS[slot];
++        let (namespace, _) = reader.resolver().resolve_attribute(parsed_attribute.key);
++        if resolved_bound(&namespace, expected)
++            && keys[slot].replace(parsed_attribute.key).is_some()
++        {
++            return invalid("ODG element has duplicate namespaced attributes");
++        }
++    }
++    let mut spans: ShapeAttributeSpans = std::array::from_fn(|_| None);
++    for (slot, key) in keys.into_iter().enumerate() {
++        if let Some(key) = key {
++            let (start, end) = attribute_value_span(tag, key.as_ref())?;
++            spans[slot] = Some(tag_start + start..tag_start + end);
++        }
++    }
++    Ok(spans)
++}
++
+ fn attribute_source_span(
+     reader: &NsReader<&[u8]>,
+     element: &BytesStart<'_>,

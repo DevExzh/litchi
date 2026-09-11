@@ -1,0 +1,27 @@
+{
+  "base_revision": "56e396d05c46022a8fc08d9ce3e81206ae4eb57d",
+  "before_files": {
+    "crates/litchi-odg/src/package/snapshot.rs": "1481ab23028aaa51d95ddcfb1884e8dda26a78124298f9ec3231d62e0976cede",
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "workspace_test_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "after_files": {
+    "crates/litchi-odg/src/package/snapshot.rs": "86531ec66ba935e344324fee242b0f3081cb62183fda8cc5f7372e40f0b55b69",
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "candidate_patch_sha256": "87ba35c931830b5cba6bb6c1ace6d7d6465e9174529b3005c6dfa1ce491bda56",
+  "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+  "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+  "candidate": "clean base plus candidate.patch; private test module is cfg(test) only",
+  "final_rebuild_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+  "test_files": {
+    "crates/litchi-odg/src/package/attribute_span_tests.rs": "a035ae9ae9817f9d1fc413b69a32856f04a9c5d50b1ebf4924cf2761634e4eda",
+    "crates/litchi-odg/tests/attribute_span_batch.rs": "a3d8dcf7ac827ae019cbb97639f7e59d856c9273c13c00c699927218a431f9c5"
+  }
+}

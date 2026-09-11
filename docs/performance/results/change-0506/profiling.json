@@ -1,0 +1,152 @@
+{
+  "commands": [
+    {
+      "kind": "instructions",
+      "scope": "metadata-large whole child, zero warmups, preflight plus one timed open",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "valgrind",
+        "--tool=callgrind",
+        "--callgrind-out-file=/tmp/litchi-goal-0506/callgrind-before.out",
+        "/tmp/litchi-goal-0506/before",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0506/profile-before.json"
+      ],
+      "exit_code": 0,
+      "log": "profile-before.log"
+    },
+    {
+      "kind": "heap",
+      "scope": "whole child includes setup, preflight and one timed open; zero warmups",
+      "argv": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0506/heap-before",
+        "/tmp/litchi-goal-0506/before",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0506/heap-before.json"
+      ],
+      "exit_code": 0,
+      "log": "heap-before.log",
+      "summary_argv": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0506/heap-before.zst"
+      ],
+      "summary_log": "heap-before-summary.txt"
+    },
+    {
+      "kind": "heap",
+      "scope": "whole child includes setup, preflight and one timed open; zero warmups",
+      "argv": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0506/heap-plain-before",
+        "/tmp/litchi-goal-0506/before",
+        "--corpus",
+        "plain-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0506/heap-plain-before.json"
+      ],
+      "exit_code": 0,
+      "log": "heap-plain-before.log",
+      "summary_argv": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0506/heap-plain-before.zst"
+      ],
+      "summary_log": "heap-plain-before-summary.txt"
+    },
+    {
+      "kind": "instructions",
+      "scope": "metadata-large whole child, zero warmups, preflight plus one timed open",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "valgrind",
+        "--tool=callgrind",
+        "--callgrind-out-file=/tmp/litchi-goal-0506/callgrind-after.out",
+        "/tmp/litchi-goal-0506/after",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0506/profile-after.json"
+      ],
+      "exit_code": 0,
+      "log": "profile-after.log"
+    },
+    {
+      "kind": "heap",
+      "scope": "whole child includes setup, preflight and one timed open; zero warmups",
+      "argv": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0506/heap-after",
+        "/tmp/litchi-goal-0506/after",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0506/heap-after.json"
+      ],
+      "exit_code": 0,
+      "log": "heap-after.log",
+      "summary_argv": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0506/heap-after.zst"
+      ],
+      "summary_log": "heap-after-summary.txt"
+    },
+    {
+      "kind": "heap",
+      "scope": "whole child includes setup, preflight and one timed open; zero warmups",
+      "argv": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0506/heap-plain-after",
+        "/tmp/litchi-goal-0506/after",
+        "--corpus",
+        "plain-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0506/heap-plain-after.json"
+      ],
+      "exit_code": 0,
+      "log": "heap-plain-after.log",
+      "summary_argv": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0506/heap-plain-after.zst"
+      ],
+      "summary_log": "heap-plain-after-summary.txt"
+    }
+  ],
+  "hardware_counters": "not available: perf_event_paranoid=4",
+  "allocation_measurements": "whole-child counts, not per-open; rounded peak bytes from heaptrack_print; profiler RSS cannot refute formal uninstrumented RSS"
+}

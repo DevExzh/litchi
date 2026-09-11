@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0506: faster ODG span discovery with an RSS tradeoff
+
+[0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.
+Shape attribute spans now use one checked pass and fixed stack slots, with
+original ordered error handling retained. Plain median open/traversal improves
+26.81–28.29%; metadata improves 17.00–18.06%. Whole-child allocation calls
+fall 26.81%/36.48% on metadata-large/plain-large, while rounded heap peaks
+are unchanged. Plain-large uninstrumented RSS rises 10.15%/9.86%: the roughly
+2 MiB cost is accepted and retained, not averaged away. The owner suite passes
+108 tests; broader CRUD/provider coverage and memory attribution remain open.
+
 ## 0505: scoped ODG attribute filtering
 
 [0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.
