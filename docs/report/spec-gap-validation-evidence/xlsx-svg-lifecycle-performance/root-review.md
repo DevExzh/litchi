@@ -15,18 +15,35 @@ byte observation is cross-referenced to the source-scope probe.
 The adapter uses deterministic synthetic packages adapted from
 `crates/litchi-xlsx/tests/drawing_svg_lifecycle.rs`, plus the retained native
 LibreOffice fixture. It exercises all three anchor forms, shared and distinct
-targets, inventory counts, namespace pressure, and refusal lanes. It must
+targets, inventory counts, namespace pressure, strict-host and incoming-edge
+lifecycle cases, captured-owner clone cases, and refusal lanes. The exploratory
+root-namespace lane requires raw-source and shared-context projections for all
+32 owners. It must
 still satisfy every semantic and refusal gate in `requirements.md` before
 setting `XLSX_SVG_PROFILE_API_WIRED=1`. The three dedicated multi-picture
 attach lanes and six exploratory detach lanes stage 16, 64, and 256 edits on
 one drawing and validate one composed commit/reopen per count. They are
 bounded cost lanes for the current per-intent rescan behavior, without a
-scaling claim. The 60-lane acceptance matrix adds exact in-memory inverse and
+scaling claim. The 65-lane acceptance matrix adds exact in-memory inverse and
 replay-refusal checks for every anchor/size pair and a composite mixed-cap
 atomic-refusal lane. The adapter repeats OPC reachability, SVG leaf, content
 type, fallback, and selected-owner checks after each changed publication;
 source-copy and cumulative staged-byte fields stay null until the production
-owner exposes those boundaries.
+owner exposes those boundaries. Shared-final inputs are built with only the
+selected picture owning the shared SVG, without production detach setup. The
+incoming-edge lane adds a separate package relationship that must retain the
+SVG leaf after final drawing-owner detach. Strict attach and detach lanes
+assert the strict worksheet/drawing relationship types. Captured-owner clone
+lanes scan and validate once before warm-up and measurement, then time only
+cloning the captured `PictureSource`, separate from workbook open/save and
+capture parsing. Namespace refusal derives the first refused active-binding
+count by probing the admitted policy, and opaque extension/descendant checks
+compare exact bytes and counts. Receipts distinguish generated pressure
+bindings, total active bindings including seven fixed root declarations, and
+the refused active limit; the first refusal is one active binding above the
+limit. The clone timer stops before post-timer
+byte/owner/reference validation; the cloned owner remains live through the
+allocator snapshot and is dropped before receipt encoding.
 
 The retained exploratory executables are tied to their source manifests and
 preimages. An isolated source-helper commit moved `HEAD` after the attach
@@ -39,7 +56,7 @@ Validation performed on the gated adapter scaffold:
 - standalone harness dependency resolution is locked and offline;
 - the adapter is written against the current callable API;
 - the release adapter compiles against an isolated candidate overlay;
-- one-sample semantic smoke checks pass for all 60 acceptance and 7 exploratory lanes (not retained as performance evidence);
+- one-sample semantic smoke checks pass for all 65 acceptance and 7 exploratory lanes (not retained as performance evidence);
 - raw receipts carry both FNV-1a and SHA-256 corpus identities;
 - shell and Python syntax checks pass;
 - the runner refuses an unfrozen run before creating a target;
@@ -54,13 +71,15 @@ detach receipts passed allocator, semantic, and exact-output checks. The full
 runner remains gated until the callable lifecycle API and semantic checks are
 frozen; no production files were written by this profiler.
 
-The current root review adds seven adversarial Python verifier tests. They
+The current root review adds nine adversarial Python verifier tests. They
 reject missing/nonempty stderr, missing/failed/duplicate exit-status records,
 changed or malformed executable digests, incorrect process identities, and
 input-size drift despite matching claimed hashes, and native receipts that
 disagree with the documented producer fixture. A copied-runner execution test
 also proves that cleanup preserves historical exploratory and unrelated
-evidence, and removes its owned target on build failure. All seven pass. Shell syntax
+evidence, and removes its owned target on build failure. Namespace tests reject
+missing, malformed, inconsistent, or changing first-refused binding counts.
+All nine pass. Shell syntax
 and three early refusal gates (unfrozen, unwired, insufficient process count)
 also pass without creating a Cargo target. These checks are verifier evidence,
 not lifecycle performance measurements or production acceptance.
@@ -68,17 +87,18 @@ not lifecycle performance measurements or production acceptance.
 The refusal-path review is now corrected. The Rust adapter emits a distinct
 typed refusal only after classifying the public API error and confirming exact
 source-byte preservation. Unexpected acceptance, source mutation, setup
-failure, and unrelated API errors remain hard failures. Two adapter unit tests
-cover those negative cases and a validated refusal; the retained candidate
-build and one-sample semantic smoke pass all 60 acceptance and 7 exploratory
-lanes. The native lane also asserts the documented producer SHA-256 before
-emitting a receipt. These checks are scaffold validation, not lifecycle
-performance measurements or production acceptance.
+failure, and unrelated API errors remain hard failures. Five adapter unit tests
+cover those negative cases, exact opaque-fragment checks, registry counts, and
+a validated external-edge refusal; the retained candidate build and one-sample
+semantic smoke pass all 65 acceptance and 7 exploratory lanes. The native lane
+also asserts the documented producer SHA-256 before emitting a receipt. These
+checks are scaffold validation, not lifecycle performance measurements or
+production acceptance.
 
-Independent review approves retaining the scaffold with measurement gates
-closed. Before final profiling, add explicit Strict-host lifecycle and incoming
-edge lanes, strengthen opaque-descendant preservation assertions, derive the
-namespace refusal boundary from the admitted policy, separate true captured
-owner cloning from open/save work, and build shared-final fixtures without
-using production detach as fixture preparation. The current 67-lane smoke
-does not close these acceptance-coverage gaps.
+The targeted coverage follow-up is now implemented in the owned scaffold, with
+measurement gates still closed. The registry is 65 acceptance lanes plus 7
+exploratory lanes (72 total). The isolated candidate build and one-sample
+semantic smoke pass all 72 lanes, including strict attach/final-detach,
+incoming-edge retention, exact opaque-fragment checks, derived namespace
+refusal, captured-owner clone, and directly constructed shared-final fixtures.
+This is readiness evidence only; it contains no timing or performance claim.

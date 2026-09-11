@@ -51,14 +51,18 @@ the corresponding source XML element. The `{size}` values are `small` and
 | `capture_raster_{anchor}_{size}` | all 3 anchor forms × 2 payload sizes | open package, source-backed picture capture, and the requested read projection |
 | `capture_attached_{anchor}_{size}` | all 3 anchor forms × 2 payload sizes | open package, source-backed SVG capture, fallback and owner assertions |
 | `clone_raster_{size}`, `clone_attached_{size}` | small and large; adapter must exercise representative all-3-anchor fixtures | open/capture plus the named immutable snapshot clones; not a clone-only claim |
+| `clone_captured_owner_{size}` | small and large; all-3-anchor source present | pre-capture and validate one `PictureSource` before the timer; time only the clone of that captured owner, without workbook open/save or package publication |
 | `inventory_shared_{256,1024}` | many direct pictures sharing one raster and one SVG target | worksheet/drawing picture inventory and every descriptor check |
 | `inventory_distinct_{256,1024}` | many direct pictures with distinct SVG targets | same inventory checks with distinct target metadata |
 | `namespace_heavy` | inherited bindings and opaque descendants below configured limits | owner capture on a namespace-heavy direct picture |
 | `namespace_limit_refusal` | syntactically complete source at the configured active-binding limit | typed pre-allocation refusal; earlier package/XML rejection is a failed lane |
 | `attach_end_to_end_{anchor}_{size}` | all 3 anchor forms × 2 payload sizes | capture, fallible commit/closure validation, publish, reopen, and semantic package checks |
+| `strict_attach_end_to_end_two_cell_small` | strict worksheet/drawing dialect | attach, commit, publish, reopen, and exact strict worksheet/drawing relationship checks |
 | `inverse_attach_detach_{anchor}_{size}` | all 3 anchor forms × 2 payload sizes | attach and publish, reopen the forward result, apply the source-bound in-memory inverse, require exact source restoration, and refuse replay on the already-published snapshot |
 | `detach_end_to_end_shared_first_{anchor}` | all 3 anchor forms | detach one of two owners; shared SVG edge and part must remain |
 | `detach_end_to_end_shared_final_{anchor}` | all 3 anchor forms | detach final owner; reachability and content-type checks may remove SVG |
+| `strict_detach_end_to_end_shared_final_two_cell` | strict worksheet/drawing dialect | detach final owner, preserve strict host relationships, publish, reopen, and verify SVG cleanup |
+| `incoming_edge_shared_final_two_cell` | one selected owner plus a separate incoming SVG relationship | remove the selected drawing-to-SVG relationship while a package-wide incoming edge retains the SVG leaf |
 | `detach_end_to_end_distinct_{anchor}_{size}` | all 3 anchor forms × 2 payload sizes | detach a distinct target and reopen the changed closure |
 | `noop_detach_{anchor}` | all 3 anchor forms | exact no-op path; source bytes and package snapshot must be shared |
 | `limit_{small,large}` | caller output/edit budget just below required staging | refusal before oversized temporary output allocation or publication |
@@ -69,20 +73,21 @@ the corresponding source XML element. The `{size}` values are `small` and
 | `malformed_unknown_uri` | unknown extension URI or foreign SVG namespace | inert preservation, no inferred resource, and exact detach no-op |
 | `multi_picture_same_drawing_{16,64,256}` | 16, 64, and 256 attach intents in one ordinary drawing transaction | composed attach, commit, publish, reopen, and all-owner checks; exposes per-intent rescan and cumulative staging cost without a scaling claim |
 
-The freeze-gated acceptance set has 60 lanes. The adapter also accepts six
+The freeze-gated acceptance set has 65 lanes. The adapter also accepts six
 exploratory-only lanes,
 `multi_picture_same_drawing_detach_{shared,distinct}_{16,64,256}`. Each lane
 detaches every direct picture in one transaction and checks the final raster
 fallback, SVG reachability cleanup, commit, and reopen. They remain outside
-the freeze-gated 60-lane acceptance set and carry no scaling claim.
+the freeze-gated 65-lane acceptance set and carry no scaling claim.
 
 The adapter also accepts the exploratory-only
 `inventory_shared_root_namespace_32` lane. It inventories 32 direct pictures
 with distinct SVG relationship IDs beneath one drawing root carrying 128
 large inherited namespace values. The lane checks the source-backed owner
-shape and retained source visibility; it is paired with the retained
-scope-probe receipt in `../xlsx-svg-source/` and carries no timing, peak-memory,
-or complexity claim.
+shape and retained source visibility for all 32 owners, including one
+raw-source and one namespace-context projection per picture; it is paired with
+the retained scope-probe receipt in `../xlsx-svg-source/` and carries no
+timing, peak-memory, or complexity claim.
 
 `capture`, `clone`, and `inventory` are isolated operations. `attach`, inverse,
 and `detach` end-to-end lanes include the public fallible commit path, complete
@@ -122,9 +127,27 @@ incoming edge scan before deleting that part. The many-picture fixtures use
 256 and 1,024 direct pictures, keep the PNG relationship shared, and vary only
 the SVG-target topology. Namespace-heavy fixtures use 252 inherited bindings
 and 1,024 opaque descendants as a bounded workload, matching the
-resolver-pressure shape used by the existing source-backed profiles. The limit
-refusal lane must derive its exact configured limit from the public error,
-rather than assuming a limit that the host does not expose.
+resolver-pressure shape used by the existing source-backed profiles. The
+namespace refusal fixture is derived by probing the admitted host policy and
+binary-searching the first refused active-binding count; the receipt records
+`namespace_generated_bindings`, `namespace_active_bindings`, and
+`namespace_active_limit`. The generated count covers only declarations added
+by the pressure fragment; the active count includes the seven fixed drawing
+root bindings. The first refused fixture must satisfy
+`active = generated + 7 = active_limit + 1`, with the preceding generated
+count accepted.
+
+Shared-final fixtures are constructed directly with one selected picture
+carrying the shared SVG owner. They do not call the production detach API to
+prepare the input, so the detach lane measures only the requested lifecycle
+operation. The separate incoming-edge fixture adds an opaque package part that
+retains an internal relationship to the SVG leaf after the selected drawing
+owner is removed.
+
+Opaque extension and namespace-descendant fixtures assert the exact opaque
+fragment bytes and expected occurrence count after every read, attach, inverse,
+and detach operation; a `source() == None` observation alone is not treated as
+memory or preservation evidence.
 
 The native fixture is never mutated by the generator. It is copied only into
 the adapter's private temporary workspace when a capture lane needs it. No
@@ -137,6 +160,7 @@ Every process receipt has schema
 
 ```text
 lane, input_bytes, input_hash_fnv1a64, input_sha256, warmup, sample_count,
+namespace_generated_bindings, namespace_active_bindings, namespace_active_limit,
 expected_success, samples[]
 ```
 
@@ -189,6 +213,14 @@ Unexpected acceptance, source mutation, setup failure, or an unrelated API
 error is a hard lane failure and must not be relabeled as the requested
 refusal class.
 
+The captured-owner clone lanes start the timer immediately before cloning the
+already prepared `PictureSource` and take the allocator snapshot before
+post-timer byte, owner, and relationship assertions. The cloned owner remains
+live through that snapshot, so `live_after` intentionally includes the clone;
+the adapter drops it before receipt encoding and the next sample. This keeps
+the clone itself in the measured allocation scope while keeping validation and
+receipt construction outside the timed operation.
+
 Three fresh processes run each lane, with two warm-up samples and twenty
 measured samples by default. The runner may increase those counts, but never
 decrease them for sealed evidence. Report p50, p95, and p99 elapsed values,
@@ -239,6 +271,10 @@ Before any receipt is considered valid, the adapter must assert:
   final-owner reachability validation;
 - strict/transitional relationship dialect and lexical source preservation are
   respected;
+- strict worksheet and drawing relationship types remain intact through attach
+  and final-owner detach;
+- package-wide incoming SVG relationships keep a shared leaf alive after the
+  selected drawing owner is detached;
 - unknown, duplicate, MCE-wrapped, linked, and malformed owners are inert or
   refused according to the design;
 - exact no-op publication shares source bytes;

@@ -104,6 +104,64 @@ class ReceiptChecks(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "different fixture"):
             verify.verify_native_identity(self.root, corpus, self.root)
 
+    def test_namespace_boundary_requires_explicit_first_refused_active_count(self):
+        path = self.root / "namespace_limit_refusal-p1.json"
+        receipt = {
+            "namespace_generated_bindings": 16378,
+            "namespace_active_bindings": 16385,
+            "namespace_active_limit": 16384,
+        }
+        self.assertEqual(
+            verify.verify_namespace_boundary(receipt, "namespace_limit_refusal", path),
+            (16378, 16385, 16384),
+        )
+        for field in receipt:
+            for bad in (None, True, "16384", 0, -1):
+                with self.subTest(field=field, bad=bad):
+                    with self.assertRaisesRegex(AssertionError, "missing or malformed"):
+                        verify.verify_namespace_boundary(
+                            {**receipt, field: bad}, "namespace_limit_refusal", path
+                        )
+        for replacement in (
+            {"namespace_active_bindings": 16378},
+            {"namespace_active_bindings": 16386},
+        ):
+            with self.assertRaises(AssertionError):
+                verify.verify_namespace_boundary({**receipt, **replacement}, "namespace_limit_refusal", path)
+        with self.assertRaisesRegex(AssertionError, "unexpected namespace boundary"):
+            verify.verify_namespace_boundary(receipt, "capture", path)
+
+    def test_namespace_boundary_must_match_across_processes(self):
+        lane = "namespace_limit_refusal"
+        sample = {
+            "expected_success": False, "actual_success": False,
+            "semantic_ok": True, "output_exact": True,
+            "direct_allocated_bytes": 0, "realloc_new_bytes": 0,
+            "realloc_old_bytes": 0, "deallocated_bytes": 0,
+            "live_before": 0, "live_after": 0, "requested_alloc_bytes": 0,
+            "alloc_balance_ok": True, "alloc_invalid": False,
+            "alloc_failed": 0, "error": {"class": "namespace_limit"},
+        }
+        receipt = {
+            "schema": "xlsx-svg-lifecycle-profile-v1", "lane": lane,
+            "warmup": 2, "sample_count": 20, "samples": [sample] * 20,
+            "expected_success": False, "input_hash_fnv1a64": 1,
+            "input_sha256": "a" * 64, "input_bytes": 100,
+            "namespace_generated_bindings": 16378,
+            "namespace_active_bindings": 16385,
+            "namespace_active_limit": 16384,
+        }
+        for number in range(1, 4):
+            self.process(f"{lane}-p{number}.json").write_text(json.dumps(receipt))
+        with patch.object(verify, "LANES", (lane,)):
+            verify.verify_lanes(self.root)
+            receipt["namespace_generated_bindings"] = 16379
+            receipt["namespace_active_bindings"] = 16386
+            receipt["namespace_active_limit"] = 16385
+            self.process(f"{lane}-p3.json").write_text(json.dumps(receipt))
+            with self.assertRaisesRegex(AssertionError, "namespace boundary changed"):
+                verify.verify_lanes(self.root)
+
     @unittest.skipUnless(Path("/usr/bin/time").is_file(), "runner requires GNU time")
     def test_runner_cleanup_preserves_exploratory_and_unrelated_evidence(self):
         here = self.root / "docs/report/spec-gap-validation-evidence/profile"
