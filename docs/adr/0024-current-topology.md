@@ -41,6 +41,22 @@ owns shared OOXML package vocabulary and services,
 host-neutral DrawingML, and [`litchi-opc`](../../crates/litchi-opc/Cargo.toml)
 owns physical OPC packaging.
 
+Spreadsheet Data Model storage is a separate shared branch owned by
+[`litchi-xldm`](../../crates/litchi-xldm/Cargo.toml):
+
+```text
+litchi-xldm
+├── litchi-xlsb
+└── litchi-xlsx
+```
+
+The XLDM crate is dependency-free within the workspace and owns the bounded,
+source-sharing storage, metadata, identity, and OLAP-proof layers. The XLSB
+and XLSX crates retain their format-specific package bindings and expose the
+shared owner only through their contextual data-model/package surfaces. Both
+edges are normal runtime dependencies; neither workbook crate reimplements or
+owns a second XLDM storage model.
+
 The root [`litchi` manifest](../../crates/litchi/Cargo.toml) retains the
 `ooxml` feature gate, but its public facade exposes the standalone owners
 directly as `litchi::{docx, pptx, xlsx, xlsb}` (alongside `opc` and
@@ -4376,3 +4392,25 @@ mutation metadata admission.
 This retires a read-side compatibility implementation. Public selector-first
 mutation admission, native changed-edit parity, and the remaining monolith
 exit gates are unchanged. See the [ADR 0028 follow-up](0028-iwa-monolith-exit.md#2026-09-06-follow-up-focused-catalog-appearance-reads-and-native-datetime).
+
+## 2026-09-11 amendment: shared XLDM topology registration
+
+The extracted [`litchi-xldm`](../../crates/litchi-xldm/Cargo.toml) crate is now
+registered as the neutral shared Spreadsheet Data Model owner. Its source
+surface owns bounded storage inspection and writing plus metadata, generated
+path, native, identity, and OLAP-closure projections while retaining borrowed
+source bytes. `litchi-xlsx` keeps its historical `package::xldm` facade and
+error mapping for API compatibility; `litchi-xlsb` uses the same owner for its
+data-model identity and closure proof. Package binding and workbook-specific
+transactions remain in those two concrete crates.
+
+The topology policy records exactly two normal XLDM edges,
+`litchi-xlsb -> litchi-xldm` and `litchi-xlsx -> litchi-xldm`; the shared owner
+has no workspace dependencies and no development-only edge. This keeps the
+storage model single-owner and prevents a format host from growing a private
+duplicate implementation.
+
+The current inventory is 65 workspace packages, 241 internal dependency
+declarations, 230 canonical edges, 12 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.

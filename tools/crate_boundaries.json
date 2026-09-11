@@ -305,6 +305,7 @@
     "litchi-word": [
       "litchi-core"
     ],
+    "litchi-xldm": [],
     "litchi-xls": [
       "litchi-biff",
       "litchi-cfb",
@@ -326,6 +327,7 @@
       "litchi-sign",
       "litchi-spreadsheet-drawing",
       "litchi-vba",
+      "litchi-xldm",
       "soapberry-zip"
     ],
     "litchi-xlsx": [
@@ -337,6 +339,7 @@
       "litchi-sheet",
       "litchi-spreadsheet-drawing",
       "litchi-vba",
+      "litchi-xldm",
       "soapberry-zip"
     ],
     "soapberry-zip": [],
@@ -522,6 +525,7 @@
     "litchi-spreadsheet-drawing",
     "litchi-vba",
     "litchi-word",
+    "litchi-xldm",
     "litchi-xlsb"
   ],
   "runtime_packages": [
