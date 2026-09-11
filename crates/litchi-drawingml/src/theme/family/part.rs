@@ -769,6 +769,14 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     &namespace,
                     &extensions,
                 );
+                // Only one direct supported family can be unambiguous. Refuse
+                // another before cloning its inherited namespace environment,
+                // even when it belongs to a different recognized extension.
+                if family_extension.is_some() && !families.is_empty() {
+                    return Err(invalid(
+                        "Theme XML contains multiple direct Theme Family owners",
+                    ));
+                }
                 let need_scope_copy = family_extension
                     .is_some_and(|index| !recognized_family_extensions.contains(&index));
                 let inherited = need_scope_copy.then(|| scope.clone());
@@ -837,6 +845,14 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     &namespace,
                     &extensions,
                 );
+                // Only one direct supported family can be unambiguous. Refuse
+                // another before cloning its inherited namespace environment,
+                // even when it belongs to a different recognized extension.
+                if family_extension.is_some() && !families.is_empty() {
+                    return Err(invalid(
+                        "Theme XML contains multiple direct Theme Family owners",
+                    ));
+                }
                 let need_scope_copy = family_extension
                     .is_some_and(|index| !recognized_family_extensions.contains(&index));
                 let inherited = need_scope_copy.then(|| scope.clone());

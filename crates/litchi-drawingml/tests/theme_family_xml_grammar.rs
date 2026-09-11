@@ -346,3 +346,43 @@ fn standalone_document_markup_cannot_be_embedded_as_a_family_child() {
             .contains("<!-- <?x is comment text -->")
     );
 }
+
+#[test]
+fn namespace_heavy_foreign_families_stay_opaque_and_duplicate_owners_fail_early() {
+    use litchi_drawingml::theme::family;
+    let uri = format!("urn:{}", "x".repeat(family::MAX_NAMESPACE_BYTES - 4));
+    let declarations = (0..120)
+        .map(|index| format!(" xmlns:p{index}=\"{uri}\""))
+        .collect::<String>();
+    let root = format!(
+        r#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:f="{}"{declarations}><a:extLst>"#,
+        family::NAMESPACE
+    );
+    // Each foreign family is small; copying the ~0.5 MiB active scope for each
+    // one would amplify a sub-1-MiB document into hundreds of MiB of retention.
+    let foreign = r#"<a:ext uri="urn:foreign"><f:themeFamily/></a:ext>"#.repeat(1000);
+    let source = format!("{root}{foreign}</a:extLst></a:theme>");
+    assert!(source.len() < family::MAX_XML_BYTES);
+    assert!(
+        part::read_family(source.as_bytes())
+            .expect("opaque foreign families")
+            .is_none()
+    );
+
+    // The second admitted family must be rejected as it is reached, before
+    // retaining another scope or continuing to the deliberately malformed tail.
+    for second in ["<f:themeFamily/>", "<f:themeFamily></f:themeFamily>"] {
+        let source = format!(
+            r#"{root}<a:ext uri="{}"><f:themeFamily name="A" id="{{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}}" vid="{{4A3C46E8-61CC-4603-A589-7422A47A8E4A}}"/></a:ext><a:ext uri="{}">{second}</a:ext><broken"#,
+            part::EXTENSION_URI,
+            part::NATIVE_EXTENSION_URI
+        );
+        let error = part::read_family(source.as_bytes()).expect_err("duplicate supported owner");
+        assert!(
+            error
+                .to_string()
+                .contains("multiple direct Theme Family owners"),
+            "{error}"
+        );
+    }
+}
