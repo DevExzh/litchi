@@ -522,6 +522,37 @@ fn namespace_uri_bound_accepts_exact_bytes_and_rejects_one_more() {
 }
 
 #[test]
+fn namespace_prefix_bound_accepts_exact_bytes_and_rejects_one_more() {
+    for length in [MAX_NAMESPACE_BYTES, MAX_NAMESPACE_BYTES + 1] {
+        let prefix = "p".repeat(length);
+        for body in [
+            String::new(),
+            format!("<{prefix}:child/>"),
+            format!("<x:child {prefix}:attr=\"value\"/>"),
+        ] {
+            let xml = format!(
+                "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:x=\"urn:child\" xmlns:{prefix}=\"urn:prefix\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\">{body}</thm15:themeFamily>"
+            );
+            let result = family::read(xml.as_bytes());
+            if length == MAX_NAMESPACE_BYTES {
+                assert!(result.is_ok(), "exact prefix boundary: {result:?}");
+            } else {
+                assert!(
+                    matches!(
+                        result,
+                        Err(litchi_drawingml::Error::Limit {
+                            resource: "theme family namespace prefix bytes",
+                            limit: MAX_NAMESPACE_BYTES,
+                        })
+                    ),
+                    "oversized declared prefix: {result:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn name_and_source_output_bounds_accept_exact_and_reject_over() {
     let exact_name = "N".repeat(MAX_NAME_BYTES);
     let exact_value = Family::new(&exact_name, OFFICE_ID, OFFICE_VID).unwrap();

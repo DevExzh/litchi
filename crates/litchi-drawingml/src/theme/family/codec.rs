@@ -187,6 +187,7 @@ fn validate_extension_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u
 
 fn validate_element_name(element: &BytesStart<'_>) -> Result<()> {
     let qualified_name = element.name();
+    validate_qname_prefix(qualified_name)?;
     let name = std::str::from_utf8(qualified_name.as_ref()).map_err(xml_error)?;
     if !is_qualified_name(name) {
         return Err(invalid("theme family element name is invalid"));
@@ -275,11 +276,22 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
 
     loop {
         let event_start = position(&reader, "theme family")?;
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(xml_error)?
+            .into_owned();
+        let resolved = match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                validate_qname_prefix(element.name())?;
+                reader.resolver().resolve_element(element.name()).0
+            },
+            Event::End(element) => {
+                validate_qname_prefix(element.name())?;
+                reader.resolver().resolve_element(element.name()).0
+            },
+            _ => ResolveResult::Unbound,
+        };
         let event_namespace = resolved_namespace(&resolved)?;
-        let event = event.into_owned();
         let event_end = position(&reader, "theme family")?;
         if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
             pre_root_event_seen = true;
@@ -519,6 +531,7 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
         if !is_qualified_name(name) {
             return Err(invalid("theme family attribute name is invalid"));
         }
+        validate_qname_prefix(attribute.key)?;
         if is_namespace_attribute(attribute.key) {
             namespaces = namespaces
                 .checked_add(1)
@@ -536,14 +549,18 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
                 ));
             }
             let value = decode_attribute(&attribute, reader.decoder())?;
-            validate_namespace_binding(
-                attribute
-                    .key
-                    .as_ref()
-                    .strip_prefix(b"xmlns:")
-                    .unwrap_or(&[]),
-                &value,
-            )?;
+            let prefix = attribute
+                .key
+                .as_ref()
+                .strip_prefix(b"xmlns:")
+                .unwrap_or(&[]);
+            if prefix.len() > MAX_NAMESPACE_BYTES {
+                return Err(limit(
+                    "theme family namespace prefix bytes",
+                    MAX_NAMESPACE_BYTES,
+                ));
+            }
+            validate_namespace_binding(prefix, &value)?;
             if value.len() > MAX_NAMESPACE_BYTES {
                 return Err(limit("theme family namespace bytes", MAX_NAMESPACE_BYTES));
             }
@@ -767,6 +784,19 @@ fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
 
 fn is_namespace_attribute(key: QName<'_>) -> bool {
     key.as_ref() == b"xmlns" || key.as_ref().starts_with(b"xmlns:")
+}
+
+fn validate_qname_prefix(name: QName<'_>) -> Result<()> {
+    if name
+        .prefix()
+        .is_some_and(|prefix| prefix.as_ref().len() > MAX_NAMESPACE_BYTES)
+    {
+        return Err(limit(
+            "theme family namespace prefix bytes",
+            MAX_NAMESPACE_BYTES,
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_event_text(value: &[u8], field: &str) -> Result<()> {
