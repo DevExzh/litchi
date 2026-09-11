@@ -6,6 +6,12 @@
 //! profile, inherited namespace bindings, and source spans. Package
 //! relationships, transactions, and durable patches remain with the format
 //! that owns the Theme part.
+//!
+//! XML names, characters, references, and document boundaries are checked across
+//! the entire source. Declarations must specify XML 1.0 and, when present, UTF-8.
+//! The owned root/list/recognized-extension containers allow only whitespace
+//! between elements. Other descendants remain opaque and may contain valid XML
+//! text; this ownership scanner does not perform full Theme schema validation.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -917,7 +923,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 validate_raw_theme_text(text.as_ref())?;
                 if element_only_context(&stack, &extensions) && !is_xml_whitespace(text.as_ref()) {
                     return Err(invalid(
-                        "recognized Theme extension container contains non-whitespace text",
+                        "owned Theme container contains non-whitespace text",
                     ));
                 }
                 if (!root_seen || root_closed) && !is_xml_whitespace(text.as_ref()) {
@@ -928,7 +934,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 family_codec::validate_event_text(text.as_ref(), "Theme XML CDATA")?;
                 if element_only_context(&stack, &extensions) && !is_xml_whitespace(text.as_ref()) {
                     return Err(invalid(
-                        "recognized Theme extension container contains non-whitespace CDATA",
+                        "owned Theme container contains non-whitespace CDATA",
                     ));
                 }
                 if !root_seen || root_closed {
@@ -944,7 +950,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     && !character.is_some_and(is_xml_whitespace_character)
                 {
                     return Err(invalid(
-                        "recognized Theme extension container contains a non-whitespace reference",
+                        "owned Theme container contains a non-whitespace reference",
                     ));
                 }
             },
@@ -2251,7 +2257,7 @@ fn is_xml_whitespace_character(character: char) -> bool {
 
 fn element_only_context(stack: &[Frame], extensions: &[ExtensionRecord]) -> bool {
     match stack.last().map(|frame| frame.kind) {
-        Some(Kind::ExtList) => true,
+        Some(Kind::Root | Kind::ExtList) => true,
         Some(Kind::Ext(index)) => extensions
             .get(index)
             .and_then(|extension| extension.uri.as_deref())

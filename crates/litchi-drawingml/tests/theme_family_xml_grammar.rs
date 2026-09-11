@@ -43,6 +43,8 @@ fn malformed_xml_is_rejected_even_without_a_family_owner() {
         "<a:1bad/>",
         "<a:b:c/>",
         "&foo;",
+        "\u{1}",
+        "&#x1;",
         "<opaque>&foo;</opaque>",
         "<opaque>&#0;</opaque>",
         "<opaque>&#xD800;</opaque>",
@@ -62,7 +64,8 @@ fn malformed_xml_is_rejected_even_without_a_family_owner() {
         assert_rejected(format!("{prefix}{}", theme("")).as_bytes());
         assert_rejected(format!("{}{prefix}", theme("")).as_bytes());
     }
-    for body in ["text", "<![CDATA[text]]>", "&#65;"] {
+    for body in ["text", "<![CDATA[abc]]>", "&#65;"] {
+        assert_rejected(theme(body).as_bytes());
         assert_rejected(theme(&format!("<a:extLst>{body}</a:extLst>")).as_bytes());
         assert_rejected(
             theme(&format!(
@@ -82,6 +85,8 @@ fn declarations_require_xml_10_utf8_and_correct_placement() {
         "<?xml version=\"1.0\" encoding=\"UTF-16\"?>",
         "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>",
         "<?xml encoding=\"UTF-8\"?>",
+        "<?xml version=\"1.0\" encoding=\"wat\"?>",
+        "<?xml ?>",
         "<?xml version=\"1.0\"version=\"1.0\"?>",
         "<?xml version=\"1.0\" standalone=\"maybe\"?>",
         " <?xml version=\"1.0\"?>",
