@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## 0506: repeated ODG shape-span walks batched
+
+[0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.
+One checked pass replaces 16 shape-span lookup walks. The fresh baseline
+attributes 18.51% of whole-child instruction references to source-span lookup;
+the candidate reduces whole-child references 15.89%. Plain p50 improves
+26.81–28.29%, metadata p50 17.00–18.06%. Plain-large RSS rises about 10%
+(~2 MiB), an explicitly accepted tradeoff. Repeated semantic value lookups
+remain roughly 355M inclusive references and are the next measured ODG
+work-elimination opportunity; no validation removal is authorized.
+
 ## 0505: avoid unrelated ODG namespace lookups
 
 [0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.

@@ -1,0 +1,16 @@
+plain-small input=2305B p50=1.933ms p95=1.947ms p99=2.111ms
+plain-large input=49143B p50=59.906ms p95=61.502ms p99=61.568ms
+metadata-small input=2652B p50=1.598ms p95=1.606ms p99=1.610ms
+metadata-large input=16719B p50=22.509ms p95=22.642ms p99=22.751ms
+plain-small input=2305B p50=1.409ms p95=1.423ms p99=1.429ms
+plain-large input=49143B p50=43.035ms p95=43.666ms p99=43.881ms
+metadata-small input=2652B p50=1.325ms p95=1.339ms p99=1.527ms
+metadata-large input=16719B p50=18.503ms p95=18.635ms p99=18.763ms
+plain-small input=2305B p50=1.420ms p95=1.429ms p99=1.434ms
+plain-large input=49143B p50=43.172ms p95=43.557ms p99=43.679ms
+metadata-small input=2652B p50=1.324ms p95=1.334ms p99=1.338ms
+metadata-large input=16719B p50=18.353ms p95=18.482ms p99=18.628ms
+plain-small input=2305B p50=1.940ms p95=1.954ms p99=2.164ms
+plain-large input=49143B p50=60.206ms p95=60.616ms p99=60.872ms
+metadata-small input=2652B p50=1.596ms p95=1.605ms p99=1.610ms
+metadata-large input=16719B p50=22.398ms p95=22.644ms p99=22.756ms

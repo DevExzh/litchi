@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0506 batches ODG source-span discovery
+
+[0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.
+The measured source-span bottleneck is reduced while exact field ordering,
+namespace resolution, checked attributes and fallback errors remain covered.
+The 108-test suite includes all 16 field mappings and private error parity.
+The plain-large ~10% RSS regression is accepted for the measured latency/work
+reduction, with unresolved allocator/working-set attribution explicitly retained.
+This does not complete the broader goal, close older-parser comparisons or
+change the ten-entry strict registry.
+
 ## Current audit: 0505 reduces ODG attribute lookup work
 
 [0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.

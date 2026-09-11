@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0506: private ODG span batching preserves error authority
+
+[0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.
+[The review and input hashes](results/change-0506/adr-review.md) cover every
+accepted ADR. The fixed 16-slot shape helper remains private, checked and
+source-preserving; errors replay the original ordered helper. Public APIs,
+source ownership, dependencies, budgets, concurrency and publication rules
+are unchanged. Exact edit/inverse and differential error tests cover the
+implementation. The ~2 MiB plain-large RSS cost is explicitly accepted under
+the performance review trigger; no resource limit is weakened.
+
 ## 0501: exact payload authority remains outside the private digest
 
 [0501](changes/0501-pptx-exact-payload-comparisons.md) removes only redundant

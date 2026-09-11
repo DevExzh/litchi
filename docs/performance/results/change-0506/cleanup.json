@@ -1,0 +1,12 @@
+{
+  "removed_path": "/tmp/litchi-goal-0506",
+  "removed_files": 3711,
+  "unique_inode_allocated_bytes": 810598400,
+  "removed_generated_analyzer_cache": [
+    "docs/performance/results/change-0502/__pycache__/summarize.cpython-314.pyc"
+  ],
+  "live_proc_path_references": [],
+  "absent_after_cleanup": true,
+  "timestamp_utc": "2026-09-11T16:53:09.914918+00:00",
+  "scope": "batch-owned builds/binaries/profiles after evidence copy, plus imported analyzer bytecode; unrelated source/build directories untouched"
+}

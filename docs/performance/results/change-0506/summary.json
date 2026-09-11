@@ -1,0 +1,436 @@
+{
+  "adverse_over_five_percent": [
+    {
+      "change_ratio": 0.10146627565982413,
+      "corpus": "plain-large",
+      "metric": "whole_child_rss_kib",
+      "repeat": "r1"
+    },
+    {
+      "change_ratio": 0.0986328125,
+      "corpus": "plain-large",
+      "metric": "whole_child_rss_kib",
+      "repeat": "r2"
+    }
+  ],
+  "bootstrap": {
+    "interpretation": "within-run sampling uncertainty only; not machine-to-machine uncertainty",
+    "metric": "ratio of independently resampled within-run medians minus one",
+    "samples": 10000,
+    "seed_base": 50200
+  },
+  "corpora": [
+    "plain-small",
+    "plain-large",
+    "metadata-small",
+    "metadata-large"
+  ],
+  "repeats": [
+    "r1",
+    "r2"
+  ],
+  "rows": [
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 1409366,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 1933477,
+      "bootstrap_95pct_ratio_ci": [
+        -0.27200468052182447,
+        -0.2701031440262569
+      ],
+      "corpus": "plain-small",
+      "input_bytes": 2305,
+      "input_sha256": "d0586e7285ed874dc19be801fc94a5bcb43f1a195beac375ec71246276d18354",
+      "p50_change_ratio": -0.27107175311627707,
+      "repeat": "r1",
+      "samples": 200,
+      "semantic_checksum": 5068,
+      "statistics": {
+        "mean_ns": {
+          "after": 1411255.34,
+          "before": 1937369.205,
+          "change_ratio": -0.2715609722928366
+        },
+        "p50_ns": {
+          "after": 1409366,
+          "before": 1933477,
+          "change_ratio": -0.27107175311627707
+        },
+        "p95_ns": {
+          "after": 1422885,
+          "before": 1946848,
+          "change_ratio": -0.26913400532553133
+        },
+        "p99_ns": {
+          "after": 1429165,
+          "before": 2110738,
+          "change_ratio": -0.322907438061948
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 1635487.1623126995,
+          "before": 1192152.790025431,
+          "change_ratio": 0.3718771419205513
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 7328,
+        "before": 7384,
+        "change_ratio": -0.007583965330444253
+      }
+    },
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 1419965,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 1940048,
+      "bootstrap_95pct_ratio_ci": [
+        -0.26923300827324215,
+        -0.2673458372619685
+      ],
+      "corpus": "plain-small",
+      "input_bytes": 2305,
+      "input_sha256": "d0586e7285ed874dc19be801fc94a5bcb43f1a195beac375ec71246276d18354",
+      "p50_change_ratio": -0.26807738777597256,
+      "repeat": "r2",
+      "samples": 200,
+      "semantic_checksum": 5068,
+      "statistics": {
+        "mean_ns": {
+          "after": 1418857.015,
+          "before": 1943467.84,
+          "change_ratio": -0.26993542892893985
+        },
+        "p50_ns": {
+          "after": 1419965,
+          "before": 1940048,
+          "change_ratio": -0.26807738777597256
+        },
+        "p95_ns": {
+          "after": 1428905,
+          "before": 1953778,
+          "change_ratio": -0.26864515825237056
+        },
+        "p99_ns": {
+          "after": 1433865,
+          "before": 2163838,
+          "change_ratio": -0.33735104014256145
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 1623279.447028624,
+          "before": 1188114.9332387652,
+          "change_ratio": 0.366264661452923
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 7360,
+        "before": 7348,
+        "change_ratio": 0.0016330974414806576
+      }
+    },
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 43034598,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 59905708,
+      "bootstrap_95pct_ratio_ci": [
+        -0.28345512890297997,
+        -0.28027849568327146
+      ],
+      "corpus": "plain-large",
+      "input_bytes": 49143,
+      "input_sha256": "1c8ba0a184b37a0b3cb5ed1c0a2ba987d665b25b21feffc46c3e6e6466e4bb84",
+      "p50_change_ratio": -0.28162775406977913,
+      "repeat": "r1",
+      "samples": 200,
+      "semantic_checksum": 184694,
+      "statistics": {
+        "mean_ns": {
+          "after": 43083501.08,
+          "before": 60225843.34,
+          "change_ratio": -0.2846343248898041
+        },
+        "p50_ns": {
+          "after": 43034598,
+          "before": 59905708,
+          "change_ratio": -0.28162775406977913
+        },
+        "p95_ns": {
+          "after": 43666071,
+          "before": 61501544,
+          "change_ratio": -0.29000041039620084
+        },
+        "p99_ns": {
+          "after": 43880531,
+          "before": 61568315,
+          "change_ratio": -0.2872871216306634
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 1141941.6535504758,
+          "before": 820339.1903823256,
+          "change_ratio": 0.39203596139087904
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 22536,
+        "before": 20460,
+        "change_ratio": 0.10146627565982413
+      }
+    },
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 43172269,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 60205741,
+      "bootstrap_95pct_ratio_ci": [
+        -0.2836439346409202,
+        -0.2822246137623321
+      ],
+      "corpus": "plain-large",
+      "input_bytes": 49143,
+      "input_sha256": "1c8ba0a184b37a0b3cb5ed1c0a2ba987d665b25b21feffc46c3e6e6466e4bb84",
+      "p50_change_ratio": -0.2829210589734291,
+      "repeat": "r2",
+      "samples": 200,
+      "semantic_checksum": 184694,
+      "statistics": {
+        "mean_ns": {
+          "after": 43146271.85,
+          "before": 60230779.265,
+          "change_ratio": -0.2836507782811931
+        },
+        "p50_ns": {
+          "after": 43172269,
+          "before": 60205741,
+          "change_ratio": -0.2829210589734291
+        },
+        "p95_ns": {
+          "after": 43557341,
+          "before": 60616372,
+          "change_ratio": -0.28142613022105645
+        },
+        "p99_ns": {
+          "after": 43679421,
+          "before": 60871853,
+          "change_ratio": -0.2824364817676899
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 1138300.1435481652,
+          "before": 816251.0615059119,
+          "change_ratio": 0.3945466011990244
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 22500,
+        "before": 20480,
+        "change_ratio": 0.0986328125
+      }
+    },
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 1325444,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 1597546,
+      "bootstrap_95pct_ratio_ci": [
+        -0.17091902205006926,
+        -0.16937987359795037
+      ],
+      "corpus": "metadata-small",
+      "input_bytes": 2652,
+      "input_sha256": "7a11a8501defff985a9c2b4889b053e52af4b82cae42db588fbc9d6e6e9b6028",
+      "p50_change_ratio": -0.17032498594719647,
+      "repeat": "r1",
+      "samples": 200,
+      "semantic_checksum": 2432,
+      "statistics": {
+        "mean_ns": {
+          "after": 1329625.84,
+          "before": 1596999.115,
+          "change_ratio": -0.1674223063047846
+        },
+        "p50_ns": {
+          "after": 1325444,
+          "before": 1597546,
+          "change_ratio": -0.17032498594719647
+        },
+        "p95_ns": {
+          "after": 1338925,
+          "before": 1606346,
+          "change_ratio": -0.16647783229764945
+        },
+        "p99_ns": {
+          "after": 1527496,
+          "before": 1609946,
+          "change_ratio": -0.05121289782390215
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 2000838.9641508807,
+          "before": 1660046.0956992789,
+          "change_ratio": 0.20529120807819856
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 7624,
+        "before": 7324,
+        "change_ratio": 0.0409612233752048
+      }
+    },
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 1324415,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 1595685,
+      "bootstrap_95pct_ratio_ci": [
+        -0.17084701732763174,
+        -0.16944774231401372
+      ],
+      "corpus": "metadata-small",
+      "input_bytes": 2652,
+      "input_sha256": "7a11a8501defff985a9c2b4889b053e52af4b82cae42db588fbc9d6e6e9b6028",
+      "p50_change_ratio": -0.17000222474987237,
+      "repeat": "r2",
+      "samples": 200,
+      "semantic_checksum": 2432,
+      "statistics": {
+        "mean_ns": {
+          "after": 1325391.755,
+          "before": 1595382.235,
+          "change_ratio": -0.16923247236735106
+        },
+        "p50_ns": {
+          "after": 1324415,
+          "before": 1595685,
+          "change_ratio": -0.17000222474987237
+        },
+        "p95_ns": {
+          "after": 1333775,
+          "before": 1605236,
+          "change_ratio": -0.16910971346269332
+        },
+        "p99_ns": {
+          "after": 1338045,
+          "before": 1609516,
+          "change_ratio": -0.1686662325817202
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 2002393.5095872518,
+          "before": 1661982.1581327142,
+          "change_ratio": 0.2048225065406235
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 7624,
+        "before": 7348,
+        "change_ratio": 0.03756124115405557
+      }
+    },
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 18502828,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 22509463,
+      "bootstrap_95pct_ratio_ci": [
+        -0.17859892470997574,
+        -0.1771709356095893
+      ],
+      "corpus": "metadata-large",
+      "input_bytes": 16719,
+      "input_sha256": "56ff7ee9e0a7868e79e4224395d7f9ef6ea7e5576c64e83b7a5be194a737963f",
+      "p50_change_ratio": -0.17799780474549753,
+      "repeat": "r1",
+      "samples": 200,
+      "semantic_checksum": 41014,
+      "statistics": {
+        "mean_ns": {
+          "after": 18512126.92,
+          "before": 22512854.915,
+          "change_ratio": -0.17770860293397828
+        },
+        "p50_ns": {
+          "after": 18502828,
+          "before": 22509463,
+          "change_ratio": -0.17799780474549753
+        },
+        "p95_ns": {
+          "after": 18634569,
+          "before": 22642383,
+          "change_ratio": -0.17700495570629649
+        },
+        "p99_ns": {
+          "after": 18762550,
+          "before": 22751003,
+          "change_ratio": -0.1753088863818444
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 903591.6023215478,
+          "before": 742754.2807218457,
+          "change_ratio": 0.21654176323748997
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 14652,
+        "before": 14904,
+        "change_ratio": -0.016908212560386437
+      }
+    },
+    {
+      "after_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+      "after_p50_ns": 18353237,
+      "before_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+      "before_p50_ns": 22398493,
+      "bootstrap_95pct_ratio_ci": [
+        -0.18156524092587534,
+        -0.17994766966213005
+      ],
+      "corpus": "metadata-large",
+      "input_bytes": 16719,
+      "input_sha256": "56ff7ee9e0a7868e79e4224395d7f9ef6ea7e5576c64e83b7a5be194a737963f",
+      "p50_change_ratio": -0.1806039361665983,
+      "repeat": "r2",
+      "samples": 200,
+      "semantic_checksum": 41014,
+      "statistics": {
+        "mean_ns": {
+          "after": 18359657.81,
+          "before": 22431179.575,
+          "change_ratio": -0.18151171013484257
+        },
+        "p50_ns": {
+          "after": 18353237,
+          "before": 22398493,
+          "change_ratio": -0.1806039361665983
+        },
+        "p95_ns": {
+          "after": 18482228,
+          "before": 22643993,
+          "change_ratio": -0.18379112729808744
+        },
+        "p99_ns": {
+          "after": 18627509,
+          "before": 22755613,
+          "change_ratio": -0.1814103623576302
+        },
+        "throughput_input_bytes_per_second_p50": {
+          "after": 910956.4705125313,
+          "before": 746434.1462615364,
+          "change_ratio": 0.22041103702850884
+        }
+      },
+      "warmups": 25,
+      "whole_child_rss_kib": {
+        "after": 14628,
+        "before": 14344,
+        "change_ratio": 0.01979921918572236
+      }
+    }
+  ],
+  "schema": "litchi.odg.attribute-span-batch-summary.v1",
+  "scope": "same semantics; owned open plus traversal; A1/B1/B2/A2 serial blocks"
+}
