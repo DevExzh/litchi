@@ -1,0 +1,27 @@
+{
+  "base_revision": "4c6c63718542d3f03b60cef9ba64a6051aeeb822",
+  "before_files": {
+    "crates/litchi-odg/src/package/snapshot.rs": "86531ec66ba935e344324fee242b0f3081cb62183fda8cc5f7372e40f0b55b69",
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "workspace_test_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "after_files": {
+    "crates/litchi-odg/src/package/snapshot.rs": "836668f07d3d478999df1a7cff45c3b1d4cec95eb6d171d20248bfcd59e77293",
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "candidate_patch_sha256": "fe16634796a4a8c07cfab8fe953e9bb2b4a4bcf37a897571e71095a5bdb911ef",
+  "before_binary_sha256": "403549598099be7013be328c777bd02ce21e168e0587cdc07e74a01212848534",
+  "after_binary_sha256": "511fb5f414ece497cc76ffb315b49fa3c88873ba1c6d28add70c218bbcaaf4c3",
+  "candidate": "clean base plus candidate.patch; cfg(test) module does not affect release binary",
+  "final_rebuild_binary_sha256": "511fb5f414ece497cc76ffb315b49fa3c88873ba1c6d28add70c218bbcaaf4c3",
+  "test_files": {
+    "crates/litchi-odg/src/package/attribute_value_tests.rs": "571e74b4e46d2a8d57db3568edb3d12daccf1484eff1d0423b224baf3f88f7e4",
+    "crates/litchi-odg/tests/attribute_value_batch.rs": "8f67587e2984a37d0fdf525798dc200b93cd41a42bb10e550d0e39ed2549dd94"
+  }
+}

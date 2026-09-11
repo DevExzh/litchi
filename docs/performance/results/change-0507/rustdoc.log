@@ -1,0 +1,7 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+ Documenting litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+    Finished `dev` profile [unoptimized] target(s) in 3.17s
+   Generated /tmp/litchi-goal-0507/test-target/doc/litchi_odg/index.html

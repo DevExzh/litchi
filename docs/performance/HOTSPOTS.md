@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0507: contiguous ODG value walks batched
+
+[0507](changes/0507-odg-attribute-value-batches.md) records this batch.
+Two groups of eight requests remove 14 repeated checked value walks per
+shape. Fresh scalar-helper attribution is 355.3M inclusive references, 241.3M
+directly from the main scanner. Whole-child references fall 17.15%; plain
+p50 improves 32.74–33.51%, metadata 17.06–19.64%. Plain-large RSS falls
+9.08%, with no paired >5% adverse flag. Remaining scalar lookups account
+for 153.2M references and parse_content for 349.4M. Future priorities must
+consider these reduced costs alongside outstanding CRUD/provider coverage;
+the older 0502 comparison remains a separate evidence question.
+
 ## 0506: repeated ODG shape-span walks batched
 
 [0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.

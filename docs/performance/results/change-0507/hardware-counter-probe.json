@@ -1,0 +1,11 @@
+{
+  "command": [
+    "perf",
+    "stat",
+    "-e",
+    "cycles,instructions",
+    "/bin/true"
+  ],
+  "exit_code": 1,
+  "scope": "capability probe only; no document benchmark"
+}

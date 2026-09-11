@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0507 reduces repeated ODG value work
+
+[0507](changes/0507-odg-attribute-value-batches.md) records this batch.
+The next attributed bottleneck is reduced by two fixed-size request groups,
+retaining scalar error precedence, semantic validation order and exact source
+preservation. All 124 tests pass; the capture improves median time 17–34%
+and plain-large RSS about 9%. This is scoped progress with no >5% adverse
+paired flag, not closure of all older-parser comparisons or the broader goal.
+The ten-entry strict registry and outstanding CRUD/provider requirements
+remain unchanged.
+
 ## Current audit: 0506 batches ODG source-span discovery
 
 [0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.

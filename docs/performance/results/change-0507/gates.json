@@ -1,0 +1,119 @@
+{
+  "scope": "ODG crate and ODF umbrella ODG-only feature; not full workspace, fuzz, sanitizer or live Office",
+  "cargo_environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0507/test-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "rustdoc_environment": {
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "gates": [
+    {
+      "name": "test-all-targets",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-odg",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "log": "test-all-targets.log",
+      "passed_tests": 124
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-odg",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "fmt.log",
+      "passed_tests": null
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-odg",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "clippy.log",
+      "passed_tests": null
+    },
+    {
+      "name": "doctests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-odg",
+        "--doc"
+      ],
+      "exit_code": 0,
+      "log": "doctests.log",
+      "passed_tests": 0
+    },
+    {
+      "name": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "-p",
+        "litchi-odg",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "log": "rustdoc.log",
+      "passed_tests": null
+    },
+    {
+      "name": "downstream",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-odf",
+        "--no-default-features",
+        "--features",
+        "odg"
+      ],
+      "exit_code": 0,
+      "log": "downstream.log",
+      "passed_tests": null
+    },
+    {
+      "name": "boundaries",
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "log": "boundaries.log",
+      "passed_tests": null
+    }
+  ],
+  "unique_tests": 124,
+  "execution": "ODG checks ran with --without-boundaries; independent boundary process ran after timing and completed successfully",
+  "initial_failure": "initial-test-all-targets.log: private test helper needed reader lifetime tied to XML input; corrected before final full suite, without production edits",
+  "final_build": {
+    "command": "CARGO_BUILD_JOBS=2 cargo build --release --locked --manifest-path docs/performance/probes/0502-odg-open/Cargo.toml --target-dir /tmp/litchi-goal-0507/target",
+    "exit_code": 0,
+    "log": "build-verify.log",
+    "matches_timed_candidate": true
+  }
+}

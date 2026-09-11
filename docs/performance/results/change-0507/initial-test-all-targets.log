@@ -1,0 +1,146 @@
+   Compiling typenum v1.20.1
+   Compiling zeroize v1.9.0
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling syn v2.0.114
+   Compiling const-oid v0.9.6
+   Compiling hybrid-array v0.4.14
+   Compiling rand_core v0.10.1
+   Compiling subtle v2.6.1
+   Compiling getrandom v0.4.3
+   Compiling crypto-common v0.1.6
+   Compiling crypto-common v0.2.2
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling block-buffer v0.10.4
+   Compiling base64ct v1.6.0
+   Compiling digest v0.10.7
+   Compiling pem-rfc7468 v0.7.0
+   Compiling block-buffer v0.12.1
+   Compiling der_derive v0.7.3
+   Compiling flagset v0.4.7
+   Compiling cmov v0.5.4
+   Compiling ctutils v0.4.2
+   Compiling cpufeatures v0.3.1
+   Compiling autocfg v1.5.1
+   Compiling der v0.7.10
+   Compiling libm v0.2.16
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.56
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling block-padding v0.4.2
+   Compiling crossbeam-utils v0.8.22
+   Compiling inout v0.2.2
+   Compiling thiserror v2.0.18
+   Compiling crossbeam-epoch v0.9.20
+   Compiling serde_core v1.0.229
+   Compiling const-oid v0.10.2
+   Compiling memchr v2.8.3
+   Compiling cpufeatures v0.2.17
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.18
+   Compiling ff v0.13.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling siphasher v1.0.3
+   Compiling base16ct v0.2.0
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling cipher v0.5.2
+   Compiling crypto-bigint v0.5.5
+   Compiling syn v3.0.4
+   Compiling zmij v1.0.19
+   Compiling rayon-core v1.13.0
+   Compiling cpubits v0.1.1
+   Compiling serde v1.0.229
+   Compiling elliptic-curve v0.13.8
+   Compiling rand_chacha v0.3.1
+   Compiling phf_shared v0.14.0
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.229
+   Compiling num-integer v0.1.47
+   Compiling universal-hash v0.6.1
+   Compiling hmac v0.12.1
+   Compiling signature v2.2.0
+   Compiling fastrand v2.5.0
+   Compiling num-bigint-dig v0.8.6
+   Compiling spin v0.9.9
+   Compiling crc32fast v1.5.1
+   Compiling serde_json v1.0.149
+   Compiling smallvec v1.16.0
+   Compiling lazy_static v1.5.0
+   Compiling phf_generator v0.14.0
+   Compiling rfc6979 v0.4.0
+   Compiling polyval v0.7.3
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling bergshamra-core v0.7.0
+   Compiling quick-xml v0.41.0
+   Compiling chacha20 v0.10.2
+   Compiling inout v0.1.4
+   Compiling either v1.18.0
+   Compiling itoa v1.0.18
+   Compiling uppsala v0.9.0
+   Compiling iana-time-zone v0.1.65
+   Compiling zlib-rs v0.6.7
+   Compiling bergshamra-xml v0.7.0
+   Compiling chrono v0.4.45
+   Compiling flate2 v1.1.10
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rayon v1.12.0
+   Compiling cipher v0.4.4
+   Compiling rand v0.10.2
+   Compiling ghash v0.6.0
+   Compiling ecdsa v0.16.9
+   Compiling phf_macros v0.14.0
+   Compiling primeorder v0.13.6
+   Compiling aes v0.9.3
+   Compiling ctr v0.10.1
+   Compiling hmac v0.13.0
+   Compiling sha2 v0.11.0
+   Compiling sha1 v0.10.7
+   Compiling aead v0.6.1
+   Compiling pkcs1 v0.7.5
+   Compiling blake2 v0.10.6
+   Compiling password-hash v0.5.0
+   Compiling once_cell v1.21.4
+   Compiling base64 v0.22.1
+   Compiling byteorder v1.5.0
+   Compiling fast-float2 v0.2.4
+   Compiling blowfish v0.9.1
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling argon2 v0.5.3
+   Compiling rsa v0.9.10
+   Compiling aes-gcm v0.11.1
+   Compiling pbkdf2 v0.13.0
+   Compiling phf v0.14.0
+   Compiling p256 v0.13.2
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling bergshamra-c14n v0.7.0
+   Compiling cbc v0.2.1
+   Compiling sha1 v0.11.0
+   Compiling x509-cert v0.2.5
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+error[E0106]: missing lifetime specifier
+  --> crates/litchi-odg/src/package/attribute_value_tests.rs:31:54
+   |
+31 | fn named_empty(xml: &str, local: &[u8]) -> (NsReader<&[u8]>, BytesStart<'static>) {
+   |                     ----         -----               ^ expected named lifetime parameter
+   |
+   = help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `xml` or `local`
+help: consider introducing a named lifetime parameter
+   |
+31 | fn named_empty<'a>(xml: &'a str, local: &'a [u8]) -> (NsReader<&'a [u8]>, BytesStart<'static>) {
+   |               ++++       ++              ++                     ++
+
+For more information about this error, try `rustc --explain E0106`.
+error: could not compile `litchi-odg` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

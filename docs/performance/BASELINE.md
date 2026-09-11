@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0507: matched ODG value-batch baseline
+
+[0507](changes/0507-odg-attribute-value-batches.md) records this batch.
+The clean `4c6c63718` executable matches 0506’s accepted candidate exactly.
+Four p50 baseline pairs are 1.399/1.408, 42.474/42.401, 1.312/1.312 and
+18.180/18.185 ms. The retained A1/B1/B2/A2 comparison has 3,200 samples,
+source/binary/report hashes, uncertainty, RSS and fresh instruction/heap
+profiles. A fresh capability probe confirms unavailable hardware counters.
+
 ## 0506: matched ODG shape-span baseline
 
 [0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.
