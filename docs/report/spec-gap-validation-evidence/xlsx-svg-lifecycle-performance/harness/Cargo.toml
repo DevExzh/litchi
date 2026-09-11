@@ -1,0 +1,16 @@
+[package]
+name = "litchi-xlsx-svg-lifecycle-profile"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xlsx-svg-lifecycle-profile"
+path = "main.rs"
+
+# The production XLSX dependency is intentionally absent until the public
+# source-backed owner and selector/attach/detach API are frozen. Wiring it
+# prematurely would make this evidence tree compile against a guessed API.
