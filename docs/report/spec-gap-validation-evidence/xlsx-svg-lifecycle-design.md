@@ -137,14 +137,32 @@ possible base implementation, but importing it does not by itself provide
 source spans, opaque extension preservation, or package relationship ownership.
 Those remain XLSX host responsibilities.
 
+## Source helper contract
+
+The source-backed scanner supplies direct-picture records selected by semantic
+drawing and picture ordinals. Each record carries:
+
+- validated two-cell, one-cell, or absolute anchor geometry;
+- raw source byte ranges for `xdr:pic`, its direct `a:blip`, and the admitted
+  extension, together with the inherited namespace context;
+- the raster `r:embed`; and
+- at most one admitted direct SVG extension owner parsed by the shared
+  `SvgBlip` codec, or a typed ambiguity/MCE refusal.
+
+The scanner borrows source bytes and preserves opaque siblings. Source ranges
+and namespace context remain the preservation authority; a typed projection
+must not cause serialization of the whole drawing. The helper discovers
+ownership and supplies source context. Mutation, byte splicing, and OPC graph
+planning remain in the worksheet transaction, which accepts borrowed SVG
+input and validates the complete staged dependency closure.
+
 ## Host ownership and ordinary API
 
 The ordinary facade should select a worksheet and picture semantically. It
 must not require a caller to supply a relationship ID, package part URI, XML
-offset, or generated name. A first profile can require exactly one direct
-worksheet drawing relationship and use a checked picture ordinal in source
-order; a future selector can add an explicit drawing ordinal. Duplicate
-nonvisual IDs or an ambiguous selector return a typed refusal.
+offset, or generated name. Selection uses checked drawing and direct-picture
+ordinals in source order. Duplicate nonvisual IDs or an ambiguous selector
+return a typed refusal.
 
 The public shape can follow this outline; names are provisional:
 
