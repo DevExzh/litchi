@@ -1,0 +1,43 @@
+{
+  "scope": "Borrowed XLSX drawing source helper prerequisite; not worksheet SVG lifecycle completion",
+  "base_commit": "16daf9a07f748ad42e1fc776b2e9675911000985",
+  "source_sha256": {
+    "crates/litchi-xlsx/src/drawing/source.rs": "1d8e6adf127a00dc25cd801bd90835f41442220ce944ba005cfdfa28e6dd62c2",
+    "crates/litchi-xlsx/src/drawing/source_tests.rs": "03c67af436e218156cd48df52de1963bff97006025bc9f2d1848122f910bcc89",
+    "crates/litchi-xlsx/src/drawing/svg.rs": "0b8a54ffbd14c844c0120f586675ca7870b4efb698e951c677377425538c0502",
+    "crates/litchi-xlsx/src/drawing/mod.rs": "4a4112069cf7598b852e077f1693463c298d5c2df9e251b61945a3a89f5bf405"
+  },
+  "workspace_lock_sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "isolation": "Sparse detached worktree at base_commit with only the four listed source files copied from the working tree. Existing test-data was linked read-only by convention; lifecycle edits were excluded.",
+  "review": "Independent bounded source-helper approval, including private namespace completion helper",
+  "root_validation": [
+    {
+      "command": "cargo test --locked -p litchi-xlsx --lib drawing::source --offline --quiet",
+      "passed": 6,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --locked -p litchi-xlsx --lib --offline --quiet",
+      "passed": 1100,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --locked -p litchi-xlsx --doc drawing::source --offline --quiet",
+      "compile_fail_passed": 1,
+      "failed": 0,
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --locked -p litchi-xlsx --lib --offline -- -D warnings",
+      "exit_code": 0
+    }
+  ],
+  "limitations": [
+    "Numeric EMU coordinate profile; unit-bearing ST_Coordinate values remain unsupported",
+    "No worksheet SVG lifecycle, generated-output schema, performance, or native application acceptance claim in this prerequisite receipt"
+  ]
+}
