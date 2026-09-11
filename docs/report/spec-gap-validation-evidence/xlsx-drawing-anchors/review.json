@@ -1,0 +1,32 @@
+{
+  "scope": "Numeric EMU worksheet drawing anchor prerequisite, not SVG lifecycle completion",
+  "source_sha256": {
+    "crates/litchi-xlsx/src/drawing/model.rs": "41741377e361a91180c5d49be740a1f2e1693e3c91de9dafaa6876eec01dc12a",
+    "crates/litchi-xlsx/src/drawing/codec.rs": "d0ff5bb29a11c795207813ea81766a9a08264cc745e4e5b1877c03dce1a9f9cb",
+    "crates/litchi-xlsx/src/drawing/mod.rs": "97776d88b864d82712c52fe3183e68b74488b25317bd8e731c3526d95b2f0a45",
+    "crates/litchi-xlsx/tests/drawing_anchor_geometry.rs": "deaee7c7fc4ed6a6cbeb650c37601d43070f5f4fb4de4c9918d937fbf1c86060"
+  },
+  "review": "Independent bounded anchor review: no commit blocker on listed source",
+  "root_validation": [
+    {
+      "command": "cargo test --locked -p litchi-xlsx --lib --offline --quiet",
+      "passed": 1094,
+      "failed": 0
+    },
+    {
+      "command": "cargo test --locked -p litchi-xlsx --test drawing_anchor_geometry --offline --quiet",
+      "passed": 8,
+      "failed": 0
+    },
+    {
+      "command": "cargo clippy --locked -p litchi-xlsx --lib --test drawing_anchor_geometry --offline -- -D warnings",
+      "exit_code": 0
+    }
+  ],
+  "limitations": [
+    "Numeric EMU coordinate profile only; ST_UniversalMeasure remains unsupported rather than rounded",
+    "Added public geometry fields require downstream struct literals to initialize them",
+    "No SVG lifecycle or native application acceptance claim",
+    "No performance measurement claim"
+  ]
+}

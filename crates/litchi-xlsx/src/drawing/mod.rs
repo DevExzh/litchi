@@ -12,5 +12,10 @@ pub use super::chart::Anchor;
 pub use codec::parse;
 pub use model::{Chart, Drawing, Object, Picture, Unknown, UnknownKind, text};
 
+/// Complete `SpreadsheetDrawing` anchor geometry.
+pub use litchi_spreadsheet_drawing::shape::{
+    Anchor as DrawingAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset,
+};
+
 #[cfg(test)]
 mod tests;

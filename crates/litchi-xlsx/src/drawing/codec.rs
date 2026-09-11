@@ -1,20 +1,30 @@
 //! Namespace-aware `SpreadsheetDrawing` reader.
 //!
-//! Both `xdr:twoCellAnchor` (worksheets) and `xdr:absoluteAnchor`
-//! (chartsheets) are understood; absolute anchors record a zero placeholder
-//! anchor because they carry EMU positions rather than cell markers.
+//! The inventory keeps the established chart-style cell anchor projection and
+//! also records the complete `twoCellAnchor`,
+//! `oneCellAnchor`, or `absoluteAnchor` geometry. The latter is the source of
+//! truth for callers that need to select or edit an ordinary worksheet
+//! picture.
 
+use std::borrow::Cow;
+
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+use litchi_spreadsheet_drawing::shape::{
+    Anchor as DrawingAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset,
+};
+
 use super::Anchor;
 use super::model::{Chart, Drawing, Object, Picture, Unknown, UnknownKind};
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, allocation};
 use crate::raw::namespace::relationship_attribute_value;
 use litchi_ooxml_common::xml::{
     decode_xml_reference, is_drawingml_chart_name, is_drawingml_name, unqualified_attribute_value,
+    xsd_token_atom,
 };
 
 const SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
@@ -23,18 +33,41 @@ const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
 const MAX_DRAWING_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DRAWING_ANCHORS: usize = 100_000;
+const MAX_DRAWING_DEPTH: usize = 256;
 const MAX_MARKER_TEXT_BYTES: usize = 64;
 const MAX_STRING_BYTES: usize = 1024 * 1024;
+
+// ECMA-376 DrawingML ST_Coordinate and ST_PositiveCoordinate bounds. The
+// parser intentionally accepts only the numeric lexical form here; callers
+// that need universal-measure lexical forms use the shape owner.
+const MIN_COORDINATE: i64 = -27_273_042_329_600;
+const MAX_COORDINATE: i64 = 27_273_042_316_900;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AnchorKind {
+    TwoCell,
+    OneCell,
+    Absolute,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Context {
     Root,
-    TwoCellAnchor,
-    AbsoluteAnchor,
-    From,
-    To,
+    Anchor(AnchorKind),
+    From(MarkerTarget),
+    To(MarkerTarget),
     Marker(MarkerTarget, MarkerField),
-    Other,
+    Position,
+    Extent,
+    Picture,
+    PictureNvPr,
+    PictureBlipFill,
+    ChartFrame,
+    ChartGraphic,
+    ChartGraphicData,
+    UnknownObject,
+    UnknownNvPr,
+    Ignored,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -51,37 +84,152 @@ enum MarkerField {
     RowOffset,
 }
 
+impl MarkerField {
+    const fn ordinal(self) -> u8 {
+        match self {
+            Self::Column => 0,
+            Self::ColumnOffset => 1,
+            Self::Row => 2,
+            Self::RowOffset => 3,
+        }
+    }
+}
+
 #[derive(Default)]
 struct Marker {
     column: Option<u32>,
     column_offset: Option<i64>,
     row: Option<u32>,
     row_offset: Option<i64>,
+    next_field: u8,
 }
 
 impl Marker {
-    fn finish(self, description: &str) -> Result<(u32, i64, u32, i64)> {
-        Ok((
-            self.column
+    fn finish(&self, description: &str) -> Result<CellMarker> {
+        let column_offset = self
+            .column_offset
+            .ok_or_else(|| invalid(format!("{description} is missing its column offset")))?;
+        let row_offset = self
+            .row_offset
+            .ok_or_else(|| invalid(format!("{description} is missing its row offset")))?;
+        check_coordinate(column_offset, "drawing column offset")?;
+        check_coordinate(row_offset, "drawing row offset")?;
+        Ok(CellMarker {
+            column: self
+                .column
                 .ok_or_else(|| invalid(format!("{description} is missing its column")))?,
-            self.column_offset
-                .ok_or_else(|| invalid(format!("{description} is missing its column offset")))?,
-            self.row
+            column_offset: Emu(column_offset),
+            row: self
+                .row
                 .ok_or_else(|| invalid(format!("{description} is missing its row")))?,
-            self.row_offset
-                .ok_or_else(|| invalid(format!("{description} is missing its row offset")))?,
-        ))
+            row_offset: Emu(row_offset),
+        })
+    }
+
+    fn set(&mut self, field: MarkerField, value: i64, description: &str) -> Result<()> {
+        if field.ordinal() != self.next_field {
+            return Err(invalid(format!("{description} fields are out of order")));
+        }
+        self.next_field = self
+            .next_field
+            .checked_add(1)
+            .ok_or_else(|| limit("drawing marker fields"))?;
+        match field {
+            MarkerField::Column => {
+                if value < 0 || value > u32::MAX as i64 {
+                    return Err(invalid("drawing column is outside its numeric range"));
+                }
+                set_once(&mut self.column, value as u32, "drawing column")
+            },
+            MarkerField::ColumnOffset => {
+                set_once(&mut self.column_offset, value, "drawing column offset")
+            },
+            MarkerField::Row => {
+                if value < 0 || value > u32::MAX as i64 {
+                    return Err(invalid("drawing row is outside its numeric range"));
+                }
+                set_once(&mut self.row, value as u32, "drawing row")
+            },
+            MarkerField::RowOffset => set_once(&mut self.row_offset, value, "drawing row offset"),
+        }
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ObjectKind {
+    Picture,
+    ChartFrame,
+    Unknown(UnknownKind),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AnchorChild {
+    From,
+    To,
+    Position,
+    Extent,
+    Object,
+    ClientData,
+}
+
 struct PendingAnchor {
+    kind: AnchorKind,
+    edit_as: EditAs,
     from: Option<Marker>,
     to: Option<Marker>,
+    position: Option<EmuOffset>,
+    extent: Option<EmuExtent>,
+    object_kind: Option<ObjectKind>,
     picture_relationship_id: Option<String>,
     chart_relationship_id: Option<String>,
     description: Option<String>,
-    unknown_kind: Option<UnknownKind>,
+    phase: u8,
+    client_data_seen: bool,
+}
+
+impl PendingAnchor {
+    fn new(kind: AnchorKind, edit_as: EditAs) -> Self {
+        Self {
+            kind,
+            edit_as,
+            from: None,
+            to: None,
+            position: None,
+            extent: None,
+            object_kind: None,
+            picture_relationship_id: None,
+            chart_relationship_id: None,
+            description: None,
+            phase: 0,
+            client_data_seen: false,
+        }
+    }
+
+    fn take_child(&mut self, child: AnchorChild) -> Result<()> {
+        let expected = match (self.kind, self.phase) {
+            (AnchorKind::TwoCell, 0) => AnchorChild::From,
+            (AnchorKind::TwoCell, 1) => AnchorChild::To,
+            (AnchorKind::TwoCell, 2) => AnchorChild::Object,
+            (AnchorKind::TwoCell, 3) => AnchorChild::ClientData,
+            (AnchorKind::OneCell, 0) => AnchorChild::From,
+            (AnchorKind::OneCell, 1) => AnchorChild::Extent,
+            (AnchorKind::OneCell, 2) => AnchorChild::Object,
+            (AnchorKind::OneCell, 3) => AnchorChild::ClientData,
+            (AnchorKind::Absolute, 0) => AnchorChild::Position,
+            (AnchorKind::Absolute, 1) => AnchorChild::Extent,
+            (AnchorKind::Absolute, 2) => AnchorChild::Object,
+            (AnchorKind::Absolute, 3) => AnchorChild::ClientData,
+            _ => return Err(invalid("drawing anchor has duplicate or trailing children")),
+        };
+        if expected != child {
+            return Err(invalid("drawing anchor children are out of order"));
+        }
+        self.phase = self
+            .phase
+            .checked_add(1)
+            .ok_or_else(|| limit("drawing anchor children"))?;
+        Ok(())
+    }
 }
 
 struct Parser {
@@ -93,6 +241,8 @@ struct Parser {
 impl Parser {
     fn parse(xml: &str) -> Result<Option<Drawing>> {
         let mut reader = NsReader::from_reader(xml.as_bytes());
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
         let mut parser = Self {
             drawing: Drawing::default(),
             anchor: None,
@@ -106,7 +256,7 @@ impl Parser {
                 .read_event()
                 .map_err(|error| Error::Invalid(error.to_string()))?
                 .into_owned();
-            let resolver = reader.resolver().clone();
+            let resolver = reader.resolver();
             let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) if stack.is_empty() => {
@@ -116,9 +266,12 @@ impl Parser {
                     if !is_spreadsheet_drawing_name(&namespace, element.name(), b"wsDr") {
                         return Ok(None);
                     }
-                    stack.push(Context::Root);
+                    push_context(&mut stack, Context::Root)?;
                 },
                 Event::Empty(element) if stack.is_empty() => {
+                    if closed_root {
+                        return Err(invalid("drawing XML contains multiple root elements"));
+                    }
                     if !is_spreadsheet_drawing_name(&namespace, element.name(), b"wsDr") {
                         return Ok(None);
                     }
@@ -128,29 +281,36 @@ impl Parser {
                     let parent = *stack
                         .last()
                         .ok_or_else(|| invalid("missing drawing root"))?;
-                    stack.push(parser.start(parent, &namespace, &element, decoder, &resolver)?);
+                    let context = parser.start(parent, &namespace, &element, decoder, resolver)?;
+                    push_context(&mut stack, context)?;
                 },
                 Event::Empty(element) => {
                     let parent = *stack
                         .last()
                         .ok_or_else(|| invalid("missing drawing root"))?;
-                    let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
+                    let context = parser.start(parent, &namespace, &element, decoder, resolver)?;
                     parser.finish(context)?;
                 },
-                Event::Text(text) if matches!(stack.last(), Some(Context::Marker(_, _))) => {
+                Event::Text(text) if matches!(stack.last(), Some(Context::Marker(..))) => {
+                    if text.as_ref().len() > MAX_MARKER_TEXT_BYTES {
+                        return Err(limit("drawing marker text"));
+                    }
                     let text = text
                         .decode()
                         .map_err(|error| Error::Invalid(error.to_string()))?;
                     parser.append_marker_text(&text)?;
                 },
-                Event::CData(text) if matches!(stack.last(), Some(Context::Marker(_, _))) => {
+                Event::CData(text) if matches!(stack.last(), Some(Context::Marker(..))) => {
+                    if text.as_ref().len() > MAX_MARKER_TEXT_BYTES {
+                        return Err(limit("drawing marker text"));
+                    }
                     let text = text
                         .decode()
                         .map_err(|error| Error::Invalid(error.to_string()))?;
                     parser.append_marker_text(&text)?;
                 },
                 Event::GeneralRef(reference)
-                    if matches!(stack.last(), Some(Context::Marker(_, _))) =>
+                    if matches!(stack.last(), Some(Context::Marker(..))) =>
                 {
                     let text = decode_xml_reference(&reference)?;
                     parser.append_marker_text(&text)?;
@@ -191,256 +351,462 @@ impl Parser {
         decoder: Decoder,
         resolver: &NamespaceResolver,
     ) -> Result<Context> {
-        if parent == Context::Root
-            && is_spreadsheet_drawing_name(namespace, element.name(), b"twoCellAnchor")
-        {
+        check_attribute_lengths(element, decoder)?;
+        if parent == Context::Root {
+            if !is_spreadsheet_drawing_namespace(namespace) {
+                return Ok(Context::Ignored);
+            }
+            let kind = match element.name().local_name().as_ref() {
+                b"twoCellAnchor" => AnchorKind::TwoCell,
+                b"oneCellAnchor" => AnchorKind::OneCell,
+                b"absoluteAnchor" => AnchorKind::Absolute,
+                _ => return Ok(Context::Ignored),
+            };
             if self.anchor.is_some() {
                 return Err(invalid("nested drawing anchor"));
             }
             if self.drawing.len() >= MAX_DRAWING_ANCHORS {
-                return Err(invalid("drawing exceeds the anchor limit"));
+                return Err(limit("anchors"));
             }
-            self.anchor = Some(PendingAnchor::default());
-            return Ok(Context::TwoCellAnchor);
+            self.drawing.reserve_object()?;
+            let edit_as = if kind == AnchorKind::TwoCell {
+                unqualified_attribute_value(element, b"editAs", decoder)?
+                    .as_deref()
+                    .map_or(Ok(EditAs::TwoCell), |value| {
+                        xsd_token_atom(value)
+                            .ok_or_else(|| invalid("drawing editAs is not one token"))?
+                            .parse()
+                            .map_err(|_| invalid("invalid drawing editAs"))
+                    })?
+            } else {
+                EditAs::TwoCell
+            };
+            self.anchor = Some(PendingAnchor::new(kind, edit_as));
+            return Ok(Context::Anchor(kind));
         }
-        if parent == Context::Root
-            && is_spreadsheet_drawing_name(namespace, element.name(), b"absoluteAnchor")
-        {
-            if self.anchor.is_some() {
-                return Err(invalid("nested drawing anchor"));
-            }
-            if self.drawing.len() >= MAX_DRAWING_ANCHORS {
-                return Err(invalid("drawing exceeds the anchor limit"));
-            }
-            self.anchor = Some(PendingAnchor::default());
-            return Ok(Context::AbsoluteAnchor);
-        }
-        if parent == Context::TwoCellAnchor
-            && is_spreadsheet_drawing_name(namespace, element.name(), b"from")
-        {
-            let anchor = self.anchor_mut()?;
-            if anchor.from.replace(Marker::default()).is_some() {
-                return Err(invalid("drawing anchor has duplicate from markers"));
-            }
-            return Ok(Context::From);
-        }
-        if parent == Context::TwoCellAnchor
-            && is_spreadsheet_drawing_name(namespace, element.name(), b"to")
-        {
-            let anchor = self.anchor_mut()?;
-            if anchor.to.replace(Marker::default()).is_some() {
-                return Err(invalid("drawing anchor has duplicate to markers"));
-            }
-            return Ok(Context::To);
-        }
-        let target = match parent {
-            Context::From => Some(MarkerTarget::From),
-            Context::To => Some(MarkerTarget::To),
-            Context::Root
-            | Context::TwoCellAnchor
-            | Context::AbsoluteAnchor
-            | Context::Marker(..)
-            | Context::Other => None,
-        };
-        if let Some(target) = target {
-            for (name, field) in [
-                (b"col".as_slice(), MarkerField::Column),
-                (b"colOff".as_slice(), MarkerField::ColumnOffset),
-                (b"row".as_slice(), MarkerField::Row),
-                (b"rowOff".as_slice(), MarkerField::RowOffset),
-            ] {
-                if is_spreadsheet_drawing_name(namespace, element.name(), name) {
-                    self.marker_text.clear();
-                    return Ok(Context::Marker(target, field));
+
+        match parent {
+            Context::Anchor(kind) => self.start_anchor_child(kind, namespace, element, decoder),
+            Context::From(target) | Context::To(target) => {
+                self.start_marker(target, namespace, element)
+            },
+            Context::Picture => {
+                if is_spreadsheet_drawing_name(namespace, element.name(), b"nvPicPr") {
+                    return Ok(Context::PictureNvPr);
                 }
-            }
+                if is_spreadsheet_drawing_name(namespace, element.name(), b"blipFill") {
+                    return Ok(Context::PictureBlipFill);
+                }
+                Ok(Context::Ignored)
+            },
+            Context::PictureNvPr => {
+                if is_spreadsheet_drawing_name(namespace, element.name(), b"cNvPr") {
+                    self.capture_description(element, decoder)?;
+                    return Ok(Context::Ignored);
+                }
+                Ok(Context::Ignored)
+            },
+            Context::PictureBlipFill => {
+                if is_drawingml_name(namespace, element.name(), b"blip") {
+                    let relationship_id =
+                        relationship_attribute_value(element, b"embed", decoder, resolver)?
+                            .ok_or_else(|| {
+                                invalid("drawing picture blip is missing an embed relationship")
+                            })?;
+                    set_relationship(
+                        &mut self.anchor_mut()?.picture_relationship_id,
+                        relationship_id,
+                        "picture",
+                    )?;
+                }
+                Ok(Context::Ignored)
+            },
+            Context::ChartFrame => {
+                if is_drawingml_name(namespace, element.name(), b"graphic") {
+                    return Ok(Context::ChartGraphic);
+                }
+                Ok(Context::Ignored)
+            },
+            Context::ChartGraphic => {
+                if is_drawingml_name(namespace, element.name(), b"graphicData") {
+                    return Ok(Context::ChartGraphicData);
+                }
+                Ok(Context::Ignored)
+            },
+            Context::ChartGraphicData => {
+                if is_drawingml_chart_name(namespace, element.name(), b"chart") {
+                    let relationship_id =
+                        relationship_attribute_value(element, b"id", decoder, resolver)?
+                            .ok_or_else(|| invalid("drawing chart is missing a relationship ID"))?;
+                    set_relationship(
+                        &mut self.anchor_mut()?.chart_relationship_id,
+                        relationship_id,
+                        "chart",
+                    )?;
+                }
+                Ok(Context::Ignored)
+            },
+            Context::UnknownObject => {
+                if is_spreadsheet_drawing_name(namespace, element.name(), b"nvSpPr")
+                    || is_spreadsheet_drawing_name(namespace, element.name(), b"nvGrpSpPr")
+                    || is_spreadsheet_drawing_name(namespace, element.name(), b"nvCxnSpPr")
+                {
+                    return Ok(Context::UnknownNvPr);
+                }
+                Ok(Context::Ignored)
+            },
+            Context::UnknownNvPr => {
+                if is_spreadsheet_drawing_name(namespace, element.name(), b"cNvPr") {
+                    self.capture_description(element, decoder)?;
+                }
+                Ok(Context::Ignored)
+            },
+            Context::Marker(..)
+            | Context::Position
+            | Context::Extent
+            | Context::Ignored
+            | Context::Root => Ok(Context::Ignored),
         }
-        if matches!(parent, Context::TwoCellAnchor | Context::AbsoluteAnchor)
-            && is_spreadsheet_drawing_namespace(namespace)
-            && let Some(kind) = unknown_kind(element.name().local_name().as_ref())
-        {
-            self.anchor_mut()?.unknown_kind = Some(kind);
+    }
+
+    fn start_anchor_child(
+        &mut self,
+        kind: AnchorKind,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<Context> {
+        let local = element.name().local_name();
+        if !is_spreadsheet_drawing_namespace(namespace) {
+            return Ok(Context::Ignored);
         }
-        if self.anchor.is_some()
-            && is_spreadsheet_drawing_name(namespace, element.name(), b"cNvPr")
-            && let Some(description) = unqualified_attribute_value(element, b"descr", decoder)?
-        {
+        match local.as_ref() {
+            b"from" => {
+                self.take_anchor_child(AnchorChild::From)?;
+                if self.anchor_mut()?.from.replace(Marker::default()).is_some() {
+                    return Err(invalid("drawing anchor has duplicate from markers"));
+                }
+                Ok(Context::From(MarkerTarget::From))
+            },
+            b"to" => {
+                self.take_anchor_child(AnchorChild::To)?;
+                if kind != AnchorKind::TwoCell {
+                    return Err(invalid("one-cell or absolute anchor has a to marker"));
+                }
+                if self.anchor_mut()?.to.replace(Marker::default()).is_some() {
+                    return Err(invalid("drawing anchor has duplicate to markers"));
+                }
+                Ok(Context::To(MarkerTarget::To))
+            },
+            b"pos" => {
+                self.take_anchor_child(AnchorChild::Position)?;
+                if kind != AnchorKind::Absolute {
+                    return Err(invalid("only an absolute anchor may contain pos"));
+                }
+                let position = EmuOffset {
+                    x: Emu(coordinate_attribute(
+                        element,
+                        b"x",
+                        decoder,
+                        "drawing position x",
+                    )?),
+                    y: Emu(coordinate_attribute(
+                        element,
+                        b"y",
+                        decoder,
+                        "drawing position y",
+                    )?),
+                };
+                if self.anchor_mut()?.position.replace(position).is_some() {
+                    return Err(invalid("drawing anchor has duplicate positions"));
+                }
+                Ok(Context::Position)
+            },
+            b"ext" => {
+                self.take_anchor_child(AnchorChild::Extent)?;
+                if kind == AnchorKind::TwoCell {
+                    return Err(invalid("a two-cell anchor cannot contain ext"));
+                }
+                let extent = EmuExtent {
+                    width: positive_coordinate_attribute(
+                        element,
+                        b"cx",
+                        decoder,
+                        "drawing extent width",
+                    )?,
+                    height: positive_coordinate_attribute(
+                        element,
+                        b"cy",
+                        decoder,
+                        "drawing extent height",
+                    )?,
+                };
+                if self.anchor_mut()?.extent.replace(extent).is_some() {
+                    return Err(invalid("drawing anchor has duplicate extents"));
+                }
+                Ok(Context::Extent)
+            },
+            b"clientData" => {
+                self.take_anchor_child(AnchorChild::ClientData)?;
+                let anchor = self.anchor_mut()?;
+                if anchor.client_data_seen {
+                    return Err(invalid("drawing anchor has duplicate clientData"));
+                }
+                anchor.client_data_seen = true;
+                Ok(Context::Ignored)
+            },
+            b"pic" => {
+                self.take_anchor_child(AnchorChild::Object)?;
+                self.open_object(ObjectKind::Picture, Context::Picture)
+            },
+            b"graphicFrame" => {
+                self.take_anchor_child(AnchorChild::Object)?;
+                self.open_object(ObjectKind::ChartFrame, Context::ChartFrame)
+            },
+            b"sp" => {
+                self.take_anchor_child(AnchorChild::Object)?;
+                self.open_object(
+                    ObjectKind::Unknown(UnknownKind::Shape),
+                    Context::UnknownObject,
+                )
+            },
+            b"grpSp" => {
+                self.take_anchor_child(AnchorChild::Object)?;
+                self.open_object(
+                    ObjectKind::Unknown(UnknownKind::Group),
+                    Context::UnknownObject,
+                )
+            },
+            b"cxnSp" => {
+                self.take_anchor_child(AnchorChild::Object)?;
+                self.open_object(
+                    ObjectKind::Unknown(UnknownKind::Connection),
+                    Context::UnknownObject,
+                )
+            },
+            b"contentPart" => {
+                self.take_anchor_child(AnchorChild::Object)?;
+                self.open_object(
+                    ObjectKind::Unknown(UnknownKind::ContentPart),
+                    Context::UnknownObject,
+                )
+            },
+            _ => Ok(Context::Ignored),
+        }
+    }
+
+    fn start_marker(
+        &mut self,
+        target: MarkerTarget,
+        namespace: &ResolveResult<'_>,
+        element: &BytesStart<'_>,
+    ) -> Result<Context> {
+        if !is_spreadsheet_drawing_namespace(namespace) {
+            return Ok(Context::Ignored);
+        }
+        let field = match element.name().local_name().as_ref() {
+            b"col" => MarkerField::Column,
+            b"colOff" => MarkerField::ColumnOffset,
+            b"row" => MarkerField::Row,
+            b"rowOff" => MarkerField::RowOffset,
+            _ => return Ok(Context::Ignored),
+        };
+        let marker = match target {
+            MarkerTarget::From => self.anchor_mut()?.from.as_mut(),
+            MarkerTarget::To => self.anchor_mut()?.to.as_mut(),
+        }
+        .ok_or_else(|| invalid("drawing marker value outside from/to"))?;
+        if marker.next_field != field.ordinal() {
+            return Err(invalid("drawing marker fields are out of order"));
+        }
+        self.marker_text.clear();
+        Ok(Context::Marker(target, field))
+    }
+
+    fn open_object(&mut self, object_kind: ObjectKind, context: Context) -> Result<Context> {
+        let anchor = self.anchor_mut()?;
+        if anchor.object_kind.replace(object_kind).is_some() {
+            return Err(invalid("drawing anchor has duplicate objects"));
+        }
+        Ok(context)
+    }
+
+    fn capture_description(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+        if let Some(description) = unqualified_attribute_value(element, b"descr", decoder)? {
             if description.len() > MAX_STRING_BYTES {
                 return Err(limit("drawing description"));
             }
-            self.anchor_mut()?.description = Some(description);
+            if self
+                .anchor_mut()?
+                .description
+                .replace(description)
+                .is_some()
+            {
+                return Err(invalid("drawing object has duplicate descriptions"));
+            }
         }
-        if self.anchor.is_some() && is_drawingml_name(namespace, element.name(), b"blip") {
-            let relationship_id = relationship_attribute_value(
-                element, b"embed", decoder, resolver,
-            )?
-            .ok_or_else(|| invalid("drawing picture blip is missing an embed relationship"))?;
-            set_relationship(
-                &mut self.anchor_mut()?.picture_relationship_id,
-                relationship_id,
-                "picture",
-            )?;
-        }
-        if self.anchor.is_some() && is_drawingml_chart_name(namespace, element.name(), b"chart") {
-            let relationship_id = relationship_attribute_value(element, b"id", decoder, resolver)?
-                .ok_or_else(|| invalid("drawing chart is missing a relationship ID"))?;
-            set_relationship(
-                &mut self.anchor_mut()?.chart_relationship_id,
-                relationship_id,
-                "chart",
-            )?;
-        }
-        Ok(Context::Other)
+        Ok(())
     }
 
     fn finish(&mut self, context: Context) -> Result<()> {
         match context {
             Context::Marker(target, field) => self.finish_marker(target, field),
-            Context::TwoCellAnchor => self.finish_anchor(),
-            Context::AbsoluteAnchor => self.finish_absolute_anchor(),
-            Context::Root | Context::From | Context::To | Context::Other => Ok(()),
+            Context::From(target) | Context::To(target) => self.finish_marker_container(target),
+            Context::Anchor(_) => self.finish_anchor(),
+            Context::Root
+            | Context::Position
+            | Context::Extent
+            | Context::Picture
+            | Context::PictureNvPr
+            | Context::PictureBlipFill
+            | Context::ChartFrame
+            | Context::ChartGraphic
+            | Context::ChartGraphicData
+            | Context::UnknownObject
+            | Context::UnknownNvPr
+            | Context::Ignored => Ok(()),
         }
     }
 
     fn finish_marker(&mut self, target: MarkerTarget, field: MarkerField) -> Result<()> {
-        let value = self.marker_text.trim();
-        let anchor = self
-            .anchor
-            .as_mut()
-            .ok_or_else(|| invalid("drawing marker outside an anchor"))?;
+        let value = trim_xml_schema_whitespace(&self.marker_text);
+        let parsed = match field {
+            MarkerField::Column | MarkerField::Row => parse_value(value, "drawing marker")?,
+            MarkerField::ColumnOffset | MarkerField::RowOffset => {
+                parse_value(value, "drawing marker offset")?
+            },
+        };
         let marker = match target {
-            MarkerTarget::From => anchor.from.as_mut(),
-            MarkerTarget::To => anchor.to.as_mut(),
+            MarkerTarget::From => self.anchor_mut()?.from.as_mut(),
+            MarkerTarget::To => self.anchor_mut()?.to.as_mut(),
         }
         .ok_or_else(|| invalid("drawing marker value outside from/to"))?;
-        match field {
-            MarkerField::Column => set_once(
-                &mut marker.column,
-                parse_value(value, "drawing column")?,
-                "drawing column",
-            ),
-            MarkerField::ColumnOffset => set_once(
-                &mut marker.column_offset,
-                parse_value(value, "drawing column offset")?,
-                "drawing column offset",
-            ),
-            MarkerField::Row => set_once(
-                &mut marker.row,
-                parse_value(value, "drawing row")?,
-                "drawing row",
-            ),
-            MarkerField::RowOffset => set_once(
-                &mut marker.row_offset,
-                parse_value(value, "drawing row offset")?,
-                "drawing row offset",
-            ),
+        marker.set(field, parsed, "drawing marker")
+    }
+
+    fn finish_marker_container(&mut self, target: MarkerTarget) -> Result<()> {
+        let marker = match target {
+            MarkerTarget::From => self.anchor_mut()?.from.as_ref(),
+            MarkerTarget::To => self.anchor_mut()?.to.as_ref(),
         }
+        .ok_or_else(|| invalid("drawing marker is missing its value"))?;
+        marker.finish(match target {
+            MarkerTarget::From => "drawing from marker",
+            MarkerTarget::To => "drawing to marker",
+        })?;
+        Ok(())
     }
 
     fn finish_anchor(&mut self) -> Result<()> {
-        let PendingAnchor {
-            from,
-            to,
-            picture_relationship_id,
-            chart_relationship_id,
-            description,
-            unknown_kind,
-        } = self
+        let pending = self
             .anchor
             .take()
             .ok_or_else(|| invalid("missing pending drawing anchor"))?;
-        let (from_col, from_col_offset, from_row, from_row_offset) = from
-            .ok_or_else(|| invalid("drawing anchor is missing from marker"))?
-            .finish("drawing from marker")?;
-        let (to_col, to_col_offset, to_row, to_row_offset) = to
-            .ok_or_else(|| invalid("drawing anchor is missing to marker"))?
-            .finish("drawing to marker")?;
-        if from_col >= 16_384 || to_col >= 16_384 || from_row >= 1_048_576 || to_row >= 1_048_576 {
-            return Err(invalid("drawing anchor exceeds worksheet bounds"));
+        if pending.phase != 4 || !pending.client_data_seen {
+            return Err(invalid("drawing anchor is missing required children"));
         }
-        if to_row < from_row
-            || to_col < from_col
-            || (to_row == from_row && to_row_offset < from_row_offset)
-            || (to_col == from_col && to_col_offset < from_col_offset)
-        {
-            return Err(invalid("drawing anchor has descending markers"));
-        }
-        let anchor = Anchor::with_offsets(
-            from_col,
-            from_col_offset,
-            from_row,
-            from_row_offset,
-            to_col,
-            to_col_offset,
-            to_row,
-            to_row_offset,
-        );
-        Self::push_anchor_object(
-            &mut self.drawing,
-            picture_relationship_id,
-            chart_relationship_id,
-            description,
-            unknown_kind,
-            anchor,
-        )
-    }
-
-    /// Finish an `xdr:absoluteAnchor` (the only anchor kind chartsheets
-    /// use). It carries EMU positions instead of cell markers, so the
-    /// recorded anchor is a zero placeholder; callers that only need the
-    /// anchored chart or picture are unaffected.
-    fn finish_absolute_anchor(&mut self) -> Result<()> {
-        let PendingAnchor {
-            picture_relationship_id,
-            chart_relationship_id,
-            description,
-            unknown_kind,
-            ..
-        } = self
-            .anchor
-            .take()
-            .ok_or_else(|| invalid("missing pending drawing anchor"))?;
-        Self::push_anchor_object(
-            &mut self.drawing,
-            picture_relationship_id,
-            chart_relationship_id,
-            description,
-            unknown_kind,
-            Anchor::new(0, 0, 0, 0),
-        )
-    }
-
-    fn push_anchor_object(
-        drawing: &mut Drawing,
-        picture_relationship_id: Option<String>,
-        chart_relationship_id: Option<String>,
-        description: Option<String>,
-        unknown_kind: Option<UnknownKind>,
-        anchor: Anchor,
-    ) -> Result<()> {
-        match (picture_relationship_id, chart_relationship_id) {
-            (Some(relationship_id), None) => drawing.push(Object::Picture(Picture {
-                anchor,
-                relationship_id,
-                description,
-            })),
-            (None, Some(relationship_id)) => drawing.push(Object::Chart(Chart {
-                anchor,
-                relationship_id,
-            })),
-            (None, None) if let Some(kind) = unknown_kind => {
-                drawing.push(Object::Unknown(Unknown {
-                    anchor,
-                    description,
+        let drawing_anchor = match pending.kind {
+            AnchorKind::TwoCell => {
+                let from = pending
+                    .from
+                    .as_ref()
+                    .ok_or_else(|| invalid("drawing anchor is missing from marker"))?
+                    .finish("drawing from marker")?;
+                let to = pending
+                    .to
+                    .as_ref()
+                    .ok_or_else(|| invalid("drawing anchor is missing to marker"))?
+                    .finish("drawing to marker")?;
+                check_marker_bounds(from)?;
+                check_marker_bounds(to)?;
+                if to.row < from.row
+                    || to.column < from.column
+                    || (to.row == from.row && to.row_offset < from.row_offset)
+                    || (to.column == from.column && to.column_offset < from.column_offset)
+                {
+                    return Err(invalid("drawing anchor has descending markers"));
+                }
+                DrawingAnchor::TwoCell {
+                    from,
+                    to,
+                    edit_as: pending.edit_as,
+                }
+            },
+            AnchorKind::OneCell => {
+                let from = pending
+                    .from
+                    .as_ref()
+                    .ok_or_else(|| invalid("one-cell anchor is missing from marker"))?
+                    .finish("drawing from marker")?;
+                check_marker_bounds(from)?;
+                let extent = pending
+                    .extent
+                    .ok_or_else(|| invalid("one-cell anchor is missing its extent"))?;
+                DrawingAnchor::OneCell { from, extent }
+            },
+            AnchorKind::Absolute => {
+                let position = pending
+                    .position
+                    .ok_or_else(|| invalid("absolute anchor is missing its position"))?;
+                let extent = pending
+                    .extent
+                    .ok_or_else(|| invalid("absolute anchor is missing its extent"))?;
+                DrawingAnchor::Absolute { position, extent }
+            },
+        };
+        let compatibility_anchor = compatibility_anchor(&drawing_anchor);
+        match (
+            pending.object_kind,
+            pending.picture_relationship_id,
+            pending.chart_relationship_id,
+        ) {
+            (Some(ObjectKind::Picture), Some(relationship_id), None) => {
+                self.drawing.push(Object::Picture(Picture {
+                    anchor: compatibility_anchor,
+                    drawing_anchor,
+                    relationship_id,
+                    description: pending.description,
+                }));
+            },
+            (Some(ObjectKind::ChartFrame), None, Some(relationship_id)) => {
+                self.drawing.push(Object::Chart(Chart {
+                    anchor: compatibility_anchor,
+                    drawing_anchor,
+                    relationship_id,
+                }));
+            },
+            (Some(ObjectKind::ChartFrame), None, None) => {
+                self.drawing.push(Object::Unknown(Unknown {
+                    anchor: compatibility_anchor,
+                    drawing_anchor,
+                    description: pending.description,
+                    kind: UnknownKind::Other,
+                }));
+            },
+            (Some(ObjectKind::Unknown(kind)), None, None) => {
+                self.drawing.push(Object::Unknown(Unknown {
+                    anchor: compatibility_anchor,
+                    drawing_anchor,
+                    description: pending.description,
                     kind,
                 }));
             },
-            (None, None) => return Err(invalid("drawing anchor has no picture or chart")),
-            (Some(_), Some(_)) => {
-                return Err(invalid("drawing anchor contains both a picture and chart"));
+            (None, _, _) => return Err(invalid("drawing anchor has no object")),
+            (Some(ObjectKind::Picture), _, _) => {
+                return Err(invalid("drawing picture has an invalid image relationship"));
+            },
+            (Some(ObjectKind::ChartFrame), _, _) => {
+                return Err(invalid("drawing chart frame has invalid relationships"));
+            },
+            (Some(ObjectKind::Unknown(_)), _, _) => {
+                return Err(invalid("drawing unknown object has relationships"));
             },
         }
         Ok(())
+    }
+
+    fn take_anchor_child(&mut self, child: AnchorChild) -> Result<()> {
+        self.anchor_mut()?.take_child(child)
     }
 
     fn anchor_mut(&mut self) -> Result<&mut PendingAnchor> {
@@ -458,6 +824,9 @@ impl Parser {
         if length > MAX_MARKER_TEXT_BYTES {
             return Err(limit("drawing marker text"));
         }
+        self.marker_text
+            .try_reserve(text.len())
+            .map_err(|source| allocation("SpreadsheetDrawing marker text", source))?;
         self.marker_text.push_str(text);
         Ok(())
     }
@@ -467,8 +836,149 @@ pub fn parse(xml: &str) -> Result<Option<Drawing>> {
     if xml.len() > MAX_DRAWING_XML_BYTES {
         return Err(limit("drawing XML"));
     }
-    let xml = litchi_ooxml_common::mce::process_str(xml)?;
+    let limits = litchi_ooxml_common::mce::Limits {
+        max_input_bytes: MAX_DRAWING_XML_BYTES,
+        max_output_bytes: MAX_DRAWING_XML_BYTES,
+        ..Default::default()
+    };
+    let processed = litchi_ooxml_common::mce::process_markup_compatibility(
+        xml.as_bytes(),
+        &litchi_ooxml_common::mce::Capabilities::default(),
+        &limits,
+    )?;
+    let xml = match processed.xml {
+        Cow::Borrowed(_) => Cow::Borrowed(xml),
+        Cow::Owned(bytes) => Cow::Owned(
+            String::from_utf8(bytes)
+                .map_err(|error| Error::Invalid(format!("MCE output is not UTF-8: {error}")))?,
+        ),
+    };
     Parser::parse(xml.as_ref())
+}
+
+fn compatibility_anchor(anchor: &DrawingAnchor) -> Anchor {
+    match anchor {
+        DrawingAnchor::TwoCell { from, to, .. } => Anchor::with_offsets(
+            from.column,
+            from.column_offset.emu(),
+            from.row,
+            from.row_offset.emu(),
+            to.column,
+            to.column_offset.emu(),
+            to.row,
+            to.row_offset.emu(),
+        ),
+        // The legacy chart anchor has no extent vocabulary. Retain the source
+        // origin as a useful compatibility projection while exposing the real
+        // extent through DrawingAnchor.
+        DrawingAnchor::OneCell { from, .. } => Anchor::with_offsets(
+            from.column,
+            from.column_offset.emu(),
+            from.row,
+            from.row_offset.emu(),
+            from.column,
+            from.column_offset.emu(),
+            from.row,
+            from.row_offset.emu(),
+        ),
+        // Existing absolute consumers observed a zero placeholder. Keep it
+        // stable; the accurate public projection is never zeroed.
+        DrawingAnchor::Absolute { .. } => Anchor::new(0, 0, 0, 0),
+    }
+}
+
+fn push_context(stack: &mut Vec<Context>, context: Context) -> Result<()> {
+    if stack.len() >= MAX_DRAWING_DEPTH {
+        return Err(limit("drawing XML depth"));
+    }
+    stack
+        .try_reserve(1)
+        .map_err(|source| allocation("SpreadsheetDrawing XML context stack", source))?;
+    stack.push(context);
+    Ok(())
+}
+
+fn check_marker_bounds(marker: CellMarker) -> Result<()> {
+    if marker.column >= 16_384 || marker.row >= 1_048_576 {
+        return Err(invalid("drawing anchor exceeds worksheet bounds"));
+    }
+    Ok(())
+}
+
+fn check_coordinate(value: i64, description: &str) -> Result<()> {
+    if !(MIN_COORDINATE..=MAX_COORDINATE).contains(&value) {
+        return Err(invalid(format!("{description} exceeds DrawingML bounds")));
+    }
+    Ok(())
+}
+
+fn check_positive_coordinate(value: i64, description: &str) -> Result<()> {
+    if !(0..=MAX_COORDINATE).contains(&value) {
+        return Err(invalid(format!("{description} exceeds DrawingML bounds")));
+    }
+    Ok(())
+}
+
+fn check_attribute_lengths(element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Invalid(error.to_string()))?;
+        if attribute.value.as_ref().len() > MAX_STRING_BYTES {
+            return Err(limit("drawing attribute"));
+        }
+        let decoded = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Invalid(error.to_string()))?;
+        if decoded.len() > MAX_STRING_BYTES {
+            return Err(limit("decoded drawing attribute"));
+        }
+    }
+    Ok(())
+}
+
+fn coordinate_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<i64> {
+    let value = unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| invalid(format!("{description} attribute is missing")))?;
+    let value = value
+        .trim_matches([' ', '\t', '\n', '\r'])
+        .parse()
+        .map_err(|_| invalid(format!("invalid {description} '{value}'")))?;
+    check_coordinate(value, description)?;
+    Ok(value)
+}
+
+fn positive_coordinate_attribute(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<Emu> {
+    Ok(Emu(check_positive_coordinate_value(
+        element,
+        name,
+        decoder,
+        description,
+    )?))
+}
+
+fn check_positive_coordinate_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: Decoder,
+    description: &str,
+) -> Result<i64> {
+    let value = unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| invalid(format!("{description} attribute is missing")))?;
+    let value = value
+        .trim_matches([' ', '\t', '\n', '\r'])
+        .parse()
+        .map_err(|_| invalid(format!("invalid {description} '{value}'")))?;
+    check_positive_coordinate(value, description)?;
+    Ok(value)
 }
 
 fn is_spreadsheet_drawing_name(
@@ -476,13 +986,11 @@ fn is_spreadsheet_drawing_name(
     name: QName<'_>,
     local_name: &[u8],
 ) -> bool {
-    name.local_name().as_ref() == local_name
-        && matches!(
-            namespace,
-            ResolveResult::Bound(Namespace(value))
-                if *value == SPREADSHEET_DRAWING_NAMESPACE
-                    || *value == STRICT_SPREADSHEET_DRAWING_NAMESPACE
-        )
+    name.local_name().as_ref() == local_name && is_spreadsheet_drawing_namespace(namespace)
+}
+
+fn trim_xml_schema_whitespace(value: &str) -> &str {
+    value.trim_matches([' ', '\t', '\n', '\r'])
 }
 
 fn is_spreadsheet_drawing_namespace(namespace: &ResolveResult<'_>) -> bool {
@@ -492,19 +1000,6 @@ fn is_spreadsheet_drawing_namespace(namespace: &ResolveResult<'_>) -> bool {
             if *value == SPREADSHEET_DRAWING_NAMESPACE
                 || *value == STRICT_SPREADSHEET_DRAWING_NAMESPACE
     )
-}
-
-fn unknown_kind(local_name: &[u8]) -> Option<UnknownKind> {
-    Some(match local_name {
-        b"from" | b"to" | b"pos" | b"ext" | b"clientData" | b"pic" | b"graphicFrame" => {
-            return None;
-        },
-        b"sp" => UnknownKind::Shape,
-        b"grpSp" => UnknownKind::Group,
-        b"cxnSp" => UnknownKind::Connection,
-        b"contentPart" => UnknownKind::ContentPart,
-        _ => UnknownKind::Other,
-    })
 }
 
 fn set_relationship(target: &mut Option<String>, value: String, kind: &str) -> Result<()> {

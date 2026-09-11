@@ -84,12 +84,14 @@ The current ordinary worksheet reader is intentionally small:
 - [`crates/litchi-xlsx/src/drawing/mod.rs`](../../../crates/litchi-xlsx/src/drawing/mod.rs)
   exports `drawing::parse` and the inventory model.
 - [`crates/litchi-xlsx/src/drawing/model.rs`](../../../crates/litchi-xlsx/src/drawing/model.rs)
-  gives `Picture` only an `Anchor`, the main image relationship ID, and a
-  description. It has no SVG descriptor or source range.
+  gives `Picture` complete `DrawingAnchor` geometry alongside the legacy
+  cell-anchor projection, main image relationship ID, and description.
+  SVG descriptors and source ranges remain lifecycle work.
 - [`crates/litchi-xlsx/src/drawing/codec.rs`](../../../crates/litchi-xlsx/src/drawing/codec.rs)
-  recognizes `twoCellAnchor` and `absoluteAnchor`, and reads only the main
-  `a:blip@r:embed`. Its context stack has no `oneCellAnchor` branch, so a
-  `oneCellAnchor` picture is not a complete current host read path.
+  now recognizes all three anchor forms with actual geometry and `editAs`,
+  validates direct ownership and geometry order, and reads the main
+  `a:blip@r:embed`. MCE input/output and parser allocations are bounded.
+  The numeric coordinate profile excludes universal-measure lexical forms.
 - [`crates/litchi-xlsx/src/workbook/edit/drawing_transfer.rs`](../../../crates/litchi-xlsx/src/workbook/edit/drawing_transfer.rs)
   already scans source ranges and recognizes all three anchor element names
   for transfer layout purposes. That transfer path is not an SVG owner: it
@@ -335,11 +337,12 @@ parsed as an SVG document.
 The implementation should land in bounded steps so the base reader and the
 host graph owner are independently reviewable.
 
-1. **Anchor reader completion.** Add one-cell parsing and geometry validation
-   to `drawing/codec.rs`, or explicitly reuse the shared shape anchor reader
-   while retaining an XLSX source scanner. Add direct tests for two-cell,
-   one-cell, and absolute picture anchors, including strict namespaces,
-   missing/duplicate geometry, bounds, and source-order identity.
+1. **Anchor reader completion (implemented).** The reader reuses shared
+   anchor geometry types for two-cell, one-cell, and absolute pictures.
+   Tests cover Strict namespaces, missing/duplicate geometry, bounds,
+   source order, XML numeric whitespace, and MCE expansion limits. The
+   added public geometry field requires downstream struct literals to
+   initialize it; legacy field access remains available.
 2. **Source-backed owner scan.** Add a source range model for direct pictures,
    resolved `a:blip`/`extLst` ownership, MCE ancestry, unknown extension spans,
    and all three anchor geometries. Add tests for inherited/default prefixes,
