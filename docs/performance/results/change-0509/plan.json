@@ -1,0 +1,14 @@
+{
+  "status": "profiling-before-production-edit",
+  "base_revision": "0455d9abe479bef8980a403f0349ae2a95b254e3",
+  "candidate": "ODT semantic text export; buffer allocation and parser attribution",
+  "basis": "0508 default ODT-large export p50 1.885/1.947ms; source drops each completed block buffer",
+  "conditions": [
+    "fresh profile before selecting optimization",
+    "preserve semantic text, nested-block start order, bounded resource use, exact typed failures/progress",
+    "same unchanged existing harness for matched timing",
+    "review >5percent latency/throughput/RSS adverse flags",
+    "retain all gates/profiles and cleanup owned temporary files",
+    "no iWork implementation work"
+  ]
+}

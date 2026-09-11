@@ -1,0 +1,12 @@
+heaptrack output will be written to "/tmp/litchi-goal-0509/before/heaptrack.zst"
+starting application, this might take some time...
+NOTE: heaptrack detected DEBUGINFOD_URLS but will disable it to prevent 
+unintended network delays during recording
+If you really want to use DEBUGINFOD, export HEAPTRACK_ENABLE_DEBUGINFOD=1
+heaptrack stats:
+	allocations:          	562156
+	leaked allocations:   	1
+	temporary allocations:	250241
+Heaptrack finished! Now run the following to investigate the data:
+
+  heaptrack --analyze "/tmp/litchi-goal-0509/before/heaptrack.zst"

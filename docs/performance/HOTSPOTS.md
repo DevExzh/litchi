@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## 0509: ODT sink allocation churn reduced
+
+[0509](changes/0509-odt-sink-buffer-reuse.md) profiles and removes repeated
+small paragraph-buffer allocation: 200,000→20 calls over twenty large exports.
+The parser keeps one cleared spare with actual capacity at most 4 KiB.
+Callgrind parser-inclusive references fall 1.83%, including the checking sink;
+`normalized_xml10_decoded_len` remains 28.35M exclusive references (9.49% of
+the candidate profile). Its validation/normalization boundary needs a separate
+proof before optimization. SHA compression occupies 44.07% under Callgrind's
+CPU dispatch, which is not a native timing share. ODS repeated row preflight
+and local provider wave/channel overhead remain separate attribution tasks.
+
+Initial large p99 +9.14% is retained. An 8,000-sample follow-up reports
++2.18%/+2.78%, below the review threshold, with modest median reductions.
+No tail-latency or peak-memory improvement is claimed. The broader priority
+queue below remains open.
+
 ## 0508: export baselines and current priority reconciliation
 
 [0508](changes/0508-default-semantic-text-export.md) adds twelve descriptive
@@ -57,7 +74,7 @@ matched whole-child profile; repeated attribute walks and unique-style scans
 remain candidates for attribution. The older 0502 regression and broader CRUD
 requirements are not declared closed.
 
-## Review queue reconciled through 0508
+## Review queue reconciled through 0509
 
 The retained evidence changes the next investigations. These priorities concern
 measured scenarios; the full taxonomy and provider matrix remain required.

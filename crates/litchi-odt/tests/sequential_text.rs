@@ -73,6 +73,43 @@ fn mixed_document_writes_exact_text_in_semantic_start_order() {
 }
 
 #[test]
+fn varied_block_sizes_and_nested_blocks_match_owned_and_source_backed_output() {
+    let oversized = "x".repeat(4097);
+    let body = format!(
+        concat!(
+            "<text:p>small</text:p>",
+            "<text:p/>",
+            "<text:p>outer-before<draw:frame><draw:text-box>",
+            "<text:p>nested</text:p>",
+            "</draw:text-box></draw:frame>outer-after</text:p>",
+            "<text:p>{oversized}</text:p>",
+            "<text:p>tail</text:p>",
+        ),
+        oversized = oversized,
+    );
+    let bytes = package(&body);
+    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let options = TextOutputOptions::new("|", "unused", 16 * 1024, 16);
+    let expected = format!("small||outer-beforeouter-after|nested|{oversized}|tail");
+
+    let (owned_output, owned_bytes, owned_objects) = write_owned(&eager, options);
+    assert_eq!(owned_output, expected.as_bytes());
+    assert_eq!(owned_bytes, expected.len() as u64);
+    assert_eq!(owned_objects, 6);
+
+    let (source, _) = MemorySource::new(bytes);
+    let source_document = SourceBackedDocument::from_read_at(source).unwrap();
+    let mut source_output = Vec::new();
+    let source_report = source_document
+        .write_text_to(&mut source_output, options)
+        .unwrap();
+    assert_eq!(source_output, expected.as_bytes());
+    assert_eq!(source_output, owned_output);
+    assert_eq!(source_report.bytes_written(), owned_bytes);
+    assert_eq!(source_report.objects_written(), owned_objects);
+}
+
+#[test]
 fn whitespace_entities_cdata_expansions_and_utf8_match_text() {
     let document = Document::from_bytes(package(
         r#"<text:p>  lead &amp; <![CDATA[<cdata>]]><text:s text:c="2"/><text:tab/><text:line-break/>尾</text:p>"#,
@@ -212,6 +249,24 @@ fn sink_failure_reports_accepted_multibyte_prefix_exactly() {
     assert_eq!(sink.accepted, "é文".as_bytes()[..3]);
     assert_eq!(error.progress().bytes_written(), 3);
     assert_eq!(error.progress().objects_written(), 0);
+    assert!(matches!(&error, TextOutputError::Sink { .. }));
+}
+
+#[test]
+fn sink_failure_after_emitted_block_preserves_progress_and_text() {
+    let document =
+        Document::from_bytes(package("<text:p>one</text:p><text:p>two</text:p>")).unwrap();
+    let mut sink = PrefixThenFail {
+        accepted: Vec::new(),
+        prefix_limit: 5,
+    };
+    let error = document
+        .write_text_to(&mut sink, TextOutputOptions::new("|", "unused", 64, 8))
+        .unwrap_err();
+
+    assert_eq!(sink.accepted, b"one|t");
+    assert_eq!(error.progress().bytes_written(), 5);
+    assert_eq!(error.progress().objects_written(), 1);
     assert!(matches!(&error, TextOutputError::Sink { .. }));
 }
 

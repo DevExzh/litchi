@@ -1,0 +1,11 @@
+{
+  "decision": "admit bounded paragraph buffer reuse only",
+  "time_utc": "2026-09-11T18:14:04.149197+00:00",
+  "evidence": "before/heaptrack-print.txt",
+  "observed_append_sink_precharged_allocations": 200000,
+  "export_samples": 20,
+  "paragraphs_per_export": 10000,
+  "retention_cap_bytes": 4096,
+  "scope": "allocation stack attributed to sink parser; total heaptrack includes fixture generation, opening, validation, and report writing; no instrumented timing claim",
+  "binary_sha256": "ab874929448dfa3a4c17fd9072e702081b4e78b84cae39f3be120518a0c7f6f2"
+}

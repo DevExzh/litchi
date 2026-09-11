@@ -1,0 +1,233 @@
+{
+  "test_counts": {
+    "odt-tests": {
+      "passed": 1008,
+      "failed": 0,
+      "ignored": 0
+    },
+    "harness-tests": {
+      "passed": 483,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "total_passed": 1491,
+  "total_ignored": 1,
+  "source_bound_receipts": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-09-11T18:21:41.267629+00:00",
+      "elapsed_seconds": 17.73886165500153,
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0509/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0509",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "odt-tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odt"
+      ],
+      "started_utc": "2026-09-11T18:21:59.170751+00:00",
+      "elapsed_seconds": 595.8802335759974,
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0509/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0509",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+      "log_sha256": "6e2b68a3e3f2e890b83de53023c9016e42a602305deb195a739e0e301f0ecfcb"
+    },
+    "odt-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odt",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_utc": "2026-09-11T18:31:55.213192+00:00",
+      "elapsed_seconds": 34.574822595001024,
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0509/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0509",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+      "log_sha256": "22ab0d496e653cdfb34054accea3adba627265397be3def718159db85144cf9e"
+    },
+    "odt-rustdoc": {
+      "command": [
+        "cargo",
+        "doc",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-odt",
+        "--no-deps"
+      ],
+      "started_utc": "2026-09-11T18:32:29.952458+00:00",
+      "elapsed_seconds": 6.353655894999974,
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0509/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0509",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+      "log_sha256": "8f12a984ed4b261535a3b83856f883f2bbeca9dd57e382d2166962e237785018"
+    },
+    "harness-tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib"
+      ],
+      "started_utc": "2026-09-11T18:32:36.470569+00:00",
+      "elapsed_seconds": 169.93614461300604,
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0509/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0509",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+      "log_sha256": "8127717411c69c55a99c41d2958252df1066bdb944686f769a615b820ca77dcf"
+    },
+    "harness-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_utc": "2026-09-11T18:35:26.570998+00:00",
+      "elapsed_seconds": 58.495264725002926,
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0509/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0509",
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+      "log_sha256": "811668064b36061dd26b97d26a7ab027104bf2be39e44f26d0f42bc6ff1669ee"
+    }
+  },
+  "additional_checks": {
+    "boundaries.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9"
+    },
+    "claims-final.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "exit_code": 0,
+      "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+    },
+    "report-classification-final.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_report_claim_classification.py",
+        "--repo-root",
+        "."
+      ],
+      "exit_code": 0,
+      "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    "diff-check.log": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

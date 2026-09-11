@@ -1,0 +1,18 @@
+{
+  "accepted": true,
+  "scope": "one operation-local spare actual capacity<=4096; 99.99percent sink-buffer allocation call reduction on large synthetic export",
+  "initial_adverse_flags": [
+    "large R1 p99 +9.140224576246458percent"
+  ],
+  "followup": "post-hoc large-only8000samples; p99 +2.1787690880325394/+2.7774623834460943percent; all adverse flags below5percent",
+  "limitations": [
+    "initial flag retained, not proven noise",
+    "follow-up candidate median drift4.37percent exceeds modest observed gain",
+    "no tail-latency improvement claim",
+    "no general peak-memory improvement claim",
+    "shared host CPU2 affinity, no isolation",
+    "hardware counters denied",
+    "synthetic export-only scope, unchanged checking sink includes hashing"
+  ],
+  "goal_status": "active"
+}

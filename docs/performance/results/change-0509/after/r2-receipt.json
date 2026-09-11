@@ -1,0 +1,35 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0509/after/litchi-perf-baseline",
+    "--case",
+    "odt_semantic_text_to_sink",
+    "--semantic-shape",
+    "tiny,medium,large",
+    "--warmup",
+    "10",
+    "--samples",
+    "500",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0509/after/r2-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0509/after/r2-catalog.json"
+  ],
+  "started_utc": "2026-09-11T18:36:39.386760+00:00",
+  "host_loadavg_before": "4.25 4.48 4.06 1/1354 1748927",
+  "host_loadavg_after": "4.25 4.48 4.06 3/1352 1748985",
+  "elapsed_seconds": 1.4555161820026115,
+  "exit_code": 0,
+  "binary_sha256": "4808a9d6e1d0f1c5c1aa903f1c88ff7713d41584a1a920336e2d99c862ebeb24",
+  "build_receipt_sha256": "3ad0895fec96215631dbe56de953a22e9cf43511a700d527f0166344f2a47544",
+  "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+  "current_source_unchanged": true,
+  "scope": "export-only uninstrumented wall-clock; hashing inside timer",
+  "artifacts": {
+    "r2.log": "eea7835cf52d2a3975d060c60d88e74f13f61933b8c8794ef39196008a23e952",
+    "r2-report.json": "2fd69d3a3e9316e2f6a645b81a4c8a0acebd69dcf7f13886deb27a04141a5502",
+    "r2-catalog.json": "248cb25914742ffcad5a05b3771792f2cea4fae8c9aa94f3a33e909fcc480c9b"
+  }
+}

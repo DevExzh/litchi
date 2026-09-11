@@ -1,0 +1,19 @@
+{
+  "verified_utc": "2026-09-11T18:43:07.014369+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0509/verify.py"
+  ],
+  "exit_code": 0,
+  "post_cleanup_replay_matches": true,
+  "native_samples": 14000,
+  "instrumented_samples_excluded_from_native_comparison": 50,
+  "summary_sha256": "3015451ae09e242ddb01d3a23e57d6b423baa213140fc4e58f6f92327148727f",
+  "replay_after_cleanup_sha256": "3015451ae09e242ddb01d3a23e57d6b423baa213140fc4e58f6f92327148727f",
+  "verifier_sha256": "6ade77cacb4f5b33b2d97fa87d817f7591207e0076a6d9689cff281c0110dff2",
+  "gates_sha256": "c3b3d2a95a9375064407f173d76802bf9c7208582cff0be8d8c78494a473a58a",
+  "cleanup_sha256": "dac703123b27a4715d4e0f619eaec644a725109750d4c4ad9f86d38c7ad7ed45",
+  "candidate_patch_sha256": "57213bf53100e636f885ab5d8eb737e3cf4cb6bd2d5820b7bb5b8509547cb1fc",
+  "candidate_patch_matches_current_source_diff": true
+}

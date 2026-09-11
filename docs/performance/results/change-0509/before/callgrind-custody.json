@@ -1,0 +1,17 @@
+{
+  "recorded_utc": "2026-09-11T18:18:38.484211+00:00",
+  "receipt_kind": "post-capture artifact custody; command and successful exit observed by coordinator tools",
+  "binary_sha256": "ab874929448dfa3a4c17fd9072e702081b4e78b84cae39f3be120518a0c7f6f2",
+  "source_manifest_sha256": "e4851370dd14cbd5f052edb27792858de75bd26e594fa1a9bec34a9191f77eed",
+  "samples": 5,
+  "warmups": 0,
+  "scope": "collection toggled only under write_text_blocks_to_writer",
+  "artifacts": {
+    "callgrind-catalog.json": "17d35ed51dd9b61dfbba000f479440aff047655955318837e391b42a0e38055d",
+    "callgrind-exclusive.txt": "37552cf921674eb671e0bafcf6122ac21d86c34d2d89ebe2dd957f33474ea646",
+    "callgrind-inclusive.txt": "91aaaca70ef6d4b0ac90761c906ad2d0ebdc7d1b894a0d8a650d0744518dd07c",
+    "callgrind-report.json": "6ba40d26538f1efa512a2ab5b1322e206bd1cc0d3649055a7b362874047b264b",
+    "callgrind.log": "1fec2e777babab7c884cbe7ae444456e3fe5a32e0fdc03c64ae6c53246da8c98",
+    "callgrind.out": "f93bd79d0db8206ab22e98d2daf6e89f6262e7013e50d1e34a785e1d3fa6ac36"
+  }
+}

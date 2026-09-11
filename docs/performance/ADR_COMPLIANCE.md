@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0509: bounded buffer reuse after successful ODT emission
+
+[0509](changes/0509-odt-sink-buffer-reuse.md) retains one cleared String only
+after ordered `write_object` success and frontier advancement. Actual capacity
+is bounded to 4 KiB; oversized buffers are discarded. Cumulative decoded-byte
+accounting, namespace checks, nested order, source fences and typed failure
+progress remain unchanged. No API, dependency or unsafe-code change occurs.
+All 29 accepted ADRs are covered by the [review](results/change-0509/adr-review.md)
+and unchanged [manifest](results/change-0509/adr-manifest.json); no exception
+is required. The measured allocation gain and retained tail flag are explicitly
+scoped, with no hardware or general memory-efficiency claim.
+
 ## 0508: measured export coverage preserves semantic scope
 
 [0508](changes/0508-default-semantic-text-export.md) changes default benchmark

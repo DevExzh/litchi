@@ -1,0 +1,47 @@
+{
+  "base_revision": "0455d9abe479bef8980a403f0349ae2a95b254e3",
+  "before_binary": "ab874929448dfa3a4c17fd9072e702081b4e78b84cae39f3be120518a0c7f6f2",
+  "timing_case": "odt_semantic_text_to_sink",
+  "shapes": [
+    "tiny",
+    "medium",
+    "large"
+  ],
+  "warmups": 10,
+  "samples_per_row": 500,
+  "order": [
+    "before/r1",
+    "after/r1",
+    "after/r2",
+    "before/r2"
+  ],
+  "timing_cpu_affinity": [
+    2
+  ],
+  "isolation_claim": false,
+  "timing_scope": "export-only; opened document and setup outside clock; bounded hashing discard sink with digest updates inside and verification outside",
+  "harness_source_changes": false,
+  "hardware_probe": "permission denied, retained",
+  "heaptrack_scope": "whole child,20largeexports",
+  "callgrind_scope": "5largeexports, collected only under *write_text_blocks_to_writer* including checking sink",
+  "retention_cap_bytes": 4096,
+  "adverse_flag_threshold_percent": 5,
+  "posthoc_tail_followup": {
+    "trigger": "initial large R1 p99 +9.14percent",
+    "order": [
+      "before/tail-r1",
+      "after/tail-r1",
+      "after/tail-r2",
+      "before/tail-r2"
+    ],
+    "shapes": [
+      "large"
+    ],
+    "samples_per_row": 2000,
+    "warmups": 10,
+    "cpu_affinity": [
+      2
+    ],
+    "binaries_unchanged": true
+  }
+}
