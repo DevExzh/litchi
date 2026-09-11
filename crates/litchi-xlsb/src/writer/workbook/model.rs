@@ -60,6 +60,8 @@ pub struct WorkbookWriter {
     /// Optional typed DrawingML theme; `None` uses the writer's Office
     /// template as an authoring policy.
     pub(super) theme: Option<crate::theme::Theme>,
+    /// Optional DrawingML 2012 applied-theme family metadata.
+    pub(super) theme_family: Option<crate::theme::Family>,
     #[cfg(feature = "vba-inspection")]
     pub(super) vba: Option<Arc<Vec<u8>>>,
 }
@@ -94,6 +96,7 @@ impl WorkbookWriter {
             xml_maps: None,
             data_model: None,
             theme: None,
+            theme_family: None,
             #[cfg(feature = "vba-inspection")]
             vba: None,
         }
@@ -115,6 +118,12 @@ impl WorkbookWriter {
     pub fn set_theme(&mut self, theme: crate::theme::Theme) -> Result<&mut Self> {
         litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?;
         self.theme = Some(theme);
+        Ok(self)
+    }
+
+    /// Set the optional DrawingML 2012 applied-theme family metadata.
+    pub fn set_theme_family(&mut self, family: crate::theme::Family) -> Result<&mut Self> {
+        self.theme_family = Some(family);
         Ok(self)
     }
 

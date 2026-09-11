@@ -16,9 +16,10 @@ use litchi_opc::{
 };
 
 use super::{
-    CONTENT_TYPE, GraphState, Limits, RELATIONSHIP_TYPE, RelationshipState,
-    STRICT_THEME_RELATIONSHIP, Snapshot, Theme, codec, invalid, is_image_relationship, parse_theme,
-    read, relationship_state, validate_image_target, validate_model,
+    CONTENT_TYPE, Family, GraphState, Limits, RELATIONSHIP_TYPE, RelationshipState,
+    STRICT_THEME_RELATIONSHIP, Snapshot, Theme, codec, invalid, is_image_relationship,
+    parse_theme_content, read, relationship_state, rewrite_source_with_family,
+    validate_image_target, validate_model,
 };
 use crate::package::error::{Error, Result};
 
@@ -54,6 +55,12 @@ impl OwnerSnapshot {
     #[must_use]
     pub fn theme(&self) -> Option<&Theme> {
         self.theme.as_ref().map(Snapshot::theme)
+    }
+
+    /// Borrow the optional applied-theme family metadata.
+    #[must_use]
+    pub fn family(&self) -> Option<&Family> {
+        self.theme.as_ref().and_then(Snapshot::family)
     }
 
     /// Borrow the present Theme snapshot, or `None` when the owner is absent.
@@ -93,6 +100,7 @@ impl OwnerSnapshot {
         OwnerTransaction {
             before: self.clone(),
             staged: self.theme.as_ref().map(|snapshot| snapshot.theme().clone()),
+            staged_family: self.family().cloned(),
         }
     }
 
@@ -118,7 +126,12 @@ impl OwnerSnapshot {
         }
     }
 
-    fn with_present(&self, theme: Theme, source_xml: Vec<u8>) -> Result<Self> {
+    fn with_present(
+        &self,
+        theme: Theme,
+        family: Option<Family>,
+        source_xml: Vec<u8>,
+    ) -> Result<Self> {
         let graph = GraphState {
             workbook_name: self.plan.workbook_name.clone(),
             theme_name: self.plan.theme_name.clone(),
@@ -131,6 +144,7 @@ impl OwnerSnapshot {
         };
         let snapshot = Snapshot {
             theme: Arc::new(theme),
+            family,
             source_xml: Arc::new(source_xml),
             graph,
             limits: self.limits,
@@ -161,6 +175,7 @@ impl OwnerSnapshot {
 pub struct OwnerTransaction {
     before: OwnerSnapshot,
     staged: Option<Theme>,
+    staged_family: Option<Family>,
 }
 
 impl OwnerTransaction {
@@ -176,6 +191,12 @@ impl OwnerTransaction {
         self.staged.as_ref()
     }
 
+    /// Borrow the currently staged applied-theme family metadata.
+    #[must_use]
+    pub fn family(&self) -> Option<&Family> {
+        self.staged_family.as_ref()
+    }
+
     /// Replace or remove the complete typed Theme owner.
     pub fn replace(&mut self, theme: Option<Theme>) -> Result<bool> {
         if let Some(value) = theme.as_ref() {
@@ -187,15 +208,41 @@ impl OwnerTransaction {
             }
         }
         if self.staged == theme {
+            if theme.is_none() && self.staged_family.is_some() {
+                self.staged_family = None;
+                return Ok(true);
+            }
             return Ok(false);
         }
         self.staged = theme;
+        if self.staged.is_none() {
+            self.staged_family = None;
+        }
         Ok(true)
     }
 
     /// Set or create the complete typed Theme owner.
     pub fn set_theme(&mut self, theme: Theme) -> Result<bool> {
         self.replace(Some(theme))
+    }
+
+    /// Set or replace the applied-theme family metadata.
+    pub fn set_family(&mut self, family: Family) -> Result<bool> {
+        let family = super::preserve_family_source(self.before.family(), family)?;
+        if self.staged_family.as_ref() == Some(&family) {
+            return Ok(false);
+        }
+        self.staged_family = Some(family);
+        Ok(true)
+    }
+
+    /// Remove the applied-theme family metadata while retaining the Theme.
+    pub fn remove_family(&mut self) -> Result<bool> {
+        if self.staged_family.is_none() {
+            return Ok(false);
+        }
+        self.staged_family = None;
+        Ok(true)
     }
 
     /// Remove the optional Theme part and its Workbook owner edge.
@@ -240,7 +287,8 @@ impl OwnerTransaction {
             .theme
             .as_ref()
             .map(|snapshot| snapshot.theme().clone());
-        if self.staged == before_theme {
+        let before_family = self.before.family().cloned();
+        if self.staged == before_theme && self.staged_family == before_family {
             let before = self.before;
             return Ok(OwnerCommit::new(
                 OwnerPatch::new(before.clone(), before),
@@ -252,31 +300,55 @@ impl OwnerTransaction {
             Some(theme) => {
                 validate_model(&theme, self.before.limits)?;
                 if let Some(before) = self.before.theme.as_ref() {
-                    let source = super::rewrite_source(
+                    let source = rewrite_source_with_family(
                         before.source_xml(),
                         before.theme(),
                         &theme,
+                        before.family(),
+                        self.staged_family.as_ref(),
                         self.before.limits,
                     )?;
-                    let parsed = parse_theme(&source, self.before.limits)?;
+                    let (parsed, parsed_family) = parse_theme_content(&source, self.before.limits)?;
                     if parsed != theme {
                         return Err(invalid(
                             "Theme owner transaction read-back did not match the staged model",
                         ));
                     }
-                    self.before.with_present(parsed, source)?
+                    if parsed_family.as_ref() != self.staged_family.as_ref() {
+                        return Err(invalid(
+                            "Theme owner transaction read-back did not match the staged family metadata",
+                        ));
+                    }
+                    self.before.with_present(parsed, parsed_family, source)?
                 } else {
-                    let source = encode_new_theme(&theme, &self.before.plan, self.before.limits)?;
-                    let parsed = parse_theme(&source, self.before.limits)?;
+                    let source = encode_new_theme(
+                        &theme,
+                        self.staged_family.as_ref(),
+                        &self.before.plan,
+                        self.before.limits,
+                    )?;
+                    let (parsed, parsed_family) = parse_theme_content(&source, self.before.limits)?;
                     if parsed != theme {
                         return Err(invalid(
                             "new Theme owner read-back did not match the staged model",
                         ));
                     }
-                    self.before.with_present(parsed, source)?
+                    if parsed_family.as_ref() != self.staged_family.as_ref() {
+                        return Err(invalid(
+                            "new Theme owner read-back did not match the staged family metadata",
+                        ));
+                    }
+                    self.before.with_present(parsed, parsed_family, source)?
                 }
             },
-            None => self.before.with_absent()?,
+            None => {
+                if self.staged_family.is_some() {
+                    return Err(invalid(
+                        "cannot commit Theme family metadata while the owner is absent",
+                    ));
+                }
+                self.before.with_absent()?
+            },
         };
         Ok(OwnerCommit::new(OwnerPatch::new(self.before, after), true))
     }
@@ -765,7 +837,12 @@ fn plan_from_absent_source(source: &OwnerSource, relationship_type: &str) -> Res
     })
 }
 
-fn encode_new_theme(theme: &Theme, plan: &CreationPlan, limits: Limits) -> Result<Vec<u8>> {
+fn encode_new_theme(
+    theme: &Theme,
+    family: Option<&Family>,
+    plan: &CreationPlan,
+    limits: Limits,
+) -> Result<Vec<u8>> {
     let name = if theme.name.is_empty() {
         return Err(invalid(
             "a newly created Theme requires a non-empty display name",
@@ -780,6 +857,14 @@ fn encode_new_theme(theme: &Theme, plan: &CreationPlan, limits: Limits) -> Resul
             return Err(invalid("generated Theme has an unexpected namespace"));
         }
         source.splice(range, codec::STRICT_NAMESPACE.bytes());
+    }
+    if let Some(family) = family {
+        source = super::family::part::add_family_with_uri_limit(
+            &source,
+            family,
+            super::family::part::NATIVE_EXTENSION_URI,
+            limits.max_xml_bytes,
+        )?;
     }
     if source.len() > limits.max_xml_bytes {
         return Err(Error::LimitExceeded {
@@ -811,13 +896,18 @@ fn materialize(
             }
             let part_name = PackURI::new(&before.graph.theme_name)
                 .map_err(|error| Error::InvalidUri(error.to_string()))?;
-            let part = package.get_part_mut(&part_name)?;
+            let part = package.get_part(&part_name)?;
             if part.content_type() != CONTENT_TYPE
                 || part.rels().iter().count() != before.graph.theme_relationships.len()
             {
                 return Err(invalid("Theme part graph changed during replacement"));
             }
-            part.set_blob_shared(Arc::clone(&after.source_xml));
+            super::replace_source_xml_part(
+                package,
+                &part_name,
+                before.source_xml(),
+                after.source_xml(),
+            )?;
         },
         (None, Some(_)) => add_owner(package, &workbook_name, after)?,
         (Some(before), None) => remove_owner(package, &workbook_name, before)?,

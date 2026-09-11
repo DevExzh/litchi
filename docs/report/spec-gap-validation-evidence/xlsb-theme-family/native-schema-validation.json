@@ -1,0 +1,98 @@
+{
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "reports": [
+    {
+      "path": "test-data/ooxml/xlsb/date.xlsb",
+      "member": "xl/theme/theme1.xml",
+      "bytes": 8390,
+      "input_sha256": "fbb969989aabed2e057b2ddfc4cfd10ef1f6ebe9b7697c3755283515158d5b09",
+      "sha256": "50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59",
+      "valid": true,
+      "families": [
+        {
+          "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+          "attributes": {
+            "name": "Office Theme",
+            "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+            "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+          }
+        }
+      ],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "test-data/ooxml/xlsb/hyperlink.xlsb",
+      "member": "xl/theme/theme1.xml",
+      "bytes": 8390,
+      "input_sha256": "6675f4bde45d1291e1d56783b7abe2857f56837ca674c7877dfc125fb49a4724",
+      "sha256": "50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59",
+      "valid": true,
+      "families": [
+        {
+          "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+          "attributes": {
+            "name": "Office Theme",
+            "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+            "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+          }
+        }
+      ],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "test-data/ooxml/xlsb/bug66682.xlsb",
+      "member": "xl/theme/theme1.xml",
+      "bytes": 8390,
+      "input_sha256": "490f0430a6bd44bdf697c7a41a898bce632ce2b775797c3b8c1517764c0900b3",
+      "sha256": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+      "valid": true,
+      "families": [
+        {
+          "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+          "attributes": {
+            "name": "Office Theme",
+            "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+            "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+          }
+        }
+      ],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    },
+    {
+      "path": "test-data/ooxml/xlsb/cond_format.xlsb",
+      "member": "xl/theme/theme1.xml",
+      "bytes": 8390,
+      "input_sha256": "801eeac381ebf3e3df0adeaf15020b63ebe9ea8d8326203d0bdf9043147dfc86",
+      "sha256": "b16106f4229f6ece6d74426b3e73ff6a677df2908d2a06f76ef0329fa27c0282",
+      "valid": true,
+      "families": [
+        {
+          "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+          "attributes": {
+            "name": "Office Theme",
+            "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+            "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+          }
+        }
+      ],
+      "family_schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+      "conformance": "Transitional",
+      "schema_archive_sha256": "d34187520749998af306faf1b730e568b0ca6d88ad24638a407c0a9bb4ca04fc",
+      "main_schema_sha256": "6978ba7e889070b0c3cb5b546b23e5a6c3516134afc53b87a21f482ca33f3858"
+    }
+  ]
+}

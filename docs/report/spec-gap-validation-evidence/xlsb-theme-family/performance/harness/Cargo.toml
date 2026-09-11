@@ -1,0 +1,20 @@
+[package]
+name = "litchi-xlsb-theme-family-profile"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "xlsb-theme-family-profile"
+path = "main.rs"
+
+[dependencies]
+litchi-core = { path = "../../../../../../crates/litchi-core" }
+litchi-drawingml = { path = "../../../../../../crates/litchi-drawingml" }
+litchi-opc = { path = "../../../../../../crates/litchi-opc" }
+litchi-xlsb = { path = "../../../../../../crates/litchi-xlsb" }
+soapberry-zip = { path = "../../../../../../crates/soapberry-zip" }
+sha2 = { version = "0.10.9", default-features = false }

@@ -15,6 +15,8 @@ use std::sync::Arc;
 
 use litchi_core::{SourceVersion, xml::escape_xml};
 use litchi_drawingml::theme::codec;
+use litchi_drawingml::theme::family;
+pub use litchi_drawingml::theme::family::Family;
 pub use litchi_drawingml::theme::{Color, Face, FontSet, Palette, Slot, Theme};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::part::Part;
@@ -35,6 +37,11 @@ const STRICT_THEME_RELATIONSHIP: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
 const STRICT_IMAGE_RELATIONSHIP: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/image";
+
+/// The DrawingML 2012 extension URI that owns `themeFamily`.
+pub const THEME_FAMILY_EXTENSION_URI: &str = family::part::NATIVE_EXTENSION_URI;
+/// The normative namespace-shaped extension identifier for `themeFamily`.
+pub const THEME_FAMILY_NAMESPACE_EXTENSION_URI: &str = family::part::EXTENSION_URI;
 
 /// Hard ceiling inherited from the shared DrawingML theme codec.
 pub const MAX_XML_BYTES: usize = codec::MAX_XML_BYTES;
@@ -102,6 +109,7 @@ impl Default for Limits {
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     theme: Arc<Theme>,
+    family: Option<Family>,
     source_xml: Arc<Vec<u8>>,
     graph: GraphState,
     limits: Limits,
@@ -112,6 +120,12 @@ impl Snapshot {
     #[must_use]
     pub fn theme(&self) -> &Theme {
         self.theme.as_ref()
+    }
+
+    /// Borrow the optional DrawingML 2012 applied-theme family metadata.
+    #[must_use]
+    pub fn family(&self) -> Option<&Family> {
+        self.family.as_ref()
     }
 
     /// Borrow the exact source XML captured from the Theme part.
@@ -140,6 +154,7 @@ impl Snapshot {
         Transaction {
             before: self.clone(),
             staged: self.theme.as_ref().clone(),
+            staged_family: self.family.clone(),
         }
     }
 
@@ -149,7 +164,7 @@ impl Snapshot {
 
     #[allow(dead_code, reason = "used by Workbook publication integration")]
     fn same_state(&self, other: &Self) -> bool {
-        self.same_source(other) && self.theme == other.theme
+        self.same_source(other) && self.theme == other.theme && self.family == other.family
     }
 }
 
@@ -162,6 +177,7 @@ impl Snapshot {
 #[derive(Clone, Debug)]
 pub struct View {
     theme: Arc<Theme>,
+    family: Option<Family>,
     source: PartData,
     graph: GraphState,
     version: SourceVersion,
@@ -173,6 +189,12 @@ impl View {
     #[must_use]
     pub fn theme(&self) -> &Theme {
         self.theme.as_ref()
+    }
+
+    /// Borrow the optional DrawingML 2012 applied-theme family metadata.
+    #[must_use]
+    pub fn family(&self) -> Option<&Family> {
+        self.family.as_ref()
     }
 
     /// Borrow the exact Theme XML captured from the source package.
@@ -210,11 +232,13 @@ impl View {
         Ok(Transaction {
             before: Snapshot {
                 theme: Arc::clone(&self.theme),
+                family: self.family.clone(),
                 source_xml: Arc::new(source_xml),
                 graph: self.graph.clone(),
                 limits: self.limits,
             },
             staged: self.theme.as_ref().clone(),
+            staged_family: self.family.clone(),
         })
     }
 }
@@ -224,6 +248,7 @@ impl View {
 pub struct Transaction {
     before: Snapshot,
     staged: Theme,
+    staged_family: Option<Family>,
 }
 
 impl Transaction {
@@ -237,6 +262,12 @@ impl Transaction {
     #[must_use]
     pub fn theme(&self) -> &Theme {
         &self.staged
+    }
+
+    /// Borrow the currently staged applied-theme family metadata.
+    #[must_use]
+    pub fn family(&self) -> Option<&Family> {
+        self.staged_family.as_ref()
     }
 
     /// Replace the typed color/font metadata after bounded validation.
@@ -270,27 +301,54 @@ impl Transaction {
         self.replace(candidate)
     }
 
+    /// Set or replace the applied-theme family metadata.
+    pub fn set_family(&mut self, family: Family) -> Result<bool> {
+        let family = preserve_family_source(self.before.family.as_ref(), family)?;
+        if self.staged_family.as_ref() == Some(&family) {
+            return Ok(false);
+        }
+        self.staged_family = Some(family);
+        Ok(true)
+    }
+
+    /// Remove the applied-theme family metadata while retaining the Theme.
+    pub fn remove_family(&mut self) -> Result<bool> {
+        if self.staged_family.is_none() {
+            return Ok(false);
+        }
+        self.staged_family = None;
+        Ok(true)
+    }
+
     /// Commit the detached draft into an exact, reversible XML patch.
     pub fn commit(self) -> Result<Commit> {
-        if self.staged == *self.before.theme {
+        if self.staged == *self.before.theme && self.staged_family == self.before.family {
             let before = self.before;
             return Ok(Commit::new(Patch::new(before.clone(), before), false));
         }
         validate_model(&self.staged, self.before.limits)?;
-        let source = rewrite_source(
+        let source = rewrite_source_with_family(
             self.before.source_xml(),
             self.before.theme(),
             &self.staged,
+            self.before.family.as_ref(),
+            self.staged_family.as_ref(),
             self.before.limits,
         )?;
-        let parsed = parse_theme(&source, self.before.limits)?;
+        let (parsed, parsed_family) = parse_theme_content(&source, self.before.limits)?;
         if parsed != self.staged {
             return Err(invalid(
                 "Theme transaction read-back did not match the staged typed model",
             ));
         }
+        if parsed_family.as_ref() != self.staged_family.as_ref() {
+            return Err(invalid(
+                "Theme transaction read-back did not match the staged family metadata",
+            ));
+        }
         let after = Snapshot {
             theme: Arc::new(parsed),
+            family: parsed_family,
             source_xml: Arc::new(source),
             graph: self.before.graph.clone(),
             limits: self.before.limits,
@@ -404,15 +462,22 @@ impl Patch {
         let mut candidate = package.clone();
         let part_name = PackURI::new(self.after.part_name().to_owned())
             .map_err(|error| Error::InvalidUri(error.to_string()))?;
-        let part = candidate.get_part_mut(&part_name)?;
-        if part.content_type() != CONTENT_TYPE {
-            return Err(Error::InvalidContentType {
-                expected: CONTENT_TYPE.to_owned(),
-                got: part.content_type().to_owned(),
-            });
+        {
+            let part = candidate.get_part(&part_name)?;
+            if part.content_type() != CONTENT_TYPE {
+                return Err(Error::InvalidContentType {
+                    expected: CONTENT_TYPE.to_owned(),
+                    got: part.content_type().to_owned(),
+                });
+            }
         }
-        part.set_blob_shared(Arc::clone(&self.after.source_xml));
         candidate.unsign();
+        replace_source_xml_part(
+            &mut candidate,
+            &part_name,
+            self.before.source_xml(),
+            self.after.source_xml(),
+        )?;
         let resulting = read(&candidate, self.before.limits)?
             .ok_or_else(|| invalid("Theme patch read-back lost the Theme part"))?;
         if !resulting.same_state(&self.after) {
@@ -432,10 +497,11 @@ pub fn read(package: &OpcPackage, limits: Limits) -> Result<Option<Snapshot>> {
         return Ok(None);
     };
     let xml = part.blob();
-    let theme = parse_theme(xml, limits)?;
+    let (theme, family) = parse_theme_content(xml, limits)?;
     validate_conformance(xml, &graph.workbook_relationship.reltype)?;
     Ok(Some(Snapshot {
         theme: Arc::new(theme),
+        family,
         source_xml: part.blob_arc(),
         graph,
         limits,
@@ -469,10 +535,11 @@ pub(crate) fn read_source(package: &SourceBackedPackage, limits: Limits) -> Resu
         });
     }
     let source = part.data()?;
-    let theme = parse_theme(source.as_bytes(), limits)?;
+    let (theme, family) = parse_theme_content(source.as_bytes(), limits)?;
     validate_conformance(source.as_bytes(), &graph.workbook_relationship.reltype)?;
     let view = View {
         theme: Arc::new(theme),
+        family,
         source,
         graph,
         version,
@@ -854,6 +921,12 @@ fn parse_theme(xml: &[u8], limits: Limits) -> Result<Theme> {
     Ok(codec::read(xml)?)
 }
 
+pub(crate) fn parse_theme_content(xml: &[u8], limits: Limits) -> Result<(Theme, Option<Family>)> {
+    let theme = parse_theme(xml, limits)?;
+    let family = family::part::read_family(xml)?;
+    Ok((theme, family))
+}
+
 fn validate_model(theme: &Theme, limits: Limits) -> Result<()> {
     // `theme@name` is optional in the DrawingML schema.  The shared authoring
     // helper requires a non-empty name, so use a validation-only placeholder
@@ -955,7 +1028,32 @@ fn bounded_xml_preflight(xml: &[u8], limits: Limits) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn rewrite_source(source: &[u8], before: &Theme, after: &Theme, limits: Limits) -> Result<Vec<u8>> {
+    rewrite_source_with_family(source, before, after, None, None, limits)
+}
+
+pub(crate) fn rewrite_source_with_family(
+    source: &[u8],
+    before: &Theme,
+    after: &Theme,
+    before_family: Option<&Family>,
+    after_family: Option<&Family>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    if before_family != after_family {
+        let patched = rewrite_family_source(source, before_family, after_family, limits)?;
+        return rewrite_base_source(&patched, before, after, limits);
+    }
+    rewrite_base_source(source, before, after, limits)
+}
+
+fn rewrite_base_source(
+    source: &[u8],
+    before: &Theme,
+    after: &Theme,
+    limits: Limits,
+) -> Result<Vec<u8>> {
     let strict = source_namespace(source)? == Some(codec::STRICT_NAMESPACE);
     let mut replacements = Vec::<Replacement>::new();
     if before.name != after.name {
@@ -1018,6 +1116,28 @@ fn rewrite_source(source: &[u8], before: &Theme, after: &Theme, limits: Limits) 
         cursor = replacement.range.end;
     }
     output.extend_from_slice(&source[cursor..]);
+    Ok(output)
+}
+
+fn rewrite_family_source(
+    source: &[u8],
+    before: Option<&Family>,
+    after: Option<&Family>,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let output = match (before, after) {
+        (Some(_), Some(family)) => {
+            family::part::replace_family_with_limit(source, family, limits.max_xml_bytes)
+        },
+        (Some(_), None) => family::part::remove_family_with_limit(source, limits.max_xml_bytes),
+        (None, Some(family)) => family::part::add_family_with_uri_limit(
+            source,
+            family,
+            family::part::NATIVE_EXTENSION_URI,
+            limits.max_xml_bytes,
+        ),
+        (None, None) => Ok(source.to_vec()),
+    }?;
     Ok(output)
 }
 
@@ -1203,8 +1323,117 @@ fn copy_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
+/// Replace one Theme payload while retaining OPC source provenance for the
+/// resulting XML. Native Theme parts commonly carry an XML declaration and
+/// line endings, which are valid source bytes but fail the compact authored
+/// XML audit after a raw `set_blob`; the owned XML splice seam records the new
+/// source token atomically and therefore permits save/reopen to preserve those
+/// bytes exactly.
+pub(crate) fn replace_source_xml_part(
+    package: &mut OpcPackage,
+    part_name: &PackURI,
+    expected: &[u8],
+    replacement: &[u8],
+) -> Result<()> {
+    let source = package.source_xml_part(part_name)?;
+    if source.bytes() != expected {
+        return Err(invalid("Theme XML source provenance is stale"));
+    }
+    let (old_open, _) = root_element_ranges(source.bytes())?;
+    let (_, new_full) = root_element_ranges(replacement)?;
+    let replacement_element = replacement
+        .get(new_full)
+        .ok_or_else(|| invalid("Theme XML replacement root range is invalid"))?;
+    let owned = source.replace_element(old_open, replacement_element)?;
+    if owned.bytes() != replacement {
+        return Err(invalid(
+            "Theme XML replacement changed bytes outside the root element",
+        ));
+    }
+    package.try_replace_owned_xml_part(expected, owned)?;
+    Ok(())
+}
+
+fn root_element_ranges(xml: &[u8]) -> Result<(Range<usize>, Range<usize>)> {
+    let mut reader = Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut open = None;
+    loop {
+        let start = usize::try_from(reader.buffer_position()).map_err(|_error| {
+            Error::CapacityOverflow {
+                resource: "Theme XML root offset",
+            }
+        })?;
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+        let end = usize::try_from(reader.buffer_position()).map_err(|_error| {
+            Error::CapacityOverflow {
+                resource: "Theme XML root offset",
+            }
+        })?;
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    if element.local_name().as_ref() != b"theme" {
+                        return Err(invalid("Theme XML has an unexpected root"));
+                    }
+                    open = Some(start..end);
+                }
+                depth = depth.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "Theme XML root depth",
+                })?;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    if element.local_name().as_ref() != b"theme" {
+                        return Err(invalid("Theme XML has an unexpected root"));
+                    }
+                    return Ok((start..end, start..end));
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("Theme XML has an unexpected closing element"))?;
+                if depth == 0 {
+                    let open = open
+                        .take()
+                        .ok_or_else(|| invalid("Theme XML root opening tag is missing"))?;
+                    let full = open.start..end;
+                    return Ok((open, full));
+                }
+            },
+            Event::Eof => return Err(invalid("Theme XML has no complete root")),
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("Theme XML contains forbidden markup"));
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+/// Retain the source-backed family fragment when a caller supplies a detached
+/// value for an existing owner.  The typed scalar values are the transaction's
+/// requested state; unknown attributes, namespace declarations, comments, and
+/// extension children remain owned by the existing source fragment.
+fn preserve_family_source(existing: Option<&Family>, incoming: Family) -> Result<Family> {
+    let Some(existing) = existing else {
+        return Ok(incoming);
+    };
+    let mut value = existing.clone();
+    value.set_name(incoming.name())?;
+    value.set_id(incoming.id().as_str())?;
+    value.set_variant_id(incoming.variant_id().as_str())?;
+    Ok(value)
 }
 
 mod lifecycle;
@@ -1248,6 +1477,7 @@ mod tests {
         assert_eq!(parsed, value);
         let snapshot = Snapshot {
             theme: Arc::new(parsed.clone()),
+            family: None,
             source_xml: Arc::new(xml.clone()),
             graph: GraphState {
                 workbook_name: "/xl/workbook.bin".to_string(),
@@ -1274,6 +1504,7 @@ mod tests {
         let xml = codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode");
         let snapshot = Snapshot {
             theme: Arc::new(value.clone()),
+            family: None,
             source_xml: Arc::new(xml.clone()),
             graph: GraphState {
                 workbook_name: "/xl/workbook.bin".to_string(),

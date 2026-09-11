@@ -1,0 +1,6 @@
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+ Documenting litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-spreadsheet-drawing)
+ Documenting litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.51s
+   Generated /home/zhuhe/code/litchi-spec-gaps/target/doc/litchi_drawingml/index.html and 1 other file

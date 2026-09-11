@@ -8,6 +8,7 @@
 use litchi_drawingml::theme::family::{
     self, DRAWINGML_NAMESPACE, Family, Guid, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NAME_BYTES,
     MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_XML_BYTES, NAMESPACE, Snapshot,
+    XML_NAMESPACE,
 };
 
 const NATIVE: &[u8] = include_bytes!("fixtures/theme-family-native.xml");
@@ -197,6 +198,15 @@ fn namespace_and_required_attribute_grammar_is_strict() {
         format!(
             "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" thm15:name=\"confused\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"/>"
         ),
+        format!(
+            "<themeFamily xmlns=\"{XML_NAMESPACE}\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"/>"
+        ),
+        format!(
+            "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:x=\"{XML_NAMESPACE}\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"><x:child/></thm15:themeFamily>"
+        ),
+        format!(
+            "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:x=\"http:&#x2F;&#x2F;www.w3.org&#x2F;XML&#x2F;1998&#x2F;namespace\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"><x:child/></thm15:themeFamily>"
+        ),
     ];
     for source in cases {
         assert!(
@@ -264,6 +274,21 @@ fn malformed_nested_qnames_comments_declarations_and_references_fail_closed() {
     let commented = source_with_body("<!-- preserved --><x:child/><!-- tail -->");
     let parsed = family::read(&commented).expect("well-formed comments are opaque markup");
     assert_eq!(family::write(&parsed).unwrap(), commented);
+}
+
+#[test]
+fn raw_text_delimiter_is_rejected_but_comments_and_attributes_allow_it() {
+    let raw_text = source_with_body("<x:child>]]></x:child>");
+    assert!(family::read(&raw_text).is_err());
+
+    let comment = source_with_body("<!-- ]]> -->");
+    assert!(family::read(&comment).is_ok());
+
+    let raw_attribute = source_with_body(r#"<x:child marker="]]>"></x:child>"#);
+    assert!(family::read(&raw_attribute).is_ok());
+
+    let escaped_attribute = source_with_body(r#"<x:child marker="]]&gt;"></x:child>"#);
+    assert!(family::read(&escaped_attribute).is_ok());
 }
 
 #[test]

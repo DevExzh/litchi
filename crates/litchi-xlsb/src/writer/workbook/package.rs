@@ -243,11 +243,24 @@ impl WorkbookWriter {
 
     /// Add the writer-selected Theme part.
     fn add_theme(&self, package: &mut OpcPackage) -> Result<()> {
-        let theme_xml = if let Some(theme) = self.theme.as_ref() {
+        let mut theme_xml = if let Some(theme) = self.theme.as_ref() {
             litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?
         } else {
             self.create_minimal_theme().as_bytes().to_vec()
         };
+        if let Some(family) = self.theme_family.as_ref() {
+            let has_family =
+                litchi_drawingml::theme::family::part::read_family(&theme_xml)?.is_some();
+            theme_xml = if has_family {
+                litchi_drawingml::theme::family::part::replace_family(&theme_xml, family)?
+            } else {
+                litchi_drawingml::theme::family::part::add_family_with_uri(
+                    &theme_xml,
+                    family,
+                    litchi_drawingml::theme::family::part::NATIVE_EXTENSION_URI,
+                )?
+            };
+        }
         let theme_uri = PackURI::new("/xl/theme/theme1.xml")?;
         let theme_part = BlobPart::new(
             theme_uri,
