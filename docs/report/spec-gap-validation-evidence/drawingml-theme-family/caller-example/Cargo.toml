@@ -1,0 +1,15 @@
+[package]
+name = "litchi-drawingml-theme-family-caller-example"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "theme-family-caller-example"
+path = "main.rs"
+
+[dependencies]
+litchi-drawingml = { path = "../../../../../crates/litchi-drawingml" }

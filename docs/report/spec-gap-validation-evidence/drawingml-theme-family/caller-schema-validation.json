@@ -1,0 +1,21 @@
+{
+  "schema_source_sha256": "72b596afed7fcbb72ebc17a142219493f67564ee2910169ef1067e9838713914",
+  "ecma_archive_sha256": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd",
+  "fragments": [
+    {
+      "path": "crates/litchi-drawingml/tests/fixtures/theme-family-native.xml",
+      "sha256": "fc3629eb8c47a9665d56152c54d52112621b889581f6ceb1299ac5ed8cfc264f",
+      "valid": true
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/drawingml-theme-family/caller-authored.xml",
+      "sha256": "1831bb0a0da747963d5158fa65288b6873429685e8312aa7c1a4f969ba2ec1a2",
+      "valid": true
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/drawingml-theme-family/caller-edited-native.xml",
+      "sha256": "e5904be29a8056341b633deb227fe901bf6f6b2e936505d1f76344a6ffb30332",
+      "valid": true
+    }
+  ]
+}
