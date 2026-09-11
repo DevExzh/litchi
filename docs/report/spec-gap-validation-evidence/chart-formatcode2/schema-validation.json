@@ -1,0 +1,32 @@
+{
+  "scope": "Global formatcode2 element XSD only; no string-decoding or host-placement proof",
+  "schema_source_sha256": "d84e92a98633c3b25d3f30c85d4ea31bcf71e5db6fe6c56beeecdb3d1d33ec3f",
+  "ecma_archive_sha256": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd",
+  "shared_schema_sha256": "48675c4f82f6b097434d4b7e313635b790257cca58fa90dd0e8f19c9affa18ed",
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "reports": [
+    {
+      "path": "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/source.xml",
+      "bytes": 129,
+      "sha256": "8de11e6b899f05c344da54a4ef64a24c2c753a0494ff0585ec1df36f2b157367",
+      "valid": true
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/edited.xml",
+      "bytes": 139,
+      "sha256": "9deed7418f4cf33f4a9265c2869de25ee6d37015817c918ce8e5f2d8ea55706f",
+      "valid": true
+    },
+    {
+      "path": "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/authored.xml",
+      "bytes": 163,
+      "sha256": "3e6b707c6b885a9d264d514a681d10a7d261ab6b105a1eeaa35cc1f9896a117a",
+      "valid": true
+    }
+  ]
+}
