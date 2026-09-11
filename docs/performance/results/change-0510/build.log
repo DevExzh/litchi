@@ -1,0 +1,27 @@
+   Compiling litchi-odt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odt)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 2m 03s
+	Command being timed: "cargo build --release --bin litchi-perf-baseline --locked --manifest-path tools/perf-baseline/Cargo.toml"
+	User time (seconds): 228.01
+	System time (seconds): 3.12
+	Percent of CPU this job got: 187%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:03.06
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2249532
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 2246611
+	Voluntary context switches: 9046
+	Involuntary context switches: 1205
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 192
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

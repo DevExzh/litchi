@@ -31,13 +31,31 @@ fn content(body: &str) -> Vec<u8> {
 
 fn package(body: &str) -> Vec<u8> {
     let content = content(body);
-    support::package(MIMETYPE, &[("content.xml", content.as_slice())])
+    raw_package(content.as_slice())
+}
+
+fn raw_package(content_xml: &[u8]) -> Vec<u8> {
+    // Keep producer bytes, including XML line-ending spelling, in the source
+    // archive so the owned and positional facades consume the same payload.
+    support::package(MIMETYPE, &[("content.xml", content_xml)])
 }
 
 fn write_owned(document: &Document, options: TextOutputOptions<'_>) -> (Vec<u8>, u64, u64) {
     let mut output = Vec::new();
     let report = document.write_text_to(&mut output, options).unwrap();
     (output, report.bytes_written(), report.objects_written())
+}
+
+fn normalized_line_ending_fixture() -> (&'static str, &'static str) {
+    (
+        concat!(
+            "<text:p>literal\rCR</text:p>",
+            "<text:p>CRLF\r\nline</text:p>",
+            "<text:p>repeat\r\rCR</text:p>",
+            "<text:p>UTF8尾<![CDATA[cdata\r\n尾]]></text:p>",
+        ),
+        "literal\nCR|CRLF\nline|repeat\n\nCR|UTF8尾cdata\n尾",
+    )
 }
 
 #[test]
@@ -425,4 +443,60 @@ fn source_backed_writer_matches_owned_writer_and_rejects_stale_source_first() {
     ));
     assert_eq!(error.progress().bytes_written(), 0);
     assert_eq!(error.progress().objects_written(), 0);
+}
+
+#[test]
+fn owned_and_source_backed_exports_match_normalized_line_endings_across_blocks() {
+    let (body, expected) = normalized_line_ending_fixture();
+    let content_xml = content(body);
+    let bytes = raw_package(content_xml.as_slice());
+    let eager = Document::from_bytes(bytes.clone()).unwrap();
+    let (source, _) = MemorySource::new(bytes);
+    let source_document = SourceBackedDocument::from_read_at(source).unwrap();
+
+    assert_eq!(
+        source_document.content_xml().unwrap().as_bytes(),
+        content_xml.as_slice()
+    );
+
+    let options = TextOutputOptions::new("|", "unused", 64, 8);
+    let (owned_output, owned_bytes, owned_objects) = write_owned(&eager, options);
+    assert_eq!(owned_output, expected.as_bytes());
+    assert_eq!(owned_bytes, 48);
+    assert_eq!(owned_objects, 4);
+
+    let mut source_output = Vec::new();
+    let source_report = source_document
+        .write_text_to(&mut source_output, options)
+        .unwrap();
+    assert_eq!(source_output, expected.as_bytes());
+    assert_eq!(source_report.bytes_written(), 48);
+    assert_eq!(source_report.objects_written(), 4);
+}
+
+#[test]
+fn normalized_output_limit_accepts_exact_length_and_refuses_one_byte_lower() {
+    let (body, expected) = normalized_line_ending_fixture();
+    let document = Document::from_bytes(raw_package(content(body).as_slice())).unwrap();
+
+    let exact = TextOutputOptions::new("|", "unused", expected.len() as u64, 8);
+    let (output, bytes_written, objects_written) = write_owned(&document, exact);
+    assert_eq!(output, expected.as_bytes());
+    assert_eq!(bytes_written, 48);
+    assert_eq!(objects_written, 4);
+
+    let mut limited_output = Vec::new();
+    let error = document
+        .write_text_to(
+            &mut limited_output,
+            TextOutputOptions::new("|", "unused", 47, 8),
+        )
+        .unwrap_err();
+    assert_eq!(limited_output, b"literal\nCR|CRLF\nline|repeat\n\nCR");
+    assert_eq!(error.progress().bytes_written(), 31);
+    assert_eq!(error.progress().objects_written(), 3);
+    let limit = error.limit().unwrap();
+    assert_eq!(limit.kind(), TextOutputLimitKind::OutputBytes);
+    assert_eq!(limit.observed(), 48);
+    assert_eq!(limit.limit(), 47);
 }

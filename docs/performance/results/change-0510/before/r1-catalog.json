@@ -1,0 +1,496 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "2bccdaef857f584fa66f4bb47213ce90761ba2ca801d967fcefc55de392629f5",
+  "content_set_sha256": "2266dd33d77cb778202dca4f5403f735dd9b2ff8e5dd18afeb9b031c7265541f",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "869bbc3ed470453b8324893180360a2d69e7c315",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "odt-odf-zip:sha256:39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+      "name": "odt-semantic-large",
+      "legacy_v1": {
+        "name": "odt-semantic-large",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 490000,
+        "archive_bytes": 28329,
+        "archive_sha256": "39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "format": "ODT/ODF/ZIP",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odt-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odt-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 49,
+          "entry_count": 10000,
+          "family": "odt",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "large",
+          "package_format": "ODT/ODF/ZIP",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odt_corpus",
+            "semantic_odt_bytes",
+            "semantic_odt_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 28329,
+        "archive_sha256": "39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+        "logical_payload_bytes": 490000,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 10000
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 28329,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odt_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odt-odf-zip:sha256:5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+      "name": "odt-semantic-tiny",
+      "legacy_v1": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2058,
+        "archive_sha256": "5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "format": "ODT/ODF/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odt-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odt-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 49,
+          "entry_count": 24,
+          "family": "odt",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "tiny",
+          "package_format": "ODT/ODF/ZIP",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odt_corpus",
+            "semantic_odt_bytes",
+            "semantic_odt_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 2058,
+        "archive_sha256": "5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+        "logical_payload_bytes": 1176,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 24
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 2058,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odt_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odt-odf-zip:sha256:81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+      "name": "odt-semantic-medium",
+      "legacy_v1": {
+        "name": "odt-semantic-medium",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 200,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 9800,
+        "archive_bytes": 2557,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "format": "ODT/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odt-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odt-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 49,
+          "entry_count": 200,
+          "family": "odt",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium",
+          "package_format": "ODT/ODF/ZIP",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odt_corpus",
+            "semantic_odt_bytes",
+            "semantic_odt_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 2557,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "logical_payload_bytes": 9800,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 200
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 2557,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odt_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "odt_semantic_text_to_sink",
+      "corpus_id": "odt-odf-zip:sha256:39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+      "legacy_name": "odt-semantic-large",
+      "legacy_archive_sha256": "39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+      "role": "timed"
+    },
+    {
+      "case": "odt_semantic_text_to_sink",
+      "corpus_id": "odt-odf-zip:sha256:5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+      "legacy_name": "odt-semantic-tiny",
+      "legacy_archive_sha256": "5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+      "role": "timed"
+    },
+    {
+      "case": "odt_semantic_text_to_sink",
+      "corpus_id": "odt-odf-zip:sha256:81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+      "legacy_name": "odt-semantic-medium",
+      "legacy_archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+      "role": "timed"
+    }
+  ]
+}

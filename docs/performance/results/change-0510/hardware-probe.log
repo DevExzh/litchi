@@ -1,0 +1,12 @@
+
+ Performance counter stats for '/bin/true':
+
+           1700328      cycles                                                                
+            766709      instructions                                                          
+
+       0.038910080 seconds time elapsed
+
+       0.000000000 seconds user
+       0.037456000 seconds sys
+
+

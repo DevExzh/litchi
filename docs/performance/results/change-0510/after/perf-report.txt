@@ -1,0 +1,32 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu/cycles/P'
+# Event count (approx.): 8903980275
+#
+# Overhead  Command          Shared Object         Symbol                                                                                         
+# ........  ...............  ....................  ...............................................................................................
+#
+    31.54%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odt::elements::text::write_text_blocks_to_writer
+    12.47%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write
+     8.68%  litchi-perf-bas  litchi-perf-baseline  [.] quick_xml::reader::Reader<R>::read_event_impl
+     8.47%  litchi-perf-bas  litchi-perf-baseline  [.] sha2::sha256::x86_sha::compress
+     3.89%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odt::elements::text::PendingSinkBlocks::recycle
+     3.49%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2
+     2.59%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+     1.90%  litchi-perf-bas  litchi-perf-baseline  [.] core::str::converts::from_utf8
+     1.80%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+     1.50%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odt::elements::text::validate_text_block_attributes
+     1.42%  litchi-perf-bas  libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---__memcmp_evex_movbe
+
+     1.31%  litchi-perf-bas  litchi-perf-baseline  [.] quick_xml::reader::state::ReaderState::emit_start
+     1.20%  litchi-perf-bas  litchi-perf-baseline  [.] quick_xml::reader::state::ReaderState::emit_end
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

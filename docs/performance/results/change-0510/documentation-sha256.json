@@ -1,0 +1,8 @@
+{
+  "docs/performance/BASELINE.md": "4598c86a131e9ecc431a6b242e1cbe564c36c42e30eb08bcd15f91659ce87f38",
+  "docs/performance/HOTSPOTS.md": "48b44300cb83bd6dd3083e04ffe0387f8141391190ffa56d9a9b15ab8f46bf4f",
+  "docs/performance/REPORT.md": "55d5293d37ec98001b12e4f5089860d74684f70ab412e12ccbe55743a13f4f8f",
+  "docs/performance/GOAL_AUDIT.md": "c0ee4926f64d676d9fbf856378240409081a9c49560d2f0f348b9052c05b28a9",
+  "docs/performance/ADR_COMPLIANCE.md": "1bf9ea071da37dab0157abc8ebf19056a472519188915f20604171dadddd3f95",
+  "docs/performance/changes/0510-odt-crlf-length-fast-path.md": "ff325c69af3a0b8d306c5905fdb42a827b1d005d5b9f18432428ef03db066a9c"
+}

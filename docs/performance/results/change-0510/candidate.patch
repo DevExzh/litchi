@@ -1,0 +1,240 @@
+diff --git a/crates/litchi-odt/src/elements/text.rs b/crates/litchi-odt/src/elements/text.rs
+index e035cddb7..bde59ccba 100644
+--- a/crates/litchi-odt/src/elements/text.rs
++++ b/crates/litchi-odt/src/elements/text.rs
+@@ -1945,8 +1945,11 @@ impl SinkTextBudget {
+ fn normalized_xml10_decoded_len(raw: &[u8], context: &str) -> Result<usize> {
+     std::str::from_utf8(raw)
+         .map_err(|error| Error::InvalidFormat(format!("invalid ODF {context}: {error}")))?;
++    let Some(first_cr) = memchr::memchr(b'\r', raw) else {
++        return Ok(raw.len());
++    };
+     let mut length = raw.len();
+-    let mut index = 0;
++    let mut index = first_cr;
+     while index < raw.len() {
+         if raw[index] == b'\r' {
+             if raw.get(index + 1) == Some(&b'\n') {
+@@ -3189,6 +3192,124 @@ mod tests {
+         assert_eq!(pending.next_emit, 0);
+     }
+ 
++    fn scalar_normalized_xml10_decoded_len(raw: &[u8], context: &str) -> Result<usize> {
++        std::str::from_utf8(raw)
++            .map_err(|error| Error::InvalidFormat(format!("invalid ODF {context}: {error}")))?;
++        let mut length = raw.len();
++        let mut index = 0;
++        while index < raw.len() {
++            if raw[index] == b'\r' {
++                if raw.get(index + 1) == Some(&b'\n') {
++                    length = length.checked_sub(1).ok_or_else(|| {
++                        Error::InvalidFormat("ODF text size overflow".to_string())
++                    })?;
++                    index += 2;
++                } else {
++                    index += 1;
++                }
++            } else {
++                index += 1;
++            }
++        }
++        Ok(length)
++    }
++
++    fn assert_normalized_len_matches_scalar(raw: &[u8], context: &str) {
++        let expected = scalar_normalized_xml10_decoded_len(raw, context);
++        let actual = normalized_xml10_decoded_len(raw, context);
++        match (expected, actual) {
++            (Ok(expected), Ok(actual)) => assert_eq!(actual, expected, "input: {raw:?}"),
++            (Err(expected), Err(actual)) => {
++                assert_eq!(actual.to_string(), expected.to_string(), "input: {raw:?}");
++            },
++            (expected, actual) => {
++                panic!("optimized/scalar result mismatch for {raw:?}: {expected:?} vs {actual:?}")
++            },
++        }
++    }
++
++    #[test]
++    fn normalized_xml10_length_matches_scalar_adversarial_and_deterministic_inputs() {
++        let adversarial: &[&[u8]] = &[
++            b"",
++            b"a",
++            b"\r",
++            b"\n",
++            b"\r\n",
++            b"\r\r\n",
++            b"\n\r\n",
++            b"\r\n\r\n",
++            b"a\r\nb",
++            "é\r\n文\r🙂".as_bytes(),
++            &[0xff],
++            &[b'a', 0xff, b'\r', b'\n'],
++            &[0xc3],
++            &[0xe2, 0x82, b'\r', b'\n'],
++        ];
++        for raw in adversarial {
++            assert_normalized_len_matches_scalar(raw, "text content");
++            assert_normalized_len_matches_scalar(raw, "text CDATA");
++        }
++
++        let mut state = 0x51_05_9e_u32;
++        for length in 0..256 {
++            let mut raw = Vec::with_capacity(length);
++            for _ in 0..length {
++                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
++                raw.push((state >> 24) as u8);
++            }
++            assert_normalized_len_matches_scalar(&raw, "deterministic arbitrary");
++        }
++
++        let alphabet = ["a", "\r", "\n", "é", "文", "🙂"];
++        for length in 0..256 {
++            let mut value = String::new();
++            for _ in 0..length {
++                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
++                value.push_str(alphabet[(state as usize) % alphabet.len()]);
++            }
++            assert_normalized_len_matches_scalar(value.as_bytes(), "deterministic valid");
++        }
++
++        for context in ["text content", "text CDATA"] {
++            let error = normalized_xml10_decoded_len(&[0xff], context)
++                .unwrap_err()
++                .to_string();
++            assert!(
++                error.starts_with(&format!("Invalid format: invalid ODF {context}:")),
++                "unexpected error context: {error}"
++            );
++        }
++    }
++
++    #[test]
++    fn normalized_xml10_length_matches_quick_xml_text_and_cdata() {
++        let values = [
++            "",
++            "a",
++            "\r",
++            "\n",
++            "\r\n",
++            "\r\r\n",
++            "é\r\n",
++            "\r\n文",
++            "a\r\n🙂\rb",
++        ];
++        for value in values {
++            let expected = normalized_xml10_decoded_len(value.as_bytes(), "text content").unwrap();
++            let text = quick_xml::events::BytesText::from_escaped(value)
++                .xml_content(XmlVersion::Explicit1_0)
++                .unwrap();
++            assert_eq!(text.len(), expected, "text input: {value:?}");
++
++            let expected = normalized_xml10_decoded_len(value.as_bytes(), "text CDATA").unwrap();
++            let cdata = quick_xml::events::BytesCData::new(value)
++                .xml_content(XmlVersion::Explicit1_0)
++                .unwrap();
++            assert_eq!(cdata.len(), expected, "CDATA input: {value:?}");
++        }
++    }
++
+     // ========== Paragraph Tests ==========
+     #[test]
+     fn test_paragraph_new() {
+diff --git a/crates/litchi-odt/tests/sequential_text.rs b/crates/litchi-odt/tests/sequential_text.rs
+index 0239c8808..c2f73a2fc 100644
+--- a/crates/litchi-odt/tests/sequential_text.rs
++++ b/crates/litchi-odt/tests/sequential_text.rs
+@@ -31,7 +31,13 @@ fn content(body: &str) -> Vec<u8> {
+ 
+ fn package(body: &str) -> Vec<u8> {
+     let content = content(body);
+-    support::package(MIMETYPE, &[("content.xml", content.as_slice())])
++    raw_package(content.as_slice())
++}
++
++fn raw_package(content_xml: &[u8]) -> Vec<u8> {
++    // Keep producer bytes, including XML line-ending spelling, in the source
++    // archive so the owned and positional facades consume the same payload.
++    support::package(MIMETYPE, &[("content.xml", content_xml)])
+ }
+ 
+ fn write_owned(document: &Document, options: TextOutputOptions<'_>) -> (Vec<u8>, u64, u64) {
+@@ -40,6 +46,18 @@ fn write_owned(document: &Document, options: TextOutputOptions<'_>) -> (Vec<u8>,
+     (output, report.bytes_written(), report.objects_written())
+ }
+ 
++fn normalized_line_ending_fixture() -> (&'static str, &'static str) {
++    (
++        concat!(
++            "<text:p>literal\rCR</text:p>",
++            "<text:p>CRLF\r\nline</text:p>",
++            "<text:p>repeat\r\rCR</text:p>",
++            "<text:p>UTF8尾<![CDATA[cdata\r\n尾]]></text:p>",
++        ),
++        "literal\nCR|CRLF\nline|repeat\n\nCR|UTF8尾cdata\n尾",
++    )
++}
++
+ #[test]
+ fn mixed_document_writes_exact_text_in_semantic_start_order() {
+     let bytes = package(concat!(
+@@ -426,3 +444,59 @@ fn source_backed_writer_matches_owned_writer_and_rejects_stale_source_first() {
+     assert_eq!(error.progress().bytes_written(), 0);
+     assert_eq!(error.progress().objects_written(), 0);
+ }
++
++#[test]
++fn owned_and_source_backed_exports_match_normalized_line_endings_across_blocks() {
++    let (body, expected) = normalized_line_ending_fixture();
++    let content_xml = content(body);
++    let bytes = raw_package(content_xml.as_slice());
++    let eager = Document::from_bytes(bytes.clone()).unwrap();
++    let (source, _) = MemorySource::new(bytes);
++    let source_document = SourceBackedDocument::from_read_at(source).unwrap();
++
++    assert_eq!(
++        source_document.content_xml().unwrap().as_bytes(),
++        content_xml.as_slice()
++    );
++
++    let options = TextOutputOptions::new("|", "unused", 64, 8);
++    let (owned_output, owned_bytes, owned_objects) = write_owned(&eager, options);
++    assert_eq!(owned_output, expected.as_bytes());
++    assert_eq!(owned_bytes, 48);
++    assert_eq!(owned_objects, 4);
++
++    let mut source_output = Vec::new();
++    let source_report = source_document
++        .write_text_to(&mut source_output, options)
++        .unwrap();
++    assert_eq!(source_output, expected.as_bytes());
++    assert_eq!(source_report.bytes_written(), 48);
++    assert_eq!(source_report.objects_written(), 4);
++}
++
++#[test]
++fn normalized_output_limit_accepts_exact_length_and_refuses_one_byte_lower() {
++    let (body, expected) = normalized_line_ending_fixture();
++    let document = Document::from_bytes(raw_package(content(body).as_slice())).unwrap();
++
++    let exact = TextOutputOptions::new("|", "unused", expected.len() as u64, 8);
++    let (output, bytes_written, objects_written) = write_owned(&document, exact);
++    assert_eq!(output, expected.as_bytes());
++    assert_eq!(bytes_written, 48);
++    assert_eq!(objects_written, 4);
++
++    let mut limited_output = Vec::new();
++    let error = document
++        .write_text_to(
++            &mut limited_output,
++            TextOutputOptions::new("|", "unused", 47, 8),
++        )
++        .unwrap_err();
++    assert_eq!(limited_output, b"literal\nCR|CRLF\nline|repeat\n\nCR");
++    assert_eq!(error.progress().bytes_written(), 31);
++    assert_eq!(error.progress().objects_written(), 3);
++    let limit = error.limit().unwrap();
++    assert_eq!(limit.kind(), TextOutputLimitKind::OutputBytes);
++    assert_eq!(limit.observed(), 48);
++    assert_eq!(limit.limit(), 47);
++}

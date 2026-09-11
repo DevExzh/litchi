@@ -1,0 +1,60 @@
+--------------------------------------------------------------------------------
+Profile data file 'docs/performance/results/change-0510/before/callgrind.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 188179474
+Trigger: Program termination
+Profiled target:  /tmp/litchi-goal-0510/before/litchi-perf-baseline --case odt_semantic_text_to_sink --semantic-shape large --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0510/before/callgrind-report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0510/before/callgrind-catalog.json (PID 1824375, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       95
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+298,831,445 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+131,710,320 (44.08%)  ???:sha2::sha256::soft::unroll::compress [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+ 28,350,000 ( 9.49%)  ???:litchi_odt::elements::text::normalized_xml10_decoded_len [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+ 17,955,390 ( 6.01%)  ???:litchi_odt::elements::text::write_text_blocks_to_writer [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+ 14,375,000 ( 4.81%)  ???:core::str::converts::from_utf8 [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+ 12,661,825 ( 4.24%)  ???:quick_xml::reader::Reader<R>::read_event_impl [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  7,015,260 ( 2.35%)  ???:<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  6,701,460 ( 2.24%)  ???:memchr::arch::x86_64::avx2::memchr::One::find_raw [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  5,599,720 ( 1.87%)  ???:litchi_perf_baseline::SinkSummary::prepare_write [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  5,499,725 ( 1.84%)  ???:litchi_core::text_output::SequentialTextWriter<W>::write_bytes [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  5,404,945 ( 1.81%)  ???:quick_xml::reader::state::ReaderState::emit_start [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  5,050,000 ( 1.69%)  ???:litchi_odt::elements::text::PendingSinkBlocks::complete [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  4,101,230 ( 1.37%)  ???:quick_xml::reader::state::ReaderState::emit_end [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  3,499,900 ( 1.17%)  ???:litchi_core::text_output::SequentialTextWriter<W>::write_object [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  3,257,005 ( 1.09%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,200,720 ( 1.07%)  ???:memchr::arch::x86_64::memchr::memchr_raw::find_avx2 [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  3,163,220 ( 1.06%)  ???:memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  3,102,400 ( 1.04%)  ???:litchi_odt::elements::text::TextNamespaceMemo::is_text_namespace [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  3,008,550 ( 1.01%)  ???:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  3,000,000 ( 1.00%)  ???:litchi_odt::elements::text::validate_text_block_attributes [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  2,550,140 ( 0.85%)  ???:litchi_odt::elements::text::PendingSinkBlocks::reserve [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  2,401,320 ( 0.80%)  ???:memchr::arch::x86_64::memchr::memchr2_raw::find_avx2 [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  2,100,000 ( 0.70%)  ???:litchi_odt::elements::text::append_sink_precharged [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  2,000,220 ( 0.67%)  ???:memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2 [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  1,959,698 ( 0.66%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,909,190 ( 0.64%)  ???:memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  1,850,630 ( 0.62%)  ???:litchi_odt::elements::text::is_text_element [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  1,850,000 ( 0.62%)  ???:quick_xml::encoding::Decoder::content [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+  1,700,300 ( 0.57%)  ???:litchi_odt::elements::text::is_text_block [/tmp/litchi-goal-0510/before/litchi-perf-baseline]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+

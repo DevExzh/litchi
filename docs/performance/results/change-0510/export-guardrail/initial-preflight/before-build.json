@@ -1,0 +1,33 @@
+{
+  "command": [
+    "rustc",
+    "--edition=2024",
+    "-O",
+    "-C",
+    "debuginfo=0",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0510/export-guardrail/probe.rs",
+    "-L",
+    "dependency=/tmp/litchi-goal-0510/target/release/deps",
+    "-o",
+    "/tmp/litchi-goal-0510/before/export-guardrail",
+    "--extern",
+    "litchi_odt=/tmp/litchi-goal-0510/target/release/deps/liblitchi_odt-f87c36768846cb2b.rlib",
+    "--extern",
+    "litchi_core=/tmp/litchi-goal-0510/target/release/deps/liblitchi_core-e8220bd94e4515f6.rlib",
+    "--extern",
+    "sha2=/tmp/litchi-goal-0510/target/release/deps/libsha2-3c14b6dd11aa4179.rlib",
+    "--extern",
+    "soapberry_zip=/tmp/litchi-goal-0510/target/release/deps/libsoapberry_zip-d8d62f764f3c21b0.rlib"
+  ],
+  "exit_code": 0,
+  "recorded_utc": "2026-09-11T18:59:54.650330+00:00",
+  "dependency_artifact_sha256": {
+    "/tmp/litchi-goal-0510/target/release/deps/liblitchi_odt-f87c36768846cb2b.rlib": "5cf10b0c261b92f5f11244dab35b1ba72bad3435218a99a6e4133fc2a75edbe2",
+    "/tmp/litchi-goal-0510/target/release/deps/liblitchi_core-e8220bd94e4515f6.rlib": "b55c6a9738a48aad74c72dd921fba14f774d366a0a28b10c453182b2df4d0c80",
+    "/tmp/litchi-goal-0510/target/release/deps/libsha2-3c14b6dd11aa4179.rlib": "27c0addfcb8d16eebd2338c28d53f935e32b23ec8b539e979d36b193a784c25b",
+    "/tmp/litchi-goal-0510/target/release/deps/libsoapberry_zip-d8d62f764f3c21b0.rlib": "c5ae90ec84f4b68c0a02e0e22bb183481a70743b7563373c0ba5ae5109faf592"
+  },
+  "probe_source_sha256": "129d0e8d89d37287ae3a56032b7179293a8c28e053e7c14560248484821614f1",
+  "library_source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+  "binary_sha256": "5ef809b8afadb9334c49673c78fae19f6c0540a3676835b53cc1cf513bacae61"
+}

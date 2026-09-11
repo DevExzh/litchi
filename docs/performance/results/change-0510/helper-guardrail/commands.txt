@@ -1,0 +1,26 @@
+# 0510 helper guardrail command custody
+pwd=/home/zhuhe/code/litchi
+toolchain=/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc
+rustc_version=rustc 1.95.0 (59807616e 2026-04-14)
+memchr_rlib=/tmp/litchi-goal-0510/target/release/deps/libmemchr-291e0ba635faa0f2.rlib
+memchr_rlib_sha256=73a74d96e4c307bec5f78cb6db20113198958de4c96107fb8d94b6872bb03815
+
+# The active 0510 target was observed before compilation:
+find /tmp/litchi-goal-0510/target/release/deps -maxdepth 1 -type f -name 'libmemchr-*.rlib'
+
+# Isolated compile; this is rustc directly, with no Cargo invocation:
+rustc --edition=2024 -O docs/performance/results/change-0510/helper-guardrail/helper_guardrail.rs \
+  --extern memchr=/tmp/litchi-goal-0510/target/release/deps/libmemchr-291e0ba635faa0f2.rlib \
+  -L dependency=/tmp/litchi-goal-0510/target/release/deps \
+  -o /tmp/litchi-goal-0510/helper-guardrail/helper_guardrail
+
+# Single-threaded forward/reverse probe, pinned away from the active build:
+taskset -c 31 /usr/bin/time -f 'run_seconds=%e\\nmax_rss_kb=%M' \
+  /tmp/litchi-goal-0510/helper-guardrail/helper_guardrail \
+  > /tmp/litchi-goal-0510/helper-guardrail/raw-results-pinned.csv
+
+output_source_sha256=3b13366fddf7c6842ed64cf0304c111bdded74e578ffdef39f2f9e5aeba09733
+output_raw_sha256=8d4047f1ce92ce7402b0b9b87ec620b4619e036bf509bec71dc1b7fd4f21c15e
+binary_sha256=bda26ca1fbe333e8623a39ead2f32ecdca36d2126b6fdde8c0f5f6d95421282c
+run_seconds=2.45
+max_rss_kb=1940

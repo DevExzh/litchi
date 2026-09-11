@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0510: first-CR search preserves XML normalization and charging
+
+[0510](changes/0510-odt-crlf-length-fast-path.md) preserves full UTF-8
+validation, scalar CRLF semantics, typed errors, precharge and sink progress.
+No API, owner, dependency, unsafe or execution-context change is introduced.
+All 29 accepted ADRs are covered by the [review](results/change-0510/adr-review.md)
+and unchanged manifest. Differential XML decoding and malformed-byte tests,
+exact limits, source-backed parity and 1,495 passing tests support the source
+review. Native newline regressions are explicit admission tradeoffs, not a
+claim of complete performance coverage. No ADR exception is requested.
+
 ## 0509: bounded buffer reuse after successful ODT emission
 
 [0509](changes/0509-odt-sink-buffer-reuse.md) retains one cleared String only
