@@ -393,6 +393,8 @@ impl OwnedContentTypes {
 )]
 #[derive(Clone)]
 pub struct OpcPackage {
+    /// Read policy captured at ingress, retained for format-level edit checks.
+    read_limits: ReadLimits,
     /// Package-level relationships
     rels: Relationships,
 
@@ -485,6 +487,7 @@ impl OpcPackage {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            read_limits: ReadLimits::default(),
             rels: Relationships::new(PACKAGE_URI.to_string()),
             parts: HashMap::new(),
             source_xml_parts: HashMap::new(),
@@ -502,6 +505,17 @@ impl OpcPackage {
             non_part_members: Vec::new(),
             save_options: SaveOptions::default(),
         }
+    }
+
+    /// Return the policy used to read this package.
+    ///
+    /// Newly authored packages use the default policy. Cloning or editing a
+    /// package retains its captured policy so format-level editors can apply
+    /// the caller's bounds before staging new payloads. This accessor does
+    /// not itself validate edits or change publication behavior.
+    #[must_use]
+    pub const fn read_limits(&self) -> ReadLimits {
+        self.read_limits
     }
 
     /// ZIP items that were present in the opened archive but are not OPC parts.
@@ -1017,6 +1031,8 @@ impl OpcPackage {
         donor: Option<&Self>,
     ) -> Result<Self> {
         let mut package = Self::new();
+
+        package.read_limits = pkg_reader.read_limits();
 
         // Get ownership of package relationships, parts, and non-part members
         let pkg_srels = pkg_reader.take_pkg_srels();
@@ -3360,6 +3376,35 @@ mod tests {
                 maximum: 3,
             })
         ));
+    }
+
+    #[test]
+    fn package_retains_ingress_limits_through_clone_and_edits() {
+        let bytes = create_minimal_docx();
+        let limits = ReadLimits::builder()
+            .max_input_bytes(bytes.len() as u64)
+            .unwrap()
+            .max_part_bytes(8192)
+            .unwrap()
+            .build()
+            .unwrap();
+        let borrowed = OpcPackage::from_bytes_with_limits(&bytes, limits).unwrap();
+        let owned = OpcPackage::from_vec_with_limits(bytes.clone(), limits).unwrap();
+        let streamed = OpcPackage::from_reader_with_limits(Cursor::new(bytes), limits).unwrap();
+        for package in [borrowed, owned, streamed] {
+            assert_eq!(package.read_limits(), limits);
+            let mut edited = package.clone();
+            edited
+                .try_add_part(Box::new(BlobPart::new(
+                    PackURI::new("/new.bin").unwrap(),
+                    "application/octet-stream".to_owned(),
+                    b"new".to_vec(),
+                )))
+                .unwrap();
+            assert_eq!(edited.read_limits(), limits);
+            assert_eq!(package.read_limits(), limits);
+        }
+        assert_eq!(OpcPackage::new().read_limits(), ReadLimits::default());
     }
 
     #[test]

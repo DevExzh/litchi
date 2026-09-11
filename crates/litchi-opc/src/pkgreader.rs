@@ -569,6 +569,8 @@ impl SerializedRelationship {
 /// This is the main entry point for reading OPC packages. It handles parsing
 /// the package structure, resolving relationships, and loading parts efficiently.
 pub struct PackageReader {
+    /// Policy used to admit the serialized package.
+    read_limits: ReadLimits,
     /// Exact source bytes for the admitted content-types member. The bytes are
     /// already charged to the structural XML limit before they are retained.
     source_content_types_xml: Arc<Vec<u8>>,
@@ -589,6 +591,10 @@ pub struct PackageReader {
 }
 
 impl PackageReader {
+    pub(crate) const fn read_limits(&self) -> ReadLimits {
+        self.read_limits
+    }
+
     pub(crate) fn parse_owned_relationships(
         xml: &[u8],
         owner: &PackURI,
@@ -705,6 +711,7 @@ impl PackageReader {
         )?;
 
         Ok(Self {
+            read_limits: limits,
             source_content_types_xml,
             source_content_types: content_types,
             source_relationships: relationship_ledger.source_xml.unwrap_or_default(),
@@ -779,6 +786,7 @@ impl PackageReader {
         )?;
 
         Ok(Self {
+            read_limits: limits,
             source_content_types_xml,
             source_content_types: content_types,
             source_relationships: relationship_ledger.source_xml.unwrap_or_default(),
