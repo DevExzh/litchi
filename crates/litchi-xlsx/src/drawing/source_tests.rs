@@ -57,6 +57,22 @@ fn transitional_drawing(body: &str) -> Vec<u8> {
     .into_bytes()
 }
 
+fn long_scope_drawing(body: &str) -> Vec<u8> {
+    let mut root = format!(
+        r#"<xdr:wsDr xmlns:xdr="{XDR}" xmlns:a="{A}" xmlns:r="{REL}" xmlns:asvg="{SVG}" xmlns:mc="{MCE}" xmlns:future="urn:future""#
+    );
+    let uri_suffix = "x".repeat(128);
+    for index in 0..128 {
+        root.push_str(&format!(
+            r#" xmlns:q{index}="urn:long-scope-{index}-{uri_suffix}""#
+        ));
+    }
+    root.push('>');
+    root.push_str(body);
+    root.push_str("</xdr:wsDr>");
+    root.into_bytes()
+}
+
 fn strict_drawing(body: &str) -> Vec<u8> {
     format!(
         r#"<xdr:wsDr xmlns:xdr="{STRICT_XDR}" xmlns:a="{STRICT_A}" xmlns:r="{STRICT_REL}" xmlns:trans="{REL}" xmlns:asvg="{SVG}">{body}</xdr:wsDr>"#
@@ -134,6 +150,85 @@ fn scans_direct_pictures_in_all_anchor_forms_and_preserves_ranges() {
             .namespace_complete_ext_list(&source_bytes, 16 * 1024)
             .unwrap()
             .is_some()
+    );
+}
+
+#[test]
+fn contextual_svg_values_share_scope_without_retaining_completed_fragments() {
+    let owner = format!(r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#);
+    let body = (0..32)
+        .map(|index| two_cell(index + 1, &owner, ""))
+        .collect::<String>();
+    let source_bytes = long_scope_drawing(&body);
+    let source = SourceDrawing::scan(&source_bytes).unwrap();
+
+    assert_eq!(source.pictures().len(), 32);
+    let owners = source
+        .pictures()
+        .iter()
+        .map(|picture| picture.svg_owner().owner().unwrap())
+        .collect::<Vec<_>>();
+    let first_context = owners[0].value().namespace_context().unwrap();
+    assert!(first_context.binding_count() >= 128);
+    assert!(owners.iter().all(|owner| owner.value().source().is_none()));
+    assert!(owners.iter().all(|owner| {
+        owner
+            .value()
+            .namespace_context()
+            .is_some_and(|context| first_context.shares_storage(context))
+    }));
+
+    let mut raw_bytes = 0usize;
+    for owner in owners {
+        let raw = owner.value().raw_source().unwrap();
+        let range = owner.svg_blip_range();
+        assert_eq!(raw, &source_bytes[range.start..range.end]);
+        assert!(
+            !raw.windows(b"xmlns:q127".len())
+                .any(|window| { window == b"xmlns:q127" })
+        );
+        raw_bytes += raw.len();
+    }
+    assert!(raw_bytes < source_bytes.len() / 2);
+}
+
+#[test]
+fn contextual_projection_uses_raw_fragment_limit_boundary() {
+    let raw = r#"<asvg:svgBlip r:embed="rIdSvg"/>"#;
+    let owner = format!(r#"<a:ext uri="{SVG_URI}">{raw}</a:ext>"#);
+    let source_bytes = transitional_drawing(&two_cell(1, &owner, ""));
+
+    let exact = SourceDrawing::scan_with_limits(
+        &source_bytes,
+        0,
+        ScanLimits {
+            max_fragment_bytes: raw.len(),
+            ..ScanLimits::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        exact
+            .picture(0)
+            .unwrap()
+            .svg_owner()
+            .owner()
+            .unwrap()
+            .value()
+            .raw_source(),
+        Some(raw.as_bytes())
+    );
+
+    assert!(
+        SourceDrawing::scan_with_limits(
+            &source_bytes,
+            0,
+            ScanLimits {
+                max_fragment_bytes: raw.len() - 1,
+                ..ScanLimits::default()
+            },
+        )
+        .is_err()
     );
 }
 

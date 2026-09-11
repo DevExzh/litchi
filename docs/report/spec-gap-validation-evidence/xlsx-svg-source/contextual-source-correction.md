@@ -1,8 +1,9 @@
 # Contextual SVG source correction
 
-Status: shared contextual codec implemented and independently reviewed;
-host integration and allocation verification remain pending. The scoped codec
-evidence is in `contextual-codec-verification.json`. This note records the
+Status: shared contextual codec and XLSX source-host integration implemented
+and independently reviewed; allocation verification remains pending. Scoped
+evidence is in `contextual-codec-verification.json` and
+`contextual-host-verification.json`. This note records the
 correction criteria for the retained-source amplification reproduced in
 `retained-scope-probe.rs`; it does not claim lifecycle approval.
 
