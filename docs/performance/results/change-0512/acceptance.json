@@ -1,0 +1,12 @@
+{
+  "decision": "retain_current_attribution_evidence_only",
+  "production_source_changes": [],
+  "native_samples": 720,
+  "preflight_samples": 12,
+  "instrumented_samples_excluded_from_native": 36,
+  "replay": "All case/corpus/sink, source/binary/fixture/tool, raw-vector, exactprofileedge andhardwarequality checks pass; negative short vector rejected.",
+  "same_build_drift_flags": [],
+  "scope": "No cross-build or optimization claim; generic operation allocator metrics and exact save-phase boundaries remain open.",
+  "next_action": "Add operation allocation observations and a post-oracle save-phase boundary before attempting measured parser/snapshot reuse with exact error ordering and bounded memory.",
+  "priority": "OLE2/OOXML until full optimization goal complete; ODF deferred; iWork excluded."
+}

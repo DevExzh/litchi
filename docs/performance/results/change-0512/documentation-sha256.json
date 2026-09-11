@@ -1,0 +1,8 @@
+{
+  "docs/performance/changes/0512-xlsx-commit-attribution.md": "a44718fb96cdcc4b3d633efcd29a87181bf429cac9cbc6df5ec43e0f60911dd2",
+  "docs/performance/BASELINE.md": "38874d57101474222d25895f30aae114ecb1521c5be040912201728b8917d5d6",
+  "docs/performance/REPORT.md": "731a7161e949d32623a21a74c7429ec9460d4f2f5dc0bee94e2f0dbe4d9eb4b6",
+  "docs/performance/HOTSPOTS.md": "4d71a045a8d5bfbe92ce5f8e3b96d46f9745655f0baa397284ddb0261af29892",
+  "docs/performance/GOAL_AUDIT.md": "eae1d0e5cd9b451ac3b4b3c45a520a0f6b43d8a28b254f353daac497c5b2f029",
+  "docs/performance/ADR_COMPLIANCE.md": "dddc0974a01256c1e1f06730d577a0e4b3d0d6b003ea5a5e1f27b445c6f3e9b6"
+}

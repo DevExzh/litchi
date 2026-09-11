@@ -1,0 +1,551 @@
+{
+  "allocation_metrics": "not collected by the normal XLSX commit selectors",
+  "attribution": {
+    "analyzer_sha256": "310191f415deb317c322e3f04fdb3ba5b5df7817bad2394b394fb1bc4491ef2d",
+    "sha256": "cbbd5c3fe56e1877f6113ed8cfece68859a8e9af0f2a2e7b00de71465b2c5be5",
+    "summary": {
+      "caveats": [
+        "Counter reset retains synthetic costs on active ancestors; never sum top-level exclusive rows.",
+        "Collection-off descendant calls may remain in call-count metadata. Only direct runner-to-commit (3) and named direct commit-child (6) edges are used for invocation proof.",
+        "Both Valgrind logs report brk-segment overflow and then complete successfully; instrumentation timings and RSS are excluded. No allocator/heap conclusion is drawn."
+      ],
+      "decision": "Prioritize the two parser traversals and snapshot layout, with operation-local allocation/phase instrumentation before fusion; shared-formula and plain-tag shortcuts alone cannot explain the major cost.",
+      "profiles": {
+        "profile-r1": {
+          "direct_commit_children": {
+            "compaction": {
+              "direct_calls": 6,
+              "ir": 2426402056,
+              "percent": 20.376676486194196
+            },
+            "rewrite": {
+              "direct_calls": 6,
+              "ir": 3236595155,
+              "percent": 27.180595329259216
+            },
+            "source_store": {
+              "direct_calls": 6,
+              "ir": 3071616936,
+              "percent": 25.795125106993837
+            },
+            "validation_parse": {
+              "direct_calls": 6,
+              "ir": 3069162876,
+              "percent": 25.774516161920594
+            }
+          },
+          "overlapping_diagnostics": {
+            "all_worksheet_parse": {
+              "ir": 6138407178,
+              "percent": 51.54971613106739
+            },
+            "eager_parser": {
+              "ir": 5553828411,
+              "percent": 46.64048339018593
+            },
+            "mce_processing": {
+              "ir": 563387229,
+              "percent": 4.731268370548399
+            },
+            "shared_formula_resolution": {
+              "ir": 5505504,
+              "percent": 0.04623465992539865
+            },
+            "snapshot_cell_address": {
+              "ir": 611286084,
+              "percent": 5.133518059539812
+            },
+            "snapshot_cell_tag": {
+              "ir": 322216593,
+              "percent": 2.705942017238674
+            },
+            "snapshot_scan": {
+              "ir": 3024869979,
+              "percent": 25.40254893968159
+            }
+          },
+          "total_ir": 11907741960
+        },
+        "profile-r2": {
+          "direct_commit_children": {
+            "compaction": {
+              "direct_calls": 6,
+              "ir": 2426410798,
+              "percent": 20.374302101367803
+            },
+            "rewrite": {
+              "direct_calls": 6,
+              "ir": 3236318203,
+              "percent": 27.175004668800426
+            },
+            "source_store": {
+              "direct_calls": 6,
+              "ir": 3073299876,
+              "percent": 25.80615787455798
+            },
+            "validation_parse": {
+              "direct_calls": 6,
+              "ir": 3069276595,
+              "percent": 25.772374830647912
+            }
+          },
+          "overlapping_diagnostics": {
+            "all_worksheet_parse": {
+              "ir": 6140203843,
+              "percent": 51.5586100112886
+            },
+            "eager_parser": {
+              "ir": 5555615760,
+              "percent": 46.6498887767314
+            },
+            "mce_processing": {
+              "ir": 563396501,
+              "percent": 4.73077787309928
+            },
+            "shared_formula_resolution": {
+              "ir": 5505504,
+              "percent": 0.04622910589119825
+            },
+            "snapshot_cell_address": {
+              "ir": 611306854,
+              "percent": 5.13307578844394
+            },
+            "snapshot_cell_tag": {
+              "ir": 322214620,
+              "percent": 2.705600393292277
+            },
+            "snapshot_scan": {
+              "ir": 3024643333,
+              "percent": 25.397594284622045
+            }
+          },
+          "total_ir": 11909172574
+        }
+      },
+      "repeat_ir_change_percent": 0.01201415016218732,
+      "scope": "Three commit bodies only per capture, zeroed at runner entry; direct children are disjoint while named diagnostics overlap. These are simulated instruction costs, not phase clocks or cycles."
+    }
+  },
+  "build": {
+    "binary_sha256": "213cb003e87ad35262ef9d71e313a836eb7b26b147d1060e94382b6e0b06c062",
+    "build_log_sha256": "0aad549905ccea39d4a4990b128c7e2eec00bef761c4f4a84448326f585e4f09",
+    "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632"
+  },
+  "comparison_scope": "same-build repeat drift only; no cross-build speedup claim",
+  "custody": {
+    "adr_files": 30,
+    "base_revision": "18d4d7fe1452bf43614a6efbd5feab4adb5a174f",
+    "compile_fixtures": {
+      "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+      "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+    },
+    "source_files": 7195,
+    "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+    "verifier_sources": {
+      "tools/generate_corpus_manifest_v2.py": "be9b3c81a561eff4bc8303b1d2b7f5d8672747980e0aa760cf71036570e13d4b",
+      "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+      "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+    }
+  },
+  "hardware": {
+    "coverage_floor_percent": 99.9,
+    "event_count": 7,
+    "events": {
+      "branch-misses": {
+        "count": 39363699,
+        "running_percent": 100.0,
+        "runtime_ns": 8117656309
+      },
+      "branches": {
+        "count": 28431111819,
+        "running_percent": 100.0,
+        "runtime_ns": 8117656309
+      },
+      "context-switches": {
+        "count": 102,
+        "running_percent": 100.0,
+        "runtime_ns": 8117656309
+      },
+      "cpu-migrations": {
+        "count": 0,
+        "running_percent": 100.0,
+        "runtime_ns": 8117656309
+      },
+      "cycles": {
+        "count": 36288731556,
+        "running_percent": 100.0,
+        "runtime_ns": 8117656309
+      },
+      "instructions": {
+        "count": 141401785247,
+        "running_percent": 100.0,
+        "runtime_ns": 8117656309
+      },
+      "page-faults": {
+        "count": 59045,
+        "running_percent": 100.0,
+        "runtime_ns": 8117656309
+      }
+    },
+    "group_events": [
+      "cycles",
+      "instructions",
+      "branches",
+      "branch-misses"
+    ],
+    "group_runtime_ns": 8117656309,
+    "instrumented_timing_excluded": true,
+    "scope": "whole child including fixture generation, opening, staging, warmups, timed commits, final readback and teardown; operation-local counters are not claimed"
+  },
+  "negative_short_vector_rejected": true,
+  "normal": {
+    "cases": [
+      "xlsx_one_cell_commit",
+      "xlsx_one_percent_commit",
+      "xlsx_one_cell_commit_save",
+      "xlsx_one_percent_commit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "lanes": [
+      "preflight",
+      "normal-r1",
+      "normal-r2"
+    ],
+    "measured_lanes": [
+      "normal-r1",
+      "normal-r2"
+    ],
+    "rows_per_lane": 12,
+    "same_build_corpus_sink_identity_verified": true,
+    "samples_per_lane": {
+      "normal-r1": 30,
+      "normal-r2": 30,
+      "preflight": 1
+    },
+    "total_rows": 36,
+    "warmups_per_lane": {
+      "normal-r1": 3,
+      "normal-r2": 3,
+      "preflight": 0
+    }
+  },
+  "profile": {
+    "annotations": {
+      "profile-r1": {
+        "commit_calls": 3,
+        "exclusive_sha256": "3f8e6ccf96bac34c40d8fc5e6250323ce81dfece13f5c7344b7df867890c61ff",
+        "inclusive_sha256": "03d119ce2d0ae0e4fe716668130186c9aeea5178d00c2ab23ef8ecb37e9b1f93",
+        "raw_sha256": "961b0b55c2e57bb2f320c25962fbb3def0258d5f2497c87d9f792f4238453f14",
+        "scope": "Edit::commit collection reset at run_xlsx_update_commit; annotations are diagnostic only",
+        "summary_ir": 11907741960
+      },
+      "profile-r2": {
+        "commit_calls": 3,
+        "exclusive_sha256": "b38152230630d50e2ee4d2d21189001d996f8da020b999256a5ccaa1cf3a8e38",
+        "inclusive_sha256": "381cdeb5a97cfdcfe85c913113850156d3f59d2146c207f45339f12eb1ed1e2b",
+        "raw_sha256": "e28e3dcd2d10e53781a285793d5bed8628408cb5db9b2daa2c3edbc8a2f4e57b",
+        "scope": "Edit::commit collection reset at run_xlsx_update_commit; annotations are diagnostic only",
+        "summary_ir": 11909172574
+      }
+    },
+    "lanes": [
+      "profile-r1",
+      "profile-r2"
+    ],
+    "rows_per_lane": 1,
+    "samples_per_lane": 3,
+    "warmups_per_lane": 0
+  },
+  "same_build_drift": {
+    "flagged_rows": [],
+    "limits_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "rows": [
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": -0.7543419671582008,
+          "p50": -0.3143579163258581,
+          "p95": -0.8511121198365834,
+          "p99": -3.090577305905773
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": -0.5746101699513173,
+          "p50": 0.09928317547307497,
+          "p95": -1.9172812001863382,
+          "p99": -1.5617525841778335
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": 0.020482419336698143,
+          "p50": -0.053337212403326006,
+          "p95": 0.6591957811469928,
+          "p99": 1.1714389404679393
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": -0.6620753909791444,
+          "p50": -0.4639391534179471,
+          "p95": -1.1717735315815214,
+          "p99": -1.0212227717126487
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": -0.8309258795133667,
+          "p50": -0.790146107916867,
+          "p95": -1.0343181605290908,
+          "p99": -0.9410501312369757
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": -0.443314957644636,
+          "p50": -0.8227474106908161,
+          "p95": 0.45518321968045505,
+          "p99": 0.4441889896290796
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": 0.5589329862157655,
+          "p50": 0.6005513566842202,
+          "p95": 0.49563939936179136,
+          "p99": 0.6934135522885132
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": 1.8980261182969693,
+          "p50": 0.8942543469674158,
+          "p95": 4.425149290752262,
+          "p99": 4.316645757064119
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": 1.8186134732634418,
+          "p50": 1.624396602260303,
+          "p95": 1.9875627304740462,
+          "p99": 2.8808386974058964
+        },
+        "shape": "dense-wide"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": 1.4030601240988982,
+          "p50": 0.9603183942864968,
+          "p95": 3.16654793891451,
+          "p99": 3.149873012201221
+        },
+        "shape": "dense-wide"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": 0.10351856977934837,
+          "p50": 0.2979262907724767,
+          "p95": -0.5283462501363578,
+          "p99": -0.5000558706164004
+        },
+        "shape": "dense-wide"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "repeat_change_percent": {
+          "mean": -0.030391659465967003,
+          "p50": 0.06668506723319645,
+          "p95": -0.6660792634492152,
+          "p99": -0.5904977380290055
+        },
+        "shape": "dense-wide"
+      }
+    ]
+  },
+  "schema": "litchi-0512-verification-v1"
+}

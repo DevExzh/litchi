@@ -1,0 +1,31 @@
+{
+  "base_revision": "18d4d7fe1452bf43614a6efbd5feab4adb5a174f",
+  "previous_turn": "progress: 0511 source, evidence, tests, cleanup and commit verified",
+  "priority": "OLE2/OOXML until full optimization goal complete; ODF deferred; iWork excluded",
+  "scope": "Fresh dense XLSX commit attribution and residual validated traversal investigation",
+  "protocol_status": "frozen before captures",
+  "claim": "No cross-build speedup claim from diagnostic profiling; source changes require fresh matched evidence",
+  "adrs": "30 previously read documents revalidated unchanged",
+  "frozen_utc": "2026-09-11T20:34:17.681720+00:00",
+  "protocol": {
+    "normal": "12 rows: one-cell/one-percent commit and commit-save across tiny/medium/dense-wide; two serial same-build repetitions,30samples3warmups,CPU2,default1worker",
+    "preflight": "same12rows1sample0warmups; not native comparison",
+    "profile": "two3sample0warmup dense one-percent commit captures; exactcommit enter/leave toggle with zero-before runner to remove generator; require3calls in each",
+    "hardware": "one30sample3warmup dense one-percent commit whole-child capture; fullgroup runtime andcoverage required; no operation-local ratio",
+    "drift_review_percent": {
+      "p50": 5,
+      "mean": 5,
+      "p95": 10,
+      "p99": 15
+    },
+    "order": [
+      "preflight",
+      "normal-r1",
+      "profile-r1",
+      "profile-r2",
+      "hardware",
+      "normal-r2"
+    ],
+    "limits": "Diagnostic normal sample counts below500registryminimum; no optimization/speedup, allocation, physicalcold/provider, cacheevent orscaling claim"
+  }
+}

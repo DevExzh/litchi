@@ -1,0 +1,42 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x,",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0512/hardware.csv",
+    "-e",
+    "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "/tmp/litchi-goal-0512/target/release/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_percent_commit",
+    "--xlsx-shape",
+    "dense-wide",
+    "--samples",
+    "30",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0512/hardware-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0512/hardware-catalog.json"
+  ],
+  "started_utc": "2026-09-11T20:39:57.586968+00:00",
+  "elapsed_seconds": 8.146980236000672,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "binary_sha256": "213cb003e87ad35262ef9d71e313a836eb7b26b147d1060e94382b6e0b06c062",
+  "scope": "Whole child including fixture generation, opening, staging, 3 warmups, timed commits, final readback and teardown; not operation-local counters",
+  "artifacts": {
+    "hardware-report.json": "759098b9ce99742979ed34d04a0dac2ee948ef7611da3c9f00d01cb661aed054",
+    "hardware-catalog.json": "85ca54ead293075311c1cea76f2f98ff47c8fb898808a2d88b7426f3221817d6",
+    "hardware.log": "6c12ac7a7e887f5f8e8dd9baea20c48934840b22ee36279f87c77ee955faa73d",
+    "hardware.csv": "02a39c1fa22fbe20e5f8a0ad74494e1989752237b3c897ead0fc086492658ac4"
+  }
+}
