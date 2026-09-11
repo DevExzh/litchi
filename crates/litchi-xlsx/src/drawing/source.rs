@@ -8,18 +8,18 @@
 //! relationship metadata needed by the SVG owner.  The source bytes remain
 //! owned by the package/`PartData` caller; no drawing-sized copy is retained.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use litchi_drawingml::svg_blip::{self, SvgBlip};
+use litchi_drawingml::svg_blip::{self, Namespace, NamespaceContext, SvgBlip};
 use litchi_spreadsheet_drawing::shape::{
     Anchor as DrawingAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset,
 };
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesDecl, BytesRef, BytesStart, Event};
-use quick_xml::name::{Namespace as XmlNamespace, QName, ResolveResult};
-use quick_xml::reader::{NsReader, Reader};
+use quick_xml::name::QName;
+use quick_xml::reader::Reader;
 
 use super::model::Drawing;
 use crate::error::{Error, Result, allocation, invalid as xlsx_invalid};
@@ -378,12 +378,14 @@ impl<'a> SvgOwner<'a> {
         )
     }
 
-    /// Return the parsed SVG blip's exact source fragment as retained by the
-    /// shared codec.  The complete owner source range remains available via
-    /// [`Self::svg_blip_range`] for byte-preserving host edits.
+    /// Return the parsed SVG blip's exact raw source fragment as retained by
+    /// the shared codec.  Contextual values deliberately do not expose this
+    /// fragment through `SvgBlip::source`, because inherited bindings are not
+    /// standalone declarations.  The complete owner source range remains
+    /// available via [`Self::svg_blip_range`] for byte-preserving host edits.
     #[must_use]
     pub fn parsed_source(&self) -> Option<&[u8]> {
-        self.value.source()
+        self.value.raw_source()
     }
 
     fn check_source(&self, source: &[u8]) -> Result<()> {
@@ -1024,6 +1026,7 @@ struct PendingExtension {
     uri_lexical: Vec<u8>,
     svg_blip: Option<ByteRange>,
     svg_context: Option<Arc<NamespaceContext>>,
+    svg_relationship_dialect: Option<RelationshipDialect>,
     svg_count: usize,
     malformed: bool,
     mce_ancestor: bool,
@@ -1436,6 +1439,7 @@ impl<'a> Scanner<'a> {
                     uri_lexical,
                     svg_blip: None,
                     svg_context: None,
+                    svg_relationship_dialect: None,
                     svg_count: 0,
                     malformed: malformed_attributes,
                     mce_ancestor,
@@ -1729,6 +1733,8 @@ impl<'a> Scanner<'a> {
                 let ext_index = ext_frame
                     .and_then(|frame| frame.extension_index)
                     .ok_or_else(|| invalid("svgBlip has no direct admitted extension owner"))?;
+                let embedded = relationship_dialect_attribute(element, &self.namespaces, b"embed")?;
+                let linked = relationship_dialect_attribute(element, &self.namespaces, b"link")?;
                 let pending = self
                     .pictures
                     .get_mut(index)
@@ -1740,7 +1746,8 @@ impl<'a> Scanner<'a> {
                     .ok_or_else(|| limit("drawing source SVG owner count", 2))?;
                 if pending.svg_count == 1 {
                     pending.svg_blip = Some(ByteRange::new(event_start, event_end));
-                    pending.svg_context = Some(Arc::clone(&self.namespaces.context));
+                    pending.svg_context = Some(Arc::clone(&context_before));
+                    pending.svg_relationship_dialect = embedded.or(linked);
                 } else {
                     pending.malformed = true;
                 }
@@ -2326,10 +2333,15 @@ fn project_svg_owner<'a>(
         .svg_context
         .as_ref()
         .ok_or_else(|| invalid("admitted SVG owner has no namespace context"))?;
-    let inherited = namespace_context_bindings(context)?;
     let fragment = svg_range.slice(source)?;
-    let complete = namespace_complete_element_fragment(fragment, &inherited, max_fragment_bytes)?;
-    let value = match svg_blip::codec::read(&complete) {
+    let maximum = max_fragment_bytes.min(MAX_FRAGMENT_BYTES);
+    if fragment.len() > maximum {
+        return Err(limit("drawing source SVG fragment bytes", maximum));
+    }
+    // Keep the host range authoritative and resolve inherited names through
+    // the persistent context.  Namespace completion remains an explicit,
+    // bounded export operation on the owner.
+    let value = match svg_blip::read_contextual(fragment, context) {
         Ok(value) => value,
         Err(_) => return Ok(SvgOwnerState::Refused),
     };
@@ -2337,7 +2349,9 @@ fn project_svg_owner<'a>(
     if embedded == linked {
         return Ok(SvgOwnerState::Refused);
     }
-    let relationship_dialect = svg_relationship_dialect(&complete, host_relationship_dialect)?;
+    let relationship_dialect = extension
+        .svg_relationship_dialect
+        .unwrap_or(host_relationship_dialect);
     let mut uri_lexical = Vec::new();
     uri_lexical
         .try_reserve_exact(extension.uri_lexical.len())
@@ -2359,65 +2373,6 @@ fn project_svg_owner<'a>(
     })
 }
 
-/// Resolve the physical relationship namespace of the admitted `embed` or
-/// `link` attribute from XML tokens.  The SVG codec intentionally exposes the
-/// typed relationship ID while retaining namespace declarations, but it does
-/// not expose which declaration was used by the attribute.  A strict host may
-/// therefore carry a Transitional `trans:embed` binding, and that distinction
-/// must come from the attribute's expanded name rather than from the host.
-fn svg_relationship_dialect(
-    fragment: &[u8],
-    fallback: RelationshipDialect,
-) -> Result<RelationshipDialect> {
-    let mut reader = NsReader::from_reader(fragment);
-    reader.config_mut().trim_text(false);
-    reader.config_mut().check_end_names = true;
-    let mut buffer = Vec::new();
-    loop {
-        let (_resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
-        match event {
-            Event::Start(element) | Event::Empty(element) => {
-                let mut dialect = None;
-                for attribute in element.attributes().with_checks(true) {
-                    let attribute = attribute.map_err(xml_error)?;
-                    let local = attribute.key.local_name();
-                    if local.as_ref() != b"embed" && local.as_ref() != b"link" {
-                        continue;
-                    }
-                    let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
-                    let candidate = match namespace {
-                        ResolveResult::Bound(XmlNamespace(uri)) if uri == RELATIONSHIPS => {
-                            Some(RelationshipDialect::Transitional)
-                        },
-                        ResolveResult::Bound(XmlNamespace(uri)) if uri == STRICT_RELATIONSHIPS => {
-                            Some(RelationshipDialect::Strict)
-                        },
-                        // The shared codec admits an unresolved `r:` prefix
-                        // for a fragment whose inherited binding is supplied
-                        // by the host.  Preserve the host dialect in that
-                        // conservative case.
-                        ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r" => None,
-                        _ => None,
-                    };
-                    if let Some(candidate) = candidate {
-                        if dialect.replace(candidate).is_some() {
-                            return Err(invalid(
-                                "SVG blip carries relationship attributes from two dialects",
-                            ));
-                        }
-                    }
-                }
-                return Ok(dialect.unwrap_or(fallback));
-            },
-            Event::Eof => return Err(invalid("SVG blip fragment has no root element")),
-            _ => {},
-        }
-        buffer.clear();
-    }
-}
-
 /// Explicit finite source scan limits.  Every allocation in the scanner is
 /// charged to one of these bounds before it is attempted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2433,7 +2388,8 @@ pub struct ScanLimits {
     pub max_pictures: usize,
     /// Maximum relationship references per picture.
     pub max_relationship_references: usize,
-    /// Maximum standalone fragment output bytes.
+    /// Maximum raw SVG owner bytes accepted during contextual projection.
+    /// Lazy standalone namespace completion uses its own explicit output cap.
     pub max_fragment_bytes: usize,
 }
 
@@ -2457,12 +2413,6 @@ struct Binding {
     depth: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct NamespaceContext {
-    parent: Option<Arc<NamespaceContext>>,
-    declarations: Arc<[Arc<Binding>]>,
-}
-
 /// Active namespace bindings.  Bindings are pushed once and popped once; a
 /// candidate stores an `Arc` chain instead of cloning the full active scope on
 /// every XML event.
@@ -2479,10 +2429,7 @@ impl Default for Namespaces {
             bindings: Vec::new(),
             by_prefix: HashMap::new(),
             active: 0,
-            context: Arc::new(NamespaceContext {
-                parent: None,
-                declarations: Arc::<[Arc<Binding>]>::from([]),
-            }),
+            context: Arc::new(NamespaceContext::empty()),
         }
     }
 }
@@ -2547,10 +2494,10 @@ impl Namespaces {
         self.by_prefix
             .try_reserve(declarations)
             .map_err(|source| allocation("drawing source namespace prefix index", source))?;
-        let mut local = Vec::<Arc<Binding>>::new();
-        local
+        let mut shared_declarations = Vec::<Namespace>::new();
+        shared_declarations
             .try_reserve_exact(declarations)
-            .map_err(|source| allocation("drawing source namespace context", source))?;
+            .map_err(|source| allocation("drawing source shared namespace context", source))?;
         for attribute in element.attributes().with_checks(true) {
             let attribute = attribute.map_err(xml_error)?;
             let Some(prefix) = attribute.key.as_namespace_binding() else {
@@ -2563,6 +2510,17 @@ impl Namespaces {
                 quick_xml::name::PrefixDeclaration::Default => &[][..],
                 quick_xml::name::PrefixDeclaration::Named(prefix) => prefix,
             };
+            let prefix_text = if prefix.is_empty() {
+                None
+            } else {
+                Some(
+                    std::str::from_utf8(prefix)
+                        .map_err(|error| Error::Invalid(error.to_string()))?,
+                )
+            };
+            let shared = Namespace::new(prefix_text, uri.as_ref())
+                .map_err(|error| invalid(error.to_string()))?;
+            shared_declarations.push(shared);
             let mut prefix_copy = Vec::new();
             prefix_copy
                 .try_reserve_exact(prefix.len())
@@ -2589,13 +2547,11 @@ impl Namespaces {
                 .try_reserve(1)
                 .map_err(|source| allocation("drawing source namespace prefix stack", source))?;
             stack.push(Arc::clone(&binding));
-            local.push(binding);
         }
-        let local: Arc<[Arc<Binding>]> = Arc::from(local.into_boxed_slice());
-        self.context = Arc::new(NamespaceContext {
-            parent: Some(Arc::clone(&self.context)),
-            declarations: local,
-        });
+        // Publish only this element's declarations.  Descendants retain this
+        // immutable node through `Arc` instead of flattening the active scope.
+        let context = self.context.child(shared_declarations)?;
+        self.context = Arc::new(context);
         self.active = self
             .active
             .checked_add(declarations)
@@ -2664,50 +2620,42 @@ impl Namespaces {
 }
 
 fn namespace_context_bindings(context: &NamespaceContext) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let mut contexts = Vec::<&NamespaceContext>::new();
-    let mut cursor = Some(context);
-    let mut declaration_count = 0usize;
-    while let Some(current) = cursor {
-        declaration_count = declaration_count
-            .checked_add(current.declarations.len())
-            .ok_or_else(|| limit("active namespace bindings", MAX_ACTIVE_NAMESPACE_BINDINGS))?;
-        if declaration_count > MAX_ACTIVE_NAMESPACE_BINDINGS {
-            return Err(limit(
-                "active namespace bindings",
-                MAX_ACTIVE_NAMESPACE_BINDINGS,
-            ));
-        }
-        contexts
-            .try_reserve(1)
-            .map_err(|source| allocation("drawing source namespace context walk", source))?;
-        contexts.push(current);
-        cursor = current.parent.as_deref();
-    }
     let mut output = Vec::new();
     output
-        .try_reserve(declaration_count)
+        .try_reserve(context.binding_count())
         .map_err(|source| allocation("drawing source inherited namespace bindings", source))?;
-    let mut seen = HashSet::<&[u8]>::new();
-    seen.try_reserve(declaration_count)
-        .map_err(|source| allocation("drawing source inherited namespace prefix index", source))?;
-    for current in contexts {
-        for binding in current.declarations.iter().rev() {
-            if !seen.insert(binding.prefix.as_slice()) {
-                continue;
-            }
-            let mut prefix = Vec::new();
-            prefix
-                .try_reserve_exact(binding.prefix.len())
-                .map_err(|source| {
-                    allocation("drawing source inherited namespace prefix", source)
-                })?;
-            prefix.extend_from_slice(&binding.prefix);
-            let mut uri = Vec::new();
-            uri.try_reserve_exact(binding.uri.len())
-                .map_err(|source| allocation("drawing source inherited namespace URI", source))?;
-            uri.extend_from_slice(binding.uri.as_slice());
-            output.push((prefix, uri));
+    let mut failure = None;
+    context.visit_visible(|prefix, uri| {
+        if failure.is_some() {
+            return;
         }
+        let prefix_bytes = prefix.map_or(&[][..], str::as_bytes);
+        let mut prefix_copy = Vec::new();
+        if let Err(source) = prefix_copy.try_reserve_exact(prefix_bytes.len()) {
+            failure = Some(allocation(
+                "drawing source inherited namespace prefix",
+                source,
+            ));
+            return;
+        }
+        prefix_copy.extend_from_slice(prefix_bytes);
+        let mut uri_copy = Vec::new();
+        if let Err(source) = uri_copy.try_reserve_exact(uri.len()) {
+            failure = Some(allocation("drawing source inherited namespace URI", source));
+            return;
+        }
+        uri_copy.extend_from_slice(uri.as_bytes());
+        if let Err(source) = output.try_reserve(1) {
+            failure = Some(allocation(
+                "drawing source inherited namespace bindings",
+                source,
+            ));
+            return;
+        }
+        output.push((prefix_copy, uri_copy));
+    })?;
+    if let Some(error) = failure {
+        return Err(error);
     }
     Ok(output)
 }
@@ -2927,6 +2875,36 @@ fn relationship_attribute(
             return Err(invalid("relationship ID is not an XML NCName"));
         }
         found = Some((value, dialect));
+    }
+    Ok(found)
+}
+
+fn relationship_dialect_attribute(
+    element: &BytesStart<'_>,
+    namespaces: &Namespaces,
+    local_name: &[u8],
+) -> Result<Option<RelationshipDialect>> {
+    let mut found = None;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.key.as_namespace_binding().is_some()
+            || attribute.key.local_name().as_ref() != local_name
+        {
+            continue;
+        }
+        let Some(namespace) = namespaces.resolve_attribute(attribute.key)? else {
+            continue;
+        };
+        let dialect = if namespace == STRICT_RELATIONSHIPS {
+            RelationshipDialect::Strict
+        } else if namespace == RELATIONSHIPS {
+            RelationshipDialect::Transitional
+        } else {
+            continue;
+        };
+        if found.is_none() {
+            found = Some(dialect);
+        }
     }
     Ok(found)
 }

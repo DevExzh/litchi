@@ -1,0 +1,56 @@
+{
+  "scope": "XLSX source scanner contextual namespace retention and raw-fragment caller admission",
+  "base_commit": "8b5838c591775990747b2cbce82fb2eea372b58b",
+  "source_sha256": {
+    "crates/litchi-xlsx/src/drawing/source.rs": "952cbc65b89314c61ecee623be91af64665d3c92b6827a58fbceaf8a722efb00",
+    "crates/litchi-xlsx/src/drawing/source_tests.rs": "7278bc01cf6bb84234e2f359064a3cf85cff6a8f270ec8ea9b7a83d868c9e34e"
+  },
+  "cargo_lock_sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b",
+  "commands": [
+    {
+      "command": "cargo test --locked --offline -q -p litchi-xlsx --lib --test drawing_svg_read",
+      "library_passed": 1105,
+      "read_passed": 14,
+      "failed": 0
+    },
+    {
+      "command": "cargo clippy --locked --offline -p litchi-xlsx --lib --test drawing_svg_read -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo doc --locked --offline -p litchi-xlsx --no-deps",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "root-xlsx-context-tests.log.gz": {
+      "sha256": "0172905643a2256cd76ac5c7549c3644effbd4fcd8125de2a1d59f0597f789d4",
+      "uncompressed_sha256": "ad01e0de243353abe0c09df2f51049838ef3ca21bb42b496ff313954ba7f7665"
+    },
+    "root-xlsx-context-clippy.log.gz": {
+      "sha256": "f41b86c5352d9f3020dcc603188ade9f7bd7c33522a80ba328dbecbc8e26af3b",
+      "uncompressed_sha256": "75ed2ca9ee2e08fea2a210800be8f5d081055c69d795fcac27a6a3423821a714"
+    },
+    "root-xlsx-context-doc.log.gz": {
+      "sha256": "ef611468c05ebe959ad20ebf4bad16009189a3cac1bb442ffa97f79055f7db71",
+      "uncompressed_sha256": "0380212530b5ff22afc2cc94ac418bf90f121897002fbbe1050599d7aad82e7a"
+    }
+  },
+  "independent_review": {
+    "agent": "/root/xlsx_svg_anchor_review",
+    "verdict": "approved",
+    "final_correction": "Raw svgBlip length is checked against min(caller fragment limit, hard limit) before contextual copying; standalone completion retains its explicit output cap."
+  },
+  "isolation": "Committed base plus these two XLSX files. Four uncommitted DOCX source-helper files were also present but DOCX is not a dependency of these XLSX targets. No uncommitted lifecycle or InkAction changes were included.",
+  "coverage": [
+    "32 pictures with 128 long inherited bindings share context storage and retain exact raw fragments",
+    "direct ownership and namespace/dialect semantics",
+    "lazy bounded standalone completion",
+    "exact raw-fragment caller boundary and one-under refusal"
+  ],
+  "remaining": [
+    "Source-scanner before/after allocation and runtime evidence",
+    "Final XLSX lifecycle correctness/resource gates and profiling"
+  ],
+  "performance_claim": null
+}
