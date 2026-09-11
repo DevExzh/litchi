@@ -421,3 +421,23 @@ fn active_namespace_cap_counts_nested_declarations_and_restores_on_scope_exit() 
         }
     }
 }
+
+#[test]
+fn direct_extension_list_rejects_foreign_children_but_extensions_keep_opaque_payload() {
+    for child in [
+        r#"<x:foreign xmlns:x="urn:vendor"/>"#,
+        r#"<x:foreign xmlns:x="urn:vendor"><x:child/></x:foreign>"#,
+        r#"<x:ext xmlns:x="urn:vendor" uri="urn:vendor"/>"#,
+        "<a:themeElements/>",
+    ] {
+        let source = theme(&format!("<a:extLst>{child}</a:extLst>"));
+        assert_rejected(source.as_bytes());
+    }
+    for uri in [part::NATIVE_EXTENSION_URI, "urn:vendor"] {
+        let source = theme(&format!(
+            r#"<a:extLst><!--keep--><a:ext uri="{uri}"><x:foreign xmlns:x="urn:vendor"><x:child/></x:foreign></a:ext></a:extLst>"#
+        ));
+        let snapshot = part::read(source.as_bytes()).expect("foreign payload inside extension");
+        assert_eq!(snapshot.xml_bytes(), source.as_bytes());
+    }
+}

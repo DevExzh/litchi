@@ -10,7 +10,9 @@
 //! XML names, characters, references, and document boundaries are checked across
 //! the entire source. Declarations must specify XML 1.0 and, when present, UTF-8.
 //! The owned root/list/recognized-extension containers allow only whitespace
-//! between elements. Other descendants remain opaque and may contain valid XML
+//! between elements. The direct extension list admits only DrawingML `ext`
+//! children and MCE `AlternateContent` envelopes (subject to the MCE mutation
+//! refusal policy). Other descendants remain opaque and may contain valid XML
 //! text; this ownership scanner does not perform full Theme schema validation.
 //!
 //! Limited mutations check the prospective complete-part size before serializing
@@ -1086,6 +1088,24 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
     })
 }
 
+fn validate_direct_list_child(
+    stack: &[Frame],
+    local: &[u8],
+    namespace: &[u8],
+    expected: &[u8],
+) -> Result<()> {
+    if matches!(stack.last().map(|frame| frame.kind), Some(Kind::ExtList))
+        && !(local == b"ext" && namespace == expected)
+        // MCE envelopes retain the existing opaque-read/ambiguous-edit policy.
+        && !(local == b"AlternateContent" && namespace == MCE_NAMESPACE.as_bytes())
+    {
+        return Err(invalid(
+            "direct Theme extLst contains a child other than ext or MCE AlternateContent",
+        ));
+    }
+    Ok(())
+}
+
 fn classify_start(
     local: &[u8],
     namespace: &[u8],
@@ -1099,6 +1119,7 @@ fn classify_start(
     start_end: usize,
 ) -> Result<Kind> {
     let expected = root_namespace(classifier.root)?;
+    validate_direct_list_child(stack, local, namespace, expected)?;
     let in_mce_branch = stack.iter().any(|frame| {
         matches!(
             frame.kind,
@@ -1263,6 +1284,7 @@ fn classify_empty(
     end: usize,
 ) -> Result<Kind> {
     let expected = root_namespace(classifier.root)?;
+    validate_direct_list_child(stack, local, namespace, expected)?;
     let in_mce_branch = stack.iter().any(|frame| {
         matches!(
             frame.kind,
