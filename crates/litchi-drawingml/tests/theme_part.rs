@@ -298,17 +298,13 @@ fn shared_theme_part_owner_add_remove_is_exact_and_absent_remove_is_noop() {
 }
 
 #[test]
-fn bom_prefixed_family_add_is_refused_or_strips_bom_before_insertion() {
+fn bom_prefixed_family_add_strips_only_the_leading_bom_before_insertion() {
     let mut bom_family = b"\xEF\xBB\xBF".to_vec();
     bom_family.extend_from_slice(native_family_fragment());
     let parsed = family::read(&bom_family).expect("read BOM-prefixed standalone family");
     let family_free = native_family_free_theme();
-    let result = part::add_family_with_uri(&family_free, &parsed, part::NATIVE_EXTENSION_URI);
-    let Ok(added) = result else {
-        // Refusing a source with a document-level BOM is safe: the BOM must
-        // never become character data inside the element-only a:ext content.
-        return;
-    };
+    let added = part::add_family_with_uri(&family_free, &parsed, part::NATIVE_EXTENSION_URI)
+        .expect("standalone BOM is stripped before embedding");
     assert!(
         !added.windows(3).any(|window| window == b"\xEF\xBB\xBF"),
         "a standalone BOM must not be embedded inside a complete Theme ext"
