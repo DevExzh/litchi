@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0507: faster ODG values with lower allocation work
+
+[0507](changes/0507-odg-attribute-value-batches.md) records this batch.
+Median owned-byte open/traversal improves 17.06–33.51% across all eight
+matched pairs. Plain-large RSS falls 2 MiB per pair (~9%); no paired measured
+latency/throughput/RSS adverse change exceeds 5%. Whole-child allocation
+calls fall 29.29% on metadata-large and 45.94% on plain-large, with unchanged
+rounded peak heap. Fixed request groups preserve validation order through
+legacy error replay. All 124 owner tests and scoped checks pass. Full CRUD,
+provider, scaling and native-application claims remain outside this capture.
+
 ## 0506: faster ODG span discovery with an RSS tradeoff
 
 [0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.

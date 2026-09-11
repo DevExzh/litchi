@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0507: fixed value groups retain validation and error order
+
+[0507](changes/0507-odg-attribute-value-batches.md) records this batch.
+[The matrix](results/change-0507/adr-review.md) uses all 30 unchanged accepted-ADR
+inputs from the verified manifest. Only two contiguous groups of eight private
+string lookups are batched. Frame/3D/z-index/lexical validation retains its
+position; raw/decode/duplicate failures drop partial values and replay the
+original scalar helper. Source bytes, ownership, limits, publication,
+dependencies, public APIs and concurrency remain unchanged. Nine private
+and seven public tests supplement the prior 108-test suite.
+
 ## 0506: private ODG span batching preserves error authority
 
 [0506](changes/0506-odg-shape-attribute-span-batch.md) records this batch.

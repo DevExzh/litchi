@@ -1,0 +1,76 @@
+{
+  "before_commands": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "valgrind",
+        "--tool=callgrind",
+        "--callgrind-out-file=/tmp/litchi-goal-0507/callgrind-before.out",
+        "/tmp/litchi-goal-0507/before",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0507/profile-before.json"
+      ],
+      "log": "profile-before.log"
+    },
+    {
+      "command": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0507/heap-before",
+        "/tmp/litchi-goal-0507/before",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0507/heap-before.json"
+      ],
+      "log": "heap-before.log"
+    },
+    {
+      "command": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0507/heap-before.zst"
+      ],
+      "log": "heap-before-summary.txt"
+    },
+    {
+      "command": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0507/heap-plain-before",
+        "/tmp/litchi-goal-0507/before",
+        "--corpus",
+        "plain-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0507/heap-plain-before.json"
+      ],
+      "log": "heap-plain-before.log"
+    },
+    {
+      "command": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0507/heap-plain-before.zst"
+      ],
+      "log": "heap-plain-before-summary.txt"
+    }
+  ],
+  "after_commands_receipt": "profiling-after.json",
+  "scope": "whole child includes setup/hashing, preflight and one timed sample, with zero warmups",
+  "hardware_counter_receipt": "hardware-counter-probe.json",
+  "annotation_commands": "callgrind_annotate --auto=no with --inclusive=yes/no and --tree=both; retained output includes function attribution"
+}

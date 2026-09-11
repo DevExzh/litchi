@@ -1,0 +1,78 @@
+{
+  "commands": [
+    {
+      "command": [
+        "taskset",
+        "-c",
+        "2",
+        "valgrind",
+        "--tool=callgrind",
+        "--callgrind-out-file=/tmp/litchi-goal-0507/callgrind-after.out",
+        "/tmp/litchi-goal-0507/after",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0507/profile-after.json"
+      ],
+      "exit_code": 0,
+      "log": "profile-after.log"
+    },
+    {
+      "command": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0507/heap-after",
+        "/tmp/litchi-goal-0507/after",
+        "--corpus",
+        "metadata-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0507/heap-after.json"
+      ],
+      "exit_code": 0,
+      "log": "heap-after.log"
+    },
+    {
+      "command": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0507/heap-after.zst"
+      ],
+      "exit_code": 0,
+      "log": "heap-after-summary.txt"
+    },
+    {
+      "command": [
+        "heaptrack",
+        "-o",
+        "/tmp/litchi-goal-0507/heap-plain-after",
+        "/tmp/litchi-goal-0507/after",
+        "--corpus",
+        "plain-large",
+        "--warmups",
+        "0",
+        "--samples",
+        "1",
+        "--output",
+        "/tmp/litchi-goal-0507/heap-plain-after.json"
+      ],
+      "exit_code": 0,
+      "log": "heap-plain-after.log"
+    },
+    {
+      "command": [
+        "heaptrack_print",
+        "/tmp/litchi-goal-0507/heap-plain-after.zst"
+      ],
+      "exit_code": 0,
+      "log": "heap-plain-after-summary.txt"
+    }
+  ],
+  "scope": "whole child includes setup and preflight plus one sample; zero warmups"
+}

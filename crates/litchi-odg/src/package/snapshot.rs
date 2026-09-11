@@ -103,6 +103,10 @@ type ShapeAttributeSpans = [Option<Range<usize>>; 16];
 #[path = "attribute_span_tests.rs"]
 mod attribute_span_tests;
 
+#[cfg(test)]
+#[path = "attribute_value_tests.rs"]
+mod attribute_value_tests;
+
 struct State {
     package: Package,
     mimetype: &'static str,
@@ -5403,18 +5407,25 @@ impl Scanner {
                 None
             };
             let z_index = optional_u32_attribute(reader, element, DRAW, b"z-index")?;
-            let geometry = [
-                attribute(reader, element, SVG, b"x")?,
-                attribute(reader, element, SVG, b"y")?,
-                attribute(reader, element, SVG, b"width")?,
-                attribute(reader, element, SVG, b"height")?,
-            ];
-            let line_geometry = [
-                attribute(reader, element, SVG, b"x1")?,
-                attribute(reader, element, SVG, b"y1")?,
-                attribute(reader, element, SVG, b"x2")?,
-                attribute(reader, element, SVG, b"y2")?,
-            ];
+            // Geometry and line endpoints are one ownership boundary: both
+            // groups are needed before lexical validation and retain the
+            // legacy request order for the ordered fallback below.
+            let [x, y, width, height, x1, y1, x2, y2] = attribute_values(
+                reader,
+                element,
+                [
+                    (SVG, b"x"),
+                    (SVG, b"y"),
+                    (SVG, b"width"),
+                    (SVG, b"height"),
+                    (SVG, b"x1"),
+                    (SVG, b"y1"),
+                    (SVG, b"x2"),
+                    (SVG, b"y2"),
+                ],
+            )?;
+            let geometry = [x, y, width, height];
+            let line_geometry = [x1, y1, x2, y2];
             validate_shape_lexical_attributes(
                 kind,
                 &geometry,
@@ -5423,19 +5434,46 @@ impl Scanner {
                 attribute(reader, element, DRAW, b"points")?.as_deref(),
             )?;
             let shape = self.pages[page].shapes().len();
+            // These are the eight remaining ShapeProperties values. Keep
+            // this batch after lexical validation so validation still reads
+            // viewBox and points in its established order before ownership
+            // moves into the parsed shape.
+            let [
+                control_reference,
+                layer,
+                path_data,
+                transform,
+                points,
+                view_box,
+                style_name,
+                text_style_name,
+            ] = attribute_values(
+                reader,
+                element,
+                [
+                    (DRAW, b"control"),
+                    (DRAW, b"layer"),
+                    (SVG, b"d"),
+                    (DRAW, b"transform"),
+                    (DRAW, b"points"),
+                    (SVG, b"viewBox"),
+                    (DRAW, b"style-name"),
+                    (DRAW, b"text-style-name"),
+                ],
+            )?;
             self.pages[page].push_shape(Shape::parsed(
                 ShapeProperties {
-                    control_reference: attribute(reader, element, DRAW, b"control")?,
+                    control_reference,
                     geometry,
-                    layer: attribute(reader, element, DRAW, b"layer")?,
+                    layer,
                     name,
-                    path_data: attribute(reader, element, SVG, b"d")?,
-                    transform: attribute(reader, element, DRAW, b"transform")?,
-                    points: attribute(reader, element, DRAW, b"points")?,
-                    view_box: attribute(reader, element, SVG, b"viewBox")?,
+                    path_data,
+                    transform,
+                    points,
+                    view_box,
                     line_geometry,
-                    style_name: attribute(reader, element, DRAW, b"style-name")?,
-                    text_style_name: attribute(reader, element, DRAW, b"text-style-name")?,
+                    style_name,
+                    text_style_name,
                     z_index,
                 },
                 kind,
@@ -11072,6 +11110,73 @@ fn attribute(
         }
     }
     Ok(value)
+}
+
+fn attribute_values<const N: usize>(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    requests: [(&[u8], &[u8]); N],
+) -> Result<[Option<String>; N]> {
+    let mut values = std::array::from_fn(|_| None);
+    let mut batch_error = false;
+
+    for raw_attribute in element.attributes() {
+        let parsed_attribute = match raw_attribute {
+            Ok(parsed_attribute) => parsed_attribute,
+            Err(_) => {
+                batch_error = true;
+                break;
+            },
+        };
+        let parsed_local = parsed_attribute.key.local_name();
+        if !requests
+            .iter()
+            .any(|(_, wanted)| parsed_local.as_ref() == *wanted)
+        {
+            continue;
+        }
+        let (namespace, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
+        for (slot, (expected, wanted)) in requests.iter().enumerate() {
+            if parsed_local.as_ref() != *wanted
+                || !resolved_bound(&namespace, expected)
+                || name.as_ref() != *wanted
+            {
+                continue;
+            }
+            if values[slot].is_some() {
+                batch_error = true;
+                break;
+            }
+            let decoded = match parsed_attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+            {
+                Ok(decoded) => decoded.into_owned(),
+                Err(_) => {
+                    batch_error = true;
+                    break;
+                },
+            };
+            values[slot] = Some(decoded);
+        }
+        if batch_error {
+            break;
+        }
+    }
+
+    if !batch_error {
+        return Ok(values);
+    }
+
+    // The fast traversal intentionally discards partial values on every
+    // error. Replaying the legacy helper in request order preserves the
+    // established first-error precedence even when raw attribute order differs
+    // from the order in which callers consume the groups.
+    drop(values);
+    let mut ordered = std::array::from_fn(|_| None);
+    for (slot, (expected, wanted)) in requests.iter().enumerate() {
+        ordered[slot] = attribute(reader, element, expected, wanted)?;
+    }
+    Ok(ordered)
 }
 
 fn arbitrary_attributes(

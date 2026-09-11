@@ -1,0 +1,222 @@
+   Compiling litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+    Finished `test` profile [unoptimized] target(s) in 0.93s
+     Running unittests src/lib.rs (/tmp/litchi-goal-0507/test-target/debug/deps/litchi_odg-5fd8455a0b549c8a)
+
+running 19 tests
+test codec::content::tests::requires_family_body ... ok
+test package::snapshot::attribute_span_tests::batch_and_ordered_helper_preserve_malformed_attribute_error_display ... ok
+test package::snapshot::attribute_span_tests::batch_follows_namespace_rebinding_on_nested_shape ... ok
+test package::snapshot::attribute_span_tests::batch_falls_back_for_reverse_order_semantic_duplicate_fields ... ok
+test package::snapshot::attribute_value_tests::value_batch_handles_zero_query_slots ... ok
+test package::snapshot::attribute_value_tests::value_batch_matches_ordered_values_and_normalizes_references ... ok
+test package::snapshot::attribute_span_tests::batch_error_is_replayed_in_order_when_raw_tag_disagrees_with_event ... ok
+test package::snapshot::attribute_value_tests::value_batch_replays_raw_syntax_and_duplicate_errors ... ok
+test package::snapshot::attribute_value_tests::value_batch_replays_ordered_error_for_reversed_invalid_values ... ok
+test package::snapshot::attribute_value_tests::value_batch_decodes_before_reporting_expanded_name_duplicate ... ok
+test package::snapshot::attribute_span_tests::batch_returns_none_for_unmatched_and_unbound_same_local_names ... ok
+test transition::tests::validates_choices_color_duration_and_bounds ... ok
+test package::snapshot::attribute_span_tests::batch_falls_back_for_raw_duplicate_attribute_error ... ok
+test package::snapshot::attribute_value_tests::value_batch_follows_namespace_rebinding_on_nested_shape ... ok
+test package::snapshot::attribute_value_tests::value_batch_supports_duplicate_query_slots_independently ... ok
+test package::snapshot::attribute_value_tests::value_batch_preserves_aliases_and_ignores_unbound_default_and_foreign_names ... ok
+test package::snapshot::attribute_span_tests::batch_matches_ordered_spans_with_aliases_and_spacing ... ok
+test package::snapshot::attribute_value_tests::value_batch_matches_ordered_values_with_large_irrelevant_inventory ... ok
+test package::snapshot::attribute_span_tests::batch_matches_ordered_helper_for_large_unrelated_inventory_and_start_tag ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/attribute_selection.rs (/tmp/litchi-goal-0507/test-target/debug/deps/attribute_selection-40c89926ae6756e4)
+
+running 4 tests
+test aliased_duplicate_target_attributes_are_rejected ... ok
+test malformed_attribute_after_selected_fields_is_rejected ... ok
+test duplicate_unrelated_attribute_after_selected_fields_is_rejected ... ok
+test aliased_attributes_select_by_namespace_and_preserve_unrelated_qnames ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/attribute_span_batch.rs (/tmp/litchi-goal-0507/test-target/debug/deps/attribute_span_batch-cc821b40999561fc)
+
+running 4 tests
+test duplicate_trailing_shape_attribute_is_still_rejected ... ok
+test malformed_trailing_shape_attribute_is_still_rejected ... ok
+test aliased_shape_attributes_ignore_same_local_foreign_fields ... ok
+test all_shape_attribute_spans_edit_exactly_and_inverse_reopens ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/attribute_value_batch.rs (/tmp/litchi-goal-0507/test-target/debug/deps/attribute_value_batch-e6fdd7001da75c72)
+
+running 7 tests
+test literal_attribute_whitespace_is_normalized_to_spaces ... ok
+test three_dimensional_validation_precedes_z_index_error ... ok
+test frame_attribute_error_precedes_z_index_error ... ok
+test z_index_error_precedes_bad_geometry_value_decode ... ok
+test geometry_lexical_validation_precedes_bad_second_group_value_decode ... ok
+test matching_alias_duplicate_and_malformed_unrelated_attribute_are_rejected ... ok
+test shape_values_are_normalized_and_noop_edit_and_inverse_preserve_source ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/capability_transactions.rs (/tmp/litchi-goal-0507/test-target/debug/deps/capability_transactions-7727da0d6cd80980)
+
+running 7 tests
+test removals_are_checked_and_group_subtrees_are_owned ... ok
+test cross_drawing_transfer_copies_and_remaps_arbitrary_style_definitions ... ok
+test one_transaction_composes_structure_geometry_style_layers_and_resources ... ok
+test unreferenced_resource_add_remove_is_safe_and_exactly_reversible ... ok
+test nested_group_transfer_remaps_style_form_and_resource_collisions_together ... ok
+test cross_drawing_group_transfer_carries_layers_resources_and_durable_inverse ... ok
+test nested_group_text_geometry_style_and_form_edits_are_owned_and_reversible ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/flat_deferred.rs (/tmp/litchi-goal-0507/test-target/debug/deps/flat_deferred-214aa57769ad02e2)
+
+running 4 tests
+test flat_pages_and_noop_bytes_stay_exact ... ok
+test flat_shape_text_edit_is_lossless_and_transactional ... ok
+test flat_wrong_family_and_malformed_or_misplaced_structures_are_typed_errors ... ok
+test flat_truncation_and_mutation_sweeps_never_panic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/inventory_dispatch.rs (/tmp/litchi-goal-0507/test-target/debug/deps/inventory_dispatch-0a2dcbe6e3d41b60)
+
+running 3 tests
+test foreign_namespace_markers_remain_opaque_and_exact ... ok
+test optional_inventory_observes_local_aliases_and_default_namespaces ... ok
+test optional_inventory_still_rejects_misplaced_aliased_owners ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_semantics.rs (/tmp/litchi-goal-0507/test-target/debug/deps/package_semantics-11e74b8077bbaf45)
+
+running 24 tests
+test ended_page_scope_does_not_capture_shapes_outside_a_page ... ok
+test exact_shape_name_selector_rejects_ambiguity ... ok
+test semantic_package_views_use_layers_shapes_and_shared_frame_context ... ok
+test package_layer_edit_is_declared_source_checked_and_reversible ... ok
+test package_edit_is_source_checked_reversible_and_compact ... ok
+test package_shape_name_edit_is_source_checked_reversible_and_compact ... ok
+test advanced_named_style_resources_are_dependency_checked_and_durable ... ok
+test history_enforces_step_and_weight_bounds_without_mutating_on_refusal ... ok
+test dtd_is_refused_and_noncompact_source_requires_checked_splices ... ok
+test form_controls_remain_inert_but_their_references_are_editable ... ok
+test durable_structural_patch_reopens_full_package_and_inverts_exactly ... ok
+test page_style_change_requires_a_declared_style_and_roundtrips ... ok
+test arbitrary_style_properties_have_dependency_checked_crud_and_exact_inverse ... ok
+test page_rename_is_durable_unique_and_dependency_checked ... ok
+test three_way_plan_does_not_mutate_until_conflicts_are_resolved ... ok
+test path_data_is_typed_losslessly_editable_and_durable ... ok
+test form_model_crud_is_inert_dependency_checked_and_durable ... ok
+test active_content_is_inventoried_preserved_or_explicitly_refused ... ok
+test transforms_points_and_line_endpoints_insert_reopen_and_invert ... ok
+test hostile_raw_package_corpus_is_bounded_and_never_partially_opened ... ok
+test signed_and_encrypted_security_state_is_inert_and_rewrite_is_refused ... ok
+test joined_edits_are_deterministic_disjoint_and_conflict_aware ... ok
+test durable_semantic_patch_roundtrips_inverts_and_refuses_stale_sources ... ok
+test fresh_password_and_signing_lifecycle_is_explicit_and_verifiable ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.23s
+
+     Running tests/package_snapshot.rs (/tmp/litchi-goal-0507/test-target/debug/deps/package_snapshot-2e56914ee98bd37d)
+
+running 7 tests
+test real_drawing_resource_xml_remains_exact_and_opaque ... ok
+test cross_drawing_transfer_closes_inherited_producer_namespaces ... ok
+test real_libreoffice_odg_opens_with_exact_bytes_and_declared_layers ... ok
+test complex_real_fontwork_change_reopens_and_inverts_exactly ... ok
+test multiple_real_libreoffice_drawings_open_exactly_with_typed_pages ... ok
+test genuine_complex_group_transfer_remaps_all_colliding_dependency_families ... ok
+test complex_real_nested_group_geometry_change_reopens_and_inverts_exactly ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/page_transitions.rs (/tmp/litchi-goal-0507/test-target/debug/deps/page_transitions-936d3623713dd1c8)
+
+running 19 tests
+test rejects_non_3d_dr3d_scene_children ... ok
+test rejects_malformed_dr3d_vector_attributes ... ok
+test recognizes_inert_dr3d_shape_owners ... ok
+test refuses_inert_dr3d_shape_authoring ... ok
+test refuses_to_mutate_a_transition_style_shared_by_pages ... ok
+test resolves_prefixed_transition_attributes_and_parent_styles ... ok
+test reads_inert_image_map_contour_and_glue_point_owners ... ok
+test reads_inert_enhanced_geometry_equations_and_handles ... ok
+test paired_contours_and_glue_points_accept_empty_content_and_retain_comments ... ok
+test rejects_invalid_enhanced_geometry_handle_grammar_and_children ... ok
+test inserts_detached_page_with_owned_transition_style_and_inverts_exactly ... ok
+test accepts_empty_anyiri_transition_sound_and_scopes_xml_ids_per_part ... ok
+test edits_named_style_owner_in_styles_xml ... ok
+test refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity ... ok
+test rejects_invalid_contour_attributes_and_non_frame_auxiliary_owners ... ok
+test preserves_paired_empty_transition_sound_markup ... ok
+test enforces_frame_and_scene_child_order_and_lexical_domains ... ok
+test reads_smil_transition_and_reopens_source_bound_edit ... ok
+test image_map_charges_retained_area_and_owner_xml_together ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/review_regressions.rs (/tmp/litchi-goal-0507/test-target/debug/deps/review_regressions-9cd60a4b8ead4677)
+
+running 4 tests
+test accepts_group_and_nested_dr3d_scene_owners ... ok
+test accepts_repeated_frame_and_scene_glue_points_and_scene_description_first ... ok
+test rejects_accessibility_elements_after_their_owner_sequence ... ok
+test first_transition_can_be_added_to_a_style_without_properties ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/semantic_api.rs (/tmp/litchi-goal-0507/test-target/debug/deps/semantic_api-0759e94308590088)
+
+running 5 tests
+test noncompact_authored_content_returns_a_typed_error ... ok
+test focused_modules_are_the_canonical_semantic_api ... ok
+test compact_authored_content_is_published_without_rewriting ... ok
+test semantic_whitespace_is_preserved_exactly ... ok
+test otg_templates_are_explicit_and_preserved_across_edits ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/transition_cache.rs (/tmp/litchi-goal-0507/test-target/debug/deps/transition_cache-9df631c79fd6b51b)
+
+running 5 tests
+test inherited_alias_transition_and_sound_reads_for_many_pages ... ok
+test shared_direct_transition_reads_and_exact_noop_stay_consistent ... ok
+test malformed_referenced_transition_owners_are_not_accepted_from_cache ... ok
+test content_style_shadowing_and_independent_sources_keep_values_local ... ok
+test cyclic_and_overdeep_transition_inheritance_remain_rejected ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.03s
+
+     Running tests/transition_ownership.rs (/tmp/litchi-goal-0507/test-target/debug/deps/transition_ownership-05362ca869363e1c)
+
+running 3 tests
+test inherited_shared_transition_noop_remains_exact ... ok
+test refuses_transition_edit_that_would_change_an_inheriting_page ... ok
+test child_transition_override_does_not_change_its_parent_page ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/transition_review.rs (/tmp/litchi-goal-0507/test-target/debug/deps/transition_review-061d739481b3b722)
+
+running 9 tests
+test equal_transition_is_a_noop_even_when_the_style_is_shared ... ok
+test inherited_transition_can_be_replaced_but_cannot_be_cleared_locally ... ok
+test transition_sub_edit_admission_honors_each_composition_bound ... ok
+test transition_edit_avoids_foreign_alias_and_local_shadowing ... ok
+test transition_edit_does_not_rebind_a_foreign_presentation_prefix ... ok
+test named_style_transition_replays_and_inverts_durably ... ok
+test transition_inverse_preserves_first_property_insertion_for_automatic_and_named_styles ... ok
+test transition_inverse_preserves_new_namespace_bindings_for_automatic_and_named_styles ... ok
+test disjoint_transition_sub_edits_join_and_same_page_edits_conflict ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests examples/native_metadata_receipt.rs (/tmp/litchi-goal-0507/test-target/debug/examples/native_metadata_receipt-35ab82561e84a041)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,7 @@
+{
+  "decision": "retain candidate",
+  "basis": "All eight paired median results improve 17.06\u201333.51%; no paired measured latency, throughput or RSS adverse change exceeds 5%. Whole-child allocation counts decrease on both profiled large corpora.",
+  "memory": "Plain-large RSS decreases 2,048 KiB per repeat; rounded heaptrack peaks unchanged. No causal allocator attribution or isolated per-operation allocation total is claimed.",
+  "correctness": "124 unique tests pass. Independent review confirms fixed groups preserve validation ordering and scalar-helper fallback; partial values dropped before replay.",
+  "scope": "Synthetic owned-byte open/traversal only; no strict-registry promotion or full-goal completion"
+}
