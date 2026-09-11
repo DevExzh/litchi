@@ -1,8 +1,4 @@
 #![expect(
-    clippy::arbitrary_source_item_ordering,
-    reason = "items remain grouped by OOXML schema family and package lifecycle"
-)]
-#![expect(
     clippy::module_name_repetitions,
     reason = "public names retain established OOXML facade terminology"
 )]
