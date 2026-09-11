@@ -1,0 +1,50 @@
+{
+  "scope": "Test-only native-package integration with synthetic opaque model payload",
+  "passed": true,
+  "source_unchanged": true,
+  "source_files": 751,
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "litchi-xlsb",
+        "--test",
+        "data_model_native_package"
+      ],
+      "exit_code": 0,
+      "log": "check.log",
+      "sha256": "c07f84af3096f6a4212882acd68fda3f2dd16f57230715e232f3ad1fab70193e"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xlsb",
+        "--test",
+        "data_model_native_package"
+      ],
+      "exit_code": 0,
+      "log": "test.log",
+      "sha256": "aee3c8b560c413a2115b6a3f2f395267e8e29ddc096f81044ddb7ef226d336b4"
+    }
+  ],
+  "suppression_variables": {
+    "RUSTFLAGS": "",
+    "CARGO_ENCODED_RUSTFLAGS": "",
+    "RUSTC_BOOTSTRAP": ""
+  },
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "log_normalization": "Trailing empty lines removed only",
+  "root_review": "Approved for explicitly synthetic native-package lifecycle and preservation assertions; no native Data Model producer claim",
+  "preexisting_build_input": {
+    "path": "crates/litchi-opc/src/phys_pkg.rs",
+    "description": "Pre-existing import-order-only worktree edit; production file left untouched and unstaged",
+    "reproduction_patch": "worktree-input.patch",
+    "sha256": "aec19221884d1fad88484ede5963b66b99077642d901564a040d77b2fc6ea424"
+  }
+}
