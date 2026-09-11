@@ -1,0 +1,64 @@
+{
+  "scope": "Borrowed worksheet SVG read facade and direct worksheet drawing source scanner",
+  "base_commit": "1d29beccef2281da8f9acb984504a1b9284ca0bd",
+  "isolated_source_changes": {
+    "crates/litchi-xlsx/src/drawing/worksheet_source.rs": "f961682c9b93049aa7ff22c1db10eb2c87d42b8fb0c480cccb8e402ded8b46ae",
+    "crates/litchi-xlsx/src/workbook/drawing.rs": "6f24ffa66ad6ce1cbee6c01e1cc1af916ecc3950dcc6456f73cfa1600940067b",
+    "crates/litchi-xlsx/src/drawing/mod.rs": "264b63935cdf58b9aadfdc092f315f4115118821dcd4e75585bd4914c7fe30fd",
+    "crates/litchi-xlsx/src/workbook/mod.rs": "b343273956582e7769ea8cc76373f6cb3f4468debe0689dff03ce1a7590830f0",
+    "crates/litchi-xlsx/tests/drawing_svg_read.rs": "812a6660a012d435606b6e80f63dbee21bf60b66e0393aedb973a82069260de7"
+  },
+  "cargo_lock_sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b",
+  "commands": [
+    {
+      "command": "cargo test --locked --offline -q -p litchi-xlsx --lib --test drawing_svg_read",
+      "result": {
+        "library_passed": 1103,
+        "read_passed": 14,
+        "failed": 0
+      }
+    },
+    {
+      "command": "cargo clippy --locked --offline -p litchi-xlsx --lib --test drawing_svg_read -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo doc --locked --offline -p litchi-xlsx --no-deps",
+      "exit_code": 0
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-xlsx/src/drawing/worksheet_source.rs crates/litchi-xlsx/src/workbook/drawing.rs crates/litchi-xlsx/tests/drawing_svg_read.rs",
+      "exit_code": 0
+    }
+  ],
+  "review": {
+    "agent": "/root/xlsx_svg_design_review",
+    "verdict": "no independent worksheet source/read seam freeze blocker",
+    "root_followup": "Removed one needless borrow and four test-only Clippy diagnostics without changing semantics; repeated tests and warning-denied gates on final files."
+  },
+  "native_fixture": {
+    "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+    "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72"
+  },
+  "not_claimed": [
+    "SVG attach/detach lifecycle acceptance",
+    "Host contextual-source allocation correction acceptance",
+    "Native application open/save acceptance",
+    "Performance improvement"
+  ],
+  "isolation": "Committed base plus listed five source/test files; no uncommitted lifecycle or host contextual-source changes included. Cargo.lock copied from root; fixture trees linked read-only by convention.",
+  "logs": {
+    "root-read-tests.log.gz": {
+      "compressed_sha256": "a0090396bdae253f7d322c9ac8be3acbe244574eb054dba0d9a7fdfc2e0e26e7",
+      "uncompressed_sha256": "3ccc19f0070673b7abb1232e6e599bff9dd4aec608b9a595ac276072be7d33ae"
+    },
+    "root-read-clippy.log.gz": {
+      "compressed_sha256": "e974e9d47e4dc482f8c68b627a8e00d5f66bdac866e1b3410d3d82afebd9e5eb",
+      "uncompressed_sha256": "1ad33b460cd163c652a73c96f13f94c616e3894370c098b81ddfa414d7e929d7"
+    },
+    "root-read-doc.log.gz": {
+      "compressed_sha256": "98ada2ee10af9528b7cf3820613a61e6a1635a9c17e7a59e3ca751b348247eb6",
+      "uncompressed_sha256": "2247ec42756e57cbea1ef4fafed6162e5cd1f2d500cab4021b8ca3d2ee842f14"
+    }
+  }
+}

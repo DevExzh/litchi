@@ -12,6 +12,7 @@ pub mod source;
 pub mod worksheet;
 
 mod codec;
+mod drawing;
 mod model;
 mod package;
 mod source_merge;
@@ -19,6 +20,10 @@ mod source_merge;
 #[cfg(test)]
 mod tests;
 
+pub use drawing::{
+    WorksheetDrawing, WorksheetImageReference, WorksheetPicture, WorksheetSvgDescriptor,
+    WorksheetSvgImage,
+};
 pub use edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, DurablePatch, Edit,
     JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, RowEdit,
