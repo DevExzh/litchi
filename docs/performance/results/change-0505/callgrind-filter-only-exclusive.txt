@@ -1,0 +1,113 @@
+--------------------------------------------------------------------------------
+Profile data file 'docs/performance/results/change-0505/callgrind-filter-only.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 225661595
+Trigger: Program termination
+Profiled target:  /tmp/litchi-goal-0505/filter-only --corpus metadata-large --warmups 0 --samples 1 --output /tmp/litchi-goal-0505/profile-filter-only.json (PID 1347095, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+1,143,560,704 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+231,525,188 (20.25%)  ???:quick_xml::events::attributes::IterState::next [/tmp/litchi-goal-0505/filter-only]
+172,627,748 (15.10%)  ???:sha2::sha256::soft::unroll::compress [/tmp/litchi-goal-0505/filter-only]
+ 84,841,334 ( 7.42%)  ???:quick_xml::events::attributes::IterState::check_for_duplicates [/tmp/litchi-goal-0505/filter-only]
+ 50,378,628 ( 4.41%)  ???:<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next [/tmp/litchi-goal-0505/filter-only]
+ 46,518,714 ( 4.07%)  ???:memchr::arch::x86_64::avx2::memchr::One::find_raw [/tmp/litchi-goal-0505/filter-only]
+ 36,768,716 ( 3.22%)  ???:quick_xml::name::NamespaceResolver::resolve_prefix [/tmp/litchi-goal-0505/filter-only]
+ 33,016,109 ( 2.89%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 31,480,630 ( 2.75%)  ???:quick_xml::reader::Reader<R>::read_event_impl [/tmp/litchi-goal-0505/filter-only]
+ 30,515,001 ( 2.67%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 25,946,776 ( 2.27%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 24,149,870 ( 2.11%)  ???:litchi_odg::package::snapshot::attribute [/tmp/litchi-goal-0505/filter-only]
+ 21,846,660 ( 1.91%)  ???:memchr::arch::x86_64::memchr::memchr3_raw::find_avx2 [/tmp/litchi-goal-0505/filter-only]
+ 21,356,450 ( 1.87%)  ???:quick_xml::name::QName::local_name [/tmp/litchi-goal-0505/filter-only]
+ 20,205,280 ( 1.77%)  ???:memchr::arch::x86_64::memchr::memchr_raw::find_avx2 [/tmp/litchi-goal-0505/filter-only]
+ 16,084,976 ( 1.41%)  ???:quick_xml::name::NamespaceResolver::push [/tmp/litchi-goal-0505/filter-only]
+ 15,408,810 ( 1.35%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 14,206,746 ( 1.24%)  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/tmp/litchi-goal-0505/filter-only]
+ 14,019,630 ( 1.23%)  ???:memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2 [/tmp/litchi-goal-0505/filter-only]
+ 13,852,096 ( 1.21%)  ???:litchi_odg::package::snapshot::attribute_source_span [/tmp/litchi-goal-0505/filter-only]
+ 11,951,205 ( 1.05%)  ???:quick_xml::reader::state::ReaderState::emit_start [/tmp/litchi-goal-0505/filter-only]
+ 11,647,326 ( 1.02%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 10,337,703 ( 0.90%)  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 10,233,020 ( 0.89%)  ???:litchi_odg::package::snapshot::attribute_value_span [/tmp/litchi-goal-0505/filter-only]
+  9,462,535 ( 0.83%)  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  9,117,360 ( 0.80%)  ???:quick_xml::name::NamespaceResolver::resolve_event [/tmp/litchi-goal-0505/filter-only]
+  8,927,246 ( 0.78%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  8,477,520 ( 0.74%)  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  8,414,976 ( 0.74%)  ???:alloc::raw_vec::RawVec<T,A>::grow_one [/tmp/litchi-goal-0505/filter-only]
+  8,011,918 ( 0.70%)  ???:memchr::arch::x86_64::avx2::memchr::Three::find_raw [/tmp/litchi-goal-0505/filter-only]
+  7,741,853 ( 0.68%)  ???:zlib_rs::deflate::algorithm::medium::deflate_medium [/tmp/litchi-goal-0505/filter-only]
+  7,178,276 ( 0.63%)  ???:quick_xml::reader::ns_reader::NsReader<R>::read_event_impl [/tmp/litchi-goal-0505/filter-only]
+  6,277,044 ( 0.55%)  ???:litchi_odg::package::snapshot::Scanner::observe [/tmp/litchi-goal-0505/filter-only]
+  5,846,399 ( 0.51%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  5,808,470 ( 0.51%)  ???:quick_xml::reader::state::ReaderState::emit_end [/tmp/litchi-goal-0505/filter-only]
+  4,556,643 ( 0.40%)  ???:core::str::converts::from_utf8 [/tmp/litchi-goal-0505/filter-only]
+  4,201,766 ( 0.37%)  ???:zlib_rs::deflate::longest_match::longest_match [/tmp/litchi-goal-0505/filter-only]
+  4,036,896 ( 0.35%)  ???:memchr::arch::x86_64::memchr::memchr2_raw::find_avx2 [/tmp/litchi-goal-0505/filter-only]
+  3,687,286 ( 0.32%)  ???:litchi_odf_common::media::reader::scan_xml [/tmp/litchi-goal-0505/filter-only]
+  3,680,664 ( 0.32%)  ???:quick_xml::events::Event::into_owned [/tmp/litchi-goal-0505/filter-only]
+  3,670,758 ( 0.32%)  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,623,522 ( 0.32%)  ???:quick_xml::reader::buffered_reader::<impl quick_xml::reader::XmlSource<&mut alloc::vec::Vec<u8>> for R>::read_with [/tmp/litchi-goal-0505/filter-only]
+  3,586,480 ( 0.31%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,451,584 ( 0.30%)  ???:litchi_odg::package::snapshot::parse_content [/tmp/litchi-goal-0505/filter-only]
+  3,395,526 ( 0.30%)  ???:litchi_odg::package::snapshot::parse_shape_auxiliary_children [/tmp/litchi-goal-0505/filter-only]
+  3,394,468 ( 0.30%)  ???:__rustc::__rdl_realloc [/tmp/litchi-goal-0505/filter-only]
+  3,181,882 ( 0.28%)  ???:__rustc::__rdl_alloc [/tmp/litchi-goal-0505/filter-only]
+  3,176,792 ( 0.28%)  ???:litchi_odg::package::snapshot::classify [/tmp/litchi-goal-0505/filter-only]
+  2,956,808 ( 0.26%)  ???:xml_minifier::audit::check_attribute_layout [/tmp/litchi-goal-0505/filter-only]
+  2,819,746 ( 0.25%)  ???:litchi_odg::package::snapshot::parse_enhanced_geometry [/tmp/litchi-goal-0505/filter-only]
+  2,725,952 ( 0.24%)  ???:quick_xml::escape::normalize_attribute_value [/tmp/litchi-goal-0505/filter-only]
+  2,633,184 ( 0.23%)  ???:memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2 [/tmp/litchi-goal-0505/filter-only]
+  2,523,280 ( 0.22%)  ???:litchi_odg::package::snapshot::parse_style_definitions [/tmp/litchi-goal-0505/filter-only]
+  2,290,162 ( 0.20%)  ???:litchi_odg::package::snapshot::find_transition_style_owner [/tmp/litchi-goal-0505/filter-only]
+  2,201,506 ( 0.19%)  ???:quick_xml::name::QName::decompose [/tmp/litchi-goal-0505/filter-only]
+  2,198,980 ( 0.19%)  ???:litchi_odg::package::snapshot::scan_active_xml [/tmp/litchi-goal-0505/filter-only]
+  2,167,110 ( 0.19%)  ???:quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with [/tmp/litchi-goal-0505/filter-only]
+  2,145,240 ( 0.19%)  ???:memchr::arch::x86_64::avx2::memchr::Two::find_raw [/tmp/litchi-goal-0505/filter-only]
+  1,993,746 ( 0.17%)  ???:litchi_odg::package::snapshot::parse_style_resources [/tmp/litchi-goal-0505/filter-only]
+  1,915,298 ( 0.17%)  ???:<core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match [/tmp/litchi-goal-0505/filter-only]
+  1,869,600 ( 0.16%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,853,964 ( 0.16%)  ???:quick_xml::name::NamespaceResolver::set_level [/tmp/litchi-goal-0505/filter-only]
+  1,600,064 ( 0.14%)  ???:litchi_odf_common::namespace::namespaced_attribute [/tmp/litchi-goal-0505/filter-only]
+  1,363,720 ( 0.12%)  ???:zlib_rs::inflate::inflate_fast_help [/tmp/litchi-goal-0505/filter-only]
+  1,202,806 ( 0.11%)  ???:xml_minifier::audit::inspect_attributes [/tmp/litchi-goal-0505/filter-only]
+  1,014,967 ( 0.09%)  ???:xml_minifier::audit::verify_with_policy [/tmp/litchi-goal-0505/filter-only]
+    984,316 ( 0.09%)  ???:quick_xml::reader::ns_reader::NsReader<R>::process_event [/tmp/litchi-goal-0505/filter-only]
+    950,400 ( 0.08%)  ???:litchi_odg::package::snapshot::is_odf_decimal [/tmp/litchi-goal-0505/filter-only]
+    925,752 ( 0.08%)  ./malloc/./malloc/arena.c:realloc
+    916,060 ( 0.08%)  ???:litchi_odg::package::snapshot::shape_kind [/tmp/litchi-goal-0505/filter-only]
+    855,522 ( 0.07%)  ???:zlib_rs::inflate::writer::Writer::copy_match_runtime_dispatch [/tmp/litchi-goal-0505/filter-only]
+    621,669 ( 0.05%)  ./malloc/./malloc/arena.c:free
+    593,855 ( 0.05%)  ???:crc32fast::specialized::pclmulqdq::calculate [/tmp/litchi-goal-0505/filter-only]
+    575,232 ( 0.05%)  ???:litchi_odg::package::snapshot::drawing_attributes [/tmp/litchi-goal-0505/filter-only]
+    553,176 ( 0.05%)  ???:zlib_rs::deflate::slide_hash::rust::slide_hash_chain [/tmp/litchi-goal-0505/filter-only]
+    550,290 ( 0.05%)  ???:<alloc::string::String as core::fmt::Write>::write_str [/tmp/litchi-goal-0505/filter-only]
+    544,712 ( 0.05%)  ./malloc/../string/bits/string_fortified.h:_int_realloc
+    531,482 ( 0.05%)  ???:core::fmt::write [/tmp/litchi-goal-0505/filter-only]
+    516,064 ( 0.05%)  ???:litchi_odg::model::enhanced::DrawingAttribute::parsed [/tmp/litchi-goal-0505/filter-only]
+    497,232 ( 0.04%)  ???:alloc::fmt::format::format_inner [/tmp/litchi-goal-0505/filter-only]
+    491,989 ( 0.04%)  ???:<core::fmt::Formatter>::pad_integral [/tmp/litchi-goal-0505/filter-only]
+    461,312 ( 0.04%)  ???:litchi_odg::package::snapshot::parse_image_map_area [/tmp/litchi-goal-0505/filter-only]
+    430,080 ( 0.04%)  ???:litchi_odg::package::snapshot::is_odf_length [/tmp/litchi-goal-0505/filter-only]
+    424,193 ( 0.04%)  ???:zlib_rs::deflate::flush_block_only [/tmp/litchi-goal-0505/filter-only]
+    416,704 ( 0.04%)  ???:core::ptr::drop_in_place<litchi_odg::model::shape::Shape> [/tmp/litchi-goal-0505/filter-only]
+    415,188 ( 0.04%)  ???:litchi_odf_common::package::path::resolve_relative_package_path [/tmp/litchi-goal-0505/filter-only]
+    411,240 ( 0.04%)  ???:core::slice::memchr::memchr_aligned [/tmp/litchi-goal-0505/filter-only]
+    383,488 ( 0.03%)  ???:litchi_odg::package::snapshot::Scanner::text [/tmp/litchi-goal-0505/filter-only]
+

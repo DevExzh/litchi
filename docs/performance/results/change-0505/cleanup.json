@@ -1,0 +1,9 @@
+{
+  "removed_path": "/tmp/litchi-goal-0505",
+  "removed_files": 3707,
+  "unique_inode_allocated_bytes": 806019072,
+  "live_proc_path_references": [],
+  "absent_after_cleanup": true,
+  "timestamp_utc": "2026-09-11T16:31:32.425940+00:00",
+  "scope": "only batch-owned scratch; evidence retained; unrelated build directories untouched"
+}

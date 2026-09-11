@@ -1,0 +1,27 @@
+{
+  "after_files": {
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "crates/litchi-odg/src/package/snapshot.rs": "1481ab23028aaa51d95ddcfb1884e8dda26a78124298f9ec3231d62e0976cede",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "base_revision": "df2e73fa3b26c090f0875e3c20e05c05c64d3428",
+  "before": "clean base revision; frozen before production edits",
+  "before_files": {
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "crates/litchi-odg/src/package/snapshot.rs": "002f478431a68287a995173584577432e1efb39b5376993066e2462d492d2a28",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "candidate_patch_sha256": "9d39a50a32812dedc6f00ab8944ec641e77f4b6e5e15d63aedf89aae5e0fb107",
+  "combined_patch_sha256": "849bf4c57bf4aa2377140a91bc22a3619bb476b62b0745d9b41f947b2bb50e8f",
+  "final_candidate": "base revision plus candidate.patch; filter only; final/ holds primary timing comparison",
+  "initial_candidate": "base revision plus combined.patch; borrowed QName experiment; root before/after reports are retained but not the shipped candidate",
+  "workspace_test_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "final_rebuild_binary_sha256": "eaa4137a0d9016776fa621eb6ae48375fa9084672a8e33aba47c4c522bebcba2",
+  "test_files": {
+    "crates/litchi-odg/tests/attribute_selection.rs": "3934f21e072303a759043521ddb46fc9d67477fa2e1bbcab4a8b28b9f77980ce"
+  }
+}

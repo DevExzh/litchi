@@ -1,0 +1,24 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-odg/tests/attribute_selection.rs:39:
+ 
+     let expected = content.replace(r#"d:name="before""#, r#"d:name="after""#);
+     assert_eq!(commit.snapshot().content_xml(), expected);
+[31m-    assert_eq!(commit.snapshot().pages()[0].shapes()[0].name(), Some("after"));
+[m[32m+    assert_eq!(
+[m[32m+        commit.snapshot().pages()[0].shapes()[0].name(),
+[m[32m+        Some("after")
+[m[32m+    );
+[m     for attribute in [
+         r#"x:name="wrong""#,
+         r#"name="default""#,
+Diff in /home/zhuhe/code/litchi/crates/litchi-odg/tests/attribute_selection.rs:73:
+ fn duplicate_unrelated_attribute_after_selected_fields_is_rejected() {
+     let content = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:x="urn:example:foreign" office:version="1.4"><office:body><office:drawing><d:page d:name="Page" xml:id="page-id" d:style-name="page-style" d:master-page-name="Master" x:opaque="first" x:opaque="second"/></office:drawing></office:body></office:document-content>"#;
+ 
+[31m-    let valid = content.replace(r#" x:opaque="first" x:opaque="second""#, r#" x:opaque="first""#);
+[m[32m+    let valid = content.replace(
+[m[32m+        r#" x:opaque="first" x:opaque="second""#,
+[m[32m+        r#" x:opaque="first""#,
+[m[32m+    );
+[m     assert!(Drawing::from_bytes(raw_package(&valid)).is_ok());
+     assert!(Drawing::from_bytes(raw_package(content)).is_err());
+ }

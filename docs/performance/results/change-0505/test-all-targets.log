@@ -1,0 +1,169 @@
+   Compiling typenum v1.20.1
+   Compiling zeroize v1.9.0
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling syn v2.0.114
+   Compiling const-oid v0.9.6
+   Compiling hybrid-array v0.4.14
+   Compiling getrandom v0.4.3
+   Compiling subtle v2.6.1
+   Compiling rand_core v0.10.1
+   Compiling crypto-common v0.1.6
+   Compiling crypto-common v0.2.2
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling block-buffer v0.10.4
+   Compiling base64ct v1.6.0
+   Compiling digest v0.10.7
+   Compiling pem-rfc7468 v0.7.0
+   Compiling block-buffer v0.12.1
+   Compiling der_derive v0.7.3
+   Compiling flagset v0.4.7
+   Compiling cmov v0.5.4
+   Compiling ctutils v0.4.2
+   Compiling autocfg v1.5.1
+   Compiling der v0.7.10
+   Compiling libm v0.2.16
+   Compiling cpufeatures v0.3.1
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.56
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling block-padding v0.4.2
+   Compiling crossbeam-utils v0.8.22
+   Compiling inout v0.2.2
+   Compiling memchr v2.8.3
+   Compiling const-oid v0.10.2
+   Compiling thiserror v2.0.18
+   Compiling serde_core v1.0.229
+   Compiling crossbeam-epoch v0.9.20
+   Compiling cpufeatures v0.2.17
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.18
+   Compiling ff v0.13.1
+   Compiling crossbeam-deque v0.8.7
+   Compiling siphasher v1.0.3
+   Compiling base16ct v0.2.0
+   Compiling sec1 v0.7.3
+   Compiling ppv-lite86 v0.2.21
+   Compiling group v0.13.0
+   Compiling cipher v0.5.2
+   Compiling crypto-bigint v0.5.5
+   Compiling syn v3.0.4
+   Compiling rayon-core v1.13.0
+   Compiling zmij v1.0.19
+   Compiling cpubits v0.1.1
+   Compiling serde v1.0.229
+   Compiling elliptic-curve v0.13.8
+   Compiling rand_chacha v0.3.1
+   Compiling phf_shared v0.14.0
+   Compiling sha2 v0.10.9
+   Compiling num-integer v0.1.47
+   Compiling serde_derive v1.0.229
+   Compiling universal-hash v0.6.1
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling num-bigint-dig v0.8.6
+   Compiling spin v0.9.9
+   Compiling smallvec v1.16.0
+   Compiling fastrand v2.5.0
+   Compiling crc32fast v1.5.1
+   Compiling serde_json v1.0.149
+   Compiling phf_generator v0.14.0
+   Compiling lazy_static v1.5.0
+   Compiling rfc6979 v0.4.0
+   Compiling polyval v0.7.3
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling bergshamra-core v0.7.0
+   Compiling quick-xml v0.41.0
+   Compiling chacha20 v0.10.2
+   Compiling inout v0.1.4
+   Compiling iana-time-zone v0.1.65
+   Compiling either v1.18.0
+   Compiling zlib-rs v0.6.7
+   Compiling uppsala v0.9.0
+   Compiling itoa v1.0.18
+   Compiling flate2 v1.1.10
+   Compiling bergshamra-xml v0.7.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rayon v1.12.0
+   Compiling chrono v0.4.45
+   Compiling cipher v0.4.4
+   Compiling rand v0.10.2
+   Compiling ghash v0.6.0
+   Compiling ecdsa v0.16.9
+   Compiling phf_macros v0.14.0
+   Compiling primeorder v0.13.6
+   Compiling aes v0.9.3
+   Compiling ctr v0.10.1
+   Compiling sha2 v0.11.0
+   Compiling hmac v0.13.0
+   Compiling sha1 v0.10.7
+   Compiling aead v0.6.1
+   Compiling pkcs1 v0.7.5
+   Compiling blake2 v0.10.6
+   Compiling password-hash v0.5.0
+   Compiling fast-float2 v0.2.4
+   Compiling byteorder v1.5.0
+   Compiling base64 v0.22.1
+   Compiling once_cell v1.21.4
+   Compiling blowfish v0.9.1
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling argon2 v0.5.3
+   Compiling rsa v0.9.10
+   Compiling aes-gcm v0.11.1
+   Compiling pbkdf2 v0.13.0
+   Compiling phf v0.14.0
+   Compiling p256 v0.13.2
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling bergshamra-c14n v0.7.0
+   Compiling cbc v0.2.1
+   Compiling sha1 v0.11.0
+   Compiling x509-cert v0.2.5
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+    Finished `test` profile [unoptimized] target(s) in 19.76s
+     Running unittests src/lib.rs (/tmp/litchi-goal-0505/test-target/debug/deps/litchi_odg-5fd8455a0b549c8a)
+
+running 2 tests
+test codec::content::tests::requires_family_body ... ok
+test transition::tests::validates_choices_color_duration_and_bounds ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/attribute_selection.rs (/tmp/litchi-goal-0505/test-target/debug/deps/attribute_selection-40c89926ae6756e4)
+
+running 4 tests
+test duplicate_unrelated_attribute_after_selected_fields_is_rejected ... FAILED
+test malformed_attribute_after_selected_fields_is_rejected ... FAILED
+test aliased_duplicate_target_attributes_are_rejected ... ok
+test aliased_attributes_select_by_namespace_and_preserve_unrelated_qnames ... ok
+
+failures:
+
+---- duplicate_unrelated_attribute_after_selected_fields_is_rejected stdout ----
+
+thread 'duplicate_unrelated_attribute_after_selected_fields_is_rejected' (1328915) panicked at crates/litchi-odg/tests/attribute_selection.rs:11:56:
+called `Result::unwrap()` on an `Err` value: InvalidFormat("XML publication rejected for 'content.xml': malformed XML at byte 229: position 109: duplicated attribute, previous declaration at position 92")
+
+---- malformed_attribute_after_selected_fields_is_rejected stdout ----
+
+thread 'malformed_attribute_after_selected_fields_is_rejected' (1328916) panicked at crates/litchi-odg/tests/attribute_selection.rs:11:56:
+called `Result::unwrap()` on an `Err` value: InvalidFormat("XML publication rejected for 'content.xml': noncompact XML AttributeSeparation at byte 301")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    duplicate_unrelated_attribute_after_selected_fields_is_rejected
+    malformed_attribute_after_selected_fields_is_rejected
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p litchi-odg --test attribute_selection`

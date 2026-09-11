@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0505 reduces ODG attribute lookup work
+
+[0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.
+A local-name filter retains checked iteration and exact source preservation,
+while reducing p50 8.43–9.88% in the matched richer-parser capture. Four new
+tests cover namespace selection and trailing invalid attributes. Full CRUD,
+provider/scaling coverage and older-parser regression attribution remain open.
+The strict claim registry remains at ten entries; this is scoped progress.
+
 ## Current audit: 0504 reduces a measured ODG open bottleneck
 
 [0504](changes/0504-odg-direct-transition-reuse.md) implements local reuse of
