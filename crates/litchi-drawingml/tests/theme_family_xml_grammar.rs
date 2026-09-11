@@ -386,3 +386,38 @@ fn namespace_heavy_foreign_families_stay_opaque_and_duplicate_owners_fail_early(
         );
     }
 }
+
+#[test]
+fn active_namespace_cap_counts_nested_declarations_and_restores_on_scope_exit() {
+    let root_count = part::MAX_ACTIVE_NAMESPACE_DECLARATIONS / 2;
+    // The Theme's own a binding is one of the root's active declarations.
+    let root_declarations = (1..root_count)
+        .map(|index| format!(" xmlns:p{index}=\"urn:root:{index}\""))
+        .collect::<String>();
+    let root = format!(
+        r#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"{root_declarations}>"#
+    );
+    let child_count = part::MAX_ACTIVE_NAMESPACE_DECLARATIONS - root_count;
+    for extra in [0, 1] {
+        // Rebinding root prefixes still consumes scope entries; those entries
+        // must be released for both paired and self-closing siblings.
+        let declarations = (0..child_count + extra)
+            .map(|index| format!(" xmlns:p{index}=\"urn:child:{index}\""))
+            .collect::<String>();
+        let source = format!(
+            "{root}<opaque{declarations}/><opaque{declarations}><child/></opaque><opaque{declarations}/></a:theme>"
+        );
+        if extra == 0 {
+            assert!(
+                part::read(source.as_bytes()).is_ok(),
+                "exact active declaration cap"
+            );
+        } else {
+            let error = part::read(source.as_bytes()).expect_err("one over active declaration cap");
+            assert!(
+                error.to_string().contains("active namespace bindings"),
+                "{error}"
+            );
+        }
+    }
+}

@@ -51,11 +51,22 @@ pub const NATIVE_EXTENSION_URI: &str = "{05A4C25C-085E-4340-85A3-A5531E510DB2}";
 
 const MCE_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
-// quick-xml resolves qualified names against the active namespace scope. Keep
-// user bindings bounded independently of the per-element declaration quota so
-// deeply nested opaque markup cannot force unbounded linear prefix lookups.
-// The built-in `xml` binding occupies the extra slot.
-const MAX_ACTIVE_NAMESPACE_BINDINGS: usize = MAX_NAMESPACE_DECLARATIONS + 1;
+/// Maximum user namespace declarations retained across the active element stack.
+///
+/// Shadowed declarations count until their element closes. Prefix lookup scans
+/// this bounded scope; namespace handling is not claimed to be fully linear.
+/// The scanner counts entries using the scope vector length and restores it on
+/// scope exit, without folding the bindings.
+///
+/// quick-xml resolves each event before this scanner admits its declarations.
+/// Its per-element cap therefore permits up to one additional event's
+/// `MAX_NAMESPACE_DECLARATIONS` user declarations transiently (at most 512 user
+/// declarations total), plus the resolver's built-in bindings. Oversized events
+/// are rejected before classification or candidate scope copying.
+pub const MAX_ACTIVE_NAMESPACE_DECLARATIONS: usize = MAX_NAMESPACE_DECLARATIONS;
+
+// The manually maintained scope includes the built-in `xml` binding.
+const MAX_ACTIVE_NAMESPACE_BINDINGS: usize = MAX_ACTIVE_NAMESPACE_DECLARATIONS + 1;
 
 /// Maximum complete theme-part bytes inspected by this owner.
 pub const MAX_XML_BYTES: usize = theme_codec::MAX_XML_BYTES;
@@ -784,10 +795,11 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 }
                 let need_scope_copy = family_extension
                     .is_some_and(|index| !recognized_family_extensions.contains(&index));
-                let inherited = need_scope_copy.then(|| scope.clone());
+                let scope_len_before = scope.len();
                 let scope_bytes_before = scope_bytes;
                 let added =
                     apply_namespace_declarations(&element, &mut scope, &mut scope_bytes, &reader)?;
+                let inherited = need_scope_copy.then(|| scope[..scope_len_before].to_vec());
                 validate_element_name(&element)?;
                 validate_element_attributes(&element, &scope, &reader)?;
                 let local = element.local_name().as_ref().to_vec();
@@ -863,10 +875,11 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 }
                 let need_scope_copy = family_extension
                     .is_some_and(|index| !recognized_family_extensions.contains(&index));
-                let inherited = need_scope_copy.then(|| scope.clone());
+                let scope_len_before = scope.len();
                 let scope_bytes_before = scope_bytes;
                 let added =
                     apply_namespace_declarations(&element, &mut scope, &mut scope_bytes, &reader)?;
+                let inherited = need_scope_copy.then(|| scope[..scope_len_before].to_vec());
                 validate_element_name(&element)?;
                 validate_element_attributes(&element, &scope, &reader)?;
                 let local = element.local_name().as_ref().to_vec();
