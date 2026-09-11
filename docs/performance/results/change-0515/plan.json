@@ -1,0 +1,31 @@
+{
+  "base_revision": "b698732363250547f05d235b8c8c090f2dd17c59",
+  "previous_turn": "progress: 0514 rejection record committed and independently replayed; source restored",
+  "priority": "OLE2/OOXML until full optimization goal complete; ODF deferred; iWork excluded",
+  "frozen_utc": "2026-09-11T22:58:22.258497+00:00",
+  "scope": "Changed-output XLSX compaction and validation internal instruction attribution, unchanged production/harness",
+  "performance_claim": "none",
+  "protocol": {
+    "normal": "12 existing rows, tiny/medium/dense-wide x one-cell/one-percent commit/commit-save;2serial repeats30samples3warmups CPU2 one worker;descriptive control drift only",
+    "preflight": "same12rows1sample0warmup",
+    "profile_commit": "2 captures3samples0warmups dense-wide one-percent commit;toggle exactcommit,zero-before runner;global3caller contexts separates direct output parser from source store",
+    "profile_compaction": "2 captures3samples0warmups dense-wide one-percent commit;toggle changed_worksheet,zero-before runner;require6 measured compactions for2changed sheets x3commits",
+    "order": [
+      "preflight",
+      "normal-r1",
+      "commit-r1",
+      "compact-r1",
+      "commit-r2",
+      "compact-r2",
+      "normal-r2"
+    ],
+    "admission": "Every capture source/binary hashes and runtime semantic oracles pass; scope proved by raw profile direct invocation edges and no extraneous collected contexts",
+    "drift_review_percent": {
+      "p50": 5,
+      "mean": 5,
+      "p95": 10,
+      "p99": 15
+    },
+    "limitations": "No optimization claim;instrumented elapsed/RSS excluded;simulated instructions not cycles;no new phase allocation/copy/cache/scaling claim"
+  }
+}

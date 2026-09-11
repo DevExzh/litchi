@@ -1,0 +1,6 @@
+{
+  "commit": "*litchi_xlsx::workbook::edit::semantic::transaction::Edit*::commit",
+  "runner": "*litchi_perf_baseline::run_xlsx_update_commit",
+  "note": "End-anchored functions; commit3calls and compaction6calls per capture afterrunnerreset; descendants may have collection-off callcounts",
+  "compaction": "*litchi_xlsx::raw::compact::changed_worksheet"
+}

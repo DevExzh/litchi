@@ -1,0 +1,2897 @@
+{
+  "artifact_and_identity_bindings_verified": true,
+  "build": {
+    "binary_sha256": "4d5193b285544315399425800903a669700f7bfba5b4f51645df289525bc3106",
+    "build_log_sha256": "547e1f6211b0affccfd30aa68b64de3535176619482a4e376ec8c11292b25d29",
+    "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c"
+  },
+  "claim_authorized": false,
+  "comparison_scope": "same-build normal repeat drift and bounded diagnostic Callgrind attribution; no cross-build speedup claim",
+  "custody": {
+    "adr_files": 30,
+    "base_revision": "b698732363250547f05d235b8c8c090f2dd17c59",
+    "compile_fixtures": {
+      "test-data/poi/test-data/spreadsheet/54016.xls": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+      "test-data/rtf/watermark.rtf": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+    },
+    "source_epoch": "base",
+    "source_files": 7196,
+    "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+    "verifier_sources": {
+      "docs/performance/results/change-0515/analyze.py": "465e574da2854bce539f76f6c5c8c0665a1572fe9864339622eaf016e007f381",
+      "docs/performance/results/change-0515/annotate.py": "6995936be00dd23dc4b4e21a74feb7e888717c5b46ceb198593859dedb1465c0",
+      "docs/performance/results/change-0515/capture.py": "b3ffbd4bf25181e12979ff9c7f5b5dfb498abd408249978062948b47327b6be5",
+      "docs/performance/results/change-0515/cleanup.py": "5e4c90d4fc9f8a4da57ee8e0cef78fcabf2c1afd5dfbf2b697f81494b8c5ab31",
+      "docs/performance/results/change-0515/gates.py": "7cdc56918201ff6cda879e1b3b3ce152515e1450188a2fe88bc58369d94bee7a",
+      "docs/performance/results/change-0515/replay-annotations.py": "ad5399deabb2a7e9b4b6400ad5e463195ff0c0e19fe2bc1243c4e0a7b82227b7",
+      "docs/performance/results/change-0515/run.py": "dd42ec36cf3abd5c13a1d2a359f0891abbd0f5bbaf6135bcfb566eebf98317a3",
+      "docs/performance/results/change-0515/verify.py": "f6d6288b814fded7d0581844c880c7209931c91a30a613ad644ee930b0f44313",
+      "tools/generate_corpus_manifest_v2.py": "be9b3c81a561eff4bc8303b1d2b7f5d8672747980e0aa760cf71036570e13d4b",
+      "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+      "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+    }
+  },
+  "hardware": {
+    "scope": "current 0515 plan has no hardware-counter lane",
+    "status": "not_collected"
+  },
+  "native": {
+    "cases": [
+      "xlsx_one_cell_commit",
+      "xlsx_one_percent_commit",
+      "xlsx_one_cell_commit_save",
+      "xlsx_one_percent_commit_save"
+    ],
+    "drift_limits_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "execution_scope": "One process per capture; iterations execute in process, with a fresh workbook staged outside each timer",
+    "lanes": [
+      "preflight",
+      "normal-r1",
+      "normal-r2"
+    ],
+    "measured_elapsed_samples": 720,
+    "measured_lanes": [
+      "normal-r1",
+      "normal-r2"
+    ],
+    "preflight_elapsed_samples": 12,
+    "preflight_samples": 1,
+    "preflight_warmups": 0,
+    "rows_per_lane": 12,
+    "rss_is_descriptive_only": true,
+    "same_build_drift": [
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 163330.29787097103,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 166822.4354623623
+          },
+          "max": 179551,
+          "mean": 165076.36666666667,
+          "min": 161021,
+          "p50": 163245,
+          "p95": 175800,
+          "p99": 179551,
+          "sample_order": [
+            18,
+            24,
+            22,
+            29,
+            26,
+            13,
+            16,
+            17,
+            15,
+            21,
+            27,
+            20,
+            11,
+            28,
+            4,
+            19,
+            9,
+            6,
+            10,
+            8,
+            3,
+            12,
+            25,
+            7,
+            0,
+            2,
+            14,
+            23,
+            5,
+            1
+          ],
+          "standard_deviation": 4676.583209576408,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": -0.6343124828488533,
+          "p50": -0.7871604030751378,
+          "p95": -1.11490329920364,
+          "p99": -2.6009323256344974
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 162469.98057907817,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 165588.55275425516
+          },
+          "max": 174881,
+          "mean": 164029.26666666666,
+          "min": 160101,
+          "p50": 161960,
+          "p95": 173840,
+          "p99": 174881,
+          "sample_order": [
+            28,
+            29,
+            21,
+            27,
+            20,
+            16,
+            23,
+            11,
+            12,
+            18,
+            19,
+            25,
+            7,
+            24,
+            15,
+            5,
+            10,
+            22,
+            13,
+            9,
+            1,
+            14,
+            3,
+            0,
+            2,
+            6,
+            26,
+            17,
+            8,
+            4
+          ],
+          "standard_deviation": 4176.313759296816,
+          "unit": "ns"
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 302479.66546903754,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 306884.06786429585
+          },
+          "max": 322741,
+          "mean": 304681.8666666667,
+          "min": 297481,
+          "p50": 302766,
+          "p95": 315011,
+          "p99": 322741,
+          "sample_order": [
+            23,
+            21,
+            24,
+            2,
+            9,
+            10,
+            18,
+            20,
+            17,
+            28,
+            7,
+            5,
+            13,
+            1,
+            6,
+            29,
+            12,
+            26,
+            15,
+            4,
+            16,
+            19,
+            27,
+            25,
+            11,
+            22,
+            8,
+            3,
+            0,
+            14
+          ],
+          "standard_deviation": 5898.26538927326,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": -0.7495906112342854,
+          "p50": -1.0073786356460057,
+          "p95": -0.9047303110050087,
+          "p99": -2.5872138959723068
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 300433.13567832316,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 304362.86432167684
+          },
+          "max": 314391,
+          "mean": 302398.0,
+          "min": 295451,
+          "p50": 299716,
+          "p95": 312161,
+          "p99": 314391,
+          "sample_order": [
+            28,
+            23,
+            17,
+            4,
+            20,
+            15,
+            26,
+            1,
+            22,
+            7,
+            11,
+            6,
+            8,
+            19,
+            12,
+            9,
+            25,
+            0,
+            18,
+            29,
+            24,
+            3,
+            27,
+            16,
+            14,
+            10,
+            5,
+            13,
+            21,
+            2
+          ],
+          "standard_deviation": 5262.594187870357,
+          "unit": "ns"
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 203282.73708744664,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 206643.46291255337
+          },
+          "max": 214731,
+          "mean": 204963.1,
+          "min": 199310,
+          "p50": 203606,
+          "p95": 214531,
+          "p99": 214731,
+          "sample_order": [
+            17,
+            8,
+            24,
+            26,
+            15,
+            13,
+            22,
+            6,
+            21,
+            27,
+            4,
+            11,
+            14,
+            28,
+            23,
+            0,
+            25,
+            12,
+            2,
+            16,
+            1,
+            5,
+            19,
+            3,
+            10,
+            29,
+            9,
+            7,
+            20,
+            18
+          ],
+          "standard_deviation": 4500.599863083376,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": 1.0694933218060587,
+          "p50": 0.3757256662377362,
+          "p95": 2.4798280901128456,
+          "p99": 3.152781852643538
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 204794.9652212822,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 209515.36811205116
+          },
+          "max": 221501,
+          "mean": 207155.1666666667,
+          "min": 201100,
+          "p50": 204371,
+          "p95": 219851,
+          "p99": 221501,
+          "sample_order": [
+            12,
+            17,
+            23,
+            25,
+            21,
+            8,
+            16,
+            19,
+            6,
+            14,
+            18,
+            3,
+            7,
+            29,
+            20,
+            5,
+            11,
+            10,
+            22,
+            9,
+            27,
+            1,
+            28,
+            26,
+            4,
+            24,
+            15,
+            2,
+            0,
+            13
+          ],
+          "standard_deviation": 6321.445339331883,
+          "unit": "ns"
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 366223.54106416326,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 370505.3922691701
+          },
+          "max": 376511,
+          "mean": 368364.4666666667,
+          "min": 361091,
+          "p50": 367766,
+          "p95": 375892,
+          "p99": 376511,
+          "sample_order": [
+            17,
+            22,
+            9,
+            14,
+            4,
+            12,
+            15,
+            25,
+            6,
+            23,
+            18,
+            10,
+            26,
+            2,
+            20,
+            28,
+            7,
+            1,
+            11,
+            19,
+            3,
+            16,
+            5,
+            21,
+            8,
+            24,
+            13,
+            27,
+            29,
+            0
+          ],
+          "standard_deviation": 5734.14790431025,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": 0.2399435197061095,
+          "p50": -0.15498985768124252,
+          "p95": 0.04522575633427728,
+          "p99": -0.06108719267166052
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 367469.8008085757,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 371026.8658580909
+          },
+          "max": 376281,
+          "mean": 369248.3333333333,
+          "min": 362891,
+          "p50": 367196,
+          "p95": 376062,
+          "p99": 376281,
+          "sample_order": [
+            23,
+            10,
+            15,
+            21,
+            4,
+            11,
+            16,
+            7,
+            5,
+            29,
+            18,
+            24,
+            27,
+            19,
+            8,
+            2,
+            3,
+            13,
+            26,
+            0,
+            20,
+            17,
+            25,
+            14,
+            28,
+            22,
+            1,
+            9,
+            6,
+            12
+          ],
+          "standard_deviation": 4763.532435532254,
+          "unit": "ns"
+        },
+        "shape": "tiny"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 1765439.3299690215,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 1771500.9366976442
+          },
+          "max": 1794957,
+          "mean": 1768470.1333333328,
+          "min": 1747226,
+          "p50": 1768922,
+          "p95": 1777867,
+          "p99": 1794957,
+          "sample_order": [
+            6,
+            4,
+            17,
+            2,
+            29,
+            19,
+            8,
+            7,
+            5,
+            23,
+            25,
+            9,
+            16,
+            24,
+            15,
+            13,
+            10,
+            18,
+            28,
+            27,
+            12,
+            0,
+            26,
+            21,
+            14,
+            22,
+            11,
+            20,
+            1,
+            3
+          ],
+          "standard_deviation": 8117.551931519896,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": -0.618491266952681,
+          "p50": -0.5492610753894178,
+          "p95": -0.6513985579348791,
+          "p99": -1.5315687228162012
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 1754935.7976934318,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 1760128.8023065678
+          },
+          "max": 1767466,
+          "mean": 1757532.2999999998,
+          "min": 1739967,
+          "p50": 1759206,
+          "p95": 1766286,
+          "p99": 1767466,
+          "sample_order": [
+            8,
+            0,
+            2,
+            6,
+            19,
+            4,
+            10,
+            12,
+            13,
+            18,
+            21,
+            7,
+            9,
+            29,
+            20,
+            23,
+            17,
+            15,
+            28,
+            14,
+            27,
+            3,
+            11,
+            26,
+            1,
+            16,
+            5,
+            22,
+            25,
+            24
+          ],
+          "standard_deviation": 6954.341730667133,
+          "unit": "ns"
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 7063605.807743006,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 7078212.19225699
+          },
+          "max": 7109358,
+          "mean": 7070908.999999998,
+          "min": 7031827,
+          "p50": 7071792,
+          "p95": 7101737,
+          "p99": 7109358,
+          "sample_order": [
+            0,
+            6,
+            8,
+            4,
+            12,
+            10,
+            5,
+            2,
+            3,
+            14,
+            24,
+            18,
+            9,
+            11,
+            20,
+            22,
+            26,
+            15,
+            1,
+            13,
+            23,
+            21,
+            28,
+            7,
+            27,
+            16,
+            17,
+            19,
+            29,
+            25
+          ],
+          "standard_deviation": 19560.504356730966,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": -0.22409141455501658,
+          "p50": -0.43358175692950196,
+          "p95": 0.5174649525883535,
+          "p99": 0.5285709342531364
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 7041371.520035771,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 7068755.87996423
+          },
+          "max": 7146936,
+          "mean": 7055063.7,
+          "min": 6986146,
+          "p50": 7041130,
+          "p95": 7138486,
+          "p99": 7146936,
+          "sample_order": [
+            0,
+            16,
+            4,
+            14,
+            9,
+            10,
+            22,
+            2,
+            12,
+            8,
+            6,
+            3,
+            7,
+            1,
+            18,
+            13,
+            11,
+            24,
+            21,
+            23,
+            20,
+            5,
+            15,
+            19,
+            25,
+            17,
+            26,
+            29,
+            28,
+            27
+          ],
+          "standard_deviation": 36672.44903583857,
+          "unit": "ns"
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 2199167.0768480413,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 2205773.8564852923
+          },
+          "max": 2227429,
+          "mean": 2202470.466666667,
+          "min": 2190458,
+          "p50": 2200053,
+          "p95": 2220839,
+          "p99": 2227429,
+          "sample_order": [
+            7,
+            21,
+            2,
+            11,
+            20,
+            12,
+            10,
+            13,
+            15,
+            22,
+            28,
+            18,
+            4,
+            19,
+            25,
+            14,
+            26,
+            5,
+            6,
+            24,
+            29,
+            3,
+            23,
+            17,
+            27,
+            1,
+            16,
+            9,
+            8,
+            0
+          ],
+          "standard_deviation": 8847.633838113468,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": 0.9785208773287257,
+          "p50": 1.099973500638396,
+          "p95": 1.0261437231604775,
+          "p99": 1.467566418503119
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 2219725.0240061544,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 2228319.175993845
+          },
+          "max": 2260118,
+          "mean": 2224022.0999999996,
+          "min": 2206928,
+          "p50": 2224253,
+          "p95": 2243628,
+          "p99": 2260118,
+          "sample_order": [
+            20,
+            7,
+            25,
+            10,
+            12,
+            13,
+            29,
+            11,
+            17,
+            24,
+            15,
+            2,
+            28,
+            27,
+            21,
+            22,
+            1,
+            3,
+            26,
+            23,
+            6,
+            5,
+            19,
+            16,
+            9,
+            18,
+            14,
+            0,
+            4,
+            8
+          ],
+          "standard_deviation": 11509.073120503886,
+          "unit": "ns"
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 8748937.365258979,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 8765493.768074354
+          },
+          "max": 8800423,
+          "mean": 8757215.566666666,
+          "min": 8715773,
+          "p50": 8758018,
+          "p95": 8797503,
+          "p99": 8800423,
+          "sample_order": [
+            2,
+            1,
+            4,
+            0,
+            5,
+            6,
+            3,
+            14,
+            10,
+            7,
+            11,
+            16,
+            19,
+            13,
+            17,
+            25,
+            20,
+            18,
+            15,
+            12,
+            9,
+            8,
+            21,
+            22,
+            28,
+            24,
+            23,
+            26,
+            29,
+            27
+          ],
+          "standard_deviation": 22171.92003208642,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": 0.6770915505650565,
+          "p50": 0.6292405427803516,
+          "p95": 0.9201360886151422,
+          "p99": 0.9675557640808963
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 8808071.297864124,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 8824948.568802543
+          },
+          "max": 8885572,
+          "mean": 8816509.933333334,
+          "min": 8782502,
+          "p50": 8813127,
+          "p95": 8878452,
+          "p99": 8885572,
+          "sample_order": [
+            0,
+            4,
+            6,
+            7,
+            17,
+            11,
+            2,
+            1,
+            5,
+            8,
+            13,
+            27,
+            3,
+            12,
+            15,
+            10,
+            9,
+            19,
+            26,
+            16,
+            24,
+            14,
+            28,
+            25,
+            18,
+            29,
+            22,
+            23,
+            20,
+            21
+          ],
+          "standard_deviation": 22601.61858703978,
+          "unit": "ns"
+        },
+        "shape": "medium"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 109286577.72121415,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 109679453.87878585
+          },
+          "max": 110542734,
+          "mean": 109483015.8,
+          "min": 108148075,
+          "p50": 109401480,
+          "p95": 110266533,
+          "p99": 110542734,
+          "sample_order": [
+            0,
+            27,
+            10,
+            24,
+            28,
+            23,
+            29,
+            18,
+            21,
+            26,
+            25,
+            4,
+            9,
+            8,
+            6,
+            14,
+            17,
+            11,
+            22,
+            12,
+            19,
+            16,
+            20,
+            3,
+            2,
+            5,
+            7,
+            13,
+            15,
+            1
+          ],
+          "standard_deviation": 526129.9115109453,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": -0.8766046736294997,
+          "p50": -0.8336020682718326,
+          "p95": -0.929830631384776,
+          "p99": -0.9528016558736474
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 108397333.57125606,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 108649231.5620773
+          },
+          "max": 109489481,
+          "mean": 108523282.56666668,
+          "min": 108059716,
+          "p50": 108489507,
+          "p95": 109241241,
+          "p99": 109489481,
+          "sample_order": [
+            8,
+            14,
+            25,
+            22,
+            17,
+            9,
+            11,
+            0,
+            3,
+            13,
+            19,
+            27,
+            20,
+            10,
+            26,
+            6,
+            16,
+            12,
+            21,
+            18,
+            15,
+            29,
+            7,
+            2,
+            28,
+            1,
+            24,
+            23,
+            5,
+            4
+          ],
+          "standard_deviation": 337335.4810831908,
+          "unit": "ns"
+        },
+        "shape": "dense-wide"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 221438956.26504493,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 222265749.06828845
+          },
+          "max": 224988774,
+          "mean": 221852352.6666667,
+          "min": 220436366,
+          "p50": 221568615,
+          "p95": 224105000,
+          "p99": 224988774,
+          "sample_order": [
+            24,
+            7,
+            0,
+            1,
+            19,
+            18,
+            9,
+            26,
+            8,
+            20,
+            3,
+            12,
+            2,
+            11,
+            10,
+            27,
+            22,
+            17,
+            21,
+            25,
+            4,
+            6,
+            16,
+            23,
+            5,
+            29,
+            14,
+            28,
+            13,
+            15
+          ],
+          "standard_deviation": 1107220.2169178585,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": -0.8549472853761064,
+          "p50": -0.6468736558198906,
+          "p95": -1.1580321724191767,
+          "p99": -1.4512377404216625
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 219599851.95695347,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 220311412.04304653
+          },
+          "max": 221723652,
+          "mean": 219955632.0,
+          "min": 218566360,
+          "p50": 220135346,
+          "p95": 221509792,
+          "p99": 221723652,
+          "sample_order": [
+            11,
+            29,
+            15,
+            25,
+            28,
+            26,
+            13,
+            21,
+            17,
+            19,
+            23,
+            27,
+            14,
+            24,
+            22,
+            16,
+            0,
+            4,
+            12,
+            10,
+            5,
+            20,
+            8,
+            6,
+            18,
+            3,
+            9,
+            2,
+            7,
+            1
+          ],
+          "standard_deviation": 952903.4478569798,
+          "unit": "ns"
+        },
+        "shape": "dense-wide"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_cell_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 153381568.20965552,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 154011320.45701116
+          },
+          "max": 156963425,
+          "mean": 153696444.33333334,
+          "min": 152908970,
+          "p50": 153434571,
+          "p95": 155936108,
+          "p99": 156963425,
+          "sample_order": [
+            28,
+            20,
+            13,
+            4,
+            1,
+            15,
+            12,
+            11,
+            3,
+            27,
+            10,
+            17,
+            18,
+            8,
+            16,
+            26,
+            25,
+            19,
+            24,
+            0,
+            9,
+            14,
+            7,
+            2,
+            5,
+            23,
+            29,
+            22,
+            6,
+            21
+          ],
+          "standard_deviation": 843348.4389150854,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": 0.3616837086968694,
+          "p50": 0.3701434404896897,
+          "p95": 0.6074776471912458,
+          "p99": 0.48326735989610015
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 153927664.57234344,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 154577014.0943233
+          },
+          "max": 157721978,
+          "mean": 154252339.33333337,
+          "min": 153673094,
+          "p50": 154002499,
+          "p95": 156883385,
+          "p99": 157721978,
+          "sample_order": [
+            3,
+            24,
+            0,
+            21,
+            29,
+            27,
+            20,
+            1,
+            18,
+            5,
+            28,
+            17,
+            25,
+            14,
+            13,
+            10,
+            2,
+            12,
+            15,
+            9,
+            7,
+            6,
+            22,
+            23,
+            16,
+            4,
+            19,
+            26,
+            11,
+            8
+          ],
+          "standard_deviation": 869592.618321658,
+          "unit": "ns"
+        },
+        "shape": "dense-wide"
+      },
+      {
+        "any_exceeds_drift_ceiling": false,
+        "case": "xlsx_one_percent_commit_save",
+        "drift_limits_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "exceeds_drift_ceiling": {
+          "mean": false,
+          "p50": false,
+          "p95": false,
+          "p99": false
+        },
+        "first_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 307648754.8717153,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 308796816.5949515
+          },
+          "max": 314699964,
+          "mean": 308222785.7333334,
+          "min": 306448592,
+          "p50": 307731827,
+          "p95": 310040285,
+          "p99": 314699964,
+          "sample_order": [
+            16,
+            12,
+            13,
+            22,
+            21,
+            24,
+            19,
+            20,
+            15,
+            25,
+            14,
+            26,
+            27,
+            11,
+            17,
+            10,
+            18,
+            9,
+            28,
+            23,
+            29,
+            0,
+            3,
+            2,
+            5,
+            4,
+            6,
+            7,
+            1,
+            8
+          ],
+          "standard_deviation": 1537455.509106845,
+          "unit": "ns"
+        },
+        "repeat_change_percent": {
+          "mean": 0.7635969853429847,
+          "p50": 0.8331747889047669,
+          "p95": 0.8800972428470111,
+          "p99": -0.37181129134161717
+        },
+        "scope": "same-build normal repeat drift; no cross-build comparison",
+        "second_statistics_ns": {
+          "confidence_interval_95": {
+            "lower": 310255395.9247462,
+            "method": "two-sided Student's t interval for the mean",
+            "upper": 310897335.34192044
+          },
+          "max": 313529874,
+          "mean": 310576365.6333333,
+          "min": 309509589,
+          "p50": 310295771,
+          "p95": 312768941,
+          "p99": 313529874,
+          "sample_order": [
+            0,
+            2,
+            28,
+            1,
+            14,
+            15,
+            27,
+            24,
+            7,
+            25,
+            4,
+            23,
+            9,
+            21,
+            11,
+            18,
+            10,
+            8,
+            29,
+            17,
+            6,
+            12,
+            26,
+            22,
+            13,
+            16,
+            3,
+            19,
+            5,
+            20
+          ],
+          "standard_deviation": 859669.1915355419,
+          "unit": "ns"
+        },
+        "shape": "dense-wide"
+      }
+    ],
+    "samples_per_lane": 30,
+    "shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "total_rows": 36,
+    "warmups_per_lane": 3,
+    "whole_child_rss": {
+      "adverse_over_5_percent": false,
+      "change_percent": -1.9844020797227024,
+      "drift_limit_percent": 5.0,
+      "first_lane": "normal-r1",
+      "first_peak_rss_kib": 138480,
+      "scope": "same-build whole-child GNU time RSS for the native normal lanes; no candidate or operation-local RSS claim",
+      "second_lane": "normal-r2",
+      "second_peak_rss_kib": 135732
+    }
+  },
+  "negative_vectors": {
+    "corrupt_elapsed_vector_rejected": true,
+    "short_elapsed_vector_rejected": true,
+    "short_operation_vector_rejected": true
+  },
+  "performance_claim": "none",
+  "profiles": {
+    "annotations": {
+      "commit-r1": {
+        "annotations": {
+          "exclusive": {
+            "profile_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0",
+            "sha256": "2cffda06a68fa392cf3675477244be6791039596dd45159e8205e5dee7c4a0ca"
+          },
+          "inclusive": {
+            "profile_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0",
+            "sha256": "8ba91aec0cd5e07135d0aa5f933b61cfdf8fd834c40c003c50bd0636e2823fd9"
+          }
+        },
+        "independent_block_replay_verified": true,
+        "instrumented_rss_excluded": true,
+        "raw_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0"
+      },
+      "commit-r2": {
+        "annotations": {
+          "exclusive": {
+            "profile_sha256": "39d99ba46efd2eb2f5217a59a345ac55373d7993fb11d0a3284ba3842707073e",
+            "sha256": "641261442c6cb2183bd22af2b1da5d1d61e18f42135ea199cb786403f897e98d"
+          },
+          "inclusive": {
+            "profile_sha256": "39d99ba46efd2eb2f5217a59a345ac55373d7993fb11d0a3284ba3842707073e",
+            "sha256": "19025510cd34cdeace11246d13775376678ade9a86f7b7379234faff99cc47ac"
+          }
+        },
+        "independent_block_replay_verified": true,
+        "instrumented_rss_excluded": true,
+        "raw_sha256": "39d99ba46efd2eb2f5217a59a345ac55373d7993fb11d0a3284ba3842707073e"
+      },
+      "compact-r1": {
+        "annotations": {
+          "exclusive": {
+            "profile_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6",
+            "sha256": "2ee2a0a3aadbe7c41ffa4c0f811ad56a1e6c7d3fb5dce77e7d91cbe5a25a4583"
+          },
+          "inclusive": {
+            "profile_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6",
+            "sha256": "1b89700c1d8bfbb4432c77357a76e4e5ceda513aa1751f6c94f09c5b4c4e2ddd"
+          }
+        },
+        "independent_block_replay_verified": true,
+        "instrumented_rss_excluded": true,
+        "raw_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6"
+      },
+      "compact-r2": {
+        "annotations": {
+          "exclusive": {
+            "profile_sha256": "c66a7b60c9640f78522220592052eac30693ce9729e7d6f5428f42ee6e0fc951",
+            "sha256": "1411165c0ff1526ea3c07419368f943fca278d2c62f3f7c173ffd8ae727465d7"
+          },
+          "inclusive": {
+            "profile_sha256": "c66a7b60c9640f78522220592052eac30693ce9729e7d6f5428f42ee6e0fc951",
+            "sha256": "faafc5b3629b833139a18ac2b749f890613461abda44e94f2aa693857679f590"
+          }
+        },
+        "independent_block_replay_verified": true,
+        "instrumented_rss_excluded": true,
+        "raw_sha256": "c66a7b60c9640f78522220592052eac30693ce9729e7d6f5428f42ee6e0fc951"
+      }
+    },
+    "attribution": {
+      "analyzer_sha256": "465e574da2854bce539f76f6c5c8c0665a1572fe9864339622eaf016e007f381",
+      "summary": {
+        "claim_authorized": false,
+        "performance_claim": "none",
+        "profile_lanes": [
+          "commit-r1",
+          "commit-r2",
+          "compact-r1",
+          "compact-r2"
+        ],
+        "profiles": {
+          "commit-r1": {
+            "eager_parser_attribution": {
+              "direct_children": {
+                "children": {
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+                    "annotated_ir": 954662998,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      8.02
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 954662998,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::worksheet::semantic::materialize": {
+                    "annotated_ir": 244645456,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      2.05
+                    ],
+                    "calls": 393216,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::semantic::materialize'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 244645456,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::resolve_event": {
+                    "annotated_ir": 227733072,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.91
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::resolve_event'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 227733072,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::set_level": {
+                    "annotated_ir": 16547784,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.14
+                    ],
+                    "calls": 787986,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::set_level'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 16547784,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::Reader<R>::read_event_impl": {
+                    "annotated_ir": 579317679,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      4.86
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::Reader<R>::read_event_impl'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 579317679,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event": {
+                    "annotated_ir": 226209740,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.9
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::ns_reader::NsReader<R>::process_event'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 226209740,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  }
+                },
+                "direct_child_names": [
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start",
+                  "litchi_xlsx::raw::worksheet::semantic::materialize",
+                  "quick_xml::name::NamespaceResolver::resolve_event",
+                  "quick_xml::name::NamespaceResolver::set_level",
+                  "quick_xml::reader::Reader<R>::read_event_impl",
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+                ],
+                "scope": "Positive direct child edges under the selected parent context; raw zero-call metadata retained but excluded from measured totals"
+              },
+              "retained_children": {
+                "children": [
+                  "quick_xml::name::NamespaceResolver::resolve_event",
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start",
+                  "litchi_xlsx::raw::worksheet::semantic::materialize"
+                ],
+                "details": {
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+                    "annotated_ir": 954662998,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      8.02
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 954662998,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::worksheet::semantic::materialize": {
+                    "annotated_ir": 244645456,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      2.05
+                    ],
+                    "calls": 393216,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::semantic::materialize'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 244645456,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::resolve_event": {
+                    "annotated_ir": 227733072,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.91
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::resolve_event'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 227733072,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  }
+                },
+                "scope": "Direct parser children retained in the profile; no removal attribution is inferred"
+              },
+              "shared_reader_candidate_ceiling": {
+                "annotated_ir": 822075203,
+                "children": [
+                  "quick_xml::reader::Reader<R>::read_event_impl",
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                  "quick_xml::name::NamespaceResolver::set_level"
+                ],
+                "interpretation": "Upper-bound arithmetic over disjoint reader/resolver direct children; diagnostic only and not a speedup claim",
+                "percent_of_commit_profile": 6.9,
+                "raw_ir": 822075203
+              }
+            },
+            "exclusive_sha256": "2cffda06a68fa392cf3675477244be6791039596dd45159e8205e5dee7c4a0ca",
+            "inclusive_sha256": "8ba91aec0cd5e07135d0aa5f933b61cfdf8fd834c40c003c50bd0636e2823fd9",
+            "mode": "commit-separate-callers-3",
+            "parse_attribution": {
+              "changed_output_parse": {
+                "annotated_calls": 6,
+                "annotated_edge_count": 1,
+                "annotated_edges": [
+                  {
+                    "calls": 6,
+                    "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config",
+                    "inclusive_ir": 3069117648,
+                    "inclusive_percent": 25.77,
+                    "parent_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config'litchi_perf_baseline::run"
+                  }
+                ],
+                "annotated_ir": 3069117648,
+                "annotated_record_count": 1,
+                "child": "litchi_xlsx::raw::worksheet::parse",
+                "expected_calls": 6,
+                "parent": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                "raw_calls": 6,
+                "raw_edge_count": 1,
+                "raw_ir": 3069117648,
+                "raw_record_count": 1,
+                "raw_zero_call_ir": 0
+              },
+              "context_pairs": [
+                {
+                  "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config",
+                  "parent": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                },
+                {
+                  "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::model::Worksheet::store'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit",
+                  "parent": "litchi_xlsx::workbook::model::Worksheet::store"
+                }
+              ],
+              "direct_parent_set": [
+                "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                "litchi_xlsx::workbook::model::Worksheet::store"
+              ],
+              "scope": "Direct worksheet parse edges only: Edit::commit is changed output and Worksheet::store is source Store; no inclusive root or readback aggregation",
+              "source_store_parse": {
+                "annotated_calls": 6,
+                "annotated_edge_count": 1,
+                "annotated_edges": [
+                  {
+                    "calls": 6,
+                    "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::model::Worksheet::store'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit",
+                    "inclusive_ir": 3070712898,
+                    "inclusive_percent": 25.79,
+                    "parent_context": "litchi_xlsx::workbook::model::Worksheet::store'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config"
+                  }
+                ],
+                "annotated_ir": 3070712898,
+                "annotated_record_count": 1,
+                "child": "litchi_xlsx::raw::worksheet::parse",
+                "expected_calls": 6,
+                "parent": "litchi_xlsx::workbook::model::Worksheet::store",
+                "raw_calls": 6,
+                "raw_edge_count": 1,
+                "raw_ir": 3070712898,
+                "raw_record_count": 1,
+                "raw_zero_call_ir": 0
+              }
+            },
+            "raw_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0",
+            "runner_to_commit": {
+              "annotated_calls": 3,
+              "annotated_edge_count": 1,
+              "annotated_edges": [
+                {
+                  "calls": 3,
+                  "child_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config'litchi_perf_baseline::run",
+                  "inclusive_ir": 11908886205,
+                  "inclusive_percent": 100.0,
+                  "parent_context": "litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config'litchi_perf_baseline::run'litchi_perf_baseline::main"
+                }
+              ],
+              "annotated_ir": 11908886205,
+              "annotated_record_count": 1,
+              "child": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+              "expected_calls": 3,
+              "parent": "litchi_perf_baseline::run_xlsx_update_commit",
+              "raw_calls": 3,
+              "raw_edge_count": 1,
+              "raw_ir": 11908886205,
+              "raw_record_count": 1,
+              "raw_zero_call_ir": 0
+            },
+            "summary_ir": 11908886205
+          },
+          "commit-r2": {
+            "eager_parser_attribution": {
+              "direct_children": {
+                "children": {
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+                    "annotated_ir": 954665928,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      8.02
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 954665928,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::worksheet::semantic::materialize": {
+                    "annotated_ir": 244651489,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      2.05
+                    ],
+                    "calls": 393216,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::semantic::materialize'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 244651489,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::resolve_event": {
+                    "annotated_ir": 227733072,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.91
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::resolve_event'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 227733072,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::set_level": {
+                    "annotated_ir": 16547784,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.14
+                    ],
+                    "calls": 787986,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::set_level'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 16547784,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::Reader<R>::read_event_impl": {
+                    "annotated_ir": 579317340,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      4.86
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::Reader<R>::read_event_impl'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 579317340,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event": {
+                    "annotated_ir": 226209490,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.9
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::ns_reader::NsReader<R>::process_event'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 226209490,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  }
+                },
+                "direct_child_names": [
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start",
+                  "litchi_xlsx::raw::worksheet::semantic::materialize",
+                  "quick_xml::name::NamespaceResolver::resolve_event",
+                  "quick_xml::name::NamespaceResolver::set_level",
+                  "quick_xml::reader::Reader<R>::read_event_impl",
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+                ],
+                "scope": "Positive direct child edges under the selected parent context; raw zero-call metadata retained but excluded from measured totals"
+              },
+              "retained_children": {
+                "children": [
+                  "quick_xml::name::NamespaceResolver::resolve_event",
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start",
+                  "litchi_xlsx::raw::worksheet::semantic::materialize"
+                ],
+                "details": {
+                  "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+                    "annotated_ir": 954665928,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      8.02
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 954665928,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::worksheet::semantic::materialize": {
+                    "annotated_ir": 244651489,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      2.05
+                    ],
+                    "calls": 393216,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::worksheet::semantic::materialize'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 244651489,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::resolve_event": {
+                    "annotated_ir": 227733072,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.91
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::resolve_event'litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse'litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit"
+                    ],
+                    "raw_ir": 227733072,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  }
+                },
+                "scope": "Direct parser children retained in the profile; no removal attribution is inferred"
+              },
+              "shared_reader_candidate_ceiling": {
+                "annotated_ir": 822074614,
+                "children": [
+                  "quick_xml::reader::Reader<R>::read_event_impl",
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                  "quick_xml::name::NamespaceResolver::set_level"
+                ],
+                "interpretation": "Upper-bound arithmetic over disjoint reader/resolver direct children; diagnostic only and not a speedup claim",
+                "percent_of_commit_profile": 6.9,
+                "raw_ir": 822074614
+              }
+            },
+            "exclusive_sha256": "641261442c6cb2183bd22af2b1da5d1d61e18f42135ea199cb786403f897e98d",
+            "inclusive_sha256": "19025510cd34cdeace11246d13775376678ade9a86f7b7379234faff99cc47ac",
+            "mode": "commit-separate-callers-3",
+            "parse_attribution": {
+              "changed_output_parse": {
+                "annotated_calls": 6,
+                "annotated_edge_count": 1,
+                "annotated_edges": [
+                  {
+                    "calls": 6,
+                    "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config",
+                    "inclusive_ir": 3069401244,
+                    "inclusive_percent": 25.78,
+                    "parent_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config'litchi_perf_baseline::run"
+                  }
+                ],
+                "annotated_ir": 3069401244,
+                "annotated_record_count": 1,
+                "child": "litchi_xlsx::raw::worksheet::parse",
+                "expected_calls": 6,
+                "parent": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                "raw_calls": 6,
+                "raw_edge_count": 1,
+                "raw_ir": 3069401244,
+                "raw_record_count": 1,
+                "raw_zero_call_ir": 0
+              },
+              "context_pairs": [
+                {
+                  "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config",
+                  "parent": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                },
+                {
+                  "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::model::Worksheet::store'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit",
+                  "parent": "litchi_xlsx::workbook::model::Worksheet::store"
+                }
+              ],
+              "direct_parent_set": [
+                "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                "litchi_xlsx::workbook::model::Worksheet::store"
+              ],
+              "scope": "Direct worksheet parse edges only: Edit::commit is changed output and Worksheet::store is source Store; no inclusive root or readback aggregation",
+              "source_store_parse": {
+                "annotated_calls": 6,
+                "annotated_edge_count": 1,
+                "annotated_edges": [
+                  {
+                    "calls": 6,
+                    "child_context": "litchi_xlsx::raw::worksheet::parse'litchi_xlsx::workbook::model::Worksheet::store'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit",
+                    "inclusive_ir": 3069288836,
+                    "inclusive_percent": 25.78,
+                    "parent_context": "litchi_xlsx::workbook::model::Worksheet::store'litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config"
+                  }
+                ],
+                "annotated_ir": 3069288836,
+                "annotated_record_count": 1,
+                "child": "litchi_xlsx::raw::worksheet::parse",
+                "expected_calls": 6,
+                "parent": "litchi_xlsx::workbook::model::Worksheet::store",
+                "raw_calls": 6,
+                "raw_edge_count": 1,
+                "raw_ir": 3069288836,
+                "raw_record_count": 1,
+                "raw_zero_call_ir": 0
+              }
+            },
+            "raw_sha256": "39d99ba46efd2eb2f5217a59a345ac55373d7993fb11d0a3284ba3842707073e",
+            "runner_to_commit": {
+              "annotated_calls": 3,
+              "annotated_edge_count": 1,
+              "annotated_edges": [
+                {
+                  "calls": 3,
+                  "child_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit'litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config'litchi_perf_baseline::run",
+                  "inclusive_ir": 11907930477,
+                  "inclusive_percent": 100.0,
+                  "parent_context": "litchi_perf_baseline::run_xlsx_update_commit'litchi_perf_baseline::run_case_with_config'litchi_perf_baseline::run'litchi_perf_baseline::main"
+                }
+              ],
+              "annotated_ir": 11907930477,
+              "annotated_record_count": 1,
+              "child": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+              "expected_calls": 3,
+              "parent": "litchi_perf_baseline::run_xlsx_update_commit",
+              "raw_calls": 3,
+              "raw_edge_count": 1,
+              "raw_ir": 11907930477,
+              "raw_record_count": 1,
+              "raw_zero_call_ir": 0
+            },
+            "summary_ir": 11907930477
+          },
+          "compact-r1": {
+            "compaction": {
+              "changed_worksheet": {
+                "annotated_calls": 6,
+                "annotated_edge_count": 1,
+                "annotated_edges": [
+                  {
+                    "calls": 6,
+                    "child_context": "litchi_xlsx::raw::compact::changed_worksheet",
+                    "inclusive_ir": 2426404049,
+                    "inclusive_percent": 100.0,
+                    "parent_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                  }
+                ],
+                "annotated_ir": 2426404049,
+                "annotated_record_count": 1,
+                "child": "litchi_xlsx::raw::compact::changed_worksheet",
+                "expected_calls": 6,
+                "parent": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                "raw_calls": 6,
+                "raw_edge_count": 1,
+                "raw_ir": 2426404049,
+                "raw_record_count": 1,
+                "raw_zero_call_ir": 0
+              },
+              "scope": "Direct changed_worksheet edges under Edit::commit only; six calls are two changed sheets across three commits"
+            },
+            "compaction_children_attribution": {
+              "direct_children": {
+                "children": {
+                  "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": {
+                    "annotated_ir": 183798702,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      7.57
+                    ],
+                    "calls": 1182738,
+                    "child_contexts": [
+                      "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 183798702,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "<quick_xml::name::NamespaceResolver as core::default::Default>::default": {
+                    "annotated_ir": 9309,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 9309,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "__rustc::__rust_dealloc": {
+                    "annotated_ir": 13816740,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.57
+                    ],
+                    "calls": 394764,
+                    "child_contexts": [
+                      "__rustc::__rust_dealloc"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 13816740,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "alloc::raw_vec::RawVec<T,A>::grow_one": {
+                    "annotated_ir": 606,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "alloc::raw_vec::RawVec<T,A>::grow_one"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 606,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "alloc::raw_vec::RawVecInner<A>::finish_grow": {
+                    "annotated_ir": 18563,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "alloc::raw_vec::RawVecInner<A>::finish_grow"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 18563,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "core::ptr::drop_in_place<quick_xml::events::Event>": {
+                    "annotated_ir": 24,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "core::ptr::drop_in_place<quick_xml::events::Event>"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 24,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": {
+                    "annotated_ir": 3363,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 3363,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "core::str::converts::from_utf8": {
+                    "annotated_ir": 30092136,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.24
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "core::str::converts::from_utf8"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 30092136,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::compact::text_bearing": {
+                    "annotated_ir": 12205212,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.5
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::compact::text_bearing"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 12205212,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::compact::write_start": {
+                    "annotated_ir": 607008921,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      25.02
+                    ],
+                    "calls": 787986,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::compact::write_start"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 607008921,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::web::check::Probe::observe": {
+                    "annotated_ir": 465489606,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      19.18
+                    ],
+                    "calls": 1969188,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::web::check::Probe::observe"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 465489606,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": {
+                    "annotated_ir": 30747060,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.27
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 30747060,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::set_level": {
+                    "annotated_ir": 16547784,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.68
+                    ],
+                    "calls": 787986,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::set_level"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 16547784,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::Reader<R>::read_event_impl": {
+                    "annotated_ir": 579317197,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      23.88
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::Reader<R>::read_event_impl"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 579317197,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event": {
+                    "annotated_ir": 226209164,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      9.32
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 226209164,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::writer::Writer<W>::write_event": {
+                    "annotated_ir": 90967146,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      3.75
+                    ],
+                    "calls": 1181202,
+                    "child_contexts": [
+                      "quick_xml::writer::Writer<W>::write_event"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 90967146,
+                    "raw_record_count": 3,
+                    "raw_zero_call_ir": 0
+                  }
+                },
+                "direct_child_names": [
+                  "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+                  "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                  "__rustc::__rust_dealloc",
+                  "alloc::raw_vec::RawVec<T,A>::grow_one",
+                  "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "core::ptr::drop_in_place<quick_xml::events::Event>",
+                  "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+                  "core::str::converts::from_utf8",
+                  "litchi_xlsx::raw::compact::text_bearing",
+                  "litchi_xlsx::raw::compact::write_start",
+                  "litchi_xlsx::raw::web::check::Probe::observe",
+                  "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                  "quick_xml::name::NamespaceResolver::set_level",
+                  "quick_xml::reader::Reader<R>::read_event_impl",
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                  "quick_xml::writer::Writer<W>::write_event"
+                ],
+                "scope": "Positive direct child edges under the selected parent context; raw zero-call metadata retained but excluded from measured totals"
+              },
+              "scope": "All positive direct children of changed_worksheet in the compaction-only profile; no worksheet parse or readback work is included"
+            },
+            "exclusive_sha256": "2ee2a0a3aadbe7c41ffa4c0f811ad56a1e6c7d3fb5dce77e7d91cbe5a25a4583",
+            "inclusive_sha256": "1b89700c1d8bfbb4432c77357a76e4e5ceda513aa1751f6c94f09c5b4c4e2ddd",
+            "mode": "compaction",
+            "raw_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6",
+            "runner_to_commit": {
+              "annotated_calls": 3,
+              "annotated_edge_count": 1,
+              "annotated_edges": [
+                {
+                  "calls": 3,
+                  "child_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                  "inclusive_ir": 2426404049,
+                  "inclusive_percent": 100.0,
+                  "parent_context": "litchi_perf_baseline::run_xlsx_update_commit"
+                }
+              ],
+              "annotated_ir": 2426404049,
+              "annotated_record_count": 1,
+              "child": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+              "expected_calls": 3,
+              "parent": "litchi_perf_baseline::run_xlsx_update_commit",
+              "raw_calls": 3,
+              "raw_edge_count": 1,
+              "raw_ir": 2426404049,
+              "raw_record_count": 1,
+              "raw_zero_call_ir": 0
+            },
+            "summary_ir": 2426404049
+          },
+          "compact-r2": {
+            "compaction": {
+              "changed_worksheet": {
+                "annotated_calls": 6,
+                "annotated_edge_count": 1,
+                "annotated_edges": [
+                  {
+                    "calls": 6,
+                    "child_context": "litchi_xlsx::raw::compact::changed_worksheet",
+                    "inclusive_ir": 2426404144,
+                    "inclusive_percent": 100.0,
+                    "parent_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit"
+                  }
+                ],
+                "annotated_ir": 2426404144,
+                "annotated_record_count": 1,
+                "child": "litchi_xlsx::raw::compact::changed_worksheet",
+                "expected_calls": 6,
+                "parent": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                "raw_calls": 6,
+                "raw_edge_count": 1,
+                "raw_ir": 2426404144,
+                "raw_record_count": 1,
+                "raw_zero_call_ir": 0
+              },
+              "scope": "Direct changed_worksheet edges under Edit::commit only; six calls are two changed sheets across three commits"
+            },
+            "compaction_children_attribution": {
+              "direct_children": {
+                "children": {
+                  "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": {
+                    "annotated_ir": 183798702,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      7.57
+                    ],
+                    "calls": 1182738,
+                    "child_contexts": [
+                      "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 183798702,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "<quick_xml::name::NamespaceResolver as core::default::Default>::default": {
+                    "annotated_ir": 9468,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "<quick_xml::name::NamespaceResolver as core::default::Default>::default"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 9468,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "__rustc::__rust_dealloc": {
+                    "annotated_ir": 13816740,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.57
+                    ],
+                    "calls": 394764,
+                    "child_contexts": [
+                      "__rustc::__rust_dealloc"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 13816740,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "alloc::raw_vec::RawVec<T,A>::grow_one": {
+                    "annotated_ir": 606,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "alloc::raw_vec::RawVec<T,A>::grow_one"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 606,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "alloc::raw_vec::RawVecInner<A>::finish_grow": {
+                    "annotated_ir": 18876,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "alloc::raw_vec::RawVecInner<A>::finish_grow"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 18876,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "core::ptr::drop_in_place<quick_xml::events::Event>": {
+                    "annotated_ir": 24,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "core::ptr::drop_in_place<quick_xml::events::Event>"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 24,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": {
+                    "annotated_ir": 3422,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.0
+                    ],
+                    "calls": 6,
+                    "child_contexts": [
+                      "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 3422,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "core::str::converts::from_utf8": {
+                    "annotated_ir": 30092136,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.24
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "core::str::converts::from_utf8"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 30092136,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::compact::text_bearing": {
+                    "annotated_ir": 12205212,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.5
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::compact::text_bearing"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 12205212,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::compact::write_start": {
+                    "annotated_ir": 607009111,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      25.02
+                    ],
+                    "calls": 787986,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::compact::write_start"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 607009111,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "litchi_xlsx::raw::web::check::Probe::observe": {
+                    "annotated_ir": 465489606,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      19.18
+                    ],
+                    "calls": 1969188,
+                    "child_contexts": [
+                      "litchi_xlsx::raw::web::check::Probe::observe"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 465489606,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": {
+                    "annotated_ir": 30747060,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      1.27
+                    ],
+                    "calls": 787980,
+                    "child_contexts": [
+                      "memchr::arch::x86_64::memchr::memchr_raw::find_avx2"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 30747060,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::name::NamespaceResolver::set_level": {
+                    "annotated_ir": 16547784,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      0.68
+                    ],
+                    "calls": 787986,
+                    "child_contexts": [
+                      "quick_xml::name::NamespaceResolver::set_level"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 16547784,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::Reader<R>::read_event_impl": {
+                    "annotated_ir": 579316373,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      23.88
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::Reader<R>::read_event_impl"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 579316373,
+                    "raw_record_count": 2,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event": {
+                    "annotated_ir": 226209362,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      9.32
+                    ],
+                    "calls": 1969194,
+                    "child_contexts": [
+                      "quick_xml::reader::ns_reader::NsReader<R>::process_event"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 226209362,
+                    "raw_record_count": 1,
+                    "raw_zero_call_ir": 0
+                  },
+                  "quick_xml::writer::Writer<W>::write_event": {
+                    "annotated_ir": 90967146,
+                    "annotated_record_count": 1,
+                    "annotation_percent": [
+                      3.75
+                    ],
+                    "calls": 1181202,
+                    "child_contexts": [
+                      "quick_xml::writer::Writer<W>::write_event"
+                    ],
+                    "parent_contexts": [
+                      "litchi_xlsx::raw::compact::changed_worksheet"
+                    ],
+                    "raw_ir": 90967146,
+                    "raw_record_count": 3,
+                    "raw_zero_call_ir": 0
+                  }
+                },
+                "direct_child_names": [
+                  "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next",
+                  "<quick_xml::name::NamespaceResolver as core::default::Default>::default",
+                  "__rustc::__rust_dealloc",
+                  "alloc::raw_vec::RawVec<T,A>::grow_one",
+                  "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "core::ptr::drop_in_place<quick_xml::events::Event>",
+                  "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>",
+                  "core::str::converts::from_utf8",
+                  "litchi_xlsx::raw::compact::text_bearing",
+                  "litchi_xlsx::raw::compact::write_start",
+                  "litchi_xlsx::raw::web::check::Probe::observe",
+                  "memchr::arch::x86_64::memchr::memchr_raw::find_avx2",
+                  "quick_xml::name::NamespaceResolver::set_level",
+                  "quick_xml::reader::Reader<R>::read_event_impl",
+                  "quick_xml::reader::ns_reader::NsReader<R>::process_event",
+                  "quick_xml::writer::Writer<W>::write_event"
+                ],
+                "scope": "Positive direct child edges under the selected parent context; raw zero-call metadata retained but excluded from measured totals"
+              },
+              "scope": "All positive direct children of changed_worksheet in the compaction-only profile; no worksheet parse or readback work is included"
+            },
+            "exclusive_sha256": "1411165c0ff1526ea3c07419368f943fca278d2c62f3f7c173ffd8ae727465d7",
+            "inclusive_sha256": "faafc5b3629b833139a18ac2b749f890613461abda44e94f2aa693857679f590",
+            "mode": "compaction",
+            "raw_sha256": "c66a7b60c9640f78522220592052eac30693ce9729e7d6f5428f42ee6e0fc951",
+            "runner_to_commit": {
+              "annotated_calls": 3,
+              "annotated_edge_count": 1,
+              "annotated_edges": [
+                {
+                  "calls": 3,
+                  "child_context": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+                  "inclusive_ir": 2426404144,
+                  "inclusive_percent": 100.0,
+                  "parent_context": "litchi_perf_baseline::run_xlsx_update_commit"
+                }
+              ],
+              "annotated_ir": 2426404144,
+              "annotated_record_count": 1,
+              "child": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+              "expected_calls": 3,
+              "parent": "litchi_perf_baseline::run_xlsx_update_commit",
+              "raw_calls": 3,
+              "raw_edge_count": 1,
+              "raw_ir": 2426404144,
+              "raw_record_count": 1,
+              "raw_zero_call_ir": 0
+            },
+            "summary_ir": 2426404144
+          }
+        },
+        "proof": {
+          "context_separated": true,
+          "exact_changed_output_parse_calls_per_commit_profile": 6,
+          "exact_changed_worksheet_calls_per_compaction_profile": 6,
+          "exact_commit_calls_per_profile": 3,
+          "exact_source_store_parse_calls_per_commit_profile": 6,
+          "inclusive_rows_not_summed": true,
+          "readback_and_root_work_excluded": true,
+          "shared_reader_candidate_ceiling_ir_by_repeat": {
+            "commit-r1": 822075203,
+            "commit-r2": 822074614
+          },
+          "shared_reader_candidate_ceiling_repeat_delta_ir": -589,
+          "shared_reader_candidate_ceiling_repeat_delta_scope": "Same-build Callgrind repeat drift; per-profile raw and annotation costs still agree exactly"
+        },
+        "schema": "litchi-0515-attribution-v1",
+        "scope": "Diagnostic simulated-instruction attribution from four Callgrind profiles; direct selected edges only, no latency, RSS, allocation, hardware, or speedup claim"
+      },
+      "summary_sha256": "f5f4a55115fdb530e265122419d90606d088c311616ca73dc589ff59eca77b8d"
+    },
+    "instrumented_elapsed_and_rss_excluded": true,
+    "lanes": [
+      "commit-r1",
+      "commit-r2",
+      "compact-r1",
+      "compact-r2"
+    ],
+    "rows_per_lane": 1,
+    "samples_per_lane": 3,
+    "total_diagnostic_iterations": 12,
+    "warmups_per_lane": 0
+  },
+  "replay": {
+    "executable_not_required_for_replay": true,
+    "owned_scratch": "/tmp/litchi-goal-0515",
+    "retained_binary_hashes_used": true
+  },
+  "report_catalog_bindings_verified": true,
+  "schema": "litchi-0515-verification-v1"
+}

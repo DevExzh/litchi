@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0515/verify.py"
+  ],
+  "started_utc": "2026-09-11T23:27:20.495104+00:00",
+  "elapsed_seconds": 9.06598792499426,
+  "exit_code": 0,
+  "stderr": "",
+  "summary_sha256": "fc3f0e95b1cacd7940308b885bede3f53025507d559778a4756f8663f4b3931a",
+  "verifier_sha256": "f6d6288b814fded7d0581844c880c7209931c91a30a613ad644ee930b0f44313",
+  "analyzer_sha256": "465e574da2854bce539f76f6c5c8c0665a1572fe9864339622eaf016e007f381",
+  "owned_scratch_present": true
+}

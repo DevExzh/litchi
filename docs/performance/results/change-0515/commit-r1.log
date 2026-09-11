@@ -1,0 +1,37 @@
+==2946092== Callgrind, a call-graph generating cache profiler
+==2946092== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==2946092== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==2946092== Command: /tmp/litchi-goal-0515/target/release/litchi-perf-baseline --case xlsx_one_percent_commit --xlsx-shape dense-wide --samples 3 --warmup 0 --json /home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1-report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1-catalog.json
+==2946092== 
+==2946092== For interactive control, run 'callgrind_control -h'.
+==2946092== brk segment overflow in thread #1: can't grow to 0x7921000
+==2946092== (see section Limitations in user manual)
+==2946092== NOTE: further instances of this message will not be shown
+==2946092== 
+==2946092== Events    : Ir
+==2946092== Collected : 11908886205
+==2946092== 
+==2946092== I   refs:      11,908,886,205
+	Command being timed: "taskset -c 2 valgrind --tool=callgrind --collect-atstart=no --toggle-collect=*litchi_xlsx::workbook::edit::semantic::transaction::Edit*::commit --zero-before=*litchi_perf_baseline::run_xlsx_update_commit --separate-callers=3 --callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1.out /tmp/litchi-goal-0515/target/release/litchi-perf-baseline --case xlsx_one_percent_commit --xlsx-shape dense-wide --samples 3 --warmup 0 --json /home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1-report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1-catalog.json"
+	User time (seconds): 67.91
+	System time (seconds): 0.26
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:08.18
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 250260
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 116630
+	Voluntary context switches: 35
+	Involuntary context switches: 841
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 1264
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

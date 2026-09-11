@@ -1,0 +1,42 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*litchi_xlsx::workbook::edit::semantic::transaction::Edit*::commit",
+    "--zero-before=*litchi_perf_baseline::run_xlsx_update_commit",
+    "--separate-callers=3",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1.out",
+    "/tmp/litchi-goal-0515/target/release/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_percent_commit",
+    "--xlsx-shape",
+    "dense-wide",
+    "--samples",
+    "3",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1-catalog.json"
+  ],
+  "started_utc": "2026-09-11T23:08:41.813357+00:00",
+  "elapsed_seconds": 68.18460852199496,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "4d5193b285544315399425800903a669700f7bfba5b4f51645df289525bc3106",
+  "scope": "Three commit bodies only, reset at runner entry; three caller contexts distinguish changed-output parser from source Store parser. Setup, readback, save and drops excluded.",
+  "artifacts": {
+    "commit-r1-report.json": "4a29c2d0c38bda92fa2de4f7d8ce8f758dbc9c1b89a966266c64966aa429dacd",
+    "commit-r1-catalog.json": "77ac211697106d33f5525c9da7c3dd8b275df8a8382a54d4b7d97b4dd624f893",
+    "commit-r1.log": "db113dbe025d0fb77a67e2adc1b9dd332595c74586045530b141c3c2a3a955fd",
+    "commit-r1.out": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0"
+  }
+}

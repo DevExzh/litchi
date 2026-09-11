@@ -1,0 +1,158 @@
+{
+  "replayed_utc": "2026-09-11T23:17:09.390440+00:00",
+  "comparison": "Complete function blocks and all incoming/outgoing rows match, ignoring equal-cost display order from Perl hash iteration; fresh bytes may differ",
+  "annotations": [
+    {
+      "raw": "commit-r1.out",
+      "raw_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0",
+      "annotation": "commit-r1-exclusive.txt",
+      "annotation_sha256": "2cffda06a68fa392cf3675477244be6791039596dd45159e8205e5dee7c4a0ca",
+      "fresh_render_sha256": "f1e0670aba8ff25d926de8d8b3ba9f4cb4016f0f1ea7758cc058e82c69415bd9",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=no",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": false,
+      "function_blocks_and_edges_identical": true
+    },
+    {
+      "raw": "commit-r1.out",
+      "raw_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0",
+      "annotation": "commit-r1-inclusive.txt",
+      "annotation_sha256": "8ba91aec0cd5e07135d0aa5f933b61cfdf8fd834c40c003c50bd0636e2823fd9",
+      "fresh_render_sha256": "527d0ac71da0664e44dd3e23c6ebe67bcadc9f98b75573970860060068706998",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=yes",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": false,
+      "function_blocks_and_edges_identical": true
+    },
+    {
+      "raw": "commit-r2.out",
+      "raw_sha256": "39d99ba46efd2eb2f5217a59a345ac55373d7993fb11d0a3284ba3842707073e",
+      "annotation": "commit-r2-exclusive.txt",
+      "annotation_sha256": "641261442c6cb2183bd22af2b1da5d1d61e18f42135ea199cb786403f897e98d",
+      "fresh_render_sha256": "ac921d6168721f1990f2618cc33c9f26994ea58aefa121449ea8628f421e147c",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=no",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r2.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": false,
+      "function_blocks_and_edges_identical": true
+    },
+    {
+      "raw": "commit-r2.out",
+      "raw_sha256": "39d99ba46efd2eb2f5217a59a345ac55373d7993fb11d0a3284ba3842707073e",
+      "annotation": "commit-r2-inclusive.txt",
+      "annotation_sha256": "19025510cd34cdeace11246d13775376678ade9a86f7b7379234faff99cc47ac",
+      "fresh_render_sha256": "6ef69e781341b05d1950af3a9a953ebcfdff40b606580b2d56c96a5c7d9c6823",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=yes",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r2.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": false,
+      "function_blocks_and_edges_identical": true
+    },
+    {
+      "raw": "compact-r1.out",
+      "raw_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6",
+      "annotation": "compact-r1-exclusive.txt",
+      "annotation_sha256": "2ee2a0a3aadbe7c41ffa4c0f811ad56a1e6c7d3fb5dce77e7d91cbe5a25a4583",
+      "fresh_render_sha256": "0b842f0c9e7869e18baa9e05935bdf55f74515fe41cbff1df35600824f896a37",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=no",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r1.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": false,
+      "function_blocks_and_edges_identical": true
+    },
+    {
+      "raw": "compact-r1.out",
+      "raw_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6",
+      "annotation": "compact-r1-inclusive.txt",
+      "annotation_sha256": "1b89700c1d8bfbb4432c77357a76e4e5ceda513aa1751f6c94f09c5b4c4e2ddd",
+      "fresh_render_sha256": "46988c64ab14b24e7efd978f954bb65cfc91b59c41c515bf75e319217f3cf151",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=yes",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r1.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": false,
+      "function_blocks_and_edges_identical": true
+    },
+    {
+      "raw": "compact-r2.out",
+      "raw_sha256": "c66a7b60c9640f78522220592052eac30693ce9729e7d6f5428f42ee6e0fc951",
+      "annotation": "compact-r2-exclusive.txt",
+      "annotation_sha256": "1411165c0ff1526ea3c07419368f943fca278d2c62f3f7c173ffd8ae727465d7",
+      "fresh_render_sha256": "2b6f3285337330c57557bec6e813366a524da488f4aa06a1df6a9bfa57cbbd7a",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=no",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r2.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": false,
+      "function_blocks_and_edges_identical": true
+    },
+    {
+      "raw": "compact-r2.out",
+      "raw_sha256": "c66a7b60c9640f78522220592052eac30693ce9729e7d6f5428f42ee6e0fc951",
+      "annotation": "compact-r2-inclusive.txt",
+      "annotation_sha256": "faafc5b3629b833139a18ac2b749f890613461abda44e94f2aa693857679f590",
+      "fresh_render_sha256": "faafc5b3629b833139a18ac2b749f890613461abda44e94f2aa693857679f590",
+      "command": [
+        "callgrind_annotate",
+        "--inclusive=yes",
+        "--tree=both",
+        "--threshold=100",
+        "--auto=no",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r2.out"
+      ],
+      "exit_code": 0,
+      "stderr_empty": true,
+      "byte_identical": true,
+      "function_blocks_and_edges_identical": true
+    }
+  ]
+}

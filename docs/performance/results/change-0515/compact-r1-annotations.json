@@ -1,0 +1,34 @@
+{
+  "exclusive": {
+    "command": [
+      "callgrind_annotate",
+      "--inclusive=no",
+      "--tree=both",
+      "--threshold=100",
+      "--auto=no",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r1.out"
+    ],
+    "started_utc": "2026-09-11T23:10:55.683484+00:00",
+    "exit_code": 0,
+    "stderr": "",
+    "output": "compact-r1-exclusive.txt",
+    "output_sha256": "2ee2a0a3aadbe7c41ffa4c0f811ad56a1e6c7d3fb5dce77e7d91cbe5a25a4583",
+    "profile_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6"
+  },
+  "inclusive": {
+    "command": [
+      "callgrind_annotate",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=100",
+      "--auto=no",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r1.out"
+    ],
+    "started_utc": "2026-09-11T23:10:55.694116+00:00",
+    "exit_code": 0,
+    "stderr": "",
+    "output": "compact-r1-inclusive.txt",
+    "output_sha256": "1b89700c1d8bfbb4432c77357a76e4e5ceda513aa1751f6c94f09c5b4c4e2ddd",
+    "profile_sha256": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6"
+  }
+}

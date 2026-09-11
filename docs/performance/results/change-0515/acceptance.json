@@ -1,0 +1,19 @@
+{
+  "status": "retain_attribution_evidence_only",
+  "decided_utc": "2026-09-11T23:18:01.876108+00:00",
+  "production_changed": false,
+  "harness_changed": false,
+  "performance_claim": "none",
+  "claim_authorized": false,
+  "scope": "Same-source repeated XLSX commit and compaction instruction attribution with native repeatability controls",
+  "decision": "Investigate writer-fed existing semantic parser on effective changed outputs, with emitted-byte equivalence proof and exact-byte fallback. Sharing reader directly targets about 6.9% of commit instruction work; full 25.8% output validation is not removable. Retain semantic, style, web, change-readback and publication checks.",
+  "next_admission": "Fresh matched candidate/control correctness, preservation, cold and warm no-op, changed-output timing and operation allocation/peak evidence; no production candidate accepted by this record",
+  "limitations": [
+    "Only existing owned-source synthetic XLSX commit/save cases are measured",
+    "No new operation-phase allocation or hardware/cache counter/scaling result",
+    "Callgrind brk overflow warnings retained; instrumented timing/RSS excluded",
+    "30 samples per native row are descriptive and below 500 registered latency-claim minimum"
+  ],
+  "program_goal_complete": false,
+  "priority": "OLE2/OOXML until full optimization goal complete; ODF deferred; iWork excluded"
+}
