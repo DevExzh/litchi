@@ -1,0 +1,1 @@
+plain-small input=2305B p50=2.094ms p95=2.109ms p99=2.114ms

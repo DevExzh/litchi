@@ -1,6 +1,7 @@
 //! Drawing-page semantics.
 
 use super::{layer::Layer, shape::Shape};
+use crate::transition::Transition;
 use litchi_core::Position;
 use std::borrow::Cow;
 
@@ -39,6 +40,7 @@ pub struct Page {
     xml_id: Option<String>,
     style_name: Option<String>,
     master_page_name: Option<String>,
+    transition: Option<Transition>,
     layer_set: bool,
     layers: Vec<Layer>,
     shapes: Vec<Shape>,
@@ -51,6 +53,7 @@ impl Page {
             xml_id: None,
             style_name: None,
             master_page_name: None,
+            transition: None,
             layer_set: false,
             layers: Vec::new(),
             shapes: Vec::new(),
@@ -83,12 +86,14 @@ impl Page {
         xml_id: Option<String>,
         style_name: Option<String>,
         master_page_name: Option<String>,
+        transition: Option<Transition>,
     ) -> Self {
         Self {
             name,
             xml_id,
             style_name,
             master_page_name,
+            transition,
             layer_set: false,
             layers: Vec::new(),
             shapes: Vec::new(),
@@ -97,6 +102,14 @@ impl Page {
 
     pub(crate) fn push_layer(&mut self, layer: Layer) {
         self.layers.push(layer);
+    }
+
+    pub(crate) fn set_transition(&mut self, transition: Option<Transition>) {
+        self.transition = transition;
+    }
+
+    pub(crate) fn set_style_name(&mut self, style_name: Option<String>) {
+        self.style_name = style_name;
     }
 
     pub(crate) fn mark_layer_set(&mut self) {
@@ -133,6 +146,19 @@ impl Page {
     #[must_use]
     pub fn master_page_name(&self) -> Option<&str> {
         self.master_page_name.as_deref()
+    }
+
+    /// Returns inert transition metadata inherited from this page's drawing-page style.
+    #[must_use]
+    pub fn transition(&self) -> Option<&Transition> {
+        self.transition.as_ref()
+    }
+
+    /// Sets transition metadata on a detached page before insertion.
+    #[must_use]
+    pub fn with_transition(mut self, transition: Transition) -> Self {
+        self.transition = Some(transition);
+        self
     }
 
     /// Returns page-local layer declarations in source order.
