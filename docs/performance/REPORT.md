@@ -25,7 +25,7 @@ has eight reports and 240 measured samples across plain/media-rich owned and
 warm-file lanes. Media-rich API p50 is 24.297/24.337 ms owned and
 28.588/28.910 ms warm-file across the two repeats.
 
-The final supplementary whole-child profile reports SHA-256 compression at
+The before supplementary whole-child profiles report SHA-256 compression at
 31.01% for owned and 30.08% for warm-file samples; the after profiles report
 27.95% and 26.93%. These profiles include
 broader lifecycle work and have incomplete caller recovery, so they show
@@ -70,7 +70,11 @@ Clippy, fmt, rustdoc, downstream, boundaries, and 38 CRUD static tests.
 Independent strict verification passes. Final cleanup removed 2,154,708,992
 unique-inode allocated bytes and retained eight replay files in local tmpfs:
 two binaries and six raw perf files, including two failed attempts. The full
-non-iWork goal remains open.
+non-iWork goal remains open. The committed `verification-final.json` is a
+historical pass bound to those captured assets; the `/tmp/litchi-goal-0501`
+retention is ephemeral and is absent from the current workspace, so a fresh
+`verify-final.py` replay currently stops with `before: frozen binary is
+missing` before it can revalidate the committed reports.
 
 ## 0500: managed source-backed paragraph batches; matched comparison complete
 

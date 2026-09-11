@@ -1,5 +1,54 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0502 adds bounded ODG metadata but retains large open regressions; the full goal remains open
+
+[0502](changes/0502-odg-metadata-open.md) adds typed ODG transitions and
+auxiliary/enhanced shape metadata, with presence-gated validation, parsed-style
+reuse, and boxed cold metadata. The committed probe evidence is four
+deterministic corpora, two serial repeats, 25 warmups, and 200 samples per
+child: 1,600 samples per phase and 3,200 matched samples in
+[the retained summary](results/change-0502/summary.json). The timing comparison
+is clean HEAD `f3f9221` versus the final working tree; source manifests and all
+raw reports are retained under `results/change-0502/`. The summary was
+recomputed from those reports and matches the retained JSON.
+
+The final p50 changes are +5.903/+6.386% for plain-small, +6.062/+5.949% for
+plain-large, +53.402/+55.215% for metadata-small, and +110.090/+111.136% for
+metadata-large across repeats. The p95/p99 rows show the same direction,
+including +110% metadata-large tails. Boxing reduces `Shape` from the 936-byte
+pre-boxing candidate to 800 bytes, versus 792 bytes at clean HEAD. A separate
+whole-child heaptrack comparison reports peak heap 13.69M to 12.57M with the
+same 174,853,447 allocation calls; its instrumented p50 and RSS are not
+operation-local measurements. Hardware counters were unavailable, so no CPU,
+cache, branch, or IPC conclusion follows. The ODG work is therefore a bounded
+correctness/layout enabler with an explicit regression queue, not an accepted
+end-to-end performance improvement.
+
+| Goal area | 0502 evidence | Audit status and boundary |
+| --- | --- | --- |
+| ODG open and metadata traversal | 3,200 matched samples over plain and metadata corpora | Measured regression; follow-up parser/representation work is required |
+| Layout and allocation shape | `Shape` 792 → 800 bytes; pre-boxing 936; heaptrack peak display −8.2% with unchanged call count | Whole-child/layout evidence only; no allocation or RSS claim for the timed operation |
+| Native producer and semantic correctness | Retained ODG tests include LibreOffice fixture checks and bounded/refusal cases | Correctness evidence only; the probe uses generated packages and does not establish native-producer performance |
+| Full non-iWork goal | No CRUD selector, edit/save, cold/range, concurrent, or scaling timing is added | Open |
+
+## Current audit: 0501 replay evidence remains retained, but its current verifier cannot be replayed
+
+The matched [0501](changes/0501-pptx-exact-payload-comparisons.md) reports,
+catalog checks, and 38 static coverage tests remain present and pass their
+current validators. The committed `verification-final.json` is the historical
+formal custody receipt for the eight before and eight after reports. A fresh
+run of `verify-final.py` is currently unavailable because the frozen before
+executable under `/tmp/litchi-goal-0501` is missing; the replay reports
+`before: frozen binary is missing`. This is a replay/custody limitation, not a
+reason to discard the retained report rows or to describe the historical receipt
+as a new run. The strict claim-registry check currently validates ten claims.
+
+The formal comparison and its 52 favorable flags remain scoped to the named
+PPTX source-backed media/plain workflows; native producer closure, cold and
+physical-I/O behavior, and exhaustive CRUD promotion remain open. The prior
+0501 timing, profile, cleanup, and exact-payload boundaries below continue to
+apply.
+
 ## Current audit: 0501 scopes PPTX payload hashing; the full goal remains open
 
 [0501](changes/0501-pptx-exact-payload-comparisons.md) removes redundant
@@ -241,18 +290,18 @@ increment and 22,859 calls; cold allocator rows retain 607,702 bytes and
 
 | Goal area | Current evidence | Audit status and boundary |
 | --- | --- | --- |
-| Opened-document edit/save | One existing paragraph replacement through commit and sequential publication across six warm providers and verified-cold file input | Baseline coverage is now present; no optimization claim, managed ordinary edit remains a typed refusal, and atomic filesystem save remains open |
+| Opened-document edit/save | One existing paragraph replacement through commit and sequential publication across six warm providers and verified-cold file input | Baseline coverage is present; 0495 subsequently enables the managed path, while this 0494 capture remains descriptive and general atomic filesystem save remains open |
 | Read-only managed provider lifecycle | 0493 synthetic opt-in open/load/text evidence | Accepted as a separate read-only slice; it must not be conflated with 0494 edit/save |
 | Provider and cache boundaries | Owned, instrumented, warm file, short-read, delayed-range, range-control, and verified-cold file cells | Descriptive provider baselines; no provider ranking or warm/cold delta is authorized |
 | Borrowed and independent-producer coverage | No genuine borrowed source and no native producer round trip | Open |
-| Concurrency and scaling | Both 0493 and 0494 use one worker and serial lifecycle execution | Open; bounded multi-worker evidence and Amdahl analysis remain required |
+| Concurrency and scaling | 0493/0494 lifecycle captures are serial; 0498/0499 add bounded low-level Part batches and 0500 adds managed batch comparison | Open; full lifecycle 1/2/4/8 scaling, lock-wait evidence, and Amdahl analysis remain required |
 | Complete non-iWork CRUD checklist | The 0494 path adds no selector or representative-index row | Open; broader format and CRUD rows remain to be evidenced |
 
-The ordinary managed edit boundary is intentional. The current production
-surface refuses before detached ownership could escape its managed reservation;
-0494 therefore does not convert the harness's unmanaged/provider baseline into
-managed production functionality. iWork remains outside this audit while its
-separate work is in progress.
+The ordinary managed edit boundary was intentional at the 0494 revision. The
+0495 follow-up now provides the owner-retained managed capability; 0494 remains
+its descriptive provider/cold baseline and does not itself establish a managed
+before/after speed claim. iWork remains outside this audit while its separate
+work is in progress.
 
 ## Current audit: 0493 production read-ahead is accepted; the full goal remains open
 
@@ -281,9 +330,9 @@ real-network, cold-filesystem, or broad format claim.
 | --- | --- | --- |
 | Explicit caller-supplied range reads | OPC-owned bounded managed window, physical-fill accounting, exact fallback, and DOCX forwarding | Partial completion for the opt-in source-backed path; default behavior remains exact |
 | Read-only content extraction | Fresh synthetic managed DOCX open/load/text lifecycle with strict source, text, cache, physical-trace, and budget oracles | Accepted but narrowly scoped to the pinned in-memory provider and one worker |
-| Opened-document edit/save | Existing narrow DOCX edit evidence remains separate from 0493 | Open; provider/storage and cold/edit/save coverage is the next measured slice |
-| Provider, cold, and producer breadth | No 0493 filesystem-cold, borrowed-lifetime, or independent-producer capture | Open |
-| Bounded concurrency and scaling | 0493 uses one worker and serializes the bounded window | Open; explicit 1/2/4/8-worker evidence and Amdahl analysis remain required |
+| Opened-document edit/save | 0494/0495 add descriptive provider/cold coverage and owner-retained managed edit/save; 0497 adds an atomic logical-tail capability | Partial capability and baseline evidence; broad before/after coverage and general atomic save remain open |
+| Provider, cold, and producer breadth | 0491 and 0494 add explicit provider and verified-cold baselines | Borrowed lifetimes, native producers, and cold intersections across the CRUD matrix remain open |
+| Bounded concurrency and scaling | 0498/0499 provide explicit ordered Part batches; 0500 compares managed batch versus repeated scalar edits | Partial low-level evidence; full lifecycle 1/2/4/8 curves, lock wait, and Amdahl analysis remain open |
 | Complete non-iWork CRUD checklist | No 0493 selector or representative-index promotion | Open; conversion, structural/deletion, cross-document, merge/split, patch, repair, dynamic-content, security, malformed, and broader format rows remain to be evidenced |
 
 The source validation for this batch passed 628 OPC tests, 1,390 DOCX tests,
@@ -293,6 +342,98 @@ integration gates; they do not turn the read-only synthetic slice into
 opened-edit, native-producer, cold-cache, borrowed-lifetime, scaling, or full
 CRUD evidence. iWork remains outside this audit while its separate work is in
 progress.
+
+## Current audit: 0492 measures a range read-ahead enabler; 0493 is the bounded production integration
+
+[0492](changes/0492-docx-bounded-range-read-ahead.md) is a benchmark-only
+4 KiB forward-window experiment over 24 pilot and 480 formal samples. On its
+simulated 1 ms range source, p50 falls from about 20.34 ms to 3.46 ms while
+physical calls fall 19→3 and accepted bytes rise 3,966→5,445 (+37.29%). The
+zero-delay normal p50 changes +4.88%/+0.50%, with a repeat-one p99 increase of
+5.20%; the window allocation is outside the operation allocator region. The
+private mutex and one-worker route are correctness details, not scaling
+evidence. [0493](changes/0493-managed-opc-source-read-ahead.md) carries the
+bounded policy into OPC with explicit InputBytes and Memory accounting; neither
+batch establishes real-network, cold-filesystem, borrowed-lifetime, or broad
+CRUD performance.
+
+## Current audit: 0491 establishes DOCX provider and verified-cold baselines
+
+[0491](changes/0491-docx-provider-and-cold-baseline.md) adds descriptive
+source-provider and filesystem observations: 600 provider samples, 360 fresh
+child filesystem samples, and four prepared-query controls that are explicitly
+cold-ineligible. The simulated 1 ms range arm has roughly 20.3 ms p50 and 19
+calls; local provider medians are roughly 0.27–0.30 ms. Verified-cold p50 is
+2.753/4.361 ms normal across repeats, with 2.724/2.797 ms allocator, and each
+row proves one main-part materialization plus positive process I/O. Repeat
+tails vary materially. Whole-child profiles include setup and report work, so
+they do not attribute operation CPU or RSS. This is a baseline, not a speedup;
+0492/0493 provide the subsequent bounded read-ahead experiment and integration.
+
+## Current audit: 0490 leaves file-store tails unresolved and bounds sync conclusions
+
+[0490](changes/0490-file-store-variance-and-sync-attribution.md) alternates
+retained before/after binaries through six blocks, preserving 72 processes and
+4,320 samples with exact source/output identities. Normal file-store p50 has a
+mean 6.73% reduction with a block-bootstrap interval of −9.71% to −4.41%, but
+normal and allocator p95/p99 intervals span both directions and adverse blocks
+remain. Four sync-only diagnostics attribute 78.99–81.61% of traced median
+operation time to the unchanged `fdatasync`; selected whole-child syscall
+counts match. The derived 1.23–1.27× bound is a scoped Amdahl model, not a
+durability optimization or hardware limit. No production change follows;
+0491 onward supplies the provider/cold work that this follow-up identified.
+
+## Current audit: 0489 reuses candidate XML audit work with retained adverse rows
+
+[0489](changes/0489-opc-candidate-xml-audit-reuse.md) reuses one successful
+candidate XML audit inside an immutable prepared splice plan while retaining
+source/candidate byte and EOF authentication, freshness, cancellation, Work,
+limits, and final reopen. Its 144-process, 4,320-sample comparison reports
+roughly 20–21% lower source-heavy medians, 14–15% lower authored-heavy file
+medians, and about 19.89% lower deterministic operation heap. Candidate bytes
+are unchanged. A file-store tail regression and four whole-child RSS increases
+above 5% remain in the review; the result does not authorize dropping freshness
+or independent candidate proofs.
+
+## Current audit: 0488 records evidence-preserving cleanup only
+
+[0488 cleanup](results/change-0488-disk-cleanup/README.md) changed no
+production code or performance behavior. It removed 503,605,403,648 allocated
+bytes of rebuildable Cargo output and 12.25 GiB of inactive worktree output,
+481.26 GiB in total, after process-use checks; protected and dirty worktrees
+were excluded and reachable commits were retained. The post-cleanup 0487 seal
+still verifies 144 formal processes, 4,320 samples, 12 diagnostic children,
+and two fuzz campaigns. This is custody evidence; rebuilding is required
+before new workspace tests, and the cleanup does not strengthen any performance
+claim.
+
+## Current audit: 0487 reduces replay sink fences but retains small-workload regressions
+
+[0487](changes/0487-opc-replay-consumed-prefix-retention.md) keeps consumed
+replay bytes in the existing adapter allocation across short reads. The matched
+144-process/4,320-sample comparison lowers authored-heavy file p50 by
+35.61–35.99% and leaves source-heavy medians within 1%; diagnostic `statx`
+falls 59.90% on authored-heavy file input while `pread64` remains unchanged.
+Four latency rows and three whole-child RSS pairs above 5% remain, all in the
+small-workload controls, and operation-heap rows do not increase. The parallel
+allocator harness assertion failed because its process-global counter is not
+isolated; the serial retry passes and the failure remains retained. Exact
+source/output and preservation oracles pass. The broader goal and candidate
+audit reuse remained open at this change.
+
+## Current audit: 0486 attributes DOCX replay metadata cost without a production change
+
+[0486](changes/0486-docx-replay-metadata-callers.md) retains four tiny
+whole-child caller profiles over the 0485 executable. The authored-heavy file
+profile places about 27.38% of sampled period weight in stacks containing
+`statx`; this is inclusive sampled attribution, not a syscall count, CPU
+measurement of the operation, or speedup. Its review identified the consumed
+prefix retention candidate and an unresolved partial-output contract boundary,
+which 0487 implemented under additional tests. Source-heavy 0485 strace data
+showed 25,219 `statx` calls, but the 0486 sampled absence of a `statx` frame in
+other profiles does not imply zero calls. No production code changed and the
+full provider, cold, scaling, native-producer, and CRUD requirements remain
+open.
 
 ## 0485: bounded consumed-window batching; full goal remains open
 
@@ -1595,26 +1736,26 @@ refusal before output; and physical ZIP ownership stays in `soapberry-zip`.
 Those constraints come from ADR 0005's exact-source amendment, ADR 0006, and
 ADRs 0010/0011.
 
-## Current evidence
+## Current evidence through 0502
 
-| Goal requirement | Evidence at audit time | Assessment |
+| Goal requirement | Current evidence | Assessment |
 | --- | --- | --- |
-| Reproducible CRUD baseline | The current coverage index maps 15 categories and 34 representative rows: 11 measured, 22 correctness-only, and one unsupported dynamic-content row (33 selector-backed mappings). Its measured rows still require a validated `target/perf/container-baseline.json`; the index itself is only an identity/contract artifact. The 0485 DOCX route is supplementary evidence without a registered selector. | Partial. The full required scenario matrix and metric set are not evidenced. |
-| Scoped claims | The earlier strict checker validated 6 claims; 0410 adds a seventh strict-registry entry, and the current strict checker passes all 7 claims. The report classifier snapshot has 167 rows: 0 `strict_claim`, 145 historical, 14 descriptive, and 8 withheld. | Claims are deliberately scoped; the current check and snapshot counts do not establish program completion. |
-| Correctness and boundaries | The 0485 scoped bundle records 1,989 all-feature OPC/DOCX tests, 1,948 no-default-feature tests, warning-denied formatting/lint/documentation gates, a 64-package/239-dependency boundary check, nine helper tests, five replay benchmark tests, and sanitizer smoke campaigns. | Useful scoped gates, but they do not establish latency, memory, I/O, or full CRUD coverage for the workspace. |
-| OPC/ZIP/ODF correctness | The 0485 route preserves candidate archive bytes, semantic output, untouched members, source identities, and reopen/patch oracles while retaining the independent source proof. | Strong correctness evidence for the exercised DOCX/OPC route; not a complete workspace performance or native-producer gate. |
-| Full gate health | The 0485 all-feature/no-default, formatting, warning-denied Clippy/rustdoc, boundary, helper, benchmark, and sanitizer lanes pass under the retained source/build identities. | These scoped gates are green; they do not establish the full performance or CRUD goal. |
-| Hardware/resource profiling | `perf stat` counters, CPU pinning, strace, RSS, allocator instrumentation, and profiling helpers remain available. | 0485 retains 12 whole-child diagnostic profiles. Authored-heavy file `statx` falls 3,735,939→1,475,055; source-heavy file `statx` rises 15,415→25,219; `pread64` remains 114/264. One sample/one warmup and setup/oracle inclusion limit this to caller-level attribution. Cold/warm, lock-wait, and Amdahl scaling evidence remain open. |
+| Reproducible CRUD baseline | The current refresh covers 15 categories, 33 selector-backed mappings, 37 cases and 31 corpora with two serial 201-row lanes and 6,030 samples; generated report/catalog validators and 38 static coverage tests pass. | Timing-report baseline gate is closed for the 11 measured mappings (48 rows); 22 mappings remain correctness-only. The complete checklist, missing metrics, native producers, and correctness-only rows remain open. |
+| Scoped claims | The strict registry currently validates 10 claims. 0501 retains 208 comparison rows and 52 favorable flags; 0502 retains a matched timing summary and an explicit regression review. | Claims are scoped to named workflows and evidence; they do not establish program completion. |
+| Correctness and boundaries | Recent bundles retain source/build manifests, exact output/source oracles, budget/cancellation tests, preservation checks, and ADR matrices; 0495–0497 cover managed edit and an atomic logical-tail capability. | Strong scoped DOCX/OPC and ODG correctness/custody evidence; general atomic save, all formats, and full CRUD remain unproven. |
+| Provider and cache states | 0491 and 0494 cover owned, file, instrumented, short, simulated delayed/range, and verified-cold DOCX lanes; 0492/0493 measure and integrate bounded read-ahead. | Descriptive and opt-in evidence only. Genuine borrowed lifetimes, physical-device cold behavior, native producers, and cross-format intersections remain open. |
+| Hardware/resource profiling | 0490 sync traces, 0496 phase clocks, 0501 whole-child profiles, 0502 heaptrack/layout observations, and allocator/RSS reports are retained with scope limits. Hardware counters are unavailable for 0502. | Attribution is partial: whole-child/setup-inclusive evidence is not operation-local CPU, allocation, or RSS proof; lock-wait and full scaling evidence remain open. |
+| Parallelism and batching | 0498/0499 provide explicit bounded ordered Part batches, and 0500 measures managed paragraph batching; adverse local rows and serial controls remain visible. | Partial capability evidence. Full lifecycle 1/2/4/8 scaling, serial-fraction/Amdahl analysis, and stable lock-contention evidence remain open. |
 
-The passing 0485 lanes establish behavior for the exercised DOCX/OPC fixtures.
-They do not establish the `docs/GOAL.md` requirements for complete p50/p95/p99
-coverage, throughput, allocations, peak RSS, copied/decompressed/recompressed
-bytes, physical I/O, lock wait, cold/warm behavior, or Amdahl scaling. The
-0485 profile includes setup and oracle work and has only one sample and one
-warmup per child, so its metadata counts remain diagnostic. The bundle's
-adverse latency and RSS rows, source-heavy metadata increase, and unmeasured
-provider/native intersections remain explicit rather than being absorbed into
-a completion claim.
+The retained 0486–0502 evidence establishes several bounded capabilities and
+descriptive baselines, including managed edit ownership, atomic logical-tail
+publication, source read-ahead, Part batching, and PPTX/ODG scoped experiments.
+It still does not establish the `docs/GOAL.md` requirements for complete
+p50/p95/p99 coverage, throughput, allocations, peak RSS,
+copied/decompressed/recompressed bytes, physical I/O, lock wait, borrowed
+inputs, native producers, all cold/warm intersections, or Amdahl scaling. The
+0502 open regressions, 0499/0500 local adverse rows, and 0501 missing replay
+binary remain explicit rather than being absorbed into a completion claim.
 
 ## ZIP64 passthrough audit
 
@@ -1691,18 +1832,20 @@ a normalizing fallback for a different unsupported source.
 
 | Priority | Requirement from `docs/GOAL.md` | Next reviewable evidence |
 | --- | --- | --- |
-| P0 | Close the ZIP64 integration and preservation contract | 0414 adds offset/count promotion and repeated OPC publication beyond the count sentinel. 0415 adds streaming Deflate framing and independent large Python OPC coverage. The 0416 batch adds local-only forced-ZIP64 reader/source-backed compatibility fixtures and focused refusal cases. Semantic bounded-memory creation/append, native producers, ODF local-sentinel catalog classification, and the broader failure-atomicity matrix remain open. |
-| P0 | Establish the Phase-1 baseline before selecting further optimizations | 0485 supplies a matched DOCX/OPC route comparison with p50/p95/p99, allocator peaks, whole-child RSS, source counters, `perf stat` diagnostics, and syscall profiles. Continue the full non-iWork capture with throughput, copied/decompressed/recompressed bytes, output bytes, lock-wait fields, cold/warm behavior, provider intersections, and explicit bounded-worker cases. |
-| P0 | Turn cache correctness into accepted observation | 0405 now retains validated direct-lock acquisition observations, cache counters, and explicit timing scope in 24 normal and 24 observed smoke rows. The release harness passes 256 tests with one ignored. Extend this descriptive evidence to representative workloads with operation-local attribution. Keep cache observations separate from latency claims until an accepted ABBA protocol exists. |
-| P0 | Capture current hardware/resource evidence | 0485 binds machine, corpus, source/build identities, raw samples, allocator observations, RSS, syscall evidence, and profiling limitations. Its caller-level profile leaves 1,475,055 authored-heavy file `statx` calls and records a source-heavy increase to 25,219; further attribution must precede any freshness-policy or replay/audit change. Remaining CFB FAT/stream/physical costs, cold-source behavior, lock wait, and the broader resource matrix remain open. |
-| P1 | Finish source-backed OPC CRUD adoption | Extend selective open/read/edit/save across format facades and topology changes; measure the selected-Part/compressor buffer, physical I/O, allocation/RSS, and semantic phase boundaries. The current report calls this migration incomplete. |
-| P1 | Cover the high-impact CRUD categories | Add or explicitly classify conversion, stream append, structural edits, deletion/sanitization, cross-document dependency copy, merge/split, patch and inverse timing, repair/normalize, dynamic calculation, security, malformed, and real-producer scenarios. Correctness-only selectors cannot close the timing requirement. |
-| P1 | Finish CFB consumer evidence | Move exact-range and overlay substrate work into DOC/XLS/PPT semantic owners; add physical-cold and high-latency range-source cases, FAT-tail behavior, and operation-local memory/resource attribution. |
-| P1 | Validate output and source variants | Cover filesystem cold cache, caller-supplied range/remote sources, sequential non-seek sinks, cancellation, source-version changes, signed/encrypted/macro-enabled files, and atomic replacement across the non-iWork formats. |
-| P2 | Demonstrate bounded parallelism | Use explicit execution contexts, then publish scaling curves and serial-fraction/Amdahl analysis. Lock-wait data is currently missing from the accepted report. |
-| P2 | Consider layout and SIMD changes | Only after the release profiles identify a hot loop and show a material benefit with scalar fallback and differential correctness tests. |
+| P0 | Resolve the 0502 ODG open regressions | Profile parser and per-shape metadata work with operation-local attribution, then capture a same-protocol before/after pair for plain and metadata corpora. Keep the boxed-layout/heaptrack result separate from latency and allocation-count claims. |
+| P0 | Restore replayable 0501 custody or recapture it | The retained 0501 reports and historical receipt are usable, but `/tmp/litchi-goal-0501` no longer contains the frozen before executable. Rebuild from the recorded source/build manifest or retain a new verified replay bundle before claiming current independent replay. |
+| P0 | Complete the Phase-1 metric and CRUD baseline | The 6,030-sample default refresh closes the timing-report gate for 11 measured mappings (48 rows) within the 33-selector index, but the 15-category checklist still has correctness-only/unsupported rows and lacks complete throughput, copy/decompression, lock-wait, cold/warm, and scaling coverage. Promote only rows with validated timing evidence. |
+| P0 | Measure provider and publication intersections | Extend the 0491–0494 DOCX provider/cold baselines and 0497 atomic logical-tail capability to genuine borrowed input, sequential non-seek sinks, filesystem atomic save, source-version/cancellation failures, and physical cold behavior across representative formats. |
+| P1 | Address the retained local batch and lifecycle adverse rows | Revisit 0499/0500 serial-versus-batch choices and their flagged latency/RSS rows with operation-local CPU/allocation evidence. Publish full explicit 1/2/4/8-worker curves, lock-wait proxy, and serial-fraction/Amdahl analysis before widening concurrency. |
+| P1 | Finish source-backed CRUD adoption across formats | Extend selective open/read/edit/save and dependency-closure publication through DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, and ODF owners; measure physical I/O, decompression/recompression, copies, allocations, RSS, and semantic phase boundaries. |
+| P1 | Cover the high-impact CRUD categories and real producers | Add or explicitly classify conversion, creation, append variants, structural/deletion/sanitization, cross-document copy, merge/split, patch/inverse/three-way merge, repair/normalize, dynamic content, security, malformed, signed/encrypted/macro-enabled, and independently produced Office corpora. |
+| P1 | Close ZIP64/CFB and output-source preservation intersections | Exercise ZIP64 and CFB topology/stream cases with non-seek sinks, cancellation, configured limits, physical cold/high-latency sources, unchanged-member passthrough, and atomic finalization while retaining typed refusals and exact untouched bytes. |
+| P2 | Apply layout, cache, or SIMD tuning only from measured hot loops | Require operation-local profiles, scalar fallbacks, differential malformed-input tests, and material end-to-end benefit before any low-level change. |
 
-No row in this audit should be read as a completion claim. The current
-evidence supports targeted capability progress, including the scoped 0485 DOCX
-splice comparison and retained ZIP64 validation; it does not close the full
-non-iWork performance goal.
+No row in this audit should be read as a completion claim. The current evidence
+supports targeted capability progress, including the 0491–0494 provider/cold
+baselines, 0495–0497 managed publication capabilities, 0498–0500 bounded batch
+work, the 0501 PPTX comparison, and the 0502 ODG audit. The retained
+regressions, missing replay executable, incomplete CRUD metrics and provider
+intersections, and unmeasured scaling keep the full non-iWork performance goal
+open.
