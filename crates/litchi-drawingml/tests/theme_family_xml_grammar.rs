@@ -121,3 +121,43 @@ fn valid_opaque_text_and_xml_whitespace_remain_lexically_intact() {
         );
     }
 }
+
+#[test]
+fn namespace_prefix_byte_limit_covers_declarations_elements_and_attributes() {
+    use litchi_drawingml::theme::family::MAX_NAMESPACE_BYTES;
+
+    for length in [MAX_NAMESPACE_BYTES, MAX_NAMESPACE_BYTES + 1] {
+        let prefix = "p".repeat(length);
+        for body in [
+            format!(r#"<opaque xmlns:{prefix}="urn:vendor"/>"#),
+            format!(r#"<{prefix}:opaque xmlns:{prefix}="urn:vendor"/>"#),
+            format!(r#"<opaque xmlns:{prefix}="urn:vendor" {prefix}:attr="value"/>"#),
+            format!(
+                r#"<opaque xmlns:{prefix}="urn:vendor"><{prefix}:child {prefix}:attr="value"/></opaque>"#
+            ),
+        ] {
+            let source = theme(&body);
+            if length == MAX_NAMESPACE_BYTES {
+                assert!(
+                    part::read(source.as_bytes()).is_ok(),
+                    "exact bound rejected"
+                );
+            } else {
+                assert_rejected(source.as_bytes());
+            }
+        }
+    }
+    // Undeclared prefixes must be bounded before lookup/error construction too.
+    let prefix = "p".repeat(MAX_NAMESPACE_BYTES + 1);
+    for body in [
+        format!("<{prefix}:opaque/>"),
+        format!("<opaque {prefix}:attr='v'/>"),
+    ] {
+        let source = theme(&body);
+        let error = part::read(source.as_bytes()).expect_err("oversized undeclared prefix");
+        assert!(
+            error.to_string().contains("namespace prefix bytes"),
+            "{error}"
+        );
+    }
+}

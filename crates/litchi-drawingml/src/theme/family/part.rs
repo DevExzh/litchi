@@ -722,6 +722,15 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
     loop {
         let event_start = position(&reader, bom_len)?;
         let (resolved, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                validate_namespace_prefix(qname_prefix(element.name().as_ref()))?;
+            },
+            Event::End(element) => {
+                validate_namespace_prefix(qname_prefix(element.name().as_ref()))?;
+            },
+            _ => {},
+        }
         let namespace = resolved_namespace(&resolved)?;
         let event_end = position(&reader, bom_len)?;
         if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
@@ -1500,7 +1509,9 @@ fn decorate_family(source: &[u8], candidate: &Candidate) -> Result<Vec<u8>> {
         ));
     }
     if candidate.inherited_bindings.is_empty() {
-        return Ok(fragment.to_vec());
+        let mut output = family_buffer(fragment.len())?;
+        output.extend_from_slice(fragment);
+        return Ok(output);
     }
     let tag_end = open_tag_end(fragment)?;
     let before_close = tag_end.saturating_sub(1);
@@ -1541,7 +1552,10 @@ fn decorate_family(source: &[u8], candidate: &Candidate) -> Result<Vec<u8>> {
             super::MAX_XML_BYTES,
         ));
     }
-    let mut declarations = String::with_capacity(declaration_bytes);
+    let mut declarations = String::new();
+    declarations
+        .try_reserve_exact(declaration_bytes)
+        .map_err(|_| invalid("Theme Family namespace allocation failed"))?;
     for binding in &candidate.inherited_bindings {
         declarations.push(' ');
         declarations.push_str("xmlns");
@@ -1555,7 +1569,7 @@ fn decorate_family(source: &[u8], candidate: &Candidate) -> Result<Vec<u8>> {
         ));
         declarations.push('"');
     }
-    let mut output = Vec::with_capacity(output_len);
+    let mut output = family_buffer(output_len)?;
     output.extend_from_slice(&fragment[..insertion]);
     output.extend_from_slice(declarations.as_bytes());
     output.extend_from_slice(&fragment[insertion..]);
@@ -1673,12 +1687,12 @@ fn remove_inherited_namespace_declarations(
             .checked_add(range.len())
             .ok_or_else(|| invalid("Theme Family namespace removal length overflows"))
     })?;
-    let mut output = Vec::with_capacity(
+    let mut output = family_buffer(
         bytes
             .len()
             .checked_sub(removed)
             .ok_or_else(|| invalid("Theme Family namespace removal underflows"))?,
-    );
+    )?;
     let mut previous = 0usize;
     for range in ranges {
         output.extend_from_slice(&bytes[previous..range.start]);
@@ -2060,6 +2074,27 @@ fn validate_output_limit(max_xml_bytes: usize) -> Result<()> {
     Ok(())
 }
 
+fn validate_namespace_prefix(prefix: &[u8]) -> Result<()> {
+    if prefix.len() > MAX_NAMESPACE_BYTES {
+        return Err(limit(
+            "Theme XML namespace prefix bytes",
+            MAX_NAMESPACE_BYTES,
+        ));
+    }
+    Ok(())
+}
+
+fn family_buffer(length: usize) -> Result<Vec<u8>> {
+    if length > super::MAX_XML_BYTES {
+        return Err(limit("Theme Family XML bytes", super::MAX_XML_BYTES));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(length)
+        .map_err(|_| invalid("Theme Family output allocation failed"))?;
+    Ok(output)
+}
+
 fn apply_namespace_declarations(
     element: &BytesStart<'_>,
     scope: &mut Vec<Binding>,
@@ -2078,6 +2113,7 @@ fn apply_namespace_declarations(
         let Some(prefix) = namespace_declaration(raw) else {
             continue;
         };
+        validate_namespace_prefix(prefix)?;
         if scope
             .iter()
             .rev()
@@ -2130,6 +2166,7 @@ fn validate_element_attributes(
             return Err(limit("Theme XML attributes", MAX_ATTRIBUTES));
         }
         let raw = attribute.key.as_ref();
+        validate_namespace_prefix(namespace_declaration(raw).unwrap_or_else(|| qname_prefix(raw)))?;
         if !is_qualified_name(std::str::from_utf8(raw).map_err(xml_error)?) {
             return Err(invalid("Theme XML attribute name is invalid"));
         }
