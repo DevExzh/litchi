@@ -11,7 +11,6 @@ use crate::{
 };
 use quick_xml::{events::Event, reader::NsReader};
 use std::collections::HashSet;
-use std::fmt::Write as _;
 use std::sync::Arc;
 
 /// Immutable relationship XML bound to its package or part owner.
@@ -286,77 +285,26 @@ impl OwnedRelationships {
                 name
             },
         );
-        let mut fragment_bound = 0usize;
-        for (reltype, target, id, mode) in additions {
-            let fields = reltype
+        let mut fragment_len = 0usize;
+        append_relationship_chunks(&relationship_name, additions, |chunk| {
+            fragment_len = fragment_len
+                .checked_add(chunk.len())
+                .ok_or_else(|| invalid("relationship batch XML size overflows"))?;
+            Ok(())
+        })?;
+        let expansion = if root_empty {
+            root_name
                 .len()
-                .checked_add(target.len())
-                .and_then(|size| size.checked_add(id.len()))
-                .and_then(|size| size.checked_mul(6))
-                .and_then(|size| {
-                    size.checked_add(if *mode == TargetMode::External { 32 } else { 4 })
-                })
-                .and_then(|size| size.checked_add(relationship_name.len().saturating_add(37)))
-                .ok_or_else(|| invalid("relationship batch XML size overflows"))?;
-            fragment_bound = fragment_bound
-                .checked_add(fields)
-                .ok_or_else(|| invalid("relationship batch XML size overflows"))?;
-        }
-        if self
-            .bytes()
-            .len()
-            .checked_add(fragment_bound)
-            .is_none_or(|size| size > maximum)
-        {
-            return Err(invalid("relationship XML exceeds output limit"));
-        }
-        let mut fragment = Vec::new();
-        fragment
-            .try_reserve_exact(fragment_bound)
-            .map_err(|source| OpcError::Allocation {
-                resource: "OPC relationship batch XML",
-                source,
-            })?;
-        for (reltype, target, id, mode) in additions {
-            let mut element = String::new();
-            write!(
-                element,
-                "<{} Id=\"{}\" Type=\"{}\" Target=\"{}\"",
-                String::from_utf8_lossy(&relationship_name),
-                litchi_core::xml::escape_xml(id),
-                litchi_core::xml::escape_xml(reltype),
-                litchi_core::xml::escape_xml(target),
-            )
-            .map_err(|_| invalid("relationship formatting failed"))?;
-            if *mode == TargetMode::External {
-                element.push_str(" TargetMode=\"External\"");
-            }
-            element.push_str("/>");
-            fragment.extend_from_slice(element.as_bytes());
-        }
-        let is_empty = root_empty;
-        let (range, suffix) = if let Some(close) = root_close.as_ref() {
-            (close.start..close.start, Vec::new())
+                .checked_add(2)
+                .ok_or_else(|| invalid("relationship root expansion overflows"))?
         } else {
-            let mut suffix = Vec::new();
-            suffix
-                .try_reserve(root_name.len().saturating_add(4))
-                .map_err(|source| OpcError::Allocation {
-                    resource: "OPC relationship root close",
-                    source,
-                })?;
-            suffix.extend_from_slice(b">");
-            suffix.extend_from_slice(b"</");
-            suffix.extend_from_slice(&root_name);
-            suffix.push(b'>');
-            (root_tag.end.saturating_sub(2)..root_tag.end, suffix)
+            0
         };
         let size = self
             .bytes()
             .len()
-            .checked_sub(range.len())
-            .and_then(|size| size.checked_add(fragment.len()))
-            .and_then(|size| size.checked_add(suffix.len()))
+            .checked_add(fragment_len)
+            .and_then(|size| size.checked_add(expansion))
             .ok_or_else(|| invalid("relationship XML output size overflows"))?;
         if size > maximum {
             return Err(invalid("relationship XML exceeds output limit"));
@@ -368,15 +316,34 @@ impl OwnedRelationships {
                 resource: "OPC relationship batch output",
                 source,
             })?;
-        bytes.extend_from_slice(&self.bytes()[..range.start]);
-        if is_empty {
-            bytes.extend_from_slice(&suffix[..1]);
-            bytes.extend_from_slice(&fragment);
-            bytes.extend_from_slice(&suffix[1..]);
+        let insertion = if root_empty {
+            root_tag
+                .end
+                .checked_sub(2)
+                .ok_or_else(|| invalid("empty relationship root is incomplete"))?
         } else {
-            bytes.extend_from_slice(&fragment);
+            root_close
+                .as_ref()
+                .ok_or_else(|| invalid("relationships root is unclosed"))?
+                .start
+        };
+        bytes.extend_from_slice(&self.bytes()[..insertion]);
+        if root_empty {
+            bytes.push(b'>');
         }
-        bytes.extend_from_slice(&self.bytes()[range.end..]);
+        append_relationship_chunks(&relationship_name, additions, |chunk| {
+            bytes.extend_from_slice(chunk);
+            Ok(())
+        })?;
+        if root_empty {
+            bytes.extend_from_slice(b"</");
+            bytes.extend_from_slice(&root_name);
+            bytes.push(b'>');
+            bytes.extend_from_slice(&self.bytes()[root_tag.end..]);
+        } else {
+            bytes.extend_from_slice(&self.bytes()[insertion..]);
+        }
+        debug_assert_eq!(bytes.len(), size);
         let xml = OwnedXmlPart::capture(
             self.xml.name.clone(),
             self.xml.content_type.clone(),
@@ -548,6 +515,46 @@ impl OpcPackage {
         }
         Ok(true)
     }
+}
+
+/// Count and emit exactly the same lexical bytes without temporary field strings.
+fn append_relationship_chunks(
+    name: &[u8],
+    additions: &[(&str, &str, &str, TargetMode)],
+    mut emit: impl FnMut(&[u8]) -> Result<()>,
+) -> Result<()> {
+    for (reltype, target, id, mode) in additions {
+        emit(b"<")?;
+        emit(name)?;
+        for (prefix, value) in [
+            (b" Id=\"".as_slice(), *id),
+            (b" Type=\"", *reltype),
+            (b" Target=\"", *target),
+        ] {
+            emit(prefix)?;
+            let mut start = 0;
+            for (offset, byte) in value.bytes().enumerate() {
+                let escaped: &[u8] = match byte {
+                    b'&' => b"&amp;",
+                    b'<' => b"&lt;",
+                    b'>' => b"&gt;",
+                    b'"' => b"&quot;",
+                    b'\'' => b"&apos;",
+                    _ => continue,
+                };
+                emit(&value.as_bytes()[start..offset])?;
+                emit(escaped)?;
+                start = offset + 1;
+            }
+            emit(&value.as_bytes()[start..])?;
+            emit(b"\"")?;
+        }
+        if *mode == TargetMode::External {
+            emit(b" TargetMode=\"External\"")?;
+        }
+        emit(b"/>")?;
+    }
+    Ok(())
 }
 
 fn invalid(message: impl Into<String>) -> OpcError {
@@ -833,6 +840,59 @@ mod tests {
                 .unwrap(),
             before
         );
+    }
+
+    #[test]
+    fn relationship_append_accepts_exact_final_size_for_paired_and_empty_roots() {
+        let sources: &[&[u8]] = &[
+            XML,
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/><!--tail-->"#,
+            br#"<p:Relationships xmlns:p="http://schemas.openxmlformats.org/package/2006/relationships" /><?tail?>"#,
+        ];
+        let additions = [
+            (
+                "urn:image",
+                "custom/image.png",
+                "rId9",
+                TargetMode::Internal,
+            ),
+            (
+                "urn:external",
+                "https://example.test/α?a=1&b=2",
+                "rId10",
+                TargetMode::External,
+            ),
+        ];
+        for xml in sources {
+            let package = OpcPackage::from_bytes(&source(xml)).unwrap();
+            let before = package
+                .source_relationships(&PackURI::new("/").unwrap())
+                .unwrap();
+            let expected = before.with_relationships(&additions, 4096).unwrap();
+            let exact = before
+                .with_relationships(&additions, expected.bytes().len())
+                .unwrap();
+            assert_eq!(exact.bytes(), expected.bytes());
+            assert!(
+                before
+                    .with_relationships(&additions, expected.bytes().len() - 1)
+                    .is_err()
+            );
+            assert_eq!(before.bytes(), *xml);
+        }
+    }
+
+    #[test]
+    fn relationship_chunks_escape_each_field_without_changing_utf8() {
+        let additions = [("urn:α&", "a<\"'>", "id", TargetMode::External)];
+        let mut bytes = Vec::new();
+        append_relationship_chunks(b"p:Relationship", &additions, |chunk| {
+            bytes.extend_from_slice(chunk);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(bytes,
+            "<p:Relationship Id=\"id\" Type=\"urn:α&amp;\" Target=\"a&lt;&quot;&apos;&gt;\" TargetMode=\"External\"/>".as_bytes());
     }
 
     #[test]
