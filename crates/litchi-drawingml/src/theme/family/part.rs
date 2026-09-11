@@ -649,6 +649,7 @@ struct Frame {
     namespace: Vec<u8>,
     kind: Kind,
     ns_added: usize,
+    scope_bytes_before: usize,
 }
 
 #[derive(Debug)]
@@ -723,6 +724,9 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
         prefix: b"xml".to_vec(),
         uri: XML_NAMESPACE.as_bytes().to_vec(),
     }];
+    // Account once for the built-in binding. Ordinary elements do not walk
+    // inherited bindings merely to recompute their aggregate size.
+    let mut scope_bytes = b"xml".len() + XML_NAMESPACE.len();
     let mut stack = Vec::<Frame>::new();
     let mut extensions = Vec::<ExtensionRecord>::new();
     let mut families = Vec::<FamilyRecord>::new();
@@ -780,7 +784,9 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 let need_scope_copy = family_extension
                     .is_some_and(|index| !recognized_family_extensions.contains(&index));
                 let inherited = need_scope_copy.then(|| scope.clone());
-                let added = apply_namespace_declarations(&element, &mut scope, &reader)?;
+                let scope_bytes_before = scope_bytes;
+                let added =
+                    apply_namespace_declarations(&element, &mut scope, &mut scope_bytes, &reader)?;
                 validate_element_name(&element)?;
                 validate_element_attributes(&element, &scope, &reader)?;
                 let local = element.local_name().as_ref().to_vec();
@@ -835,6 +841,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     namespace,
                     kind,
                     ns_added: added,
+                    scope_bytes_before,
                 });
             },
             Event::Empty(element) => {
@@ -856,7 +863,9 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 let need_scope_copy = family_extension
                     .is_some_and(|index| !recognized_family_extensions.contains(&index));
                 let inherited = need_scope_copy.then(|| scope.clone());
-                let added = apply_namespace_declarations(&element, &mut scope, &reader)?;
+                let scope_bytes_before = scope_bytes;
+                let added =
+                    apply_namespace_declarations(&element, &mut scope, &mut scope_bytes, &reader)?;
                 validate_element_name(&element)?;
                 validate_element_attributes(&element, &scope, &reader)?;
                 let local = element.local_name().as_ref().to_vec();
@@ -914,6 +923,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     extensions[index].range.end = event_end;
                 }
                 scope.truncate(scope.len().saturating_sub(added));
+                scope_bytes = scope_bytes_before;
             },
             Event::End(element) => {
                 if !root_seen || root_closed {
@@ -959,6 +969,7 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                     | Kind::HiddenExt(_) => {},
                 }
                 scope.truncate(scope.len().saturating_sub(frame.ns_added));
+                scope_bytes = frame.scope_bytes_before;
             },
             Event::Text(text) => {
                 family_codec::validate_event_text(text.as_ref(), "Theme XML text")?;
@@ -2198,15 +2209,10 @@ fn family_buffer(length: usize) -> Result<Vec<u8>> {
 fn apply_namespace_declarations(
     element: &BytesStart<'_>,
     scope: &mut Vec<Binding>,
+    scope_bytes: &mut usize,
     reader: &NsReader<&[u8]>,
 ) -> Result<usize> {
     let mut added = 0usize;
-    let mut scope_bytes = scope.iter().try_fold(0usize, |total, binding| {
-        total
-            .checked_add(binding.prefix.len())
-            .and_then(|value| value.checked_add(binding.uri.len()))
-            .ok_or_else(|| invalid("Theme XML namespace scope length overflows"))
-    })?;
     for attribute in element.attributes() {
         let attribute = attribute.map_err(xml_error)?;
         let raw = attribute.key.as_ref();
@@ -2237,10 +2243,10 @@ fn apply_namespace_declarations(
                 MAX_ACTIVE_NAMESPACE_BINDINGS,
             ));
         }
-        scope_bytes = scope_bytes
+        *scope_bytes = scope_bytes
             .checked_add(binding_bytes)
             .ok_or_else(|| invalid("Theme XML namespace scope length overflows"))?;
-        if scope_bytes > MAX_XML_BYTES {
+        if *scope_bytes > MAX_XML_BYTES {
             return Err(limit("Theme XML namespace scope bytes", MAX_XML_BYTES));
         }
         scope.push(Binding {
