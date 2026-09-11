@@ -1,0 +1,24 @@
+{
+  "frozen_utc": "2026-09-11T21:45:17.222078+00:00",
+  "reason": "Independent review identified speculative cold semantic-noop Layout work and ordinary parser codegen as admission obligations. Declared before any guard build/capture; primary main protocol unchanged.",
+  "shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "scenario_scope": "Cold first-cell read, cold and warm same-value commits, and warm Store changed commits; exact scenario order is bound to the probe source.",
+  "native": "100 samples and 3 warmups, serial ABBA before/r1, after/r1, after/r2, before/r2; separate pilot 20/2 for both roles and preflight 1/0.",
+  "allocator": "Canonical unchanged allocation_metrics and counting_allocator modules included by source path in the standalone guard; isolated feature binary, 10 samples and 1 warmup, two repeats per role. Regions surround the same clock; instrumented elapsed and RSS are excluded.",
+  "fidelity": "Cold same values derive from the generator without querying source cells. Warm Store access is explicit before the clock. Result destruction, exact no-op bytes/patch checks and changed/read oracles are outside the clock.",
+  "source_binding": "Guard main.rs, Cargo.toml and Cargo.lock, plus canonical allocator hashes, role production source manifests and executable digests. Guard corpora are independent from the main harness.",
+  "final_probe_freeze_utc": "2026-09-11T21:53:04.394123+00:00",
+  "scenarios": [
+    "cold-first-cell-read",
+    "cold-same-one-cell",
+    "cold-same-one-percent",
+    "warm-same-one-cell",
+    "warm-same-one-percent",
+    "warm-changed-one-cell",
+    "warm-changed-one-percent"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "restored_utc": "2026-09-11T22:29:18.174650+00:00",
+  "base_revision": "33a21e0f087b4ead80ca63187c7cf30d0584b1f6",
+  "production_and_tests_restored": true,
+  "exact_source_manifest_match": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "candidate_manifest_sha256": "6694d0c53128805e3c5bd77386501e86b6508c809790d87ebe0a15da4ada68da",
+  "candidate_patch_sha256": "b66dbafd9e1f39d859b306459a1826967c708c1f3361e365c9d277000d0c3053",
+  "restored_paths": [
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/fusion.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/tests.rs",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/fusion.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs",
+    "crates/litchi-xlsx/src/workbook/model.rs"
+  ],
+  "scope": "Only14candidatepaths; evidenceandindependentguardretained"
+}

@@ -1,0 +1,21 @@
+{
+  "base_revision": "33a21e0f087b4ead80ca63187c7cf30d0584b1f6",
+  "previous_turn": "Progress: 0513 committed source-bound operation allocation and exact save profiles; post-commit replay, cleanup and clean worktree verified.",
+  "frozen_utc": "2026-09-11T21:32:17.686988+00:00",
+  "priority": "OLE2/OOXML until their full optimization goal complete; ODF deferred; iWork excluded.",
+  "candidate": "Conditional shared-event source eager parser plus ephemeral snapshot Layout reuse for ordinary grid edits on original borrowed MCE input; preserve semantic/style/error ordering and fallback routes.",
+  "native_protocol": "12 rows: four existing XLSX commit/save cases across tiny,medium,dense-wide;500samples5warmups;serialbefore/r1,after/r1,after/r2,before/r2 onCPU2 one worker.",
+  "allocator_protocol": "Separate allocatorbinary, same12rows,10samples1warmup, two repeats eachrole; native timing/RSS excluded.",
+  "profile_protocol": "Exact xlsx_commit_save_operation helper; dense one-percent commit/save3samples0warmup eachrole; raw runner/helper/commit/writer edges.",
+  "pilot_protocol": "Control and candidate preflight1/0 and preliminary20samples2warmups (all12rows); candidate allocator/profile and semantic-noop pilot before full native admission. Retain rejection if fails semantic, resource or useful-work gates.",
+  "review_thresholds_percent": {
+    "latency_throughput_rss": 5,
+    "drift_p50": 5,
+    "drift_mean": 5,
+    "drift_p95": 10,
+    "drift_p99": 15
+  },
+  "allocation_review": "Report both absolute region peak and per-sample peak-minus-entry. Any increased temporary overlap requires explicit practical review; do not hide baseline lifetime differences.",
+  "claim": "No blanket format or full-goal completion claim; retention requires representative practical benefit or rejection with exact evidence.",
+  "semantic_noop_guard": "Standalone public-API probe separately source/manifest/lock-bound before candidate apply; cold same-value one-cell/one-percent and warm Store controls, tiny/medium/dense;100samples3warmupsABBA. Candidate20/2 pilot before full admission; exact no-op/changed oracles outside timers. Added before any performance capture."
+}

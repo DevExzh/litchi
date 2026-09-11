@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0514/after/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide",
+    "--samples",
+    "20",
+    "--warmup",
+    "2",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0514/after/pilot-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0514/after/pilot-catalog.json"
+  ],
+  "started_utc": "2026-09-11T22:25:11.430038+00:00",
+  "elapsed_seconds": 24.88205511999695,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "6694d0c53128805e3c5bd77386501e86b6508c809790d87ebe0a15da4ada68da",
+  "binary_sha256": "410f9c927ee6520a0a1fa71cca106dd3b29b60f6a7034e08fc7460602007ba96",
+  "scope": "Existing native commit or commit+save clock; setup, expected output, sink reservation, oracles and drop excluded",
+  "artifacts": {
+    "pilot-report.json": "30779657743925a0b389ca7d4f9857207965a5a96d7e172bdcc416d66da1547d",
+    "pilot-catalog.json": "5118249d5c674074464719793fcd301248aa520688abfd95a97ce9644e74489b",
+    "pilot.log": "c5a2580d5e50a0d62853f804ce474c747a482a19fbde284f596334ec89413a48"
+  }
+}

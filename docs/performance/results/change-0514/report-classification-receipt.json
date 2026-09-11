@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_report_claim_classification.py",
+    "--repo-root",
+    "."
+  ],
+  "started_utc": "2026-09-11T22:37:50.419689+00:00",
+  "elapsed_seconds": 0.06266288800543407,
+  "exit_code": 0,
+  "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8",
+  "scope": "Existing REPORT.md classification registry; no registered0514speedupclaim"
+}

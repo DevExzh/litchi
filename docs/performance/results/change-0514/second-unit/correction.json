@@ -1,0 +1,4 @@
+{
+  "scope": "Test-only immutable borrow crossed mutable rewrite; retain the asserted error string before rewrite",
+  "production_changed": false
+}

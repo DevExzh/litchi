@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0514/before/xlsx-guard",
+    "--samples",
+    "100",
+    "--warmup",
+    "3",
+    "--shape",
+    "tiny,medium,dense-wide",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0514/before/guard-r1-report.json"
+  ],
+  "started_utc": "2026-09-11T22:03:09.230992+00:00",
+  "elapsed_seconds": 69.4804689589946,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "guard_manifest_sha256": "2666c55055c9c426a65459feae2a69fe7507d203671a4d7e96638e4f91c12a30",
+  "artifacts": {
+    "guard-r1-report.json": "cb854d91575438254228b140562fdf86488cd3f190c14441bd1380ba66edaa1a",
+    "guard-r1.log": "383d4be8cf0226b8ce57d0968dc404623526f740db99255a04a7106c75d19e0b"
+  },
+  "scope": "Separate public guard; per-scenario commit or first-cell clock excludes setup, warming, oracles and result drop; allocator timing/RSS excluded.",
+  "binary_sha256": "1077267e9efb1a7be0285472a2753bfa646cf9c2f7d4025571b380598e9d0b71"
+}

@@ -1,0 +1,6 @@
+{
+  "status": "failed_compile_retained",
+  "exit_code": 101,
+  "correction": "Borrow owned CLI Strings at the two parse_list(&str) call sites. No guard measurements existed and no production sources changed.",
+  "corrected_utc": "2026-09-11T21:57:13.780283+00:00"
+}

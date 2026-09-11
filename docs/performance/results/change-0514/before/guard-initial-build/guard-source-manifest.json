@@ -1,0 +1,7 @@
+{
+  "docs/performance/results/change-0514/guard-probe/Cargo.lock": "3f890a81afab337d8c994c754d15526fb2bf523883214c028bf6accb7814566a",
+  "docs/performance/results/change-0514/guard-probe/Cargo.toml": "82d5e5b06adb460c6c9e4dd08902bb4733df98d5082622969cbaab6943e2d3fe",
+  "docs/performance/results/change-0514/guard-probe/src/main.rs": "7f4eedcda4707f18ca1c7eb29b57b67baab94da343043f6fd3796d077c78a9c7",
+  "tools/perf-baseline/src/allocation_metrics.rs": "57e7c03432434bcbe7e0415eab08c599c1faa72638db5a663e92cfeb510c5897",
+  "tools/perf-baseline/src/bin/support/counting_allocator.rs": "c498a1e0cd3984551bc09f4f4bbe0885104deb7428c79bd249250f9b1b4e5cd5"
+}

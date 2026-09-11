@@ -1,0 +1,9 @@
+{
+  "scope": "Pre-measurement test compilation and formatting only",
+  "errors": [
+    "Two expect_err calls imposed Debug on private successful result; inspect err Option instead",
+    "Borrow deferred error for assertion rather than moving it before rewrite",
+    "Format both new test files using repository rustfmt configuration"
+  ],
+  "production_changed": false
+}

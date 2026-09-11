@@ -1,0 +1,31 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--evidence-root",
+    ".",
+    "--mode",
+    "strict"
+  ],
+  "started_utc": "2026-09-11T22:21:30.939413+00:00",
+  "elapsed_seconds": 70.22849026200129,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "6694d0c53128805e3c5bd77386501e86b6508c809790d87ebe0a15da4ada68da",
+  "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8",
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0514/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0514",
+    "RUSTDOCFLAGS": "-D warnings"
+  }
+}
