@@ -11,6 +11,8 @@ publish = false
 name = "xlsx-svg-lifecycle-profile"
 path = "main.rs"
 
-# The production XLSX dependency is intentionally absent until the public
-# source-backed owner and selector/attach/detach API are frozen. Wiring it
-# prematurely would make this evidence tree compile against a guessed API.
+[dependencies]
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-xlsx = { path = "../../../../../crates/litchi-xlsx" }
+quick-xml = "0.41"
+sha2 = "0.11"

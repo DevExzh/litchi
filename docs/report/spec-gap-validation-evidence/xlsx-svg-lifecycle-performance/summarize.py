@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 LANES = (
+    "capture_native_fixture",
     "capture_raster_two_cell_small",
     "capture_raster_two_cell_large",
     "capture_raster_one_cell_small",
@@ -38,6 +39,12 @@ LANES = (
     "attach_end_to_end_one_cell_large",
     "attach_end_to_end_absolute_small",
     "attach_end_to_end_absolute_large",
+    "inverse_attach_detach_two_cell_small",
+    "inverse_attach_detach_two_cell_large",
+    "inverse_attach_detach_one_cell_small",
+    "inverse_attach_detach_one_cell_large",
+    "inverse_attach_detach_absolute_small",
+    "inverse_attach_detach_absolute_large",
     "detach_end_to_end_shared_first_two_cell",
     "detach_end_to_end_shared_first_one_cell",
     "detach_end_to_end_shared_first_absolute",
@@ -55,10 +62,14 @@ LANES = (
     "noop_detach_absolute",
     "limit_small",
     "limit_large",
+    "mixed_caps_rejection",
     "malformed_duplicate_owner",
     "malformed_mce_owner",
     "malformed_linked_owner",
     "malformed_unknown_uri",
+    "multi_picture_same_drawing_16",
+    "multi_picture_same_drawing_64",
+    "multi_picture_same_drawing_256",
 )
 
 

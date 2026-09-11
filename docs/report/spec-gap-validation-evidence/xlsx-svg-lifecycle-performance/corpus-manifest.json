@@ -41,6 +41,7 @@
     "limit_case": "resolve the configured active namespace-binding limit from the host error"
   },
   "lanes": [
+    {"id": "capture_native_fixture", "source_fixture": "source_fixture", "state": "producer_attached_read_only"},
     {"id": "capture_raster_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only"},
     {"id": "capture_attached_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "svg_attached"},
     {"id": "clone_raster_{size}", "sizes": ["small", "large"], "state": "raster_only", "clone_scope": "immutable source snapshot and captured owner"},
@@ -50,15 +51,20 @@
     {"id": "namespace_heavy", "state": "raster_only", "namespace_heavy": true},
     {"id": "namespace_limit_refusal", "state": "raster_only", "expected": "typed_limit_refusal"},
     {"id": "attach_end_to_end_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only", "operation": "attach"},
+    {"id": "inverse_attach_detach_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only", "operation": "attach_then_in_memory_inverse", "checks": ["reopen_forward", "exact_source_restore", "replay_refusal"]},
     {"id": "detach_end_to_end_shared_first_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "svg_attached", "target_topology": "shared", "owner_phase": "first"},
     {"id": "detach_end_to_end_shared_final_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "svg_attached", "target_topology": "shared", "owner_phase": "final"},
     {"id": "detach_end_to_end_distinct_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "svg_attached", "target_topology": "distinct", "operation": "detach"},
     {"id": "noop_detach_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "raster_only", "operation": "detach_noop"},
     {"id": "limit_{size}", "sizes": ["small", "large"], "state": "raster_only", "expected": "caller_budget_refusal"},
+    {"id": "mixed_caps_rejection", "state": "svg_attached", "target_topology": "shared", "operation": "mixed_detach_attach_under_each_retained_limit", "expected": "atomic_refusal", "caps": ["parts", "total_part_bytes", "total_relationships", "total_relationship_xml_bytes", "total_relationship_xml_events", "content_type_mappings"]},
     {"id": "malformed_duplicate_owner", "expected": "ambiguous_owner_refusal"},
     {"id": "malformed_mce_owner", "expected": "mce_ancestry_refusal"},
     {"id": "malformed_linked_owner", "expected": "linked_owner_refusal"},
-    {"id": "malformed_unknown_uri", "expected": "inert_unknown_extension"}
+    {"id": "malformed_unknown_uri", "expected": "inert_unknown_extension_noop"},
+    {"id": "multi_picture_same_drawing_{count}", "counts": [16, 64, 256], "state": "raster_only", "operation": "attach_all_in_one_transaction", "scope": "one_drawing_per_intent_rescan"},
+    {"id": "multi_picture_same_drawing_detach_{topology}_{count}", "counts": [16, 64, 256], "topologies": ["shared", "distinct"], "state": "svg_attached", "operation": "detach_all_in_one_transaction", "scope": "exploratory-only; one_drawing_per_intent_rescan"},
+    {"id": "inventory_shared_root_namespace_32", "count": 32, "state": "svg_attached", "target_topology": "distinct", "root_namespace_bindings": 128, "root_binding_payload_bytes": 1000, "operation": "source_inventory_only", "scope": "exploratory-only; retained SVG source amplification probe"}
   ],
   "limits": {
     "drawing_xml_bytes": "existing_xlsx_scanner_bound",

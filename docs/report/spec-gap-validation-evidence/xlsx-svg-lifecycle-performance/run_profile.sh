@@ -6,7 +6,7 @@ if [[ "${PROFILE_FROZEN:-}" != "1" ]]; then
     exit 2
 fi
 if [[ "${XLSX_SVG_PROFILE_API_WIRED:-}" != "1" ]]; then
-    echo "refusing to profile the unwired XLSX scaffold; set XLSX_SVG_PROFILE_API_WIRED=1 only after a reviewed API adapter is wired" >&2
+    echo "refusing to profile before the XLSX SVG API adapter is review-wired; set XLSX_SVG_PROFILE_API_WIRED=1 only after semantic review and freeze" >&2
     exit 2
 fi
 for variable in RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP; do
@@ -32,6 +32,7 @@ else
 fi
 MANIFEST_TOOL="$HERE/source_manifest.py"
 LANES=(
+    capture_native_fixture
     capture_raster_two_cell_small capture_raster_two_cell_large
     capture_raster_one_cell_small capture_raster_one_cell_large
     capture_raster_absolute_small capture_raster_absolute_large
@@ -46,6 +47,9 @@ LANES=(
     attach_end_to_end_two_cell_small attach_end_to_end_two_cell_large
     attach_end_to_end_one_cell_small attach_end_to_end_one_cell_large
     attach_end_to_end_absolute_small attach_end_to_end_absolute_large
+    inverse_attach_detach_two_cell_small inverse_attach_detach_two_cell_large
+    inverse_attach_detach_one_cell_small inverse_attach_detach_one_cell_large
+    inverse_attach_detach_absolute_small inverse_attach_detach_absolute_large
     detach_end_to_end_shared_first_two_cell
     detach_end_to_end_shared_first_one_cell
     detach_end_to_end_shared_first_absolute
@@ -60,8 +64,11 @@ LANES=(
     detach_end_to_end_distinct_absolute_large
     noop_detach_two_cell noop_detach_one_cell noop_detach_absolute
     limit_small limit_large
+    mixed_caps_rejection
     malformed_duplicate_owner malformed_mce_owner
     malformed_linked_owner malformed_unknown_uri
+    multi_picture_same_drawing_16 multi_picture_same_drawing_64
+    multi_picture_same_drawing_256
 )
 PROCESSES=${PROCESSES:-3}
 WARMUP=${WARMUP:-2}
@@ -73,6 +80,10 @@ case "$PROCESSES:$WARMUP:$SAMPLES" in
         exit 2
         ;;
 esac
+if [[ "$PROCESSES" -ne 3 || "$WARMUP" -lt 2 || "$SAMPLES" -lt 20 ]]; then
+    echo "acceptance requires 3 processes, at least 2 warmups, and at least 20 samples" >&2
+    exit 2
+fi
 if [[ "$TARGET" == "/" || "$TARGET" == "$ROOT" || "$TARGET" == "$ROOT/target" || "$TARGET" == "$HERE" ]]; then
     echo "refusing unsafe Cargo target path: $TARGET" >&2
     exit 2
@@ -94,14 +105,23 @@ cleanup_target() {
 trap cleanup_target EXIT
 
 mkdir -p "$RESULTS" "$TARGET"
-rm -f "$RESULTS"/*.json "$RESULTS"/*.time.txt "$RESULTS"/*.log \
-    "$RESULTS"/commands.txt "$RESULTS"/source-manifest-*.txt \
-    "$RESULTS"/source-provenance.txt "$RESULTS"/binary.sha256 \
+# Remove only this runner's acceptance outputs. Historical exploratory
+# receipts and review records in the same directory are not disposable.
+for lane in "${LANES[@]}"; do
+    rm -f "$RESULTS/${lane}"-p[0-9]*.json \
+        "$RESULTS/${lane}"-p[0-9]*.time.txt \
+        "$RESULTS/${lane}"-p[0-9]*.stderr.log
+done
+rm -f "$RESULTS"/metadata-before.json "$RESULTS"/metadata-after.json \
+    "$RESULTS"/build.log "$RESULTS"/commands.txt \
+    "$RESULTS"/source-manifest-before.txt "$RESULTS"/source-manifest-after.txt \
+    "$RESULTS"/source-provenance.txt "$RESULTS"/binary.sha256 "$RESULTS"/binary-after.sha256 \
     "$RESULTS"/build-provenance.txt "$HERE/report.md" "$HERE/verification.json"
 
 unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP
 export CARGO_TARGET_DIR="$TARGET"
 export CARGO_INCREMENTAL=0
+export LC_ALL=C
 
 cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS" \
     >"$RESULTS/metadata-before.json"
@@ -113,6 +133,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$ROOT/Cargo.lock" \
     --extra "$HARNESS" \
     --extra "$HERE/harness/Cargo.lock" \
+    --extra "$HERE/harness/adapter.rs" \
     --extra "$HERE/harness/support.rs" \
     --extra "$MANIFEST_TOOL" \
     --extra "$HERE/run_profile.sh" \
@@ -122,6 +143,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/requirements.md" \
     --extra "$HERE/root-review.md" \
     --extra "$HERE/corpus-manifest.json" \
+    --extra "$ROOT/3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx" \
     --extra "$ROOT/docs/GOAL.md" \
     --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md"
 
@@ -162,10 +184,12 @@ for lane in "${LANES[@]}"; do
             >>"$RESULTS/commands.txt"
         /usr/bin/time -v -o "$timing" "$BIN" \
             --lane "$lane" --warmup "$WARMUP" --samples "$SAMPLES" \
-            >"$report"
+            >"$report" 2>"$RESULTS/${lane}-p${process}.stderr.log"
         process=$((process + 1))
     done
 done
+sha256sum "$BIN" >"$RESULTS/binary-after.sha256"
+cmp -s "$RESULTS/binary.sha256" "$RESULTS/binary-after.sha256"
 
 cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS" \
     >"$RESULTS/metadata-after.json"
@@ -177,6 +201,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$ROOT/Cargo.lock" \
     --extra "$HARNESS" \
     --extra "$HERE/harness/Cargo.lock" \
+    --extra "$HERE/harness/adapter.rs" \
     --extra "$HERE/harness/support.rs" \
     --extra "$MANIFEST_TOOL" \
     --extra "$HERE/run_profile.sh" \
@@ -186,6 +211,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/requirements.md" \
     --extra "$HERE/root-review.md" \
     --extra "$HERE/corpus-manifest.json" \
+    --extra "$ROOT/3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx" \
     --extra "$ROOT/docs/GOAL.md" \
     --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md"
 cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt"

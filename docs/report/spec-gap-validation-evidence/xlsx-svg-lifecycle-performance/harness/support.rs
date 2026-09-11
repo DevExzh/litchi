@@ -1,13 +1,15 @@
 //! Reusable process-local profile support for the future XLSX API adapter.
 //!
-//! The current binary deliberately does not call production XLSX code. These
-//! helpers are kept here so the adapter can use one allocator accounting
-//! implementation and one receipt equation after the public API is frozen.
+//! The adapter uses these helpers around the current public XLSX API. The
+//! shell runner keeps collection closed until production semantic checks and
+//! the profile freeze have completed.
 
 #![allow(dead_code)]
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+use sha2::{Digest, Sha256};
 
 pub struct CountingAllocator;
 
@@ -211,6 +213,11 @@ pub fn fnv1a64(bytes: &[u8]) -> u64 {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     hash
+}
+
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 pub fn json_escape(value: &str) -> String {

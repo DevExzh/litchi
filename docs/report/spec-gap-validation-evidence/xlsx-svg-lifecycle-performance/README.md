@@ -3,9 +3,14 @@
 This directory is a bounded profiling scaffold for the ordinary worksheet
 `SpreadsheetDrawing` SVG lifecycle described by
 [`xlsx-svg-lifecycle-design.md`](../xlsx-svg-lifecycle-design.md). It is
-intentionally unwired: the XLSX source-backed owner and its public attach /
-detach API are not frozen yet, so this directory contains no measurements and
-makes no performance claim.
+wired to the current source-backed owner and public attach/detach signatures,
+but remains freeze-gated for acceptance. It contains no final or acceptance
+measurements or performance claims. A separately labeled
+`results/exploratory-before/` bundle retains one bounded current-working-tree
+receipt per same-drawing 16/64/256 attach cost lane for optimization
+comparison. A later `results/exploratory-detach-before/` bundle uses six
+shared and distinct multi-detach lanes. Neither bundle must be read as frozen
+evidence.
 
 The profile boundary is one worksheet drawing relationship containing direct
 `xdr:pic` owners. It covers an existing PNG compatibility fallback, an
@@ -23,25 +28,53 @@ linked-resource fetching, SVG rendering or conversion, DOCX, and picture
 creation from an empty drawing. Unknown extensions are retained or refused as
 specified by the design; they are not silently interpreted as SVG owners.
 
-No XLSX production dependency is present in `harness/Cargo.toml` while the
-public API is provisional. `harness/main.rs` has the lane vocabulary, a
-process-local counting allocator, and the receipt support used by the future
-adapter, but it exits with an explicit `api-wiring-pending` refusal. This is
-deliberate: copying a guessed API into a benchmark would create evidence for
-an operation that does not exist.
+`harness/Cargo.toml` now links the settled `litchi-xlsx` and `litchi-opc`
+interfaces. `harness/main.rs` and `harness/adapter.rs` call
+`Workbook::edit`, semantic worksheet selection, `PictureSelector`, borrowed
+`SvgInput`, `SourceDrawing`, and `Commit`. The shell runner still requires an
+explicit API-wiring and freeze gate, so compiling the adapter does not collect
+measurements while production semantic checks are still being reviewed.
 
-The recipe-only synthetic corpus is recorded in
+The deterministic synthetic corpus is recorded in
 [`corpus-manifest.json`](corpus-manifest.json). It describes small and large
 opaque payloads, 256/1,024-picture inventory cases, shared and distinct SVG
 targets, inherited namespace pressure, three anchor forms, and refusal cases.
+Each raw receipt records both the legacy FNV-1a identity and a SHA-256 digest
+of the exact bounded input identity; the verifier requires those identities to
+remain stable across fresh processes.
 The native producer fixture is used for read/capture validation only:
 
 `3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx`
 
 Its archive hash is the design hash
 `0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72`.
-Synthetic package generation and semantic assertions belong in the eventual
-API adapter, not in this pre-freeze scaffold.
+The adapter does not mutate that fixture. The
+`multi_picture_same_drawing_{16,64,256}` lanes stage several lifecycle changes
+on one drawing in one transaction. They retain the current composed-planner
+cost shape, including its per-intent source rescans, without making a scaling
+claim. `source_copy_bytes` and `staged_bytes` remain explicitly unavailable
+in receipts because the public API does not expose those stage counters;
+allocator totals are not used as a substitute.
+
+The 60-lane acceptance matrix also includes
+`inverse_attach_detach_{anchor}_{size}` for exact in-memory inverse restoration
+and replay refusal across all three anchors and both payload sizes, plus the
+composite `mixed_caps_rejection` lane. The latter exercises the retained part,
+aggregate bytes, relationship count/XML bytes/XML events, and content-type
+mapping ceilings against one shared detach+attach transaction; it is an
+atomic refusal gate rather than a per-cap performance comparison.
+
+The six exploratory detach lanes,
+`multi_picture_same_drawing_detach_{shared,distinct}_{16,64,256}`, use the
+same bounded picture counts and exercise the fallback path with shared and
+distinct SVG targets. They live outside the 60-lane acceptance list.
+
+The exploratory `inventory_shared_root_namespace_32` lane inventories 32
+distinct SVG owners under 128 large inherited root bindings. Its source-shape
+receipt is paired with the retained scope probe at
+[`../xlsx-svg-source/retained-scope-probe.rs`](../xlsx-svg-source/retained-scope-probe.rs),
+which records retained owner source bytes only. Neither artifact is a timing,
+peak-memory, or final performance result.
 
 When the owner and adapter are frozen, the intended command is:
 
@@ -49,7 +82,7 @@ When the owner and adapter are frozen, the intended command is:
 PROFILE_FROZEN=1 \
 XLSX_SVG_PROFILE_API_WIRED=1 \
 CARGO_TARGET_DIR=/var/tmp/litchi-xlsx-svg-lifecycle-profile-target \
-sh docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/run_profile.sh
+bash docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/run_profile.sh
 ```
 
 The runner rejects unset freeze or wiring gates before it creates a profile
@@ -60,7 +93,21 @@ only a newly created isolated Cargo target. The runner never removes the main
 Cargo target. Set `ALLOW_EXISTING_TARGET=1` only when an explicitly isolated
 target has been inspected and is intentionally reused.
 
-The future adapter must preserve the receipt contract in
+Each process retains a stderr file and an exit-status receipt. Verification
+requires empty stderr, exit status zero, exact process identities, consistent
+input sizes and digests, and identical executable digests before and after
+measurement. The executable itself is disposable; retained digest receipts
+record its measured identity rather than promising later executable rehashing.
+Run `python3 -B -m unittest test_verify` from this directory to exercise the
+adversarial receipt checks without compiling or measuring production code.
+
+Refusal lanes emit a typed expected-refusal outcome only after the public API
+returns a matching limit/owner error and the source bytes remain unchanged.
+Unexpected acceptance, source mutation, setup failure, or an unrelated API
+error remains a failed lane and cannot be relabeled with the lane's requested
+refusal class.
+
+The adapter must preserve the receipt contract in
 [`requirements.md`](requirements.md). It must report the timed scope for
 capture, clone, source splice, graph planning, commit validation, publication,
 and reopen where the public API permits those boundaries. End-to-end lanes
