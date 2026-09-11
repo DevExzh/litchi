@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0508/promote.py", line 102, in <module>
+    main()
+    ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0508/promote.py", line 87, in main
+    assert row['status'] == 'correctness-only'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

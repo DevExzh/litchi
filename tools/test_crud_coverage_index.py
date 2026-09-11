@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools import perf_compare
 from tools.validate_crud_coverage_index import (
     ValidationError,
     _validate_identity_artifact,
@@ -23,7 +24,16 @@ CATALOG_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SELECTOR_PATH = ROOT / "tools/perf-baseline/src/lib.rs"
 CHECKLIST_PATH = ROOT / "docs/CRUD_Scenario_Checklist.md"
 EXPECTED_CATALOG_SHA256 = (
-    "d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f"
+    "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a"
+)
+NEW_CONVERSION_SELECTORS = (
+    "rtf_semantic_text_to_sink",
+    "odt_semantic_text_to_sink",
+    "ods_semantic_text_to_sink",
+    "odp_semantic_text_to_sink",
+)
+PREVIOUS_RESULT_KEYS_SHA256 = (
+    "f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670"
 )
 
 
@@ -154,6 +164,67 @@ class CrudCoverageIndexTests(unittest.TestCase):
         self.assertEqual(checked_catalog["catalog_sha256"], EXPECTED_CATALOG_SHA256)
         self.assertEqual(checked_catalog["catalog_sha256"], self.catalog["catalog_sha256"])
 
+    def test_0508_conversion_sinks_are_checked_timed_bindings(self) -> None:
+        category = next(
+            category
+            for category in self.index["categories"]
+            if category["id"] == "conversion-export"
+        )
+        scenarios = {
+            scenario["selector"]: scenario
+            for scenario in category["scenarios"]
+            if scenario.get("selector") in NEW_CONVERSION_SELECTORS
+        }
+        self.assertEqual(set(scenarios), set(NEW_CONVERSION_SELECTORS))
+        self.assertEqual(category["status"], "measured")
+        corpus_by_id = {corpus["id"]: corpus for corpus in self.catalog["corpora"]}
+        binding_ids = {
+            case: sorted(
+                binding["corpus_id"]
+                for binding in self.catalog["case_bindings"]
+                if binding["case"] == case
+            )
+            for case in NEW_CONVERSION_SELECTORS
+        }
+        for selector in NEW_CONVERSION_SELECTORS:
+            scenario = scenarios[selector]
+            self.assertEqual(scenario["status"], "measured")
+            self.assertEqual(scenario["corpus"]["kind"], "checked-catalog")
+            self.assertEqual(scenario["corpus"]["case"], selector)
+            identifiers = scenario["corpus"]["ids"]
+            self.assertEqual(identifiers, binding_ids[selector])
+            self.assertEqual(scenario["corpus"]["shapes"], ["large", "medium", "tiny"])
+            self.assertEqual(len(identifiers), 3)
+            self.assertTrue(
+                all(
+                    corpus_by_id[identifier]["coverage"]["timed_cases"] == [selector]
+                    for identifier in identifiers
+                )
+            )
+
+    def test_0508_preserves_prior_201_default_result_identity(self) -> None:
+        old_cases = [
+            case
+            for case in self.identity["default_cases"]
+            if case not in NEW_CONVERSION_SELECTORS
+        ]
+        self.assertEqual(len(old_cases), 37)
+        keys = []
+        for case in old_cases:
+            for name in self.identity["case_corpora"][case]:
+                corpus_identity = json.dumps(
+                    self.identity["corpora"][name],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+                keys.append((case, corpus_identity))
+        self.assertEqual(len(keys), 201)
+        self.assertEqual(
+            perf_compare.result_key_manifest_sha256(keys),
+            PREVIOUS_RESULT_KEYS_SHA256,
+        )
+
     def test_missing_category_is_rejected(self) -> None:
         index = copy.deepcopy(self.index)
         index["categories"].pop()
@@ -189,8 +260,15 @@ class CrudCoverageIndexTests(unittest.TestCase):
 
     def test_generated_per_run_identity_is_required(self) -> None:
         index = copy.deepcopy(self.index)
-        identity = index["categories"][2]["scenarios"][0]["corpus"]["identity"]
-        index["categories"][2]["scenarios"][0]["corpus"]["identity"] = identity.replace(
+        scenario = next(
+            scenario
+            for category in index["categories"]
+            for scenario in category["scenarios"]
+            if scenario.get("status") == "correctness-only"
+            and scenario.get("corpus", {}).get("kind") == "generated-per-run"
+        )
+        identity = scenario["corpus"]["identity"]
+        scenario["corpus"]["identity"] = identity.replace(
             "schema-2", "schema-one"
         )
         with self.assertRaises(ValidationError):
@@ -233,6 +311,22 @@ class CrudCoverageIndexTests(unittest.TestCase):
         report["results"] = [row for row in report["results"]
                              if row["case"] != "odp_existing_append_lifecycle"]
         with self.assertRaisesRegex(ValidationError, "missing measured row.*odp_existing_append"):
+            self.validate(self.index, report=report)
+
+    def test_measured_conversion_sink_cannot_omit_report_row(self) -> None:
+        report = self.measured_report()
+        report["results"] = [
+            row
+            for row in report["results"]
+            if not (
+                row["case"] == "ods_semantic_text_to_sink"
+                and row["corpus"]["shape"] == "medium"
+            )
+        ]
+        with self.assertRaisesRegex(
+            ValidationError,
+            "missing measured row.*ods_semantic_text_to_sink",
+        ):
             self.validate(self.index, report=report)
 
     def test_measured_status_requires_retained_timing_artifact(self) -> None:
@@ -325,7 +419,14 @@ class CrudCoverageIndexTests(unittest.TestCase):
 
     def test_missing_nested_corpus_field_is_rejected_as_validation_error(self) -> None:
         index = copy.deepcopy(self.index)
-        del index["categories"][2]["scenarios"][0]["corpus"]["identity"]
+        scenario = next(
+            scenario
+            for category in index["categories"]
+            for scenario in category["scenarios"]
+            if scenario.get("status") == "correctness-only"
+            and scenario.get("corpus", {}).get("kind") == "generated-per-run"
+        )
+        del scenario["corpus"]["identity"]
         with self.assertRaises(ValidationError):
             self.validate(index)
 

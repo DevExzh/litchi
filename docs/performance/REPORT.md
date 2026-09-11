@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0508: measured default text-export coverage
+
+[0508](changes/0508-default-semantic-text-export.md) promotes four existing
+semantic text-output selectors across three sizes into the checked default.
+The matrix now has 41 cases/213 rows/43 corpora and preserves all 201 old
+identities. Two serial full runs validate 6,390 samples. The representative
+CRUD index now binds 15 measured selectors to 60 case/corpus rows, leaving
+18 correctness-only selectors. RTF retains a pre-reserved output buffer; ODF
+hashes into a discard sink. These are descriptive export-only timings and
+neither a cross-format ranking nor an end-to-end speedup claim. All raw
+samples and replay checks are retained. The broader non-iWork goal is open.
+
 ## 0507: faster ODG values with lower allocation work
 
 [0507](changes/0507-odg-attribute-value-batches.md) records this batch.

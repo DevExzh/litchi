@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0508: export baselines and current priority reconciliation
+
+[0508](changes/0508-default-semantic-text-export.md) adds twelve descriptive
+text-export rows while preserving the old default identities. ODT-large emits
+19,999 sink writes and ODS-large 65,535, with 49/54-byte largest writes. Those
+output boundaries are candidates for future attribution, not proof that
+coalescing is the dominant cost. Matched profiling is required before changing
+traversal, error order or sink behavior. Eighteen index selectors remain
+correctness-only. The [ODG comparison audit](results/change-0508/odg-priority-review.md)
+keeps the accepted recent improvements separate from an unmatched historical
+endpoint comparison; further ODG work should use the current residual costs.
+
 ## 0507: contiguous ODG value walks batched
 
 [0507](changes/0507-odg-attribute-value-batches.md) records this batch.
@@ -45,17 +57,17 @@ matched whole-child profile; repeated attribute walks and unique-style scans
 remain candidates for attribution. The older 0502 regression and broader CRUD
 requirements are not declared closed.
 
-## Review queue reconciled through 0502
+## Review queue reconciled through 0508
 
 The retained evidence changes the next investigations. These priorities concern
 measured scenarios; the full taxonomy and provider matrix remain required.
 
 | Priority | Observed cost | Next evidence needed |
 | --- | --- | --- |
-| P0 | ODG open p50 regresses 5.9–6.4% on plain and 53.4–111.1% on metadata corpora in 0502. | Profile the current richer parser and attribute repeated scanning and retained metadata costs before another change; preserve all newly supported state and validation. The older parser is not a semantics-equivalent replacement. |
+| P1 | 0502 recorded historical richer-parser regressions; matched 0504–0507 captures establish subsequent reductions. | Use current residual parse/attribute profiles for optimization. A fresh, fully source-bound old-to-current comparison is needed for a causal historical-closure claim; retain richer semantics. |
 | P1 | 0499 many-small local Part batches remain slower than serial despite worker reuse; delayed batch-8 p99 rises 30.79%. | Isolate queue/wave overhead and delayed-provider tails with matched operation-local observations before changing admission policy. |
 | P1 | 0500 K=1 p128 owned batch lifecycle p50 rises 7.34%; p512 K=8 warm-file RSS rises 5.77%. | Recheck the publication-phase association and memory in matched repeated runs; larger batches do not erase these flags. |
-| P1 | The 0501 full-run reports validate 48 measured mappings but leave 22 mappings correctness-only. | Extend measured CRUD/provider coverage from the checked taxonomy, retaining source, output, and preservation oracles. |
+| P1 | 0508 full runs validate 60 mapped case/corpus rows; 18 selectors remain correctness-only. | Extend measured CRUD/provider and native-producer coverage from the checked taxonomy, retaining source, output, and preservation oracles. |
 
 The 2026-09-11 evidence audit reproduces the 0502 summary, including its
 bootstrap intervals, from all 16 raw timing reports. It also validates both

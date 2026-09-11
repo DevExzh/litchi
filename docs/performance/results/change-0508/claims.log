@@ -1,0 +1,4 @@
+usage: check_perf_claims.py [-h] --registry REGISTRY --repo-root REPO_ROOT
+                            [--evidence-root EVIDENCE_ROOT]
+                            [--mode {structural,strict}] [--canonical-sha256]
+check_perf_claims.py: error: the following arguments are required: --registry, --repo-root

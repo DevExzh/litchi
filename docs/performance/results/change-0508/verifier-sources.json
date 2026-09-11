@@ -1,0 +1,16 @@
+{
+  "tools/generate_corpus_manifest_v2.py": "be9b3c81a561eff4bc8303b1d2b7f5d8672747980e0aa760cf71036570e13d4b",
+  "tools/perf_compare.py": "9383ed2cf0b2dc1c571f459f0dd23b70627a0b5f7f494a7f069c7a573dea623e",
+  "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+  "tools/validate_crud_coverage_index.py": "41433f041d134ce8d2c733529f4765894bcece11a93d5c0ba9192c6938b176db",
+  "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558",
+  "tools/test_corpus_manifest_v2.py": "3d196f960239f36a9612b105328e7f57e83010195589d0584806397c2ed11891",
+  "tools/test_crud_coverage_index.py": "93a9f06e31b10ddd24c6cdea152f229a89145d67f2506b73176badc1a9dbd777",
+  "tools/test_perf_compare.py": "708dd81cc571cb5b75e80c4268976725ee69928cde32b202201355d2a2a4de7e",
+  "tools/test_perf_baseline_source_policy.py": "489bc06fe54a87a6d1ff9475ea13e99df8e16a3380d2f918853ecc781e002daa",
+  "tools/test_perf_workflow_policy.py": "5886f3190171094b7eddabe90aac6c7be4f9c9df37bce55a42dbcf435ca04e46",
+  "docs/performance/crud-coverage-index-v1.json": "1a8a22039e9cd88431c2800913d1a86777373e44217881fc6ad5cce8e597a8b5",
+  "docs/performance/perf-regression-policy-v1.json": "1b8469630a6d7d505ef73bafba7e1378527360b0d38c13539ba9eb5e9749747b",
+  "docs/performance/results/perf-corpus-manifest-v2.json": "19c24e27ad1a48954d788964c637738bae3ae97767ff6a40e49ea5644d5e2082",
+  "docs/performance/results/perf-regression-default-manifest-v1.json": "e95dfcc7b1ff467956749994034576839c55323b2f89c4f62123f117a7886e75"
+}

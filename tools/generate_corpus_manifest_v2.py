@@ -130,6 +130,83 @@ FAMILY_MAP: dict[str, dict[str, Any]] = {
             "SemanticShape",
         ],
     },
+    "litchi-rtf-semantic-v2": {
+        "family": "rtf",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.rtf-semantic-text-v1",
+        "seed_spec": "none",
+        "source_functions": [
+            "build_semantic_rtf_corpus",
+            "semantic_rtf_bytes",
+            "semantic_rtf_text",
+            "semantic_rtf_variant_text",
+            "semantic_rtf_paragraph_count",
+            "SemanticShape",
+            "RtfSemanticVariant",
+        ],
+    },
+    "litchi-odt-semantic-v1": {
+        "family": "odt",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.odt-semantic-text-v1",
+        "seed_spec": "none",
+        "source_functions": [
+            "build_semantic_odt_corpus",
+            "semantic_odt_bytes",
+            "semantic_odt_text",
+            "SemanticShape",
+        ],
+    },
+    "litchi-ods-semantic-v1": {
+        "family": "ods",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.ods-semantic-grid-v1",
+        "seed_spec": "none",
+        "source_functions": [
+            "build_semantic_ods_corpus",
+            "semantic_ods_bytes",
+            "semantic_ods_sheet_name",
+            "semantic_ods_text",
+            "SemanticShape",
+        ],
+    },
+    "litchi-odp-semantic-v1": {
+        "family": "odp",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.odp-semantic-slides-v1",
+        "seed_spec": "none",
+        "source_functions": [
+            "build_semantic_odp_corpus",
+            "semantic_odp_bytes",
+            "semantic_odp_title",
+            "semantic_odp_text",
+            "SemanticShape",
+        ],
+    },
 }
 
 _COMPRESSIBLE_PAYLOAD_FORMULA = (
@@ -298,22 +375,100 @@ def generator_parameters(
         )
         return parameters
 
-    if family_id == "odp":
+    if family_id == "rtf":
         parameters.update(
             {
-                "base_generator": "litchi-odp-buffered-slides-v1",
-                "slide_count_by_shape": {"tiny": 64, "medium": 4096, "large": 8192},
-                "append_count": 1,
-                "opaque_member_path": (
-                    "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+                "rtf_variant": legacy.get("rtf_variant"),
+                "paragraph_count_by_shape": {
+                    "tiny": 24,
+                    "medium": 200,
+                    "large": 10_000,
+                },
+                "text_template": (
+                    "litchi-perf-baseline-rtf-semantic-v1-"
+                    "{state}-{index:05}"
                 ),
-                "opaque_payload_bytes": 65_536,
-                "opaque_payload_formula": (
-                    "byte[index] = index_byte*37 + page_byte + 0x5b + "
-                    "variant (mod 256); variant=0"
+                "paragraph_separator": "\\n",
+            }
+        )
+        return parameters
+
+    if family_id == "odt":
+        parameters.update(
+            {
+                "paragraph_count_by_shape": {
+                    "tiny": 24,
+                    "medium": 200,
+                    "large": 10_000,
+                },
+                "text_template": (
+                    "litchi-perf-baseline-odt-semantic-v1-"
+                    "{state}-{index:05}"
+                ),
+                "paragraph_separator": "\\n",
+            }
+        )
+        return parameters
+
+    if family_id == "ods":
+        parameters.update(
+            {
+                "sheet_count_by_shape": {"tiny": 1, "medium": 2, "large": 2},
+                "rows_per_sheet_by_shape": {"tiny": 8, "medium": 32, "large": 128},
+                "columns_per_sheet_by_shape": {
+                    "tiny": 8,
+                    "medium": 32,
+                    "large": 128,
+                },
+                "text_template": (
+                    "litchi-perf-baseline-ods-semantic-v1-"
+                    "{state}-{sheet:02}-{row:03}-{column:03}"
                 ),
             }
         )
+        return parameters
+
+    if family_id == "odp":
+        if legacy["generator"] == "litchi-odp-existing-append-lifecycle-v1":
+            parameters.update(
+                {
+                    "base_generator": "litchi-odp-buffered-slides-v1",
+                    "slide_count_by_shape": {
+                        "tiny": 64,
+                        "medium": 4096,
+                        "large": 8192,
+                    },
+                    "append_count": 1,
+                    "opaque_member_path": (
+                        "Opaque/litchi-perf-odp-existing-append-opaque.bin"
+                    ),
+                    "opaque_payload_bytes": 65_536,
+                    "opaque_payload_formula": (
+                        "byte[index] = index_byte*37 + page_byte + 0x5b + "
+                        "variant (mod 256); variant=0"
+                    ),
+                }
+            )
+        elif legacy["generator"] == "litchi-odp-semantic-v1":
+            parameters.update(
+                {
+                    "slide_count_by_shape": {
+                        "tiny": 3,
+                        "medium": 12,
+                        "large": 100,
+                    },
+                    "title_template": (
+                        "litchi-perf-baseline-odp-title-v1-"
+                        "{state}-{index:03}"
+                    ),
+                    "body_template": (
+                        "litchi-perf-baseline-odp-body-v1-"
+                        "{state}-{index:03}"
+                    ),
+                    "slide_text_separator": "\\n",
+                    "presentation_text_separator": "\\n\\n",
+                }
+            )
         return parameters
 
     return parameters
@@ -324,6 +479,11 @@ def migrate_corpus(legacy: dict[str, Any]) -> dict[str, Any]:
     shape = legacy["shape"]
     payload_kind = legacy["payload_kind"]
     family = FAMILY_MAP.get(generator)
+    # The semantic RTF generator also admits the checked-in watermark fixture.
+    # Its bytes come from test-data rather than the deterministic text builder,
+    # so keep that variant conservative until it has its own provenance entry.
+    if generator == "litchi-rtf-semantic-v2" and legacy.get("rtf_variant") == "watermark":
+        family = None
     generated = family is not None or "synthetic" in generator
     categories = ["legacy-migrated"]
     if generated:

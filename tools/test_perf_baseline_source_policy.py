@@ -25,6 +25,9 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         cls.allocator = (
             PERF_BASELINE / "src" / "bin" / "litchi-perf-baseline-alloc.rs"
         ).read_text(encoding="utf-8")
+        cls.allocator_support = (
+            PERF_BASELINE / "src" / "bin" / "support" / "counting_allocator.rs"
+        ).read_text(encoding="utf-8")
         cls.xlsb_crud = (
             PERF_BASELINE / "src" / "bin" / "xlsb_crud.rs"
         ).read_text(encoding="utf-8")
@@ -53,11 +56,15 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertNotIn("GlobalAlloc", self.library)
 
     def test_allocator_target_owns_global_allocator_unsafe_surface(self):
-        self.assertIn("use litchi_perf_baseline::allocation_metrics;", self.allocator)
-        self.assertNotIn("use super::allocation_metrics;", self.allocator)
-        self.assertIn("unsafe impl GlobalAlloc", self.allocator)
-        self.assertIn("#[global_allocator]", self.allocator)
-        self.assertIn("System.alloc", self.allocator)
+        self.assertIn('#[path = "support/counting_allocator.rs"]\nmod allocator;', self.allocator)
+        self.assertIn("litchi_perf_baseline::allocation_metrics::enable();", self.allocator)
+        self.assertNotIn("counting_allocator", self.normal)
+        self.assertNotIn("counting_allocator", self.library)
+        self.assertIn("use litchi_perf_baseline::allocation_metrics;", self.allocator_support)
+        self.assertNotIn("use super::allocation_metrics;", self.allocator_support)
+        self.assertIn("unsafe impl GlobalAlloc", self.allocator_support)
+        self.assertIn("#[global_allocator]", self.allocator_support)
+        self.assertIn("System.alloc", self.allocator_support)
         self.assertNotIn("#![forbid(unsafe_code)]", self.allocator)
         self.assertNotIn("unsafe impl", self.metrics)
         self.assertNotIn("#[global_allocator]", self.metrics)

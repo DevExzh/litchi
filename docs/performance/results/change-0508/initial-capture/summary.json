@@ -1,0 +1,557 @@
+{
+  "kind": "descriptive baseline; no before/after speedup claim",
+  "preserved_prior_rows": 201,
+  "cases": 41,
+  "corpora": 43,
+  "rows_per_run": 213,
+  "full_run_samples": 6390,
+  "new_export_samples": 360,
+  "repeats": [
+    {
+      "lane": "r1",
+      "elapsed_seconds": 47.08128988799581,
+      "exports": [
+        {
+          "case": "rtf_semantic_text_to_sink",
+          "corpus": "rtf-semantic-plain-tiny",
+          "p50_ns": 1840,
+          "p95_ns": 2160,
+          "p99_ns": 2160,
+          "sink": {
+            "accepted_bytes": 1199,
+            "write_calls": 47,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 47,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": null
+        },
+        {
+          "case": "rtf_semantic_text_to_sink",
+          "corpus": "rtf-semantic-plain-medium",
+          "p50_ns": 15540,
+          "p95_ns": 15611,
+          "p99_ns": 15611,
+          "sink": {
+            "accepted_bytes": 9999,
+            "write_calls": 399,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 399,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": null
+        },
+        {
+          "case": "rtf_semantic_text_to_sink",
+          "corpus": "rtf-semantic-plain-large",
+          "p50_ns": 958834,
+          "p95_ns": 962984,
+          "p99_ns": 962984,
+          "sink": {
+            "accepted_bytes": 499999,
+            "write_calls": 19999,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 19999,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": null
+        },
+        {
+          "case": "odt_semantic_text_to_sink",
+          "corpus": "odt-semantic-tiny",
+          "p50_ns": 6440,
+          "p95_ns": 6650,
+          "p99_ns": 6650,
+          "sink": {
+            "accepted_bytes": 1199,
+            "write_calls": 47,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 47,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "4f2585e8f43b6be71d996d9b8de0402785d034f612dcbccfb46cffda359c85bd"
+        },
+        {
+          "case": "odt_semantic_text_to_sink",
+          "corpus": "odt-semantic-medium",
+          "p50_ns": 40110,
+          "p95_ns": 48090,
+          "p99_ns": 48090,
+          "sink": {
+            "accepted_bytes": 9999,
+            "write_calls": 399,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 399,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "efd577b210a5effdd558dc56ab8589a0d4a68e8df9c091f948fae201ab6bf099"
+        },
+        {
+          "case": "odt_semantic_text_to_sink",
+          "corpus": "odt-semantic-large",
+          "p50_ns": 1892287,
+          "p95_ns": 1926367,
+          "p99_ns": 1926367,
+          "sink": {
+            "accepted_bytes": 499999,
+            "write_calls": 19999,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 19999,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "7559b81385c1773da1ef9ee52972f8ff032e1cf4996824d30e4b40a003a135c0"
+        },
+        {
+          "case": "ods_semantic_text_to_sink",
+          "corpus": "ods-semantic-tiny",
+          "p50_ns": 3490,
+          "p95_ns": 3580,
+          "p99_ns": 3580,
+          "sink": {
+            "accepted_bytes": 3519,
+            "write_calls": 127,
+            "largest_write": 54,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 127,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "6070edfdf06fe2b33d217eee8a10d1e91c62786e27868accb1ccf60b9614b447"
+        },
+        {
+          "case": "ods_semantic_text_to_sink",
+          "corpus": "ods-semantic-medium",
+          "p50_ns": 111620,
+          "p95_ns": 118381,
+          "p99_ns": 118381,
+          "sink": {
+            "accepted_bytes": 112639,
+            "write_calls": 4095,
+            "largest_write": 54,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 4095,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "c10b977ef3c3b61ae9cc83c3f665022937559cabffd9f15ce6befdca2852e381"
+        },
+        {
+          "case": "ods_semantic_text_to_sink",
+          "corpus": "ods-semantic-large",
+          "p50_ns": 1832316,
+          "p95_ns": 1836127,
+          "p99_ns": 1836127,
+          "sink": {
+            "accepted_bytes": 1802239,
+            "write_calls": 65535,
+            "largest_write": 54,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 65535,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "86b230b52987d191312f0b51dd1f01fc53a43b62f57e93e4caa99c68852c2cfe"
+        },
+        {
+          "case": "odp_semantic_text_to_sink",
+          "corpus": "odp-semantic-tiny",
+          "p50_ns": 9570,
+          "p95_ns": 9750,
+          "p99_ns": 9750,
+          "sink": {
+            "accepted_bytes": 268,
+            "write_calls": 11,
+            "largest_write": 44,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 11,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "5d1b90a80d40b03d726af6cb6ad3e9a0d4b6d9ff8362f0f814fa2ffa77672eba"
+        },
+        {
+          "case": "odp_semantic_text_to_sink",
+          "corpus": "odp-semantic-medium",
+          "p50_ns": 30451,
+          "p95_ns": 30700,
+          "p99_ns": 30700,
+          "sink": {
+            "accepted_bytes": 1078,
+            "write_calls": 47,
+            "largest_write": 44,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 47,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "460bfe509d9c35eb05728c4ff847e0a080aec9bf7a2684ee80b2f9e46b37e3c7"
+        },
+        {
+          "case": "odp_semantic_text_to_sink",
+          "corpus": "odp-semantic-large",
+          "p50_ns": 233021,
+          "p95_ns": 240761,
+          "p99_ns": 240761,
+          "sink": {
+            "accepted_bytes": 8998,
+            "write_calls": 399,
+            "largest_write": 44,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 399,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "ac5005041bef7b60dfd9e18f04d7b62b742c89144d4750065156df6fe4bb3ec8"
+        }
+      ]
+    },
+    {
+      "lane": "r2",
+      "elapsed_seconds": 47.922164388000965,
+      "exports": [
+        {
+          "case": "rtf_semantic_text_to_sink",
+          "corpus": "rtf-semantic-plain-tiny",
+          "p50_ns": 1820,
+          "p95_ns": 2110,
+          "p99_ns": 2110,
+          "sink": {
+            "accepted_bytes": 1199,
+            "write_calls": 47,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 47,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": null
+        },
+        {
+          "case": "rtf_semantic_text_to_sink",
+          "corpus": "rtf-semantic-plain-medium",
+          "p50_ns": 15630,
+          "p95_ns": 19570,
+          "p99_ns": 19570,
+          "sink": {
+            "accepted_bytes": 9999,
+            "write_calls": 399,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 399,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": null
+        },
+        {
+          "case": "rtf_semantic_text_to_sink",
+          "corpus": "rtf-semantic-plain-large",
+          "p50_ns": 961103,
+          "p95_ns": 1184975,
+          "p99_ns": 1184975,
+          "sink": {
+            "accepted_bytes": 499999,
+            "write_calls": 19999,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 19999,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": null
+        },
+        {
+          "case": "odt_semantic_text_to_sink",
+          "corpus": "odt-semantic-tiny",
+          "p50_ns": 6591,
+          "p95_ns": 6890,
+          "p99_ns": 6890,
+          "sink": {
+            "accepted_bytes": 1199,
+            "write_calls": 47,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 47,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "4f2585e8f43b6be71d996d9b8de0402785d034f612dcbccfb46cffda359c85bd"
+        },
+        {
+          "case": "odt_semantic_text_to_sink",
+          "corpus": "odt-semantic-medium",
+          "p50_ns": 40400,
+          "p95_ns": 41810,
+          "p99_ns": 41810,
+          "sink": {
+            "accepted_bytes": 9999,
+            "write_calls": 399,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 399,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "efd577b210a5effdd558dc56ab8589a0d4a68e8df9c091f948fae201ab6bf099"
+        },
+        {
+          "case": "odt_semantic_text_to_sink",
+          "corpus": "odt-semantic-large",
+          "p50_ns": 1880748,
+          "p95_ns": 1889927,
+          "p99_ns": 1889927,
+          "sink": {
+            "accepted_bytes": 499999,
+            "write_calls": 19999,
+            "largest_write": 49,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 19999,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "7559b81385c1773da1ef9ee52972f8ff032e1cf4996824d30e4b40a003a135c0"
+        },
+        {
+          "case": "ods_semantic_text_to_sink",
+          "corpus": "ods-semantic-tiny",
+          "p50_ns": 3500,
+          "p95_ns": 3601,
+          "p99_ns": 3601,
+          "sink": {
+            "accepted_bytes": 3519,
+            "write_calls": 127,
+            "largest_write": 54,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 127,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "6070edfdf06fe2b33d217eee8a10d1e91c62786e27868accb1ccf60b9614b447"
+        },
+        {
+          "case": "ods_semantic_text_to_sink",
+          "corpus": "ods-semantic-medium",
+          "p50_ns": 111691,
+          "p95_ns": 118050,
+          "p99_ns": 118050,
+          "sink": {
+            "accepted_bytes": 112639,
+            "write_calls": 4095,
+            "largest_write": 54,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 4095,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "c10b977ef3c3b61ae9cc83c3f665022937559cabffd9f15ce6befdca2852e381"
+        },
+        {
+          "case": "ods_semantic_text_to_sink",
+          "corpus": "ods-semantic-large",
+          "p50_ns": 1840547,
+          "p95_ns": 1845937,
+          "p99_ns": 1845937,
+          "sink": {
+            "accepted_bytes": 1802239,
+            "write_calls": 65535,
+            "largest_write": 54,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 65535,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "86b230b52987d191312f0b51dd1f01fc53a43b62f57e93e4caa99c68852c2cfe"
+        },
+        {
+          "case": "odp_semantic_text_to_sink",
+          "corpus": "odp-semantic-tiny",
+          "p50_ns": 9470,
+          "p95_ns": 21601,
+          "p99_ns": 21601,
+          "sink": {
+            "accepted_bytes": 268,
+            "write_calls": 11,
+            "largest_write": 44,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 11,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "5d1b90a80d40b03d726af6cb6ad3e9a0d4b6d9ff8362f0f814fa2ffa77672eba"
+        },
+        {
+          "case": "odp_semantic_text_to_sink",
+          "corpus": "odp-semantic-medium",
+          "p50_ns": 30681,
+          "p95_ns": 40861,
+          "p99_ns": 40861,
+          "sink": {
+            "accepted_bytes": 1078,
+            "write_calls": 47,
+            "largest_write": 44,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 47,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "460bfe509d9c35eb05728c4ff847e0a080aec9bf7a2684ee80b2f9e46b37e3c7"
+        },
+        {
+          "case": "odp_semantic_text_to_sink",
+          "corpus": "odp-semantic-large",
+          "p50_ns": 232401,
+          "p95_ns": 241690,
+          "p99_ns": 241690,
+          "sink": {
+            "accepted_bytes": 8998,
+            "write_calls": 399,
+            "largest_write": 44,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_1_to_512": 399,
+              "bytes_513_to_4096": 0,
+              "bytes_4097_to_16384": 0,
+              "bytes_16385_to_65536": 0,
+              "bytes_over_65536": 0
+            },
+            "retained_output_bytes": 0
+          },
+          "output_sha256": "ac5005041bef7b60dfd9e18f04d7b62b742c89144d4750065156df6fe4bb3ec8"
+        }
+      ]
+    }
+  ],
+  "negative_probes": [
+    {
+      "kind": "missing-export-row",
+      "rejected": true,
+      "reason": "report is missing measured row 'rtf_semantic_text_to_sink' / 'rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328'"
+    },
+    {
+      "kind": "short-export-sample-vector",
+      "rejected": true,
+      "reason": "report result 198 elapsed_ns has fewer than 15 samples"
+    }
+  ]
+}

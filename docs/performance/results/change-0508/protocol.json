@@ -1,0 +1,27 @@
+{
+  "revision": "40a44b44e1d5c83cb81fc36d7eb61de239666c78",
+  "kind": "descriptive default baseline coverage expansion; no performance improvement claim",
+  "new_cases": [
+    "rtf_semantic_text_to_sink",
+    "odt_semantic_text_to_sink",
+    "ods_semantic_text_to_sink",
+    "odp_semantic_text_to_sink"
+  ],
+  "preflight": {
+    "warmup": 0,
+    "samples": 1
+  },
+  "full_runs": {
+    "serial_repeats": 2,
+    "warmup": 3,
+    "samples": 15
+  },
+  "requirements": [
+    "preserve every prior201 default identity",
+    "Existing exact RTF output/progress checks and ODF sink digest/progress checks outside timing remain unchanged",
+    "Python and Rust schema2 catalog derivations must agree",
+    "strict default report and CRUD validators pass on both full runs",
+    "retain raw reports, host, binary and source hashes, build/test receipts",
+    "do not promote mappings unless actual full reports validate"
+  ]
+}

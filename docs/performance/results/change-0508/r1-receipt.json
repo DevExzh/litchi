@@ -1,0 +1,30 @@
+{
+  "lane": "r1",
+  "command": [
+    "/tmp/litchi-goal-0508/target/release/litchi-perf-baseline",
+    "--warmup",
+    "3",
+    "--samples",
+    "15",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0508/r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0508/r1-catalog.json"
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0508/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0508"
+  },
+  "started_utc": "2026-09-11T17:49:14.598617+00:00",
+  "elapsed_seconds": 48.16162926799734,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "e4851370dd14cbd5f052edb27792858de75bd26e594fa1a9bec34a9191f77eed",
+  "log_sha256": "562f92e06cdd902f1a07ea171a5aba09416dc89bd3c344960c38d534d09b94c1",
+  "binary_sha256": "ab874929448dfa3a4c17fd9072e702081b4e78b84cae39f3be120518a0c7f6f2"
+}

@@ -1,0 +1,179 @@
+{
+  "scope": "standalone performance harness default library and allocator-feature all-target checks; format production unchanged",
+  "rust_tests_passed": 483,
+  "rust_tests_ignored": 1,
+  "python_tests_passed": 199,
+  "gates": [
+    {
+      "lane": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--bin",
+        "litchi-perf-baseline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "log_sha256": "1867931aaa68145ed3fca4ab226715e1a7786ea5f7d8c0a30745cd1b72f291c0"
+    },
+    {
+      "lane": "preflight",
+      "command": [
+        "/tmp/litchi-goal-0508/target/release/litchi-perf-baseline",
+        "--warmup",
+        "0",
+        "--samples",
+        "1",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0508/preflight-report.json",
+        "--corpus-manifest",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0508/preflight-catalog.json"
+      ],
+      "exit_code": 0,
+      "log_sha256": "55d0a5387564fedc409d8d1e258aac978ec824cc5035cbfeb27d8a843590eead"
+    },
+    {
+      "lane": "r1",
+      "command": [
+        "/tmp/litchi-goal-0508/target/release/litchi-perf-baseline",
+        "--warmup",
+        "3",
+        "--samples",
+        "15",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0508/r1-report.json",
+        "--corpus-manifest",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0508/r1-catalog.json"
+      ],
+      "exit_code": 0,
+      "log_sha256": "562f92e06cdd902f1a07ea171a5aba09416dc89bd3c344960c38d534d09b94c1"
+    },
+    {
+      "lane": "r2",
+      "command": [
+        "/tmp/litchi-goal-0508/target/release/litchi-perf-baseline",
+        "--warmup",
+        "3",
+        "--samples",
+        "15",
+        "--json",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0508/r2-report.json",
+        "--corpus-manifest",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0508/r2-catalog.json"
+      ],
+      "exit_code": 0,
+      "log_sha256": "60befa614a43468698ede472ad9e2166b7fb8ba1a4ac7b6e122735cf6271610c"
+    },
+    {
+      "lane": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--lib",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "log_sha256": "f562ae962499c4e68b722b923a69e9e20437172d521641fb188eff58936a4b90"
+    },
+    {
+      "lane": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--lib",
+        "--bin",
+        "litchi-perf-baseline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log_sha256": "be06f4daabb6a9f5bb2d9c4eccb6d0563c7cabf5a5f3571a76a28c12cf32acb3"
+    },
+    {
+      "lane": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "--release",
+        "--lib",
+        "--no-deps",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "log_sha256": "dd0be83b8bb0e8bf8763b1cd1937901ff54502641d36849d7a87879fb3aec09a"
+    },
+    {
+      "lane": "doctests",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--doc",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e71654b4b1467690cbdcaa90003f1888ad117e4d75fff98c1096f2f7279a3075"
+    },
+    {
+      "lane": "check-features",
+      "command": [
+        "cargo",
+        "check",
+        "--release",
+        "--all-targets",
+        "--features",
+        "allocator-metrics",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "log_sha256": "2e262a1d75d27e49b6fe3013b4a99004fca6caca641c5fd928212f80d744ea7a"
+    },
+    {
+      "lane": "python-tests-source-final.log",
+      "exit_code": 0,
+      "log_sha256": "dd37e322fce1bd02e9aa4e994ec2fc70fb03256f0c99cc62f0a6eb3d85c5d0d4"
+    },
+    {
+      "lane": "claims-source-final.log",
+      "exit_code": 0,
+      "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+    },
+    {
+      "lane": "report-claims-final.log",
+      "exit_code": 0,
+      "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    {
+      "lane": "cargo-fmt.log",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "lane": "fmt-final.log",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "lane": "boundaries.log",
+      "exit_code": 0,
+      "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9"
+    }
+  ]
+}

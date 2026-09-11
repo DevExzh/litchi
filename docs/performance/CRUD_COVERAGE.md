@@ -1,5 +1,18 @@
 # Performance CRUD coverage
 
+## 0508: four text-export selectors enter the default contract
+
+[0508](changes/0508-default-semantic-text-export.md) adds plain RTF, ODT, ODS
+and ODP semantic text output across tiny/medium/large shapes. The default is
+41 cases/213 rows/43 corpora; all prior 201 identities remain exact. Both
+15-sample full matrices pass report/catalog and CRUD timing validation, with
+6,390 measured samples in total. The index still has 15 categories and 33
+mapped selectors: 15 measured selectors bind 60 case/corpus rows, while
+18 remain correctness-only. The conversion category now cites scope and
+measured-claim requirements; plain text export does not exercise XML
+compaction. These generated fixtures establish no native-producer, provider,
+full-format support, or new mutation-preservation claim.
+
 ## 0501: PPTX payload preparation only; no coverage promotion
 
 [0501](changes/0501-pptx-exact-payload-comparisons.md) measures a scoped

@@ -1,5 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0508: concrete default conversion coverage expansion
+
+[0508](changes/0508-default-semantic-text-export.md) preserves all 201 prior
+default identities and adds twelve measured text-export rows. The default
+now has 41 cases/213 rows/43 corpora. Two fresh full matrices validate 6,390
+samples; 15 mapped measured selectors bind 60 case/corpus rows, with 18
+selectors still correctness-only. The XML-compaction checklist mismatch is
+corrected. This advances representative conversion/export coverage without
+claiming native-producer, cold-provider or complete checklist certification.
+The [ODG audit](results/change-0508/odg-priority-review.md) distinguishes
+matched 0504–0507 improvements from the historical old-parser comparison.
+Remaining priorities include the 0499 local Part-batch overhead, 0500 K1
+latency/RSS flags, the remaining coverage gaps and real-producer evidence.
+The program goal remains active.
+
 ## Current audit: 0507 reduces repeated ODG value work
 
 [0507](changes/0507-odg-attribute-value-batches.md) records this batch.

@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0508: semantic text export joins the default baseline
+
+[0508](changes/0508-default-semantic-text-export.md) expands the checked default
+to 41 cases, 213 rows and 43 deterministic corpora, preserving all prior 201
+identities. Two serial full runs retain 6,390 measured samples, including 360
+for plain RTF/ODT/ODS/ODP text export. Both full report/catalog and CRUD timing
+validators pass. This is a descriptive Rust 1.95.0 baseline, with document
+opening outside timing and distinct retained RTF versus hashing ODF sinks;
+no historical speedup or native-producer claim is made.
+
 ## 0507: matched ODG value-batch baseline
 
 [0507](changes/0507-odg-attribute-value-batches.md) records this batch.

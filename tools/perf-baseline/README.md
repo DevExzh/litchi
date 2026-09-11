@@ -1,5 +1,20 @@
 # OPC, CFB, OLE2 Office, OOXML, RTF, and ODF performance baseline
 
+## Current default: semantic text export (0508)
+
+The checked default is 41 cases, 213 rows and 43 deterministic corpora.
+[0508](../../docs/performance/changes/0508-default-semantic-text-export.md)
+appends the existing plain RTF, ODT, ODS and ODP `semantic_text_to_sink`
+selectors across three sizes, preserving every old 201-row identity. Two full
+serial runs retain 6,390 samples and pass report/catalog and CRUD timing gates.
+The registry has 441 selectors; the coverage index's minimum remains 439.
+RTF uses a bounded retained sink; ODF uses a bounded hashing discard sink.
+Opening, setup and output verification are outside the export timer. This is
+synthetic descriptive coverage, not a before/after speedup or native-producer
+claim. [Evidence and replay](../../docs/performance/results/change-0508/README.md).
+
+The sections below retain the dated evolution of earlier default matrices.
+
 0465 adds the existing materialized `odp_existing_append_lifecycle` case to the
 checked default matrix. Preflight preserves all prior 198 identities; the
 checked identity is 37 default cases, 201 rows and 31 deterministic corpora,

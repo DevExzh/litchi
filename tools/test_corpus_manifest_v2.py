@@ -9,7 +9,12 @@ import json
 import unittest
 from pathlib import Path
 
-from tools.generate_corpus_manifest_v2 import FAMILY_MAP, canonical_bytes, generate
+from tools.generate_corpus_manifest_v2 import (
+    FAMILY_MAP,
+    canonical_bytes,
+    generate,
+    migrate_corpus,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,10 +22,10 @@ V1_PATH = ROOT / "docs/performance/results/perf-regression-default-manifest-v1.j
 V2_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SCHEMA_PATH = ROOT / "docs/performance/schemas/corpus-manifest-v2.schema.json"
 EXPECTED_RESULT_KEYS_SHA256 = (
-    "f0fd76293959e72211e06e51b0a2b41f371423fda34c55144077193d262b1670"
+    "63cdfaaf094b744baf9a6bb770c676c7752671a3d08a711fa0e2c98538efc8cd"
 )
 EXPECTED_CONTENT_SET_SHA256 = (
-    "0ac5a8c267b6da1424ae0f322ac309e6a52606a67cfccaed12cd6821e93becd5"
+    "8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5"
 )
 
 
@@ -75,7 +80,7 @@ class CorpusManifestV2Tests(unittest.TestCase):
     def test_catalog_shape_and_bindings(self):
         self.assertEqual(self.v2["manifest_version"], 2)
         self.assertEqual(self.v2["manifest_kind"], "corpus-catalog")
-        self.assertEqual(len(self.v2["corpora"]), 31)
+        self.assertEqual(len(self.v2["corpora"]), 43)
         self.assertEqual(len(self.v2["case_bindings"]), self.v1["result_count"])
         ids = [corpus["id"] for corpus in self.v2["corpora"]]
         self.assertEqual(ids, sorted(ids))
@@ -124,6 +129,26 @@ class CorpusManifestV2Tests(unittest.TestCase):
             "litchi-odp-existing-append-lifecycle-v1": (
                 "odp",
                 "litchi-perf.odp-existing-append-v1",
+                "none",
+            ),
+            "litchi-rtf-semantic-v2": (
+                "rtf",
+                "litchi-perf.rtf-semantic-text-v1",
+                "none",
+            ),
+            "litchi-odt-semantic-v1": (
+                "odt",
+                "litchi-perf.odt-semantic-text-v1",
+                "none",
+            ),
+            "litchi-ods-semantic-v1": (
+                "ods",
+                "litchi-perf.ods-semantic-grid-v1",
+                "none",
+            ),
+            "litchi-odp-semantic-v1": (
+                "odp",
+                "litchi-perf.odp-semantic-slides-v1",
                 "none",
             ),
         }
@@ -189,6 +214,43 @@ class CorpusManifestV2Tests(unittest.TestCase):
                 self.assertEqual(parameters["append_count"], 1)
                 self.assertEqual(parameters["opaque_payload_bytes"], 65_536)
                 self.assertIn("variant=0", parameters["opaque_payload_formula"])
+            elif generator["id"] == "litchi-rtf-semantic-v2":
+                self.assertEqual(generator["seed_spec"], "none")
+                self.assertEqual(parameters["rtf_variant"], corpus["legacy_v1"]["rtf_variant"])
+                self.assertEqual(
+                    parameters["paragraph_count_by_shape"],
+                    {"tiny": 24, "medium": 200, "large": 10_000},
+                )
+                self.assertEqual(parameters["paragraph_separator"], "\\n")
+            elif generator["id"] == "litchi-odt-semantic-v1":
+                self.assertEqual(generator["seed_spec"], "none")
+                self.assertEqual(
+                    parameters["paragraph_count_by_shape"],
+                    {"tiny": 24, "medium": 200, "large": 10_000},
+                )
+                self.assertEqual(parameters["paragraph_separator"], "\\n")
+            elif generator["id"] == "litchi-ods-semantic-v1":
+                self.assertEqual(generator["seed_spec"], "none")
+                self.assertEqual(
+                    parameters["sheet_count_by_shape"],
+                    {"tiny": 1, "medium": 2, "large": 2},
+                )
+                self.assertEqual(
+                    parameters["rows_per_sheet_by_shape"],
+                    {"tiny": 8, "medium": 32, "large": 128},
+                )
+                self.assertEqual(
+                    parameters["columns_per_sheet_by_shape"],
+                    {"tiny": 8, "medium": 32, "large": 128},
+                )
+            elif generator["id"] == "litchi-odp-semantic-v1":
+                self.assertEqual(generator["seed_spec"], "none")
+                self.assertEqual(
+                    parameters["slide_count_by_shape"],
+                    {"tiny": 3, "medium": 12, "large": 100},
+                )
+                self.assertEqual(parameters["slide_text_separator"], "\\n")
+                self.assertEqual(parameters["presentation_text_separator"], "\\n\\n")
             else:
                 self.assertEqual(generator["id"], "litchi-legacy-writer-v1")
                 self.assertEqual(generator["seed_spec"], "none")
@@ -235,6 +297,24 @@ class CorpusManifestV2Tests(unittest.TestCase):
             self.assertEqual(corpus["security"]["encryption"]["state"], "unknown")
             self.assertEqual(corpus["security"]["signature"]["state"], "unknown")
             self.assertEqual(corpus["security"]["macros"]["state"], "unknown")
+
+    def test_rtf_watermark_variant_keeps_unmapped_provenance(self):
+        legacy = copy.deepcopy(next(iter(self.v1["corpora"].values())))
+        legacy.update(
+            {
+                "generator": "litchi-rtf-semantic-v2",
+                "package_format": "RTF",
+                "shape": "tiny",
+                "payload_kind": "producer-watermark-drawing",
+                "rtf_variant": "watermark",
+            }
+        )
+        migrated = migrate_corpus(legacy)
+        self.assertEqual(migrated["generator"]["kind"], "unknown")
+        self.assertIsNone(migrated["generator"]["algorithm_id"])
+        self.assertIsNone(migrated["generator"]["seed_spec"])
+        self.assertEqual(migrated["provenance"]["source_kind"], "unknown")
+        self.assertIsNone(migrated["provenance"]["source_path"])
 
     def test_adding_reference_does_not_change_v1_result_identity(self):
         original = copy.deepcopy(self.v1)
