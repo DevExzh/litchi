@@ -606,7 +606,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 declaration_seen = true;
             },
             Event::Start(element) if !root_seen => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, false)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
                 root_seen = true;
                 increment_nodes(&mut nodes)?;
@@ -624,7 +624,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 });
             },
             Event::Empty(element) if !root_seen => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, false)?;
                 legacy_fragment = require_root(&element, &resolved, &reader)?;
                 root_seen = true;
                 root_closed = true;
@@ -636,7 +636,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 validate_unit(time_unit.as_deref().unwrap_or_default(), "timeUnit")?;
             },
             Event::Start(element) if root_seen && !root_closed => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, false)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes)?;
                 enforce_depth(stack.len().saturating_add(1))?;
@@ -670,7 +670,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 });
             },
             Event::Empty(element) if root_seen && !root_closed => {
-                validate_element(&element, &reader)?;
+                validate_element(&element, &reader, false)?;
                 validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
                 increment_nodes(&mut nodes)?;
                 enforce_depth(stack.len().saturating_add(1))?;
@@ -908,20 +908,25 @@ pub fn read_profile(xml: &[u8]) -> Result<Profile> {
             },
             Event::Text(text) => {
                 let text = validate_text(&text, "ink actions profile text")?;
+                if text.contains("]]>") {
+                    return Err(invalid(
+                        "ink actions profile text contains a raw CDATA terminator",
+                    ));
+                }
                 if (root.is_none() || root_closed) && !text.bytes().all(is_xml_whitespace) {
                     return Err(invalid("ink actions profile has text outside its root"));
                 }
-                if root.is_some() && !root_closed && !text.bytes().all(is_xml_whitespace) {
-                    ensure_profile_text_allowed(&stack)?;
+                if root.is_some() && !root_closed && !text.is_empty() {
+                    ensure_profile_character_content(&stack, text.bytes().all(is_xml_whitespace))?;
                 }
             },
             Event::CData(data) => {
                 let data = validate_text(&data, "ink actions profile CDATA")?;
-                if (root.is_none() || root_closed) && !data.bytes().all(is_xml_whitespace) {
+                if root.is_none() || root_closed {
                     return Err(invalid("ink actions profile has CDATA outside its root"));
                 }
-                if root.is_some() && !root_closed && !data.bytes().all(is_xml_whitespace) {
-                    ensure_profile_text_allowed(&stack)?;
+                if !data.is_empty() {
+                    ensure_profile_character_content(&stack, data.bytes().all(is_xml_whitespace))?;
                 }
             },
             Event::GeneralRef(reference) => {
@@ -931,7 +936,11 @@ pub fn read_profile(xml: &[u8]) -> Result<Profile> {
                         "ink actions profile has a reference outside its root",
                     ));
                 }
-                ensure_profile_text_allowed(&stack)?;
+                let whitespace = reference
+                    .resolve_char_ref()
+                    .map_err(xml_error)?
+                    .is_some_and(|character| matches!(character, ' ' | '\t' | '\r' | '\n'));
+                ensure_profile_character_content(&stack, whitespace)?;
             },
             Event::Comment(comment) => {
                 validate_text(&comment, "ink actions profile comment")?;
@@ -1184,7 +1193,7 @@ fn validate_profile_element<R: std::io::BufRead>(
     resolved: &ResolveResult<'_>,
     reader: &NsReader<R>,
 ) -> Result<()> {
-    validate_element(element, reader)?;
+    validate_element(element, reader, true)?;
     validate_unknown_prefix(resolved, element, false)
 }
 
@@ -1762,7 +1771,16 @@ fn decoded_namespace<R: std::io::BufRead>(value: &[u8], reader: &NsReader<R>) ->
     Ok(result)
 }
 
-fn ensure_profile_text_allowed(stack: &[ProfileFrame]) -> Result<()> {
+fn ensure_profile_character_content(stack: &[ProfileFrame], whitespace: bool) -> Result<()> {
+    if matches!(
+        stack.last().map(|frame| &frame.kind),
+        Some(ProfileFrameKind::Property { .. })
+    ) {
+        return Err(invalid("ink action property has character content"));
+    }
+    if whitespace {
+        return Ok(());
+    }
     match stack.last().map(|frame| &frame.kind) {
         Some(ProfileFrameKind::Definitions { .. })
         | Some(ProfileFrameKind::DataChild { .. })
@@ -2008,6 +2026,7 @@ fn validate_end_name(
 fn validate_element<R: std::io::BufRead>(
     element: &BytesStart<'_>,
     reader: &NsReader<R>,
+    strict_profile: bool,
 ) -> Result<()> {
     let element_name = element.name();
     let name = std::str::from_utf8(element_name.as_ref()).map_err(xml_error)?;
@@ -2033,10 +2052,37 @@ fn validate_element<R: std::io::BufRead>(
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        if strict_profile && attribute.value.contains(&b'<') {
+            return Err(invalid(
+                "ink actions profile attribute contains a raw less-than sign",
+            ));
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
         validate_xml_characters(&value, "ink actions attribute")?;
+        if strict_profile {
+            let key = attribute.key.as_ref();
+            let declared_prefix = if key == b"xmlns" {
+                Some(b"".as_slice())
+            } else {
+                key.strip_prefix(b"xmlns:")
+            };
+            if let Some(prefix) = declared_prefix {
+                const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+                const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
+                if prefix == b"xmlns"
+                    || value == XMLNS_NAMESPACE
+                    || (value == XML_NAMESPACE && prefix != b"xml")
+                    || (prefix == b"xml" && value != XML_NAMESPACE)
+                    || (!prefix.is_empty() && value.is_empty())
+                {
+                    return Err(invalid(
+                        "ink actions profile has an invalid namespace binding",
+                    ));
+                }
+            }
+        }
         if let Some(prefix) = attribute.key.prefix()
             && !matches!(prefix.as_ref(), b"xml" | b"xmlns")
             && matches!(
