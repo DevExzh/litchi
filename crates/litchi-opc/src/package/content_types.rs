@@ -5,7 +5,6 @@ use crate::Result;
 use crate::error::OpcError;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
-use std::fmt::Write as _;
 
 /// Remove `<Override>` elements for the supplied part names and their
 /// relationship members. The source XML is edited through validated structural
@@ -180,10 +179,22 @@ pub(crate) fn preflight_part_overrides(
         selector_bytes = selector_bytes
             .checked_add(part.as_str().len())
             .and_then(|size| size.checked_add(content_type.len()))
-            .and_then(|size| size.checked_add(64))
             .ok_or_else(|| {
                 OpcError::InvalidContentTypesManifest("content-type override size overflows".into())
             })?;
+        // Check each caller-provided field against the requested input cap,
+        // but do not charge a made-up per-entry XML overhead here. The exact
+        // escaped output is calculated below and is the only final-byte cap.
+        if part.as_str().len() > maximum || content_type.len() > maximum {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-type override selectors exceed the metadata limit".into(),
+            ));
+        }
+        // Raw selector bytes are a strict lower bound for the final escaped
+        // XML, so this aggregate admission cannot reject a candidate whose
+        // exact final output fits. Unlike the former +64-per-entry estimate,
+        // it avoids false failures for many small overrides while bounding
+        // selector metadata before names are cloned and sorted.
         if selector_bytes > maximum {
             return Err(OpcError::InvalidContentTypesManifest(
                 "content-type override selectors exceed the metadata limit".into(),
@@ -202,7 +213,7 @@ pub(crate) fn with_part_overrides(
     overrides: &[(&PackURI, &str)],
     max_output_bytes: usize,
 ) -> Result<OwnedXmlPart> {
-    let (maximum, selector_bytes) = preflight_part_overrides(source, overrides, max_output_bytes)?;
+    let (maximum, _selector_bytes) = preflight_part_overrides(source, overrides, max_output_bytes)?;
     let mut names = Vec::new();
     names
         .try_reserve_exact(overrides.len())
@@ -299,51 +310,21 @@ pub(crate) fn with_part_overrides(
             name
         },
     );
-    let mut fragment_bound = 0usize;
+    let mut fragment_len = 0usize;
     for (part, content_type) in overrides {
-        let fields = part
-            .as_str()
+        let escaped_part_len = escaped_xml_attribute_len(part.as_str())?;
+        let escaped_content_type_len = escaped_xml_attribute_len(content_type)?;
+        let fields = b"<"
             .len()
-            .checked_add(content_type.len())
-            .and_then(|size| size.checked_mul(6))
-            .and_then(|size| size.checked_add(element_name.len().saturating_add(39)))
+            .checked_add(element_name.len())
+            .and_then(|size| size.checked_add(b" PartName=\"\" ContentType=\"\"/>".len()))
+            .and_then(|size| size.checked_add(escaped_part_len))
+            .and_then(|size| size.checked_add(escaped_content_type_len))
             .ok_or_else(|| {
                 OpcError::InvalidContentTypesManifest("content-type override size overflows".into())
             })?;
-        fragment_bound = fragment_bound.checked_add(fields).ok_or_else(|| {
+        fragment_len = fragment_len.checked_add(fields).ok_or_else(|| {
             OpcError::InvalidContentTypesManifest("content-type override size overflows".into())
-        })?;
-    }
-    if source
-        .bytes()
-        .len()
-        .checked_add(fragment_bound)
-        .is_none_or(|size| size > maximum)
-    {
-        return Err(OpcError::InvalidContentTypesManifest(
-            "content-type override output exceeds the metadata limit".into(),
-        ));
-    }
-    let mut fragment = String::new();
-    fragment
-        .try_reserve_exact(fragment_bound.max(selector_bytes))
-        .map_err(|source| OpcError::Allocation {
-            resource: "OPC content-types override XML",
-            source,
-        })?;
-    let element_name = std::str::from_utf8(&element_name).map_err(|_| {
-        OpcError::InvalidContentTypesManifest("content-types root prefix is not UTF-8".into())
-    })?;
-    for (part, content_type) in overrides {
-        write!(
-            fragment,
-            "<{} PartName=\"{}\" ContentType=\"{}\"/>",
-            element_name,
-            litchi_core::xml::escape_xml(part.as_str()),
-            litchi_core::xml::escape_xml(content_type),
-        )
-        .map_err(|_| {
-            OpcError::InvalidContentTypesManifest("content-type override formatting failed".into())
         })?;
     }
     let (range, suffix) = if let Some(close) = root_close.as_ref() {
@@ -366,7 +347,7 @@ pub(crate) fn with_part_overrides(
         .bytes()
         .len()
         .checked_sub(range.len())
-        .and_then(|size| size.checked_add(fragment.len()))
+        .and_then(|size| size.checked_add(fragment_len))
         .and_then(|size| size.checked_add(suffix.len()))
         .ok_or_else(|| {
             OpcError::InvalidContentTypesManifest("content-type output size overflows".into())
@@ -386,10 +367,10 @@ pub(crate) fn with_part_overrides(
     bytes.extend_from_slice(&source.bytes()[..range.start]);
     if root_empty {
         bytes.extend_from_slice(&suffix[..1]);
-        bytes.extend_from_slice(fragment.as_bytes());
+        append_override_bytes(&mut bytes, &element_name, overrides);
         bytes.extend_from_slice(&suffix[1..]);
     } else {
-        bytes.extend_from_slice(fragment.as_bytes());
+        append_override_bytes(&mut bytes, &element_name, overrides);
     }
     bytes.extend_from_slice(&source.bytes()[range.end..]);
     OwnedXmlPart::capture(
@@ -397,6 +378,51 @@ pub(crate) fn with_part_overrides(
         source.content_type.clone(),
         std::sync::Arc::new(bytes),
     )
+}
+
+fn escaped_xml_attribute_len(value: &str) -> Result<usize> {
+    value.bytes().try_fold(0usize, |length, byte| {
+        let encoded = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            _ => 1,
+        };
+        length.checked_add(encoded).ok_or_else(|| {
+            OpcError::InvalidContentTypesManifest(
+                "escaped content-type attribute length overflows".into(),
+            )
+        })
+    })
+}
+
+fn append_override_bytes(
+    output: &mut Vec<u8>,
+    element_name: &[u8],
+    overrides: &[(&PackURI, &str)],
+) {
+    for (part, content_type) in overrides {
+        output.extend_from_slice(b"<");
+        output.extend_from_slice(element_name);
+        output.extend_from_slice(b" PartName=\"");
+        append_xml_escaped(output, part.as_str());
+        output.extend_from_slice(b"\" ContentType=\"");
+        append_xml_escaped(output, content_type);
+        output.extend_from_slice(b"\"/>");
+    }
+}
+
+fn append_xml_escaped(output: &mut Vec<u8>, value: &str) {
+    for byte in value.bytes() {
+        match byte {
+            b'&' => output.extend_from_slice(b"&amp;"),
+            b'<' => output.extend_from_slice(b"&lt;"),
+            b'>' => output.extend_from_slice(b"&gt;"),
+            b'"' => output.extend_from_slice(b"&quot;"),
+            b'\'' => output.extend_from_slice(b"&apos;"),
+            byte => output.push(byte),
+        }
+    }
 }
 
 fn cmp_ascii_case_insensitive(left: &str, right: &str) -> std::cmp::Ordering {
@@ -556,5 +582,77 @@ mod tests {
         let text = std::str::from_utf8(output.bytes()).unwrap();
         assert!(text.contains("<!--keep-->") && text.contains("<ct:Override "));
         assert_eq!(text.matches("<ct:Types").count(), 1);
+    }
+
+    #[test]
+    fn default_empty_root_exact_cap_and_one_under_fail_before_output_allocation() {
+        let source = OwnedXmlPart::capture(
+            PackURI::new("/[Content_Types].xml").unwrap(),
+            "application/xml".into(),
+            std::sync::Arc::new(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>"#
+                    .to_vec(),
+            ),
+        )
+        .unwrap();
+        let part = PackURI::new("/word/media/vector.svg").unwrap();
+        let overrides = [(&part, "image/svg+xml")];
+        let unconstrained = with_part_overrides(&source, &overrides, usize::MAX).unwrap();
+        let exact = unconstrained.bytes().len();
+        let exact_output = with_part_overrides(&source, &overrides, exact).unwrap();
+        assert_eq!(exact_output.bytes(), unconstrained.bytes());
+        let under = with_part_overrides(&source, &overrides, exact - 1).unwrap_err();
+        assert!(matches!(
+            under,
+            OpcError::InvalidContentTypesManifest(message)
+                if message.contains("output exceeds")
+        ));
+    }
+
+    #[test]
+    fn prefixed_empty_root_exact_cap_preserves_prefix_and_typed_readback() {
+        let source = OwnedXmlPart::capture(
+            PackURI::new("/[Content_Types].xml").unwrap(),
+            "application/xml".into(),
+            std::sync::Arc::new(
+                br#"<ct:Types xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types"/>"#
+                    .to_vec(),
+            ),
+        )
+        .unwrap();
+        let part = PackURI::new("/word/media/vector.svg").unwrap();
+        let overrides = [(&part, "image/svg+xml")];
+        let output = with_part_overrides(&source, &overrides, usize::MAX).unwrap();
+        let text = std::str::from_utf8(output.bytes()).unwrap();
+        assert!(text.contains("<ct:Override "));
+        assert!(text.contains("</ct:Types>"));
+        let exact = output.bytes().len();
+        assert!(with_part_overrides(&source, &overrides, exact).is_ok());
+        assert!(with_part_overrides(&source, &overrides, exact - 1).is_err());
+    }
+
+    #[test]
+    fn many_small_overrides_use_exact_escaped_cap_without_selector_overcharge() {
+        let source = OwnedXmlPart::capture(
+            PackURI::new("/[Content_Types].xml").unwrap(),
+            "application/xml".into(),
+            std::sync::Arc::new(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#.to_vec(),
+            ),
+        )
+        .unwrap();
+        let parts: Vec<_> = (0..32)
+            .map(|index| PackURI::new(format!("/word/media/v{index}.svg")).unwrap())
+            .collect();
+        let overrides: Vec<_> = parts.iter().map(|part| (part, "image/svg+xml")).collect();
+        let output = with_part_overrides(&source, &overrides, usize::MAX).unwrap();
+        let exact = output.bytes().len();
+        assert!(with_part_overrides(&source, &overrides, exact).is_ok());
+        let under = with_part_overrides(&source, &overrides, exact - 1).unwrap_err();
+        assert!(matches!(
+            under,
+            OpcError::InvalidContentTypesManifest(message)
+                if message.contains("output exceeds")
+        ));
     }
 }
