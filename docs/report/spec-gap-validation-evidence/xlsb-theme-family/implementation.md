@@ -21,10 +21,12 @@ complete DrawingML Theme and the XLSB workbook-owned Theme surface.
 Existing-family replacement copies the requested scalar values onto the
 current source-backed family. Incoming opaque content does not replace the
 current owner's unknown attributes or children. Removing family metadata
-deletes only the selected `themeFamily` element. The surrounding `ext` and
-`extLst` wrappers are retained even when empty, preserving their URI, attributes,
-comments, and lexical bytes. This operation performs no container cleanup;
-the inverse patch restores the exact pre-removal source.
+deletes the selected `themeFamily` element, its `ext` if otherwise empty, and
+the root `extLst` if that too becomes empty. XML whitespace alone does not
+retain a container; comments, unrelated content, and foreign attributes do.
+The inverse patch restores the exact pre-removal source. This closure policy
+supersedes the initial retention behavior; its fresh evidence is in
+`../theme-family-removal-closure/`.
 
 Family XML ownership remains in DrawingML. XLSB resolves the workbook Theme
 relationship and performs source-checked, signature-aware package publication.

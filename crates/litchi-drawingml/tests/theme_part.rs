@@ -273,11 +273,12 @@ fn shared_theme_part_owner_add_remove_is_exact_and_absent_remove_is_noop() {
         family::Family::new("Office Theme", OFFICE_ID, OFFICE_VID).expect("detached family");
     let restored = part::add_family_with_uri(&removed, &detached, part::NATIVE_EXTENSION_URI)
         .expect("add native family");
-    assert_eq!(restored, NATIVE_THEME);
+    let restored_snapshot = part::read(&restored).expect("read restored native family");
     assert_eq!(
-        part::family_profile(&restored).expect("family profile"),
+        restored_snapshot.family_profile(),
         Some(part::ExtensionProfile::NativeDiscriminator)
     );
+    assert_eq!(restored_snapshot.family(), Some(&detached));
 
     let normative = String::from_utf8(removed)
         .expect("family-free Theme is UTF-8")
@@ -321,7 +322,9 @@ fn bom_prefixed_family_add_is_refused_or_strips_bom_before_insertion() {
 #[test]
 fn admitted_extension_context_rejects_nonwhitespace_text_but_allows_whitespace_and_foreign_children()
  {
-    let family_free = native_family_free_theme();
+    // Keep the direct empty ext/extLst wrappers here: this test targets their
+    // element-only content grammar independently of removal closure.
+    let family_free = replace_native_family(b"");
     let empty_ext = native_empty_extension();
 
     let invalid_ext_text = replace_bytes(
@@ -531,11 +534,19 @@ fn shared_theme_part_allows_delimiters_in_comments_and_attributes() {
 
 #[test]
 fn add_reuses_an_extension_list_prefix_when_the_container_is_prefixed() {
-    let removed = part::remove_family(NATIVE_THEME).expect("remove native family");
+    let retained = format!(
+        "{}<!-- retain extension wrapper -->",
+        std::str::from_utf8(native_family_fragment()).expect("family UTF-8")
+    );
+    let source = replace_native_family(retained.as_bytes());
+    let removed = part::remove_family(&source).expect("remove native family");
     let empty = String::from_utf8(removed)
         .expect("family-free Theme is UTF-8")
         .replace(
-            &format!("<a:ext uri=\"{}\"></a:ext>", part::NATIVE_EXTENSION_URI),
+            &format!(
+                "<a:ext uri=\"{}\"><!-- retain extension wrapper --></a:ext>",
+                part::NATIVE_EXTENSION_URI
+            ),
             "",
         )
         .replace(

@@ -33,9 +33,11 @@ It does not claim completion of the broader specification audit.
    values. Reopen the resulting XML before publishing a commit.
 3. Preserve unrelated bytes, unknown children/attributes, extension identifiers,
    and package graph state. Removing the selected family is not permission to
-   discard its enclosing extension's unrelated content. Empty `ext` and
-   `extLst` wrappers deliberately remain; this is family-element removal,
-   not implicit container cleanup.
+   discard its enclosing extension's unrelated content. Remove the selected
+   `ext`, then its root `extLst`, when only XML whitespace remains. Comments,
+   unrelated content, and foreign attributes retain their container. This
+   later closure requirement supersedes the original wrapper-retention policy;
+   see `../theme-family-removal-closure/` for fresh validation.
 4. Resolve inherited namespaces safely and avoid prefix collisions when
    inserting XML. Retain unchanged lexical XML and exact semantic no-op source
    allocations where required by the existing Theme contract.

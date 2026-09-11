@@ -1,5 +1,10 @@
 # XLSB applied-theme family metadata
 
+**Policy follow-up:** [removal closure](../theme-family-removal-closure/README.md)
+supersedes the original empty-wrapper retention behavior. The gate, review,
+caller, and performance receipts below describe their recorded `9facb6057`
+revision; they must not be treated as measurements of the changed removal.
+
 This evidence directory covers optional family metadata inside an XLSB-owned
 complete Theme part. The prior `drawingml-theme-family` evidence covers the
 standalone fragment grammar; `xlsb-theme` covers the base Theme and whole-part
