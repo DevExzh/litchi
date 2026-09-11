@@ -571,9 +571,6 @@ impl Relationships {
     /// code. It preserves the byte output of [`Self::to_xml`] without relying on
     /// infallible `String` growth or temporary escaped strings.
     pub(crate) fn try_to_xml_bytes(&self) -> Result<Vec<u8>> {
-        const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
-        const FOOTER: &[u8] = b"</Relationships>";
-
         // Reserve once from the checked escaped size. Reserving each emitted
         // fragment exactly otherwise requests progressively larger reallocations
         // for every relationship in a large owner.
@@ -584,46 +581,53 @@ impl Relationships {
                 resource: "OPC relationship XML",
                 source,
             })?;
+        self.for_each_canonical_xml_chunk(|chunk| append_relationship_xml_bytes(&mut xml, chunk))?;
+        Ok(xml)
+    }
+
+    /// Visit the canonical XML serialization in bounded chunks without
+    /// allocating the serialized byte buffer.  Source-backed topology
+    /// planning uses this for an exact lexical comparison before aggregate
+    /// output admission; the same ordering and escaping helpers drive the
+    /// normal fallible serializer above.
+    pub(crate) fn for_each_canonical_xml_chunk<F>(&self, mut visit: F) -> Result<()>
+    where
+        F: FnMut(&[u8]) -> Result<()>,
+    {
+        const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
+        const FOOTER: &[u8] = b"</Relationships>";
+
         let mut rels = Vec::new();
         rels.try_reserve_exact(self.rels.len())
             .map_err(|source| OpcError::Allocation {
-                resource: "OPC relationship XML references",
+                resource: "OPC relationship XML comparison references",
                 source,
             })?;
         rels.extend(self.rels.values());
         rels.sort_unstable_by_key(|rel| rel.r_id());
 
-        append_relationship_xml_bytes(&mut xml, HEADER)?;
+        visit(HEADER)?;
         for rel in rels {
-            append_relationship_xml_bytes(&mut xml, br#"<Relationship Id=""#)?;
-            append_relationship_xml_escaped(&mut xml, rel.r_id())?;
-            append_relationship_xml_bytes(&mut xml, br#"" Type=""#)?;
-            append_relationship_xml_escaped(&mut xml, rel.reltype())?;
-            append_relationship_xml_bytes(&mut xml, br#"" Target=""#)?;
-            append_relationship_xml_escaped(&mut xml, rel.target_ref())?;
+            visit(br#"<Relationship Id=""#)?;
+            visit_escaped_xml(&mut visit, rel.r_id())?;
+            visit(br#"" Type=""#)?;
+            visit_escaped_xml(&mut visit, rel.reltype())?;
+            visit(br#"" Target=""#)?;
+            visit_escaped_xml(&mut visit, rel.target_ref())?;
             if rel.target_mode() == TargetMode::External {
-                append_relationship_xml_bytes(&mut xml, br#"" TargetMode="External"/>"#)?;
+                visit(br#"" TargetMode="External"/>"#)?;
             } else {
-                append_relationship_xml_bytes(&mut xml, br#""/>"#)?;
+                visit(br#""/>"#)?;
             }
         }
-        append_relationship_xml_bytes(&mut xml, FOOTER)?;
-        Ok(xml)
+        visit(FOOTER)
     }
 }
 
-fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
-    output
-        .try_reserve_exact(bytes.len())
-        .map_err(|source| OpcError::Allocation {
-            resource: "OPC relationship XML",
-            source,
-        })?;
-    output.extend_from_slice(bytes);
-    Ok(())
-}
-
-fn append_relationship_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<()> {
+fn visit_escaped_xml<F>(visit: &mut F, value: &str) -> Result<()>
+where
+    F: FnMut(&[u8]) -> Result<()>,
+{
     let bytes = value.as_bytes();
     let mut cursor = 0;
     for (index, byte) in bytes.iter().enumerate() {
@@ -636,12 +640,23 @@ fn append_relationship_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<
             _ => None,
         };
         if let Some(escaped) = escaped {
-            append_relationship_xml_bytes(output, &bytes[cursor..index])?;
-            append_relationship_xml_bytes(output, escaped)?;
+            visit(&bytes[cursor..index])?;
+            visit(escaped)?;
             cursor = index + 1;
         }
     }
-    append_relationship_xml_bytes(output, &bytes[cursor..])
+    visit(&bytes[cursor..])
+}
+
+fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC relationship XML",
+            source,
+        })?;
+    output.extend_from_slice(bytes);
+    Ok(())
 }
 
 impl Default for Relationships {
@@ -783,6 +798,60 @@ mod tests {
             relationships.try_to_xml_bytes().unwrap(),
             br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test:type&lt;&amp;&gt;&quot;&apos;" Target="target&lt;&amp;&gt;&quot;&apos;" TargetMode="External"/></Relationships>"#
         );
+    }
+
+    #[test]
+    fn canonical_chunks_match_serialization_without_collecting_output() {
+        let mut relationships = Relationships::new("/word".to_owned());
+        for (id, mode, target) in [
+            ("rId2", TargetMode::Internal, "../media/image.xml?x=1&y=2#z"),
+            (
+                "rId10",
+                TargetMode::External,
+                "https://example.invalid/é<&>\"'",
+            ),
+            ("rId1", TargetMode::External, ""),
+        ] {
+            relationships
+                .try_add_relationship(
+                    "urn:example".to_owned(),
+                    target.to_owned(),
+                    id.to_owned(),
+                    mode,
+                )
+                .unwrap();
+        }
+        for relationships in [Relationships::default(), relationships] {
+            let expected = relationships.to_xml();
+            let mut remaining = expected.as_bytes();
+            relationships
+                .for_each_canonical_xml_chunk(|chunk| {
+                    remaining = remaining
+                        .strip_prefix(chunk)
+                        .expect("chunk matches canonical bytes");
+                    Ok(())
+                })
+                .unwrap();
+            assert!(remaining.is_empty());
+            assert_eq!(
+                relationships.try_to_xml_bytes().unwrap(),
+                expected.as_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_chunk_visitor_stops_on_consumer_failure() {
+        let relationships = Relationships::default();
+        let mut calls = 0;
+        let result = relationships.for_each_canonical_xml_chunk(|_| {
+            calls += 1;
+            Err(OpcError::PartNotFound("consumer sentinel".to_owned()))
+        });
+        assert!(
+            matches!(result, Err(OpcError::PartNotFound(message)) if message == "consumer sentinel")
+        );
+        assert_eq!(calls, 1);
     }
 
     #[test]
