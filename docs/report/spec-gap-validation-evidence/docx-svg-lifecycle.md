@@ -28,7 +28,7 @@ caller-generated relationship IDs or media Part names.
 Media data remains deferred until requested. `svg_pictures` is the eager
 compatibility inventory; callers concerned with unnecessary media reads should
 choose the source-view API. Commit diagnostics expose the staged-operation and
-selected-picture counts and whether the commit changes the source.
+selected-picture counts and whether the commit changes story or dependency state.
 
 ## Preservation and supported scope
 
