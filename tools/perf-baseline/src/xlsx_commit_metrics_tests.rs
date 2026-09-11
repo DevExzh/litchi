@@ -1,0 +1,256 @@
+use std::error::Error;
+
+use super::allocation_metrics::{Scope, TEST_LOCK};
+use super::operation_metrics::{MetricStatus, MetricVector};
+use super::*;
+
+const XLSX_COMMIT_CASES: [Case; 4] = [
+    Case::XlsxOneCellCommit,
+    Case::XlsxOneCellCommitSave,
+    Case::XlsxOnePercentCommit,
+    Case::XlsxOnePercentCommitSave,
+];
+
+fn assert_repeated_metric(metric: &MetricVector, value: u64, sample_count: usize) {
+    assert_eq!(metric.status, MetricStatus::Measured);
+    let expected = vec![value; sample_count];
+    assert_eq!(metric.values.as_ref(), Some(&expected));
+}
+
+fn assert_normal_allocation_unavailable(operation: &operation_metrics::OperationMetrics) {
+    let allocation = operation
+        .allocation
+        .as_ref()
+        .expect("normal XLSX operation publishes allocator status");
+    assert_eq!(allocation.status, MetricStatus::Unavailable);
+    assert_eq!(allocation.scope, Scope::OperationGlobalSystemAllocator);
+    for metric in [
+        &allocation.allocation_calls,
+        &allocation.deallocation_calls,
+        &allocation.reallocation_calls,
+        &allocation.failed_allocation_calls,
+        &allocation.allocated_bytes,
+        &allocation.deallocated_bytes,
+        &allocation.live_bytes_before,
+        &allocation.live_bytes_after,
+        &allocation.peak_live_bytes_before,
+        &allocation.peak_live_bytes_after,
+        &allocation.region_peak_live_bytes,
+    ] {
+        assert_eq!(metric.status, MetricStatus::Unavailable);
+        assert!(metric.values.is_none());
+    }
+}
+
+fn assert_sample_alignment(
+    measured: &CaseResult,
+    operation: &operation_metrics::OperationMetrics,
+    sample_count: usize,
+) {
+    assert_eq!(measured.elapsed_ns.samples.len(), sample_count);
+    assert!(
+        measured
+            .elapsed_ns
+            .samples
+            .windows(2)
+            .all(|pair| pair[0] <= pair[1]),
+        "elapsed samples must be sorted"
+    );
+    let mut sample_order = measured.elapsed_ns.sample_order.clone();
+    let expected_order = (0..sample_count).collect::<Vec<_>>();
+    sample_order.sort_unstable();
+    assert_eq!(sample_order, expected_order);
+    assert_eq!(operation.sample_count, sample_count);
+    assert_eq!(operation.sample_indices, measured.elapsed_ns.sample_order);
+    assert_eq!(
+        operation.alignment,
+        "elapsed_ns.samples_by_elapsed_then_sample_index"
+    );
+}
+
+fn assert_promoted_save_sink(
+    operation: &operation_metrics::OperationMetrics,
+    sink: SinkSummary,
+    sample_count: usize,
+) {
+    assert_eq!(operation.sink.status, MetricStatus::NotApplicable);
+    assert_eq!(operation.sink.write_status, MetricStatus::Measured);
+    assert_repeated_metric(
+        &operation.sink.accepted_bytes,
+        sink.accepted_bytes,
+        sample_count,
+    );
+    assert_repeated_metric(&operation.sink.write_calls, sink.write_calls, sample_count);
+    assert_repeated_metric(
+        &operation.sink.largest_write,
+        sink.largest_write,
+        sample_count,
+    );
+    let buckets = &sink.write_size_buckets;
+    assert_eq!(
+        operation.sink.write_size_buckets.status,
+        MetricStatus::Measured
+    );
+    assert_repeated_metric(
+        &operation.sink.write_size_buckets.bytes_0,
+        buckets.bytes_0,
+        sample_count,
+    );
+    assert_repeated_metric(
+        &operation.sink.write_size_buckets.bytes_1_to_512,
+        buckets.bytes_1_to_512,
+        sample_count,
+    );
+    assert_repeated_metric(
+        &operation.sink.write_size_buckets.bytes_513_to_4096,
+        buckets.bytes_513_to_4096,
+        sample_count,
+    );
+    assert_repeated_metric(
+        &operation.sink.write_size_buckets.bytes_4097_to_16384,
+        buckets.bytes_4097_to_16384,
+        sample_count,
+    );
+    assert_repeated_metric(
+        &operation.sink.write_size_buckets.bytes_16385_to_65536,
+        buckets.bytes_16385_to_65536,
+        sample_count,
+    );
+    assert_repeated_metric(
+        &operation.sink.write_size_buckets.bytes_over_65536,
+        buckets.bytes_over_65536,
+        sample_count,
+    );
+}
+
+#[test]
+fn xlsx_commit_metrics_align_warmups_and_report_normal_allocator_status() {
+    // The library test binary does not install the allocator wrapper. The
+    // shared lock only keeps allocator unit tests from temporarily enabling
+    // their private instrumentation while these normal-report assertions run.
+    let _allocation_test_lock = TEST_LOCK.lock().unwrap();
+    let corpus = build_xlsx_corpus(XlsxShape::Tiny).unwrap();
+
+    for sample_count in [2, 3] {
+        for case in XLSX_COMMIT_CASES {
+            let mut measured = run_case(case, &corpus, 1, sample_count).unwrap();
+            let top_level_sink = measured.sink;
+            let before_promotion = serde_json::to_value(&measured).unwrap();
+
+            // Exercise the same promotion pass used immediately before report
+            // serialization, including the existing sink-summary compatibility
+            // field for save cases.
+            promote_sink_operation_metrics(std::slice::from_mut(&mut measured)).unwrap();
+
+            let operation = measured
+                .operation_metrics
+                .as_ref()
+                .expect("XLSX commit operation metrics");
+            assert_sample_alignment(&measured, operation, sample_count);
+            assert_normal_allocation_unavailable(operation);
+            assert_eq!(measured.sink, top_level_sink);
+
+            let after_promotion = serde_json::to_value(&measured).unwrap();
+            assert_eq!(
+                before_promotion.get("sink"),
+                after_promotion.get("sink"),
+                "sink compatibility summary changed during promotion"
+            );
+            assert_eq!(
+                after_promotion["operation_metrics"]["sample_indices"],
+                serde_json::to_value(&measured.elapsed_ns.sample_order).unwrap()
+            );
+            assert_eq!(
+                after_promotion["operation_metrics"]["allocation"]["status"],
+                "unavailable"
+            );
+            assert!(
+                after_promotion["operation_metrics"]["allocation"]["allocation_calls"]
+                    .get("values")
+                    .is_none(),
+                "normal allocator status must not serialize a fabricated zero vector"
+            );
+
+            match case {
+                Case::XlsxOneCellCommit | Case::XlsxOnePercentCommit => {
+                    assert!(top_level_sink.is_none());
+                    assert_eq!(operation.sink.write_status, MetricStatus::NotApplicable);
+                    assert_eq!(
+                        after_promotion["operation_metrics"]["sink"]["write_status"],
+                        "not_applicable"
+                    );
+                }
+                Case::XlsxOneCellCommitSave | Case::XlsxOnePercentCommitSave => {
+                    let sink = top_level_sink.expect("save case publishes sink summary");
+                    assert!(sink.accepted_bytes > 0);
+                    assert!(sink.write_calls > 0);
+                    assert_promoted_save_sink(operation, sink, sample_count);
+                    assert_eq!(
+                        after_promotion["operation_metrics"]["sink"]["write_status"],
+                        "measured"
+                    );
+                    assert_eq!(
+                        after_promotion["operation_metrics"]["sink"]["accepted_bytes"]["values"],
+                        serde_json::to_value(vec![sink.accepted_bytes; sample_count]).unwrap()
+                    );
+                }
+                _ => unreachable!("the test case list contains only XLSX commit cases"),
+            }
+        }
+    }
+}
+
+#[test]
+fn xlsx_commit_save_operation_returns_exact_output_and_semantic_commit()
+-> Result<(), Box<dyn Error>> {
+    let _allocation_test_lock = TEST_LOCK.lock().unwrap();
+    let corpus = build_xlsx_corpus(XlsxShape::Tiny)?;
+    let spec = xlsx_spec(&corpus)?;
+
+    for update_count in [1, spec.one_percent_updates.len()] {
+        let updates = &spec.one_percent_updates[..update_count];
+        let expected = xlsx_expected_output(&corpus, updates)?;
+        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let edit = prepare_xlsx_updates(&workbook, updates)?;
+        let mut sink = CountingSink::bounded(xlsx_output_ceiling(expected.len())?, 64 * 1024);
+        sink.reserve_budget()?;
+
+        let commit = xlsx_commit_save_operation(edit, &mut sink)?;
+        assert_eq!(sink.bytes, expected);
+        assert_eq!(commit.patch().len(), updates.len());
+        verify_xlsx_cells(commit.workbook(), spec, updates)?;
+
+        let reopened = Workbook::from_bytes(sink.bytes.clone())?;
+        verify_xlsx_cells(&reopened, spec, updates)?;
+        let encoded_sink = serde_json::to_value(sink.summary())?;
+        assert_eq!(
+            encoded_sink["accepted_bytes"],
+            serde_json::Value::from(u64::try_from(expected.len())?)
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn xlsx_commit_save_operation_propagates_a_short_counting_sink() -> Result<(), Box<dyn Error>> {
+    let _allocation_test_lock = TEST_LOCK.lock().unwrap();
+    let corpus = build_xlsx_corpus(XlsxShape::Tiny)?;
+    let spec = xlsx_spec(&corpus)?;
+    let updates = &spec.one_percent_updates[..1];
+    let expected = xlsx_expected_output(&corpus, updates)?;
+    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let edit = prepare_xlsx_updates(&workbook, updates)?;
+    let short_limit = u64::try_from(expected.len().checked_sub(1).ok_or("empty XLSX output")?)?;
+    let mut sink = CountingSink::bounded(short_limit, 64 * 1024);
+    sink.reserve_budget()?;
+
+    let error = xlsx_commit_save_operation(edit, &mut sink)
+        .expect_err("a short CountingSink must reject the complete save");
+    assert!(!sink.bytes.is_empty(), "save must retain its partial output");
+    assert!(sink.summary().write_calls > 0);
+    assert!(sink.bytes.len() < expected.len());
+    assert!(sink.summary().accepted_bytes <= short_limit);
+    assert_eq!(sink.bytes, expected[..sink.bytes.len()]);
+    assert!(!error.to_string().is_empty());
+    Ok(())
+}

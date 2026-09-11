@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0513/after/litchi-perf-baseline-alloc",
+    "--case",
+    "xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide",
+    "--samples",
+    "10",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0513/after/allocator-r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0513/after/allocator-r1-catalog.json"
+  ],
+  "started_utc": "2026-09-11T21:15:40.714557+00:00",
+  "elapsed_seconds": 14.916648459999124,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "9d6f75aced8f21ea39be395f23892e4f5a7da428681f21e6249a5793890eae7a",
+  "scope": "Allocation region begins before Instant and ends after elapsed; operation only, no setup/oracles/drop; instrumented elapsed and RSS excluded",
+  "artifacts": {
+    "allocator-r1-report.json": "7050536952a1ed20a2c088189fad2a571084de7640b8e5f863a36838dfbc6a0b",
+    "allocator-r1-catalog.json": "8a06516a46de1777b3855516cd150ae2f50953adc1c9b2a94c3d419b95ce57b8",
+    "allocator-r1.log": "d19863409e0dc38effff0b4ef5ea22e170a4c624274e8327804c1fc98b2a3bad"
+  }
+}

@@ -1,5 +1,19 @@
 # Performance optimization ADR-compliance matrix
 
+## 0513: operation observations in the XLSX harness
+
+[0513](changes/0513-xlsx-operation-allocation.md) changes only the performance
+harness and its focused tests. All 29 accepted ADRs and the README remain
+hash-identical. ADRs 0001/0005/0008 govern aligned, explicitly scoped evidence;
+normal allocator fields remain unavailable, while a separate instrumented
+binary observes commit and commit/save. The private helper returns Commit
+before caller teardown and preserves error/partial-output behavior. Production
+parsing, publication, preservation, limits, dependencies and public APIs remain
+unchanged. The [ADR review](results/change-0513/adr-review.md) and
+[source review](results/change-0513/source-review.md) record the boundaries.
+Future parser/Layout reuse remains subject to ADRs 0003/0006/0011/0018 and
+matched error, byte and memory evidence. No ADR exception is needed.
+
 ## 0512: scoped XLSX evidence without semantic changes
 
 [0512](changes/0512-xlsx-commit-attribution.md) changes profiling artifacts and

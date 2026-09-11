@@ -1,0 +1,8 @@
+{
+  "docs/performance/changes/0513-xlsx-operation-allocation.md": "5193387e084ef344321a7595436333414709b323313977305bbbff1d5a445a33",
+  "docs/performance/BASELINE.md": "cf29113857031ccaea9cdf6052423f24c1c1eaebe9ac4cdf39adc1608c0de7cf",
+  "docs/performance/REPORT.md": "1fe964a0717a76dee5fd409d04dcd685e78b228d746926ce7ddef9eea95027ac",
+  "docs/performance/HOTSPOTS.md": "25f5e4137f27ec5e4ab0238f9aeb9f01752f84ef41a8c5a060563fa9566f4853",
+  "docs/performance/GOAL_AUDIT.md": "fc2f85b504a646f766a04d887187e25ea4232fda70f6e45897d9afbf9291f292",
+  "docs/performance/ADR_COMPLIANCE.md": "6732345c23aba7aa8cea5a4fc593be409b84793a74d5824c8612540d69b1326c"
+}

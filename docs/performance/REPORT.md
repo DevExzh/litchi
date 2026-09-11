@@ -1,5 +1,21 @@
 # Performance program phase report
 
+## 0513: XLSX operation allocation baseline
+
+[0513](changes/0513-xlsx-operation-allocation.md) adds allocation observations
+to four existing XLSX commit/save cases and a private save profiling boundary.
+The 4,800 matched native samples show p50 changes of −0.48% to +2.32%, with
+no latency/throughput/RSS or repeat-drift flag. The separate 240 allocator
+samples establish candidate-only baselines: dense one-percent commit allocates
+273,128,176 bytes in 2,400,578 allocation calls; commit/save allocates
+286,872,324 bytes in 2,532,326 calls. Both have 58,496,820 bytes of derived
+incremental live demand above region entry. Absolute region peaks differ
+because commit-only retains the prior result; neither is document peak or RSS.
+This is a measured harness enabler, with no format speedup or memory-reduction
+claim. The next production candidate must measure parser/snapshot reuse while
+preserving error order, original-source spans and bounded temporary overlap.
+The full OLE2/OOXML goal remains active; ODF stays deferred.
+
 ## 0512: current XLSX commit attribution
 
 [0512](changes/0512-xlsx-commit-attribution.md) isolates three dense one-percent
