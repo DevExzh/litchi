@@ -8,12 +8,19 @@
 
 mod codec;
 mod model;
+pub mod source;
 mod validation;
 
+#[cfg(test)]
+mod source_tests;
 #[cfg(test)]
 mod tests;
 
 pub use model::{Anchor, AnchorId, Kind, LegacyAnchor, LegacyAnchorKind, Object};
+pub use source::{
+    ByteRange, DrawingDialect, DrawingPlacement, ElementRange, NamespaceContext, PictureSource,
+    RelationshipDialect, RelationshipReference, ScanLimits, SourceDrawing, SvgOwner, SvgOwnerState,
+};
 
 pub(crate) use codec::{parse, parse_legacy};
 pub(crate) use validation::append_word2010_anchor_id;

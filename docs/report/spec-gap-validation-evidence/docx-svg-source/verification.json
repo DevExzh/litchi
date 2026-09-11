@@ -1,0 +1,72 @@
+{
+  "scope": "Borrowed direct main-story DOCX drawing/SVG source inventory; no lifecycle acceptance",
+  "base_commit": "8b5838c591775990747b2cbce82fb2eea372b58b",
+  "source_sha256": {
+    "crates/litchi-docx/src/drawing/source.rs": "21a8f0095c1c570831fe7910cd3faa551807fc3afb658b59dbc9de4e3b475337",
+    "crates/litchi-docx/src/drawing/source_tests.rs": "5dc2ea60b0670cab88c3ead5e84f24d58b7ea5b14510cff9777e564e373c6374",
+    "crates/litchi-docx/src/drawing/mod.rs": "53294c05d6597528195f6aa6a0a0a55bf60028e94c43d014acbf85ff7b95e73b",
+    "crates/litchi-docx/tests/drawing_svg_source.rs": "f8e308d94d292d854d7366cc0de4cdb32844ee5ffcd49c602fa82bfeaeb042f7"
+  },
+  "cargo_lock_sha256": "ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b",
+  "fixtures_sha256": {
+    "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx": "1ce06ef88f89c5e14d1d22cd8e4b3a5f70951e7bd53e19053d4942873333d21d",
+    "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx": "569572dc2ec5dfee9334504ae331482ebb8188b80a0d3c93d44b8884cda29283"
+  },
+  "commands": [
+    {
+      "command": "cargo test --locked --offline -q -p litchi-docx --lib --test drawing_svg_source",
+      "library_passed": 1097,
+      "integration_passed": 5,
+      "failed": 0
+    },
+    {
+      "command": "cargo clippy --locked --offline -p litchi-docx --lib --test drawing_svg_source -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --locked --offline -q -p litchi-docx --doc",
+      "doctests_passed": 76,
+      "doctests_ignored": 31,
+      "separate_borrow_compile_fail_passed": 1,
+      "failed": 0
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo doc --locked --offline -p litchi-docx --no-deps",
+      "exit_code": 0
+    }
+  ],
+  "logs": {
+    "root-docx-source-tests.log.gz": {
+      "sha256": "98075a22db02bf38473192b79d1022d5ad5aa1bb7f7004076d3d23f9fb6bfa81",
+      "uncompressed_sha256": "52895c8318c706c3f48177c591d294d8c618c7b9e712c45d331f84bb456312f5"
+    },
+    "root-docx-source-clippy.log.gz": {
+      "sha256": "bb854af4b72e4f66ba3a4f46b315ae8e696e609f54c5f3fd5952ec23084c98e6",
+      "uncompressed_sha256": "76534712888559a78f3060916b4f82f0a46a55097a5827d56cc943db0ccefddb"
+    },
+    "root-docx-source-doctests.log.gz": {
+      "sha256": "59c93170804270c65b55a2fb82c9932520a7d9acd5fe8ac3b88fda0374ea1f0f",
+      "uncompressed_sha256": "b2f55f3ad29d9570dfec97eb1118fdc30b6dbe490dd03aa7a29c11557705ce24"
+    },
+    "root-docx-source-doc.log.gz": {
+      "sha256": "7fa750dc45d055d23a9295a5f11724ddc67c39995b7ff691903ba13b16381a60",
+      "uncompressed_sha256": "7e31abe917d4ade660924ebcd4291a38ae30499dbdb3e33d170ccae7c356254d"
+    }
+  },
+  "independent_review": {
+    "agent": "/root/xlsx_svg_source_coder",
+    "verdict": "approved",
+    "reviewed_runtime_source_sha256": "2118a49a1565637dcfd2de59cc586f865595e3b43de9612c891230cdaa9a76f2",
+    "root_followup": "Clarified max_fragment_bytes comment as raw input admission, with separate standalone export cap. Reran all recorded gates on final source."
+  },
+  "namespace_budget_policy": "Each persistent scope node charges its decoded declarations once before construction. Charges accumulate throughout the scan, including expired scopes; shared ancestors are not charged per picture.",
+  "isolation": "Committed base plus listed DOCX files; two XLSX source files were also present but are not dependencies of these DOCX targets. Uncommitted DOCX/XLSX lifecycle and InkAction changes were excluded.",
+  "not_claimed": [
+    "SVG lifecycle mutation or publication approval",
+    "Full package media closure validation by the source scanner",
+    "Subsidiary story source scanning",
+    "Rendering or native Word acceptance",
+    "Runtime or memory improvement"
+  ],
+  "performance_claim": null
+}
