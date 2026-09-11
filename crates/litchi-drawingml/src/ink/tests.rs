@@ -320,6 +320,156 @@ fn rejects_duplicate_expanded_attributes_in_opaque_elements() {
 }
 
 #[test]
+fn strict_ink_actions_profile_exposes_ordered_typed_children() {
+    let source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:inkml="http://www.w3.org/2003/InkML" xml:id="root" lengthUnit="cm" timeUnit="ms"><inkml:definitions><inkml:future/></inkml:definitions><iact:action xml:id="a0" type="add" startTime="0"><iact:property name="dataType"/><iact:actionDataGroup xml:id="g0" name="path"><iact:actionData xml:id="d0" name="target"><iact:transform/><inkml:trace/><inkml:traceView/></iact:actionData></iact:actionDataGroup></iact:action><iact:actionGroup xml:id="ag0" type="transform" startTime="1"><iact:action type="remove" startTime="2"/></iact:actionGroup></iact:actions>"#;
+    let profile = actions::read_profile(source).expect("strict action profile");
+    assert_eq!(profile.length_unit(), actions::LengthUnit::Centimeter);
+    assert_eq!(profile.time_unit(), actions::TimeUnit::Millisecond);
+    assert_eq!(profile.xml_id(), Some("root"));
+    assert!(profile.definitions_span().is_some());
+    assert_eq!(profile.children().len(), 2);
+    assert_eq!(actions::write_profile(&profile).unwrap(), source);
+
+    let actions::RootChild::Action(action) = &profile.children()[0] else {
+        panic!("first root child must be an action");
+    };
+    assert_eq!(action.properties().len(), 1);
+    assert_eq!(action.xml_id(), Some("a0"));
+    assert_eq!(action.properties()[0].name(), "dataType");
+    assert_eq!(action.properties()[0].value(), "ink");
+    assert_eq!(action.children().len(), 2);
+    assert!(matches!(
+        action.children()[0],
+        actions::ActionChild::Property(_)
+    ));
+    let actions::ActionChild::DataGroup(group) = &action.children()[1] else {
+        panic!("second action child must be a data group");
+    };
+    assert_eq!(group.name(), "path");
+    assert_eq!(group.xml_id(), Some("g0"));
+    assert_eq!(group.data().len(), 1);
+    assert_eq!(group.data()[0].name(), "target");
+    assert_eq!(group.data()[0].xml_id(), Some("d0"));
+    assert_eq!(group.data()[0].children().len(), 3);
+    assert!(matches!(
+        group.data()[0].children()[0],
+        actions::DataChild::Transform(_)
+    ));
+    assert!(matches!(
+        group.data()[0].children()[1],
+        actions::DataChild::Trace(_)
+    ));
+    assert!(matches!(
+        group.data()[0].children()[2],
+        actions::DataChild::TraceView(_)
+    ));
+    assert_eq!(
+        action.xml_from(profile.source()),
+        br#"<iact:action xml:id="a0" type="add" startTime="0"><iact:property name="dataType"/><iact:actionDataGroup xml:id="g0" name="path"><iact:actionData xml:id="d0" name="target"><iact:transform/><inkml:trace/><inkml:traceView/></iact:actionData></iact:actionDataGroup></iact:action>"#
+    );
+    let actions::RootChild::ActionGroup(group) = &profile.children()[1] else {
+        panic!("second root child must be an action group");
+    };
+    assert_eq!(group.xml_id(), Some("ag0"));
+}
+
+#[test]
+fn strict_ink_actions_profile_rejects_invalid_structure_but_keeps_legacy_read() {
+    let prefix = r#"xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s""#;
+    let legacy = br#"<iact:actions lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0"/></iact:actions>"#;
+    assert!(actions::read(legacy).is_ok());
+    assert!(actions::read_profile(legacy).is_err());
+    let legacy_opaque = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><x:future/></iact:actions>"#;
+    assert!(actions::read(legacy_opaque).is_ok());
+    assert!(actions::read_profile(legacy_opaque).is_err());
+
+    let cases = [
+        format!("<iact:actions {prefix}><iact:property name=\"x\"/></iact:actions>"),
+        format!(
+            "<iact:actions {prefix}><iact:action type=\"add\" startTime=\"0\"><iact:actionData name=\"stroke\"/><iact:property name=\"late\"/></iact:action></iact:actions>"
+        ),
+        format!(
+            "<iact:actions xmlns:inkml=\"http://www.w3.org/2003/InkML\" {prefix}><iact:action type=\"add\" startTime=\"0\"><iact:actionData><inkml:trace/><iact:transform/></iact:actionData></iact:action></iact:actions>"
+        ),
+        format!(
+            "<iact:actions {prefix}><iact:action type=\"add\" startTime=\"0\"><iact:actionData><iact:transform/><iact:transform/></iact:actionData></iact:action></iact:actions>"
+        ),
+        format!(
+            "<iact:actions {prefix}><iact:action type=\"add\" startTime=\"0\"><iact:action><iact:actionData/></iact:action></iact:action></iact:actions>"
+        ),
+        format!(
+            "<iact:actions xmlns:inkml=\"http://www.w3.org/2003/InkML\" {prefix}><iact:action type=\"add\" startTime=\"0\"/><inkml:definitions/></iact:actions>"
+        ),
+        format!(
+            "<iact:actions {prefix}><iact:actionGroup type=\"add\" startTime=\"0\"/></iact:actions>"
+        ),
+        format!(
+            "<iact:actions {prefix}><iact:action type=\"add\" startTime=\"0\"><iact:actionDataGroup/></iact:action></iact:actions>"
+        ),
+        format!("<iact:actions {prefix} lengthUnit=\"px\"/>"),
+    ];
+    for case in cases {
+        assert!(actions::read_profile(case.as_bytes()).is_err(), "{case}");
+    }
+    assert!(actions::read_profile(
+        br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="px" timeUnit="s"/>"#
+    )
+    .is_err());
+}
+
+#[test]
+fn strict_ink_actions_profile_preserves_opaque_descendants_and_scopes_reserved_semantics() {
+    let source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" xmlns:inkml="http://www.w3.org/2003/InkML" lengthUnit="m" timeUnit="s"><iact:action type="add" startTime="0"><iact:actionData><iact:transform><x:future><x:payload>opaque</x:payload></x:future></iact:transform></iact:actionData></iact:action></iact:actions>"#;
+    let profile = actions::read_profile(source).expect("opaque action descendant");
+    let actions::RootChild::Action(action) = &profile.children()[0] else {
+        panic!("root action expected");
+    };
+    assert_eq!(action.action_type().as_str(), "add");
+    assert!(matches!(
+        action.children().first(),
+        Some(actions::ActionChild::Data(_))
+    ));
+    assert_eq!(profile.source(), source);
+}
+
+#[test]
+fn strict_ink_actions_profile_rejects_schema_owned_unknowns_and_canonicalizes_namespaces() {
+    let encoded = br#"<iact:actions xmlns:iact="http:&#x2F;&#x2F;schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"/>"#;
+    assert!(actions::read_profile(encoded).is_ok());
+
+    let unknown_root_attribute = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s" future="x"/>"#;
+    assert!(actions::read_profile(unknown_root_attribute).is_err());
+
+    let unknown_action_attribute = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0" future="x"/></iact:actions>"#;
+    assert!(actions::read_profile(unknown_action_attribute).is_err());
+
+    let foreign_root_child = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><x:future/></iact:actions>"#;
+    assert!(actions::read_profile(foreign_root_child).is_err());
+
+    let foreign_action_child = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0"><x:future/></iact:action></iact:actions>"#;
+    assert!(actions::read_profile(foreign_action_child).is_err());
+
+    let wrong_namespace_action = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" lengthUnit="cm" timeUnit="s"><x:action type="add" startTime="0"/></iact:actions>"#;
+    assert!(actions::read_profile(wrong_namespace_action).is_err());
+
+    let encoded_duplicate = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:x="urn:future" xmlns:a="urn:foo&#x2F;" xmlns:b="urn:foo/" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0"><iact:actionData><iact:transform a:value="one" b:value="two"/></iact:actionData></iact:action></iact:actions>"#;
+    assert!(actions::read_profile(encoded_duplicate).is_err());
+}
+
+#[test]
+fn strict_ink_actions_profile_collapses_decimal_whitespace_and_allows_empty_user_type() {
+    let source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"><iact:action type="" startTime="&#x9; 1&#xA;"/></iact:actions>"#;
+    let profile =
+        actions::read_profile(source).expect("xsd decimal whitespace and empty user type");
+    let actions::RootChild::Action(action) = &profile.children()[0] else {
+        panic!("root action expected");
+    };
+    assert_eq!(action.action_type().as_str(), "");
+    assert_eq!(action.start_time(), "1");
+    assert_eq!(profile.source(), source);
+}
+
+#[test]
 fn accepts_exact_depth_and_rejects_empty_element_overflow() {
     let mut exact = String::from(
         r#"<inkml:ink xmlns:inkml="http://www.w3.org/2003/InkML" xmlns:x="urn:opaque">"#,

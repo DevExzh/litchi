@@ -13,8 +13,8 @@ use quick_xml::{
 use crate::{Error, Result};
 
 use super::{
-    ACTION_NAMESPACE, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES, MAX_SOURCE_BYTES,
-    MAX_TOKEN_BYTES,
+    ACTION_NAMESPACE, INKML_NAMESPACE, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES,
+    MAX_SOURCE_BYTES, MAX_TOKEN_BYTES, SourceSpan,
 };
 
 /// Maximum action records retained by one action part.
@@ -49,7 +49,18 @@ pub enum ActionType {
 
 impl ActionType {
     fn parse(value: &str) -> Result<Self> {
-        if value.is_empty() || value.len() > 256 || value.bytes().any(|byte| byte == 0) {
+        Self::parse_with_empty(value, false)
+    }
+
+    fn parse_profile(value: &str) -> Result<Self> {
+        Self::parse_with_empty(value, true)
+    }
+
+    fn parse_with_empty(value: &str, allow_empty: bool) -> Result<Self> {
+        if (!allow_empty && value.is_empty())
+            || value.len() > 256
+            || value.bytes().any(|byte| byte == 0)
+        {
             return Err(invalid("ink action type is empty or overlong"));
         }
         Ok(match value {
@@ -72,16 +83,28 @@ impl ActionType {
 }
 
 /// Typed metadata for one CT_Action element.
+///
+/// The compatibility [`read`] path populates the action attributes while
+/// retaining child markup opaque; child accessors are populated by
+/// [`read_profile`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use]
 pub struct Action {
+    xml_id: Option<Box<str>>,
     action_type: ActionType,
     start_time: Box<str>,
     source_start: usize,
     source_end: usize,
+    properties: Vec<ActionProperty>,
+    children: Vec<ActionChild>,
 }
 
 impl Action {
+    /// Optional `xml:id` lexical value.
+    #[must_use]
+    pub fn xml_id(&self) -> Option<&str> {
+        self.xml_id.as_deref()
+    }
     /// The action type.
     #[must_use]
     pub const fn action_type(&self) -> &ActionType {
@@ -104,6 +127,389 @@ impl Action {
             .source
             .get(self.source_start..self.source_end)
             .unwrap_or_default()
+    }
+    /// Additional properties in source order.
+    #[must_use]
+    pub fn properties(&self) -> &[ActionProperty] {
+        &self.properties
+    }
+    /// Action data children in source order.
+    #[must_use]
+    pub fn children(&self) -> &[ActionChild] {
+        &self.children
+    }
+    /// Borrow this action's source span from an arbitrary retained source.
+    #[must_use]
+    pub fn xml_from<'a>(&self, source: &'a [u8]) -> &'a [u8] {
+        source
+            .get(self.source_start..self.source_end)
+            .unwrap_or_default()
+    }
+}
+
+/// Exact InkML length units admitted by the strict PowerPoint ink-action
+/// profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LengthUnit {
+    /// Metres (`m`).
+    Meter,
+    /// Centimetres (`cm`).
+    Centimeter,
+    /// Millimetres (`mm`).
+    Millimeter,
+    /// Inches (`in`).
+    Inch,
+    /// Points (`pt`).
+    Point,
+    /// Picas (`pc`).
+    Pica,
+    /// Relative em units (`em`).
+    Em,
+    /// Relative ex units (`ex`).
+    Ex,
+}
+
+impl LengthUnit {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "m" => Ok(Self::Meter),
+            "cm" => Ok(Self::Centimeter),
+            "mm" => Ok(Self::Millimeter),
+            "in" => Ok(Self::Inch),
+            "pt" => Ok(Self::Point),
+            "pc" => Ok(Self::Pica),
+            "em" => Ok(Self::Em),
+            "ex" => Ok(Self::Ex),
+            _ => Err(invalid(
+                "ink actions lengthUnit is not an InkML standard unit",
+            )),
+        }
+    }
+    /// Return the exact schema lexical value.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Meter => "m",
+            Self::Centimeter => "cm",
+            Self::Millimeter => "mm",
+            Self::Inch => "in",
+            Self::Point => "pt",
+            Self::Pica => "pc",
+            Self::Em => "em",
+            Self::Ex => "ex",
+        }
+    }
+}
+
+/// Exact InkML time units admitted by the strict PowerPoint ink-action
+/// profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TimeUnit {
+    /// Seconds (`s`).
+    Second,
+    /// Milliseconds (`ms`).
+    Millisecond,
+}
+
+impl TimeUnit {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "s" => Ok(Self::Second),
+            "ms" => Ok(Self::Millisecond),
+            _ => Err(invalid(
+                "ink actions timeUnit is not an InkML standard unit",
+            )),
+        }
+    }
+    /// Return the exact schema lexical value.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Second => "s",
+            Self::Millisecond => "ms",
+        }
+    }
+}
+
+/// A CT_ActionProperty child retained as typed metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
+pub struct ActionProperty {
+    name: Box<str>,
+    value: Box<str>,
+    source: SourceSpan,
+}
+
+impl ActionProperty {
+    /// Required property name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// Optional property value, including the schema default (`ink`).
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+    /// Complete source span of the property element.
+    #[must_use]
+    pub const fn source_span(&self) -> SourceSpan {
+        self.source
+    }
+    /// Borrow the exact property element XML from the retained profile source.
+    #[must_use]
+    pub fn xml<'a>(&self, profile: &'a Profile) -> &'a [u8] {
+        profile.xml(self.source)
+    }
+}
+
+/// A typed child of CT_ActionData, in source order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DataChild {
+    /// The optional CT_Matrix transform.
+    Transform(SourceSpan),
+    /// An InkML trace.
+    Trace(SourceSpan),
+    /// An InkML trace view.
+    TraceView(SourceSpan),
+}
+
+impl DataChild {
+    /// Source span of the complete child element.
+    #[must_use]
+    pub const fn source_span(self) -> SourceSpan {
+        match self {
+            Self::Transform(span) | Self::Trace(span) | Self::TraceView(span) => span,
+        }
+    }
+}
+
+/// A CT_ActionData element retained as typed metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
+pub struct ActionData {
+    xml_id: Option<Box<str>>,
+    name: Box<str>,
+    reference: Option<Box<str>>,
+    children: Vec<DataChild>,
+    source: SourceSpan,
+}
+
+impl ActionData {
+    /// Optional `xml:id` lexical value.
+    #[must_use]
+    pub fn xml_id(&self) -> Option<&str> {
+        self.xml_id.as_deref()
+    }
+    /// Effective data name, including the schema default (`stroke`).
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// Optional `ref` lexical value.
+    #[must_use]
+    pub fn reference(&self) -> Option<&str> {
+        self.reference.as_deref()
+    }
+    /// Recognized children in source order.
+    #[must_use]
+    pub fn children(&self) -> &[DataChild] {
+        &self.children
+    }
+    /// Complete source span of the data element.
+    #[must_use]
+    pub const fn source_span(&self) -> SourceSpan {
+        self.source
+    }
+    /// Borrow the exact data element XML from the retained profile source.
+    #[must_use]
+    pub fn xml<'a>(&self, profile: &'a Profile) -> &'a [u8] {
+        profile.xml(self.source)
+    }
+}
+
+/// A CT_ActionDataGroup child retained as typed metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
+pub struct ActionDataGroup {
+    xml_id: Option<Box<str>>,
+    name: Box<str>,
+    data: Vec<ActionData>,
+    source: SourceSpan,
+}
+
+impl ActionDataGroup {
+    /// Optional `xml:id` lexical value.
+    #[must_use]
+    pub fn xml_id(&self) -> Option<&str> {
+        self.xml_id.as_deref()
+    }
+    /// Effective data-group name, including the schema default (`stroke`).
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// Action data in source order.
+    #[must_use]
+    pub fn data(&self) -> &[ActionData] {
+        &self.data
+    }
+    /// Complete source span of the data-group element.
+    #[must_use]
+    pub const fn source_span(&self) -> SourceSpan {
+        self.source
+    }
+    /// Borrow the exact data-group XML from the retained profile source.
+    #[must_use]
+    pub fn xml<'a>(&self, profile: &'a Profile) -> &'a [u8] {
+        profile.xml(self.source)
+    }
+}
+
+/// A typed child of CT_Action, in source order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ActionChild {
+    /// A CT_ActionProperty child.
+    Property(ActionProperty),
+    /// A CT_ActionData child.
+    Data(ActionData),
+    /// A CT_ActionDataGroup child.
+    DataGroup(ActionDataGroup),
+}
+
+/// A CT_ActionGroup element retained as typed metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
+pub struct ActionGroup {
+    xml_id: Option<Box<str>>,
+    action_type: ActionType,
+    start_time: Box<str>,
+    actions: Vec<Action>,
+    source: SourceSpan,
+}
+
+impl ActionGroup {
+    /// Optional `xml:id` lexical value.
+    #[must_use]
+    pub fn xml_id(&self) -> Option<&str> {
+        self.xml_id.as_deref()
+    }
+    /// Action-group type.
+    #[must_use]
+    pub const fn action_type(&self) -> &ActionType {
+        &self.action_type
+    }
+    /// XML-whitespace-collapsed decimal start-time value.
+    ///
+    /// The retained profile source remains available through [`Profile::source`]
+    /// and the action span, so collapsing this typed value does not rewrite or
+    /// discard the source lexical form.
+    #[must_use]
+    pub fn start_time(&self) -> &str {
+        &self.start_time
+    }
+    /// Actions in source order.
+    #[must_use]
+    pub fn actions(&self) -> &[Action] {
+        &self.actions
+    }
+    /// Complete source span of the group element.
+    #[must_use]
+    pub const fn source_span(&self) -> SourceSpan {
+        self.source
+    }
+    /// Borrow the exact group XML from the retained profile source.
+    #[must_use]
+    pub fn xml<'a>(&self, profile: &'a Profile) -> &'a [u8] {
+        profile.xml(self.source)
+    }
+}
+
+/// A direct child of CT_Actions, in source order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RootChild {
+    /// A CT_ActionGroup child.
+    ActionGroup(ActionGroup),
+    /// A CT_Action child.
+    Action(Action),
+}
+
+/// Strict, namespace-bound CT_Actions metadata with exact source replay.
+///
+/// This profile validates the recognized §2.21 structure and preserves opaque
+/// descendants only inside admitted InkML `definitions`, `trace`, `traceView`,
+/// and `transform` payload boundaries. Those payloads are not a full InkML
+/// schema validation pass; their bytes remain available through the retained
+/// source. It does not interpret or execute `add`, `remove`, or `transform`
+/// actions, and it does not require the optional action-data names described as
+/// semantic conventions by §2.21.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
+pub struct Profile {
+    source: Arc<[u8]>,
+    xml_id: Option<Box<str>>,
+    length_unit: LengthUnit,
+    time_unit: TimeUnit,
+    definitions: Option<SourceSpan>,
+    children: Vec<RootChild>,
+}
+
+impl Profile {
+    /// Borrow exact source bytes.
+    #[must_use]
+    pub fn source(&self) -> &[u8] {
+        &self.source
+    }
+    /// Optional root `xml:id` lexical value.
+    #[must_use]
+    pub fn xml_id(&self) -> Option<&str> {
+        self.xml_id.as_deref()
+    }
+    /// Exact length unit.
+    #[must_use]
+    pub const fn length_unit(&self) -> LengthUnit {
+        self.length_unit
+    }
+    /// Exact time unit.
+    #[must_use]
+    pub const fn time_unit(&self) -> TimeUnit {
+        self.time_unit
+    }
+    /// Optional InkML definitions element span.
+    #[must_use]
+    pub const fn definitions_span(&self) -> Option<SourceSpan> {
+        self.definitions
+    }
+    /// Direct action/group children in source order.
+    #[must_use]
+    pub fn children(&self) -> &[RootChild] {
+        &self.children
+    }
+    /// Borrow direct actions in source order without allocating a projection.
+    #[must_use]
+    pub fn actions(&self) -> impl Iterator<Item = &Action> {
+        self.children.iter().filter_map(|child| match child {
+            RootChild::Action(action) => Some(action),
+            RootChild::ActionGroup(_) => None,
+        })
+    }
+    /// Borrow direct action groups in source order without allocating a projection.
+    #[must_use]
+    pub fn action_groups(&self) -> impl Iterator<Item = &ActionGroup> {
+        self.children.iter().filter_map(|child| match child {
+            RootChild::ActionGroup(group) => Some(group),
+            RootChild::Action(_) => None,
+        })
+    }
+    /// Borrow a checked span from the retained profile source.
+    #[must_use]
+    pub fn xml(&self, span: SourceSpan) -> &[u8] {
+        self.source.get(span.range()).unwrap_or_default()
     }
 }
 
@@ -201,7 +607,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
             },
             Event::Start(element) if !root_seen => {
                 validate_element(&element, &reader)?;
-                legacy_fragment = require_root(&element, &resolved)?;
+                legacy_fragment = require_root(&element, &resolved, &reader)?;
                 root_seen = true;
                 increment_nodes(&mut nodes)?;
                 enforce_depth(1)?;
@@ -211,7 +617,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 validate_unit(time_unit.as_deref().unwrap_or_default(), "timeUnit")?;
                 reserve_one(&mut stack, "ink actions XML stack")?;
                 stack.push(Frame {
-                    namespace: namespace_id(&resolved)?,
+                    namespace: namespace_id(&resolved, &reader)?,
                     action: None,
                     action_group: false,
                     direct_actions: 0,
@@ -219,7 +625,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
             },
             Event::Empty(element) if !root_seen => {
                 validate_element(&element, &reader)?;
-                legacy_fragment = require_root(&element, &resolved)?;
+                legacy_fragment = require_root(&element, &resolved, &reader)?;
                 root_seen = true;
                 root_closed = true;
                 increment_nodes(&mut nodes)?;
@@ -235,10 +641,12 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 increment_nodes(&mut nodes)?;
                 enforce_depth(stack.len().saturating_add(1))?;
                 let local = element.name().local_name();
-                let action_group = is_action_namespace(&resolved, &element, legacy_fragment)
-                    && local.as_ref() == b"actionGroup";
-                let action_element = is_action_namespace(&resolved, &element, legacy_fragment)
-                    && local.as_ref() == b"action";
+                let action_group =
+                    is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                        && local.as_ref() == b"actionGroup";
+                let action_element =
+                    is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                        && local.as_ref() == b"action";
                 let action = if action_group {
                     increment_groups(&mut groups)?;
                     require_action_attrs(&element, &reader)?;
@@ -255,7 +663,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 };
                 reserve_one(&mut stack, "ink actions XML stack")?;
                 stack.push(Frame {
-                    namespace: namespace_id(&resolved)?,
+                    namespace: namespace_id(&resolved, &reader)?,
                     action,
                     action_group,
                     direct_actions: 0,
@@ -267,13 +675,13 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                 increment_nodes(&mut nodes)?;
                 enforce_depth(stack.len().saturating_add(1))?;
                 let local = element.name().local_name();
-                if is_action_namespace(&resolved, &element, legacy_fragment)
+                if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
                     && local.as_ref() == b"actionGroup"
                 {
                     increment_groups(&mut groups)?;
                     require_action_attrs(&element, &reader)?;
                     return Err(invalid("ink actionGroup requires an action child"));
-                } else if is_action_namespace(&resolved, &element, legacy_fragment)
+                } else if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
                     && local.as_ref() == b"action"
                 {
                     ensure_action_capacity(&actions)?;
@@ -290,7 +698,7 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
                     return Err(invalid("ink actionGroup requires an action child"));
                 }
                 validate_end_name(&element, &resolved, legacy_fragment)?;
-                if frame.namespace != namespace_id(&resolved)? {
+                if frame.namespace != namespace_id(&resolved, &reader)? {
                     return Err(invalid("ink actions has mismatched closing elements"));
                 }
                 if let Some(index) = frame.action {
@@ -364,6 +772,222 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
     })
 }
 
+/// Read a namespace-bound CT_Actions value using the strict §2.21 structural
+/// profile.
+///
+/// The existing [`read`] function intentionally accepts the historical
+/// unresolved-`iact` fragment form and treats unrecognized descendants as
+/// opaque. This entry point is explicit: the root and recognized children must
+/// resolve to their normative action namespace, while unknown descendants are
+/// still retained byte-for-byte in [`Profile::source`] inside those payload
+/// boundaries. Schema-adjacent conventions such as the required
+/// `stroke`/`target` data names for reserved action types are deliberately not
+/// enforced here; this profile is inert and does not execute actions.
+pub fn read_profile(xml: &[u8]) -> Result<Profile> {
+    if xml.len() > MAX_SOURCE_BYTES {
+        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+
+    let mut stack = Vec::new();
+    let mut root_closed = false;
+    let mut root = None;
+    let mut nodes = 0usize;
+    let mut declaration_seen = false;
+    let mut preamble_content_seen = false;
+
+    loop {
+        let start = pos(&reader)?;
+        let event = reader.read_event().map_err(xml_error)?;
+        let (resolved, event) = reader.resolver().resolve_event(event);
+        let end = pos(&reader)?;
+        let is_declaration = matches!(&event, Event::Decl(_));
+        match event {
+            Event::Decl(declaration)
+                if root.is_none() && !declaration_seen && !preamble_content_seen =>
+            {
+                validate_declaration(&declaration)?;
+                declaration_seen = true;
+            },
+            Event::Start(element) if root.is_none() => {
+                validate_profile_element(&element, &resolved, &reader)?;
+                let root_state = profile_root(&element, &resolved, &reader)?;
+                root = Some(root_state);
+                increment_nodes(&mut nodes)?;
+                enforce_depth(1)?;
+                reserve_one(&mut stack, "ink actions profile XML stack")?;
+                stack.push(ProfileFrame {
+                    namespace: NamespaceId::Action,
+                    kind: ProfileFrameKind::Root,
+                });
+            },
+            Event::Empty(element) if root.is_none() => {
+                validate_profile_element(&element, &resolved, &reader)?;
+                let root_state = profile_root(&element, &resolved, &reader)?;
+                root = Some(root_state);
+                increment_nodes(&mut nodes)?;
+                enforce_depth(1)?;
+                root_closed = true;
+            },
+            Event::Start(element) if root.is_some() && !root_closed => {
+                validate_profile_element(&element, &resolved, &reader)?;
+                increment_nodes(&mut nodes)?;
+                enforce_depth(stack.len().saturating_add(1))?;
+                let kind = profile_start_kind(
+                    &mut stack,
+                    root.as_mut()
+                        .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                    &element,
+                    &resolved,
+                    start,
+                    &reader,
+                )?;
+                let namespace = namespace_id(&resolved, &reader)?;
+                reserve_one(&mut stack, "ink actions profile XML stack")?;
+                stack.push(ProfileFrame { namespace, kind });
+            },
+            Event::Empty(element) if root.is_some() && !root_closed => {
+                validate_profile_element(&element, &resolved, &reader)?;
+                increment_nodes(&mut nodes)?;
+                enforce_depth(stack.len().saturating_add(1))?;
+                let kind = profile_start_kind(
+                    &mut stack,
+                    root.as_mut()
+                        .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                    &element,
+                    &resolved,
+                    start,
+                    &reader,
+                )?;
+                let value = profile_finish_empty(kind, start, end)?;
+                attach_profile_value(
+                    stack.last_mut(),
+                    root.as_mut()
+                        .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                    value,
+                )?;
+            },
+            Event::End(element) if root.is_some() && !root_closed => {
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("ink actions profile has an unexpected end"))?;
+                validate_end_name(&element, &resolved, false)?;
+                if frame.namespace != namespace_id(&resolved, &reader)? {
+                    return Err(invalid(
+                        "ink actions profile has mismatched closing namespaces",
+                    ));
+                }
+                if stack.is_empty() {
+                    if !matches!(frame.kind, ProfileFrameKind::Root) {
+                        return Err(invalid("ink actions profile root frame is invalid"));
+                    }
+                    root_closed = true;
+                } else {
+                    let value = profile_finish(frame.kind, end)?;
+                    attach_profile_value(
+                        stack.last_mut(),
+                        root.as_mut()
+                            .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                        value,
+                    )?;
+                }
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+                return Err(invalid("ink actions profile has content after its root"));
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {
+                return Err(invalid(
+                    "ink actions profile has an invalid root transition",
+                ));
+            },
+            Event::Text(text) => {
+                let text = validate_text(&text, "ink actions profile text")?;
+                if (root.is_none() || root_closed) && !text.bytes().all(is_xml_whitespace) {
+                    return Err(invalid("ink actions profile has text outside its root"));
+                }
+                if root.is_some() && !root_closed && !text.bytes().all(is_xml_whitespace) {
+                    ensure_profile_text_allowed(&stack)?;
+                }
+            },
+            Event::CData(data) => {
+                let data = validate_text(&data, "ink actions profile CDATA")?;
+                if (root.is_none() || root_closed) && !data.bytes().all(is_xml_whitespace) {
+                    return Err(invalid("ink actions profile has CDATA outside its root"));
+                }
+                if root.is_some() && !root_closed && !data.bytes().all(is_xml_whitespace) {
+                    ensure_profile_text_allowed(&stack)?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                validate_reference(&reference)?;
+                if root.is_none() || root_closed {
+                    return Err(invalid(
+                        "ink actions profile has a reference outside its root",
+                    ));
+                }
+                ensure_profile_text_allowed(&stack)?;
+            },
+            Event::Comment(comment) => {
+                validate_text(&comment, "ink actions profile comment")?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "ink actions profile rejects DTDs and processing instructions",
+                ));
+            },
+            Event::Decl(_) => {
+                return Err(invalid(
+                    "ink actions profile has a duplicate or late XML declaration",
+                ));
+            },
+            Event::Eof => break,
+        }
+        if !is_declaration {
+            preamble_content_seen = true;
+        }
+    }
+
+    if root.is_none() || !root_closed || !stack.is_empty() {
+        return Err(invalid(
+            "ink actions profile root is absent or unterminated",
+        ));
+    }
+    let root = root.ok_or_else(|| invalid("ink actions profile root is missing"))?;
+    Ok(Profile {
+        source: copy_source(xml)?,
+        xml_id: root.xml_id,
+        length_unit: root.length_unit,
+        time_unit: root.time_unit,
+        definitions: root.definitions,
+        children: root.children,
+    })
+}
+
+/// Write a strict profile using its exact retained source bytes.
+pub fn write_profile(profile: &Profile) -> Result<Vec<u8>> {
+    if profile.source.len() > MAX_SOURCE_BYTES {
+        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(profile.source.len())
+        .map_err(|_| invalid("ink actions profile output allocation failed"))?;
+    output.extend_from_slice(profile.source());
+    Ok(output)
+}
+
+/// Write a strict profile to a caller-provided sink.
+pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile) -> Result<()> {
+    writer.write_all(profile.source())?;
+    Ok(())
+}
+
 /// Write one action part using exact retained source bytes.
 ///
 /// # Errors
@@ -384,6 +1008,770 @@ pub fn write(actions: &Actions) -> Result<Vec<u8>> {
         return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
     }
     Ok(actions.source().to_vec())
+}
+
+#[derive(Debug)]
+struct ProfileRoot {
+    xml_id: Option<Box<str>>,
+    length_unit: LengthUnit,
+    time_unit: TimeUnit,
+    definitions: Option<SourceSpan>,
+    children: Vec<RootChild>,
+    definitions_seen: bool,
+    action_seen: bool,
+    action_count: usize,
+    group_count: usize,
+}
+
+#[derive(Debug)]
+struct ProfileFrame {
+    namespace: NamespaceId,
+    kind: ProfileFrameKind,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProfileAttributeSet {
+    Root,
+    Action,
+    Property,
+    ActionData,
+    ActionDataGroup,
+}
+
+fn validate_profile_attributes(
+    element: &BytesStart<'_>,
+    allowed: ProfileAttributeSet,
+) -> Result<()> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let key = attribute.key.as_ref();
+        if key == b"xmlns" || key.strip_prefix(b"xmlns:").is_some() {
+            continue;
+        }
+        if key == b"xml:id" {
+            if !matches!(
+                allowed,
+                ProfileAttributeSet::Root
+                    | ProfileAttributeSet::Action
+                    | ProfileAttributeSet::ActionData
+                    | ProfileAttributeSet::ActionDataGroup
+            ) {
+                return Err(invalid(
+                    "ink actions profile schema-owned element has an unexpected xml:id",
+                ));
+            }
+            continue;
+        }
+        if attribute.key.prefix().is_some() {
+            return Err(invalid(
+                "ink actions profile schema-owned element has an unknown qualified attribute",
+            ));
+        }
+        let is_allowed = match allowed {
+            ProfileAttributeSet::Root => matches!(key, b"lengthUnit" | b"timeUnit"),
+            ProfileAttributeSet::Action => matches!(key, b"type" | b"startTime"),
+            ProfileAttributeSet::Property => matches!(key, b"name" | b"value"),
+            ProfileAttributeSet::ActionData => matches!(key, b"name" | b"ref"),
+            ProfileAttributeSet::ActionDataGroup => key == b"name",
+        };
+        if !is_allowed {
+            return Err(invalid(
+                "ink actions profile schema-owned element has an unknown attribute",
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+enum ProfileFrameKind {
+    Root,
+    Definitions {
+        source_start: usize,
+    },
+    ActionGroup {
+        xml_id: Option<Box<str>>,
+        action_type: ActionType,
+        start_time: Box<str>,
+        actions: Vec<Action>,
+        source_start: usize,
+    },
+    Action {
+        xml_id: Option<Box<str>>,
+        action_type: ActionType,
+        start_time: Box<str>,
+        properties: Vec<ActionProperty>,
+        children: Vec<ActionChild>,
+        source_start: usize,
+        data_seen: bool,
+    },
+    Property {
+        name: Box<str>,
+        value: Box<str>,
+        source_start: usize,
+    },
+    DataGroup {
+        xml_id: Option<Box<str>>,
+        name: Box<str>,
+        data: Vec<ActionData>,
+        source_start: usize,
+    },
+    Data {
+        xml_id: Option<Box<str>>,
+        name: Box<str>,
+        reference: Option<Box<str>>,
+        children: Vec<DataChild>,
+        source_start: usize,
+        transform_seen: bool,
+        trace_seen: bool,
+    },
+    DataChild {
+        kind: DataChildKind,
+        source_start: usize,
+    },
+    Opaque,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DataChildKind {
+    Transform,
+    Trace,
+    TraceView,
+}
+
+#[derive(Debug)]
+enum ProfileValue {
+    Definitions(SourceSpan),
+    ActionGroup(ActionGroup),
+    Action(Action),
+    Property(ActionProperty),
+    DataGroup(ActionDataGroup),
+    Data(ActionData),
+    DataChild(DataChild),
+    None,
+}
+
+fn profile_root<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    reader: &NsReader<R>,
+) -> Result<ProfileRoot> {
+    if !namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?
+        || element.name().local_name().as_ref() != b"actions"
+    {
+        return Err(invalid(
+            "ink actions profile root must be bound iact:actions",
+        ));
+    }
+    validate_profile_attributes(element, ProfileAttributeSet::Root)?;
+    let length = required_attr(element, b"lengthUnit", reader)?;
+    let time = required_attr(element, b"timeUnit", reader)?;
+    Ok(ProfileRoot {
+        xml_id: optional_xml_id(element, reader)?,
+        length_unit: LengthUnit::parse(&length)?,
+        time_unit: TimeUnit::parse(&time)?,
+        definitions: None,
+        children: Vec::new(),
+        definitions_seen: false,
+        action_seen: false,
+        action_count: 0,
+        group_count: 0,
+    })
+}
+
+fn validate_profile_element<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    reader: &NsReader<R>,
+) -> Result<()> {
+    validate_element(element, reader)?;
+    validate_unknown_prefix(resolved, element, false)
+}
+
+fn profile_start_kind<R: std::io::BufRead>(
+    stack: &mut [ProfileFrame],
+    root: &mut ProfileRoot,
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    start: usize,
+    reader: &NsReader<R>,
+) -> Result<ProfileFrameKind> {
+    let local = element.name().local_name();
+    let action = namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?;
+    let inkml = namespace_matches(resolved, INKML_NAMESPACE.as_bytes(), reader)?;
+    let local = local.as_ref();
+    let known_action = is_known_action_local(local);
+    let parent = stack
+        .last_mut()
+        .ok_or_else(|| invalid("ink actions profile has no parent frame"))?;
+    match &mut parent.kind {
+        ProfileFrameKind::Root => {
+            if inkml && local == b"definitions" {
+                if root.definitions_seen || root.action_seen {
+                    return Err(invalid(
+                        "ink actions profile definitions must precede actions and be unique",
+                    ));
+                }
+                root.definitions_seen = true;
+                return Ok(ProfileFrameKind::Definitions {
+                    source_start: start,
+                });
+            }
+            if action && local == b"actionGroup" {
+                increment_profile_group(root)?;
+                validate_profile_attributes(element, ProfileAttributeSet::Action)?;
+                root.action_seen = true;
+                let (xml_id, action_type, start_time) = profile_action_attributes(element, reader)?;
+                return Ok(ProfileFrameKind::ActionGroup {
+                    xml_id,
+                    action_type,
+                    start_time,
+                    actions: Vec::new(),
+                    source_start: start,
+                });
+            }
+            if action && local == b"action" {
+                increment_profile_action(root)?;
+                validate_profile_attributes(element, ProfileAttributeSet::Action)?;
+                root.action_seen = true;
+                let (xml_id, action_type, start_time) = profile_action_attributes(element, reader)?;
+                return Ok(ProfileFrameKind::Action {
+                    xml_id,
+                    action_type,
+                    start_time,
+                    properties: Vec::new(),
+                    children: Vec::new(),
+                    source_start: start,
+                    data_seen: false,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid root ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile root contains an unknown direct child",
+            ));
+        },
+        ProfileFrameKind::Definitions { .. } => {
+            return Ok(ProfileFrameKind::Opaque);
+        },
+        ProfileFrameKind::ActionGroup { .. } => {
+            if action && local == b"action" {
+                increment_profile_action(root)?;
+                validate_profile_attributes(element, ProfileAttributeSet::Action)?;
+                let (xml_id, action_type, start_time) = profile_action_attributes(element, reader)?;
+                return Ok(ProfileFrameKind::Action {
+                    xml_id,
+                    action_type,
+                    start_time,
+                    properties: Vec::new(),
+                    children: Vec::new(),
+                    source_start: start,
+                    data_seen: false,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid action-group ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionGroup contains an unknown direct child",
+            ));
+        },
+        ProfileFrameKind::Action { data_seen, .. } => {
+            if action && local == b"property" {
+                validate_profile_attributes(element, ProfileAttributeSet::Property)?;
+                if *data_seen {
+                    return Err(invalid(
+                        "ink actions profile property must precede action data",
+                    ));
+                }
+                let name = strict_token(required_attr(element, b"name", reader)?, "property name")?;
+                let value = strict_token(
+                    optional_attr(element, b"value", reader)?.unwrap_or_else(|| "ink".to_owned()),
+                    "property value",
+                )?;
+                return Ok(ProfileFrameKind::Property {
+                    name,
+                    value,
+                    source_start: start,
+                });
+            }
+            if action && (local == b"actionData" || local == b"actionDataGroup") {
+                *data_seen = true;
+                if local == b"actionData" {
+                    validate_profile_attributes(element, ProfileAttributeSet::ActionData)?;
+                    let (xml_id, name, reference) = profile_data_attributes(element, reader)?;
+                    return Ok(ProfileFrameKind::Data {
+                        xml_id,
+                        name,
+                        reference,
+                        children: Vec::new(),
+                        source_start: start,
+                        transform_seen: false,
+                        trace_seen: false,
+                    });
+                }
+                validate_profile_attributes(element, ProfileAttributeSet::ActionDataGroup)?;
+                let xml_id = optional_xml_id(element, reader)?;
+                let name = strict_token(
+                    optional_attr(element, b"name", reader)?.unwrap_or_else(|| "stroke".to_owned()),
+                    "action data-group name",
+                )?;
+                return Ok(ProfileFrameKind::DataGroup {
+                    xml_id,
+                    name,
+                    data: Vec::new(),
+                    source_start: start,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid action ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile action contains an unknown direct child",
+            ));
+        },
+        ProfileFrameKind::DataGroup { .. } => {
+            if action && local == b"actionData" {
+                validate_profile_attributes(element, ProfileAttributeSet::ActionData)?;
+                let (xml_id, name, reference) = profile_data_attributes(element, reader)?;
+                return Ok(ProfileFrameKind::Data {
+                    xml_id,
+                    name,
+                    reference,
+                    children: Vec::new(),
+                    source_start: start,
+                    transform_seen: false,
+                    trace_seen: false,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid data-group ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionDataGroup contains an unknown direct child",
+            ));
+        },
+        ProfileFrameKind::Data {
+            transform_seen,
+            trace_seen,
+            ..
+        } => {
+            if action && local == b"transform" {
+                if *transform_seen || *trace_seen {
+                    return Err(invalid(
+                        "ink actions profile transform must be first and unique",
+                    ));
+                }
+                *transform_seen = true;
+                return Ok(ProfileFrameKind::DataChild {
+                    kind: DataChildKind::Transform,
+                    source_start: start,
+                });
+            }
+            if inkml && (local == b"trace" || local == b"traceView") {
+                *trace_seen = true;
+                return Ok(ProfileFrameKind::DataChild {
+                    kind: if local == b"trace" {
+                        DataChildKind::Trace
+                    } else {
+                        DataChildKind::TraceView
+                    },
+                    source_start: start,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid data ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionData contains an unknown direct child",
+            ));
+        },
+        ProfileFrameKind::Property { .. } => {
+            return Err(invalid(
+                "ink actions profile property contains a child element",
+            ));
+        },
+        ProfileFrameKind::DataChild { .. } | ProfileFrameKind::Opaque => {},
+    }
+    Ok(ProfileFrameKind::Opaque)
+}
+
+fn profile_finish_empty(kind: ProfileFrameKind, _start: usize, end: usize) -> Result<ProfileValue> {
+    profile_finish(kind, end)
+}
+
+fn profile_finish(kind: ProfileFrameKind, end: usize) -> Result<ProfileValue> {
+    match kind {
+        ProfileFrameKind::Root => Err(invalid("ink actions profile root cannot be nested")),
+        ProfileFrameKind::Definitions { source_start } => Ok(ProfileValue::Definitions(
+            SourceSpan::new(source_start, end),
+        )),
+        ProfileFrameKind::ActionGroup {
+            xml_id,
+            action_type,
+            start_time,
+            actions,
+            source_start,
+        } => {
+            if actions.is_empty() {
+                return Err(invalid(
+                    "ink actions profile actionGroup requires an action child",
+                ));
+            }
+            Ok(ProfileValue::ActionGroup(ActionGroup {
+                xml_id,
+                action_type,
+                start_time,
+                actions,
+                source: SourceSpan::new(source_start, end),
+            }))
+        },
+        ProfileFrameKind::Action {
+            xml_id,
+            action_type,
+            start_time,
+            properties,
+            children,
+            source_start,
+            ..
+        } => Ok(ProfileValue::Action(Action {
+            xml_id,
+            action_type,
+            start_time,
+            source_start,
+            source_end: end,
+            properties,
+            children,
+        })),
+        ProfileFrameKind::Property {
+            name,
+            value,
+            source_start,
+        } => Ok(ProfileValue::Property(ActionProperty {
+            name,
+            value,
+            source: SourceSpan::new(source_start, end),
+        })),
+        ProfileFrameKind::DataGroup {
+            xml_id,
+            name,
+            data,
+            source_start,
+        } => {
+            if data.is_empty() {
+                return Err(invalid(
+                    "ink actions profile actionDataGroup requires actionData",
+                ));
+            }
+            Ok(ProfileValue::DataGroup(ActionDataGroup {
+                xml_id,
+                name,
+                data,
+                source: SourceSpan::new(source_start, end),
+            }))
+        },
+        ProfileFrameKind::Data {
+            xml_id,
+            name,
+            reference,
+            children,
+            source_start,
+            ..
+        } => Ok(ProfileValue::Data(ActionData {
+            xml_id,
+            name,
+            reference,
+            children,
+            source: SourceSpan::new(source_start, end),
+        })),
+        ProfileFrameKind::DataChild { kind, source_start } => Ok(ProfileValue::DataChild(
+            DataChild::from_kind(kind, SourceSpan::new(source_start, end)),
+        )),
+        ProfileFrameKind::Opaque => Ok(ProfileValue::None),
+    }
+}
+
+fn attach_profile_value(
+    frame: Option<&mut ProfileFrame>,
+    root: &mut ProfileRoot,
+    value: ProfileValue,
+) -> Result<()> {
+    let Some(frame) = frame else {
+        return Err(invalid("ink actions profile value has no parent"));
+    };
+    match (&mut frame.kind, value) {
+        (ProfileFrameKind::Root, ProfileValue::Definitions(span)) => {
+            root.definitions = Some(span);
+        },
+        (ProfileFrameKind::Root, ProfileValue::ActionGroup(group)) => {
+            root.children
+                .try_reserve(1)
+                .map_err(|_| invalid("ink actions profile root allocation failed"))?;
+            root.children.push(RootChild::ActionGroup(group));
+        },
+        (ProfileFrameKind::Root, ProfileValue::Action(action)) => {
+            root.children
+                .try_reserve(1)
+                .map_err(|_| invalid("ink actions profile root allocation failed"))?;
+            root.children.push(RootChild::Action(action));
+        },
+        (ProfileFrameKind::ActionGroup { actions, .. }, ProfileValue::Action(action)) => {
+            actions
+                .try_reserve(1)
+                .map_err(|_| invalid("ink actions profile action-group allocation failed"))?;
+            actions.push(action);
+        },
+        (ProfileFrameKind::Action { properties, .. }, ProfileValue::Property(property)) => {
+            properties
+                .try_reserve(1)
+                .map_err(|_| invalid("ink actions profile property allocation failed"))?;
+            properties.push(property.clone());
+            if let ProfileFrameKind::Action { children, .. } = &mut frame.kind {
+                children
+                    .try_reserve(1)
+                    .map_err(|_| invalid("ink actions profile action allocation failed"))?;
+                children.push(ActionChild::Property(property));
+            }
+        },
+        (ProfileFrameKind::Action { children, .. }, ProfileValue::Data(data)) => {
+            children
+                .try_reserve(1)
+                .map_err(|_| invalid("ink actions profile action allocation failed"))?;
+            children.push(ActionChild::Data(data));
+        },
+        (ProfileFrameKind::Action { children, .. }, ProfileValue::DataGroup(group)) => {
+            children
+                .try_reserve(1)
+                .map_err(|_| invalid("ink actions profile action allocation failed"))?;
+            children.push(ActionChild::DataGroup(group));
+        },
+        (ProfileFrameKind::DataGroup { data, .. }, ProfileValue::Data(item)) => {
+            data.try_reserve(1)
+                .map_err(|_| invalid("ink actions profile data-group allocation failed"))?;
+            data.push(item);
+        },
+        (ProfileFrameKind::Data { children, .. }, ProfileValue::DataChild(child)) => {
+            children
+                .try_reserve(1)
+                .map_err(|_| invalid("ink actions profile data allocation failed"))?;
+            children.push(child);
+        },
+        (_, ProfileValue::None) => {},
+        _ => {
+            return Err(invalid(
+                "ink actions profile recognized child has invalid ancestry",
+            ));
+        },
+    }
+    Ok(())
+}
+
+impl DataChild {
+    fn from_kind(kind: DataChildKind, span: SourceSpan) -> Self {
+        match kind {
+            DataChildKind::Transform => Self::Transform(span),
+            DataChildKind::Trace => Self::Trace(span),
+            DataChildKind::TraceView => Self::TraceView(span),
+        }
+    }
+}
+
+fn profile_action_attributes<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+) -> Result<(Option<Box<str>>, ActionType, Box<str>)> {
+    let xml_id = optional_xml_id(element, reader)?;
+    let action_type = ActionType::parse_profile(&required_attr(element, b"type", reader)?)?;
+    let start_time = collapse_xml_whitespace(&required_attr(element, b"startTime", reader)?)?;
+    validate_decimal(&start_time)?;
+    Ok((xml_id, action_type, start_time.into_boxed_str()))
+}
+
+fn collapse_xml_whitespace(value: &str) -> Result<String> {
+    let mut result = String::new();
+    result
+        .try_reserve_exact(value.len())
+        .map_err(|_| invalid("ink action startTime allocation failed"))?;
+    let mut pending_space = false;
+    for character in value.chars() {
+        if matches!(character, ' ' | '\t' | '\r' | '\n') {
+            if !result.is_empty() {
+                pending_space = true;
+            }
+        } else {
+            if pending_space {
+                result.push(' ');
+                pending_space = false;
+            }
+            result.push(character);
+        }
+    }
+    Ok(result)
+}
+
+fn profile_data_attributes<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+) -> Result<(Option<Box<str>>, Box<str>, Option<Box<str>>)> {
+    let xml_id = optional_xml_id(element, reader)?;
+    let name = strict_token(
+        optional_attr(element, b"name", reader)?.unwrap_or_else(|| "stroke".to_owned()),
+        "action data name",
+    )?;
+    let reference = optional_attr(element, b"ref", reader)?
+        .map(|value| strict_token(value, "action data reference"))
+        .transpose()?;
+    Ok((xml_id, name, reference))
+}
+
+fn strict_token(value: String, field: &'static str) -> Result<Box<str>> {
+    if value.len() > MAX_TOKEN_BYTES || value.bytes().any(|byte| byte == 0) {
+        return Err(limit(field, MAX_TOKEN_BYTES));
+    }
+    Ok(value.into_boxed_str())
+}
+
+fn increment_profile_action(root: &mut ProfileRoot) -> Result<()> {
+    let next = root
+        .action_count
+        .checked_add(1)
+        .ok_or_else(|| limit("ink actions", MAX_ACTIONS))?;
+    if next > MAX_ACTIONS {
+        return Err(limit("ink actions", MAX_ACTIONS));
+    }
+    root.action_count = next;
+    Ok(())
+}
+
+fn increment_profile_group(root: &mut ProfileRoot) -> Result<()> {
+    let next = root
+        .group_count
+        .checked_add(1)
+        .ok_or_else(|| limit("ink action groups", MAX_ACTION_GROUPS))?;
+    if next > MAX_ACTION_GROUPS {
+        return Err(limit("ink action groups", MAX_ACTION_GROUPS));
+    }
+    root.group_count = next;
+    Ok(())
+}
+
+fn optional_attr<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    reader: &NsReader<R>,
+) -> Result<Option<String>> {
+    let mut result = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.key.prefix().is_some() || attribute.key.local_name().as_ref() != name {
+            continue;
+        }
+        if result.is_some() {
+            return Err(invalid(
+                "ink actions profile has a duplicate typed attribute",
+            ));
+        }
+        if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
+            return Err(limit(
+                "ink actions attribute value bytes",
+                MAX_ATTRIBUTE_VALUE_BYTES,
+            ));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(xml_error)?;
+        validate_xml_characters(&value, "ink actions profile attribute")?;
+        result = Some(value.into_owned());
+    }
+    Ok(result)
+}
+
+fn optional_xml_id<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+) -> Result<Option<Box<str>>> {
+    let mut result = None;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.key.as_ref() != b"xml:id" {
+            continue;
+        }
+        if result.is_some() {
+            return Err(invalid("ink actions profile has a duplicate xml:id"));
+        }
+        if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
+            return Err(limit(
+                "ink actions attribute value bytes",
+                MAX_ATTRIBUTE_VALUE_BYTES,
+            ));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(xml_error)?;
+        validate_xml_characters(&value, "ink actions profile xml:id")?;
+        result = Some(strict_token(value.into_owned(), "xml:id")?);
+    }
+    Ok(result)
+}
+
+fn is_known_action_local(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"action"
+            | b"actionGroup"
+            | b"property"
+            | b"actionData"
+            | b"actionDataGroup"
+            | b"transform"
+    )
+}
+
+fn namespace_matches<R: std::io::BufRead>(
+    resolved: &ResolveResult<'_>,
+    expected: &[u8],
+    reader: &NsReader<R>,
+) -> Result<bool> {
+    let ResolveResult::Bound(Namespace(value)) = resolved else {
+        return Ok(false);
+    };
+    if *value == expected {
+        return Ok(true);
+    }
+    Ok(decoded_namespace(value, reader)?.as_bytes() == expected)
+}
+
+fn decoded_namespace<R: std::io::BufRead>(value: &[u8], reader: &NsReader<R>) -> Result<String> {
+    let decoded = reader.decoder().decode(value).map_err(xml_error)?;
+    let unescaped = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
+    let mut result = String::new();
+    result
+        .try_reserve_exact(unescaped.len())
+        .map_err(|_| invalid("ink actions namespace allocation failed"))?;
+    result.push_str(&unescaped);
+    Ok(result)
+}
+
+fn ensure_profile_text_allowed(stack: &[ProfileFrame]) -> Result<()> {
+    match stack.last().map(|frame| &frame.kind) {
+        Some(ProfileFrameKind::Definitions { .. })
+        | Some(ProfileFrameKind::DataChild { .. })
+        | Some(ProfileFrameKind::Opaque)
+        | None => Ok(()),
+        _ => Err(invalid(
+            "ink actions profile recognized element-only content contains text",
+        )),
+    }
 }
 
 #[derive(Debug)]
@@ -412,10 +1800,13 @@ fn parse_action<R: std::io::BufRead>(
     let start_time = required_attr(element, b"startTime", reader)?;
     validate_decimal(&start_time)?;
     Ok(Action {
+        xml_id: optional_xml_id(element, reader)?,
         action_type: ActionType::parse(&action_type)?,
         start_time: start_time.into_boxed_str(),
         source_start: start,
         source_end: end,
+        properties: Vec::new(),
+        children: Vec::new(),
     })
 }
 
@@ -511,14 +1902,18 @@ fn validate_unit(value: &str, name: &'static str) -> Result<()> {
     Ok(())
 }
 
-fn require_root(element: &BytesStart<'_>, resolved: &ResolveResult<'_>) -> Result<bool> {
+fn require_root<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    reader: &NsReader<R>,
+) -> Result<bool> {
     if element.name().local_name().as_ref() != b"actions" {
         return Err(invalid("ink actions root must be iact:actions"));
     }
+    if namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)? {
+        return Ok(false);
+    }
     match resolved {
-        ResolveResult::Bound(Namespace(value)) if *value == ACTION_NAMESPACE.as_bytes() => {
-            Ok(false)
-        },
         ResolveResult::Unknown(prefix)
             if prefix.as_slice() == b"iact"
                 && !has_namespace_declaration(element, prefix.as_slice()) =>
@@ -533,23 +1928,30 @@ fn is_action_namespace(
     resolved: &ResolveResult<'_>,
     element: &BytesStart<'_>,
     legacy_fragment: bool,
-) -> bool {
-    match resolved {
-        ResolveResult::Bound(Namespace(value)) => *value == ACTION_NAMESPACE.as_bytes(),
+    reader: &NsReader<impl std::io::BufRead>,
+) -> Result<bool> {
+    if namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)? {
+        return Ok(true);
+    }
+    Ok(match resolved {
         ResolveResult::Unknown(prefix) => {
             legacy_fragment
                 && prefix.as_slice() == b"iact"
                 && !has_namespace_declaration(element, prefix.as_slice())
         },
-        ResolveResult::Unbound => false,
-    }
+        ResolveResult::Bound(_) | ResolveResult::Unbound => false,
+    })
 }
 
-fn namespace_id(resolved: &ResolveResult<'_>) -> Result<NamespaceId> {
+fn namespace_id<R: std::io::BufRead>(
+    resolved: &ResolveResult<'_>,
+    reader: &NsReader<R>,
+) -> Result<NamespaceId> {
     match resolved {
         ResolveResult::Bound(Namespace(value)) => {
+            let action = namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?;
             std::str::from_utf8(value).map_err(xml_error)?;
-            Ok(if *value == ACTION_NAMESPACE.as_bytes() {
+            Ok(if action {
                 NamespaceId::Action
             } else {
                 NamespaceId::Other
@@ -646,14 +2048,12 @@ fn validate_element<R: std::io::BufRead>(
                 "ink actions attribute uses an undeclared namespace prefix",
             ));
         }
-        if attribute_keys
-            .iter()
-            .copied()
-            .any(|key| expanded_attribute_names_equal(key, attribute.key, reader))
-        {
-            return Err(invalid(
-                "ink actions element has duplicate expanded attributes",
-            ));
+        for key in attribute_keys.iter().copied() {
+            if expanded_attribute_names_equal(key, attribute.key, reader)? {
+                return Err(invalid(
+                    "ink actions element has duplicate expanded attributes",
+                ));
+            }
         }
         attribute_keys
             .try_reserve(1)
@@ -785,6 +2185,10 @@ fn validate_text<'a>(value: &'a [u8], what: &str) -> Result<&'a str> {
     Ok(value)
 }
 
+fn is_xml_whitespace(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+}
+
 fn validate_reference(reference: &BytesRef<'_>) -> Result<()> {
     let value = std::str::from_utf8(reference.as_ref()).map_err(xml_error)?;
     match value {
@@ -848,18 +2252,21 @@ fn expanded_attribute_names_equal<R: std::io::BufRead>(
     left: QName<'_>,
     right: QName<'_>,
     reader: &NsReader<R>,
-) -> bool {
+) -> Result<bool> {
     let (left_namespace, left_local) = reader.resolver().resolve_attribute(left);
     let (right_namespace, right_local) = reader.resolver().resolve_attribute(right);
     if left_local != right_local {
-        return false;
+        return Ok(false);
     }
     match (left_namespace, right_namespace) {
-        (ResolveResult::Unbound, ResolveResult::Unbound) => true,
+        (ResolveResult::Unbound, ResolveResult::Unbound) => Ok(true),
         (ResolveResult::Bound(Namespace(left)), ResolveResult::Bound(Namespace(right))) => {
-            left == right
+            if left == right {
+                return Ok(true);
+            }
+            Ok(decoded_namespace(left, reader)? == decoded_namespace(right, reader)?)
         },
-        _ => false,
+        _ => Ok(false),
     }
 }
 
