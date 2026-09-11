@@ -194,7 +194,14 @@ impl Family {
         &self.variant_id
     }
 
-    /// Return the exact source fragment retained by a parsed value.
+    /// Return the retained namespace-complete, standalone-ready source.
+    ///
+    /// For values parsed by [`super::read`], these are the exact input bytes.
+    /// Projections read from a complete Theme part may include injected `xmlns`
+    /// declarations for inherited bindings, so their source can differ from
+    /// the raw fragment in that part. Use [`super::part::Snapshot::xml_bytes`]
+    /// with [`super::part::Snapshot::family_range`] for those exact raw bytes.
+    /// Scalar edits retain this source; serialization applies the staged values.
     #[must_use]
     pub fn source(&self) -> Option<&[u8]> {
         self.source.as_deref().map(|source| source.xml.as_ref())

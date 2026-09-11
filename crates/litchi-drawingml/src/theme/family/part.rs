@@ -117,8 +117,9 @@ impl Snapshot {
     }
 
     /// Borrow the optional source-backed `themeFamily` projection. Inherited
-    /// namespace bindings are retained as a bounded closure in the fragment
-    /// codec source; [`Self::family_range`] identifies the exact source span.
+    /// namespace bindings are injected as declarations in its standalone-ready
+    /// [`Family::source`]. Use [`Self::family_range`] with [`Self::xml_bytes`]
+    /// for the exact raw fragment before those declarations were injected.
     #[must_use]
     pub fn family(&self) -> Option<&Family> {
         self.family.as_ref()
@@ -252,8 +253,8 @@ pub fn read_shared(source: Arc<[u8]>) -> Result<Snapshot> {
 /// This path does not retain or copy the complete Theme part and is
 /// intended for package owners that already manage the part's source
 /// allocation. When the family inherits namespace bindings from the
-/// Theme, the returned fragment retains a bounded closure declaration so
-/// the existing family codec can write it as a standalone value. Use
+/// Theme, the returned [`Family::source`] includes injected namespace
+/// declarations so the family codec can write a standalone value. Use
 /// [`family_range`] with the original Theme bytes for the exact raw span.
 pub fn read_family(xml: &[u8]) -> Result<Option<Family>> {
     if xml.len() > MAX_XML_BYTES {
