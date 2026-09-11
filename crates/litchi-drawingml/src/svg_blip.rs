@@ -186,10 +186,12 @@ pub struct Namespace {
 
 impl Namespace {
     /// Construct a namespace declaration; `None` denotes the default prefix.
+    /// An empty URI clears the default namespace, as in `xmlns=""`.
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid prefix or empty/overlong URI.
+    /// Returns an error for an invalid prefix, an empty prefixed URI, or an
+    /// overlong URI.
     pub fn new(
         prefix: Option<&str>,
         uri: impl AsRef<str>,
@@ -211,7 +213,7 @@ impl Namespace {
             return Err(ValueError::NamespaceBinding);
         }
         let uri = uri.as_ref();
-        if uri.is_empty() {
+        if uri.is_empty() && prefix.is_some_and(|value| !value.is_empty()) {
             return Err(ValueError::EmptyNamespace);
         }
         if uri.len() > MAX_NAMESPACE_BYTES {
@@ -328,8 +330,8 @@ pub enum ValueError {
     /// A namespace prefix is invalid.
     #[error("invalid SVG namespace prefix '{value}'")]
     NamespacePrefix { value: String },
-    /// A namespace URI is empty.
-    #[error("SVG namespace URI is empty")]
+    /// A prefixed namespace URI is empty.
+    #[error("prefixed SVG namespace URI is empty")]
     EmptyNamespace,
     /// An unknown attribute name is not an XML qualified name.
     #[error("invalid SVG attribute name '{value}'")]

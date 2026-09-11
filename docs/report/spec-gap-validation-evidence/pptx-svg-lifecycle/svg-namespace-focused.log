@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/svg_blip.rs (target/debug/deps/svg_blip-3b7f404409980c43)
+
+running 8 tests
+test constructs_empty_svg_blip_with_typed_reference ... ok
+test accepts_ancestor_bound_root_prefix_for_unknown_attributes ... ok
+test reads_typed_relationship_and_preserves_unknown_markup ... ok
+test changing_relationship_keeps_future_content ... ok
+test rejects_invalid_root_and_relationship_values ... ok
+test edits_default_namespace_and_alternate_relationship_prefix_without_unbound_names ... ok
+test retains_default_namespace_undeclaration_through_relationship_edits ... ok
+test rejects_non_xml_content_after_the_root ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
