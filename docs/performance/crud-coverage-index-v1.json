@@ -35,8 +35,8 @@
   "checked_catalog": {
     "path": "docs/performance/results/perf-corpus-manifest-v2.json",
     "catalog_id": "litchi-perf-corpus-v2",
-    "catalog_sha256": "d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f",
-    "content_set_sha256": "0ac5a8c267b6da1424ae0f322ac309e6a52606a67cfccaed12cd6821e93becd5"
+    "catalog_sha256": "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a",
+    "content_set_sha256": "8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5"
   },
   "status_values": [
     "measured",
@@ -137,27 +137,34 @@
       "id": "conversion-export",
       "name": "Conversion and export",
       "checklist_refs": [
-        "Compact XML output",
-        "Referenced XML is compact"
+        "Scope is explicit",
+        "Performance claims are measured"
       ],
-      "status": "correctness-only",
+      "status": "measured",
       "measurement": {
-        "kind": "correctness-only",
-        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
       },
       "coverage_scope": "representative",
       "scenarios": [
         {
           "selector": "rtf_semantic_text_to_sink",
-          "status": "correctness-only",
+          "status": "measured",
           "corpus": {
-            "kind": "generated-per-run",
+            "kind": "checked-catalog",
+            "case": "rtf_semantic_text_to_sink",
+            "ids": [
+              "rtf:sha256:48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+              "rtf:sha256:957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+              "rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328"
+            ],
             "shapes": [
               "large",
               "medium",
               "tiny"
-            ],
-            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+            ]
           },
           "evidence": [
             "tools/perf-baseline/README.md",
@@ -166,15 +173,20 @@
         },
         {
           "selector": "odt_semantic_text_to_sink",
-          "status": "correctness-only",
+          "status": "measured",
           "corpus": {
-            "kind": "generated-per-run",
+            "kind": "checked-catalog",
+            "case": "odt_semantic_text_to_sink",
+            "ids": [
+              "odt-odf-zip:sha256:39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+              "odt-odf-zip:sha256:5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+              "odt-odf-zip:sha256:81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7"
+            ],
             "shapes": [
               "large",
               "medium",
               "tiny"
-            ],
-            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+            ]
           },
           "evidence": [
             "tools/perf-baseline/README.md",
@@ -183,15 +195,20 @@
         },
         {
           "selector": "ods_semantic_text_to_sink",
-          "status": "correctness-only",
+          "status": "measured",
           "corpus": {
-            "kind": "generated-per-run",
+            "kind": "checked-catalog",
+            "case": "ods_semantic_text_to_sink",
+            "ids": [
+              "ods-odf-zip:sha256:3318bdf143965aaf3a780658d076c2d63c60574dcbb95a86bc00d5666d08a2d3",
+              "ods-odf-zip:sha256:e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+              "ods-odf-zip:sha256:f4d7a31785e734db61b7c99194a61d446ad5de2dab81f8e7e1ea7197c2715e67"
+            ],
             "shapes": [
               "large",
               "medium",
               "tiny"
-            ],
-            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+            ]
           },
           "evidence": [
             "tools/perf-baseline/README.md",
@@ -200,15 +217,20 @@
         },
         {
           "selector": "odp_semantic_text_to_sink",
-          "status": "correctness-only",
+          "status": "measured",
           "corpus": {
-            "kind": "generated-per-run",
+            "kind": "checked-catalog",
+            "case": "odp_semantic_text_to_sink",
+            "ids": [
+              "odp-odf-zip:sha256:08389eff98c92ec9ce0c989a0ed353e5be8013651a756a5167ea3a6ebee67eff",
+              "odp-odf-zip:sha256:8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+              "odp-odf-zip:sha256:b047dec931b6252e9b43e71321a60c4ede396d419a818907680ed64d952c114d"
+            ],
             "shapes": [
               "large",
               "medium",
               "tiny"
-            ],
-            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+            ]
           },
           "evidence": [
             "tools/perf-baseline/README.md",

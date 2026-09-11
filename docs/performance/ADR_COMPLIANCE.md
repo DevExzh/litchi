@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## 0508: measured export coverage preserves semantic scope
+
+[0508](changes/0508-default-semantic-text-export.md) changes default benchmark
+selection and source-audited catalog metadata, with no format implementation,
+API or dependency change. All 29 accepted ADRs and the README are unchanged
+under the [fresh manifest](results/change-0508/adr-manifest.json).
+[The dispositions](results/change-0508/adr-review.md) and
+[source review](results/change-0508/source-review.md) distinguish RTF's
+retained sink from ODF's hashing discard sink, preserve output/object ceilings
+and oracles, and limit coverage to representative synthetic plain-text export.
+Actual full reports and prior-identity checks authorize the timing-contract
+promotion. Native producer and complete support claims remain outside scope.
+
 ## 0507: fixed value groups retain validation and error order
 
 [0507](changes/0507-odg-attribute-value-batches.md) records this batch.

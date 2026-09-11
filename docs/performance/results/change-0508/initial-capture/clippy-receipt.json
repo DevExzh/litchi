@@ -1,0 +1,32 @@
+{
+  "lane": "clippy",
+  "command": [
+    "cargo",
+    "clippy",
+    "--release",
+    "--lib",
+    "--bin",
+    "litchi-perf-baseline",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0508/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0508"
+  },
+  "started_utc": "2026-09-11T17:44:27.948279+00:00",
+  "elapsed_seconds": 56.30489492799825,
+  "exit_code": 101,
+  "source_unchanged": true,
+  "source_manifest_sha256": "0099541fd38502f9c09a69f5fae9c82e831763da3976a7c00e59821fa96270ae",
+  "log_sha256": "75df13a059e14c766780ca7e4dd5f17a6d99c4c220612bba85515a06d2004bf5"
+}

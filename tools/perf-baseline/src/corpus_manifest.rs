@@ -84,6 +84,35 @@ const ODP_EXISTING_APPEND_SOURCE_FUNCTIONS: &[&str] = &[
     "odp_buffered_create::build_odp_buffered_corpus",
     "SemanticShape",
 ];
+const RTF_SEMANTIC_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_semantic_rtf_corpus",
+    "semantic_rtf_bytes",
+    "semantic_rtf_text",
+    "semantic_rtf_variant_text",
+    "semantic_rtf_paragraph_count",
+    "SemanticShape",
+    "RtfSemanticVariant",
+];
+const ODT_SEMANTIC_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_semantic_odt_corpus",
+    "semantic_odt_bytes",
+    "semantic_odt_text",
+    "SemanticShape",
+];
+const ODS_SEMANTIC_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_semantic_ods_corpus",
+    "semantic_ods_bytes",
+    "semantic_ods_sheet_name",
+    "semantic_ods_text",
+    "SemanticShape",
+];
+const ODP_SEMANTIC_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_semantic_odp_corpus",
+    "semantic_odp_bytes",
+    "semantic_odp_title",
+    "semantic_odp_text",
+    "SemanticShape",
+];
 
 // Keep this source-audited map in lockstep with the Python migration and the
 // table in CORPUS_MANIFEST_V2.md.  It describes generator algorithms, not an
@@ -167,6 +196,70 @@ const FAMILY_MAP: &[(&str, FamilyMetadata)] = &[
             algorithm_id: "litchi-perf.odp-existing-append-v1",
             seed_spec: "none",
             source_functions: ODP_EXISTING_APPEND_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-rtf-semantic-v2",
+        FamilyMetadata {
+            family: "rtf",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.rtf-semantic-text-v1",
+            seed_spec: "none",
+            source_functions: RTF_SEMANTIC_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-odt-semantic-v1",
+        FamilyMetadata {
+            family: "odt",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.odt-semantic-text-v1",
+            seed_spec: "none",
+            source_functions: ODT_SEMANTIC_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-ods-semantic-v1",
+        FamilyMetadata {
+            family: "ods",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.ods-semantic-grid-v1",
+            seed_spec: "none",
+            source_functions: ODS_SEMANTIC_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-odp-semantic-v1",
+        FamilyMetadata {
+            family: "odp",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.odp-semantic-slides-v1",
+            seed_spec: "none",
+            source_functions: ODP_SEMANTIC_SOURCE_FUNCTIONS,
         },
     ),
 ];
@@ -617,27 +710,87 @@ fn generator_parameters(
                 json!("ceil(cell_count / 100)"),
             );
         },
-        "odp" => {
+        "rtf" => {
+            parameters.insert("rtf_variant".to_owned(), json!(legacy.rtf_variant));
             parameters.insert(
-                "base_generator".to_owned(),
-                json!("litchi-odp-buffered-slides-v1"),
+                "paragraph_count_by_shape".to_owned(),
+                json!({"tiny": 24, "medium": 200, "large": 10_000}),
             );
             parameters.insert(
-                "slide_count_by_shape".to_owned(),
-                json!({"tiny": 64, "medium": 4096, "large": 8192}),
+                "text_template".to_owned(),
+                json!("litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}"),
             );
-            parameters.insert("append_count".to_owned(), json!(1));
+            parameters.insert("paragraph_separator".to_owned(), json!("\\n"));
+        },
+        "odt" => {
             parameters.insert(
-                "opaque_member_path".to_owned(),
-                json!("Opaque/litchi-perf-odp-existing-append-opaque.bin"),
+                "paragraph_count_by_shape".to_owned(),
+                json!({"tiny": 24, "medium": 200, "large": 10_000}),
             );
-            parameters.insert("opaque_payload_bytes".to_owned(), json!(65_536));
             parameters.insert(
-                "opaque_payload_formula".to_owned(),
+                "text_template".to_owned(),
+                json!("litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}"),
+            );
+            parameters.insert("paragraph_separator".to_owned(), json!("\\n"));
+        },
+        "ods" => {
+            parameters.insert(
+                "sheet_count_by_shape".to_owned(),
+                json!({"tiny": 1, "medium": 2, "large": 2}),
+            );
+            parameters.insert(
+                "rows_per_sheet_by_shape".to_owned(),
+                json!({"tiny": 8, "medium": 32, "large": 128}),
+            );
+            parameters.insert(
+                "columns_per_sheet_by_shape".to_owned(),
+                json!({"tiny": 8, "medium": 32, "large": 128}),
+            );
+            parameters.insert(
+                "text_template".to_owned(),
                 json!(
-                    "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0"
+                    "litchi-perf-baseline-ods-semantic-v1-{state}-{sheet:02}-{row:03}-{column:03}"
                 ),
             );
+        },
+        "odp" => {
+            if legacy.generator == "litchi-odp-existing-append-lifecycle-v1" {
+                parameters.insert(
+                    "base_generator".to_owned(),
+                    json!("litchi-odp-buffered-slides-v1"),
+                );
+                parameters.insert(
+                    "slide_count_by_shape".to_owned(),
+                    json!({"tiny": 64, "medium": 4096, "large": 8192}),
+                );
+                parameters.insert("append_count".to_owned(), json!(1));
+                parameters.insert(
+                    "opaque_member_path".to_owned(),
+                    json!("Opaque/litchi-perf-odp-existing-append-opaque.bin"),
+                );
+                parameters.insert("opaque_payload_bytes".to_owned(), json!(65_536));
+                parameters.insert(
+                    "opaque_payload_formula".to_owned(),
+                    json!(
+                        "byte[index] = index_byte*37 + page_byte + 0x5b + variant (mod 256); variant=0"
+                    ),
+                );
+            } else if legacy.generator == "litchi-odp-semantic-v1" {
+                parameters.insert(
+                    "slide_count_by_shape".to_owned(),
+                    json!({"tiny": 3, "medium": 12, "large": 100}),
+                );
+                parameters.insert(
+                    "title_template".to_owned(),
+                    json!("litchi-perf-baseline-odp-title-v1-{state}-{index:03}"),
+                );
+                parameters.insert(
+                    "body_template".to_owned(),
+                    json!("litchi-perf-baseline-odp-body-v1-{state}-{index:03}"),
+                );
+                parameters.insert("slide_text_separator".to_owned(), json!("\\n"));
+                parameters.insert("presentation_text_separator".to_owned(), json!("\\n\\n"));
+            }
         },
         _ => {},
     }
@@ -817,7 +970,10 @@ impl CorpusManifestV2 {
         let target_payload_bytes = u64::try_from(legacy.target_payload_bytes)
             .map_err(|_| ManifestError::new("target byte count does not fit u64"))?;
         let id = content_id(&legacy.package_format, &legacy.archive_sha256);
-        let family = family_metadata(&legacy.generator);
+        let family = family_metadata(&legacy.generator).filter(|_| {
+            !(legacy.generator == "litchi-rtf-semantic-v2"
+                && legacy.rtf_variant.as_deref() == Some("watermark"))
+        });
         let generated = family.is_some() || legacy.generator.contains("synthetic");
         let mut categories = vec!["legacy-migrated".to_owned()];
         if generated {
@@ -1242,7 +1398,7 @@ mod tests {
 
     #[test]
     fn known_family_map_enriches_without_source_hashes() {
-        assert_eq!(FAMILY_MAP.len(), 5);
+        assert_eq!(FAMILY_MAP.len(), 9);
         let expected = [
             (
                 "litchi-cfb-synthetic-v1",
@@ -1278,6 +1434,34 @@ mod tests {
                 "none",
                 "odp",
                 "tools/perf-baseline/src/odp_existing_append.rs",
+            ),
+            (
+                "litchi-rtf-semantic-v2",
+                "litchi-perf.rtf-semantic-text-v1",
+                "none",
+                "rtf",
+                "tools/perf-baseline/src/lib.rs",
+            ),
+            (
+                "litchi-odt-semantic-v1",
+                "litchi-perf.odt-semantic-text-v1",
+                "none",
+                "odt",
+                "tools/perf-baseline/src/lib.rs",
+            ),
+            (
+                "litchi-ods-semantic-v1",
+                "litchi-perf.ods-semantic-grid-v1",
+                "none",
+                "ods",
+                "tools/perf-baseline/src/lib.rs",
+            ),
+            (
+                "litchi-odp-semantic-v1",
+                "litchi-perf.odp-semantic-slides-v1",
+                "none",
+                "odp",
+                "tools/perf-baseline/src/lib.rs",
             ),
         ];
         for (generator, algorithm_id, seed_spec, family, source_path) in expected {

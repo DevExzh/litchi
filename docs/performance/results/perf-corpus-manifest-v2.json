@@ -6,12 +6,12 @@
     "algorithm": "sorted-json-utf8-compact-v1",
     "hash": "sha256"
   },
-  "catalog_sha256": "d2c35126ee4e862ada539944ddb6cc2c654b82fe1e1465f505034fd1a9f7a84f",
-  "content_set_sha256": "0ac5a8c267b6da1424ae0f322ac309e6a52606a67cfccaed12cd6821e93becd5",
+  "catalog_sha256": "f03c9f56846f3c7a22d012189e40126dd65be50efbfd24275c3f9ab40854e41a",
+  "content_set_sha256": "8e629fef89f7eccf023ebc6a6e8b8aebdbcf91207f6d6dfedd2e2fe59c3452a5",
   "build": {
     "tool": "litchi-perf-baseline",
     "tool_version": "0.1.0",
-    "git_revision": "161cf53b20d8bb65fe79d4567b9ea7768430de7b",
+    "git_revision": "40a44b44e1d5c83cb81fc36d7eb61de239666c78",
     "git_worktree_dirty": true,
     "source_files": []
   },
@@ -1735,6 +1735,160 @@
       }
     },
     {
+      "id": "odp-odf-zip:sha256:08389eff98c92ec9ce0c989a0ed353e5be8013651a756a5167ea3a6ebee67eff",
+      "name": "odp-semantic-large",
+      "legacy_v1": {
+        "name": "odp-semantic-large",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 100,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 8700,
+        "archive_bytes": 3335,
+        "archive_sha256": "08389eff98c92ec9ce0c989a0ed353e5be8013651a756a5167ea3a6ebee67eff",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-semantic-slides-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "body_template": "litchi-perf-baseline-odp-body-v1-{state}-{index:03}",
+          "compression": "deflate",
+          "entry_bytes": 43,
+          "entry_count": 100,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "large",
+          "package_format": "ODP/ODF/ZIP",
+          "presentation_text_separator": "\\n\\n",
+          "slide_count_by_shape": {
+            "large": 100,
+            "medium": 12,
+            "tiny": 3
+          },
+          "slide_text_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odp_corpus",
+            "semantic_odp_bytes",
+            "semantic_odp_title",
+            "semantic_odp_text",
+            "SemanticShape"
+          ],
+          "title_template": "litchi-perf-baseline-odp-title-v1-{state}-{index:03}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 3335,
+        "archive_sha256": "08389eff98c92ec9ce0c989a0ed353e5be8013651a756a5167ea3a6ebee67eff",
+        "logical_payload_bytes": 8700,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 43,
+        "entry_count": 100
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 3335,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "slide:0",
+          "logical_bytes": 43,
+          "sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
       "id": "odp-odf-zip:sha256:62f45803d9363c0a0afd9c35600487a9ac6f287bedd9c0aba37dbd9b7aa3a593",
       "name": "odp-existing-append-lifecycle-medium",
       "legacy_v1": {
@@ -1887,6 +2041,160 @@
       "coverage": {
         "timed_cases": [
           "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odp-odf-zip:sha256:8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+      "name": "odp-semantic-medium",
+      "legacy_v1": {
+        "name": "odp-semantic-medium",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 12,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 1044,
+        "archive_bytes": 2268,
+        "archive_sha256": "8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-semantic-slides-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "body_template": "litchi-perf-baseline-odp-body-v1-{state}-{index:03}",
+          "compression": "deflate",
+          "entry_bytes": 43,
+          "entry_count": 12,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium",
+          "package_format": "ODP/ODF/ZIP",
+          "presentation_text_separator": "\\n\\n",
+          "slide_count_by_shape": {
+            "large": 100,
+            "medium": 12,
+            "tiny": 3
+          },
+          "slide_text_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odp_corpus",
+            "semantic_odp_bytes",
+            "semantic_odp_title",
+            "semantic_odp_text",
+            "SemanticShape"
+          ],
+          "title_template": "litchi-perf-baseline-odp-title-v1-{state}-{index:03}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 2268,
+        "archive_sha256": "8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+        "logical_payload_bytes": 1044,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 43,
+        "entry_count": 12
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 2268,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "slide:0",
+          "logical_bytes": 43,
+          "sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_semantic_text_to_sink"
         ],
         "guard_cases": [],
         "inventory_only": false
@@ -2051,6 +2359,160 @@
       }
     },
     {
+      "id": "odp-odf-zip:sha256:b047dec931b6252e9b43e71321a60c4ede396d419a818907680ed64d952c114d",
+      "name": "odp-semantic-tiny",
+      "legacy_v1": {
+        "name": "odp-semantic-tiny",
+        "generator": "litchi-odp-semantic-v1",
+        "package_format": "ODP/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "entry_bytes": 43,
+        "uncompressed_payload_bytes": 261,
+        "archive_bytes": 2139,
+        "archive_sha256": "b047dec931b6252e9b43e71321a60c4ede396d419a818907680ed64d952c114d",
+        "target_entry": "slide:0",
+        "target_payload_bytes": 43,
+        "target_payload_sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e",
+        "xlsx": null
+      },
+      "format": "ODP/ODF/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odp-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odp-semantic-slides-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "body_template": "litchi-perf-baseline-odp-body-v1-{state}-{index:03}",
+          "compression": "deflate",
+          "entry_bytes": 43,
+          "entry_count": 3,
+          "family": "odp",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "tiny",
+          "package_format": "ODP/ODF/ZIP",
+          "presentation_text_separator": "\\n\\n",
+          "slide_count_by_shape": {
+            "large": 100,
+            "medium": 12,
+            "tiny": 3
+          },
+          "slide_text_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odp_corpus",
+            "semantic_odp_bytes",
+            "semantic_odp_title",
+            "semantic_odp_text",
+            "SemanticShape"
+          ],
+          "title_template": "litchi-perf-baseline-odp-title-v1-{state}-{index:03}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 2139,
+        "archive_sha256": "b047dec931b6252e9b43e71321a60c4ede396d419a818907680ed64d952c114d",
+        "logical_payload_bytes": 261,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 43,
+        "entry_count": 3
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 2139,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "slide:0",
+          "logical_bytes": 43,
+          "sha256": "24c502dc423b65e5072c39dd904cd49c0899f008914870bde957ec78c690191e"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odp_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
       "id": "odp-odf-zip:sha256:bda1bffb24b312cd872ee36b1c72e6da886f22fdf93086b727aecb2262c5563c",
       "name": "odp-existing-append-lifecycle-large",
       "legacy_v1": {
@@ -2203,6 +2665,942 @@
       "coverage": {
         "timed_cases": [
           "odp_existing_append_lifecycle"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ods-odf-zip:sha256:3318bdf143965aaf3a780658d076c2d63c60574dcbb95a86bc00d5666d08a2d3",
+      "name": "ods-semantic-tiny",
+      "legacy_v1": {
+        "name": "ods-semantic-tiny",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 64,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 3456,
+        "archive_bytes": 1066,
+        "archive_sha256": "3318bdf143965aaf3a780658d076c2d63c60574dcbb95a86bc00d5666d08a2d3",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "format": "ODS/ODF/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-ods-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.ods-semantic-grid-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 3,
+          "columns_per_sheet_by_shape": {
+            "large": 128,
+            "medium": 32,
+            "tiny": 8
+          },
+          "compression": "deflate",
+          "entry_bytes": 54,
+          "entry_count": 64,
+          "family": "ods",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "tiny",
+          "package_format": "ODS/ODF/ZIP",
+          "rows_per_sheet_by_shape": {
+            "large": 128,
+            "medium": 32,
+            "tiny": 8
+          },
+          "sheet_count_by_shape": {
+            "large": 2,
+            "medium": 2,
+            "tiny": 1
+          },
+          "source_functions": [
+            "build_semantic_ods_corpus",
+            "semantic_ods_bytes",
+            "semantic_ods_sheet_name",
+            "semantic_ods_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-ods-semantic-v1-{state}-{sheet:02}-{row:03}-{column:03}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 1066,
+        "archive_sha256": "3318bdf143965aaf3a780658d076c2d63c60574dcbb95a86bc00d5666d08a2d3",
+        "logical_payload_bytes": 3456,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 54,
+        "entry_count": 64
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 1066,
+          "members": 3,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Sheet 0!R0C0",
+          "logical_bytes": 54,
+          "sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "ods_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ods-odf-zip:sha256:e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+      "name": "ods-semantic-medium",
+      "legacy_v1": {
+        "name": "ods-semantic-medium",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 2048,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 110592,
+        "archive_bytes": 7011,
+        "archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "format": "ODS/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-ods-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.ods-semantic-grid-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 3,
+          "columns_per_sheet_by_shape": {
+            "large": 128,
+            "medium": 32,
+            "tiny": 8
+          },
+          "compression": "deflate",
+          "entry_bytes": 54,
+          "entry_count": 2048,
+          "family": "ods",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium",
+          "package_format": "ODS/ODF/ZIP",
+          "rows_per_sheet_by_shape": {
+            "large": 128,
+            "medium": 32,
+            "tiny": 8
+          },
+          "sheet_count_by_shape": {
+            "large": 2,
+            "medium": 2,
+            "tiny": 1
+          },
+          "source_functions": [
+            "build_semantic_ods_corpus",
+            "semantic_ods_bytes",
+            "semantic_ods_sheet_name",
+            "semantic_ods_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-ods-semantic-v1-{state}-{sheet:02}-{row:03}-{column:03}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 7011,
+        "archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "logical_payload_bytes": 110592,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 54,
+        "entry_count": 2048
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 7011,
+          "members": 3,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Sheet 0!R0C0",
+          "logical_bytes": 54,
+          "sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "ods_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "ods-odf-zip:sha256:f4d7a31785e734db61b7c99194a61d446ad5de2dab81f8e7e1ea7197c2715e67",
+      "name": "ods-semantic-large",
+      "legacy_v1": {
+        "name": "ods-semantic-large",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 32768,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 1769472,
+        "archive_bytes": 98941,
+        "archive_sha256": "f4d7a31785e734db61b7c99194a61d446ad5de2dab81f8e7e1ea7197c2715e67",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "format": "ODS/ODF/ZIP",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-ods-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.ods-semantic-grid-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 3,
+          "columns_per_sheet_by_shape": {
+            "large": 128,
+            "medium": 32,
+            "tiny": 8
+          },
+          "compression": "deflate",
+          "entry_bytes": 54,
+          "entry_count": 32768,
+          "family": "ods",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "large",
+          "package_format": "ODS/ODF/ZIP",
+          "rows_per_sheet_by_shape": {
+            "large": 128,
+            "medium": 32,
+            "tiny": 8
+          },
+          "sheet_count_by_shape": {
+            "large": 2,
+            "medium": 2,
+            "tiny": 1
+          },
+          "source_functions": [
+            "build_semantic_ods_corpus",
+            "semantic_ods_bytes",
+            "semantic_ods_sheet_name",
+            "semantic_ods_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-ods-semantic-v1-{state}-{sheet:02}-{row:03}-{column:03}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 98941,
+        "archive_sha256": "f4d7a31785e734db61b7c99194a61d446ad5de2dab81f8e7e1ea7197c2715e67",
+        "logical_payload_bytes": 1769472,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 54,
+        "entry_count": 32768
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 98941,
+          "members": 3,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Sheet 0!R0C0",
+          "logical_bytes": 54,
+          "sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "ods_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odt-odf-zip:sha256:39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+      "name": "odt-semantic-large",
+      "legacy_v1": {
+        "name": "odt-semantic-large",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 10000,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 490000,
+        "archive_bytes": 28329,
+        "archive_sha256": "39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "format": "ODT/ODF/ZIP",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odt-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odt-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 49,
+          "entry_count": 10000,
+          "family": "odt",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "large",
+          "package_format": "ODT/ODF/ZIP",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odt_corpus",
+            "semantic_odt_bytes",
+            "semantic_odt_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 28329,
+        "archive_sha256": "39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+        "logical_payload_bytes": 490000,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 10000
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 28329,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odt_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odt-odf-zip:sha256:5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+      "name": "odt-semantic-tiny",
+      "legacy_v1": {
+        "name": "odt-semantic-tiny",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 24,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1176,
+        "archive_bytes": 2058,
+        "archive_sha256": "5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "format": "ODT/ODF/ZIP",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odt-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odt-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 49,
+          "entry_count": 24,
+          "family": "odt",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "tiny",
+          "package_format": "ODT/ODF/ZIP",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odt_corpus",
+            "semantic_odt_bytes",
+            "semantic_odt_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 2058,
+        "archive_sha256": "5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+        "logical_payload_bytes": 1176,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 24
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 2058,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odt_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "odt-odf-zip:sha256:81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+      "name": "odt-semantic-medium",
+      "legacy_v1": {
+        "name": "odt-semantic-medium",
+        "generator": "litchi-odt-semantic-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 200,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 9800,
+        "archive_bytes": 2557,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de",
+        "xlsx": null
+      },
+      "format": "ODT/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-odt-semantic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.odt-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 5,
+          "compression": "deflate",
+          "entry_bytes": 49,
+          "entry_count": 200,
+          "family": "odt",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium",
+          "package_format": "ODT/ODF/ZIP",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "source_functions": [
+            "build_semantic_odt_corpus",
+            "semantic_odt_bytes",
+            "semantic_odt_text",
+            "SemanticShape"
+          ],
+          "text_template": "litchi-perf-baseline-odt-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 2557,
+        "archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+        "logical_payload_bytes": 9800,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 200
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 2557,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "4aa41b1ab60be8842e28c547e429e03eb6a16fcfddbccf8e0dd85e0491e7a4de"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odt_semantic_text_to_sink"
         ],
         "guard_cases": [],
         "inventory_only": false
@@ -4011,6 +5409,474 @@
       }
     },
     {
+      "id": "rtf:sha256:48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "name": "rtf-semantic-plain-medium",
+      "legacy_v1": {
+        "name": "rtf-semantic-plain-medium",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 200,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 9999,
+        "archive_bytes": 10851,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "format": "RTF",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-rtf-semantic-v2",
+        "kind": "synthetic",
+        "revision": "v2",
+        "algorithm_id": "litchi-perf.rtf-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 1,
+          "compression": "none",
+          "entry_bytes": 49,
+          "entry_count": 200,
+          "family": "rtf",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium",
+          "package_format": "RTF",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "rtf_variant": "plain",
+          "source_functions": [
+            "build_semantic_rtf_corpus",
+            "semantic_rtf_bytes",
+            "semantic_rtf_text",
+            "semantic_rtf_variant_text",
+            "semantic_rtf_paragraph_count",
+            "SemanticShape",
+            "RtfSemanticVariant"
+          ],
+          "text_template": "litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 10851,
+        "archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+        "logical_payload_bytes": 9999,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 200
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 10851,
+          "members": 1,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "rtf_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "rtf:sha256:957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "name": "rtf-semantic-plain-large",
+      "legacy_v1": {
+        "name": "rtf-semantic-plain-large",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "large",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 10000,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 499999,
+        "archive_bytes": 540051,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "format": "RTF",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-rtf-semantic-v2",
+        "kind": "synthetic",
+        "revision": "v2",
+        "algorithm_id": "litchi-perf.rtf-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 1,
+          "compression": "none",
+          "entry_bytes": 49,
+          "entry_count": 10000,
+          "family": "rtf",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "large",
+          "package_format": "RTF",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "rtf_variant": "plain",
+          "source_functions": [
+            "build_semantic_rtf_corpus",
+            "semantic_rtf_bytes",
+            "semantic_rtf_text",
+            "semantic_rtf_variant_text",
+            "semantic_rtf_paragraph_count",
+            "SemanticShape",
+            "RtfSemanticVariant"
+          ],
+          "text_template": "litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 540051,
+        "archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+        "logical_payload_bytes": 499999,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 10000
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 540051,
+          "members": 1,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "rtf_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
+      "id": "rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+      "name": "rtf-semantic-plain-tiny",
+      "legacy_v1": {
+        "name": "rtf-semantic-plain-tiny",
+        "generator": "litchi-rtf-semantic-v2",
+        "package_format": "RTF",
+        "shape": "tiny",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "none",
+        "entry_count": 24,
+        "archive_member_count": 1,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 1199,
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "target_entry": "paragraph:0",
+        "target_payload_bytes": 49,
+        "target_payload_sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84",
+        "rtf_variant": "plain",
+        "xlsx": null
+      },
+      "format": "RTF",
+      "size_class": "tiny",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-rtf-semantic-v2",
+        "kind": "synthetic",
+        "revision": "v2",
+        "algorithm_id": "litchi-perf.rtf-semantic-text-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 1,
+          "compression": "none",
+          "entry_bytes": 49,
+          "entry_count": 24,
+          "family": "rtf",
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "tiny",
+          "package_format": "RTF",
+          "paragraph_count_by_shape": {
+            "large": 10000,
+            "medium": 200,
+            "tiny": 24
+          },
+          "paragraph_separator": "\\n",
+          "rtf_variant": "plain",
+          "source_functions": [
+            "build_semantic_rtf_corpus",
+            "semantic_rtf_bytes",
+            "semantic_rtf_text",
+            "semantic_rtf_variant_text",
+            "semantic_rtf_paragraph_count",
+            "SemanticShape",
+            "RtfSemanticVariant"
+          ],
+          "text_template": "litchi-perf-baseline-rtf-semantic-v1-{state}-{index:05}"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 1347,
+        "archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+        "logical_payload_bytes": 1199,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 24
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 1347,
+          "members": 1,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "paragraph:0",
+          "logical_bytes": 49,
+          "sha256": "53e4c6278ffce9c877ab42ca8c4d25d2cb21524a6fd9e6482efc383bda1d3c84"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "rtf_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    },
+    {
       "id": "xls-cfb:sha256:228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
       "name": "xls-large",
       "legacy_v1": {
@@ -5540,6 +7406,69 @@
       "role": "timed"
     },
     {
+      "case": "odp_semantic_text_to_sink",
+      "corpus_id": "odp-odf-zip:sha256:08389eff98c92ec9ce0c989a0ed353e5be8013651a756a5167ea3a6ebee67eff",
+      "legacy_name": "odp-semantic-large",
+      "legacy_archive_sha256": "08389eff98c92ec9ce0c989a0ed353e5be8013651a756a5167ea3a6ebee67eff",
+      "role": "timed"
+    },
+    {
+      "case": "odp_semantic_text_to_sink",
+      "corpus_id": "odp-odf-zip:sha256:8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+      "legacy_name": "odp-semantic-medium",
+      "legacy_archive_sha256": "8efa67b515572855143622f3dab0ba29eaafd39af5f72f441527b07af614562c",
+      "role": "timed"
+    },
+    {
+      "case": "odp_semantic_text_to_sink",
+      "corpus_id": "odp-odf-zip:sha256:b047dec931b6252e9b43e71321a60c4ede396d419a818907680ed64d952c114d",
+      "legacy_name": "odp-semantic-tiny",
+      "legacy_archive_sha256": "b047dec931b6252e9b43e71321a60c4ede396d419a818907680ed64d952c114d",
+      "role": "timed"
+    },
+    {
+      "case": "ods_semantic_text_to_sink",
+      "corpus_id": "ods-odf-zip:sha256:3318bdf143965aaf3a780658d076c2d63c60574dcbb95a86bc00d5666d08a2d3",
+      "legacy_name": "ods-semantic-tiny",
+      "legacy_archive_sha256": "3318bdf143965aaf3a780658d076c2d63c60574dcbb95a86bc00d5666d08a2d3",
+      "role": "timed"
+    },
+    {
+      "case": "ods_semantic_text_to_sink",
+      "corpus_id": "ods-odf-zip:sha256:e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+      "legacy_name": "ods-semantic-medium",
+      "legacy_archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+      "role": "timed"
+    },
+    {
+      "case": "ods_semantic_text_to_sink",
+      "corpus_id": "ods-odf-zip:sha256:f4d7a31785e734db61b7c99194a61d446ad5de2dab81f8e7e1ea7197c2715e67",
+      "legacy_name": "ods-semantic-large",
+      "legacy_archive_sha256": "f4d7a31785e734db61b7c99194a61d446ad5de2dab81f8e7e1ea7197c2715e67",
+      "role": "timed"
+    },
+    {
+      "case": "odt_semantic_text_to_sink",
+      "corpus_id": "odt-odf-zip:sha256:39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+      "legacy_name": "odt-semantic-large",
+      "legacy_archive_sha256": "39662778e7a17d1909848487afcfd68e9d9945118769709bbde6f156a257bae4",
+      "role": "timed"
+    },
+    {
+      "case": "odt_semantic_text_to_sink",
+      "corpus_id": "odt-odf-zip:sha256:5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+      "legacy_name": "odt-semantic-tiny",
+      "legacy_archive_sha256": "5f4741273e40a5e847662d8a7af03e72bb0481ad5260f7d8efeed358a662eb48",
+      "role": "timed"
+    },
+    {
+      "case": "odt_semantic_text_to_sink",
+      "corpus_id": "odt-odf-zip:sha256:81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+      "legacy_name": "odt-semantic-medium",
+      "legacy_archive_sha256": "81fe7ba18afe0a4d7652f86bd0ced3383b2a3dccd4e67133f280783915610dd7",
+      "role": "timed"
+    },
+    {
       "case": "opc_mutated_save",
       "corpus_id": "opc-zip:sha256:08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
       "legacy_name": "tiny-incompressible",
@@ -6006,6 +7935,27 @@
       "corpus_id": "ppt-cfb:sha256:e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4",
       "legacy_name": "ppt-tiny",
       "legacy_archive_sha256": "e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_semantic_text_to_sink",
+      "corpus_id": "rtf:sha256:48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "legacy_name": "rtf-semantic-plain-medium",
+      "legacy_archive_sha256": "48b7dd8bf77ddd08a357520f2b4d5448b17217699273f93191527d377de31999",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_semantic_text_to_sink",
+      "corpus_id": "rtf:sha256:957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "legacy_name": "rtf-semantic-plain-large",
+      "legacy_archive_sha256": "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e",
+      "role": "timed"
+    },
+    {
+      "case": "rtf_semantic_text_to_sink",
+      "corpus_id": "rtf:sha256:ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
+      "legacy_name": "rtf-semantic-plain-tiny",
+      "legacy_archive_sha256": "ee4a5c5b5d1c97d5fb4f1e862c2787a859136b237addd0d14a7d52ddc9e62328",
       "role": "timed"
     },
     {

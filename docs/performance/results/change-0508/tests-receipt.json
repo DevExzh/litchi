@@ -1,0 +1,27 @@
+{
+  "lane": "tests",
+  "command": [
+    "cargo",
+    "test",
+    "--release",
+    "--lib",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml"
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0508/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0508"
+  },
+  "started_utc": "2026-09-11T17:52:15.841394+00:00",
+  "elapsed_seconds": 168.7242008999965,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "e4851370dd14cbd5f052edb27792858de75bd26e594fa1a9bec34a9191f77eed",
+  "log_sha256": "f562ae962499c4e68b722b923a69e9e20437172d521641fb188eff58936a4b90"
+}

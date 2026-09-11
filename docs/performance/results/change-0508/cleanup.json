@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "path": "/tmp/litchi-goal-0508",
+  "removed": true,
+  "regular_files": 3320,
+  "unique_file_inodes": 3296,
+  "unique_inode_allocated_bytes": 1348038656,
+  "live_references": [],
+  "completed_utc": "2026-09-11T17:57:07.407118+00:00"
+}

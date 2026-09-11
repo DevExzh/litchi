@@ -1,0 +1,30 @@
+{
+  "lane": "preflight",
+  "command": [
+    "/tmp/litchi-goal-0508/target/release/litchi-perf-baseline",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0508/preflight-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0508/preflight-catalog.json"
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0508/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0508"
+  },
+  "started_utc": "2026-09-11T17:39:07.520479+00:00",
+  "elapsed_seconds": 6.0183553470051265,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "0099541fd38502f9c09a69f5fae9c82e831763da3976a7c00e59821fa96270ae",
+  "log_sha256": "57325d95c83716f63ed217a13bdaba10ce051fc5b5c26ea61b2cc9bf36622932",
+  "binary_sha256": "a1b29400bf5ff451372c802e6c836c91885033781a9c5adcc23f73cb50eef07e"
+}

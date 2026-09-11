@@ -1,0 +1,40 @@
+........................E...........E........................................................................................................................................F.........................
+======================================================================
+ERROR: test_generated_per_run_identity_is_required (tools.test_crud_coverage_index.CrudCoverageIndexTests.test_generated_per_run_identity_is_required)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 263, in test_generated_per_run_identity_is_required
+    identity = index["categories"][2]["scenarios"][0]["corpus"]["identity"]
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+KeyError: 'identity'
+
+======================================================================
+ERROR: test_missing_nested_corpus_field_is_rejected_as_validation_error (tools.test_crud_coverage_index.CrudCoverageIndexTests.test_missing_nested_corpus_field_is_rejected_as_validation_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 415, in test_missing_nested_corpus_field_is_rejected_as_validation_error
+    del index["categories"][2]["scenarios"][0]["corpus"]["identity"]
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+KeyError: 'identity'
+
+======================================================================
+FAIL: test_allocator_target_owns_global_allocator_unsafe_surface (tools.test_perf_baseline_source_policy.PerfBaselineSourcePolicyTests.test_allocator_target_owns_global_allocator_unsafe_surface)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_perf_baseline_source_policy.py", line 56, in test_allocator_target_owns_global_allocator_unsafe_surface
+    self.assertIn("use litchi_perf_baseline::allocation_metrics;", self.allocator)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'use litchi_perf_baseline::allocation_metrics;' not found in '//! Isolated allocator-instrumented benchmark entry point.\n//!\n//! The shared harness library is forbid-safe. Only this target owns the\n//! process-global allocator wrapper, which lives in the reusable support\n//! module so isolated benchmark bins report the same metric semantics.\n\n#[path = "support/counting_allocator.rs"]\nmod allocator;\n\nfn main() -> Result<(), Box<dyn std::error::Error>> {\n    litchi_perf_baseline::allocation_metrics::enable();\n    let mut args = std::env::args_os();\n    let _executable = args.next();\n    match args.next() {\n        Some(selector) if selector == std::ffi::OsStr::new("retention") => {\n            litchi_perf_baseline::pptx_retention::run_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("provider-lifecycle") => {\n            litchi_perf_baseline::pptx_provider_lifecycle::run_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("docx-provider-lifecycle") => {\n            litchi_perf_baseline::docx_provider_lifecycle::run_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("docx-edit-provider-cold") => {\n            litchi_perf_baseline::docx_edit_provider::run_cold_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("docx-edit-provider") => {\n            litchi_perf_baseline::docx_edit_provider::run_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("docx-managed-edit") => {\n            litchi_perf_baseline::docx_managed_edit::run_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("docx-managed-read-ahead") => {\n            litchi_perf_baseline::docx_managed_read_ahead::run_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("pptx-pair-lifecycle") => {\n            litchi_perf_baseline::pptx_pair_lifecycle::run_from_args(args)\n        },\n        Some(selector) if selector == std::ffi::OsStr::new("odp-append-attribution") => {\n            litchi_perf_baseline::odp_append_attribution::run_from_args(args)\n        },\n        _ => litchi_perf_baseline::run(),\n    }\n}\n'
+
+----------------------------------------------------------------------
+Ran 199 tests in 0.853s
+
+FAILED (failures=1, errors=2)
+PASS: 1 matched results, 7 metrics, 0 regressions
+Worst latency movement: opc_open elapsed_ns.p50 +4.00% (limit +5.00%)
+REGRESSION: 1 matched results, 7 metrics, 3 regressions
+REGRESSION opc_open[tiny] elapsed_ns.p50: 100 -> 120 (+20.00%; limit +5.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p95: 100 -> 120 (+20.00%; limit +8.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p99: 100 -> 120 (+20.00%; limit +12.00%)
+INVALID: 0 matched results, 0 metrics, 0 regressions
+ERROR: cannot read /tmp/tmpjbyu2wy0/current.json: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
