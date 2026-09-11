@@ -1,0 +1,22 @@
+binary=docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/bin/xlsx-svg-lifecycle-profile
+8d160e44176c3904479d09da50f4cfb63cd0b5f0ec01abb8c9659367ace4a5cd  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/bin/xlsx-svg-lifecycle-profile
+rustc -vV:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/litchi-xlsx-svg-before-target
+cargo_incremental=0
+allocator=CountingAllocator (process-local GlobalAlloc observer)
+api_binding=current XLSX source-backed owner adapter; exploratory BEFORE only
+git_head=16daf9a07f748ad42e1fc776b2e9675911000985
+os=Linux 7.0.0-1012-aws x86_64
+cpu_model=unavailable
+core_count=32
+memory_total=unavailable
+storage=/dev/root       2033087068 627650268 1405420416      31% /
+environment=CARGO_INCREMENTAL=0 RUSTFLAGS=unset CARGO_ENCODED_RUSTFLAGS=unset RUSTC_BOOTSTRAP=unset

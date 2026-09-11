@@ -1,0 +1,6 @@
+76d0ced01bbf59eb09ebd33c4efca61f0065586ab237c55b04ca69a6d8dea147  crates/litchi-xlsx/src/drawing/source.rs
+5f528a246b7923553ea12bf305786c72d33f68b7eecc0ddebcaacc74542630a6  crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs
+dfa7156369b6173a5a0ffb740cd637372aa533e46c7b7948469f110585549c25  crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+9b070c7cbed68fd16a79ddffe694d97ae25d8722f2e5a4b23a41a40114275383  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/adapter.rs
+ac757292987db580830d7346b18f8dbbfcde3c66ff553dacdd68f36019bd53b0  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.toml
+52eb5b41856fa5cffa30b21451f97d61ef99247dea145236f9668cf531d9bee7  docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.lock

@@ -1,0 +1,21 @@
+binary_recorded_path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-detach-before/bin/xlsx-svg-lifecycle-profile (removed after pre-removal hash verification)
+binary_sha256=1cdb1564fba8dbb173cef453910dc91f984ce96ec0940209a384f0a822601691
+rustc -vV:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+profile=release
+cargo_incremental=0
+allocator=CountingAllocator (process-local GlobalAlloc observer)
+api_binding=reviewed XLSX source-backed owner adapter
+source_root=/var/tmp/litchi-xlsx-svg-detach-isolated-source-1
+target=/var/tmp/litchi-xlsx-svg-detach-isolated-target-1
+source_manifest_before_after=identical inside isolated source root
+source_manifest_sha256=3b557f9c445de01bacb75f194fc97c83f0a1cb7fc97f4b8018df877e75344e2e
+source_snapshot_sha256=eb5228d7c3b7da45d6fa253e5e9c2c3cf7c55aa05dd326d2484e722c4735d211
+git_head_observed_after_copy=026b5f3e7c2ffe900cdc9c364bd703c2f8af5482
