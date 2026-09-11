@@ -43,6 +43,8 @@ mod process_metrics;
 #[cfg(test)]
 mod security_corpus;
 mod xls_numeric;
+#[cfg(test)]
+mod xlsx_commit_metrics_tests;
 pub mod xml_stream_audit;
 pub mod zip_directory_spool;
 
@@ -40733,19 +40735,33 @@ fn run_xlsx_update_commit(
         Case::XlsxOnePercentCommit
     };
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut final_commit = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
         let duration = started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
         if commit.patch().len() != updates.len() {
             return Err("XLSX update commit has an unexpected semantic change count".into());
         }
         std::hint::black_box(&commit);
         final_commit = Some(commit);
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+        if iteration >= warmup_iterations {
+            let elapsed_ns = elapsed_ns(duration)?;
+            elapsed.push(elapsed_ns);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns,
+                process_metrics: None,
+                allocation_metrics,
+            });
+        }
     }
     verify_xlsx_cells(
         final_commit
@@ -40755,7 +40771,11 @@ fn run_xlsx_update_commit(
         spec,
         updates,
     )?;
-    Ok(result(case, corpus, elapsed, None))
+    let mut output = result(case, corpus, elapsed, None);
+    output.operation_metrics = Some(
+        operation_metrics::from_in_process_observations_without_sink(&observations)?,
+    );
+    Ok(output)
 }
 
 fn run_xlsx_one_cell_commit_first_read(
@@ -40817,6 +40837,18 @@ fn run_xlsx_one_cell_commit_first_read(
     ))
 }
 
+// Keep a stable profiling boundary after expected-output construction.
+// Return the commit so successful teardown stays outside the measured region.
+#[inline(never)]
+fn xlsx_commit_save_operation(
+    edit: litchi_xlsx::edit::Edit,
+    sink: &mut CountingSink,
+) -> Result<litchi_xlsx::edit::Commit, Box<dyn Error>> {
+    let commit = edit.commit()?;
+    commit.workbook().write_to(sink)?;
+    Ok(commit)
+}
+
 fn run_xlsx_update_commit_save(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -40837,16 +40869,21 @@ fn run_xlsx_update_commit_save(
     let expected = xlsx_expected_output(corpus, updates)?;
     let maximum = xlsx_output_ceiling(expected.len())?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let workbook = Workbook::from_bytes(corpus.archive.clone())?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let commit = edit.commit()?;
-        commit.workbook().write_to(&mut sink)?;
+        let commit = xlsx_commit_save_operation(edit, &mut sink)?;
         let duration = started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
         if sink.bytes != expected {
             return Err(
                 "XLSX changed commit/save differs from deterministic expected output".into(),
@@ -40854,13 +40891,35 @@ fn run_xlsx_update_commit_save(
         }
         let reopened = Workbook::from_bytes(sink.bytes.clone())?;
         verify_xlsx_cells(&reopened, spec, updates)?;
+        std::hint::black_box(&commit);
         if iteration >= warmup_iterations {
             sink_summaries.push(sink.summary());
+            let elapsed_ns = elapsed_ns(duration)?;
+            elapsed.push(elapsed_ns);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns,
+                process_metrics: None,
+                allocation_metrics,
+            });
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
     let sink = deterministic_sink_summary(&sink_summaries, "XLSX changed commit/save")?;
-    Ok(result(case, corpus, elapsed, Some(sink)))
+    let sink_observation = operation_metrics::SinkObservation {
+        accepted_bytes: sink.accepted_bytes,
+        write_calls: sink.write_calls,
+        largest_write: sink.largest_write,
+        bytes_0: sink.write_size_buckets.bytes_0,
+        bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+        bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+        bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+        bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+        bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+    };
+    let operation_metrics =
+        operation_metrics::from_in_process_observations(&observations, sink_observation)?;
+    let mut output = result(case, corpus, elapsed, Some(sink));
+    output.operation_metrics = Some(operation_metrics);
+    Ok(output)
 }
 
 fn xlsx_cell_crud_eager_output(

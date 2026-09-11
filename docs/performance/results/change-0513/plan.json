@@ -1,0 +1,17 @@
+{
+  "base_revision": "53a7c4a523e8518a7150d259ccf3435cb134e4a4",
+  "previous_turn": "Progress: committed 0512 current exact commit attribution; replay, checks and cleanup verified.",
+  "priority": "OLE2/OOXML first; ODF deferred until their full optimization goal is complete; iWork excluded.",
+  "scope": "Measured enabler: operation allocation on four existing XLSX commit/save cases and an exact post-oracle save profiler boundary; no format implementation change.",
+  "native_protocol": "12 rows across tiny/medium/dense-wide, 100 samples and 3 warmups, serial ABBA on CPU 2 with one worker; descriptive instrumentation-overhead check, no registered speedup claim.",
+  "allocator_protocol": "Same 12 rows, 10 samples and 1 warmup; separate allocator binary, two repeats; instrumented timing and RSS excluded.",
+  "profile_protocol": "Exact new save helper, dense one-percent commit/save, 3 samples and 0 warmups; require 3 direct commit and 3 writer calls, excluding generator and expected-output work.",
+  "review_thresholds_percent": {
+    "latency_throughput_rss": 5,
+    "drift_p50": 5,
+    "drift_mean": 5,
+    "drift_p95": 10,
+    "drift_p99": 15
+  },
+  "source_scope": "Harness Rust and focused tests only; preserve timer, oracle, drop and sink semantics."
+}

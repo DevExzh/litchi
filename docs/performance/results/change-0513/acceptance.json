@@ -1,0 +1,24 @@
+{
+  "decision": "retain_necessary_measured_harness_enabler",
+  "production_source_changes": [],
+  "harness_source_changes": [
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/xlsx_commit_metrics_tests.rs"
+  ],
+  "native_samples": 4800,
+  "preflight_samples": 24,
+  "allocator_samples": 240,
+  "profile_samples": 3,
+  "native_p50_change_percent_range": [
+    -0.4849628525053107,
+    2.316470215880795
+  ],
+  "adverse_latency_throughput_rss_or_drift_flags": [],
+  "allocation_claim": "Candidate-only absolute baseline; no control allocator observations and no allocation-reduction claim. Instrumented elapsed and RSS excluded. Region peak is absolute live bytes; checked peak-minus-entry is derived incremental demand.",
+  "profile_claim": "Three exact measured helper calls, each with one commit and package write; source/oracle setup and caller drop excluded. Simulated Ir only; nonfatal brk warning retained.",
+  "performance_claim": "none",
+  "claim_authorized": false,
+  "correctness": "486 harness library tests passed, one ignored; all capture corpus/sink/runtime oracles and replay checks pass.",
+  "next_action": "Measure conditional source parser/snapshot Layout reuse with exact parser/style/snapshot error ordering, MCE original-byte guards, no-op/patch preservation and bounded temporary overlap; use fresh matched native and operation allocation baselines.",
+  "priority": "OLE2/OOXML until their full optimization goal is complete; ODF deferred; iWork excluded."
+}

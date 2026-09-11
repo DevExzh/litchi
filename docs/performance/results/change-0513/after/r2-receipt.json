@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0513/after/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide",
+    "--samples",
+    "100",
+    "--warmup",
+    "3",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0513/after/r2-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0513/after/r2-catalog.json"
+  ],
+  "started_utc": "2026-09-11T21:11:59.073750+00:00",
+  "elapsed_seconds": 110.39162508899608,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "58ce287eb09dd5fa107be2baf02051b2b89d5146e323866075ee42004efb756f",
+  "scope": "Existing native commit or commit+save clock; setup, expected output, sink reservation, oracles and drop excluded",
+  "artifacts": {
+    "r2-report.json": "a1b338fcb7ac95d72b18b34c60cf7242ba98dae1277876db5079365da57f0226",
+    "r2-catalog.json": "8a06516a46de1777b3855516cd150ae2f50953adc1c9b2a94c3d419b95ce57b8",
+    "r2.log": "e335bcf5c291415f5b83f392eb72d21e511caa340b702429ed14dcca731a14a5"
+  }
+}

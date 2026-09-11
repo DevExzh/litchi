@@ -1,0 +1,23 @@
+	Command being timed: "taskset -c 2 /tmp/litchi-goal-0513/after/litchi-perf-baseline --case xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_one_cell_commit_save,xlsx_one_percent_commit_save --xlsx-shape tiny,medium,dense-wide --samples 100 --warmup 3 --json /home/zhuhe/code/litchi/docs/performance/results/change-0513/after/r1-report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0513/after/r1-catalog.json"
+	User time (seconds): 109.89
+	System time (seconds): 0.17
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:50.08
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 141672
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 60925
+	Voluntary context switches: 37
+	Involuntary context switches: 1185
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 704
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

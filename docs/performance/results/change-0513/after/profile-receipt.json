@@ -1,0 +1,60 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*litchi_perf_baseline::xlsx_commit_save_operation",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0513/after/profile.out",
+    "/tmp/litchi-goal-0513/after/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide",
+    "--samples",
+    "3",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0513/after/profile-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0513/after/profile-catalog.json"
+  ],
+  "started_utc": "2026-09-11T21:16:11.368277+00:00",
+  "elapsed_seconds": 105.97324545899755,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "58ce287eb09dd5fa107be2baf02051b2b89d5146e323866075ee42004efb756f",
+  "scope": "Three xlsx_commit_save_operation helper calls only; fixture and expected-output commits/writes excluded; helper returns Commit before caller drop",
+  "artifacts": {
+    "profile-report.json": "5e5ef2efe57d380dec83557860e2a78af5bee1b5e84df46ddc3b0a74c828a5b9",
+    "profile-catalog.json": "9f453af80b01a00f3d675f541a42f10386898d99a025fb35a36396aebc2b3249",
+    "profile.log": "9f11db446aeaafe7825c9645655bc536893f19968547f4bb562655ed4413a9c3",
+    "profile.out": "192b91be6af71b6d19bfd5c92fec844ca393a55457705e3fe537629e057dd4de",
+    "profile-inclusive.txt": "f17975f07ba0f14f41bb9d5a77316c3117a0cc8f666601c64aa750605f082624",
+    "profile-exclusive.txt": "33f35512b75abc9066bb014ae7205be3537e9bbce1e65e40bdcca1cc4719dca3"
+  },
+  "annotation_commands": [
+    [
+      "callgrind_annotate",
+      "--auto=no",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=100",
+      "docs/performance/results/change-0513/after/profile.out"
+    ],
+    [
+      "callgrind_annotate",
+      "--auto=no",
+      "--inclusive=no",
+      "--tree=both",
+      "--threshold=100",
+      "docs/performance/results/change-0513/after/profile.out"
+    ]
+  ]
+}

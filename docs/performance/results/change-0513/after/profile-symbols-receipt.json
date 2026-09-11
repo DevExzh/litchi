@@ -1,0 +1,11 @@
+{
+  "command": [
+    "nm",
+    "-C",
+    "/tmp/litchi-goal-0513/after/litchi-perf-baseline"
+  ],
+  "exit_code": 0,
+  "filter": "xlsx_commit_save_operation or (PackageWriter and write_to)",
+  "binary_sha256": "58ce287eb09dd5fa107be2baf02051b2b89d5146e323866075ee42004efb756f",
+  "log_sha256": "b87f724636c2a8ae8913fb7368e6f3b3112d6410cc9f004776ac2efc0a130d5e"
+}
