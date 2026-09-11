@@ -425,32 +425,24 @@ fn inherited_family_projection_is_reusable_and_insertable() {
 }
 
 #[test]
-fn hidden_mce_family_is_ignored_and_add_never_edits_that_subtree() {
+fn hidden_mce_family_is_ignored_and_all_mutations_refuse_without_editing_subtree() {
     let source = mce_hidden_extlst_theme();
     let snapshot = part::read(&source).expect("read MCE-wrapped Theme");
     assert!(snapshot.family().is_none());
 
     let detached =
         family::Family::new("Fresh Office", OFFICE_ID, OFFICE_VID).expect("detached family");
-    let result = snapshot.add_family_with_uri(&detached, part::NATIVE_EXTENSION_URI);
-    let Ok(added) = result else {
-        // A safe refusal is valid when an ignored branch contains a candidate;
-        // the source-backed owner has no mutation channel to alter it.
-        return;
-    };
-    let parsed = part::read(&added).expect("read direct family after add");
-    assert_eq!(
-        parsed.family().expect("direct family").name(),
-        "Fresh Office"
+    assert!(
+        snapshot
+            .add_family_with_uri(&detached, part::NATIVE_EXTENSION_URI)
+            .is_err()
     );
-    assert_eq!(
-        added
-            .windows(native_family_fragment().len())
-            .filter(|window| *window == native_family_fragment())
-            .count(),
-        1,
-        "the hidden family bytes remain exactly one unchanged subtree"
-    );
+    assert!(snapshot.replace_family(&detached).is_err());
+    assert!(snapshot.remove_family().is_err());
+    assert!(part::add_family_with_uri(&source, &detached, part::NATIVE_EXTENSION_URI).is_err());
+    assert!(part::replace_family(&source, &detached).is_err());
+    assert!(part::remove_family(&source).is_err());
+    assert_eq!(snapshot.xml_bytes(), source.as_slice());
 }
 
 #[test]
