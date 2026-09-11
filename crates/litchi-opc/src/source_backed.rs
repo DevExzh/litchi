@@ -5306,6 +5306,12 @@ pub(crate) struct ValidationOpenError {
 }
 
 impl SourceBackedPackage {
+    /// Return the bounded read policy captured when this package was opened.
+    #[must_use]
+    pub const fn read_limits(&self) -> ReadLimits {
+        self.limits
+    }
+
     /// Validation-only source open. Ordinary callers retain the existing open
     /// path; this variant adds phase provenance without changing its hot path.
     pub(crate) fn from_read_at_for_validation(
