@@ -1,0 +1,106 @@
+{
+  "schema": "theme-family-hardening-standalone-v1",
+  "revision": "f4f29c9306d182072aabe8eca08145470fdcfadd",
+  "binary_sha256": "149b6a8f03185157aee7a8a528375abf46bd348357c0e3416a65176c5b677c50",
+  "inputs": {
+    "test-data/ooxml/xlsb/date.xlsb": "fbb969989aabed2e057b2ddfc4cfd10ef1f6ebe9b7697c3755283515158d5b09",
+    "test-data/ooxml/xlsb/hyperlink.xlsb": "6675f4bde45d1291e1d56783b7abe2857f56837ca674c7877dfc125fb49a4724"
+  },
+  "sources": {
+    "crates/litchi-drawingml/src/theme/family/part.rs": "cb3f384a6798a343b0e92c994d982a6e196bf50311a18d5441db3fa6678e6f79",
+    "crates/litchi-drawingml/src/theme/family/codec.rs": "3671ef78454309c45039741414d5385a400fd9c8a736fdfac974e704e577a910",
+    "crates/litchi-drawingml/src/theme/family/mod.rs": "33557a195ba76b1eb793fa3bfca1b00ecec842c4016446ea969dd0da2932ace1",
+    "crates/litchi-drawingml/src/theme/family/model.rs": "e3f0e9cb33324faf29fdc94cad733cc7a95bf86ae3d583df37b29202220d7d55",
+    "crates/litchi-xlsb/src/theme.rs": "9193d579c2951940b4943b396fd6249a35a0c1743dff183e168f3556a5a0a8f8",
+    "crates/litchi-xlsb/src/theme/lifecycle.rs": "c663b8cde2191539a554cadf78987c3f2d51a9faddbc2bd5813aecbad685dd70",
+    "docs/report/spec-gap-validation-evidence/xlsb-theme-family/validate_schema.py": "1f2db80c8e3c36f9f45579a809fee07cf4a294c7db7b607ca602c77003ea50af",
+    "docs/report/spec-gap-validation-evidence/xlsb-theme/verify-theme-schema.py": "88ace5770aa0ed9f49b17c9d189f35b1fd254d803f930d5ac1d5e3f5aa35451e",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/Cargo.toml": "c6deb635a956b1df236f6b9e2f1a73446b75601a297125db958c4596a7d1201a",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/Cargo.lock": "49dffcf626b5f67ddc0674d18b5d558150dda00a3c387124324c5874ca5ce8c5",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/main.rs": "5c66f7a531e8aafff60ad42d9a41f52561d6c424416bee611554d43f5866c741",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/commands.txt": "a7ff45b70039cf45266384a45614e84aaedd28541cd6514d009cab8225ba888c"
+  },
+  "outputs": {
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/added.xml": "46659db8a572eeb2e4d9aefd8c8f7f00cdad6cf9c96b360c1b2a16d1cf904c79",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/native.xml": "50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/opaque-preserved-diagnostic.xml": "553ddb0fd0e59e84d844b427b2df9943af0d54526f58c481b40632c775d62678",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/probe-results.tsv": "ca8fedc77e7f05d88ae996b5b17e699cae89c95eb123952b6f0ba265871b50d0",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/removed.xml": "fa8c8865c4fd4a5d60bd740f68b5a34783f81e4d4e5490fc0329a5e181bd2aae",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/updated.xml": "18d00f349b190e417fe0c00c5ca4f36a6fed08bc599c6ee7f891493eff0c8ce9",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/schema-validation.json": "ba181f89a21a261e7ba9f335214dc3b238dfd99404a1cab7c512a039cf1b4d04",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/probe.log": "1d53042fbbfb20d9e39011d1c8279fce1c9e74ba56b37c39ef454cc3456104c3",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/check.log": "8e6d255f58d7a1f3e50f5f614977688dc572aa6d44844906f088cc0ed1eb0bb9",
+    "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "schema_validation": {
+    "validator": "docs/report/spec-gap-validation-evidence/xlsb-theme-family/validate_schema.py",
+    "validator_source_hash": "1f2db80c8e3c36f9f45579a809fee07cf4a294c7db7b607ca602c77003ea50af",
+    "lxml_version": [
+      6,
+      0,
+      2,
+      0
+    ],
+    "reports": [
+      {
+        "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/native.xml",
+        "bytes": 8390,
+        "sha256": "50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59",
+        "valid": true,
+        "families": [
+          {
+            "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+            "attributes": {
+              "name": "Office Theme",
+              "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+              "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+            }
+          }
+        ]
+      },
+      {
+        "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/updated.xml",
+        "bytes": 8396,
+        "sha256": "18d00f349b190e417fe0c00c5ca4f36a6fed08bc599c6ee7f891493eff0c8ce9",
+        "valid": true,
+        "families": [
+          {
+            "extension_uri": "{05A4C25C-085E-4340-85A3-A5531E510DB2}",
+            "attributes": {
+              "name": "Audit Edited Theme",
+              "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+              "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+            }
+          }
+        ]
+      },
+      {
+        "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/removed.xml",
+        "bytes": 8112,
+        "sha256": "fa8c8865c4fd4a5d60bd740f68b5a34783f81e4d4e5490fc0329a5e181bd2aae",
+        "valid": true,
+        "families": []
+      },
+      {
+        "path": "docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/added.xml",
+        "bytes": 8469,
+        "sha256": "46659db8a572eeb2e4d9aefd8c8f7f00cdad6cf9c96b360c1b2a16d1cf904c79",
+        "valid": true,
+        "families": [
+          {
+            "extension_uri": "http://schemas.microsoft.com/office/thememl/2012/main",
+            "attributes": {
+              "name": "Office Theme",
+              "id": "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+              "vid": "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "probe_cases": 17,
+  "probe_passed": true,
+  "temporary_target": "root target/debug (shared; retained)",
+  "claims_scope": "native, scalar, wrapper, grammar, MCE, namespace, and caller-limit checks; opaque diagnostic XML is not claimed schema-valid"
+}

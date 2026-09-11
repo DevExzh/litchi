@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Verify the compile-first Theme-family hardening receipts against their reviewed inputs."""
+import hashlib
+import json
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = next(p for p in HERE.parents if (p / "crates").is_dir())
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+receipt = json.loads((HERE / "gates/receipt.json").read_text())
+assert receipt["passed"] and receipt["source_unchanged"]
+assert [row["name"] for row in receipt["commands"]] == [
+    "compile", "tests", "clippy", "rustdoc", "format", "diff"]
+assert all(row["exit_code"] == 0 for row in receipt["commands"])
+sources = json.loads((HERE / "gates/source-hashes.json").read_text())
+for name, expected in sources.items():
+    assert digest(ROOT / name) == expected, name
+for name, expected in receipt["logs"].items():
+    assert digest(HERE / "gates" / name) == expected, name
+review = json.loads((HERE / "review.json").read_text())
+assert review["verdict"] == "approved"
+for name, expected in review["source_hashes"].items():
+    assert sources[name] == expected, name
+standalone = json.loads((HERE / "standalone/receipt.json").read_text())
+assert standalone["probe_passed"]
+for group in ("inputs", "sources", "outputs"):
+    for name, expected in standalone[group].items():
+        assert digest(ROOT / name) == expected, name
+schema = standalone["schema_validation"]["reports"]
+assert len(schema) == 4 and all(row["valid"] for row in schema)
+for row in schema:
+    assert digest(ROOT / row["path"]) == row["sha256"], row["path"]
+result = {
+    "passed": True,
+    "compile_first": True,
+    "source_files_checked": len(sources),
+    "reviewed_source_files": len(review["source_hashes"]),
+    "test_totals_including_doctests": receipt["test_totals_including_doctests"],
+    "receipt_sha256": digest(HERE / "gates/receipt.json"),
+    "standalone_receipt_sha256": digest(HERE / "standalone/receipt.json"),
+    "standalone_probe_cases": standalone["probe_cases"],
+    "schema_valid_outputs": len(schema),
+}
+(HERE / "verification.json").write_text(json.dumps(result, indent=2) + "\n")
+print(json.dumps(result, indent=2))
