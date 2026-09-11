@@ -9,6 +9,7 @@
 //! while raw-copying every unselected ZIP member.
 
 mod ink;
+mod svg_lifecycle;
 
 pub mod paragraph_copy;
 pub mod paragraph_remove;
@@ -20,6 +21,17 @@ pub use story_text::{
     GlossaryBatchSnapshot, GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits,
     Patch as StoryTextPatch, Publication as StoryTextPublication, Selector as StorySelector,
     Snapshot as StoryTextSnapshot,
+};
+pub use svg_lifecycle::{
+    PictureSelector, PictureSelector as SvgPictureSelector, RasterResourceSourceView,
+    RasterResourceView, SourceBackedSvgAttachmentBatchCommit, SourceBackedSvgAttachmentBatchEdit,
+    SourceBackedSvgAttachmentBatchPatch, SourceBackedSvgAttachmentBatchPublication,
+    SourceBackedSvgAttachmentBatchSnapshot, SourceBackedSvgAttachmentCommit,
+    SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
+    SourceBackedSvgAttachmentPublication, SourceBackedSvgAttachmentReplacement,
+    SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment, SourceSvgPictureSourceView,
+    SourceSvgPictureView, SvgAttachmentCommitDiagnostics, SvgInput, SvgPictureOwnerState,
+    SvgPictureView, SvgResourceSourceView, SvgResourceView,
 };
 
 use crate::alt::Data;
