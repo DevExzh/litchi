@@ -250,3 +250,40 @@ fn native_family_name_edit_preserves_exact_future_cdata_payload() {
         Some(&replacement)
     );
 }
+
+#[test]
+fn caller_limit_preflight_handles_source_fragments_and_escaped_replacement_names() {
+    use litchi_drawingml::theme::family;
+    let native = include_str!("fixtures/theme-part-native.xml");
+    let snapshot = part::read(native.as_bytes()).expect("native family");
+    let mut replacement = snapshot.family().expect("family").clone();
+    replacement
+        .set_name("Expanded & <quoted> \"name\"\r\n\t")
+        .expect("escaped name");
+    let changed = part::replace_family(native.as_bytes(), &replacement).expect("replace");
+    assert!(changed.len() > native.len());
+    assert_eq!(
+        part::replace_family_with_limit(native.as_bytes(), &replacement, changed.len())
+            .expect("exact limit"),
+        changed
+    );
+    assert!(
+        part::replace_family_with_limit(native.as_bytes(), &replacement, changed.len() - 1)
+            .is_err()
+    );
+
+    let fragment = format!(
+        r#"<f:themeFamily xmlns:f="{}" name="Large" id="{{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}}" vid="{{4A3C46E8-61CC-4603-A589-7422A47A8E4A}}"><!--{}--></f:themeFamily>"#,
+        family::NAMESPACE,
+        "x".repeat(64 * 1024)
+    );
+    let incoming = family::read(fragment.as_bytes()).expect("source-backed incoming family");
+    let source = theme("");
+    assert!(part::add_family_with_limit(source.as_bytes(), &incoming, 1024).is_err());
+    let added = part::add_family(source.as_bytes(), &incoming).expect("large add");
+    assert_eq!(
+        part::add_family_with_limit(source.as_bytes(), &incoming, added.len())
+            .expect("exact add limit"),
+        added
+    );
+}
