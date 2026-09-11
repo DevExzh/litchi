@@ -357,6 +357,17 @@ owner and payload hash are present or absent, all changed relationships have
 the expected type/target/mode, and no dangling edge, duplicate content type,
 or orphaned media owner was introduced.
 
+For source-backed publication, complete semantic readback may use the
+OPC-owned effective candidate described in
+[the prepared-topology contract](opc-prepared-topology-design.md). That view
+must include the actual generated XML, effective relationships and content
+types, complete Part membership, and lazy unchanged payloads that publication
+will use. A projection of only the selected story and SVG is insufficient.
+Physical ZIP publication is still tested by reopening its output and comparing
+that graph with the effective candidate. This separates semantic validation
+from ZIP framing checks without introducing an implicit whole-archive memory
+buffer or weakening changed-closure validation.
+
 ## Snapshots, patches, and inverse
 
 The edit records source fingerprints and immutable before-bytes for every
