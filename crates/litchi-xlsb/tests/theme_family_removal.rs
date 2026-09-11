@@ -258,3 +258,33 @@ fn xlsb_add_refuses_direct_extension_mce_child_without_source_mutation() {
         "failed mutation changed source"
     );
 }
+
+#[test]
+fn native_family_name_edit_preserves_declaration_crlf_through_save_and_inverse() {
+    let mut workbook = workbook();
+    let original = theme_bytes(&workbook);
+    assert!(original.starts_with(b"<?xml "));
+    assert!(original.windows(4).any(|bytes| bytes == b"?>\r\n"));
+    let snapshot = workbook.theme().expect("read Theme").expect("native Theme");
+    let mut family = snapshot.family().expect("native family").clone();
+    family.set_name("Saved Native Family").expect("name");
+    let old_fragment = theme_family_fragment(&original);
+    let expected_fragment = replace_bytes(
+        old_fragment,
+        b"name=\"Office Theme\"",
+        b"name=\"Saved Native Family\"",
+    );
+    let expected = replace_bytes(&original, old_fragment, &expected_fragment);
+    let mut edit = snapshot.edit();
+    edit.set_family(family).expect("stage name edit");
+    let commit = edit.commit().expect("commit name edit");
+    workbook.apply_theme(&commit).expect("publish edit");
+    assert_eq!(theme_bytes(&workbook), expected);
+    let reopened = Workbook::new(Cursor::new(saved_bytes(&workbook))).expect("reopen edit");
+    assert_eq!(theme_bytes(&reopened), expected);
+    workbook
+        .apply_theme_patch(&commit.patch().inverse())
+        .expect("publish inverse");
+    let restored = Workbook::new(Cursor::new(saved_bytes(&workbook))).expect("reopen inverse");
+    assert_eq!(theme_bytes(&restored), original);
+}
