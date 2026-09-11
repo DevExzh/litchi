@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0505: avoid unrelated ODG namespace lookups
+
+[0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.
+Filtering local names before namespace lookup reduces whole-child Callgrind
+instruction references by 12.38%; exclusive namespace resolution falls
+149.9M to 36.8M references. Checked attribute iteration and duplicate checking
+remain unchanged and prominent. Final p50 improves 8.43–9.88% across all
+eight pairs, without a >5% adverse measured flag.
+
 ## 0504: repeated ODG transition owner scans reduced
 
 [0504](changes/0504-odg-direct-transition-reuse.md) reuses successful direct

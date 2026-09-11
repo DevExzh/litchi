@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0505: ODG attribute-filter baseline
+
+[0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.
+Fresh filter-only comparisons against `df2e73fa3` retain 3,200 samples across
+four 0502 corpora in serial A1/B1/B2/A2 blocks. Before p50 pairs are
+2.121/2.141, 65.559/65.027, 1.766/1.759 and 25.006/24.862 ms.
+The primary evidence is under `change-0505/final/`; root reports describe a
+separate, rejected borrowing experiment.
+
 ## 0504: matched richer-parser ODG baseline
 
 [0504](changes/0504-odg-direct-transition-reuse.md) refreshes the four 0502

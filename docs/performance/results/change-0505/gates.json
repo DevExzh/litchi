@@ -1,0 +1,123 @@
+{
+  "scope": "ODG and ODF umbrella ODG feature; no full workspace, live Office, fuzz or sanitizer run",
+  "unique_tests": 96,
+  "focused_rerun_tests": 4,
+  "cargo_environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0505/test-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "rustdoc_environment": {
+    "RUSTDOCFLAGS": "-D warnings"
+  },
+  "initial_failures": "test-all-targets.log: malformed fixtures rejected by fixture writer; corrected with raw archive construction and valid controls. fmt-initial.log: test formatting corrected.",
+  "gates": [
+    {
+      "name": "test-focused",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-odg",
+        "--test",
+        "attribute_selection"
+      ],
+      "exit_code": 0,
+      "log": "test-focused.log"
+    },
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-odg",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "fmt.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-odg",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "clippy.log"
+    },
+    {
+      "name": "doctest",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-odg",
+        "--doc"
+      ],
+      "exit_code": 0,
+      "log": "doctest.log"
+    },
+    {
+      "name": "doc",
+      "command": [
+        "cargo",
+        "doc",
+        "-p",
+        "litchi-odg",
+        "--no-deps"
+      ],
+      "exit_code": 0,
+      "log": "doc.log"
+    },
+    {
+      "name": "odf-check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-odf",
+        "--no-default-features",
+        "--features",
+        "odg"
+      ],
+      "exit_code": 0,
+      "log": "odf-check.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-odg",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "log": "test-all-targets-final.log",
+      "passed": 96
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "log": "boundaries.log"
+    },
+    {
+      "command": "CARGO_BUILD_JOBS=2 cargo build --release --locked --manifest-path docs/performance/probes/0502-odg-open/Cargo.toml --target-dir /tmp/litchi-goal-0505/target",
+      "exit_code": 0,
+      "log": "build-verify.log"
+    }
+  ]
+}

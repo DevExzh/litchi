@@ -1,0 +1,24 @@
+diff --git a/crates/litchi-odg/src/package/snapshot.rs b/crates/litchi-odg/src/package/snapshot.rs
+index 99216e1f1..beeed91e2 100644
+--- a/crates/litchi-odg/src/package/snapshot.rs
++++ b/crates/litchi-odg/src/package/snapshot.rs
+@@ -11065,6 +11065,9 @@ fn attribute(
+     for raw_attribute in element.attributes() {
+         let parsed_attribute = raw_attribute
+             .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute: {error}")))?;
++        if parsed_attribute.key.local_name().as_ref() != local {
++            continue;
++        }
+         let (namespace, name) = reader.resolver().resolve_attribute(parsed_attribute.key);
+         if resolved_bound(&namespace, expected) && name.as_ref() == local {
+             let decoded = parsed_attribute
+@@ -11405,6 +11408,9 @@ fn attribute_source_span(
+     for raw_attribute in element.attributes() {
+         let parsed_attribute = raw_attribute
+             .map_err(|error| Error::InvalidFormat(format!("invalid ODG attribute: {error}")))?;
++        if parsed_attribute.key.local_name().as_ref() != wanted_local {
++            continue;
++        }
+         let (namespace, local) = reader.resolver().resolve_attribute(parsed_attribute.key);
+         if resolved_bound(&namespace, expected)
+             && local.as_ref() == wanted_local

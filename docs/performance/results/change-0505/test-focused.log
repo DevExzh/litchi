@@ -1,0 +1,12 @@
+   Compiling litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+    Finished `test` profile [unoptimized] target(s) in 0.23s
+     Running tests/attribute_selection.rs (/tmp/litchi-goal-0505/test-target/debug/deps/attribute_selection-40c89926ae6756e4)
+
+running 4 tests
+test aliased_duplicate_target_attributes_are_rejected ... ok
+test malformed_attribute_after_selected_fields_is_rejected ... ok
+test duplicate_unrelated_attribute_after_selected_fields_is_rejected ... ok
+test aliased_attributes_select_by_namespace_and_preserve_unrelated_qnames ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

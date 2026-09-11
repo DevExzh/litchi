@@ -1,0 +1,2738 @@
+reading file "/tmp/litchi-goal-0505/heap-after.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-goal-0505/after --corpus metadata-large --warmups 0 --samples 1 --output /tmp/litchi-goal-0505/heap-after.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+341222 calls to allocation functions with 0B peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /tmp/litchi-goal-0505/after
+3444 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+3444 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2564 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2564 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2115 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    xml_minifier::audit::inspect_attributes::h0c1f6a7c22bc22c4
+      in /tmp/litchi-goal-0505/after
+    xml_minifier::audit::verify_with_policy::h3a5a93cff9a5e9c9
+      in /tmp/litchi-goal-0505/after
+    xml_minifier::audit::verify_authored::h43d7884dc29b5a9a
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::add_file::h83a9308cb688b5f4
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 327091 from 733 other places
+
+68820 calls to allocation functions with 0B peak consumption from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /tmp/litchi-goal-0505/after
+5958 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5958 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5958 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5958 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5958 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 39030 from 7 other places
+
+33974 calls to allocation functions with 73.22K peak consumption from
+litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+  in /tmp/litchi-goal-0505/after
+2080 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2080 calls with 21.71K peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2048 calls with 6.14K peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2048 calls with 6.14K peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2048 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 23670 from 85 other places
+
+12672 calls to allocation functions with 5.89M peak consumption from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h68c97fc5e2d3a648E.llvm.8250711037667594016
+  in /tmp/litchi-goal-0505/after
+1792 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he37dd4732f8d64fb
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::text::h6448692be0464469
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1792 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h26f2cb6f658a59c4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::text::h6448692be0464469
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1792 calls with 17.07K peak consumption from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::he37dd4732f8d64fb
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::text::h6448692be0464469
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1792 calls with 172.03K peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h26f2cb6f658a59c4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::text::h6448692be0464469
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h174b433fa370eb51
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::drawing_attributes::h8d4bd9202559fb79
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 5248 from 145 other places
+
+5440 calls to allocation functions with 20.90K peak consumption from
+litchi_odg::package::snapshot::drawing_attributes::h8d4bd9202559fb79
+  in /tmp/litchi-goal-0505/after
+1280 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1280 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1280 calls with 10.24K peak consumption from:
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1280 calls with 9.47K peak consumption from:
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+48 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 272 from 7 other places
+
+4256 calls to allocation functions with 1.63K peak consumption from
+alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h3ff744b9efd74377
+  in /tmp/litchi-goal-0505/after
+2080 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2080 calls with 1.63K peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+32 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+32 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+8 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::transition_attribute_spans::h252ad94564004227
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::find_transition_style_owner::hf92dca2fc8327877
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::transition_values_from_style::he7717919e68ec24b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::resolve_transition_style::he37fdbbf630b8663
+      in /tmp/litchi-goal-0505/after
+    _$LT$core..iter..adapters..GenericShunt$LT$I$C$R$GT$$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h50fed64f4469f8d3
+      in /tmp/litchi-goal-0505/after
+    _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter..SpecFromIter$LT$T$C$I$GT$$GT$::from_iter::h7c6b6ad82d331150
+      in /tmp/litchi-goal-0505/after
+    core::iter::adapters::try_process::h4568801bea362e6c
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::resolve_page_transitions::h5b582fea76e1866b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 24 from 3 other places
+
+3584 calls to allocation functions with 0B peak consumption from
+litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+  in /tmp/litchi-goal-0505/after
+1792 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1792 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+
+3584 calls to allocation functions with 0B peak consumption from
+quick_xml::encoding::Decoder::decode_cow::h9548d915e67be596
+  in /tmp/litchi-goal-0505/after
+1792 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1792 calls with 0B peak consumption from:
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+
+3374 calls to allocation functions with 436.62K peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-goal-0505/after
+256 calls with 384B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::normalize_str_fallibly::h61acb56410abd645
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::lookup_member_name::h46adecf389e8895d
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::contains::ha963961a171728a6
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::finish_image::h884826ee4cca6e4e
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 2094 from 134 other places
+
+2592 calls to allocation functions with 6.51K peak consumption from
+litchi_odf_common::namespace::namespaced_attribute::h1333eabae401ffc3
+  in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    litchi_odf_common::media::reader::start_image::h9f7c0e7d6210646f
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 calls with 0B peak consumption from:
+    litchi_odf_common::media::reader::start_image::h9f7c0e7d6210646f
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 1312 from 7 other places
+
+
+PEAK MEMORY CONSUMERS
+5.89M peak memory consumed over 12672 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h68c97fc5e2d3a648E.llvm.8250711037667594016
+  in /tmp/litchi-goal-0505/after
+3.28M consumed over 96 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::he9f587fe034b220b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::model::page::Page::push_shape::h5c34782b8f51a0a4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+393.22K consumed over 96 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h39c402176fa942b0
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+393.22K consumed over 96 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h39c402176fa942b0
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+278.53K consumed over 256 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h7e3565e2044b9085
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+196.61K consumed over 96 calls from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h82da7e467abf671e
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 1.35M from 145 other places
+
+436.62K peak memory consumed over 3374 calls from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-goal-0505/after
+432.61K consumed over 1 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::xml::part::XmlPart::from_bytes::hd74dc034efa59ecc
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::family::Package::from_owned_package::hf28ac9b2e74eef6d
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::family::Package::from_bytes::hd7491d94c5b6f51c
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1.38K consumed over 256 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+864B consumed over 256 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+384B consumed over 256 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+384B consumed over 256 calls from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::try_copy_string::hf1420dbe691f5586
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 1000B from 134 other places
+
+239.84K peak memory consumed over 2560 calls from
+litchi_odg::package::snapshot::source_fragment::hb9736d84ef4d1bf0
+  in /tmp/litchi-goal-0505/after
+95.34K consumed over 256 calls from:
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+86.90K consumed over 512 calls from:
+    litchi_odg::package::snapshot::parse_image_map_area::h88a3d33015d0a3dd
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+36.35K consumed over 256 calls from:
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+21.25K consumed over 256 calls from:
+    litchi_odg::package::snapshot::parse_glue_point::h88cb0b3972af0ee2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 0B from 3 other places
+
+135.94K peak memory consumed over 698 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h85e914a535597504E.llvm.7898183464731344883
+  in /tmp/litchi-goal-0505/after
+135.17K consumed over 6 calls from:
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+448B consumed over 1 calls from:
+    soapberry_zip::office::IndexedArchive$LT$R$GT$::from_reader_with_limits_and_policy::h30449e4405974ee3
+      in /tmp/litchi-goal-0505/after
+    _ZN17litchi_odf_common4core7package12OwnedPackage40from_shared_bytes_with_policy_and_limits17h6cec172f41620e0bE.llvm.8201456895778016032
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::family::Package::from_bytes::hd7491d94c5b6f51c
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+288B consumed over 1 calls from:
+    soapberry_zip::office::IndexedArchive$LT$R$GT$::from_reader_with_limits_and_policy::h30449e4405974ee3
+      in /tmp/litchi-goal-0505/after
+    _ZN17litchi_odf_common4core7package12OwnedPackage40from_shared_bytes_with_policy_and_limits17h6cec172f41620e0bE.llvm.8201456895778016032
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::family::Package::from_bytes::hd7491d94c5b6f51c
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+32B consumed over 1 calls from:
+    soapberry_zip::office::collect_order_fallibly::h74373a318dd083b6
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::IndexedArchive$LT$R$GT$::from_reader_with_limits_and_policy::h30449e4405974ee3
+      in /tmp/litchi-goal-0505/after
+    _ZN17litchi_odf_common4core7package12OwnedPackage40from_shared_bytes_with_policy_and_limits17h6cec172f41620e0bE.llvm.8201456895778016032
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::family::Package::from_bytes::hd7491d94c5b6f51c
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 0B from 89 other places
+
+73.73K peak memory consumed over 1 calls from
+0x795b7a6c0941
+  in /usr/lib/x86_64-linux-gnu/libstdc++.so.6
+73.73K consumed over 1 calls from:
+    call_init
+      at ./elf/dl-init.c:74
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init::call_init
+      at ./elf/dl-init.c:120
+      in /lib64/ld-linux-x86-64.so.2
+    _dl_init
+      at ./elf/./elf/dl-init.c:121
+    _dl_start_user
+      in /lib64/ld-linux-x86-64.so.2
+
+73.22K peak memory consumed over 33974 calls from
+litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+  in /tmp/litchi-goal-0505/after
+21.71K consumed over 2080 calls from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+6.66K consumed over 256 calls from:
+    litchi_odg::package::snapshot::parse_image_map_area::h88a3d33015d0a3dd
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+6.14K consumed over 2048 calls from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+6.14K consumed over 2048 calls from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5.38K consumed over 1792 calls from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 27.19K from 85 other places
+
+36.86K peak memory consumed over 512 calls from
+litchi_odg::model::shape::Shape::push_glue_point::hd1e1b8cbafb1657b
+  in /tmp/litchi-goal-0505/after
+36.86K consumed over 256 calls from:
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+
+32.30K peak memory consumed over 21 calls from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h5895e405064c0cccE.llvm.9523233837051951944
+  in /tmp/litchi-goal-0505/after
+32.23K consumed over 1 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6791777c14c5e081
+      in /tmp/litchi-goal-0505/after
+    _$LT$soapberry_zip..office..BoundedOutput$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hd4a3bb2f88d644be
+      in /tmp/litchi-goal-0505/after
+    std::io::Write::write_all::hd05b81ba7bb1323d
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::PreparedSizedMember::write_local::ha1683af712fcf151
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::ZipArchiveWriter$LT$W$GT$::write_precompressed_file_classified::h658f41d9ec2263fb
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated_sized_with_accounting::hfc34b4afe15fced4
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::add_file::h83a9308cb688b5f4
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+64B consumed over 3 calls from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6791777c14c5e081
+      in /tmp/litchi-goal-0505/after
+    _$LT$alloc..string..String$u20$as$u20$core..iter..traits..collect..FromIterator$LT$alloc..string..String$GT$$GT$::from_iter::h16d2bd2baa0fccc3
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::sha256::hca822cc3e1d03798
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 0B from 12 other places
+
+20.90K peak memory consumed over 5440 calls from
+litchi_odg::package::snapshot::drawing_attributes::h8d4bd9202559fb79
+  in /tmp/litchi-goal-0505/after
+10.24K consumed over 1280 calls from:
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+9.47K consumed over 1280 calls from:
+    litchi_odg::package::snapshot::parse_contour::hfcda381008e89f9b
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+416B consumed over 48 calls from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+384B consumed over 32 calls from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+208B consumed over 48 calls from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 176B from 7 other places
+
+16.72K peak memory consumed over 2 calls from
+odg_open_probe::measure_once::h4989ec73bfa87fa6
+  in /tmp/litchi-goal-0505/after
+16.72K consumed over 1 calls from:
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+
+
+MOST TEMPORARY ALLOCATIONS
+303249 temporary allocations of 341222 allocations in total (88.87%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h87e5799d62ccd3c1E.llvm.15101124816713740780
+  in /tmp/litchi-goal-0505/after
+3187 temporary allocations of 3444 allocations in total (92.54%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+3187 temporary allocations of 3444 allocations in total (92.54%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2308 temporary allocations of 2564 allocations in total (90.02%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2308 temporary allocations of 2564 allocations in total (90.02%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    _$LT$quick_xml..events..attributes..Attributes$u20$as$u20$core..iter..traits..iterator..Iterator$GT$::next::h719f96ef1205b146
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::attribute::h96d2b513a1fb37c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_xml::hfeae5444be4023fa
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_active_content::hce5c3d580a86afb4
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+2115 temporary allocations of 2115 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h22fd37bdf3d2f937
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::check_for_duplicates::h62f5841a0d36e290
+      in /tmp/litchi-goal-0505/after
+    quick_xml::events::attributes::IterState::next::hc054e37ccf4f5dfc
+      in /tmp/litchi-goal-0505/after
+    xml_minifier::audit::inspect_attributes::h0c1f6a7c22bc22c4
+      in /tmp/litchi-goal-0505/after
+    xml_minifier::audit::verify_with_policy::h3a5a93cff9a5e9c9
+      in /tmp/litchi-goal-0505/after
+    xml_minifier::audit::verify_authored::h43d7884dc29b5a9a
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::add_file::h83a9308cb688b5f4
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 290.14K from 733 other places
+
+58286 temporary allocations of 68820 allocations in total (84.69%) from
+quick_xml::events::Event::into_owned::h66cdc02723ba981e
+  in /tmp/litchi-goal-0505/after
+5942 temporary allocations of 5958 allocations in total (99.73%) from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5942 temporary allocations of 5958 allocations in total (99.73%) from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5702 temporary allocations of 5958 allocations in total (95.70%) from:
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5702 temporary allocations of 5958 allocations in total (95.70%) from:
+    litchi_odg::package::snapshot::parse_shape_auxiliary_children::hb70b3d7275a6de9d
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+5463 temporary allocations of 5512 allocations in total (99.11%) from:
+    litchi_odg::package::snapshot::parse_enhanced_geometry::h893b1b228df62e16
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 29.54K from 7 other places
+
+2080 temporary allocations of 2080 allocations in total (100.00%) from
+_RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+  in /tmp/litchi-goal-0505/after
+1792 temporary allocations of 1792 allocations in total (100.00%) from:
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 temporary allocations of 256 allocations in total (100.00%) from:
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+16 temporary allocations of 16 allocations in total (100.00%) from:
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+8 temporary allocations of 8 allocations in total (100.00%) from:
+    litchi_odg::package::snapshot::parse_style_definitions::h1b2ef8d255b5cc17
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+8 temporary allocations of 8 allocations in total (100.00%) from:
+    litchi_odg::package::snapshot::parse_style_definitions::h1b2ef8d255b5cc17
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+
+672 temporary allocations of 3374 allocations in total (19.92%) from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-goal-0505/after
+256 temporary allocations of 256 allocations in total (100.00%) from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::normalize_str_fallibly::h61acb56410abd645
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::lookup_member_name::h46adecf389e8895d
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::contains::ha963961a171728a6
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::finish_image::h884826ee4cca6e4e
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+256 temporary allocations of 256 allocations in total (100.00%) from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String17try_reserve_exact
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::normalize_str_fallibly::h61acb56410abd645
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::lookup_member_name::h46adecf389e8895d
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::package::codec::_$LT$impl$u20$litchi_odf_common..package..model..Archive$GT$::contains::ha963961a171728a6
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::finish_image::h884826ee4cca6e4e
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+28 temporary allocations of 31 allocations in total (90.32%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-goal-0505/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-goal-0505/after
+    _RNvXse_NtNtCsgEmfK2I1SDS_4core3fmt3numhNtB7_8LowerHex3fmt
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-goal-0505/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-goal-0505/after
+    _$LT$alloc..string..String$u20$as$u20$core..iter..traits..collect..FromIterator$LT$alloc..string..String$GT$$GT$::from_iter::h16d2bd2baa0fccc3
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::sha256::hca822cc3e1d03798
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+27 temporary allocations of 30 allocations in total (90.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-goal-0505/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-goal-0505/after
+    _RNvXse_NtNtCsgEmfK2I1SDS_4core3fmt3numhNtB7_8LowerHex3fmt
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-goal-0505/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-goal-0505/after
+    _$LT$alloc..string..String$u20$as$u20$core..iter..traits..collect..FromIterator$LT$alloc..string..String$GT$$GT$::from_iter::h16d2bd2baa0fccc3
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::sha256::hca822cc3e1d03798
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+8 temporary allocations of 10 allocations in total (80.00%) from:
+    _RINvNvMs2_NtCslNYArtu3iFV_5alloc7raw_vecINtB8_11RawVecInnerpE7reserve21do_reserve_and_handleNtNtBa_5alloc6GlobalEBa_
+      in /tmp/litchi-goal-0505/after
+    _RNvXsZ_NtCslNYArtu3iFV_5alloc6stringNtB5_6StringNtNtCsgEmfK2I1SDS_4core3fmt5Write9write_str
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsgEmfK2I1SDS_4core3fmt5write
+      in /tmp/litchi-goal-0505/after
+    _RNvNvNtCslNYArtu3iFV_5alloc3fmt6format12format_inner
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_style_definitions::h1b2ef8d255b5cc17
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 97B from 134 other places
+
+32 temporary allocations of 4256 allocations in total (0.75%) from
+alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h3ff744b9efd74377
+  in /tmp/litchi-goal-0505/after
+16 temporary allocations of 32 allocations in total (50.00%) from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+16 temporary allocations of 32 allocations in total (50.00%) from:
+    litchi_odg::package::snapshot::Scanner::observe::hda0c8a382b9c09ee
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::parse_content::h4be02181f5edf317
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 0B from 3 other places
+
+15 temporary allocations of 20 allocations in total (75.00%) from
+litchi_core::xml::escape::escape_xml::hcbc5147cf2936fe1
+  in /tmp/litchi-goal-0505/after
+3 temporary allocations of 3 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::write_manifest_entry::h87099797f49c58a5
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter::finish::h7ea8fc1057bcca67
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+3 temporary allocations of 3 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::write_manifest_entry::h87099797f49c58a5
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter::finish::h7ea8fc1057bcca67
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::validate_manifest_candidate::h7433838db139d739
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::set_mimetype::h16799e6abb1ffa31
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::validate_manifest_candidate::h7433838db139d739
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::set_mimetype::h16799e6abb1ffa31
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::validate_manifest_candidate::h7433838db139d739
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::set_mimetype::h16799e6abb1ffa31
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 6B from 11 other places
+
+14 temporary allocations of 698 allocations in total (2.01%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h85e914a535597504E.llvm.7898183464731344883
+  in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6f4a08a38f4c8e48
+      in /tmp/litchi-goal-0505/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::ha91ba39bde8d0fa1
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::manifest::Manifest::parse::h7da73d4fe7cbf293
+      in /tmp/litchi-goal-0505/after
+    _ZN17litchi_odf_common4core7package7Package12from_archive17h610307121ac26eb2E.llvm.8201456895778016032
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::package::OwnedPackage::has_file::h6776bdfba9d84e4c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::family::Package::from_owned_package::hf28ac9b2e74eef6d
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::family::Package::from_bytes::hd7491d94c5b6f51c
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6f4a08a38f4c8e48
+      in /tmp/litchi-goal-0505/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::ha91ba39bde8d0fa1
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6f4a08a38f4c8e48
+      in /tmp/litchi-goal-0505/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::ha91ba39bde8d0fa1
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::manifest::Manifest::parse::h7da73d4fe7cbf293
+      in /tmp/litchi-goal-0505/after
+    _ZN17litchi_odf_common4core7package7Package12from_archive17h610307121ac26eb2E.llvm.8201456895778016032
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::package::OwnedPackage::package::h9fa9c4d4b4218501
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6f4a08a38f4c8e48
+      in /tmp/litchi-goal-0505/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::ha91ba39bde8d0fa1
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::manifest::Manifest::parse::h7da73d4fe7cbf293
+      in /tmp/litchi-goal-0505/after
+    _ZN17litchi_odf_common4core7package7Package12from_archive17h610307121ac26eb2E.llvm.8201456895778016032
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::package::OwnedPackage::package::h9fa9c4d4b4218501
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6f4a08a38f4c8e48
+      in /tmp/litchi-goal-0505/after
+    quick_xml::reader::Reader$LT$R$GT$::read_event_impl::ha91ba39bde8d0fa1
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_xml::h7b71d817860f664c
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::media::reader::scan_package::h3e6a15978ab66308
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::scan_resources::hce5842b7ead1a6c2
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::package::snapshot::Snapshot::from_package::h463d671aff6bb257
+      in /tmp/litchi-goal-0505/after
+    litchi_odg::facade::Drawing::from_bytes::h8355691e28b18d53
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::measure_once::h4989ec73bfa87fa6
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 9B from 89 other places
+
+3 temporary allocations of 21 allocations in total (14.29%) from
+_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h5895e405064c0cccE.llvm.9523233837051951944
+  in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6791777c14c5e081
+      in /tmp/litchi-goal-0505/after
+    _$LT$soapberry_zip..office..BoundedOutput$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hd4a3bb2f88d644be
+      in /tmp/litchi-goal-0505/after
+    std::io::Write::write_all::hd05b81ba7bb1323d
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::PreparedSizedMember::write_local::ha1683af712fcf151
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::ZipArchiveWriter$LT$W$GT$::write_stored_file_with_accounting::h521d7c48794b8282
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_stored_with_accounting::hd56a96371265e491
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::set_mimetype::h16799e6abb1ffa31
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6791777c14c5e081
+      in /tmp/litchi-goal-0505/after
+    _$LT$soapberry_zip..office..BoundedOutput$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hd4a3bb2f88d644be
+      in /tmp/litchi-goal-0505/after
+    std::io::Write::write_all::hd05b81ba7bb1323d
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::PreparedSizedMember::write_local::ha1683af712fcf151
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::ZipArchiveWriter$LT$W$GT$::write_stored_file_with_accounting::h521d7c48794b8282
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_stored_with_accounting::hd56a96371265e491
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::set_mimetype::h16799e6abb1ffa31
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h6791777c14c5e081
+      in /tmp/litchi-goal-0505/after
+    _$LT$soapberry_zip..office..BoundedOutput$LT$W$GT$$u20$as$u20$std..io..Write$GT$::write::hd4a3bb2f88d644be
+      in /tmp/litchi-goal-0505/after
+    std::io::Write::write_all::hd05b81ba7bb1323d
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::PreparedSizedMember::write_local::ha1683af712fcf151
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::writer::ZipArchiveWriter$LT$W$GT$::write_precompressed_file_classified::h658f41d9ec2263fb
+      in /tmp/litchi-goal-0505/after
+    soapberry_zip::office::StreamingArchiveWriter$LT$W$GT$::write_deflated_sized_with_accounting::hfc34b4afe15fced4
+      in /tmp/litchi-goal-0505/after
+    litchi_odf_common::core::writer::PackageWriter$LT$W$GT$::add_file::h83a9308cb688b5f4
+      in /tmp/litchi-goal-0505/after
+    odg_open_probe::main::h6a4025253ade7f3d
+      in /tmp/litchi-goal-0505/after
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+  and 0B from 12 other places
+
+1 temporary allocations of 1 allocations in total (100.00%) from
+__GI___getdelim
+  at ./libio/iogetdelim.c:111
+  in /usr/lib/x86_64-linux-gnu/libc.so.6
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    __pthread_getattr_np
+      at ./nptl/pthread_getattr_np.c:122
+      in /usr/lib/x86_64-linux-gnu/libc.so.6
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+
+1 temporary allocations of 4 allocations in total (25.00%) from
+odg_open_probe::main::h6a4025253ade7f3d
+  in /tmp/litchi-goal-0505/after
+1 temporary allocations of 1 allocations in total (100.00%) from:
+    std::sys::backtrace::__rust_begin_short_backtrace::hc5e47d4c3e52bcc0
+      in /tmp/litchi-goal-0505/after
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h229bf22292108eeaE.llvm.17920096561923662475
+      in /tmp/litchi-goal-0505/after
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0505/after
+    main
+      in /tmp/litchi-goal-0505/after
+
+
+total runtime: 0.27s.
+calls to allocation functions: 488252 (1815063/s)
+temporary memory allocations: 364355 (1354479/s)
+peak heap memory consumption: 6.98M
+peak RSS (including heaptrack overhead): 14.44M
+total memory leaked: 544B

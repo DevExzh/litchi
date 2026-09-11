@@ -1,0 +1,75 @@
+[
+  {
+    "name": "test-focused",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-odg",
+      "--test",
+      "attribute_selection"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "-p",
+      "litchi-odg",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "-p",
+      "litchi-odg",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "doctest",
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "litchi-odg",
+      "--doc"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "doc",
+    "command": [
+      "cargo",
+      "doc",
+      "-p",
+      "litchi-odg",
+      "--no-deps"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "odf-check",
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "litchi-odf",
+      "--no-default-features",
+      "--features",
+      "odg"
+    ],
+    "exit_code": 0
+  }
+]

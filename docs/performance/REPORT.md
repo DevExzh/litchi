@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0505: scoped ODG attribute filtering
+
+[0505](changes/0505-odg-attribute-name-prefilter.md) records this batch.
+The six-line private helper change improves synthetic open/traversal p50
+8.43–9.88% across two reversed repeats of four corpora. Final measurements
+have no >5% adverse latency/throughput/RSS flag; allocation counts and rounded
+peak heap are unchanged. The separate QName-borrowing experiment is withheld
+and its adverse RSS evidence retained. The scoped suite passes 96 tests.
+
 ## 0504: scoped ODG direct transition reuse
 
 [0504](changes/0504-odg-direct-transition-reuse.md) records 3,200 fresh samples
