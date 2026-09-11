@@ -12,6 +12,11 @@
 //! The owned root/list/recognized-extension containers allow only whitespace
 //! between elements. Other descendants remain opaque and may contain valid XML
 //! text; this ownership scanner does not perform full Theme schema validation.
+//!
+//! Limited mutations check the prospective complete-part size before serializing
+//! replacement buffers. Their cap also bounds the standalone family intermediate
+//! used to preserve inherited namespaces; bounded scalar sizing and source
+//! validation still occur before those output buffers are constructed.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -372,6 +377,8 @@ fn replace_family_source_with_limit(
     staged.set_id(incoming.id().as_str())?;
     staged.set_variant_id(incoming.variant_id().as_str())?;
     let owner = owner.ok_or_else(|| invalid("Theme Family candidate owner is missing"))?;
+    let replacement_len = family_child_len(&staged, &owner.inherited_bindings, max_xml_bytes)?;
+    ensure_splice_output_limit(xml, &candidate.family_range, replacement_len, max_xml_bytes)?;
     let replacement = family_child_bytes(&staged, &owner.inherited_bindings)?;
     let output = splice_with_limit(
         xml,
@@ -425,6 +432,16 @@ fn add_family_from_scan(
     }
     let _requested = ExtensionProfile::from_uri(uri)
         .ok_or_else(|| invalid("unsupported Theme Family extension URI"))?;
+    let family_len = family_child_len(family, &[], max_xml_bytes)?;
+    if let Some(extension) = scanned.root.admitted_ext.as_ref() {
+        ensure_extension_insertion_limit(xml, extension, family_len, max_xml_bytes)?;
+    } else if let Some(list) = scanned.root.ext_list.as_ref() {
+        let length = serialized_extension_len(qname_prefix(&list.qualified_name), uri, family_len)?;
+        ensure_container_insertion_limit(xml, list, length, max_xml_bytes)?;
+    } else {
+        let length = serialized_ext_list_len(&scanned.root.element_prefix, uri, family_len)?;
+        ensure_root_insertion_limit(xml, &scanned.root, length, max_xml_bytes)?;
+    }
     let family = family_child_bytes(family, &[])?;
     let output = if let Some(ext) = scanned.root.admitted_ext.as_ref() {
         // Preserve a native discriminator already present in the Theme part.
@@ -1597,14 +1614,11 @@ fn has_xml_declaration(bytes: &[u8]) -> bool {
         .is_some_and(|value| value.starts_with(b"<?xml"))
 }
 
-fn remove_inherited_namespace_declarations(
-    bytes: Vec<u8>,
+fn inherited_namespace_removal_ranges(
+    bytes: &[u8],
     inherited: &[Binding],
-) -> Result<Vec<u8>> {
-    if inherited.is_empty() {
-        return Ok(bytes);
-    }
-    let root_range = family_root_open_range(&bytes)?;
+) -> Result<Vec<Range<usize>>> {
+    let root_range = family_root_open_range(bytes)?;
     let root = bytes
         .get(root_range.clone())
         .ok_or_else(|| invalid("Theme Family root range is invalid"))?;
@@ -1679,6 +1693,42 @@ fn remove_inherited_namespace_declarations(
         }
         cursor += 1;
     }
+    Ok(ranges)
+}
+
+fn family_child_len(family: &Family, inherited: &[Binding], max_xml_bytes: usize) -> Result<usize> {
+    let mut length = family_codec::serialized_len(family)?;
+    // The standalone intermediate must also fit the caller's cap.
+    if length > max_xml_bytes {
+        return Err(limit("patched Theme XML bytes", max_xml_bytes));
+    }
+    if let Some(source) = family.source_state() {
+        if has_xml_declaration(source.xml.as_ref()) {
+            return Err(invalid("Theme Family child contains an XML declaration"));
+        }
+        let bom = usize::from(source.xml.starts_with(b"\xEF\xBB\xBF")) * 3;
+        length = length
+            .checked_sub(bom)
+            .ok_or_else(|| invalid("Theme Family child length underflows"))?;
+        if !inherited.is_empty() {
+            for range in inherited_namespace_removal_ranges(source.xml.as_ref(), inherited)? {
+                length = length
+                    .checked_sub(range.len())
+                    .ok_or_else(|| invalid("Theme Family child length underflows"))?;
+            }
+        }
+    }
+    Ok(length)
+}
+
+fn remove_inherited_namespace_declarations(
+    bytes: Vec<u8>,
+    inherited: &[Binding],
+) -> Result<Vec<u8>> {
+    if inherited.is_empty() {
+        return Ok(bytes);
+    }
+    let ranges = inherited_namespace_removal_ranges(&bytes, inherited)?;
     if ranges.is_empty() {
         return Ok(bytes);
     }
@@ -1837,6 +1887,29 @@ fn qualified_len(prefix: &[u8], local: &[u8]) -> Result<usize> {
         .checked_add(usize::from(!prefix.is_empty()))
         .and_then(|value| value.checked_add(local.len()))
         .ok_or_else(|| invalid("Theme qualified-name length overflows"))
+}
+
+fn ensure_extension_insertion_limit(
+    source: &[u8],
+    extension: &Extension,
+    family_len: usize,
+    max_xml_bytes: usize,
+) -> Result<()> {
+    if extension.empty {
+        let source_range = source
+            .get(extension.range.clone())
+            .ok_or_else(|| invalid("Theme extension range is invalid"))?;
+        let slash = empty_element_slash(source_range)
+            .ok_or_else(|| invalid("Theme empty extension slash is missing"))?;
+        let length =
+            empty_element_replacement_len(slash, family_len, extension.qualified_name.len())?;
+        ensure_splice_output_limit(source, &extension.range, length, max_xml_bytes)
+    } else {
+        let end = extension
+            .end_start
+            .ok_or_else(|| invalid("Theme extension closing range is missing"))?;
+        ensure_splice_output_limit(source, &(end..end), family_len, max_xml_bytes)
+    }
 }
 
 fn insert_into_ext(

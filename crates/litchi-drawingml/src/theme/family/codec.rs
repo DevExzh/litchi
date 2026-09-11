@@ -814,10 +814,7 @@ pub(crate) fn validate_namespace_binding(prefix: &[u8], value: &str) -> Result<(
     Ok(())
 }
 
-fn write_detached(value: &Family) -> Result<Vec<u8>> {
-    let name = escape_attribute(value.name());
-    let id = escape_xml(value.id().as_str());
-    let variant_id = escape_xml(value.variant_id().as_str());
+fn detached_len(name: &str, id: &str, variant_id: &str) -> Result<usize> {
     let output_len = b"<thm15:themeFamily xmlns:thm15=\""
         .len()
         .checked_add(NAMESPACE.len())
@@ -832,6 +829,30 @@ fn write_detached(value: &Family) -> Result<Vec<u8>> {
     if output_len > MAX_XML_BYTES {
         return Err(limit("theme family output bytes", MAX_XML_BYTES));
     }
+    Ok(output_len)
+}
+
+/// Size the serialized fragment without allocating its complete output buffer.
+pub(crate) fn serialized_len(value: &Family) -> Result<usize> {
+    validate(value)?;
+    if let Some(source) = value.source_state() {
+        if source_is_exact(value) {
+            return Ok(source.xml.len());
+        }
+        return Ok(source_rewrite(source, value)?.output_len);
+    }
+    detached_len(
+        &escape_attribute(value.name()),
+        &escape_xml(value.id().as_str()),
+        &escape_xml(value.variant_id().as_str()),
+    )
+}
+
+fn write_detached(value: &Family) -> Result<Vec<u8>> {
+    let name = escape_attribute(value.name());
+    let id = escape_xml(value.id().as_str());
+    let variant_id = escape_xml(value.variant_id().as_str());
+    let output_len = detached_len(&name, &id, &variant_id)?;
     let mut output = String::new();
     output
         .try_reserve_exact(output_len)
@@ -848,7 +869,12 @@ fn write_detached(value: &Family) -> Result<Vec<u8>> {
     bounded_output(output.into_bytes())
 }
 
-fn rewrite_source(source: &Source, value: &Family) -> Result<Vec<u8>> {
+struct SourceRewrite {
+    output_len: usize,
+    replacements: Vec<(std::ops::Range<usize>, String)>,
+}
+
+fn source_rewrite(source: &Source, value: &Family) -> Result<SourceRewrite> {
     let root = source
         .xml
         .get(source.root_start..source.root_end)
@@ -880,9 +906,6 @@ fn rewrite_source(source: &Source, value: &Family) -> Result<Vec<u8>> {
             escape_xml(value.variant_id().as_str()),
         ));
     }
-    if replacements.is_empty() {
-        return Ok(source.xml.as_ref().to_vec());
-    }
     let mut absolute = replacements
         .into_iter()
         .map(|(range, value)| {
@@ -908,6 +931,17 @@ fn rewrite_source(source: &Source, value: &Family) -> Result<Vec<u8>> {
     if output_len > MAX_XML_BYTES {
         return Err(limit("patched theme family XML bytes", MAX_XML_BYTES));
     }
+    Ok(SourceRewrite {
+        output_len,
+        replacements: absolute,
+    })
+}
+
+fn rewrite_source(source: &Source, value: &Family) -> Result<Vec<u8>> {
+    let SourceRewrite {
+        output_len,
+        replacements: absolute,
+    } = source_rewrite(source, value)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
