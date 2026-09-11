@@ -11,10 +11,6 @@
     reason = "parser bindings are intentionally refined after validation"
 )]
 #![expect(
-    clippy::shadow_unrelated,
-    reason = "local parser names mirror the OOXML role currently being decoded"
-)]
-#![expect(
     clippy::wildcard_enum_match_arm,
     reason = "non-exhaustive dependency enums require a future-safe fallback"
 )]

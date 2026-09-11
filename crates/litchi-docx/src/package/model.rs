@@ -2,14 +2,6 @@
     clippy::arbitrary_source_item_ordering,
     reason = "items remain grouped by OOXML schema family and package lifecycle"
 )]
-#![expect(
-    clippy::shadow_reuse,
-    reason = "parser bindings are intentionally refined after validation"
-)]
-#![expect(
-    clippy::shadow_unrelated,
-    reason = "local parser names mirror the OOXML role currently being decoded"
-)]
 //! Typed DOCX package state and semantic document-facing operations.
 
 pub(super) use crate::Variables;
