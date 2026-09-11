@@ -1,0 +1,13 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-core)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/soapberry-zip)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-cfb)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-fonts)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-sign)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-vba)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.39s

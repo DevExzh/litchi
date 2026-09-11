@@ -1,8 +1,9 @@
 # PPTX SVG attachment lifecycle evidence
 
-This directory is being prepared for a source-backed PPTX SVG attachment and
-detachment implementation. It is not yet a final feature approval. The completed
-OPC removal and shared SVG namespace prerequisites have their own committed,
+This directory records evidence for source-backed PPTX SVG attachment and
+detachment. Approval depends on the matching source-bound receipts described
+below. The completed OPC removal and shared SVG namespace prerequisites have
+their own committed,
 source-bound review records (`opc-review.json` and `svg-namespace-review.json`).
 
 The host operation selects an existing direct slide picture with an internal PNG

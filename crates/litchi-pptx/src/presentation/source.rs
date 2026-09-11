@@ -33,6 +33,13 @@ use crate::{Error, Result};
 
 use litchi_drawingml::svg_blip::SvgBlip;
 
+mod svg_lifecycle;
+
+pub use svg_lifecycle::{
+    SourceBackedSvgAttachmentCommit, SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
+    SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment, SourceSvgAttachmentReplacement,
+};
+
 #[cfg(test)]
 thread_local! {
     static SOURCE_CATALOG_BUILDS: Cell<usize> = const { Cell::new(0) };
@@ -105,6 +112,7 @@ pub(super) struct SourceInner {
     // Retain the pinned mandatory root without relying on the OPC payload cache.
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
+    pub(super) limits: ReadLimits,
 }
 
 struct SourceCatalog {
@@ -1014,7 +1022,10 @@ impl SourceBackedPresentation {
     /// The reader is consumed once into the source-backed positional owner;
     /// slide payloads remain deferred until a selected slide is read.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_reader(reader)?)
+        Self::from_source_backed_package_with_limits(
+            SourceBackedPackage::from_reader(reader)?,
+            ReadLimits::default(),
+        )
     }
 
     /// Open a PPTX source from a sequential reader with explicit OPC limits.
@@ -1022,9 +1033,10 @@ impl SourceBackedPresentation {
     /// Reader ingestion is bounded by `limits.max_input_bytes()`, and slide
     /// payloads remain deferred after the presentation graph is indexed.
     pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_reader_with_limits(
-            reader, limits,
-        )?)
+        Self::from_source_backed_package_with_limits(
+            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
+            limits,
+        )
     }
 
     /// Open from a positional source with explicit OPC resource limits.
@@ -1034,9 +1046,10 @@ impl SourceBackedPresentation {
     /// Returns an error when the source exceeds `limits`, changes while being
     /// read, or does not contain a coherent PresentationML catalog.
     pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
+        Self::from_source_backed_package_with_limits(
+            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
+            limits,
+        )
     }
 
     /// Open from a positional source with an explicit finite payload-cache
@@ -1047,10 +1060,10 @@ impl SourceBackedPresentation {
         source: Arc<dyn ReadAt>,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
+        Self::from_source_backed_package_with_limits(
+            SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits)?,
+            ReadLimits::default(),
+        )
     }
 
     /// Open from a positional source with explicit read and cache policies.
@@ -1059,12 +1072,13 @@ impl SourceBackedPresentation {
         limits: ReadLimits,
         cache_limits: SourceCacheLimits,
     ) -> Result<Self> {
-        Self::from_source_backed_package(
+        Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
                 source,
                 limits,
                 cache_limits,
             )?,
+            limits,
         )
     }
 
@@ -1087,9 +1101,10 @@ impl SourceBackedPresentation {
         limits: ReadLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source, limits, context,
-        )?)
+        Self::from_source_backed_package_with_limits(
+            SourceBackedPackage::from_read_at_with_execution_context(source, limits, context)?,
+            limits,
+        )
     }
 
     /// Open from a positional source with explicit read, cache, and
@@ -1100,13 +1115,14 @@ impl SourceBackedPresentation {
         cache_limits: SourceCacheLimits,
         context: ExecutionContext,
     ) -> Result<Self> {
-        Self::from_source_backed_package(
+        Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                 source,
                 limits,
                 cache_limits,
                 context,
             )?,
+            limits,
         )
     }
 
@@ -1119,6 +1135,14 @@ impl SourceBackedPresentation {
     /// Returns an error when the main part or its ordered slide graph is not a
     /// coherent PresentationML presentation.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+        let limits = package.read_limits();
+        Self::from_source_backed_package_with_limits(package, limits)
+    }
+
+    fn from_source_backed_package_with_limits(
+        package: SourceBackedPackage,
+        limits: ReadLimits,
+    ) -> Result<Self> {
         package.check_execution()?;
         let catalog = source_catalog(&package)?;
         package.check_execution()?;
@@ -1128,6 +1152,7 @@ impl SourceBackedPresentation {
                 package,
                 _presentation: catalog.presentation,
                 slides: catalog.slides,
+                limits,
             }),
         })
     }
@@ -1934,20 +1959,39 @@ impl SourceBackedPresentationEditor {
         let view = self.package.part(&slide.part_uri)?;
         let source_part = SourcePart::from_view(&view, view.data()?)?;
         validate_source_slide_root(&source_part)?;
-        reject_picture_markup_compatibility(source_part.blob())?;
         validate_full_slide_picture_relationships(&self.package, source_part.blob())?;
         let scene = crate::shape::Scene::read(source_part.blob())?;
+        let mut picture_xmls = Vec::new();
+        picture_xmls
+            .try_reserve(scene.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed picture XML fragments",
+                source,
+            })?;
+        for shape in scene.iter() {
+            if let Shape::Picture(picture) = shape {
+                picture_xmls.push(picture.common().xml()?);
+            }
+        }
+        let relationships = svg_lifecycle::parse_picture_relationships_with_source(
+            source_part.blob(),
+            picture_xmls.iter().copied(),
+            self.limits.max_part_bytes(),
+        )?;
+        let mut relationships = relationships.into_iter();
         let mut picture_count = 0usize;
         let mut selected = None;
         for shape in scene.iter() {
-            let Shape::Picture(picture) = shape else {
+            let Shape::Picture(_picture) = shape else {
                 continue;
             };
             let position = picture_count;
             picture_count = picture_count
                 .checked_add(1)
                 .ok_or_else(|| Error::Invalid("source-backed picture count overflow".into()))?;
-            let relationship = parse_picture_relationship(picture.common().xml()?)?;
+            let relationship = relationships.next().ok_or_else(|| {
+                Error::Invalid("source-backed picture relationship inventory is truncated".into())
+            })?;
             let raster_target = resolve_picture_target(&self.package, &view, &relationship)?;
             let svg_target = relationship
                 .svg
@@ -2073,7 +2117,14 @@ impl SourceBackedPresentationEditor {
         let part = SourcePart::from_view(&view, raw)?;
         #[cfg(test)]
         record_test_semantic_slide_part_read();
-        SlidePart::from_part(&part)?;
+        if let Err(error) = SlidePart::from_part(&part) {
+            // The SVG owner scanner preserves legal opaque extension markup
+            // that the general SlidePart/MCE projection deliberately refuses
+            // to interpret. Other malformed slide errors remain fatal.
+            if !matches!(error, Error::MarkupCompatibility(_)) {
+                return Err(error);
+            }
+        }
         let SourcePart { data: raw, .. } = part;
         self.package.check_execution()?;
         let source_version = self.package.source_version()?;
@@ -3190,13 +3241,43 @@ impl SourceSlide {
         let view = self.owner.package.part(&self.data.part_uri)?;
         let part = self.load_part(&view)?;
         validate_source_slide_root(&part)?;
-        reject_picture_markup_compatibility(part.blob())?;
         validate_full_slide_picture_relationships(&self.owner.package, part.blob())?;
         // Keep the normal borrowed part validation on the safe path as well;
         // the raw-root check above prevents MCE preprocessing from masking a
         // malformed selected slide before our refusal scan runs.
-        SlidePart::from_part(&part)?;
-        let scene = crate::shape::Scene::read(part.blob())?;
+        if let Err(error) = SlidePart::from_part(&part) {
+            // The SVG owner scanner preserves legal opaque extension markup
+            // that the general SlidePart/MCE projection deliberately refuses
+            // to interpret. Other malformed slide errors remain fatal.
+            if !matches!(error, Error::MarkupCompatibility(_)) {
+                return Err(error);
+            }
+        }
+        let scene = match crate::shape::Scene::read(part.blob()) {
+            Ok(scene) => scene,
+            Err(Error::MarkupCompatibility(_)) => {
+                return self.query_images_from_raw_owner(&part, &view, mode);
+            },
+            Err(error) => return Err(error),
+        };
+        let mut picture_xmls = Vec::new();
+        picture_xmls
+            .try_reserve(scene.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed picture XML fragments",
+                source,
+            })?;
+        for shape in scene.iter() {
+            if let Shape::Picture(picture) = shape {
+                picture_xmls.push(picture.common().xml()?);
+            }
+        }
+        let relationships = svg_lifecycle::parse_picture_relationships_with_source(
+            part.blob(),
+            picture_xmls.iter().copied(),
+            self.owner.limits.max_part_bytes(),
+        )?;
+        let mut relationships = relationships.into_iter();
 
         let mut descriptors = match mode {
             PictureQueryMode::All => {
@@ -3229,7 +3310,9 @@ impl SourceSlide {
                 .checked_add(1)
                 .ok_or_else(|| Error::Invalid("source-backed picture count overflow".into()))?;
             let common = picture.common();
-            let relationship = parse_picture_relationship(common.xml()?)?;
+            let relationship = relationships.next().ok_or_else(|| {
+                Error::Invalid("source-backed picture relationship inventory is truncated".into())
+            })?;
             let target = resolve_picture_target(&self.owner.package, &view, &relationship)?;
             let svg = relationship
                 .svg
@@ -3281,6 +3364,100 @@ impl SourceSlide {
             )),
             PictureQueryMode::Selected(_) => Ok(PictureQueryResult::Selected {
                 descriptor: selected_descriptor,
+                len: picture_count,
+            }),
+        }
+    }
+
+    /// Query the direct picture owner without asking the general Scene
+    /// processor to interpret unrelated extension payload.  The Scene path
+    /// remains the metadata-rich fast path; this bounded fallback is needed
+    /// for source slides whose opaque extension subtree contains legal PI or
+    /// unsupported MCE markup.  Relationship and target facts still come
+    /// from the same raw owner scanner used by lifecycle edits.
+    fn query_images_from_raw_owner(
+        &self,
+        part: &SourcePart,
+        view: &PartView<'_>,
+        mode: PictureQueryMode,
+    ) -> Result<PictureQueryResult> {
+        let relationships = svg_lifecycle::parse_picture_relationships_from_source(
+            part.blob(),
+            self.owner.limits.max_part_bytes(),
+        )?;
+        let picture_count = relationships.len();
+        let mut descriptors = match mode {
+            PictureQueryMode::All => {
+                let mut descriptors = Vec::new();
+                descriptors
+                    .try_reserve_exact(picture_count)
+                    .map_err(|source| Error::Allocation {
+                        resource: "source-backed raw picture descriptors",
+                        source,
+                    })?;
+                Some(descriptors)
+            },
+            PictureQueryMode::Selected(_) => None,
+        };
+        for (position, relationship) in relationships.into_iter().enumerate() {
+            let target = resolve_picture_target(&self.owner.package, view, &relationship)?;
+            let svg = relationship
+                .svg
+                .as_ref()
+                .map(|svg| resolve_svg_target(&self.owner.package, view, svg).map(Arc::new))
+                .transpose()?;
+            let descriptor = match mode {
+                PictureQueryMode::All => Some(SourceImageDescriptor {
+                    position,
+                    // The raw fallback intentionally does not invent a
+                    // processed Scene pre-order index.  The direct picture
+                    // order remains exact and is the only selector used by
+                    // this source-backed lifecycle.
+                    shape_position: position,
+                    id: None,
+                    name: None,
+                    bounds: None,
+                    relationship_id: relationship.id,
+                    target,
+                    svg,
+                }),
+                PictureQueryMode::Selected(selected) if selected == position => {
+                    Some(SourceImageDescriptor {
+                        position,
+                        shape_position: position,
+                        id: None,
+                        name: None,
+                        bounds: None,
+                        relationship_id: relationship.id,
+                        target,
+                        svg,
+                    })
+                },
+                PictureQueryMode::Selected(_) => None,
+            };
+            if let Some(descriptor) = descriptor {
+                match mode {
+                    PictureQueryMode::All => descriptors
+                        .as_mut()
+                        .expect("raw all picture query retains descriptors")
+                        .push(descriptor),
+                    PictureQueryMode::Selected(_) => {
+                        return Ok(PictureQueryResult::Selected {
+                            descriptor: Some(descriptor),
+                            len: picture_count,
+                        });
+                    },
+                }
+            }
+        }
+        match mode {
+            PictureQueryMode::All => Ok(PictureQueryResult::All(
+                descriptors
+                    .take()
+                    .expect("raw all picture query retains descriptors"),
+            )),
+            PictureQueryMode::Selected(_) => Ok(PictureQueryResult::Selected {
+                descriptor: None,
                 len: picture_count,
             }),
         }
@@ -3438,7 +3615,25 @@ const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml
 const SVG_BLIP_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/drawing/2016/SVG/main";
 const SVG_BLIP_EXTENSION_URI: &[u8] = b"{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
-fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
+fn parse_picture_relationship_with_limit(
+    xml: &[u8],
+    max_output_bytes: u64,
+) -> Result<PictureRelationship> {
+    parse_picture_relationship_inner(xml, false, max_output_bytes)
+}
+
+fn parse_picture_relationship_strict_with_limit(
+    xml: &[u8],
+    max_output_bytes: u64,
+) -> Result<PictureRelationship> {
+    parse_picture_relationship_inner(xml, true, max_output_bytes)
+}
+
+fn parse_picture_relationship_inner(
+    xml: &[u8],
+    reject_empty_svg_extension: bool,
+    max_output_bytes: u64,
+) -> Result<PictureRelationship> {
     let mut reader = NsReader::from_reader(xml);
     let mut stack: Vec<(PictureNode, Vec<u8>)> = Vec::new();
     let mut root_seen = false;
@@ -3450,8 +3645,10 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
     let mut saw_fill_rectangle = false;
     let mut saw_blip_extension_list = false;
     let mut saw_svg_blip = false;
+    let mut current_svg_extension_has_child = false;
     let mut svg_start = None;
     let mut relationship = None;
+    let mut root_namespace_declarations = Vec::<(Vec<u8>, Vec<u8>)>::new();
     loop {
         let event_start = position(&reader)?;
         let event = reader
@@ -3482,6 +3679,8 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                         ));
                     }
                     root_seen = true;
+                    root_namespace_declarations =
+                        namespace_declarations(&element, reader.decoder())?;
                 }
                 if !opaque_parent && node == PictureNode::Picture && !stack.is_empty() {
                     return Err(Error::Invalid(
@@ -3504,6 +3703,15 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                     } else {
                         PictureNode::OpaqueBlipExtension
                     };
+                }
+
+                if reject_empty_svg_extension && node == PictureNode::SvgBlipExtension {
+                    if !is_start {
+                        return Err(Error::Invalid(
+                            "recognized SVG extension must contain one svgBlip child".into(),
+                        ));
+                    }
+                    current_svg_extension_has_child = false;
                 }
 
                 match parent {
@@ -3620,6 +3828,7 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                                 "picture a:blip extension contains an unsupported or duplicate svgBlip".into(),
                             ));
                         }
+                        current_svg_extension_has_child = true;
                         saw_svg_blip = true;
                         if is_start {
                             svg_start = Some(event_start);
@@ -3627,7 +3836,12 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                             let fragment = xml.get(event_start..event_end).ok_or_else(|| {
                                 Error::Invalid("picture svgBlip range is outside its XML".into())
                             })?;
-                            attach_svg_relationship(&mut relationship, fragment)?;
+                            attach_svg_relationship(
+                                &mut relationship,
+                                fragment,
+                                &root_namespace_declarations,
+                                max_output_bytes,
+                            )?;
                         }
                     },
                     Some(PictureNode::OpaqueBlipExtension) => {},
@@ -3678,6 +3892,14 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                         "picture descriptor has a mismatched end element".into(),
                     ));
                 }
+                if reject_empty_svg_extension
+                    && closed_node == PictureNode::SvgBlipExtension
+                    && !current_svg_extension_has_child
+                {
+                    return Err(Error::Invalid(
+                        "recognized SVG extension must contain one svgBlip child".into(),
+                    ));
+                }
                 if closed_node == PictureNode::SvgBlip {
                     let start = svg_start.take().ok_or_else(|| {
                         Error::Invalid("picture svgBlip source range is unavailable".into())
@@ -3685,7 +3907,12 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                     let fragment = xml.get(start..event_end).ok_or_else(|| {
                         Error::Invalid("picture svgBlip range is outside its XML".into())
                     })?;
-                    attach_svg_relationship(&mut relationship, fragment)?;
+                    attach_svg_relationship(
+                        &mut relationship,
+                        fragment,
+                        &root_namespace_declarations,
+                        max_output_bytes,
+                    )?;
                 }
             },
             Event::Text(text) => {
@@ -3723,7 +3950,7 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                     ));
                 }
             },
-            Event::CData(_) | Event::GeneralRef(_) | Event::Comment(_)
+            Event::CData(_) | Event::GeneralRef(_)
                 if stack.last().is_some_and(|(node, _)| {
                     matches!(
                         node,
@@ -3745,7 +3972,12 @@ fn parse_picture_relationship(xml: &[u8]) -> Result<PictureRelationship> {
                         .into(),
                 ));
             },
+            Event::Comment(_) => {},
             Event::Eof => break,
+            Event::PI(_)
+                if stack
+                    .last()
+                    .is_some_and(|(node, _)| *node == PictureNode::OpaqueBlipExtension) => {},
             Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
                 return Err(Error::Invalid(
                     "picture descriptor contains forbidden XML declarations".into(),
@@ -3814,7 +4046,15 @@ fn validate_blip_extension_attributes(
                 "picture a:ext uri attribute is empty".into(),
             ));
         }
-        svg_uri = value.as_bytes() == SVG_BLIP_EXTENSION_URI;
+        // CT_OfficeArtExtension@uri is xsd:token.  Its whitespace facet is
+        // the XML four-character class; Rust's Unicode `split_whitespace`
+        // would incorrectly classify NBSP and other Unicode separators.
+        let normalized = value
+            .split([' ', '\t', '\r', '\n'])
+            .filter(|token| !token.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+        svg_uri = normalized.as_bytes() == SVG_BLIP_EXTENSION_URI;
     }
     if !uri_seen {
         return Err(Error::Invalid(
@@ -3827,8 +4067,15 @@ fn validate_blip_extension_attributes(
 fn attach_svg_relationship(
     relationship: &mut Option<PictureRelationship>,
     fragment: &[u8],
+    inherited_namespaces: &[(Vec<u8>, Vec<u8>)],
+    max_output_bytes: u64,
 ) -> Result<()> {
-    let blip = litchi_drawingml::svg_blip::read(fragment)?;
+    let fragment = svg_lifecycle::namespace_complete_element_fragment(
+        fragment,
+        inherited_namespaces,
+        max_output_bytes,
+    )?;
+    let blip = litchi_drawingml::svg_blip::read(&fragment)?;
     let (id, external) = match (blip.embedded(), blip.linked()) {
         (Some(id), None) => (id.as_str().to_owned(), false),
         (None, Some(id)) => (id.as_str().to_owned(), true),
@@ -3853,6 +4100,50 @@ fn attach_svg_relationship(
     }
     relationship.svg = Some(SvgRelationship { id, external, blip });
     Ok(())
+}
+
+fn namespace_declarations(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    let mut declarations = Vec::new();
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let Some(prefix) = attribute.key.as_namespace_binding() else {
+            continue;
+        };
+        let prefix = match prefix {
+            quick_xml::name::PrefixDeclaration::Default => &[][..],
+            quick_xml::name::PrefixDeclaration::Named(prefix) => prefix,
+        };
+        let uri = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        declarations
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "SVG relationship namespace declarations",
+                source,
+            })?;
+        let mut prefix_copy = Vec::new();
+        prefix_copy
+            .try_reserve_exact(prefix.len())
+            .map_err(|source| Error::Allocation {
+                resource: "SVG relationship namespace prefix",
+                source,
+            })?;
+        prefix_copy.extend_from_slice(prefix);
+        let mut uri_copy = Vec::new();
+        uri_copy
+            .try_reserve_exact(uri.len())
+            .map_err(|source| Error::Allocation {
+                resource: "SVG relationship namespace URI",
+                source,
+            })?;
+        uri_copy.extend_from_slice(uri.as_bytes());
+        declarations.push((prefix_copy, uri_copy));
+    }
+    Ok(declarations)
 }
 
 fn picture_node(namespace: &ResolveResult<'_>, name: quick_xml::name::QName<'_>) -> PictureNode {
@@ -3972,84 +4263,6 @@ fn validate_blip_attributes(
     Ok(())
 }
 
-fn reject_picture_markup_compatibility(xml: &[u8]) -> Result<()> {
-    let mut reader = NsReader::from_reader(xml);
-    let mut stack = Vec::<(bool, bool)>::new();
-    let mut picture_depth = 0usize;
-    let mut mce_depth = 0usize;
-    loop {
-        let (namespace, event) = reader
-            .read_resolved_event()
-            .map_err(|error| Error::Xml(error.to_string()))?;
-        let is_start = matches!(&event, Event::Start(_));
-        match event {
-            Event::Start(element) | Event::Empty(element) => {
-                let is_picture = is_presentation_name(&namespace, element.name(), b"pic");
-                let is_mce = is_mce_namespace(&namespace);
-                let has_mce_attribute =
-                    element
-                        .attributes()
-                        .with_checks(true)
-                        .try_fold(false, |seen, attribute| {
-                            let attribute =
-                                attribute.map_err(|error| Error::Xml(error.to_string()))?;
-                            Ok::<_, Error>(
-                                seen || is_mce_namespace(
-                                    &reader.resolver().resolve_attribute(attribute.key).0,
-                                ),
-                            )
-                        })?;
-                if (picture_depth > 0 || is_picture) && (is_mce || has_mce_attribute)
-                    || (is_picture && mce_depth > 0)
-                {
-                    return Err(Error::UnsafeEdit {
-                        operation: "source-backed picture inventory",
-                        reason: "markup-compatibility picture branches are refused",
-                    });
-                }
-                if is_picture {
-                    picture_depth = picture_depth
-                        .checked_add(1)
-                        .ok_or_else(|| Error::Invalid("picture depth overflow".into()))?;
-                }
-                if is_mce {
-                    mce_depth = mce_depth.checked_add(1).ok_or_else(|| {
-                        Error::Invalid("markup-compatibility depth overflow".into())
-                    })?;
-                }
-                if is_start {
-                    stack.push((is_picture, is_mce));
-                } else {
-                    if is_picture {
-                        picture_depth -= 1;
-                    }
-                    if is_mce {
-                        mce_depth -= 1;
-                    }
-                }
-            },
-            Event::End(_) => {
-                let (is_picture, is_mce) = stack.pop().ok_or_else(|| {
-                    Error::Invalid("slide markup-compatibility scan has an unmatched end".into())
-                })?;
-                if is_picture {
-                    picture_depth -= 1;
-                }
-                if is_mce {
-                    mce_depth -= 1;
-                }
-            },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(Error::Invalid(
-                    "slide XML contains forbidden XML declarations".into(),
-                ));
-            },
-            Event::Eof => return Ok(()),
-            _ => {},
-        }
-    }
-}
-
 fn validate_source_slide_root(part: &dyn Part) -> Result<()> {
     if part.content_type() != ct::PML_SLIDE {
         return Err(Error::ContentType {
@@ -4090,6 +4303,41 @@ fn validate_source_slide_root(part: &dyn Part) -> Result<()> {
     }
 }
 
+fn is_opaque_drawing_extension(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<bool> {
+    let mut uri_seen = false;
+    let mut native_uri = false;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_namespace_binding().is_some() {
+            continue;
+        }
+        if attribute.key.prefix().is_none() && attribute.key.as_ref() == b"uri" {
+            if uri_seen {
+                return Ok(true);
+            }
+            uri_seen = true;
+            let uri = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            // The admitted SVG GUID has no internal XML whitespace.  Trimming
+            // the xsd:token edge class is therefore enough to recognize its
+            // profile without allocating a collapsed-token buffer; any
+            // internal whitespace remains a foreign URI.
+            native_uri = uri
+                .trim_matches(|character| matches!(character, ' ' | '\t' | '\r' | '\n'))
+                .as_bytes()
+                == SVG_BLIP_EXTENSION_URI;
+        }
+    }
+    if !uri_seen {
+        return Ok(true);
+    }
+    Ok(!native_uri)
+}
+
 fn validate_full_slide_picture_relationships(
     package: &SourceBackedPackage,
     xml: &[u8],
@@ -4098,15 +4346,30 @@ fn validate_full_slide_picture_relationships(
     let mut stack = Vec::<Vec<u8>>::new();
     let mut picture_depth = None;
     let mut picture_blip_fill_depth = None;
+    // A direct DrawingML extension with an unrecognized URI is opaque.  Keep
+    // validating its XML stack, but do not infer a typed p:pic/a:blip owner
+    // from namespace lookalikes nested inside that payload.
+    let mut opaque_extension_depth = None;
     let mut root_seen = false;
     let mut root_closed = false;
     let mut expected_relationship_namespace = None;
+    let mut buffer = Vec::new();
 
     loop {
         package.check_execution()?;
-        let (namespace, event) = reader
-            .read_resolved_event()
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::Xml(error.to_string()))?;
+        let event = event.into_owned();
+        let resolver = reader.resolver().clone();
+        let decoder = reader.decoder();
+        let namespace = match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                resolver.resolve_prefix(element.name().prefix(), true)
+            },
+            Event::End(element) => resolver.resolve_prefix(element.name().prefix(), true),
+            _ => ResolveResult::Unbound,
+        };
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -4117,6 +4380,7 @@ fn validate_full_slide_picture_relationships(
                 }
                 let depth = stack.len();
                 let name = element.name();
+                let opaque_ancestor = opaque_extension_depth.is_some();
                 if !root_seen {
                     if !is_presentation_name(&namespace, name, b"sld") {
                         return Err(Error::Invalid(
@@ -4143,7 +4407,7 @@ fn validate_full_slide_picture_relationships(
                     root_seen = true;
                 }
 
-                if is_presentation_name(&namespace, name, b"pic") {
+                if !opaque_ancestor && is_presentation_name(&namespace, name, b"pic") {
                     if picture_depth.is_some() {
                         return Err(Error::Invalid(
                             "source slide picture scan contains a nested p:pic".into(),
@@ -4154,7 +4418,8 @@ fn validate_full_slide_picture_relationships(
                             Error::Invalid("source slide XML depth overflow".into())
                         })?);
                     }
-                } else if is_presentation_name(&namespace, name, b"blipFill")
+                } else if !opaque_ancestor
+                    && is_presentation_name(&namespace, name, b"blipFill")
                     && picture_depth == Some(depth)
                 {
                     if picture_blip_fill_depth.is_some() {
@@ -4168,14 +4433,15 @@ fn validate_full_slide_picture_relationships(
                             Error::Invalid("source slide XML depth overflow".into())
                         })?);
                     }
-                } else if is_drawing_name(&namespace, name, b"blip")
+                } else if !opaque_ancestor
+                    && is_drawing_name(&namespace, name, b"blip")
                     && picture_blip_fill_depth == Some(depth)
                 {
                     validate_full_slide_blip_attributes(
                         package,
                         &element,
-                        reader.resolver(),
-                        reader.decoder(),
+                        &resolver,
+                        decoder,
                         expected_relationship_namespace.ok_or_else(|| {
                             Error::Invalid("source slide relationship namespace is missing".into())
                         })?,
@@ -4196,6 +4462,12 @@ fn validate_full_slide_picture_relationships(
                         })?;
                     start_name.extend_from_slice(name.as_ref());
                     stack.push(start_name);
+                    if opaque_extension_depth.is_none()
+                        && is_drawing_name(&namespace, name, b"ext")
+                        && is_opaque_drawing_extension(&element, decoder)?
+                    {
+                        opaque_extension_depth = Some(stack.len());
+                    }
                 } else if stack.is_empty() {
                     root_closed = true;
                 }
@@ -4210,6 +4482,9 @@ fn validate_full_slide_picture_relationships(
                     ));
                 }
                 let closing_depth = stack.len() + 1;
+                if opaque_extension_depth == Some(closing_depth) {
+                    opaque_extension_depth = None;
+                }
                 if picture_blip_fill_depth == Some(closing_depth) {
                     picture_blip_fill_depth = None;
                 }
@@ -4227,15 +4502,21 @@ fn validate_full_slide_picture_relationships(
                     "source slide picture scan contains text outside its root".into(),
                 ));
             },
-            Event::DocType(_) | Event::PI(_) => {
+            // Processing instructions are legal opaque content in an unknown
+            // extension subtree.  The owner scanner applies the stricter
+            // direct-owner/MCE rules; this relationship pass only rejects a
+            // document type declaration, which cannot be preserved safely.
+            Event::DocType(_) => {
                 return Err(Error::UnsafeEdit {
                     operation: "source-backed picture inventory",
-                    reason: "markup-compatibility or processing-instruction content is refused",
+                    reason: "DOCTYPE content is refused",
                 });
             },
+            Event::PI(_) => {},
             Event::Eof => break,
             _ => {},
         }
+        buffer.clear();
     }
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(Error::Invalid(
