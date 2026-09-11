@@ -1,0 +1,70 @@
+{
+  "schema": "xlsx-svg-lifecycle-corpus-v1",
+  "status": "recipe-only-until-api-freeze",
+  "description": "Deterministic bounded recipes for ordinary worksheet direct-picture SVG lifecycle profiling.",
+  "source_fixture": {
+    "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+    "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+    "use": "read/capture topology only; never mutate or treat as Office acceptance evidence"
+  },
+  "package_shape": {
+    "worksheet_count": 1,
+    "drawing_relationship_count": 1,
+    "direct_picture_owner": true,
+    "raster_fallback_content_type": "image/png",
+    "svg_content_type": "image/svg+xml",
+    "svg_payload_is_opaque": true
+  },
+  "payloads": {
+    "small": {
+      "svg_bytes": 512,
+      "raster_bytes": 1024,
+      "generation": "repeat deterministic byte pattern seeded by lane id"
+    },
+    "large": {
+      "svg_bytes": 65536,
+      "raster_bytes": 65536,
+      "generation": "repeat deterministic byte pattern seeded by lane id"
+    }
+  },
+  "inventory": {
+    "counts": [256, 1024],
+    "raster_relationship": "one shared internal PNG relationship",
+    "shared_svg": "one SVG relationship and media leaf referenced by every direct picture",
+    "distinct_svg": "one internal SVG relationship and media leaf per direct picture",
+    "picture_order": "source order, zero based",
+    "anchor_cycle": ["two_cell", "one_cell", "absolute"]
+  },
+  "namespace_heavy": {
+    "inherited_bindings": 252,
+    "opaque_descendants": 1024,
+    "limit_case": "resolve the configured active namespace-binding limit from the host error"
+  },
+  "lanes": [
+    {"id": "capture_raster_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only"},
+    {"id": "capture_attached_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "svg_attached"},
+    {"id": "clone_raster_{size}", "sizes": ["small", "large"], "state": "raster_only", "clone_scope": "immutable source snapshot and captured owner"},
+    {"id": "clone_attached_{size}", "sizes": ["small", "large"], "state": "svg_attached", "clone_scope": "immutable source snapshot and captured owner"},
+    {"id": "inventory_shared_{count}", "counts": [256, 1024], "state": "svg_attached", "target_topology": "shared"},
+    {"id": "inventory_distinct_{count}", "counts": [256, 1024], "state": "svg_attached", "target_topology": "distinct"},
+    {"id": "namespace_heavy", "state": "raster_only", "namespace_heavy": true},
+    {"id": "namespace_limit_refusal", "state": "raster_only", "expected": "typed_limit_refusal"},
+    {"id": "attach_end_to_end_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "raster_only", "operation": "attach"},
+    {"id": "detach_end_to_end_shared_first_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "svg_attached", "target_topology": "shared", "owner_phase": "first"},
+    {"id": "detach_end_to_end_shared_final_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "svg_attached", "target_topology": "shared", "owner_phase": "final"},
+    {"id": "detach_end_to_end_distinct_{anchor}_{size}", "anchors": ["two_cell", "one_cell", "absolute"], "sizes": ["small", "large"], "state": "svg_attached", "target_topology": "distinct", "operation": "detach"},
+    {"id": "noop_detach_{anchor}", "anchors": ["two_cell", "one_cell", "absolute"], "state": "raster_only", "operation": "detach_noop"},
+    {"id": "limit_{size}", "sizes": ["small", "large"], "state": "raster_only", "expected": "caller_budget_refusal"},
+    {"id": "malformed_duplicate_owner", "expected": "ambiguous_owner_refusal"},
+    {"id": "malformed_mce_owner", "expected": "mce_ancestry_refusal"},
+    {"id": "malformed_linked_owner", "expected": "linked_owner_refusal"},
+    {"id": "malformed_unknown_uri", "expected": "inert_unknown_extension"}
+  ],
+  "limits": {
+    "drawing_xml_bytes": "existing_xlsx_scanner_bound",
+    "svg_fragment": "shared_svg_blip_codec_bounds",
+    "aggregate_edit_bytes": "caller_visible_budget",
+    "precharge_required": true,
+    "allocation_policy": "reject before constructing an oversized replacement buffer"
+  }
+}
