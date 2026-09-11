@@ -1,0 +1,12 @@
+{
+  "command": [
+    "perf",
+    "stat",
+    "-x",
+    ",",
+    "-e",
+    "cycles,instructions,branches,branch-misses,cache-references,cache-misses,page-faults,context-switches,cpu-migrations",
+    "/bin/true"
+  ],
+  "exit_code": 0
+}

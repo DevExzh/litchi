@@ -1,0 +1,157 @@
+{
+  "decision": "retain_with_documented_tradeoffs",
+  "all_guardrail_flags": {
+    "export_guardrail": {
+      "pairs": [
+        {
+          "repeat": "r1",
+          "case": "sparse_crlf-1024",
+          "before_p50_ns": 357706,
+          "after_p50_ns": 333271,
+          "changes_percent": {
+            "p50": -6.8310288337349645,
+            "mean": -6.067833009620271,
+            "p95": -2.758820967039355,
+            "p99": 8.334673946987415,
+            "throughput": 6.459803072829917
+          },
+          "adverse_over_5_percent": true
+        },
+        {
+          "repeat": "r1",
+          "case": "sparse_crlf-65536",
+          "before_p50_ns": 354706,
+          "after_p50_ns": 490867,
+          "changes_percent": {
+            "p50": 38.387002193365774,
+            "mean": 38.34679611054259,
+            "p95": 34.627543887896415,
+            "p99": 33.29530367356417,
+            "throughput": -27.717877962206316
+          },
+          "adverse_over_5_percent": true
+        },
+        {
+          "repeat": "r2",
+          "case": "all_cr-1024",
+          "before_p50_ns": 3216712,
+          "after_p50_ns": 3231567,
+          "changes_percent": {
+            "p50": 0.46180696313502523,
+            "mean": 0.5694782215417415,
+            "p95": 0.5368431911253246,
+            "p99": 5.597267424019159,
+            "throughput": -0.5662535310039574
+          },
+          "adverse_over_5_percent": true
+        },
+        {
+          "repeat": "r2",
+          "case": "dense_crlf-49",
+          "before_p50_ns": 2545839,
+          "after_p50_ns": 2599679,
+          "changes_percent": {
+            "p50": 2.114823443273517,
+            "mean": 2.1682701400170368,
+            "p95": 2.194171500345221,
+            "p99": 8.33863071745089,
+            "throughput": -2.12225394150799
+          },
+          "adverse_over_5_percent": true
+        },
+        {
+          "repeat": "r2",
+          "case": "sparse_crlf-1024",
+          "before_p50_ns": 341586,
+          "after_p50_ns": 344711,
+          "changes_percent": {
+            "p50": 0.9148501402282294,
+            "mean": 2.489049679232802,
+            "p95": 19.66341055463112,
+            "p99": 35.19713775330013,
+            "throughput": -2.42860060369664
+          },
+          "adverse_over_5_percent": true
+        }
+      ],
+      "drift": [
+        {
+          "stage": "before",
+          "case": "sparse_crlf-65536",
+          "changes_percent": {
+            "p50": -7.50057794342357,
+            "mean": -5.348270077178363,
+            "p95": -3.731078176553426,
+            "p99": -4.149608008440564
+          },
+          "exceeds_drift_ceiling": true
+        },
+        {
+          "stage": "after",
+          "case": "sparse_crlf-1024",
+          "changes_percent": {
+            "p50": 3.432641904036049,
+            "mean": 4.053245226636659,
+            "p95": 17.310200850282165,
+            "p99": 15.362878394136992
+          },
+          "exceeds_drift_ceiling": true
+        },
+        {
+          "stage": "after",
+          "case": "sparse_crlf-65536",
+          "changes_percent": {
+            "p50": -38.484151511509225,
+            "mean": -37.49496442508856,
+            "p95": -41.46974402587836,
+            "p99": -41.10098240458102
+          },
+          "exceeds_drift_ceiling": true
+        }
+      ],
+      "rss": []
+    },
+    "export_guardrail_followup": {
+      "pairs": [
+        {
+          "repeat": "followup-r1",
+          "case": "dense_crlf-49",
+          "before_p50_ns": 2536965,
+          "after_p50_ns": 2711085,
+          "changes_percent": {
+            "p50": 6.863318965772103,
+            "mean": 6.7341388915870715,
+            "p95": 6.614189207647603,
+            "p99": 1.5616580170423333,
+            "throughput": -6.309264272443449
+          },
+          "adverse_over_5_percent": true
+        },
+        {
+          "repeat": "followup-r1",
+          "case": "sparse_crlf-1024",
+          "before_p50_ns": 343902,
+          "after_p50_ns": 345851,
+          "changes_percent": {
+            "p50": 0.566731219940575,
+            "mean": 1.1739712479540643,
+            "p95": 1.0651790152021556,
+            "p99": 14.111554785666813,
+            "throughput": -1.1603490833397512
+          },
+          "adverse_over_5_percent": true
+        }
+      ],
+      "drift": [],
+      "rss": []
+    }
+  },
+  "disposition": {
+    "initial_sparse_65536": "Initial R1 median +38.39%, R2 -7.97% and candidate drift -38.48% make that initial comparison unstable; the longer posthoc repeat gives +2.08%/-2.03% without drift flags. Initial results retained, not attributed conclusively to noise.",
+    "dense_49": "Follow-up R1 p50 +6.86%, mean +6.73%, p95 +6.61%, throughput -6.31%; R2 p50 +2.72%. This workload has 10000 paragraphs made of 49 CR/LF bytes. Accept the measured cost for the stable ordinary-export p50 reduction of 3.92-8.87% and reduced instructions; do not claim universal newline improvement.",
+    "tails": "Initial all-CR1024, dense49 and sparse1024 adverse tails retained; follow-up sparse1024 R1 p99 +14.11% versus R2 -2.74%. No newline-tail improvement or regression-free claim.",
+    "memory": "No paired whole-child RSS adverse flag. Stack-filtered allocations remain one per export and rounded peak heap is unchanged; no peak-memory improvement claim."
+  },
+  "scope": "6000 primary native samples;18000 initial public guardrail;36000 posthoc longer public guardrail;6050 instrumented exports excluded from native comparisons",
+  "priority": "Finish this batch, then OLE2/OOXML first; further ODF optimization deferred until full OLE2/OOXML goal complete."
+}

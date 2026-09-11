@@ -1,0 +1,43 @@
+reading file "/tmp/litchi-goal-0510/after/heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-goal-0510/after/litchi-perf-baseline --case odt_semantic_text_to_sink --semantic-shape large --warmup 0 --samples 20 --json /home/zhuhe/code/litchi/docs/performance/results/change-0510/after/heaptrack-report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0510/after/heaptrack-catalog.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+20 calls to allocation functions with 0B peak consumption from
+_RNvMs4_NtCslNYArtu3iFV_5alloc7raw_vecNtB5_11RawVecInner11finish_growB7_
+  in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+20 calls with 0B peak consumption from:
+    _RNvMNtCslNYArtu3iFV_5alloc6stringNtB2_6String11try_reserve
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    litchi_odt::elements::text::append_sink_precharged::hafa1c4b73554366f
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    litchi_odt::elements::text::write_text_blocks_to_writer::h800573da2a416183
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    litchi_odt::elements::text::codec::Elements::write_text_to::hdf0bf07a26adf456
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    litchi_perf_baseline::run_case_with_config::heb566ecfd6ebe590
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    litchi_perf_baseline::run::hecbbeeb11584de5f
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    litchi_perf_baseline::main::hdd047343651d116c
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    std::sys::backtrace::__rust_begin_short_backtrace::h905b1b1d261b37d9
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    _ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$17h930bf2da5dfe7b6dE.llvm.16387318710088772729
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    _RNvNtCsjrHSEGnQ3l9_3std2rt19lang_start_internal
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+    main
+      in /tmp/litchi-goal-0510/after/litchi-perf-baseline
+
+
+PEAK MEMORY CONSUMERS
+
+MOST TEMPORARY ALLOCATIONS
+
+total runtime: 0.32s.
+calls to allocation functions: 362178 (1124776/s)
+temporary memory allocations: 50244 (156037/s)
+peak heap memory consumption: 9.91M
+peak RSS (including heaptrack overhead): 32.18M
+total memory leaked: 544B

@@ -1,0 +1,18 @@
+{
+  "decision": "trial first-CR hybrid; final retention conditional on matched export and newline guardrails",
+  "recorded_utc": "2026-09-11T19:00:46.751755+00:00",
+  "fresh_control_binary_sha256": "4808a9d6e1d0f1c5c1aa903f1c88ff7713d41584a1a920336e2d99c862ebeb24",
+  "fresh_callgrind_instruction_references": 298831445,
+  "normalized_length_exclusive_references": 28350000,
+  "rejected_candidates": [
+    "unconditional memchr iterator: up to+672.3percent helper median on denseCR",
+    "unconditional memmem iterator: up to+754.3percent helper median on denseCRLF"
+  ],
+  "selected_candidate": "after unchanged UTF8 validation, memchr finds firstCR; absent returns exactrawlen, otherwise unchangedscalarloop startsatfirstCR",
+  "unresolved_helper_flags": [
+    "tiny denseCRLF+33.3percent",
+    "large sparseCRLF+8.4percent"
+  ],
+  "guardrail": "nine publicexport newline cases; frozen controlbinary andexactpreflightsbeforeediting; CountSink timingdistinctfromhashingbaseline",
+  "source_changes_before_admission": false
+}

@@ -1,0 +1,24 @@
+{
+  "before": {
+    "callgrind_instruction_references": 298831445,
+    "append_sink_precharged_allocations": 20,
+    "callgrind_export_samples": 5,
+    "heaptrack_export_samples": 20
+  },
+  "after": {
+    "callgrind_instruction_references": 275608266,
+    "append_sink_precharged_allocations": 20,
+    "callgrind_export_samples": 5,
+    "heaptrack_export_samples": 20
+  },
+  "callgrind_change_percent": -7.771330423409761,
+  "helper_exclusive_references": {
+    "before": 28350000,
+    "after": 1600000
+  },
+  "helper_inclusive_references": {
+    "before": 35537500,
+    "after": 12287500
+  },
+  "scope": "Callgrind collection toggled only under ODT sink parser including checking SHA sink; simulated instructions, not hardware cycles. Heaptrack whole-child peak rounds to9.91MB both; no peak-memory reduction claim."
+}

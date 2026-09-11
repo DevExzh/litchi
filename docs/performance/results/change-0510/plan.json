@@ -1,0 +1,18 @@
+{
+  "base_revision": "869bbc3ed470453b8324893180360a2d69e7c315",
+  "previous_turn": "progress: committed869bbc3ed; verifiedsource/profilebindings",
+  "candidate": "replace full-byte scalar CRLF length walk with existing bounded memchr iteration; preserve UTF8 validation and typederrorprecharge",
+  "admission_evidence": "change-0509/after/callgrind.out; source-manifest andbinarybindings match currentHEAD; normalized_xml10_decoded_len28.35M exclusive instructions9.49percent",
+  "required": [
+    "controlbinary retained beforeediting",
+    "exact differential decoderlength/errorparity",
+    "matchedunchangedharness native timing andinstructionprofile",
+    "allocation/resource/errorboundaries preserved",
+    "review flags over5percent",
+    "scoped gates,committed raw evidence andscratchcleanup"
+  ],
+  "goal_status": "active",
+  "fresh_environment_change": "perf_event_paranoid now1; cycles/instructions probe succeeds; add matched whole-child perfstat andnative sampling to Callgrind/helperdiagnostics",
+  "algorithm_selection": "compare scalar, CRiterator, CRLFfinder, firstCRprefix before production edit",
+  "user_priority_after_this_batch": "OLE2 and OOXML optimization first; defer further ODF work until that goal is complete"
+}

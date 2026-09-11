@@ -1,0 +1,10 @@
+{
+  "command": [
+    "perf",
+    "stat",
+    "-e",
+    "cycles,instructions",
+    "/bin/true"
+  ],
+  "exit_code": 0
+}

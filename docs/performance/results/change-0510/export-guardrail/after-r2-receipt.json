@@ -1,0 +1,26 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0510/after/export-guardrail",
+    "500"
+  ],
+  "started_utc": "2026-09-11T19:20:13.412390+00:00",
+  "elapsed_seconds": 9.771490546998393,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "binary_sha256": "5ed9492102742e4e84d53f35dfe0a92e4e6d55db07617d936df77187e06df12b",
+  "build_receipt_sha256": "0a558a29124cca650f1eec203018262537ed929f8d2436988e73f9420452d296",
+  "library_source_manifest_sha256": "6f453fbf386665b174abc108b4a60e35fdc34922782fdc4dbd57af486dc2356a",
+  "samples_per_case": 500,
+  "warmups": 10,
+  "cpu_affinity": [
+    2
+  ],
+  "scope": "public export to zero-retaining byte-counting sink; opening and exact byte checks outside timer; no timed hashing",
+  "artifacts": {
+    "after-r2.csv": "ea58fc763674af5eba6c73a8dbc61b3d92460fa5f4b76dec4dc3d01a7ba815aa",
+    "after-r2.log": "2976f3a84c4e37ebfb7b32718b1ccb6a1bed283c3a6f87b866bd337579229465"
+  }
+}

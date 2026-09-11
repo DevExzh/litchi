@@ -1,5 +1,16 @@
 # Performance hotspot inventory
 
+## Current priority after 0510: OLE2 and OOXML
+
+Per the user's September 11 instruction, prioritize OLE2 and OOXML performance
+until their full optimization goal is complete. Further ODF optimization is
+deferred until then. This overrides the ordering of older entries below.
+The initial investigation order is CFB/OLE2 chain and validation costs, dense
+XLSX commit/save costs, then DOCX provider and publication costs. These three
+investigations are not a completion checklist. The broader requirements and
+outstanding coverage remain open; iWork remains outside this workstream.
+See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
+
 ## 0509: ODT sink allocation churn reduced
 
 [0509](changes/0509-odt-sink-buffer-reuse.md) profiles and removes repeated

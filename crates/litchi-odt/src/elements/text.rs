@@ -1945,8 +1945,11 @@ impl SinkTextBudget {
 fn normalized_xml10_decoded_len(raw: &[u8], context: &str) -> Result<usize> {
     std::str::from_utf8(raw)
         .map_err(|error| Error::InvalidFormat(format!("invalid ODF {context}: {error}")))?;
+    let Some(first_cr) = memchr::memchr(b'\r', raw) else {
+        return Ok(raw.len());
+    };
     let mut length = raw.len();
-    let mut index = 0;
+    let mut index = first_cr;
     while index < raw.len() {
         if raw[index] == b'\r' {
             if raw.get(index + 1) == Some(&b'\n') {
@@ -3187,6 +3190,124 @@ mod tests {
         assert!(matches!(error, TextOutputError::Sink { .. }));
         assert!(pending.reusable.is_none());
         assert_eq!(pending.next_emit, 0);
+    }
+
+    fn scalar_normalized_xml10_decoded_len(raw: &[u8], context: &str) -> Result<usize> {
+        std::str::from_utf8(raw)
+            .map_err(|error| Error::InvalidFormat(format!("invalid ODF {context}: {error}")))?;
+        let mut length = raw.len();
+        let mut index = 0;
+        while index < raw.len() {
+            if raw[index] == b'\r' {
+                if raw.get(index + 1) == Some(&b'\n') {
+                    length = length.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("ODF text size overflow".to_string())
+                    })?;
+                    index += 2;
+                } else {
+                    index += 1;
+                }
+            } else {
+                index += 1;
+            }
+        }
+        Ok(length)
+    }
+
+    fn assert_normalized_len_matches_scalar(raw: &[u8], context: &str) {
+        let expected = scalar_normalized_xml10_decoded_len(raw, context);
+        let actual = normalized_xml10_decoded_len(raw, context);
+        match (expected, actual) {
+            (Ok(expected), Ok(actual)) => assert_eq!(actual, expected, "input: {raw:?}"),
+            (Err(expected), Err(actual)) => {
+                assert_eq!(actual.to_string(), expected.to_string(), "input: {raw:?}");
+            },
+            (expected, actual) => {
+                panic!("optimized/scalar result mismatch for {raw:?}: {expected:?} vs {actual:?}")
+            },
+        }
+    }
+
+    #[test]
+    fn normalized_xml10_length_matches_scalar_adversarial_and_deterministic_inputs() {
+        let adversarial: &[&[u8]] = &[
+            b"",
+            b"a",
+            b"\r",
+            b"\n",
+            b"\r\n",
+            b"\r\r\n",
+            b"\n\r\n",
+            b"\r\n\r\n",
+            b"a\r\nb",
+            "é\r\n文\r🙂".as_bytes(),
+            &[0xff],
+            &[b'a', 0xff, b'\r', b'\n'],
+            &[0xc3],
+            &[0xe2, 0x82, b'\r', b'\n'],
+        ];
+        for raw in adversarial {
+            assert_normalized_len_matches_scalar(raw, "text content");
+            assert_normalized_len_matches_scalar(raw, "text CDATA");
+        }
+
+        let mut state = 0x51_05_9e_u32;
+        for length in 0..256 {
+            let mut raw = Vec::with_capacity(length);
+            for _ in 0..length {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                raw.push((state >> 24) as u8);
+            }
+            assert_normalized_len_matches_scalar(&raw, "deterministic arbitrary");
+        }
+
+        let alphabet = ["a", "\r", "\n", "é", "文", "🙂"];
+        for length in 0..256 {
+            let mut value = String::new();
+            for _ in 0..length {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                value.push_str(alphabet[(state as usize) % alphabet.len()]);
+            }
+            assert_normalized_len_matches_scalar(value.as_bytes(), "deterministic valid");
+        }
+
+        for context in ["text content", "text CDATA"] {
+            let error = normalized_xml10_decoded_len(&[0xff], context)
+                .unwrap_err()
+                .to_string();
+            assert!(
+                error.starts_with(&format!("Invalid format: invalid ODF {context}:")),
+                "unexpected error context: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn normalized_xml10_length_matches_quick_xml_text_and_cdata() {
+        let values = [
+            "",
+            "a",
+            "\r",
+            "\n",
+            "\r\n",
+            "\r\r\n",
+            "é\r\n",
+            "\r\n文",
+            "a\r\n🙂\rb",
+        ];
+        for value in values {
+            let expected = normalized_xml10_decoded_len(value.as_bytes(), "text content").unwrap();
+            let text = quick_xml::events::BytesText::from_escaped(value)
+                .xml_content(XmlVersion::Explicit1_0)
+                .unwrap();
+            assert_eq!(text.len(), expected, "text input: {value:?}");
+
+            let expected = normalized_xml10_decoded_len(value.as_bytes(), "text CDATA").unwrap();
+            let cdata = quick_xml::events::BytesCData::new(value)
+                .xml_content(XmlVersion::Explicit1_0)
+                .unwrap();
+            assert_eq!(cdata.len(), expected, "CDATA input: {value:?}");
+        }
     }
 
     // ========== Paragraph Tests ==========

@@ -1,0 +1,64 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu/cycles/P'
+# Event count (approx.): 9246497454
+#
+# Overhead  Command          Shared Object         Symbol                                                                                         
+# ........  ...............  ....................  ...............................................................................................
+#
+    28.29%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odt::elements::text::write_text_blocks_to_writer
+            |
+            ---litchi_odt::elements::text::write_text_blocks_to_writer
+
+    13.32%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write
+            |
+            ---<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write
+
+    10.35%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odt::elements::text::normalized_xml10_decoded_len
+            |
+            ---litchi_odt::elements::text::normalized_xml10_decoded_len
+
+     6.81%  litchi-perf-bas  litchi-perf-baseline  [.] quick_xml::reader::Reader<R>::read_event_impl
+            |
+            ---quick_xml::reader::Reader<R>::read_event_impl
+
+     5.83%  litchi-perf-bas  litchi-perf-baseline  [.] sha2::sha256::x86_sha::compress
+            |
+            ---sha2::sha256::x86_sha::compress
+               |          
+                --4.51%--0x8000000000000012
+                          0x2222222222222221
+
+     3.35%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_odt::elements::text::PendingSinkBlocks::recycle
+            |
+            ---litchi_odt::elements::text::PendingSinkBlocks::recycle
+
+     2.97%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+               0x2727272727272726
+               quick_xml::reader::Reader<R>::read_event_impl
+               |          
+                --2.39%--0x3
+
+     2.68%  litchi-perf-bas  litchi-perf-baseline  [.] core::str::converts::from_utf8
+            |
+            ---core::str::converts::from_utf8
+
+     2.20%  litchi-perf-bas  litchi-perf-baseline  [.] memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+            |
+            ---memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+               0x3c3c3c3c3c3c3c3b
+
+     1.53%  litchi-perf-bas  litchi-perf-baseline  [.] quick_xml::reader::state::ReaderState::emit_end
+            |
+            ---quick_xml::reader::state::ReaderState::emit_end
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

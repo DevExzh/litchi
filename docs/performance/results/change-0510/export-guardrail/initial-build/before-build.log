@@ -1,0 +1,24 @@
+error[E0277]: the trait bound `Array<u8, UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>>: LowerHex` is not satisfied
+  --> /home/zhuhe/code/litchi/docs/performance/results/change-0510/export-guardrail/probe.rs:25:21
+   |
+25 |     format!("{:x}", Sha256::digest(bytes))
+   |              ----   ^^^^^^^^^^^^^^^^^^^^^ the trait `LowerHex` is not implemented for `Array<u8, UInt<UInt<UInt<UInt<UInt<..., ...>, ...>, ...>, ...>, ...>>`
+   |              |
+   |              required by this formatting parameter
+   |
+   = help: the following other types implement trait `LowerHex`:
+             &T
+             &mut T
+             Saturating<T>
+             Wrapping<T>
+             base16ct::display::HexDisplay<'_>
+             crypto_bigint::limb::Limb
+             crypto_bigint::non_zero::NonZero<T>
+             crypto_bigint::uint::Uint<LIMBS>
+           and 34 others
+   = note: the full name for the type has been written to '/tmp/litchi-goal-0510/before/export-guardrail.long-type-18371809938310101938.txt'
+   = note: consider using `--verbose` to print the full type name to the console
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0277`.

@@ -1,0 +1,35 @@
+{
+  "command": [
+    "heaptrack",
+    "-o",
+    "/tmp/litchi-goal-0510/after/heaptrack",
+    "/tmp/litchi-goal-0510/after/litchi-perf-baseline",
+    "--case",
+    "odt_semantic_text_to_sink",
+    "--semantic-shape",
+    "large",
+    "--warmup",
+    "0",
+    "--samples",
+    "20",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0510/after/heaptrack-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0510/after/heaptrack-catalog.json"
+  ],
+  "started_utc": "2026-09-11T19:04:07.864356+00:00",
+  "host_loadavg_before": "2.51 2.90 3.78 3/1232 1867611",
+  "host_loadavg_after": "2.51 2.90 3.78 3/1229 1867683",
+  "elapsed_seconds": 0.5444616919994587,
+  "exit_code": 0,
+  "binary_sha256": "6e25e32d926756354de400bd089ea3ecdb214e338bbf8831d452ad7305407eab",
+  "build_receipt_sha256": "0bfb5a7f2755254ccd60fc17da294546e242ffe61f72d41b440374cfe69a45eb",
+  "source_manifest_sha256": "6f453fbf386665b174abc108b4a60e35fdc34922782fdc4dbd57af486dc2356a",
+  "current_source_unchanged": true,
+  "scope": "instrumented, excluded from latency comparison",
+  "artifacts": {
+    "heaptrack.log": "0213f5412ebd5256174867dcbd6e39d7d14bce6f915b12d3c67c60a17b933879",
+    "heaptrack-report.json": "d23ba1c0de9eada9471966e1209a63abbe042b009d640e58d93f98e5baaa8132",
+    "heaptrack-catalog.json": "1eafa1db41581443108b76dd3e10f5660d314f72ecfdf37cab943937ec228316"
+  }
+}

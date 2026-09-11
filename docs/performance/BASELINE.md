@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0510: ODT decoded-length fast path with newline tradeoffs
+
+[0510](changes/0510-odt-crlf-length-fast-path.md) keeps UTF-8 validation and
+uses one first-CR search before the existing scalar normalization walk.
+Primary export medians improve 3.92–8.87%; scoped Callgrind references fall
+7.77%. The 60,000 native samples include a longer newline guardrail that
+retains dense-small p50 +6.86%/+2.72% and sparse-medium R1 p99 +14.11% flags.
+These tradeoffs are explicit in the admission record. Whole-child RSS has
+no >5% adverse pair; no peak-memory or universal newline improvement is
+claimed. All 1,495 Rust tests/doctests pass with one existing test ignored.
+After this batch OLE2/OOXML takes priority; further ODF work is deferred until
+that full optimization goal is complete. The broader goal remains active.
+
 ## 0509: matched ODT sink allocation reduction
 
 [0509](changes/0509-odt-sink-buffer-reuse.md) uses the unchanged ODT export
