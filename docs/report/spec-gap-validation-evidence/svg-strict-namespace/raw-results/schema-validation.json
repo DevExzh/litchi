@@ -1,0 +1,142 @@
+{
+  "passed": true,
+  "scope": "Strict PresentationML and native Strict SpreadsheetDrawing core XSDs with direct unmodified MS-ODRAWXML 5.24 child validation; no native Office acceptance or rendering proof",
+  "strict_ecma_archive_sha256": "9d0bcad9cf06054785b03762fcfadbf6bab7e54a5f9d69434e34b7fd464d4129",
+  "transitional_ecma_archive_sha256": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd",
+  "ms_odrawxml_5_24_schema_sha256": "30ae3393d282bb2f66291e17bf37db3ac98f574f3c4b0443ff449fe3c1067736",
+  "ms_schema_namespace_policy": "unmodified target/a/r namespace values; relative import locations only mapped to vendored Transitional members",
+  "strict_schema_members": [
+    "pml.xsd",
+    "dml-main.xsd",
+    "dml-spreadsheetDrawing.xsd"
+  ],
+  "ms_schema_import_members": [
+    "dml-main.xsd",
+    "shared-relationshipReference.xsd"
+  ],
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "native_xlsx_control": {
+    "fixture": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+    "fixture_sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+    "fixture_member": "xl/drawings/drawing1.xml",
+    "fixture_member_sha256": "c9d4149c14d847d4979239fc9771de0f34383c5e01ee505e270aea1bce05ffe8",
+    "output_sha256": "bbf330c74da578bf78b565388c713c5001ef506b4876283f1d8117d6ad96c9f7",
+    "output_path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/xlsx-mixed-strict.xml"
+  },
+  "reports": [
+    {
+      "kind": "strict-presentation-slide",
+      "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-source.xml",
+      "sha256": "834eab5f9254eacbe576d34632356220a40ca353eef80bed4ee13aa4c39e957d",
+      "bytes": 946,
+      "core_strict_xsd_valid": true,
+      "core_namespace_bindings": {
+        "p": "http://purl.oclc.org/ooxml/presentationml/main",
+        "a": "http://purl.oclc.org/ooxml/drawingml/main",
+        "r": "http://purl.oclc.org/ooxml/officeDocument/relationships"
+      },
+      "physical_relationship_types": [
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/image"
+      ],
+      "svg_owners": []
+    },
+    {
+      "kind": "strict-presentation-slide",
+      "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-attached.xml",
+      "sha256": "9f19321517077475c310ea613deb000a105fd963a8793a4b01c006db32be3894",
+      "bytes": 1187,
+      "core_strict_xsd_valid": true,
+      "core_namespace_bindings": {
+        "p": "http://purl.oclc.org/ooxml/presentationml/main",
+        "a": "http://purl.oclc.org/ooxml/drawingml/main",
+        "r": "http://purl.oclc.org/ooxml/officeDocument/relationships"
+      },
+      "physical_relationship_types": [
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/image",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/image"
+      ],
+      "svg_owners": [
+        {
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rIdSvg"
+          },
+          "relationship_attribute_namespace": {
+            "embed": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "link": null
+          }
+        }
+      ]
+    },
+    {
+      "kind": "strict-presentation-slide",
+      "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/strict-detached.xml",
+      "sha256": "834eab5f9254eacbe576d34632356220a40ca353eef80bed4ee13aa4c39e957d",
+      "bytes": 946,
+      "core_strict_xsd_valid": true,
+      "core_namespace_bindings": {
+        "p": "http://purl.oclc.org/ooxml/presentationml/main",
+        "a": "http://purl.oclc.org/ooxml/drawingml/main",
+        "r": "http://purl.oclc.org/ooxml/officeDocument/relationships"
+      },
+      "physical_relationship_types": [
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/image"
+      ],
+      "svg_owners": []
+    },
+    {
+      "kind": "direct-ms-odrawxml-svg-child",
+      "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-transitional-valid.xml",
+      "sha256": "0cd6a1992c60095be6a37b74babd46e324b7bf140ab9156710e629a9a1ba9123",
+      "bytes": 181,
+      "schema_valid": true,
+      "expected_valid": true,
+      "error": null
+    },
+    {
+      "kind": "direct-ms-odrawxml-svg-child",
+      "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/direct-strict-invalid.xml",
+      "sha256": "768890e5a57e3d0867317a2810392411dc87d90f1be7ee02ed0c53d159107b9b",
+      "bytes": 169,
+      "schema_valid": false,
+      "expected_valid": false,
+      "error": "<string>:1:0:ERROR:SCHEMASV:SCHEMAV_CVC_COMPLEX_TYPE_3_2_1: Element '{http://schemas.microsoft.com/office/drawing/2016/SVG/main}svgBlip', attribute '{http://purl.oclc.org/ooxml/officeDocument/relationships}embed': The attribute '{http://purl.oclc.org/ooxml/officeDocument/relationships}embed' is not allowed."
+    },
+    {
+      "kind": "strict-native-xlsx-mixed-namespace-drawing",
+      "path": "docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs/xlsx-mixed-strict.xml",
+      "sha256": "bbf330c74da578bf78b565388c713c5001ef506b4876283f1d8117d6ad96c9f7",
+      "bytes": 2816,
+      "core_strict_xsd_valid": true,
+      "anchor_counts": {
+        "twoCellAnchor": 2,
+        "oneCellAnchor": 0,
+        "absoluteAnchor": 0
+      },
+      "svg_owners": [
+        {
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          },
+          "relationship_attribute_namespace": {
+            "embed": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "link": null
+          }
+        },
+        {
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          },
+          "relationship_attribute_namespace": {
+            "embed": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "link": null
+          }
+        }
+      ]
+    }
+  ]
+}

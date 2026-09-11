@@ -24,6 +24,7 @@ const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relatio
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 const STRICT_DRAWINGML: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+const STRICT_IMAGE: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/image";
 const SVG_NS: &str = "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
 const SVG_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 const SLIDE: &str = "/ppt/slides/slide1.xml";
@@ -163,6 +164,28 @@ fn package_from_namespace_variant(default_drawing: bool, strict: bool) -> Vec<u8
         true,
         false,
     )
+}
+
+fn package_from_strict_raster() -> Vec<u8> {
+    let slide = String::from_utf8(raster_slide_xml(false, false))
+        .unwrap()
+        .replace(PML, STRICT_PML)
+        .replace(DRAWINGML, STRICT_DRAWINGML)
+        .replace(REL, STRICT_REL)
+        .into_bytes();
+    let mut package = OpcPackage::from_bytes(&source_package(slide, false, false)).unwrap();
+    let slide = package.get_part_mut(&PackURI::new(SLIDE).unwrap()).unwrap();
+    slide.rels_mut().remove("rIdRaster");
+    slide
+        .rels_mut()
+        .try_add_relationship(
+            rt::STRICT_IMAGE.to_owned(),
+            "../media/raster.png".to_owned(),
+            "rIdRaster".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
 }
 
 fn foreign_nested_picture_package() -> Vec<u8> {
@@ -1526,6 +1549,103 @@ fn custom_inherited_namespaces_default_drawingml_and_strict_dialect_round_trip()
             "{label} readback must retain the raster picture"
         );
     }
+}
+
+#[test]
+fn strict_host_attach_uses_transitional_svg_attribute_namespace_and_strict_core_relationships() {
+    let source = package_from_strict_raster();
+    let source_slide = slide_member(&source);
+    let source_relationships = slide_relationships_member(&source);
+    assert!(
+        source_slide
+            .windows(STRICT_REL.len())
+            .any(|window| { window == STRICT_REL.as_bytes() })
+    );
+    let source_relationships_text = String::from_utf8(source_relationships.clone()).unwrap();
+    assert!(source_relationships_text.contains(&format!(
+        r#"Type="{STRICT_IMAGE}" Target="../media/raster.png""#
+    )));
+
+    let presentation =
+        SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+            .unwrap();
+    assert!(
+        presentation.slide(0).unwrap().images().unwrap()[0]
+            .svg()
+            .is_none()
+    );
+
+    let editor = open_editor(&source);
+    let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
+    assert_eq!(edit.source().raster_relationship_type(), rt::STRICT_IMAGE);
+    assert!(edit.attach_svg(NEW_SVG).unwrap());
+    let commit = edit.commit_checked().unwrap();
+    assert_eq!(
+        commit.snapshot().svg().unwrap().relationship_type(),
+        rt::STRICT_IMAGE,
+        "the physical SVG relationship keeps the host package's Strict image type"
+    );
+    let inverse = commit.patch().inverse();
+    let restored = inverse.apply(commit.snapshot()).unwrap();
+    assert!(restored.svg().is_none());
+
+    let mut attached = Vec::new();
+    editor
+        .publish_svg_attachment_commit_to_stream(&mut attached, &commit)
+        .unwrap();
+    let attached_slide = String::from_utf8(slide_member(&attached)).unwrap();
+    assert!(attached_slide.contains(&format!(
+        r#"<asvg:svgBlip xmlns:asvg="{SVG_NS}" xmlns:r="{REL}" r:embed="rIdSvg"/>"#
+    )));
+    assert!(attached_slide.contains(&format!(r#"xmlns:r="{STRICT_REL}""#)));
+    assert!(attached_slide.contains(r#"r:embed="rIdRaster""#));
+    let attached_relationships = String::from_utf8(slide_relationships_member(&attached)).unwrap();
+    assert!(attached_relationships.contains(&format!(
+        r#"Type="{STRICT_IMAGE}" Target="../media/raster.png""#
+    )));
+    assert!(attached_relationships.contains(&format!(
+        r#"Type="{STRICT_IMAGE}" Target="../media/vector.svg""#
+    )));
+    assert!(!attached_relationships.contains(&format!(
+        r#"Type="{REL}/image" Target="../media/vector.svg""#
+    )));
+
+    let reopened =
+        SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(attached.clone())))
+            .unwrap();
+    assert_eq!(
+        reopened.slide(0).unwrap().images().unwrap()[0]
+            .svg()
+            .unwrap()
+            .relationship_id(),
+        "rIdSvg"
+    );
+
+    let reopened_editor = open_editor(&attached);
+    let mut detach = reopened_editor.edit_svg_attachment(0, 0).unwrap();
+    assert!(detach.detach().unwrap());
+    let detach_commit = detach.commit_checked().unwrap();
+    let detach_inverse = detach_commit.patch().inverse();
+    let restored_attached = detach_inverse.apply(detach_commit.snapshot()).unwrap();
+    assert!(restored_attached.svg().is_some());
+    let mut detached = Vec::new();
+    reopened_editor
+        .publish_svg_attachment_commit_to_stream(&mut detached, &detach_commit)
+        .unwrap();
+    assert_eq!(slide_member(&detached), source_slide);
+    assert_eq!(slide_relationships_member(&detached), source_relationships);
+    assert_eq!(
+        physical_member(&detached, RASTER),
+        physical_member(&source, RASTER)
+    );
+    assert_eq!(
+        physical_member(&detached, OPAQUE),
+        physical_member(&source, OPAQUE)
+    );
+    assert_eq!(
+        physical_member_names(&detached),
+        physical_member_names(&source)
+    );
 }
 
 #[test]

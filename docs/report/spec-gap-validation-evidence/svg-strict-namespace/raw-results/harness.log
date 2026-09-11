@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running `target/debug/svg-strict-namespace-evidence docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/outputs/source.pptx docs/report/spec-gap-validation-evidence/svg-strict-namespace/outputs`
+passed strict package conversion, Transitional SVG attribute proof, ordinary attach/commit/save/reopen/detach/inverse, Strict physical relationship preservation, and exact detached restoration
