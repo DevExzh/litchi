@@ -17,6 +17,15 @@ use super::{
     MAX_SOURCE_BYTES, MAX_TOKEN_BYTES, SourceSpan,
 };
 
+#[path = "actions_edit.rs"]
+pub mod edit;
+
+pub use edit::{
+    ActionDataDraft, ActionDraft, ActionGroupDraft, ActionParent, ActionSelector, ChildSelector,
+    Commit, DataChildDraft, DataGroupDraft, DataSelector, Draft, Edit, Limits, OpaquePayload,
+    Patch, Prepared, PropertyDraft,
+};
+
 /// Maximum action records retained by one action part.
 pub const MAX_ACTIONS: usize = 65_536;
 /// Maximum action-group records retained by one action part.
