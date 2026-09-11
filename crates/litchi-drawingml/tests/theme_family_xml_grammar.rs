@@ -161,3 +161,61 @@ fn namespace_prefix_byte_limit_covers_declarations_elements_and_attributes() {
         );
     }
 }
+
+#[test]
+fn inherited_namespace_decoration_respects_fragment_output_limit() {
+    use litchi_drawingml::theme::family::{MAX_XML_BYTES, NAMESPACE};
+    let opening = format!(
+        r#"<f:themeFamily xmlns:f="{NAMESPACE}" name="A" id="{{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}}" vid="{{4A3C46E8-61CC-4603-A589-7422A47A8E4A}}"><!--"#
+    );
+    let closing = "--></f:themeFamily>";
+    let inherited = r#" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main""#;
+    let padding = MAX_XML_BYTES - opening.len() - closing.len() - inherited.len();
+    for extra in [0, 1] {
+        let fragment = format!("{opening}{}{closing}", "x".repeat(padding + extra));
+        assert!(fragment.len() < MAX_XML_BYTES);
+        let source = theme(&format!(
+            r#"<a:extLst><a:ext uri="{}">{fragment}</a:ext></a:extLst>"#,
+            part::EXTENSION_URI
+        ));
+        if extra == 0 {
+            assert!(
+                part::read(source.as_bytes()).is_ok(),
+                "exact decorated bound"
+            );
+        } else {
+            let error = part::read(source.as_bytes()).expect_err("decoration exceeds bound");
+            assert!(
+                error
+                    .to_string()
+                    .contains("decorated Theme Family XML bytes"),
+                "{error}"
+            );
+        }
+    }
+}
+
+#[test]
+fn insertion_wrappers_obey_exact_complete_part_output_limit() {
+    let family = Family::new(
+        "Added & escaped",
+        "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+        "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}",
+    )
+    .expect("valid family");
+    for body in [
+        String::new(),
+        "<a:extLst/>".to_owned(),
+        format!(
+            r#"<a:extLst><a:ext uri="{}"/></a:extLst>"#,
+            part::EXTENSION_URI
+        ),
+    ] {
+        let source = theme(&body);
+        let output = part::add_family(source.as_bytes(), &family).expect("unbounded insertion");
+        let exact = part::add_family_with_limit(source.as_bytes(), &family, output.len())
+            .expect("exact output limit");
+        assert_eq!(output, exact);
+        assert!(part::add_family_with_limit(source.as_bytes(), &family, output.len() - 1).is_err());
+    }
+}
