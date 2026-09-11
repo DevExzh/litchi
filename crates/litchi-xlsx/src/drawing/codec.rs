@@ -34,6 +34,7 @@ const STRICT_SPREADSHEET_DRAWING_NAMESPACE: &[u8] =
 const MAX_DRAWING_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DRAWING_ANCHORS: usize = 100_000;
 const MAX_DRAWING_DEPTH: usize = 256;
+const MAX_DRAWING_EVENTS: usize = 1_000_000;
 const MAX_MARKER_TEXT_BYTES: usize = 64;
 const MAX_STRING_BYTES: usize = 1024 * 1024;
 
@@ -236,10 +237,12 @@ struct Parser {
     drawing: Drawing,
     anchor: Option<PendingAnchor>,
     marker_text: String,
+    max_depth: usize,
+    max_events: usize,
 }
 
 impl Parser {
-    fn parse(xml: &str) -> Result<Option<Drawing>> {
+    fn parse(xml: &str, max_depth: usize, max_events: usize) -> Result<Option<Drawing>> {
         let mut reader = NsReader::from_reader(xml.as_bytes());
         reader.config_mut().trim_text(false);
         reader.config_mut().check_end_names = true;
@@ -247,10 +250,19 @@ impl Parser {
             drawing: Drawing::default(),
             anchor: None,
             marker_text: String::new(),
+            max_depth,
+            max_events,
         };
         let mut stack = Vec::new();
         let mut closed_root = false;
+        let mut events = 0usize;
         loop {
+            events = events
+                .checked_add(1)
+                .ok_or_else(|| limit("drawing XML event count"))?;
+            if events > parser.max_events {
+                return Err(limit("drawing XML event count"));
+            }
             let decoder = reader.decoder();
             let event = reader
                 .read_event()
@@ -260,15 +272,17 @@ impl Parser {
             let (namespace, event) = resolver.resolve_event(event);
             match event {
                 Event::Start(element) if stack.is_empty() => {
+                    check_context_depth(stack.len(), parser.max_depth)?;
                     if closed_root {
                         return Err(invalid("drawing XML contains multiple root elements"));
                     }
                     if !is_spreadsheet_drawing_name(&namespace, element.name(), b"wsDr") {
                         return Ok(None);
                     }
-                    push_context(&mut stack, Context::Root)?;
+                    push_context(&mut stack, Context::Root, parser.max_depth)?;
                 },
                 Event::Empty(element) if stack.is_empty() => {
+                    check_context_depth(stack.len(), parser.max_depth)?;
                     if closed_root {
                         return Err(invalid("drawing XML contains multiple root elements"));
                     }
@@ -278,13 +292,15 @@ impl Parser {
                     return Ok(Some(parser.drawing));
                 },
                 Event::Start(element) => {
+                    check_context_depth(stack.len(), parser.max_depth)?;
                     let parent = *stack
                         .last()
                         .ok_or_else(|| invalid("missing drawing root"))?;
                     let context = parser.start(parent, &namespace, &element, decoder, resolver)?;
-                    push_context(&mut stack, context)?;
+                    push_context(&mut stack, context, parser.max_depth)?;
                 },
                 Event::Empty(element) => {
+                    check_context_depth(stack.len(), parser.max_depth)?;
                     let parent = *stack
                         .last()
                         .ok_or_else(|| invalid("missing drawing root"))?;
@@ -833,13 +849,35 @@ impl Parser {
 }
 
 pub fn parse(xml: &str) -> Result<Option<Drawing>> {
-    if xml.len() > MAX_DRAWING_XML_BYTES {
+    parse_with_limits(xml, &litchi_opc::ReadLimits::default())
+}
+
+/// Parse a worksheet drawing under the caller's retained package read policy.
+///
+/// The MCE processor receives the same per-part, XML-event, and XML-depth
+/// ceilings that bound the typed drawing parser.  Its bounded output is then
+/// passed directly to the parser, so a selected MCE branch cannot grow beyond
+/// the caller's part budget before semantic allocations begin.
+pub(crate) fn parse_with_limits(
+    xml: &str,
+    caller: &litchi_opc::ReadLimits,
+) -> Result<Option<Drawing>> {
+    let caller_part_bytes = usize::try_from(caller.max_part_bytes()).unwrap_or(usize::MAX);
+    let max_xml_bytes = MAX_DRAWING_XML_BYTES.min(caller_part_bytes);
+    if xml.len() > max_xml_bytes {
         return Err(limit("drawing XML"));
     }
+
+    let defaults = litchi_ooxml_common::mce::Limits::default();
+    let max_events = MAX_DRAWING_EVENTS.min(caller.max_xml_events());
+    let max_depth = MAX_DRAWING_DEPTH.min(caller.max_xml_depth());
     let limits = litchi_ooxml_common::mce::Limits {
-        max_input_bytes: MAX_DRAWING_XML_BYTES,
-        max_output_bytes: MAX_DRAWING_XML_BYTES,
-        ..Default::default()
+        max_input_bytes: defaults.max_input_bytes.min(max_xml_bytes),
+        max_output_bytes: defaults.max_output_bytes.min(max_xml_bytes),
+        max_depth: defaults.max_depth.min(max_depth),
+        max_namespace_bindings: defaults.max_namespace_bindings.min(max_events),
+        max_directive_tokens: defaults.max_directive_tokens.min(max_events),
+        max_choices_per_alternate: defaults.max_choices_per_alternate.min(max_events),
     };
     let processed = litchi_ooxml_common::mce::process_markup_compatibility(
         xml.as_bytes(),
@@ -853,7 +891,7 @@ pub fn parse(xml: &str) -> Result<Option<Drawing>> {
                 .map_err(|error| Error::Invalid(format!("MCE output is not UTF-8: {error}")))?,
         ),
     };
-    Parser::parse(xml.as_ref())
+    Parser::parse(xml.as_ref(), max_depth, max_events)
 }
 
 fn compatibility_anchor(anchor: &DrawingAnchor) -> Anchor {
@@ -887,14 +925,19 @@ fn compatibility_anchor(anchor: &DrawingAnchor) -> Anchor {
     }
 }
 
-fn push_context(stack: &mut Vec<Context>, context: Context) -> Result<()> {
-    if stack.len() >= MAX_DRAWING_DEPTH {
-        return Err(limit("drawing XML depth"));
-    }
+fn push_context(stack: &mut Vec<Context>, context: Context, max_depth: usize) -> Result<()> {
+    check_context_depth(stack.len(), max_depth)?;
     stack
         .try_reserve(1)
         .map_err(|source| allocation("SpreadsheetDrawing XML context stack", source))?;
     stack.push(context);
+    Ok(())
+}
+
+fn check_context_depth(depth: usize, max_depth: usize) -> Result<()> {
+    if depth >= max_depth {
+        return Err(limit("drawing XML depth"));
+    }
     Ok(())
 }
 
@@ -1039,4 +1082,72 @@ fn limit(message: impl Into<String>) -> Error {
         "SpreadsheetDrawing {} limit exceeded",
         message.into()
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_with_limits;
+    use litchi_ooxml_common::mce::process_markup_compatibility;
+
+    const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
+    const DRAWINGML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    const RELATIONSHIPS: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    #[test]
+    fn caller_part_cap_rejects_mce_output_growth_before_typed_parse() {
+        let xml = format!(
+            r#"<xdr:wsDr xmlns:xdr="{XDR}" xmlns:a="{DRAWINGML}" xmlns:r="{RELATIONSHIPS}" xmlns:mc="{MCE}"/>"#
+        );
+        let expanded = process_markup_compatibility(
+            xml.as_bytes(),
+            &litchi_ooxml_common::mce::Capabilities::default(),
+            &litchi_ooxml_common::mce::Limits {
+                max_input_bytes: xml.len(),
+                max_output_bytes: 1024 * 1024,
+                ..Default::default()
+            },
+        )
+        .expect("test MCE input should preprocess")
+        .xml;
+        assert!(expanded.len() > xml.len());
+
+        let caller_limit = litchi_opc::ReadLimits::builder()
+            .max_part_bytes((expanded.len() - 1) as u64)
+            .expect("positive part limit")
+            .build()
+            .expect("consistent read limits");
+        assert!(xml.len() <= caller_limit.max_part_bytes() as usize);
+        assert!(parse_with_limits(&xml, &caller_limit).is_err());
+    }
+
+    #[test]
+    fn exact_part_cap_accepts_unmodified_drawing_without_mce() {
+        let xml = format!(r#"<wsDr xmlns="{XDR}"/>"#);
+        let caller_limit = litchi_opc::ReadLimits::builder()
+            .max_part_bytes(xml.len() as u64)
+            .expect("positive part limit")
+            .build()
+            .expect("consistent read limits");
+
+        let drawing = parse_with_limits(&xml, &caller_limit)
+            .expect("exact no-MCE part limit should be accepted")
+            .expect("drawing root should be present");
+        assert!(drawing.is_empty());
+    }
+
+    #[test]
+    fn depth_is_admitted_before_empty_element_semantics() {
+        let empty_root = format!(r#"<wsDr xmlns="{XDR}"/>"#);
+        assert!(super::Parser::parse(&empty_root, 0, 8).is_err());
+
+        let empty_child = format!(r#"<wsDr xmlns="{XDR}"><future/></wsDr>"#);
+        let caller_limit = litchi_opc::ReadLimits::builder()
+            .max_xml_depth(1)
+            .expect("positive depth limit")
+            .build()
+            .expect("consistent read limits");
+        assert!(parse_with_limits(&empty_child, &caller_limit).is_err());
+    }
 }
