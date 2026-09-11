@@ -1029,7 +1029,7 @@ fn validate_source_element(
         let key_name = reader.decoder().decode(key).map_err(|error| {
             invalid_source(format!("source XML attribute name is invalid: {error}"))
         })?;
-        validate_xml_qname(&key_name, "attribute")?;
+        validate_source_attribute_key(reader, attribute.key)?;
         if attribute.value.as_ref().contains(&b'<') {
             return Err(invalid_source(
                 "source XML attribute contains a literal '<'",
@@ -1086,6 +1086,34 @@ fn validate_source_element(
     Ok(())
 }
 
+/// Validate an XML attribute QName and its namespace prefix against the
+/// resolver state for the current element. Namespace declaration values are
+/// checked by the caller because they need the decoded value as well.
+///
+/// This small shared seam keeps source-backed relationship splices subject to
+/// the same QName and unbound-prefix rules as ordinary source XML ingress.
+pub(crate) fn validate_source_attribute_key(
+    reader: &NsReader<&[u8]>,
+    key: quick_xml::name::QName<'_>,
+) -> Result<()> {
+    let key_name = reader.decoder().decode(key.as_ref()).map_err(|error| {
+        invalid_source(format!("source XML attribute name is invalid: {error}"))
+    })?;
+    validate_xml_qname(&key_name, "attribute")?;
+    if key_name == "xmlns" || key_name.starts_with("xmlns:") {
+        return Ok(());
+    }
+    if matches!(
+        reader.resolver().resolve_attribute(key).0,
+        ResolveResult::Unknown(_)
+    ) {
+        return Err(invalid_source(
+            "source XML attribute uses an unbound namespace prefix",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_source_qname(reader: &NsReader<&[u8]>, raw: &[u8], kind: &str) -> Result<()> {
     let name = reader
         .decoder()
@@ -1136,7 +1164,7 @@ fn validate_xml_qname(value: &str, kind: &str) -> Result<()> {
     }
 }
 
-fn validate_namespace_binding(name: &str, value: &str) -> Result<()> {
+pub(crate) fn validate_namespace_binding(name: &str, value: &str) -> Result<()> {
     let prefix = name.strip_prefix("xmlns:");
     if name != "xmlns" && prefix.is_none_or(|prefix| !is_xml_id(prefix)) {
         return Err(invalid_source(
