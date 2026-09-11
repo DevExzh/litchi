@@ -1,0 +1,8 @@
+{
+  "docs/performance/changes/0511-cfb-fat-entry-reservation.md": "f895fe4cc34d25b7c49ea90764a5a66b4257c475b80e52d001f6083979b73d69",
+  "docs/performance/BASELINE.md": "1010abfb0795bf4a8efab84216ea77c1933c4e6563afb106bfe4e5e99753e275",
+  "docs/performance/REPORT.md": "ac79b240cba960f4ffa680bd6d92880eb1f0dcd79af61e50140659bc8ddcec3e",
+  "docs/performance/HOTSPOTS.md": "cb6148b09441d4813ecebb11239a9b574323af72988fdc73041e6234675970a5",
+  "docs/performance/GOAL_AUDIT.md": "2dc4359e56be1f17fd08f0296b9e8baa58e2edf9be18ee13cf09cea1bd046b3c",
+  "docs/performance/ADR_COMPLIANCE.md": "cf927580868d13241af6e9f7602d07fcfc234d4c50dfbb3551d93ab6d5f96aa8"
+}

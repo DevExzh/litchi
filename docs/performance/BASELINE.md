@@ -1,5 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0511: CFB FAT decoding after exact reservation
+
+[0511](changes/0511-cfb-fat-entry-reservation.md) extends complete FAT sectors
+within the existing checked fallible reservation. In 44,000 matched native
+samples, eager XLS p50 improves 14.87–17.25%, tiny CFB 8.85–11.99%, and
+few-large CFB 45.78–46.30%. Plain OwnedSource results are small and mixed;
+no blanket source-workflow gain is claimed. No paired native metric/RSS or
+drift flag crosses its review threshold. All 1,080 allocator samples retain
+identical operation counts and bytes; no memory reduction is claimed.
+Source-constructor simulated instructions fall 7.63%; whole-child hardware
+instructions fall about 4.2%, but cycles rise 0.46%/3.64%. All scopes and
+rejected initial-variant evidence remain explicit. The default matrix and
+10 registered claims are unchanged; this is a bounded OLE2 result.
+
 ## 0510: ODT decoded-length fast path with newline tradeoffs
 
 [0510](changes/0510-odt-crlf-length-fast-path.md) keeps UTF-8 validation and

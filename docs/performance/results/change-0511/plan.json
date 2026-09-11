@@ -1,0 +1,21 @@
+{
+  "base_revision": "b0b9ebb577d616a9a0ed93f16619a1b79f3b3bc7",
+  "previous_turn": "progress: committed b0b9ebb57, replay and cleanup verified",
+  "priority": "OLE2/OOXML; further ODF deferred until full OLE2/OOXML goal complete",
+  "scope": "Fresh CFB/XLS operation attribution before candidate admission",
+  "lead": "FAT entry construction still calls try_push after exact fallible reservation; profile contribution and preserve all validation",
+  "adrs": "30 previously read documents revalidated unchanged",
+  "protocol": {
+    "native": "9 XLS rows and 2 incompressible CFB rows, 1,000 samples and 20 warmups; serial ABBA on CPU 2 separately by family",
+    "allocation": "9 XLS rows, 30 samples and 3 warmups; separate allocator binaries; serial ABBA; elapsed excluded",
+    "hardware": "4 grouped whole-child perf stat captures, each with 1,000 plain OwnedSource open/one-cell operations and no warmups; instrumented elapsed excluded",
+    "latency_throughput_rss_adverse_review_percent": 5,
+    "within_role_drift_ceiling_percent": {
+      "p50": 5,
+      "mean": 5,
+      "p95": 10,
+      "p99": 15
+    },
+    "policy": "Preserve every initial result and flag; any followup must be explicitly posthoc; retention requires meaningful matched benefit and reviewed regressions, not only a valid report"
+  }
+}

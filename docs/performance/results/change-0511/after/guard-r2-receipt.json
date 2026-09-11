@@ -1,0 +1,34 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0511/after/litchi-perf-baseline",
+    "--case",
+    "cfb_open",
+    "--samples",
+    "1000",
+    "--warmup",
+    "20",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/guard-r2-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/after/guard-r2-catalog.json",
+    "--shape",
+    "tiny,few-large",
+    "--payload",
+    "incompressible"
+  ],
+  "started_utc": "2026-09-11T19:54:57.055903+00:00",
+  "elapsed_seconds": 0.537884010002017,
+  "exit_code": 0,
+  "binary_sha256": "575edf83f86566350faf206b7a0449f8b4950938f4bbed40be58d831c6beccc3",
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "source_unchanged": true,
+  "artifacts": {
+    "guard-r2.log": "32cc5033c5185521e8974ffbb23bc509698236d45a7a9bf47034d4ea5f6a1972",
+    "guard-r2-report.json": "a91089d58d1b5e00b227e871656b8e276c64509687191c9100abdc8af1952bc2",
+    "guard-r2-catalog.json": "a2ed68f875b4168d1f87bb41bbe5147bdb740c451db3cac2917589cdaed476f1"
+  },
+  "scope": "existing matched operation clocks; whole-child RSS includes setup, copies and oracles"
+}

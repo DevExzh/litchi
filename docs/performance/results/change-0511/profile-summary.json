@@ -1,0 +1,29 @@
+{
+  "before": {
+    "source_open_instruction_references": 15127968,
+    "load_fat_exclusive_instruction_references": 1407020,
+    "source_opens": 5
+  },
+  "after": {
+    "source_open_instruction_references": 13973601,
+    "load_fat_exclusive_instruction_references": 250820,
+    "source_opens": 5
+  },
+  "change_percent": {
+    "source_open_instruction_references": -7.6306811331171565,
+    "load_fat_exclusive_instruction_references": -82.17367201603389
+  },
+  "scope": "Simulated instruction references during five source opens only; native samples and whole-child hardware counters have separate scopes",
+  "cfb_guard": {
+    "before": {
+      "runner_ir": 22681105,
+      "constructor_inclusive_ir": 22672032
+    },
+    "after": {
+      "runner_ir": 13081195,
+      "constructor_inclusive_ir": 13072122
+    },
+    "runner_change_percent": -42.3255833434923,
+    "scope": "Supplemental attribution after native large-CFB gain: five constructor calls inside guard runner; runner includes timers, file-size oracles, drops and result construction; all instrumentation excluded from native comparisons"
+  }
+}

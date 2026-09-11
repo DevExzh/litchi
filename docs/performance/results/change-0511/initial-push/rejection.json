@@ -1,0 +1,10 @@
+{
+  "decision": "reject initial push-only candidate",
+  "before_ir": 15127968,
+  "after_ir": 15462114,
+  "change_percent": 2.2087963168615943,
+  "before_load_fat_exclusive_ir": 1407020,
+  "after_load_fat_exclusive_ir": 1740600,
+  "scope": "five source opens; simulated references; no formal native or allocation samples captured",
+  "reason": "Expected work reduction not observed; no measured benefit supports retention. Next experiment batches one complete FAT sector through an exact-size iterator."
+}

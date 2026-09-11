@@ -1,0 +1,27 @@
+{
+  "verified_utc": "2026-09-11T20:24:24.562355+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0511/verify.py"
+  ],
+  "exit_code": 0,
+  "post_cleanup_replay_matches": true,
+  "native_samples": 44000,
+  "instrumented_samples_excluded_from_native_comparison": 5105,
+  "summary_sha256": "d347987db75040357b504625beb414f7b3649d84dfc5e94cc393c183fa8fe929",
+  "replay_after_cleanup_sha256": "d347987db75040357b504625beb414f7b3649d84dfc5e94cc393c183fa8fe929",
+  "verifiers": {
+    "verify.py": "b2983f39fea25cfb121623dd9ef000df9c76ccba65e0ac4750d3e843e0477cf5",
+    "verify_allocation.py": "80d83906b7ccb98d07d065f8e9570846373e8966f63f94cdc9b43cf701800694",
+    "verify_hardware.py": "592f7b35a2be8df9e205c3ec8e66fe9fab4cceb2b6c411121025516a8d6a5c6e",
+    "verify_supplemental.py": "7995590868c30559b5341dabc756a77c7150491d391556f8d7b43c8cb1d12ff7"
+  },
+  "gates_sha256": "3db69db976f87814a06d4e09aa09936eb63246f3c06846f75b838a2b804dabdd",
+  "cleanup_sha256": "bfd9b1d6099de0676ff8449f1363c22bfc3d84a16d827c3970827713f424901e",
+  "candidate_patch_sha256": "bdd3570f665bebc416dd5e23c5b5386b4f8db90c6d124951d20140dd30aeb43d",
+  "candidate_patch_matches_current_source_diff": true,
+  "acceptance_sha256": "209267605869f3a49ed36230b379ffd2102aef8eead6bcbe6c63b6df3ddb8c9d",
+  "final_review_sha256": "3b050b8f58148e8fa69a06af4f61b104e4a377268fed114eae128425b413a491",
+  "documentation_manifest_sha256": "676d4e07b89effd0441ebd44de3446643b08c70769ceb0f74c0b92800c3156e6"
+}

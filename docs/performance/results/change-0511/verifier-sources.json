@@ -1,0 +1,5 @@
+{
+  "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+  "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558",
+  "tools/generate_corpus_manifest_v2.py": "be9b3c81a561eff4bc8303b1d2b7f5d8672747980e0aa760cf71036570e13d4b"
+}

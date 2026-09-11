@@ -1,0 +1,21 @@
+{
+  "stage": "historical experiment admission before matched measurements; final retention in acceptance.json",
+  "source_open_callgrind_ir": 15127968,
+  "measured_opens": 5,
+  "scope": "Exact SourceBackedWorkbook::from_read_at_with_limits calls, selected query/setup/drop excluded",
+  "exclusive_percent": {
+    "collect_exact": 37.03,
+    "claim_sector": 16.46,
+    "physical_layout": 13.17,
+    "stream_allocations": 13.08,
+    "load_fat": 9.3
+  },
+  "choice": "Decode and append each complete FAT sector through an exact-size iterator after the existing fallible total-table reservation; preserve every sector read, marker check and publication boundary",
+  "candidate_files": [
+    "crates/litchi-cfb/src/file.rs"
+  ],
+  "allocation_expectation": "same allocation calls and bytes; no memory improvement claim",
+  "required": "9 XLS lifecycle rows and tiny/few-large CFB guards; ABBA raw samples; allocation captures; CFB/XLS/DOC/PPT tests; explicit adverse review",
+  "initial_experiment": "Push-only variant rejected: +2.21% scoped IR, no formal native benefit established; full capture retained in initial-push/",
+  "capacity_proof": "Before each extension, remaining reserved capacity covers exactly sector_size/4 entries. Each &[u8;4] decodes identically to the previous checked conversion, whose length-error branch was unreachable."
+}

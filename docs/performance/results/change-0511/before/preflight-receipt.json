@@ -1,0 +1,30 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0511/before/litchi-perf-baseline",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/before/preflight-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0511/before/preflight-catalog.json"
+  ],
+  "started_utc": "2026-09-11T19:38:05.602759+00:00",
+  "elapsed_seconds": 0.4817802789984853,
+  "exit_code": 0,
+  "binary_sha256": "6e25e32d926756354de400bd089ea3ecdb214e338bbf8831d452ad7305407eab",
+  "source_manifest_sha256": "6f453fbf386665b174abc108b4a60e35fdc34922782fdc4dbd57af486dc2356a",
+  "source_unchanged": true,
+  "artifacts": {
+    "preflight.log": "e40679b9d75a570d703b5419bdb673ab8019f9ba146b91d0c31bb0b8ac4904ce",
+    "preflight-report.json": "deb38ccff463606f30032e92246748666086b8869c90aae6dbe5ccb7b27f4f1b",
+    "preflight-catalog.json": "8be2964303ed69d951027ba41d9a76c1d326038bd212d56413b7a6eef7b4e393"
+  },
+  "scope": "existing matched operation clocks; whole-child RSS includes setup, copies and oracles"
+}

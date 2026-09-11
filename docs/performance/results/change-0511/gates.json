@@ -1,0 +1,301 @@
+{
+  "source_bound_receipts": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-09-11T19:58:48.591657+00:00",
+      "elapsed_seconds": 17.74665009299497,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0511/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0511",
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    "ole2-tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "-p",
+        "litchi-xls",
+        "-p",
+        "litchi-doc",
+        "-p",
+        "litchi-ppt",
+        "--all-features",
+        "--all-targets"
+      ],
+      "started_utc": "2026-09-11T19:59:06.500963+00:00",
+      "elapsed_seconds": 1303.1888747589983,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "b02f08255bee3299213846fd599749f87805088b579a161069b2d1c2a736c85f",
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0511/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0511",
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    "ole2-doctests": {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "-p",
+        "litchi-xls",
+        "-p",
+        "litchi-doc",
+        "-p",
+        "litchi-ppt",
+        "--all-features",
+        "--doc"
+      ],
+      "started_utc": "2026-09-11T20:20:49.849832+00:00",
+      "elapsed_seconds": 26.8449527949997,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "6b517cb0a0b0a17ae86cfb0b87f51672f7ddb2b60ec571965905de47ed32cd46",
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0511/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0511",
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    "cfb-no-default-tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "--no-default-features"
+      ],
+      "started_utc": "2026-09-11T20:21:16.858110+00:00",
+      "elapsed_seconds": 28.27134133099753,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "a3d96bddd83b21c044c9c4e6930683e5355991bd2a9f732bf8cb4453679b4eca",
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0511/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0511",
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    "cfb-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_utc": "2026-09-11T20:21:45.292515+00:00",
+      "elapsed_seconds": 9.49974923699483,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "01df513f9bede7af1e99bb68844f383ad7608248fb4bcac9a58ef302c6f2da3c",
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0511/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0511",
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    "cfb-rustdoc": {
+      "command": [
+        "cargo",
+        "doc",
+        "--release",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "--all-features",
+        "--no-deps"
+      ],
+      "started_utc": "2026-09-11T20:21:54.956899+00:00",
+      "elapsed_seconds": 1.2393693999983952,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "8a12afad33ca71c3e2c64e90ef163afbc9ec868b212ef7edea089161107a9a72",
+      "environment": {
+        "CARGO_TARGET_DIR": "/tmp/litchi-goal-0511/target",
+        "CARGO_BUILD_JOBS": "2",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "TMPDIR": "/tmp/litchi-goal-0511",
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    }
+  },
+  "test_counts": {
+    "ole2-tests": {
+      "passed": 4026,
+      "failed": 0,
+      "ignored": 5
+    },
+    "ole2-doctests": {
+      "passed": 41,
+      "failed": 0,
+      "ignored": 22
+    },
+    "cfb-no-default-tests": {
+      "passed": 305,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "total_passed": 4372,
+  "total_ignored": 28,
+  "additional_checks": {
+    "boundaries.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9"
+    },
+    "claims.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "exit_code": 0,
+      "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+    },
+    "claims-final.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "exit_code": 0,
+      "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+    },
+    "report-classification-final.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_report_claim_classification.py",
+        "--repo-root",
+        "."
+      ],
+      "exit_code": 0,
+      "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    "diff-check.log": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "authored-diff-check.log": {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check",
+        "--",
+        "crates/litchi-cfb/src/file.rs",
+        "docs/performance/changes/0511-cfb-fat-entry-reservation.md",
+        "docs/performance/BASELINE.md",
+        "docs/performance/REPORT.md",
+        "docs/performance/HOTSPOTS.md",
+        "docs/performance/GOAL_AUDIT.md",
+        "docs/performance/ADR_COMPLIANCE.md",
+        "docs/performance/results/change-0511/run.py",
+        "docs/performance/results/change-0511/capture.py",
+        "docs/performance/results/change-0511/adr-review.md",
+        "docs/performance/results/change-0511/build-allocator.py",
+        "docs/performance/results/change-0511/verify.py",
+        "docs/performance/results/change-0511/fat-reservation-review.md",
+        "docs/performance/results/change-0511/cleanup.py",
+        "docs/performance/results/change-0511/gates.py",
+        "docs/performance/results/change-0511/profile-scope-review.md",
+        "docs/performance/results/change-0511/verify_allocation.py",
+        "docs/performance/results/change-0511/verify_hardware.py",
+        "docs/performance/results/change-0511/sector-batch-review.md",
+        "docs/performance/results/change-0511/final-review.md",
+        "docs/performance/results/change-0511/cfb-source-review.md",
+        "docs/performance/results/change-0511/verify_supplemental.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scope": "Authored Rust/Python/Markdown only; raw logs, profiles and exact patches retain producer whitespace."
+    }
+  }
+}

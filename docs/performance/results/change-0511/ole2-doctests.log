@@ -1,0 +1,92 @@
+    Finished `release` profile [optimized] target(s) in 0.10s
+   Doc-tests litchi_cfb
+
+running 13 tests
+test crates/litchi-cfb/src/writer/core.rs - writer::core (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::DIFSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::FATSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::MAXREGSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::NOSTREAM (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::ENDOFCHAIN (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_storage (line 487) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_stream (line 372) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::save (line 1178) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::set_root_clsid (line 341) - compile ... ok
+test crates/litchi-cfb/src/writer/directory.rs - writer::directory::DirectoryEntryBuilder::set_clsid (line 184) ... ignored
+test crates/litchi-cfb/src/writer/core.rs - writer::core::STGTY_ROOT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::new (line 273) ... ok
+
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 1.90s; merged doctests compilation took 1.90s
+   Doc-tests litchi_doc
+
+running 26 tests
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::paragraph_count (line 29) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/links.rs - document::model::semantic::links::Document::hyperlinks (line 17) ... ignored
+test crates/litchi-doc/src/document/model/semantic/media.rs - document::model::semantic::media::Document::image_data (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/numbering.rs - document::model::semantic::numbering::Document::list_tables (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/headers.rs - document::model::semantic::subdocuments::headers::Document::headers_footers (line 16) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::endnotes (line 51) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::footnotes (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::table_count (line 56) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::paragraphs (line 46) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::elements (line 217) - compile ... ok
+test crates/litchi-doc/src/document/model/state.rs - document::model::state::Document (line 54) - compile ... ok
+test crates/litchi-doc/src/lib.rs - (line 97) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<File>::open (line 22) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::document (line 151) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::text (line 10) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_ole_file (line 124) - compile ... ok
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph (line 17) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph::formulas_as_latex (line 247) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run (line 279) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run::formula_as_latex (line 609) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run::image (line 651) ... ignored
+test crates/litchi-doc/src/table.rs - table::Table (line 17) ... ignored
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::tables (line 193) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_reader (line 57) - compile ... ok
+test crates/litchi-doc/src/writer/mod.rs - writer::core (line 57) - compile ... ok
+test crates/litchi-doc/src/package/model.rs - package::model::Package (line 521) - compile ... ok
+
+test result: ok. 14 passed; 0 failed; 12 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 6.13s; merged doctests compilation took 6.12s
+   Doc-tests litchi_ppt
+
+running 22 tests
+test crates/litchi-ppt/src/lib.rs - (line 2) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<File>::open (line 22) - compile ... ok
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation (line 120) - compile ... ok
+test crates/litchi-ppt/src/package/model.rs - package::model::Package (line 242) - compile ... ok
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::from_ole_file (line 108) - compile ... ok
+test crates/litchi-ppt/src/shapes/geometry.rs - shapes::geometry::extract_geometry_rect (line 253) ... ignored
+test crates/litchi-ppt/src/shapes/geometry.rs - shapes::geometry::extract_vertices (line 315) ... ignored
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::from_reader (line 56) - compile ... ok
+test crates/litchi-ppt/src/presentation/model.rs - presentation::model::Presentation::images (line 1277) - compile ... ok
+test crates/litchi-ppt/src/shapes/picture.rs - shapes::picture::PictureShape (line 39) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new (line 521) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::new_borrowed (line 561) ... ignored
+test crates/litchi-ppt/src/shapes/shape.rs - shapes::shape::ShapeContainer<'a>::set_text_margins (line 647) ... ignored
+test crates/litchi-ppt/src/shapes/textbox.rs - shapes::textbox::TextBox<'a>::format_from_props (line 312) ... ignored
+test crates/litchi-ppt/src/text_run/model.rs - text_run::model::TextRun (line 238) ... ignored
+test crates/litchi-ppt/src/package/codec.rs - package::codec::Package<R>::presentation (line 144) - compile ... ok
+test crates/litchi-ppt/src/shapes/mod.rs - shapes::geometry (line 24) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::chart (line 94) - compile ... ok
+test crates/litchi-ppt/src/writer/mod.rs - writer::table (line 86) - compile ... ok
+test crates/litchi-ppt/src/writer/custom_shows.rs - writer::custom_shows::CustomShow::new (line 32) ... ok
+test crates/litchi-ppt/src/writer/comments.rs - writer::comments::SlideComment::new (line 77) ... ok
+test crates/litchi-ppt/src/writer/slide_timing.rs - writer::slide_timing::SlideTiming::auto_advance (line 63) ... ok
+
+test result: ok. 14 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 10.01s; merged doctests compilation took 10.00s
+   Doc-tests litchi_xls
+
+running 2 tests
+test crates/litchi-xls/src/writer/core/codec/worksheet.rs - writer::core::codec::worksheet::Writer::add_filter_condition (line 100) ... ignored
+test crates/litchi-xls/src/writer/mod.rs - writer::core (line 22) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 6.33s; merged doctests compilation took 6.33s
