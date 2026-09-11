@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "gate_input_files": 352,
+  "gate_tests_including_doctests": {
+    "passed": 201,
+    "failed": 0,
+    "ignored": 0
+  },
+  "profile_source_manifest_sha256": "5720486c5de6c77ff2ef3ea16cbe21e788ee2ea7d33a5e913286c1934d786b72",
+  "processes": 24,
+  "samples": 720,
+  "lanes": [
+    {
+      "fixture": "small",
+      "operation": "read",
+      "samples": 90,
+      "p50_ns": 2370,
+      "requested_bytes_p50": 2221
+    },
+    {
+      "fixture": "small",
+      "operation": "clone",
+      "samples": 90,
+      "p50_ns": 50,
+      "requested_bytes_p50": 0
+    },
+    {
+      "fixture": "small",
+      "operation": "noop",
+      "samples": 90,
+      "p50_ns": 230,
+      "requested_bytes_p50": 0
+    },
+    {
+      "fixture": "small",
+      "operation": "change",
+      "samples": 90,
+      "p50_ns": 3300,
+      "requested_bytes_p50": 2875
+    },
+    {
+      "fixture": "opaque",
+      "operation": "read",
+      "samples": 90,
+      "p50_ns": 184921,
+      "requested_bytes_p50": 128250
+    },
+    {
+      "fixture": "opaque",
+      "operation": "clone",
+      "samples": 90,
+      "p50_ns": 50,
+      "requested_bytes_p50": 0
+    },
+    {
+      "fixture": "opaque",
+      "operation": "noop",
+      "samples": 90,
+      "p50_ns": 230,
+      "requested_bytes_p50": 0
+    },
+    {
+      "fixture": "opaque",
+      "operation": "change",
+      "samples": 90,
+      "p50_ns": 185191,
+      "requested_bytes_p50": 145876
+    }
+  ]
+}

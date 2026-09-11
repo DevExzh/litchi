@@ -1,0 +1,272 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.88s
+     Running unittests src/lib.rs (target/debug/deps/litchi_drawingml-add19e300dbc9a1e)
+
+running 161 tests
+test chart::bubble::tests::scale_accepts_boundaries_and_rejects_values_above_the_range ... ok
+test blip::tests::malformed_attributes_are_not_silently_discarded ... ok
+test chart::bubble::tests::size_tokens_round_trip_without_allocation ... ok
+test blip::tests::writes_escaped_ids_and_reads_normal_ids ... ok
+test chart::reader::tests::ignores_foreign_namespace_lookalikes_and_their_descendants ... ok
+test chart::reader::tests::parses_and_validates_chart_group_data_labels ... ok
+test chart::reader::tests::parses_chart_group_percentage_union_values ... ok
+test chart::reader::tests::parses_of_pie_schema_defaults_and_empty_custom_split ... ok
+test chart::reader::tests::parses_strict_chart_and_drawingml_namespaces ... ok
+test chart::reader::tests::preserves_and_validates_chart_group_axis_bindings ... ok
+test chart::reader::tests::preserves_automatic_display_units_labels ... ok
+test chart::reader::tests::parses_prefixed_chart_content ... ok
+test chart::reader::tests::rejects_empty_plot_containers_without_consuming_following_content ... ok
+test chart::reader::tests::rejects_non_chart_roots_and_trailing_roots ... ok
+test chart::reader::tests::parses_and_validates_chart_data_tables ... ok
+test chart::reader::tests::rejects_invalid_of_pie_input_and_output ... ok
+test chart::reader::tests::rejects_invalid_scaling_on_every_axis_kind ... ok
+test chart::reader::tests::preserves_explicit_empty_series_and_point_markers ... ok
+test chart::reader::tests::rejects_truncated_and_invalid_chart_values ... ok
+test chart::reader::tests::round_trips_and_validates_chart_language_and_pivot_source ... ok
+test chart::reader::tests::round_trips_and_validates_chart_protection ... ok
+test chart::reader::tests::preserves_chart_space_drawing_and_extension_fragments ... ok
+test chart::reader::tests::writer_rejects_invalid_axes_and_duplicate_legend_entries ... ok
+test chart::reader::tests::round_trips_and_validates_chart_color_map_overrides ... ok
+test chart::writer::tests::facade::writer_facade_emits_a_chart_space ... ok
+test chart::writer::tests::records::chart_style_record_is_emitted_without_reordering_chart_space ... ok
+test chart::reader::tests::round_trips_and_validates_chart_print_settings ... ok
+test chart::reader::tests::round_trips_and_validates_chart_external_data ... ok
+test chart::reader::tests::writer_rejects_invalid_chart_group_ranges ... ok
+test chart::writer::tests::facade::relationship_overrides_are_forwarded_to_external_data ... ok
+test chart::reader::tests::round_trips_chart_surface_shape_and_picture_options ... ok
+test chart::reader::tests::round_trips_and_validates_chart_user_shapes_relationships ... ok
+test chart::reader::tests::round_trips_display_units_label_formatting_and_extensions ... ok
+test chart::writer::tests::records::data_label_leader_line_records_are_written_together ... ok
+test chart::writer::tests::validation::chart_style_accepts_the_ecma_defined_range ... ok
+test chart::writer::tests::validation::chart_style_rejects_values_outside_the_ecma_defined_range ... ok
+test chart::reader::tests::round_trips_and_validates_surface_band_formats ... ok
+test color::tests::rgb_values_are_checked_compact_and_canonical ... ok
+test chart::reader::tests::round_trips_legend_and_entry_formatting_fragments ... ok
+test color::tests::scalar_and_transform_bounds_are_rejected ... ok
+test chart::reader::tests::round_trips_and_validates_pivot_chart_formats ... ok
+test color::tests::scheme_values_cover_the_shared_closed_vocabulary ... ok
+test coordinate::tests::extents_accept_only_the_exact_integer_lexical_space ... ok
+test color::tests::every_typed_transform_round_trips_in_source_order ... ok
+test color::tests::unsupported_choices_and_attributes_are_retained_exactly ... ok
+test coordinate::tests::extents_are_nonnegative_bounded_and_representation_compact ... ok
+test coordinate::tests::malformed_or_unbounded_spellings_are_rejected ... ok
+test color::tests::typed_color_choices_and_transforms_round_trip ... ok
+test coordinate::tests::universal_measures_cover_every_unit_without_floating_point ... ok
+test diagram::data::codec::tests::optional_attribute_keeps_minimal_schema_lexical_form ... ok
+test color::tests::malformed_fragments_and_resource_exhaustion_are_rejected ... ok
+test coordinate::tests::measures_retain_long_decimal_lexicals_without_float_rounding ... ok
+test coordinate::tests::unqualified_coordinates_are_canonical_and_bounded ... ok
+test chart::reader::tests::round_trips_chart_lines_and_up_down_bars ... ok
+test diagram::data::tests::accepts_all_schema_connection_types_without_string_fallback ... ok
+test diagram::data::tests::model_id_is_a_closed_zero_allocation_wire_domain ... ok
+test diagram::data::tests::extracts_only_drawingml_text_leaf_content ... ok
+test diagram::data::tests::enforces_data_model_structure_and_unqualified_schema_attributes ... ok
+test diagram::data::tests::rejects_missing_ids ... ok
+test diagram::data::tests::rejects_wrong_root_and_dtd ... ok
+test chart::reader::tests::writer_round_trips_modeled_axis_properties_in_one_scaling_block ... ok
+test diagram::data::tests::parses_strict_namespace_model ... ok
+test diagram::data::tests::rejects_values_outside_fixed_point_and_connection_domains ... ok
+test diagram::model::tests::test_diagram_type_from_uri ... ok
+test diagram::data::tests::semantic_crud_guards_duplicates_and_cascades_dependencies ... ok
+test chart::reader::tests::round_trips_chart_and_axis_title_formatting_fragments ... ok
+test diagram::definition::tests::rejects_mismatched_root ... ok
+test diagram::definition::tests::parses_layout_definition ... ok
+test diagram::data::tests::parses_transitional_model_with_hierarchy_and_multi_run_text ... ok
+test diagram::model::tests::test_smartart_builder ... ok
+test diagram::definition::tests::parses_strict_quick_style_and_colors_definitions ... ok
+test geom::tests::domains_are_compact_and_allocation_free ... ok
+test diagram::data::tests::canonical_writer_round_trips_both_conformance_classes ... ok
+test diagram::data::tests::tolerates_cycles_and_dangling_connections ... ok
+test chart::reader::tests::round_trips_series_and_data_point_formatting_fragments ... ok
+test geometry::tests::adjust_values_parse_numbers_and_guide_names ... ok
+test geom::tests::text_tokens_are_complete_unique_and_round_trip ... ok
+test geometry::tests::formula_operands_distinguish_literals_from_guide_references ... ok
+test chart::edit::tests::stale_and_invalid_edits_are_rejected_atomically ... ok
+test geometry::tests::formula_parsing_rejects_malformed_tokens ... ok
+test geometry::tests::path_fill_mode_tokens_round_trip ... ok
+test geometry::tests::parsed_validation_preserves_schema_valid_open_guide_names ... ok
+test geometry::tests::serialization_omits_defaults_and_empty_lists ... ok
+test geometry::tests::serialization_writes_non_default_path_attributes ... ok
+test geometry::tests::formulas_round_trip_through_their_token_form ... ok
+test geom::tests::shape_tokens_are_complete_unique_and_round_trip ... ok
+test geometry::tests::validation_rejects_an_empty_path_list ... ok
+test geometry::tests::validation_accepts_a_complete_geometry ... ok
+test geometry::tests::validation_rejects_invalid_guide_names ... ok
+test geometry::tests::validation_rejects_out_of_range_values ... ok
+test ink::authoring::tests::canonical_import_preflight_rejects_aliases_depth_and_scalar_quotas ... ok
+test ext::tests::creation_ids_are_xml_escaped ... ok
+test ink::authoring::tests::canonical_import_uses_decoded_attribute_quota_for_escaped_values ... ok
+test ink::authoring::tests::charges_cumulative_retained_text_before_finish ... ok
+test ink::authoring::tests::rejects_duplicate_and_unresolved_local_ids ... ok
+test ink::authoring::tests::rejects_incompatible_context_attributes_and_missing_trace_refs ... ok
+test ink::authoring::tests::rejects_invalid_known_brush_property_values_and_units ... ok
+test ink::authoring::tests::rejects_invalid_trace_lexical_text_and_external_refs ... ok
+test ink::tests::accepts_and_preserves_a_utf8_bom_before_the_xml_declaration ... ok
+test ink::authoring::tests::rejects_invalid_limits_before_authoring ... ok
+test ink::authoring::tests::generated_source_ids_avoid_user_ids_and_respect_limits ... ok
+test ink::authoring::tests::finish_reopens_schema_whitespace_values_without_rewriting_source ... ok
+test ink::authoring::tests::custom_brush_property_xml_escaping_preserves_attribute_whitespace ... ok
+test ink::tests::effective_brush_properties_use_normative_units_and_xsd_whitespace ... ok
+test ink::tests::ink_actions_reject_document_level_references_and_invalid_units ... ok
+test ink::tests::ink_actions_support_ancestor_bound_prefix_fragments ... ok
+test ink::tests::ink_actions_are_typed_and_preserved ... ok
+test ink::tests::effective_brush_properties_apply_profile_defaults_without_changing_source ... ok
+test ink::authoring::tests::canonical_output_reopens_and_shares_bytes ... ok
+test ink::authoring::tests::enforces_exact_record_and_output_boundaries ... ok
+test ink::tests::rejects_forbidden_ink_markup ... ok
+test ink::tests::metadata_owns_typed_values_without_retaining_input ... ok
+test ink::tests::rejects_duplicate_expanded_attributes_in_opaque_elements ... ok
+test ink::tests::rejects_duplicate_declarations_and_bound_foreign_root_prefixes ... ok
+test ink::tests::rejects_invalid_context_guid_and_points ... ok
+test ink::tests::rejects_invalid_text_cdata_references_and_utf8_before_retaining_source ... ok
+test ink::tests::read_shared_retains_the_caller_payload_and_spans ... ok
+test ink::tests::metadata_matches_shared_document_and_clones_share_storage ... ok
+test ink::tests::reads_typed_context_trace_and_extended_brush_property ... ok
+test ink::tests::filtered_metadata_requires_exact_source_spans ... ok
+test ink::authoring::tests::canonical_import_rejects_malformed_noncanonical_and_limits ... ok
+test model3d::tests::opaque_constructor_accepts_one_element_and_rejects_multiple_roots ... ok
+test ink::tests::accepts_exact_depth_and_rejects_empty_element_overflow ... ok
+test ink::tests::source_backed_write_is_byte_exact ... ok
+test model3d::tests::authoring_facade_can_replace_raster_without_losing_scene_children ... ok
+test text::tests::common_values_remain_cache_friendly ... ok
+test model3d::tests::rejects_invalid_sequence_and_duplicate_raster_blip ... ok
+test text::tests::underline_codecs_are_lossless_in_both_dialects ... ok
+test model3d::tests::reads_typed_relationships_and_keeps_the_scene_inert ... ok
+test theme::codec::tests::authored_format_scheme_has_schema_required_entries ... ok
+test text::tests::bounded_values_reject_invalid_authoring_and_xml ... ok
+test model3d::tests::preserves_unknown_children_and_namespace_declarations_on_round_trip ... ok
+test text::body::model::tests::applies_drawingml_defaults_and_joins_text ... ok
+test text::body::writer::tests::writes_defaults_and_escapes_text ... ok
+test text::body::writer::tests::writes_non_default_body_and_run_properties ... ok
+test theme::codec::tests::typed_read_requires_drawingml_namespaces_and_direct_scheme_parents ... ok
+test text::tests::booleans_are_dialect_exact ... ok
+test text::tests::closed_domains_round_trip_and_reject_unknown_tokens ... ok
+test ink::authoring::tests::canonical_bytes_import_with_all_typed_fields ... ok
+test model3d::tests::relationship_graph_distinguishes_embedded_linked_and_missing_targets ... ok
+test ink::xml_characters::tests::mixed_text_and_exclusions_at_block_boundaries_keep_the_same_contract ... ok
+test transform::tests::detached_builder_keeps_authored_defaults_distinct ... ok
+test theme::codec::tests::scheme_replacement_rebinds_generated_fragment_to_strict_source ... ok
+test theme::codec::tests::scheme_replacement_refuses_ignored_source_content ... ok
+test transform::tests::scalar_and_structure_bounds_are_strict ... ok
+test transform::tests::typed_transform_reads_all_shared_fields_and_round_trips ... ok
+test transform::tests::snapshots_replay_source_exactly_and_edits_are_atomic ... ok
+test chart::reader::tests::writer_round_trips_every_modeled_chart_group ... ok
+test theme::codec::tests::all_system_color_tokens_round_trip ... ok
+test theme::codec::tests::authored_text_rejects_xml_forbidden_chars_and_preserves_whitespace ... ok
+test theme::codec::tests::complete_theme_round_trips ... ok
+test transform::tests::resource_limits_and_fragment_shape_are_checked ... ok
+test chart::edit::tests::no_op_replays_source_and_changed_edits_keep_opaque_xml ... ok
+test theme::codec::tests::override_round_trips_and_scheme_patching_is_local ... ok
+test ink::tests::read_metadata_rejects_malformed_and_oversized_payloads ... ok
+test ink::tests::read_shared_rejects_malformed_and_oversized_payloads_before_retention ... ok
+test chart::style::codec::tests::parses_producer_styles_as_inert_lossless_metadata ... ok
+test chart::style::codec::tests::rejects_hostile_style_grammar_and_relationships ... ok
+test ink::xml_characters::tests::matches_xml10_char_production_for_every_unicode_scalar ... ok
+test ink::tests::accepts_exact_node_and_attribute_value_limits ... ok
+test diagram::data::tests::canonical_writer_enforces_xml_and_aggregate_size_budgets ... ok
+
+test result: ok. 161 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+
+     Running tests/chart_bubble_api.rs (target/debug/deps/chart_bubble_api-595077e3bac164d1)
+
+running 3 tests
+test parser_rejects_invalid_bubble_settings ... ok
+test typed_bubble_settings_round_trip_through_the_public_api ... ok
+test office_compatible_output_keeps_bubble_3d_at_series_level ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/chart_style.rs (target/debug/deps/chart_style-f2d403ed36618a9e)
+
+running 2 tests
+test parses_color_style_and_rejects_invalid_color ... ok
+test parses_schema_owned_chart_style_without_package_types ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/diagram_data_api.rs (target/debug/deps/diagram_data_api-3184a57cf8876405)
+
+running 2 tests
+test invalid_fixed_domain_values_never_reach_the_public_model ... ok
+test typed_diagram_data_crud_round_trips_without_raw_identifier_strings ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/geometry.rs (target/debug/deps/geometry-d66efc81c2f1f755)
+
+running 2 tests
+test contextual_geometry_values_and_guides_are_typed ... ok
+test geometry_paths_retain_typed_commands ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/markup_compatibility.rs (target/debug/deps/markup_compatibility-a985668ae9b6b34a)
+
+running 1 test
+test chart_reader_uses_the_fallback_branch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/svg_blip.rs (target/debug/deps/svg_blip-3b7f404409980c43)
+
+running 7 tests
+test constructs_empty_svg_blip_with_typed_reference ... ok
+test accepts_ancestor_bound_root_prefix_for_unknown_attributes ... ok
+test rejects_invalid_root_and_relationship_values ... ok
+test changing_relationship_keeps_future_content ... ok
+test edits_default_namespace_and_alternate_relationship_prefix_without_unbound_names ... ok
+test reads_typed_relationship_and_preserves_unknown_markup ... ok
+test rejects_non_xml_content_after_the_root ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/theme.rs (target/debug/deps/theme-266448c200dcc98f)
+
+running 2 tests
+test strict_theme_namespace_is_accepted ... ok
+test theme_schema_model_round_trips_without_package_types ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/theme_family.rs (target/debug/deps/theme_family-56b0be1202a76861)
+
+running 19 tests
+test comments_reject_xml_forbidden_controls ... ok
+test immutable_snapshots_are_send_sync ... ok
+test detached_authoring_escapes_name_and_round_trips ... ok
+test guid_domain_is_braced_hyphenated_uppercase_hex ... ok
+test invalid_edits_do_not_leak_into_a_transaction ... ok
+test native_fragment_reads_the_schema_fields_and_replays_exactly ... ok
+test exact_no_op_inverse_and_stale_source_guards_are_enforced ... ok
+test namespace_and_required_attribute_grammar_is_strict ... ok
+test extension_list_shape_and_text_are_checked_while_foreign_children_stay_opaque ... ok
+test xml_prolog_is_single_utf8_version_10_and_first ... ok
+test source_attribute_whitespace_normalizes_but_character_references_survive ... ok
+test opaque_extensions_and_unknown_attributes_survive_known_edits ... ok
+test malformed_nested_qnames_comments_declarations_and_references_fail_closed ... ok
+test namespace_uri_bound_accepts_exact_bytes_and_rejects_one_more ... ok
+test bounded_malformed_inputs_fail_closed ... ok
+test depth_bound_accepts_empty_leaf_at_the_limit_and_rejects_one_more ... ok
+test namespace_declaration_bound_accepts_exact_count_and_rejects_one_more ... ok
+test attribute_bound_accepts_exact_count_and_rejects_one_more ... ok
+test name_and_source_output_bounds_accept_exact_and_reject_over ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/transform.rs (target/debug/deps/transform-684d1f1b4eacdf63)
+
+running 1 test
+test transform_facade_is_typed_and_snapshot_based ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests litchi_drawingml
+
+running 1 test
+test crates/litchi-drawingml/src/chart/mod.rs - chart (line 31) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.15s; merged doctests compilation took 0.15s
