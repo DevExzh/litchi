@@ -1,0 +1,319 @@
+diff --git a/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs b/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+index b56528aab..a5f67e93d 100644
+--- a/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
++++ b/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+@@ -34,9 +34,10 @@ use crate::style::StyleLineage;
+ use crate::web::{Binding as WebBinding, Bindings as WebBindings};
+ 
+ use super::super::model::{
+-    PartChange, PatchAuthority, RelationshipChange, StyleGuard, defaults_after, ensure_merge_area,
+-    merge_conflicts, project_merges,
++    ContentTypesChange, PartChange, PatchAuthority, RelationshipChange, StyleGuard, SvgPartChange,
++    defaults_after, ensure_merge_area, merge_conflicts, project_merges,
+ };
++use super::super::svg_lifecycle as svg_plan;
+ use super::super::validation::{
+     Added, FinalOrder, HyperlinkAction, MergeIntent, OptionalAction, OrderPlan, PanesAction,
+     Placement, SheetActions, TabAction, Target, pending_merge,
+@@ -48,8 +49,19 @@ use super::super::{
+ use super::super::{codec, package};
+ 
+ use self::snapshot::Snapshot;
++use super::super::svg::{PictureSelector, SvgInput};
+ use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
+ 
++const MAX_SVG_INPUT_BYTES: usize = 32 * 1024 * 1024;
++
++#[derive(Debug, Clone)]
++pub(crate) struct SvgLifecycleIntent {
++    pub(crate) position: usize,
++    pub(crate) selector: PictureSelector,
++    pub(crate) attach: bool,
++    pub(crate) payload: Option<Arc<Vec<u8>>>,
++}
++
+ const MAX_CELL_TRANSFER: u64 = 65_536;
+ const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
+ const MAX_VALIDATED_STORE_HANDOFF_CELLS: usize = 4_096;
+@@ -213,6 +225,9 @@ pub struct Edit {
+     pub(in crate::workbook::edit) added: Vec<Added>,
+     pub(in crate::workbook::edit) removed: BTreeSet<usize>,
+     pub(in crate::workbook::edit) cross_workbook_scalar: bool,
++    pub(in crate::workbook::edit) svg_lifecycle: Vec<SvgLifecycleIntent>,
++    pub(in crate::workbook::edit) svg_preflight:
++        HashMap<(usize, usize), super::super::svg_lifecycle::DrawingPreflight>,
+ }
+ 
+ impl Edit {
+@@ -229,9 +244,82 @@ impl Edit {
+             added: Vec::new(),
+             removed: BTreeSet::new(),
+             cross_workbook_scalar: false,
++            svg_lifecycle: Vec::new(),
++            svg_preflight: HashMap::new(),
+         })
+     }
+ 
++    pub(super) fn stage_svg_attach(
++        &mut self,
++        position: usize,
++        selector: PictureSelector,
++        input: SvgInput<'_>,
++    ) -> Result<()> {
++        guard::no_removal(self, "SVG lifecycle")?;
++        let bytes = input.as_bytes();
++        if bytes.is_empty() {
++            return Err(invalid("SVG payload cannot be empty"));
++        }
++        let input_limit = svg_plan::payload_limit(&self.base).min(MAX_SVG_INPUT_BYTES);
++        if bytes.len() > input_limit {
++            return Err(invalid(format!(
++                "SVG attachment input exceeds {} bytes",
++                input_limit
++            )));
++        }
++        svg_plan::preflight_with_pending(
++            &self.base,
++            position,
++            selector,
++            true,
++            &self.svg_lifecycle,
++            &mut self.svg_preflight,
++        )?;
++        self.svg_lifecycle
++            .try_reserve(1)
++            .map_err(|source| allocation("SVG lifecycle intents", source))?;
++        let mut owned = Vec::new();
++        owned
++            .try_reserve_exact(bytes.len())
++            .map_err(|source| allocation("SVG attachment input", source))?;
++        owned.extend_from_slice(bytes);
++        self.svg_lifecycle.push(SvgLifecycleIntent {
++            position,
++            selector,
++            attach: true,
++            payload: Some(Arc::new(owned)),
++        });
++        Ok(())
++    }
++
++    pub(super) fn stage_svg_detach(
++        &mut self,
++        position: usize,
++        selector: PictureSelector,
++    ) -> Result<bool> {
++        guard::no_removal(self, "SVG lifecycle")?;
++        if !svg_plan::preflight_with_pending(
++            &self.base,
++            position,
++            selector,
++            false,
++            &self.svg_lifecycle,
++            &mut self.svg_preflight,
++        )? {
++            return Ok(false);
++        }
++        self.svg_lifecycle
++            .try_reserve(1)
++            .map_err(|source| allocation("SVG lifecycle intents", source))?;
++        self.svg_lifecycle.push(SvgLifecycleIntent {
++            position,
++            selector,
++            attach: false,
++            payload: None,
++        });
++        Ok(true)
++    }
++
+     /// Create or replace the complete persisted Office Add-in task-pane graph.
+     ///
+     /// The owned model is moved into this isolated transaction. Its worksheet
+@@ -976,6 +1064,7 @@ impl Edit {
+                 .saturating_add(usize::from(self.panes.is_some()))
+                 .saturating_add(usize::from(self.defined_names.is_some()))
+                 .saturating_add(self.drawings.len())
++                .saturating_add(self.svg_lifecycle.len())
+                 .saturating_add(usize::from(self.active.is_some()))
+                 .saturating_add(
+                     self.order
+@@ -1006,6 +1095,7 @@ impl Edit {
+             && self.panes.is_none()
+             && self.defined_names.is_none()
+             && self.drawings.is_empty()
++            && self.svg_lifecycle.is_empty()
+             && self
+                 .order
+                 .as_ref()
+@@ -1058,6 +1148,18 @@ impl Edit {
+                 rejected: Box::new(other),
+             });
+         }
++        if self.svg_lifecycle.iter().any(|intent| {
++            other.svg_lifecycle.iter().any(|candidate| {
++                intent.position == candidate.position && intent.selector == candidate.selector
++            })
++        }) {
++            return Err(JoinError {
++                failure: JoinFailure::Overlap(ConflictSet {
++                    conflicts: Box::new([]),
++                }),
++                rejected: Box::new(other),
++            });
++        }
+         let conflicts = self.conflicts_with(&other);
+         if !conflicts.is_empty() {
+             return Err(JoinError {
+@@ -1075,6 +1177,8 @@ impl Edit {
+             self.defined_names = other.defined_names;
+         }
+         self.drawings.extend(other.drawings);
++        self.svg_lifecycle.extend(other.svg_lifecycle);
++        self.svg_preflight.extend(other.svg_preflight);
+         if self.active.is_none() {
+             self.active = other.active.map(|target| match target {
+                 Target::Base(position) => Target::Base(position),
+@@ -1186,6 +1290,8 @@ impl Edit {
+             added,
+             removed: _,
+             cross_workbook_scalar,
++            svg_lifecycle: svg_intents,
++            svg_preflight: _,
+         } = self;
+         ensure_defined_name_edit_is_composable(
+             requested_defined_names.as_deref(),
+@@ -1201,6 +1307,18 @@ impl Edit {
+         let mut validated_worksheet_stores = Vec::new();
+         let mut needs_recalculation = false;
+         let mut drawing_graph = Vec::new();
++        let mut svg_parts = Vec::new();
++        let mut content_types = None;
++
++        svg_plan::plan(
++            &base,
++            &svg_intents,
++            &mut parts,
++            &mut relationship_changes,
++            &mut svg_parts,
++            &mut content_types,
++            &mut package_changes,
++        )?;
+ 
+         let effective_renames = take_effective_renames(&base, &mut sheets)?;
+         if let Some((position, _)) = effective_renames.first() {
+@@ -2013,6 +2131,8 @@ impl Edit {
+                 uri: data.part_uri.clone(),
+                 before,
+                 after,
++                before_source: None,
++                after_source: None,
+             });
+         }
+         if !drawings.is_empty() {
+@@ -2600,6 +2720,8 @@ impl Edit {
+                     uri: base.inner.workbook_uri.clone(),
+                     before,
+                     after: Arc::new(after),
++                    before_source: None,
++                    after_source: None,
+                 });
+             }
+         }
+@@ -2659,6 +2781,8 @@ impl Edit {
+             && package_changes.is_empty()
+             && parts.is_empty()
+             && relationship_changes.is_empty()
++            && content_types.is_none()
++            && svg_parts.is_empty()
+             && graph.is_empty()
+             && web_patch.is_none()
+         {
+@@ -2676,14 +2800,59 @@ impl Edit {
+         for change in &relationship_changes {
+             change.validate(&package)?;
+         }
+-        for part in &parts {
+-            package
+-                .get_part_mut(&part.uri)?
+-                .set_blob_shared(Arc::clone(&part.after));
++        for change in &svg_parts {
++            if change.action == super::super::model::GraphAction::Add {
++                change.validate(&package)?;
++            }
++        }
++        // Source-proven XML transitions are applied through their proofs so
++        // stale provenance cannot silently fall back to a canonical rewrite.
++        for change in &parts {
++            if let (Some(expected), Some(replacement)) =
++                (&change.before_source, &change.after_source)
++            {
++                if expected.bytes() != change.before.as_slice()
++                    || replacement.bytes() != change.after.as_slice()
++                {
++                    return Err(Error::PatchConflict {
++                        part: change.uri.to_string(),
++                    });
++                }
++                package.try_replace_owned_xml_part(expected.bytes(), replacement.clone())?;
++            } else {
++                package
++                    .get_part_mut(&change.uri)?
++                    .set_blob_shared(Arc::clone(&change.after));
++            }
++        }
++        if let Some(change) = &content_types {
++            change.validate(&package)?;
++            change.apply(&mut package)?;
++        }
++        for change in &svg_parts {
++            if change.action == super::super::model::GraphAction::Add {
++                change.apply(&mut package)?;
++            }
+         }
++        // Manifest edits must be validated before graph publication and are
++        // applied after changed XML/relationship members are staged.
++        // (The concrete SVG planner supplies this token when needed.)
++        // Content types are otherwise untouched by ordinary worksheet edits.
+         for change in &relationship_changes {
+             change.apply(&mut package)?;
+         }
++        for change in &svg_parts {
++            if change.action == super::super::model::GraphAction::Remove {
++                change.validate(&package)?;
++            }
++        }
++        // Additions must exist before the relationship transition. Removals
++        // happen after that transition and before the inverse manifest.
++        for change in &svg_parts {
++            if change.action == super::super::model::GraphAction::Remove {
++                change.apply(&mut package)?;
++            }
++        }
+         for change in &graph {
+             change.validate(&package)?;
+             change.apply(&mut package)?;
+@@ -2725,6 +2894,8 @@ impl Edit {
+                 package_changes: package_changes.into_boxed_slice(),
+                 parts: parts.into_boxed_slice(),
+                 relationships: relationship_changes.into_boxed_slice(),
++                content_types,
++                svg_parts: svg_parts.into_boxed_slice(),
+                 graph: graph.into_boxed_slice(),
+                 web: web_patch,
+                 style_guard,
+@@ -3285,6 +3456,7 @@ impl Edit {
+         self.panes.is_some()
+             || self.defined_names.is_some()
+             || !self.drawings.is_empty()
++            || !self.svg_lifecycle.is_empty()
+             || self.active.is_some()
+             || self.order.as_ref().is_some_and(OrderPlan::is_effective)
+             || self.sheets.values().any(|actions| !actions.is_empty())
+@@ -3406,6 +3578,8 @@ fn project_hyperlink_actions(
+                 owner: owner.clone(),
+                 before: previous_relationship,
+                 after: next_relationship,
++                before_source: None,
++                after_source: None,
+             };
+             apply_relationship_change_to_collection(&mut verification_relationships, &delta)?;
+             physical_changes.push(delta);

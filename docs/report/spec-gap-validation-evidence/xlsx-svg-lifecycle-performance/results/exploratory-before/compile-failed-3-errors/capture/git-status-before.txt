@@ -1,0 +1,121 @@
+ M crates/litchi-opc/src/phys_pkg.rs
+ M crates/litchi-xlsx/src/drawing/mod.rs
+ M crates/litchi-xlsx/src/edit.rs
+ M crates/litchi-xlsx/src/workbook/edit/codec.rs
+ M crates/litchi-xlsx/src/workbook/edit/mod.rs
+ M crates/litchi-xlsx/src/workbook/edit/model.rs
+ M crates/litchi-xlsx/src/workbook/edit/package.rs
+ M crates/litchi-xlsx/src/workbook/edit/semantic/mod.rs
+ M crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+ M crates/litchi-xlsx/src/workbook/edit/semantic/worksheet.rs
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/README.md
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/corpus-manifest.json
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.lock
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.toml
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/main.rs
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/support.rs
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/report.md
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/requirements.md
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/root-review.md
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/run_profile.sh
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/summarize.py
+ M docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/verify.py
+?? and
+?? crates/litchi-docx/src/drawing/source.rs
+?? crates/litchi-xlsx/examples/data_model_profile.rs
+?? crates/litchi-xlsx/examples/survey_catalog_profile.rs
+?? crates/litchi-xlsx/src/drawing/source.rs
+?? crates/litchi-xlsx/src/drawing/source_tests.rs
+?? crates/litchi-xlsx/src/drawing/svg.rs
+?? crates/litchi-xlsx/src/workbook/edit/svg.rs
+?? crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs
+?? crates/litchi-xlsx/tests/drawing_svg_lifecycle.rs
+?? docs/GOAL.md
+?? docs/performance/data-model-workflow-baseline-rust1981.md
+?? docs/performance/data-model-workflow-baseline.md
+?? docs/performance/mce-output-growth.md
+?? docs/performance/results/data-model-workflow-baseline-rust1981/
+?? docs/performance/results/data-model-workflow-baseline/
+?? docs/performance/results/mce-output-growth/
+?? docs/performance/results/security-corpus-v1/
+?? docs/performance/results/spec-gap-baseline/
+?? docs/performance/results/xldm-crc-table/
+?? docs/performance/spec-gap-baseline.md
+?? docs/performance/survey-catalog-sharing.md
+?? docs/performance/xldm-crc-table.md
+?? docs/report/spec-gap-audit.md
+?? docs/report/spec-gap-implementation-status.md
+?? docs/report/spec-gap-odf-review.md
+?? docs/report/spec-gap-validation-evidence/README.md
+?? docs/report/spec-gap-validation-evidence/cfb/
+?? docs/report/spec-gap-validation-evidence/custom-data-connections/
+?? docs/report/spec-gap-validation-evidence/data-model-opaque/
+?? docs/report/spec-gap-validation-evidence/data-model-publication/
+?? docs/report/spec-gap-validation-evidence/docx-ink-authoring-design.md
+?? docs/report/spec-gap-validation-evidence/docx-ink-authoring-final/
+?? docs/report/spec-gap-validation-evidence/docx-ink-authoring-performance/
+?? docs/report/spec-gap-validation-evidence/docx-ink-authoring/
+?? docs/report/spec-gap-validation-evidence/docx-ink-character-performance/
+?? docs/report/spec-gap-validation-evidence/docx-ink-characters/
+?? docs/report/spec-gap-validation-evidence/docx-ink-durable-performance-root-verification.json
+?? docs/report/spec-gap-validation-evidence/docx-ink-durable-performance/
+?? docs/report/spec-gap-validation-evidence/docx-ink-durable/
+?? docs/report/spec-gap-validation-evidence/docx-ink-edit-design.md
+?? docs/report/spec-gap-validation-evidence/docx-ink-inventory/
+?? docs/report/spec-gap-validation-evidence/docx-ink-performance/
+?? docs/report/spec-gap-validation-evidence/docx-ink-read-session-review.md
+?? docs/report/spec-gap-validation-evidence/docx-ink-removal/
+?? docs/report/spec-gap-validation-evidence/docx-ink-session-performance/
+?? docs/report/spec-gap-validation-evidence/docx-ink-session/
+?? docs/report/spec-gap-validation-evidence/docx-ink-source/
+?? docs/report/spec-gap-validation-evidence/docx-revision-stories/
+?? docs/report/spec-gap-validation-evidence/docx-revisions/
+?? docs/report/spec-gap-validation-evidence/docx-signatures-ink/
+?? docs/report/spec-gap-validation-evidence/docx-web-custom-functions-completion.md
+?? docs/report/spec-gap-validation-evidence/docx-web-custom-functions-design.md
+?? docs/report/spec-gap-validation-evidence/docx-web-custom-functions-performance-report-correction.md
+?? docs/report/spec-gap-validation-evidence/docx-web-custom-functions-performance-root-verification.json
+?? docs/report/spec-gap-validation-evidence/docx-web-custom-functions-performance/
+?? docs/report/spec-gap-validation-evidence/docx-web-custom-functions-root-verification.json
+?? docs/report/spec-gap-validation-evidence/docx-web-custom-functions/
+?? docs/report/spec-gap-validation-evidence/local-followup/
+?? docs/report/spec-gap-validation-evidence/mce-output-growth/
+?? docs/report/spec-gap-validation-evidence/native-model-connections-owner-intermediate/
+?? docs/report/spec-gap-validation-evidence/native-model-connections-owner-pre-review/
+?? docs/report/spec-gap-validation-evidence/native-model-connections-owner/
+?? docs/report/spec-gap-validation-evidence/native-model-removal-pre-review/
+?? docs/report/spec-gap-validation-evidence/native-model-removal/
+?? docs/report/spec-gap-validation-evidence/opc-relationship-lifecycle/
+?? docs/report/spec-gap-validation-evidence/opc-relationship-source/
+?? docs/report/spec-gap-validation-evidence/opc-source-publication-hardening-completion.md
+?? docs/report/spec-gap-validation-evidence/opc-source-publication-hardening-root-verification.json
+?? docs/report/spec-gap-validation-evidence/opc-source-publication-hardening-v2-root-verification.json
+?? docs/report/spec-gap-validation-evidence/opc-source-publication-hardening-v2/
+?? docs/report/spec-gap-validation-evidence/opc-source-publication-hardening/
+?? docs/report/spec-gap-validation-evidence/rtf-interop/
+?? docs/report/spec-gap-validation-evidence/survey-catalog-sharing/
+?? docs/report/spec-gap-validation-evidence/survey-properties/
+?? docs/report/spec-gap-validation-evidence/survey-question-sequences/
+?? docs/report/spec-gap-validation-evidence/survey-schema/
+?? docs/report/spec-gap-validation-evidence/survey-source-publication/
+?? docs/report/spec-gap-validation-evidence/survey-strings/
+?? docs/report/spec-gap-validation-evidence/xldm-crc-table/
+?? docs/report/spec-gap-validation-evidence/xldm-tabular-storage-first-final-run/
+?? docs/report/spec-gap-validation-evidence/xldm-tabular-storage-import-run/
+?? docs/report/spec-gap-validation-evidence/xldm-tabular-storage-lifetime-run/
+?? docs/report/spec-gap-validation-evidence/xldm-tabular-storage-raw-ingress-run/
+?? docs/report/spec-gap-validation-evidence/xldm-tabular-storage/
+?? docs/report/spec-gap-validation-evidence/xldm-tabular-xpress/
+?? docs/report/spec-gap-validation-evidence/xlsb-volatile-dependencies-completion.md
+?? docs/report/spec-gap-validation-evidence/xlsb-volatile-dependencies-performance-root-verification.json
+?? docs/report/spec-gap-validation-evidence/xlsb-volatile-dependencies-performance/
+?? docs/report/spec-gap-validation-evidence/xlsb-volatile-dependencies-root-verification.json
+?? docs/report/spec-gap-validation-evidence/xlsb-volatile-dependencies/
+?? docs/report/spec-gap-validation-evidence/xlsx-shared-payloads/
+?? docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/adapter.rs
+?? docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/results/exploratory-before/
+?? docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle/generated/
+?? docs/report/spec-gap-validation.md
+?? docs/report/xldm-tabular-profile.md
+?? tools/generate_security_corpus_catalog.py
+?? tools/validate_security_corpus_catalog.py

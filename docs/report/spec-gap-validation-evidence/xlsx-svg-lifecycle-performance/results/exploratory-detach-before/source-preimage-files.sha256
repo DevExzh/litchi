@@ -1,0 +1,9 @@
+c2ac88298161bd6f85b922e2a9c0f8237279bb82aaeb802c037cdc97fe98bc06  ./crates/litchi-opc/src/package/relationships.rs
+2ddaf604cb6a3ef8e24cad38158608dd5feab056cf45978f2ef292a1ab8e0e20  ./crates/litchi-opc/src/phys_pkg.rs
+1d8e6adf127a00dc25cd801bd90835f41442220ce944ba005cfdfa28e6dd62c2  ./crates/litchi-xlsx/src/drawing/source.rs
+92c0cf4c6f80e84725893ace3ba80fe3a8172c24659aa1db44c2507b57e04417  ./crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+24d2973d89fab50df81bd69a5034dabd2bf518553746d57e95fe05add1cc0898  ./crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs
+64ec008018096f1bf441cb1eccfaf93a4ec98b1c5addd7e7cf6341f8eadee16d  ./crates/litchi-xlsx/tests/drawing_svg_lifecycle.rs
+52eb5b41856fa5cffa30b21451f97d61ef99247dea145236f9668cf531d9bee7  ./docs-harness/Cargo.lock
+ac757292987db580830d7346b18f8dbbfcde3c66ff553dacdd68f36019bd53b0  ./docs-harness/Cargo.toml
+44f7da649c103eb330a3bf7d6617e03a28bd738a969341164a4aef001e35a070  ./docs-harness/adapter.rs

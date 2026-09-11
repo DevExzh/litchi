@@ -1,0 +1,4 @@
+lane	input_bytes	elapsed_ns	requested_alloc_bytes	peak_live_delta	semantic_ok	output_exact
+multi_picture_same_drawing_16	4126	2462820	4132401	653817	True	True
+multi_picture_same_drawing_64	4876	7386359	8748614	1123353	True	True
+multi_picture_same_drawing_256	7692	32882749	28544839	4054897	True	True

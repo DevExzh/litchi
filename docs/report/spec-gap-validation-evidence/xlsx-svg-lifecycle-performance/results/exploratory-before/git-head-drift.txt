@@ -1,0 +1,6 @@
+status=recorded-git-head-drift
+head_at_source_capture=16daf9a07f748ad42e1fc776b2e9675911000985
+head_after_run=d91f9ef5dd08df1dc63f4204a08161e7ee9d36e5
+reason=an isolated source-helper commit advanced HEAD after the executable/source snapshot was captured
+baseline_authority=source-manifest-before.txt equals source-manifest-after.txt equals source-manifest-after-run.txt; source-preimage.sha256 and binary.sha256
+interpretation=do not identify the exploratory executable with the later commit by HEAD alone; source bytes and manifest are the reproducibility authority

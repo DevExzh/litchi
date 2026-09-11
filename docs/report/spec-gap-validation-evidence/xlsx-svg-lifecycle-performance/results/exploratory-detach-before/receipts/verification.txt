@@ -1,0 +1,13 @@
+status=passed
+scope=exploratory-detach-before-six-multi-picture-same-drawing-lanes
+source_root=/var/tmp/litchi-xlsx-svg-detach-isolated-source-1
+fresh_processes=1
+samples_per_process=1
+source_copy_bytes=unavailable
+staged_bytes=unavailable
+lane=multi_picture_same_drawing_detach_shared_16 input_bytes=4654 elapsed_ns=5845534 requested_alloc_bytes=7119087 peak_live_delta=567718 semantic_ok=True output_exact=True
+lane=multi_picture_same_drawing_detach_shared_64 input_bytes=5405 elapsed_ns=66955833 requested_alloc_bytes=54256690 peak_live_delta=757997 semantic_ok=True output_exact=True
+lane=multi_picture_same_drawing_detach_shared_256 input_bytes=8223 elapsed_ns=1006415956 requested_alloc_bytes=776245335 peak_live_delta=1909792 semantic_ok=True output_exact=True
+lane=multi_picture_same_drawing_detach_distinct_16 input_bytes=12242 elapsed_ns=6661957 requested_alloc_bytes=7722264 peak_live_delta=618464 semantic_ok=True output_exact=True
+lane=multi_picture_same_drawing_detach_distinct_64 input_bytes=37316 elapsed_ns=73567270 requested_alloc_bytes=59088918 peak_live_delta=978362 semantic_ok=True output_exact=True
+lane=multi_picture_same_drawing_detach_distinct_256 input_bytes=137369 elapsed_ns=1090813930 requested_alloc_bytes=831189490 peak_live_delta=3085369 semantic_ok=True output_exact=True
