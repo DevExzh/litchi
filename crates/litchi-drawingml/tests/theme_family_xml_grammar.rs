@@ -287,3 +287,22 @@ fn caller_limit_preflight_handles_source_fragments_and_escaped_replacement_names
         added
     );
 }
+
+#[test]
+fn empty_prefixed_bindings_are_rejected_before_attribute_projection() {
+    let source = r#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:x="" x:y="z"/>"#;
+    assert_rejected(source.as_bytes());
+    for body in [
+        r#"<opaque xmlns:x="" x:y="z"/>"#,
+        r#"<opaque xmlns:x=""><child x:y="z"/></opaque>"#,
+        r#"<opaque xmlns:x="urn:vendor"><child xmlns:x="" x:y="z"/></opaque>"#,
+    ] {
+        assert_rejected(theme(body).as_bytes());
+    }
+    let valid =
+        theme(r#"<opaque xmlns="urn:vendor"><child xmlns="" y="z" xml:lang="en"/></opaque>"#);
+    assert!(
+        part::read(valid.as_bytes()).is_ok(),
+        "default namespace reset is legal"
+    );
+}
