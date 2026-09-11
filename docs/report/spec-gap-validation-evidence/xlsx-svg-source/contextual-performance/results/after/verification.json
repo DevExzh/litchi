@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "lanes": 39,
+  "processes_per_lane": 3,
+  "warmup_minimum": 2,
+  "samples_minimum_per_process": 20,
+  "source_manifest_sha256": "622d4b9bda1e1699cf2387b03eb574ea288dd12b693cef2189c080c4d1198081",
+  "manifest_inputs_checked": 4852,
+  "status": "exploratory source-bound evidence; no lifecycle acceptance claim",
+  "snapshot": "after-fc44c4e6c",
+  "expected_commit": "fc44c4e6c945ab07ded7447f40670d898839eeb3"
+}

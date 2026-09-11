@@ -1,0 +1,5 @@
+format=xlsx-svg-contextual-normalized-manifest-v1
+before=docs/report/spec-gap-validation-evidence/xlsx-svg-source/contextual-performance/results/before/source-manifest-before.txt
+after=docs/report/spec-gap-validation-evidence/xlsx-svg-source/contextual-performance/results/after/source-manifest-before.txt
+normalized_sha256=aacacce9411a6d94bc7211b2f6f511ac2d9109bb4155ca683ecaf48e15539c94
+admitted_source_deltas=crates/litchi-xlsx/src/drawing/source.rs,crates/litchi-xlsx/src/drawing/source_tests.rs
