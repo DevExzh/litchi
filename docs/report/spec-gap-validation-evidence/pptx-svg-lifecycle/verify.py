@@ -4,6 +4,7 @@
 import hashlib
 import json
 from pathlib import Path
+import re
 
 HERE = Path(__file__).resolve().parent
 ROOT = next(path for path in HERE.parents if (path / "crates").is_dir())
@@ -30,6 +31,16 @@ def main():
         assert digest(ROOT / name) == expected, name
     for name, expected in gates["logs"].items():
         assert digest(HERE / "gates" / name) == expected, name
+    assert set(gates["logs"]) == {f"{row['name']}.log" for row in gates["commands"]}
+    test_log = (HERE / "gates/tests.log").read_text()
+    totals = re.findall(r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored", test_log)
+    assert totals, "test log contains no successful test summaries"
+    assert "test result: FAILED" not in test_log
+    recomputed_totals = dict(zip(
+        ["passed", "failed", "ignored"],
+        [sum(int(row[i]) for row in totals) for i in range(3)],
+    ))
+    assert gates["test_totals_including_doctests"] == recomputed_totals
     review = json.loads((HERE / "review.json").read_text())
     assert review["verdict"] == "approved"
     required_review = {

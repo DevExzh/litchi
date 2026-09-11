@@ -29,6 +29,12 @@ exist and agree. Preliminary generated output alone is not final evidence.
 Performance measurements are maintained separately in
 `../pptx-svg-lifecycle-performance/`; final measurements must follow source freeze.
 
+`worktree-input.patch` records the pre-existing import-order-only change in OPC
+`phys_pkg.rs` included in the build inputs. It is retained for reproducibility;
+the production file is not part of this feature change. Gate receipts include
+only logs executed by that invocation, and the verifier recomputes test totals
+from the retained test log.
+
 Exact patch inverse means applying the retained inverse to its authorized
 in-memory target snapshot restores the stored source state. An independently
 reopened saved package does not carry that patch provenance. A fresh detach after
@@ -49,6 +55,9 @@ names/prefixes/namespace URIs. Namespace declaration lexical values have a 16 Ki
 preflight bound. Namespace-complete parser fragments are admitted before their
 output allocation and also respect the caller limit passed by the host. These
 are support limits, not claims that larger documents are invalid XML. Namespace
-lookup uses a bounded reverse search; this does not imply fully linear runtime.
+lookup uses a scoped prefix index. Picture records share immutable ancestor
+declaration layers, and source inventory uses one raw layout scan. Parser-only
+namespace closure materialization remains explicit work; this does not imply
+fully linear runtime for every workload.
 The many-picture profile is required to assess host scan amplification separately
 from payload size and inherited-namespace cost.
