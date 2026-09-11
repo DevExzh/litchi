@@ -29,6 +29,55 @@ fn extension(uri: &str, contents: &str) -> String {
 }
 
 #[test]
+fn spaced_uri_diagnostics_are_normalized_while_read_add_and_edit_keep_source_spelling() {
+    for profile in [
+        part::ExtensionProfile::Normative,
+        part::ExtensionProfile::NativeDiscriminator,
+    ] {
+        let uri = profile.uri();
+        for lexical in [format!(" \t{uri}\r\n "), format!("&#x20;{uri}&#9;")] {
+            let attribute = format!("uri=\"{lexical}\"");
+            let source = with_extensions(&extension(&lexical, fragment()));
+            let snapshot = part::read(source.as_bytes()).expect("spaced recognized URI");
+            assert_eq!(snapshot.family_extension_uri(), Some(uri));
+            assert_eq!(snapshot.family_profile(), Some(profile));
+            assert_eq!(snapshot.xml_bytes(), source.as_bytes());
+
+            let removed = snapshot
+                .remove_family()
+                .expect("retain spaced empty extension");
+            let empty = part::read(&removed).expect("read retained empty extension");
+            assert_eq!(empty.family_extension_uri(), None);
+            assert_eq!(empty.family_profile(), None);
+            let detached = Family::new("Added", ID, VID).expect("new family");
+            let added = empty
+                .add_family(&detached)
+                .expect("reuse existing spaced URI");
+            let added_snapshot = part::read(&added).expect("read added family");
+            assert_eq!(added_snapshot.family_extension_uri(), Some(uri));
+            assert_eq!(added_snapshot.family_profile(), Some(profile));
+            assert_eq!(added_snapshot.family(), Some(&detached));
+
+            let replacement = Family::new("Replaced", ID, VID).expect("replacement family");
+            let changed = added_snapshot
+                .replace_family(&replacement)
+                .expect("update with spaced URI");
+            let changed_snapshot = part::read(&changed).expect("read replacement");
+            assert_eq!(changed_snapshot.family_extension_uri(), Some(uri));
+            assert_eq!(changed_snapshot.family_profile(), Some(profile));
+            assert_eq!(changed_snapshot.family(), Some(&replacement));
+            for bytes in [&removed, &added, &changed] {
+                assert!(
+                    std::str::from_utf8(bytes)
+                        .expect("Theme UTF-8")
+                        .contains(&attribute)
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn duplicate_supported_extensions_and_families_refuse_every_scanner_edit() {
     let native = extension(part::NATIVE_EXTENSION_URI, fragment());
     let normative = extension(part::EXTENSION_URI, fragment());
