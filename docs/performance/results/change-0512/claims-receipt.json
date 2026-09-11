@@ -1,0 +1,21 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--evidence-root",
+    ".",
+    "--mode",
+    "strict"
+  ],
+  "started_utc": "2026-09-11T20:46:56.745326+00:00",
+  "elapsed_seconds": 70.95329381600459,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+}

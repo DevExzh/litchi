@@ -1,0 +1,25 @@
+{
+  "verified_utc": "2026-09-11T20:50:13.780503+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0512/verify.py"
+  ],
+  "exit_code": 0,
+  "post_cleanup_replay_matches": true,
+  "source_and_harness_unchanged": true,
+  "native_samples": 720,
+  "preflight_samples": 12,
+  "instrumented_samples_excluded": 36,
+  "summary_sha256": "696c9504ee58c832a8306b2a8cec19d71f2fa92297629bb56aa2826c283c9500",
+  "replay_after_cleanup_sha256": "696c9504ee58c832a8306b2a8cec19d71f2fa92297629bb56aa2826c283c9500",
+  "verifiers": {
+    "verify.py": "b30892b2dbaa74525f9fd656491dd0b27f50085a601e954719a9099a53d0e59f",
+    "analyze.py": "310191f415deb317c322e3f04fdb3ba5b5df7817bad2394b394fb1bc4491ef2d"
+  },
+  "gates_sha256": "89750c4e217e349ff01c3548bad879faa38ec465aae22242091a65a24e3c8d51",
+  "cleanup_sha256": "bc2f3f5ec904aa586d5b3d0b1afaabe1f78b86174b22d3b1001c8e3c6e7a1126",
+  "acceptance_sha256": "7589c2975d000d6dd0a0a636c76a48128298d5bba5d5ba9103f3714cbf93572a",
+  "final_review_sha256": "47ace7565ef2e870ea89a11cad02ae41b8ceaa505ecb643bd509bbb34fa1ca5b",
+  "documentation_manifest_sha256": "f8aac22649f78ae744a2de86e96dbddbc49c0b0c0b47e10e8387281077bb74cc"
+}

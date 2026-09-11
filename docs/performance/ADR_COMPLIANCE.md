@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0512: scoped XLSX evidence without semantic changes
+
+[0512](changes/0512-xlsx-commit-attribution.md) changes profiling artifacts and
+documentation only. All 29 accepted ADRs and the README remain hash-identical;
+[the review](results/change-0512/adr-review.md) separates current instruction
+attribution, native timers and whole-child hardware observations. It preserves
+missing operation-memory/save-phase evidence as open requirements. Future
+parser/snapshot fusion must retain original-byte identity, preprocessing and
+error precedence, bounded memory and the existing Store handoff. No exception
+or new compatibility claim is made.
+
 ## 0511: FAT sector extension preserves checked capacity and errors
 
 [0511](changes/0511-cfb-fat-entry-reservation.md) keeps the exact fallible FAT

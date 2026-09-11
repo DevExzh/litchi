@@ -1,0 +1,101 @@
+{
+  "source_bound_receipts": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-09-11T20:42:22.852754+00:00",
+      "elapsed_seconds": 17.82387775400275,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "boundaries": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "started_utc": "2026-09-11T20:42:40.840869+00:00",
+      "elapsed_seconds": 255.73987384399516,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9"
+    },
+    "claims": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "started_utc": "2026-09-11T20:46:56.745326+00:00",
+      "elapsed_seconds": 70.95329381600459,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+      "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+    }
+  },
+  "additional_checks": {
+    "report-classification.log": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_report_claim_classification.py",
+        "--repo-root",
+        "."
+      ],
+      "exit_code": 0,
+      "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    "python-syntax.log": {
+      "command": "ast.parse all retained *.py scripts",
+      "exit_code": 0,
+      "log_sha256": "69a7368b848ec891e9082a78204b01003e61013b111aabcb548ba43970d42914"
+    },
+    "authored-diff-check.log": {
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check",
+        "--",
+        "docs/performance/changes/0512-xlsx-commit-attribution.md",
+        "docs/performance/BASELINE.md",
+        "docs/performance/REPORT.md",
+        "docs/performance/HOTSPOTS.md",
+        "docs/performance/GOAL_AUDIT.md",
+        "docs/performance/ADR_COMPLIANCE.md",
+        "docs/performance/results/change-0512/run.py",
+        "docs/performance/results/change-0512/capture.py",
+        "docs/performance/results/change-0512/adr-review.md",
+        "docs/performance/results/change-0512/source-review.md",
+        "docs/performance/results/change-0512/scope-review.md",
+        "docs/performance/results/change-0512/verify.py",
+        "docs/performance/results/change-0512/cleanup.py",
+        "docs/performance/results/change-0512/README.md",
+        "docs/performance/results/change-0512/gates.py",
+        "docs/performance/results/change-0512/final-review.md",
+        "docs/performance/results/change-0512/analyze.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "scope": "Authored Markdown/Python only; raw producer whitespace preserved."
+    }
+  },
+  "rust_test_scope": "No Rust source changes; no new Rust test suite claimed. Fresh benchmark correctness oracles and evidence/tooling checks cover this batch."
+}

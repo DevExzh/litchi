@@ -1,0 +1,5 @@
+{
+  "commit": "*litchi_xlsx::workbook::edit::semantic::transaction::Edit*::commit",
+  "runner": "*litchi_perf_baseline::run_xlsx_update_commit",
+  "note": "End-anchored commit pattern permits demangler angle brackets, excludes closures and other edit owners; exact3calls required afterrunnerreset"
+}

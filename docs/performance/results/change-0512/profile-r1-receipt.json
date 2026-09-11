@@ -1,0 +1,43 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*litchi_xlsx::workbook::edit::semantic::transaction::Edit*::commit",
+    "--zero-before=*litchi_perf_baseline::run_xlsx_update_commit",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0512/profile-r1.out",
+    "/tmp/litchi-goal-0512/target/release/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_percent_commit",
+    "--xlsx-shape",
+    "dense-wide",
+    "--samples",
+    "3",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0512/profile-r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0512/profile-r1-catalog.json"
+  ],
+  "started_utc": "2026-09-11T20:35:54.837589+00:00",
+  "elapsed_seconds": 66.76508249399922,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "4a0317050b0a28390a307b89321ad65d76d42a2a6d5619b6a5ba778db8378632",
+  "binary_sha256": "213cb003e87ad35262ef9d71e313a836eb7b26b147d1060e94382b6e0b06c062",
+  "scope": "Commit function only, reset at update-commit runner entry to exclude generator commit; 3 measured commits, no warmups; setup, final readback, save and drop excluded",
+  "artifacts": {
+    "profile-r1-report.json": "35e942141ce79b6b151b80a48570f4fb8b50566cd56a6c680df21382134e9cde",
+    "profile-r1-catalog.json": "85ca54ead293075311c1cea76f2f98ff47c8fb898808a2d88b7426f3221817d6",
+    "profile-r1.log": "bfa313330e4968986e49f7f8c43dc5b79c48951f01ba85416a78be45fb5424f3",
+    "profile-r1.out": "961b0b55c2e57bb2f320c25962fbb3def0258d5f2497c87d9f792f4238453f14",
+    "profile-r1-exclusive.txt": "3f8e6ccf96bac34c40d8fc5e6250323ce81dfece13f5c7344b7df867890c61ff",
+    "profile-r1-inclusive.txt": "03d119ce2d0ae0e4fe716668130186c9aeea5178d00c2ab23ef8ecb37e9b1f93"
+  }
+}

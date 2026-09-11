@@ -1,5 +1,19 @@
 # Performance program phase report
 
+## 0512: current XLSX commit attribution
+
+[0512](changes/0512-xlsx-commit-attribution.md) isolates three dense one-percent
+commit bodies per profile, resetting after fixture generation. Two captures
+differ by 0.012% in simulated instruction references. Direct source Store and
+validation parsing consume about 52%, rewrite 27% and compaction 20%; nested
+snapshot scanning is 25.40%, while shared-formula resolution is only 0.05%.
+These are scoped instruction diagnostics, not phase clocks or a speedup.
+Twelve unchanged native cases retain 720 durations across two repeats with no
+same-build drift flags. Whole-child hardware/RSS remain separate; operation
+allocation and exact save-phase boundaries are still missing. Next work should
+add those observations before attempting parser/snapshot fusion with preserved
+error order and bounded memory. No production or default-matrix change occurs.
+
 ## 0511: CFB FAT decoding after exact reservation
 
 [0511](changes/0511-cfb-fat-entry-reservation.md) extends complete FAT sectors

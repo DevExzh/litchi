@@ -1,0 +1,122 @@
+{
+  "caveats": [
+    "Counter reset retains synthetic costs on active ancestors; never sum top-level exclusive rows.",
+    "Collection-off descendant calls may remain in call-count metadata. Only direct runner-to-commit (3) and named direct commit-child (6) edges are used for invocation proof.",
+    "Both Valgrind logs report brk-segment overflow and then complete successfully; instrumentation timings and RSS are excluded. No allocator/heap conclusion is drawn."
+  ],
+  "decision": "Prioritize the two parser traversals and snapshot layout, with operation-local allocation/phase instrumentation before fusion; shared-formula and plain-tag shortcuts alone cannot explain the major cost.",
+  "profiles": {
+    "profile-r1": {
+      "direct_commit_children": {
+        "compaction": {
+          "direct_calls": 6,
+          "ir": 2426402056,
+          "percent": 20.376676486194196
+        },
+        "rewrite": {
+          "direct_calls": 6,
+          "ir": 3236595155,
+          "percent": 27.180595329259216
+        },
+        "source_store": {
+          "direct_calls": 6,
+          "ir": 3071616936,
+          "percent": 25.795125106993837
+        },
+        "validation_parse": {
+          "direct_calls": 6,
+          "ir": 3069162876,
+          "percent": 25.774516161920594
+        }
+      },
+      "overlapping_diagnostics": {
+        "all_worksheet_parse": {
+          "ir": 6138407178,
+          "percent": 51.54971613106739
+        },
+        "eager_parser": {
+          "ir": 5553828411,
+          "percent": 46.64048339018593
+        },
+        "mce_processing": {
+          "ir": 563387229,
+          "percent": 4.731268370548399
+        },
+        "shared_formula_resolution": {
+          "ir": 5505504,
+          "percent": 0.04623465992539865
+        },
+        "snapshot_cell_address": {
+          "ir": 611286084,
+          "percent": 5.133518059539812
+        },
+        "snapshot_cell_tag": {
+          "ir": 322216593,
+          "percent": 2.705942017238674
+        },
+        "snapshot_scan": {
+          "ir": 3024869979,
+          "percent": 25.40254893968159
+        }
+      },
+      "total_ir": 11907741960
+    },
+    "profile-r2": {
+      "direct_commit_children": {
+        "compaction": {
+          "direct_calls": 6,
+          "ir": 2426410798,
+          "percent": 20.374302101367803
+        },
+        "rewrite": {
+          "direct_calls": 6,
+          "ir": 3236318203,
+          "percent": 27.175004668800426
+        },
+        "source_store": {
+          "direct_calls": 6,
+          "ir": 3073299876,
+          "percent": 25.80615787455798
+        },
+        "validation_parse": {
+          "direct_calls": 6,
+          "ir": 3069276595,
+          "percent": 25.772374830647912
+        }
+      },
+      "overlapping_diagnostics": {
+        "all_worksheet_parse": {
+          "ir": 6140203843,
+          "percent": 51.5586100112886
+        },
+        "eager_parser": {
+          "ir": 5555615760,
+          "percent": 46.6498887767314
+        },
+        "mce_processing": {
+          "ir": 563396501,
+          "percent": 4.73077787309928
+        },
+        "shared_formula_resolution": {
+          "ir": 5505504,
+          "percent": 0.04622910589119825
+        },
+        "snapshot_cell_address": {
+          "ir": 611306854,
+          "percent": 5.13307578844394
+        },
+        "snapshot_cell_tag": {
+          "ir": 322214620,
+          "percent": 2.705600393292277
+        },
+        "snapshot_scan": {
+          "ir": 3024643333,
+          "percent": 25.397594284622045
+        }
+      },
+      "total_ir": 11909172574
+    }
+  },
+  "repeat_ir_change_percent": 0.01201415016218732,
+  "scope": "Three commit bodies only per capture, zeroed at runner entry; direct children are disjoint while named diagnostics overlap. These are simulated instruction costs, not phase clocks or cycles."
+}
