@@ -136,3 +136,33 @@ fn rejects_non_xml_content_after_the_root() {
     let trailing_reference = [SVG_BLIP, b"&future;"].concat();
     assert!(read(&trailing_reference).is_err());
 }
+
+#[test]
+fn retains_default_namespace_undeclaration_through_relationship_edits() {
+    let source = br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns="" r:embed="rIdSvg"><future/></asvg:svgBlip>"#;
+    let mut value = read(source).expect("a default namespace can be cleared");
+    assert_eq!(write(&value).unwrap(), source);
+    assert!(
+        value
+            .namespaces()
+            .iter()
+            .any(|namespace| { namespace.prefix().is_none() && namespace.uri().is_empty() })
+    );
+    value
+        .set_reference(Reference::embedded("rIdUpdated").unwrap())
+        .unwrap();
+    let output = write(&value).unwrap();
+    let reopened = read(&output).unwrap();
+    assert_eq!(reopened.embedded().unwrap().as_str(), "rIdUpdated");
+    assert!(
+        reopened
+            .namespaces()
+            .iter()
+            .any(|namespace| { namespace.prefix().is_none() && namespace.uri().is_empty() })
+    );
+    assert_eq!(reopened.children()[0].as_bytes(), b"<future/>");
+    assert!(Namespace::new(None, "").is_ok());
+    assert!(Namespace::new(Some(""), "").is_ok());
+    assert!(Namespace::new(Some("future"), "").is_err());
+    assert!(read(br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:future="" future:attr="x"/>"#).is_err());
+}
