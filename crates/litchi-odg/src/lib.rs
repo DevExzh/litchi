@@ -11,6 +11,8 @@ mod facade;
 mod flat;
 mod model;
 mod package;
+#[path = "model/transition.rs"]
+pub mod transition;
 
 pub use facade::{
     ActiveContentStatus as PackageActiveContentStatus,
@@ -21,7 +23,8 @@ pub use facade::{
     JoinedEdits as PackageJoinedEdits, LayerChange as PackageLayerChange,
     Lineage as PackageLineage, MergePlan as PackageMergePlan, NameChange as PackageNameChange,
     PageNameChange as PackagePageNameChange, PageStyleChange as PackagePageStyleChange,
-    Patch as PackagePatch, PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
+    PageTransitionChange as PackagePageTransitionChange, Patch as PackagePatch,
+    PathChange as PackagePathChange, PreparedEdit as PackagePreparedEdit,
     ResourceChange as PackageResourceChange, SecurityCapabilities as PackageSecurityCapabilities,
     SecurityLifecycleDisposition as PackageSecurityLifecycleDisposition,
     SecurityLifecycleOperation as PackageSecurityLifecycleOperation,
@@ -45,4 +48,10 @@ pub use litchi_odf_common::{
         SignatureAlgorithm, SignatureValidity, SignatureVerification,
     },
 };
-pub use model::{FormControl, form, group, layer, page, resource, shape, style, style_resource};
+pub use model::{
+    Contour, ContourKind, DrawingAttribute, DrawingAttributeNamespace, EnhancedGeometry,
+    EnhancedGeometryChild, EnhancedGeometryChildKind, FormControl, GluePoint, ImageMap,
+    ImageMapArea, ImageMapAreaShape, auxiliary, enhanced, form, group, layer, page, resource,
+    shape, style, style_resource,
+};
+pub use transition::{Sound as TransitionSound, Transition};

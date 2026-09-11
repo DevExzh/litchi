@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0502: ODG metadata open; regressions and heap reduction retained
+
+[0502](changes/0502-odg-metadata-open.md) records four deterministic ODG
+corpora, two serial repeats, 25 warmups, and 200 samples per child (1,600
+measured samples per phase). Optional-pass gating and parsed-style reuse remove
+duplicate work. The final candidate remains 5.9–6.4% slower on plain p50 and
+53.4–111.1% slower on metadata p50 than the old parser, which exposed less
+metadata. These remain follow-up hotspots, with within-run bootstrap intervals
+and whole-child RSS retained. Boxing optional metadata reduces `Shape` from
+936 to 800 bytes (old baseline: 792); a separate heaptrack comparison reduces
+plain-large peak heap from 13.69M to 12.57M with unchanged allocation counts.
+Hardware counters were unavailable. These scoped measurements do not establish
+a CRUD speedup or complete the broader performance goal.
+
 ## 0501: redundant PPTX payload hashing is a scoped preparation hotspot
 
 [0501](changes/0501-pptx-exact-payload-comparisons.md) removes only the image

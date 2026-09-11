@@ -1,0 +1,54 @@
+{
+  "schema": "litchi.odg.heaptrack-receipt.v1",
+  "corpus": "plain-large",
+  "input_bytes": 49143,
+  "input_sha256": "1c8ba0a184b37a0b3cb5ed1c0a2ba987d665b25b21feffc46c3e6e6466e4bb84",
+  "protocol": {
+    "cpu_affinity": "2",
+    "warmups": 25,
+    "samples": 200,
+    "tool": "heaptrack 1.5.0",
+    "summary_tool": "heaptrack_print 1.5.0",
+    "raw_trace_format": "heaptrack .heaptrack.gz.zst",
+    "debuginfod": "disabled by heaptrack for recording"
+  },
+  "before": {
+    "label": "0502 pre-boxing candidate",
+    "shape_size_bytes": 936,
+    "binary_sha256": "caf9cc658ab5a1aea5a2ae5dc50b6292a546bbcd855a84b1e4bf317d3573ddfa",
+    "raw_trace_sha256": "586a3add38822d802007427902173ab5a5572c49674ccaba303a3126dfefa7e3",
+    "probe_p50_ns": 319318884,
+    "heaptrack": {
+      "runtime_seconds": 72.36,
+      "allocation_calls": 174853447,
+      "temporary_allocation_calls": 124131942,
+      "peak_heap_display": "13.69M",
+      "peak_rss_display": "23.29M (including heaptrack overhead)",
+      "memory_leaked_display": "544B"
+    }
+  },
+  "after": {
+    "label": "0502 boxed metadata candidate",
+    "shape_size_bytes": 800,
+    "binary_sha256": "9a2615a451c0d498de5658363876a9fe7b3839c9eca1eb7a1decc1603a4d6732",
+    "raw_trace_sha256": "adf05571b57a20693d17d5f93df3d2c5fbdd04b53888fa7ca3c0596adc8549f2",
+    "probe_p50_ns": 317054005,
+    "heaptrack": {
+      "runtime_seconds": 71.72,
+      "allocation_calls": 174853447,
+      "temporary_allocation_calls": 124131942,
+      "peak_heap_display": "12.57M",
+      "peak_rss_display": "24.10M (including heaptrack overhead)",
+      "memory_leaked_display": "544B"
+    }
+  },
+  "change_percent": {
+    "probe_p50": -0.7099661266838947,
+    "runtime": -0.8844665561103431,
+    "allocation_calls": 0.0,
+    "temporary_allocation_calls": 0.0,
+    "peak_heap_display": -8.181154127100065,
+    "peak_rss_display": 3.477887505367727
+  },
+  "limitations": "Whole-child heaptrack includes package generation, warmups, report serialization, process setup, and profiler overhead. Display-unit peak heap and peak RSS values are retained exactly as emitted by heaptrack_print; they are not operation-local allocation or resident-memory measurements. This pair was captured before later source-formatting and inverse-only edits; the final timing binary and source manifests are recorded separately."
+}

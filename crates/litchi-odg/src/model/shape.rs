@@ -4,6 +4,11 @@ use litchi_core::Position;
 use litchi_odf_common::drawing::Frame;
 use std::borrow::Cow;
 
+use super::{
+    auxiliary::{Contour, GluePoint, ImageMap},
+    enhanced::EnhancedGeometry,
+};
+
 /// Selector for a shape on one drawing page.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -57,6 +62,12 @@ pub enum ShapeKind {
     Polyline,
     Rectangle,
     RegularPolygon,
+    ThreeDimensionalScene,
+    ThreeDimensionalLight,
+    ThreeDimensionalCube,
+    ThreeDimensionalSphere,
+    ThreeDimensionalExtrude,
+    ThreeDimensionalRotate,
 }
 
 impl ShapeKind {
@@ -78,12 +89,40 @@ impl ShapeKind {
             Self::Polyline => "polyline",
             Self::Rectangle => "rect",
             Self::RegularPolygon => "regular-polygon",
+            Self::ThreeDimensionalScene => "dr3d:scene",
+            Self::ThreeDimensionalLight => "dr3d:light",
+            Self::ThreeDimensionalCube => "dr3d:cube",
+            Self::ThreeDimensionalSphere => "dr3d:sphere",
+            Self::ThreeDimensionalExtrude => "dr3d:extrude",
+            Self::ThreeDimensionalRotate => "dr3d:rotate",
         }
+    }
+
+    /// Whether this is an inert OpenDocument 3D element.
+    #[must_use]
+    pub const fn is_three_dimensional(self) -> bool {
+        matches!(
+            self,
+            Self::ThreeDimensionalScene
+                | Self::ThreeDimensionalLight
+                | Self::ThreeDimensionalCube
+                | Self::ThreeDimensionalSphere
+                | Self::ThreeDimensionalExtrude
+                | Self::ThreeDimensionalRotate
+        )
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct ShapeMetadata {
+    enhanced_geometry: Option<EnhancedGeometry>,
+    image_map: Option<ImageMap>,
+    contours: Vec<Contour>,
+    glue_points: Vec<GluePoint>,
+}
+
 /// One bounded, inert shape view from `content.xml`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Shape {
     control_reference: Option<String>,
     name: Option<String>,
@@ -105,7 +144,37 @@ pub struct Shape {
     kind: ShapeKind,
     text: String,
     frame: Option<Frame>,
+    metadata: Option<Box<ShapeMetadata>>,
+    source_backed: bool,
 }
+
+impl PartialEq for Shape {
+    fn eq(&self, other: &Self) -> bool {
+        self.control_reference == other.control_reference
+            && self.name == other.name
+            && self.layer == other.layer
+            && self.style_name == other.style_name
+            && self.text_style_name == other.text_style_name
+            && self.z_index == other.z_index
+            && self.x == other.x
+            && self.y == other.y
+            && self.width == other.width
+            && self.height == other.height
+            && self.path_data == other.path_data
+            && self.transform == other.transform
+            && self.points == other.points
+            && self.view_box == other.view_box
+            && self.line_geometry == other.line_geometry
+            && self.title == other.title
+            && self.description == other.description
+            && self.kind == other.kind
+            && self.text == other.text
+            && self.frame == other.frame
+            && self.metadata == other.metadata
+    }
+}
+
+impl Eq for Shape {}
 
 pub(crate) struct Properties {
     pub(crate) control_reference: Option<String>,
@@ -126,7 +195,7 @@ impl Shape {
     /// Creates a detached shape value for structural insertion.
     #[must_use]
     pub fn new(kind: ShapeKind) -> Self {
-        Self::parsed(
+        let mut shape = Self::parsed(
             Properties {
                 control_reference: None,
                 geometry: [None, None, None, None],
@@ -143,7 +212,9 @@ impl Shape {
             },
             kind,
             None,
-        )
+        );
+        shape.source_backed = false;
+        shape
     }
 
     pub(crate) fn parsed(properties: Properties, kind: ShapeKind, frame: Option<Frame>) -> Self {
@@ -183,6 +254,8 @@ impl Shape {
             kind,
             text: String::new(),
             frame,
+            metadata: None,
+            source_backed: true,
         }
     }
 
@@ -328,6 +401,30 @@ impl Shape {
         }
     }
 
+    pub(crate) fn set_enhanced_geometry(&mut self, geometry: EnhancedGeometry) {
+        self.metadata_mut().enhanced_geometry = Some(geometry);
+    }
+
+    pub(crate) fn set_image_map(&mut self, image_map: ImageMap) -> bool {
+        if self
+            .metadata
+            .as_ref()
+            .is_some_and(|metadata| metadata.image_map.is_some())
+        {
+            return false;
+        }
+        self.metadata_mut().image_map = Some(image_map);
+        true
+    }
+
+    pub(crate) fn push_contour(&mut self, contour: Contour) {
+        self.metadata_mut().contours.push(contour);
+    }
+
+    pub(crate) fn push_glue_point(&mut self, glue_point: GluePoint) {
+        self.metadata_mut().glue_points.push(glue_point);
+    }
+
     /// The optional `draw:name` selector.
     #[must_use]
     pub fn name(&self) -> Option<&str> {
@@ -446,5 +543,47 @@ impl Shape {
     #[must_use]
     pub fn frame(&self) -> Option<&Frame> {
         self.frame.as_ref()
+    }
+
+    /// Inert `draw:enhanced-geometry` metadata for a custom shape.
+    #[must_use]
+    pub fn enhanced_geometry(&self) -> Option<&EnhancedGeometry> {
+        self.metadata
+            .as_deref()
+            .and_then(|metadata| metadata.enhanced_geometry.as_ref())
+    }
+
+    /// Inert image-map metadata owned by a direct `draw:frame` child.
+    #[must_use]
+    pub fn image_map(&self) -> Option<&ImageMap> {
+        self.metadata
+            .as_deref()
+            .and_then(|metadata| metadata.image_map.as_ref())
+    }
+
+    /// Inert image contours owned by direct `draw:frame` children.
+    #[must_use]
+    pub fn contours(&self) -> &[Contour] {
+        self.metadata
+            .as_deref()
+            .map_or(&[], |metadata| metadata.contours.as_slice())
+    }
+
+    /// Inert glue points owned directly by this drawing shape.
+    #[must_use]
+    pub fn glue_points(&self) -> &[GluePoint] {
+        self.metadata
+            .as_deref()
+            .map_or(&[], |metadata| metadata.glue_points.as_slice())
+    }
+
+    fn metadata_mut(&mut self) -> &mut ShapeMetadata {
+        self.metadata
+            .get_or_insert_with(|| Box::new(ShapeMetadata::default()))
+            .as_mut()
+    }
+
+    pub(crate) const fn source_backed(&self) -> bool {
+        self.source_backed
     }
 }

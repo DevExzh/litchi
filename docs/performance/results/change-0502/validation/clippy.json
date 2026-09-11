@@ -1,0 +1,2667 @@
+{
+  "cargo_env": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+  },
+  "child_rss": {
+    "high_water_bytes": 364789760,
+    "measurement": "sampled_summed_descendant_process_tree_high_water",
+    "platform": "linux",
+    "reason": "one or more phase RSS samples were partial or unavailable",
+    "sample_interval_ms": 20,
+    "scope": "sampled-descendant-process-tree",
+    "status": "partial"
+  },
+  "claim_scope": "no performance claim",
+  "cleanup": {
+    "disposition": "retained_by_policy",
+    "failure_artifacts": "failing phase/root retained",
+    "package_clean_commands": [],
+    "package_clean_scopes": [],
+    "prior_successful_lib_test_roots": "may be cleaned",
+    "recursive": false
+  },
+  "clock": {
+    "monotonic": true,
+    "name": "time.monotonic_ns",
+    "unit": "ns"
+  },
+  "elapsed_ns": 23530303840,
+  "env_keys": [
+    "CARGO_BUILD_JOBS",
+    "CARGO_INCREMENTAL",
+    "CARGO_PROFILE_DEV_DEBUG",
+    "CARGO_PROFILE_TEST_DEBUG",
+    "CARGO_TARGET_DIR"
+  ],
+  "error": null,
+  "feature_unification": {
+    "aggregate_guard": "existing workspace CI",
+    "aggregate_workspace_unification": "not_claimed",
+    "gate_scope": "per-package-root --all-features"
+  },
+  "host": {
+    "machine": "x86_64",
+    "os_name": "posix",
+    "platform": "linux",
+    "python_implementation": "CPython",
+    "python_version": "3.14.4"
+  },
+  "limitations": {
+    "interruption": "KeyboardInterrupt returns 130 and requests best-effort child or process-group termination; SIGTERM handling is not guaranteed",
+    "rss": "20 ms sampled sums of readable descendant VmRSS values; short-lived processes and unreadable descendants may be missed; this is not an OS or child-process peak-RSS measurement",
+    "target_scan": "logical regular-file entries are counted with lstat without following symlinks; concurrent changes or access errors produce incomplete/unavailable status; traversal is bounded by explicit entry=100000, directory=20000, depth=64 caps"
+  },
+  "mode": "clippy",
+  "outcome": "passed",
+  "phases": [
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-biff",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 93986816,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103001661,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 1,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-biff",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-cfb",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95969280,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102318878,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 2,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-cfb",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-codepage",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 79208448,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 105497359,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 3,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-codepage",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-core",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96247808,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104092744,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 4,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-core",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-crypto",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96104448,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104228023,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 5,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-crypto",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-doc",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96038912,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104412275,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 6,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-doc",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-docx",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 105254912,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 126127377,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 7,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-docx",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-drawingml",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95907840,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104319564,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 8,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-drawingml",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-eval",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95690752,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104226084,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 9,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-eval",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-fonts",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95977472,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103685421,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 10,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-fonts",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-formula",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96714752,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103465001,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 11,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-formula",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-imgconv",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95793152,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104222644,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 12,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-imgconv",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-markdown",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96206848,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103685301,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 13,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-markdown",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odb",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96018432,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104360944,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 14,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odb",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odc",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96235520,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 107203615,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 15,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odc",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odf",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 364789760,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 751907251,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 16,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odf",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odf-common",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95928320,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102365035,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 17,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odf-common",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odf-formula",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96055296,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104174872,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 18,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odf-formula",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odg",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95842304,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103156578,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 19,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odg",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odi",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95932416,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104347463,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 20,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odi",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odm",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96047104,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104157752,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 21,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odm",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odp",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95813632,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104180172,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 22,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odp",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odraw",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 80003072,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103742700,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 23,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odraw",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-ods",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95956992,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104358653,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 24,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-ods",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-odt",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96006144,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 104263892,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 25,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-odt",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-ograph",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96210944,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103261888,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 26,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-ograph",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-ole-common",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96075776,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103264369,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 27,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-ole-common",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-ooxml-common",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95932416,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103730700,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 28,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-ooxml-common",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-opc",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95760384,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102800727,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 29,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-opc",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-oth",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95858688,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103744761,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 30,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-oth",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-ppt",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 105103360,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 127901489,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 31,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-ppt",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-pptx",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 102330368,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 127739257,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 32,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-pptx",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-rtf",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95891456,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102709286,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 33,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-rtf",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-sheet",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96251904,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103006367,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 34,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-sheet",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-sign",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96043008,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103519040,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 35,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-sign",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-slide",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96022528,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 103614120,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 36,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-slide",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-spreadsheet-drawing",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 97259520,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 127461646,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 37,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-spreadsheet-drawing",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-vba",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95764480,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102193434,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 38,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-vba",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-word",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95784960,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102168784,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 39,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-word",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-xls",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95801344,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102238644,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 40,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-xls",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-xlsb",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95858688,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 125998321,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 41,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-xlsb",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi-xlsx",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95739904,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 101872682,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 42,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/litchi-xlsx",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "soapberry-zip",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96120832,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 101953713,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 43,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/soapberry-zip",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "xml-minifier",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96399360,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 101902603,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 44,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/xml-minifier",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "xml-minifier-macros",
+        "--all-features",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 96346112,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 102128184,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 45,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "bulk/xml-minifier-macros",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 95969280,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 101904633,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 46,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "facade-default-feature",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--package",
+        "litchi",
+        "--no-default-features",
+        "--features",
+        "automatic-fonts,cfb,doc,docx,drawingml,encryption,eval,font-discovery,font-subset,fonts,formula,images,legacy,markdown,odf,odf-common,odp,ods,odt,ole,ooxml,ooxml-common,opc,ppt,pptx,rtf,sheet,sign,vba-inspection,web-functions,xls,xlsb,xlsx,yaml",
+        "--lib",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cargo_env": {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi/target"
+      },
+      "child_rss": {
+        "high_water_bytes": 122503168,
+        "measurement": "sampled_summed_descendant_process_tree_high_water",
+        "platform": "linux",
+        "reason": "one or more process-tree samples were unreadable",
+        "sample_interval_ms": 20,
+        "scope": "sampled-descendant-process-tree",
+        "status": "partial"
+      },
+      "elapsed_ns": 173519433,
+      "env_keys": [
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR"
+      ],
+      "index": 47,
+      "mode": "clippy",
+      "returncode": 0,
+      "scope": "facade-safe-features",
+      "status": "passed",
+      "target_after": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      },
+      "target_before": {
+        "reason": "target scan entry cap reached",
+        "regular_file_bytes": null,
+        "regular_file_count": null,
+        "status": "incomplete"
+      }
+    }
+  ],
+  "target_after": {
+    "reason": "target scan entry cap reached",
+    "regular_file_bytes": null,
+    "regular_file_count": null,
+    "status": "incomplete"
+  },
+  "target_before": {
+    "reason": "target scan entry cap reached",
+    "regular_file_bytes": null,
+    "regular_file_count": null,
+    "status": "incomplete"
+  },
+  "target_dir": "/home/zhuhe/code/litchi/target",
+  "target_scan_limits": {
+    "max_depth": 64,
+    "max_directories": 20000,
+    "max_entries": 100000
+  },
+  "version": 1
+}

@@ -1,0 +1,40 @@
+{
+  "schema": "litchi.odg.shape-layout.v1",
+  "probe": "docs/performance/probes/0502-odg-open/src/bin/shape-size.rs",
+  "before": {
+    "revision": "f3f9221171864fd48b02f7758dc2ebb1d14f9022",
+    "shape_size_bytes": 792,
+    "shape_align_bytes": 8
+  },
+  "after": {
+    "revision": "working-tree-odg-0502-final",
+    "shape_size_bytes": 800,
+    "shape_align_bytes": 8
+  },
+  "intermediate_before_boxing": {
+    "revision": "working-tree-odg-0502-pre-boxing",
+    "shape_size_bytes": 936,
+    "shape_align_bytes": 8
+  },
+  "delta": {
+    "bytes": 8,
+    "percent": 1.0101010101010102,
+    "plain_small_shape_count": 256,
+    "plain_small_struct_bytes": 2048,
+    "plain_large_shape_count": 8192,
+    "plain_large_struct_bytes": 65536,
+    "metadata_small_shape_count": 128,
+    "metadata_small_struct_bytes": 1024,
+    "metadata_large_shape_count": 2048,
+    "metadata_large_struct_bytes": 16384
+  },
+  "intermediate_before_boxing_delta": {
+    "bytes": 144,
+    "percent": 18.181818181818183,
+    "plain_small_struct_bytes": 36864,
+    "plain_large_struct_bytes": 1179648,
+    "metadata_small_struct_bytes": 18432,
+    "metadata_large_struct_bytes": 294912
+  },
+  "interpretation": "The final boxed representation retains an 8-byte per-shape pointer over clean HEAD; the pre-boxing candidate's 144-byte inline increase is retained for audit. Struct-footprint arithmetic is not an allocation or RSS measurement; it identifies cold per-shape layout cost for the representation decision."
+}
