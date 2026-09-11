@@ -1,0 +1,12 @@
+{
+  "verdict": "approved",
+  "reviewer": "theme_family_final_review",
+  "scope": "New empty-container removal closure; existing malformed recognized content still fails closed.",
+  "source_hashes": {
+    "crates/litchi-drawingml/src/theme/family/part.rs": "177cb661e1ce3dbef7eabd153cd6f2769ef4d1559990172f71c2c471b858c426",
+    "crates/litchi-xlsb/src/theme.rs": "9193d579c2951940b4943b396fd6249a35a0c1743dff183e168f3556a5a0a8f8",
+    "crates/litchi-xlsb/src/theme/lifecycle.rs": "c663b8cde2191539a554cadf78987c3f2d51a9faddbc2bd5813aecbad685dd70"
+  },
+  "range_and_output_bounds_checked": true,
+  "opaque_content_and_attribute_retention_checked": true
+}

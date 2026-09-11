@@ -187,8 +187,9 @@ impl Snapshot {
         add_family_source_with_limit(self.source.as_ref(), family, uri, max_xml_bytes)
     }
 
-    /// Remove the recognized direct family owner, preserving its extension
-    /// container and all unrelated source bytes.
+    /// Remove the recognized direct family owner and its semantically empty
+    /// extension/list containers. XML whitespace alone does not retain a
+    /// container; comments, unrelated content, and foreign attributes do.
     pub fn remove_family(&self) -> Result<Vec<u8>> {
         remove_family_source(self.source.as_ref())
     }
@@ -317,7 +318,8 @@ pub fn add_family_with_uri_limit(
     add_family_source_with_limit(xml, family, uri, max_xml_bytes)
 }
 
-/// Remove a direct recognized family from a complete Theme part.
+/// Remove a direct recognized family and empty enclosing extension/list
+/// containers. Preserve comments, unrelated content, and foreign attributes.
 pub fn remove_family(xml: &[u8]) -> Result<Vec<u8>> {
     remove_family_source(xml)
 }
@@ -471,10 +473,27 @@ fn remove_family_source_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<V
     // malformed supported owner must refuse the edit rather than being
     // silently sanitized by removal.
     let _ = parse_family(xml, &scanned)?;
+    let mut removal = candidate.family_range.clone();
+    if let Some(extension) = scanned.root.admitted_ext.as_ref()
+        && empty_container_after_removal(
+            xml,
+            &extension.range,
+            extension.end_start,
+            &removal,
+            true,
+        )?
+    {
+        removal = extension.range.clone();
+        if let Some(list) = scanned.root.ext_list.as_ref()
+            && empty_container_after_removal(xml, &list.range, list.end_start, &removal, false)?
+        {
+            removal = list.range.clone();
+        }
+    }
     let output = splice_with_limit(
         xml,
         &[Replacement {
-            range: candidate.family_range.clone(),
+            range: removal,
             bytes: Vec::new(),
         }],
         max_xml_bytes,
@@ -484,6 +503,51 @@ fn remove_family_source_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<V
         return Err(invalid("removed Theme Family owner remains present"));
     }
     Ok(output)
+}
+
+fn empty_container_after_removal(
+    xml: &[u8],
+    container: &Range<usize>,
+    end_start: Option<usize>,
+    removed: &Range<usize>,
+    extension: bool,
+) -> Result<bool> {
+    let open_end = container.start + open_tag_end(&xml[container.clone()])?;
+    let close_start =
+        end_start.ok_or_else(|| invalid("Theme container closing span is missing"))?;
+    if removed.start < open_end || removed.end > close_start {
+        return Err(invalid("Theme removal span lies outside its container"));
+    }
+    // Namespace declarations and the selected extension's discriminator belong
+    // to the wrapper. Other attributes are opaque metadata and retain it.
+    let mut reader = NsReader::from_reader(&xml[container.start..open_end]);
+    let Event::Start(element) = reader.read_event().map_err(xml_error)? else {
+        return Err(invalid("Theme container opening tag is missing"));
+    };
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let name = attribute.key.as_ref();
+        if namespace_declaration(name).is_none() && !(extension && name == b"uri") {
+            return Ok(false);
+        }
+    }
+    Ok(only_xml_whitespace(&xml[open_end..removed.start])?
+        && only_xml_whitespace(&xml[removed.end..close_start])?)
+}
+
+fn only_xml_whitespace(xml: &[u8]) -> Result<bool> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        match reader.read_event().map_err(xml_error)? {
+            Event::Text(value) if is_xml_whitespace(value.as_ref()) => {},
+            Event::CData(value) if is_xml_whitespace(value.as_ref()) => {},
+            Event::GeneralRef(value)
+                if family_codec::validate_general_ref(&value)?
+                    .is_some_and(is_xml_whitespace_character) => {},
+            Event::Eof => return Ok(true),
+            _ => return Ok(false),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

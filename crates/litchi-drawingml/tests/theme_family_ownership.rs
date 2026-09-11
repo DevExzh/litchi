@@ -37,7 +37,10 @@ fn spaced_uri_diagnostics_are_normalized_while_read_add_and_edit_keep_source_spe
         let uri = profile.uri();
         for lexical in [format!(" \t{uri}\r\n "), format!("&#x20;{uri}&#9;")] {
             let attribute = format!("uri=\"{lexical}\"");
-            let source = with_extensions(&extension(&lexical, fragment()));
+            let source = with_extensions(&extension(
+                &lexical,
+                &format!("{}<!-- retain spaced URI wrapper -->", fragment()),
+            ));
             let snapshot = part::read(source.as_bytes()).expect("spaced recognized URI");
             assert_eq!(snapshot.family_extension_uri(), Some(uri));
             assert_eq!(snapshot.family_profile(), Some(profile));
@@ -45,10 +48,15 @@ fn spaced_uri_diagnostics_are_normalized_while_read_add_and_edit_keep_source_spe
 
             let removed = snapshot
                 .remove_family()
-                .expect("retain spaced empty extension");
+                .expect("retain spaced extension because its comment is opaque content");
             let empty = part::read(&removed).expect("read retained empty extension");
             assert_eq!(empty.family_extension_uri(), None);
             assert_eq!(empty.family_profile(), None);
+            assert!(
+                std::str::from_utf8(&removed)
+                    .expect("Theme UTF-8")
+                    .contains("<!-- retain spaced URI wrapper -->")
+            );
             let detached = Family::new("Added", ID, VID).expect("new family");
             let added = empty
                 .add_family(&detached)
@@ -182,36 +190,161 @@ fn inherited_bindings_used_only_by_opaque_descendants_survive_detached_replaceme
 }
 
 #[test]
-fn removal_retains_empty_wrappers_and_exact_whitespace_comments_and_payload() {
-    for (list_prefix, ext_prefix, ext_suffix, list_suffix) in [
-        ("", "", "", ""),
-        (" \r\n", "\t ", "\r\n ", "\t"),
+fn removal_of_sole_family_closes_empty_wrappers_and_normative_add_recreates_owner() {
+    let source = NATIVE;
+    let list_start = source.find("<a:extLst>").expect("native extension list");
+    let list_end = source
+        .find("</a:extLst>")
+        .expect("native extension list end")
+        + "</a:extLst>".len();
+    let expected = format!("{}{}", &source[..list_start], &source[list_end..]);
+    let removed = part::remove_family(source.as_bytes()).expect("remove sole native family");
+    assert_eq!(removed, expected.as_bytes());
+    assert!(
+        !std::str::from_utf8(&removed)
+            .expect("Theme UTF-8")
+            .contains("<a:extLst>")
+    );
+    assert!(
+        part::read(&removed)
+            .expect("reopen family-free Theme")
+            .family()
+            .is_none()
+    );
+
+    let detached = Family::new("Normative", ID, VID).expect("normative family");
+    let added = part::add_family(&removed, &detached).expect("add default normative family");
+    let reopened = part::read(&added).expect("reopen normative family");
+    assert_eq!(
+        reopened.family_profile(),
+        Some(part::ExtensionProfile::Normative)
+    );
+    assert_eq!(reopened.family(), Some(&detached));
+}
+
+#[test]
+fn removal_ignores_xml_whitespace_when_closing_empty_wrappers() {
+    let cases = [
         (
-            "<!-- list-before -->",
-            "<!-- ext-before -->",
-            "<!-- ext-after -->",
-            "<!-- list-after -->",
+            "literal whitespace",
+            format!(
+                "\n {} \t",
+                extension(
+                    part::NATIVE_EXTENSION_URI,
+                    &format!("\r\n \t{} \r\n", fragment())
+                )
+            ),
         ),
         (
-            "",
-            "<v:opaque xmlns:v=\"urn:vendor\">keep</v:opaque>",
-            "",
-            "",
+            "CDATA whitespace",
+            format!(
+                "<![CDATA[\r\n \t]]>{}<![CDATA[\r\n]]>",
+                extension(
+                    part::NATIVE_EXTENSION_URI,
+                    &format!("<![CDATA[\r\n]]>{}<![CDATA[\t]]>", fragment())
+                )
+            ),
+        ),
+        (
+            "reference whitespace",
+            format!(
+                "&#10;{}&#x20;",
+                extension(
+                    part::NATIVE_EXTENSION_URI,
+                    &format!("&#13;{}&#9;", fragment())
+                )
+            ),
+        ),
+    ];
+    for (label, contents) in cases {
+        let source = with_extensions(&contents);
+        let list_start = source.find("<a:extLst>").expect("extension list");
+        let list_end =
+            source.find("</a:extLst>").expect("extension list end") + "</a:extLst>".len();
+        let expected = format!("{}{}", &source[..list_start], &source[list_end..]);
+        let removed = part::remove_family(source.as_bytes())
+            .unwrap_or_else(|error| panic!("remove {label} wrappers: {error:?}"));
+        assert_eq!(removed, expected.as_bytes(), "{label}");
+        assert!(
+            !std::str::from_utf8(&removed)
+                .expect("Theme UTF-8")
+                .contains("<a:extLst>"),
+            "{label}"
+        );
+    }
+}
+
+#[test]
+fn removal_retains_comments_payload_siblings_and_foreign_attributes() {
+    let comment_source = with_extensions(&format!(
+        "<!-- list-before -->{}<!-- list-after -->",
+        extension(
+            part::NATIVE_EXTENSION_URI,
+            &format!("<!-- ext-before -->{}<!-- ext-after -->", fragment()),
+        )
+    ));
+    let payload_source = with_extensions(
+        extension(
+            part::NATIVE_EXTENSION_URI,
+            &format!(
+                "{}<v:payload xmlns:v=\"urn:vendor\">keep</v:payload>",
+                fragment()
+            ),
+        )
+        .as_str(),
+    );
+    let sibling_source = with_extensions(&format!(
+        "{}{}",
+        extension(part::NATIVE_EXTENSION_URI, fragment()),
+        extension(
+            "urn:unrelated",
+            "<v:sibling xmlns:v=\"urn:vendor\" marker=\"keep\"/>",
+        ),
+    ));
+    let foreign_attribute_source = with_extensions(&format!(
+        "<a:ext uri=\"{}\" v:marker=\"keep\">{}</a:ext>",
+        part::NATIVE_EXTENSION_URI,
+        fragment()
+    ))
+    .replacen("<a:theme ", "<a:theme xmlns:v=\"urn:vendor\" ", 1);
+
+    for (label, source, retained) in [
+        (
+            "comments",
+            comment_source,
+            ["<!-- list-before -->", "<!-- ext-after -->"].as_slice(),
+        ),
+        ("payload", payload_source, ["<v:payload"].as_slice()),
+        (
+            "sibling",
+            sibling_source,
+            ["urn:unrelated", "v:sibling"].as_slice(),
+        ),
+        (
+            "foreign attribute",
+            foreign_attribute_source,
+            ["v:marker=\"keep\""].as_slice(),
         ),
     ] {
-        let body = format!("{ext_prefix}{}{ext_suffix}", fragment());
-        let source = with_extensions(&format!(
-            "{list_prefix}{}{list_suffix}",
-            extension(part::NATIVE_EXTENSION_URI, &body)
-        ));
-        let snapshot = part::read(source.as_bytes()).expect("removal source");
-        let removed = snapshot.remove_family().expect("remove selected element");
-        assert_eq!(removed, source.replacen(fragment(), "", 1).as_bytes());
-        let reopened = part::read(&removed).expect("retained wrappers remain readable");
-        assert!(reopened.family().is_none());
-        assert_eq!(
-            reopened.remove_family().expect("second removal no-op"),
-            removed
+        let snapshot = part::read(source.as_bytes()).expect("retention source");
+        let removed = snapshot
+            .remove_family()
+            .expect("remove retained-family source");
+        let text = std::str::from_utf8(&removed).expect("Theme UTF-8");
+        assert!(text.contains("<a:extLst>"), "{label} retains extLst");
+        assert!(text.contains("<a:ext "), "{label} retains ext");
+        for marker in retained {
+            assert!(text.contains(marker), "{label} retains {marker}");
+        }
+        assert!(
+            !text.contains("themeFamily"),
+            "{label} removes family element"
+        );
+        assert!(
+            part::read(&removed)
+                .expect("reopen retained wrappers")
+                .family()
+                .is_none()
         );
     }
 }
