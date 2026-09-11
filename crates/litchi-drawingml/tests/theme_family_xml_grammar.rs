@@ -306,3 +306,43 @@ fn empty_prefixed_bindings_are_rejected_before_attribute_projection() {
         "default namespace reset is legal"
     );
 }
+
+#[test]
+fn standalone_document_markup_cannot_be_embedded_as_a_family_child() {
+    use litchi_drawingml::theme::family;
+    let value = Family::new(
+        "Standalone",
+        "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}",
+        "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}",
+    )
+    .expect("family");
+    let fragment = String::from_utf8(family::write(&value).expect("write family")).expect("UTF-8");
+    let source = theme("");
+    for prefix in [
+        "<?xml version='1.0'?>",
+        "\u{feff}<?xml version='1.0'?>",
+        "<?xml version='1.0'?><!-- prolog -->",
+    ] {
+        let standalone = format!("{prefix}{fragment}");
+        let parsed = family::read(standalone.as_bytes()).expect("valid standalone declaration");
+        assert!(part::add_family(source.as_bytes(), &parsed).is_err());
+        assert!(part::replace_family(source.as_bytes(), &parsed).is_err());
+    }
+    for standalone in [
+        format!("<?future data?>{fragment}"),
+        fragment.replace("/>", "><?future data?></thm15:themeFamily>"),
+    ] {
+        assert!(
+            family::read(standalone.as_bytes()).is_err(),
+            "actual PI must be rejected"
+        );
+    }
+    let commented = family::read(format!("<!-- <?x is comment text -->{fragment}").as_bytes())
+        .expect("legal comment");
+    let added = part::add_family(source.as_bytes(), &commented).expect("comment can be embedded");
+    assert!(
+        std::str::from_utf8(&added)
+            .expect("UTF-8")
+            .contains("<!-- <?x is comment text -->")
+    );
+}
