@@ -1854,7 +1854,7 @@ fn insert_into_ext(
         let replacement_len =
             empty_element_replacement_len(slash, family.len(), extension.qualified_name.len())?;
         ensure_splice_output_limit(source, &extension.range, replacement_len, max_xml_bytes)?;
-        let mut replacement = Vec::with_capacity(replacement_len);
+        let mut replacement = theme_buffer(replacement_len)?;
         replacement.extend_from_slice(&source_range[..slash]);
         replacement.push(b'>');
         replacement.extend_from_slice(family);
@@ -1900,7 +1900,7 @@ fn insert_into_container(
         let replacement_len =
             empty_element_replacement_len(slash, extension.len(), container.qualified_name.len())?;
         ensure_splice_output_limit(source, &container.range, replacement_len, max_xml_bytes)?;
-        let mut replacement = Vec::with_capacity(replacement_len);
+        let mut replacement = theme_buffer(replacement_len)?;
         replacement.extend_from_slice(&source_range[..slash]);
         replacement.push(b'>');
         replacement.extend_from_slice(extension);
@@ -1946,7 +1946,7 @@ fn insert_before_root_close(
         let replacement_len =
             empty_element_replacement_len(slash, extension.len(), root.qualified_name.len())?;
         ensure_splice_output_limit(source, &root.range, replacement_len, max_xml_bytes)?;
-        let mut replacement = Vec::with_capacity(replacement_len);
+        let mut replacement = theme_buffer(replacement_len)?;
         replacement.extend_from_slice(&source_range[..slash]);
         replacement.push(b'>');
         replacement.extend_from_slice(extension);
@@ -1978,8 +1978,8 @@ fn insert_before_root_close(
 }
 
 fn make_extension(prefix: &[u8], uri: &str, family: &[u8]) -> Result<Vec<u8>> {
+    let mut output = theme_buffer(serialized_extension_len(prefix, uri, family.len())?)?;
     let name = qualified(prefix, b"ext");
-    let mut output = Vec::with_capacity(serialized_extension_len(prefix, uri, family.len())?);
     output.extend_from_slice(b"<");
     output.extend_from_slice(&name);
     output.extend_from_slice(b" uri=\"");
@@ -1993,9 +1993,9 @@ fn make_extension(prefix: &[u8], uri: &str, family: &[u8]) -> Result<Vec<u8>> {
 }
 
 fn make_ext_list(prefix: &[u8], uri: &str, family: &[u8]) -> Result<Vec<u8>> {
+    let mut output = theme_buffer(serialized_ext_list_len(prefix, uri, family.len())?)?;
     let list = qualified(prefix, b"extLst");
     let extension = make_extension(prefix, uri, family)?;
-    let mut output = Vec::with_capacity(serialized_ext_list_len(prefix, uri, family.len())?);
     output.extend_from_slice(b"<");
     output.extend_from_slice(&list);
     output.push(b'>');
@@ -2048,7 +2048,7 @@ fn splice_with_limit(
     if output_len > max_xml_bytes {
         return Err(limit("patched Theme XML bytes", max_xml_bytes));
     }
-    let mut output = Vec::with_capacity(output_len);
+    let mut output = theme_buffer(output_len)?;
     let mut cursor = 0usize;
     for replacement in replacements {
         output.extend_from_slice(&source[cursor..replacement.range.start]);
@@ -2082,6 +2082,17 @@ fn validate_namespace_prefix(prefix: &[u8]) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn theme_buffer(length: usize) -> Result<Vec<u8>> {
+    if length > MAX_XML_BYTES {
+        return Err(limit("Theme XML bytes", MAX_XML_BYTES));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(length)
+        .map_err(|_| invalid("Theme XML output allocation failed"))?;
+    Ok(output)
 }
 
 fn family_buffer(length: usize) -> Result<Vec<u8>> {

@@ -73,7 +73,12 @@ pub fn write(value: &Family) -> Result<Vec<u8>> {
     validate(value)?;
     if source_is_exact(value) {
         if let Some(source) = value.source_state() {
-            return Ok(source.xml.as_ref().to_vec());
+            let mut output = Vec::new();
+            output
+                .try_reserve_exact(source.xml.len())
+                .map_err(|_| invalid("theme family output allocation failed"))?;
+            output.extend_from_slice(source.xml.as_ref());
+            return Ok(output);
         }
     }
     if let Some(source) = value.source_state() {
@@ -813,7 +818,24 @@ fn write_detached(value: &Family) -> Result<Vec<u8>> {
     let name = escape_attribute(value.name());
     let id = escape_xml(value.id().as_str());
     let variant_id = escape_xml(value.variant_id().as_str());
-    let mut output = String::with_capacity(160 + name.len() + id.len() + variant_id.len());
+    let output_len = b"<thm15:themeFamily xmlns:thm15=\""
+        .len()
+        .checked_add(NAMESPACE.len())
+        .and_then(|length| length.checked_add(b"\" name=\"".len()))
+        .and_then(|length| length.checked_add(name.len()))
+        .and_then(|length| length.checked_add(b"\" id=\"".len()))
+        .and_then(|length| length.checked_add(id.len()))
+        .and_then(|length| length.checked_add(b"\" vid=\"".len()))
+        .and_then(|length| length.checked_add(variant_id.len()))
+        .and_then(|length| length.checked_add(b"\"/>".len()))
+        .ok_or_else(|| invalid("theme family output length overflows"))?;
+    if output_len > MAX_XML_BYTES {
+        return Err(limit("theme family output bytes", MAX_XML_BYTES));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| invalid("theme family output allocation failed"))?;
     output.push_str("<thm15:themeFamily xmlns:thm15=\"");
     output.push_str(NAMESPACE);
     output.push_str("\" name=\"");
