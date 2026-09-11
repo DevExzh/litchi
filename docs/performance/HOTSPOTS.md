@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0504: repeated ODG transition owner scans reduced
+
+[0504](changes/0504-odg-direct-transition-reuse.md) reuses successful direct
+style values within one resolver invocation, retaining per-page inheritance
+checks. The fresh Callgrind owner-scan cost falls 557.4M → 34.8M inclusive
+instruction references. Metadata-large open/traversal p50 falls 34.43%/34.32%
+in reversed repeats; metadata-small falls 9.77%/10.15%. No measured paired
+latency/throughput/RSS regression exceeds 5%. These are synthetic owned-byte
+scenarios. `parse_content` remains roughly 850M inclusive references in the
+matched whole-child profile; repeated attribute walks and unique-style scans
+remain candidates for attribution. The older 0502 regression and broader CRUD
+requirements are not declared closed.
+
 ## Review queue reconciled through 0502
 
 The retained evidence changes the next investigations. These priorities concern

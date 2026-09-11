@@ -1,0 +1,291 @@
+   Compiling typenum v1.20.1
+   Compiling zeroize v1.9.0
+   Compiling cfg-if v1.0.4
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.44
+   Compiling unicode-ident v1.0.22
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.9
+   Compiling syn v2.0.114
+   Compiling const-oid v0.9.6
+   Compiling hybrid-array v0.4.14
+   Compiling getrandom v0.4.3
+   Compiling rand_core v0.10.1
+   Compiling subtle v2.6.1
+   Compiling crypto-common v0.1.6
+   Compiling crypto-common v0.2.2
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling block-buffer v0.10.4
+   Compiling base64ct v1.6.0
+   Compiling digest v0.10.7
+   Compiling pem-rfc7468 v0.7.0
+   Compiling block-buffer v0.12.1
+   Compiling der_derive v0.7.3
+   Compiling flagset v0.4.7
+   Compiling cmov v0.5.4
+   Compiling ctutils v0.4.2
+   Compiling libm v0.2.16
+   Compiling autocfg v1.5.1
+   Compiling der v0.7.10
+   Compiling cpufeatures v0.3.1
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.56
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling block-padding v0.4.2
+   Compiling crossbeam-utils v0.8.22
+   Compiling inout v0.2.2
+   Compiling memchr v2.8.3
+   Compiling const-oid v0.10.2
+   Compiling thiserror v2.0.18
+   Compiling crossbeam-epoch v0.9.20
+   Compiling serde_core v1.0.229
+   Compiling cpufeatures v0.2.17
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.18
+   Compiling ff v0.13.1
+   Compiling base16ct v0.2.0
+   Compiling crossbeam-deque v0.8.7
+   Compiling siphasher v1.0.3
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling cipher v0.5.2
+   Compiling crypto-bigint v0.5.5
+   Compiling syn v3.0.4
+   Compiling cpubits v0.1.1
+   Compiling zmij v1.0.19
+   Compiling rayon-core v1.13.0
+   Compiling serde v1.0.229
+   Compiling elliptic-curve v0.13.8
+   Compiling rand_chacha v0.3.1
+   Compiling phf_shared v0.14.0
+   Compiling sha2 v0.10.9
+   Compiling serde_derive v1.0.229
+   Compiling num-integer v0.1.47
+   Compiling universal-hash v0.6.1
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling crc32fast v1.5.1
+   Compiling serde_json v1.0.149
+   Compiling spin v0.9.9
+   Compiling num-bigint-dig v0.8.6
+   Compiling smallvec v1.16.0
+   Compiling fastrand v2.5.0
+   Compiling phf_generator v0.14.0
+   Compiling lazy_static v1.5.0
+   Compiling rfc6979 v0.4.0
+   Compiling polyval v0.7.3
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling bergshamra-core v0.7.0
+   Compiling quick-xml v0.41.0
+   Compiling chacha20 v0.10.2
+   Compiling inout v0.1.4
+   Compiling iana-time-zone v0.1.65
+   Compiling either v1.18.0
+   Compiling zlib-rs v0.6.7
+   Compiling itoa v1.0.18
+   Compiling uppsala v0.9.0
+   Compiling bergshamra-xml v0.7.0
+   Compiling flate2 v1.1.10
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling rayon v1.12.0
+   Compiling chrono v0.4.45
+   Compiling cipher v0.4.4
+   Compiling rand v0.10.2
+   Compiling ghash v0.6.0
+   Compiling ecdsa v0.16.9
+   Compiling phf_macros v0.14.0
+   Compiling primeorder v0.13.6
+   Compiling aes v0.9.3
+   Compiling ctr v0.10.1
+   Compiling hmac v0.13.0
+   Compiling sha2 v0.11.0
+   Compiling sha1 v0.10.7
+   Compiling aead v0.6.1
+   Compiling pkcs1 v0.7.5
+   Compiling blake2 v0.10.6
+   Compiling password-hash v0.5.0
+   Compiling byteorder v1.5.0
+   Compiling once_cell v1.21.4
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling blowfish v0.9.1
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling argon2 v0.5.3
+   Compiling rsa v0.9.10
+   Compiling aes-gcm v0.11.1
+   Compiling phf v0.14.0
+   Compiling pbkdf2 v0.13.0
+   Compiling p256 v0.13.2
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling bergshamra-c14n v0.7.0
+   Compiling cbc v0.2.1
+   Compiling sha1 v0.11.0
+   Compiling x509-cert v0.2.5
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+    Finished `test` profile [unoptimized] target(s) in 19.45s
+     Running unittests src/lib.rs (/tmp/litchi-goal-0504/test-target/debug/deps/litchi_odg-5fd8455a0b549c8a)
+
+running 2 tests
+test codec::content::tests::requires_family_body ... ok
+test transition::tests::validates_choices_color_duration_and_bounds ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/capability_transactions.rs (/tmp/litchi-goal-0504/test-target/debug/deps/capability_transactions-7727da0d6cd80980)
+
+running 7 tests
+test removals_are_checked_and_group_subtrees_are_owned ... ok
+test cross_drawing_transfer_copies_and_remaps_arbitrary_style_definitions ... ok
+test unreferenced_resource_add_remove_is_safe_and_exactly_reversible ... ok
+test one_transaction_composes_structure_geometry_style_layers_and_resources ... ok
+test nested_group_transfer_remaps_style_form_and_resource_collisions_together ... ok
+test cross_drawing_group_transfer_carries_layers_resources_and_durable_inverse ... ok
+test nested_group_text_geometry_style_and_form_edits_are_owned_and_reversible ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/flat_deferred.rs (/tmp/litchi-goal-0504/test-target/debug/deps/flat_deferred-214aa57769ad02e2)
+
+running 4 tests
+test flat_pages_and_noop_bytes_stay_exact ... ok
+test flat_wrong_family_and_malformed_or_misplaced_structures_are_typed_errors ... ok
+test flat_shape_text_edit_is_lossless_and_transactional ... ok
+test flat_truncation_and_mutation_sweeps_never_panic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/inventory_dispatch.rs (/tmp/litchi-goal-0504/test-target/debug/deps/inventory_dispatch-0a2dcbe6e3d41b60)
+
+running 3 tests
+test foreign_namespace_markers_remain_opaque_and_exact ... ok
+test optional_inventory_observes_local_aliases_and_default_namespaces ... ok
+test optional_inventory_still_rejects_misplaced_aliased_owners ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_semantics.rs (/tmp/litchi-goal-0504/test-target/debug/deps/package_semantics-11e74b8077bbaf45)
+
+running 24 tests
+test ended_page_scope_does_not_capture_shapes_outside_a_page ... ok
+test exact_shape_name_selector_rejects_ambiguity ... ok
+test semantic_package_views_use_layers_shapes_and_shared_frame_context ... ok
+test package_layer_edit_is_declared_source_checked_and_reversible ... ok
+test package_edit_is_source_checked_reversible_and_compact ... ok
+test package_shape_name_edit_is_source_checked_reversible_and_compact ... ok
+test history_enforces_step_and_weight_bounds_without_mutating_on_refusal ... ok
+test form_controls_remain_inert_but_their_references_are_editable ... ok
+test advanced_named_style_resources_are_dependency_checked_and_durable ... ok
+test page_style_change_requires_a_declared_style_and_roundtrips ... ok
+test dtd_is_refused_and_noncompact_source_requires_checked_splices ... ok
+test durable_structural_patch_reopens_full_package_and_inverts_exactly ... ok
+test arbitrary_style_properties_have_dependency_checked_crud_and_exact_inverse ... ok
+test page_rename_is_durable_unique_and_dependency_checked ... ok
+test path_data_is_typed_losslessly_editable_and_durable ... ok
+test three_way_plan_does_not_mutate_until_conflicts_are_resolved ... ok
+test active_content_is_inventoried_preserved_or_explicitly_refused ... ok
+test form_model_crud_is_inert_dependency_checked_and_durable ... ok
+test hostile_raw_package_corpus_is_bounded_and_never_partially_opened ... ok
+test joined_edits_are_deterministic_disjoint_and_conflict_aware ... ok
+test signed_and_encrypted_security_state_is_inert_and_rewrite_is_refused ... ok
+test transforms_points_and_line_endpoints_insert_reopen_and_invert ... ok
+test durable_semantic_patch_roundtrips_inverts_and_refuses_stale_sources ... ok
+test fresh_password_and_signing_lifecycle_is_explicit_and_verifiable ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.30s
+
+     Running tests/package_snapshot.rs (/tmp/litchi-goal-0504/test-target/debug/deps/package_snapshot-2e56914ee98bd37d)
+
+running 7 tests
+test real_drawing_resource_xml_remains_exact_and_opaque ... ok
+test cross_drawing_transfer_closes_inherited_producer_namespaces ... ok
+test real_libreoffice_odg_opens_with_exact_bytes_and_declared_layers ... ok
+test complex_real_fontwork_change_reopens_and_inverts_exactly ... ok
+test multiple_real_libreoffice_drawings_open_exactly_with_typed_pages ... ok
+test complex_real_nested_group_geometry_change_reopens_and_inverts_exactly ... ok
+test genuine_complex_group_transfer_remaps_all_colliding_dependency_families ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/page_transitions.rs (/tmp/litchi-goal-0504/test-target/debug/deps/page_transitions-936d3623713dd1c8)
+
+running 19 tests
+test rejects_non_3d_dr3d_scene_children ... ok
+test rejects_malformed_dr3d_vector_attributes ... ok
+test recognizes_inert_dr3d_shape_owners ... ok
+test refuses_inert_dr3d_shape_authoring ... ok
+test resolves_prefixed_transition_attributes_and_parent_styles ... ok
+test refuses_to_mutate_a_transition_style_shared_by_pages ... ok
+test reads_inert_image_map_contour_and_glue_point_owners ... ok
+test reads_inert_enhanced_geometry_equations_and_handles ... ok
+test paired_contours_and_glue_points_accept_empty_content_and_retain_comments ... ok
+test rejects_invalid_enhanced_geometry_handle_grammar_and_children ... ok
+test inserts_detached_page_with_owned_transition_style_and_inverts_exactly ... ok
+test accepts_empty_anyiri_transition_sound_and_scopes_xml_ids_per_part ... ok
+test edits_named_style_owner_in_styles_xml ... ok
+test preserves_paired_empty_transition_sound_markup ... ok
+test rejects_invalid_contour_attributes_and_non_frame_auxiliary_owners ... ok
+test refuses_generic_mutation_of_inert_3d_and_preserves_detached_source_identity ... ok
+test enforces_frame_and_scene_child_order_and_lexical_domains ... ok
+test reads_smil_transition_and_reopens_source_bound_edit ... ok
+test image_map_charges_retained_area_and_owner_xml_together ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/review_regressions.rs (/tmp/litchi-goal-0504/test-target/debug/deps/review_regressions-9cd60a4b8ead4677)
+
+running 4 tests
+test accepts_group_and_nested_dr3d_scene_owners ... ok
+test accepts_repeated_frame_and_scene_glue_points_and_scene_description_first ... ok
+test rejects_accessibility_elements_after_their_owner_sequence ... ok
+test first_transition_can_be_added_to_a_style_without_properties ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/semantic_api.rs (/tmp/litchi-goal-0504/test-target/debug/deps/semantic_api-0759e94308590088)
+
+running 5 tests
+test noncompact_authored_content_returns_a_typed_error ... ok
+test focused_modules_are_the_canonical_semantic_api ... ok
+test semantic_whitespace_is_preserved_exactly ... ok
+test compact_authored_content_is_published_without_rewriting ... ok
+test otg_templates_are_explicit_and_preserved_across_edits ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/transition_ownership.rs (/tmp/litchi-goal-0504/test-target/debug/deps/transition_ownership-05362ca869363e1c)
+
+running 3 tests
+test inherited_shared_transition_noop_remains_exact ... ok
+test refuses_transition_edit_that_would_change_an_inheriting_page ... ok
+test child_transition_override_does_not_change_its_parent_page ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/transition_review.rs (/tmp/litchi-goal-0504/test-target/debug/deps/transition_review-061d739481b3b722)
+
+running 9 tests
+test equal_transition_is_a_noop_even_when_the_style_is_shared ... ok
+test inherited_transition_can_be_replaced_but_cannot_be_cleared_locally ... ok
+test transition_sub_edit_admission_honors_each_composition_bound ... ok
+test transition_edit_does_not_rebind_a_foreign_presentation_prefix ... ok
+test transition_edit_avoids_foreign_alias_and_local_shadowing ... ok
+test named_style_transition_replays_and_inverts_durably ... ok
+test transition_inverse_preserves_first_property_insertion_for_automatic_and_named_styles ... ok
+test transition_inverse_preserves_new_namespace_bindings_for_automatic_and_named_styles ... ok
+test disjoint_transition_sub_edits_join_and_same_page_edits_conflict ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests examples/native_metadata_receipt.rs (/tmp/litchi-goal-0504/test-target/debug/examples/native_metadata_receipt-35ab82561e84a041)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

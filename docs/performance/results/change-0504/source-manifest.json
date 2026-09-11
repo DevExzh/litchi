@@ -1,0 +1,22 @@
+{
+  "after": "base revision plus candidate.patch; final rebuild binary matches timed executable",
+  "after_files": {
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "crates/litchi-odg/src/package/snapshot.rs": "002f478431a68287a995173584577432e1efb39b5376993066e2462d492d2a28",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "base_revision": "aeb9e229ae7129a08a77f3db85ee4823185cbe69",
+  "before": "clean base revision; frozen before production edit",
+  "before_files": {
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "crates/litchi-odg/src/package/snapshot.rs": "da92427f4870ff6707fa863d4f0a1d28971be87b1e1a3d477e42cb669b6d7344",
+    "docs/performance/probes/0502-odg-open/Cargo.lock": "0d07a6243479dadb94219f29e7cb5796cb96b6e24ba4555567145449a1b760e1",
+    "docs/performance/probes/0502-odg-open/Cargo.toml": "e1b66f0e81def534e29680e10912e97eb4f9ce8f9f6811d3911efaaf689771f8",
+    "docs/performance/probes/0502-odg-open/src/main.rs": "607ce25edd50c79a310bb38bfa97c0bcda5b0c402b54340e02e076c983a53040"
+  },
+  "candidate_patch_sha256": "1dd0bf0b1c426ce51bba67f996c6e8a9894c1217aa3febfde9b390ce93bf4223",
+  "scope": "changed production source and build/probe inputs; all other production files remain at base revision",
+  "workspace_test_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a"
+}
