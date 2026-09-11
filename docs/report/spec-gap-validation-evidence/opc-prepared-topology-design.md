@@ -1,9 +1,10 @@
 # OPC prepared topology and effective candidate readback
 
-This is a design and evidence contract for source-preserving OPC topology
-publication. It is owned by the OPC/DOCX lifecycle review and does not claim
-that the prepared-topology API has already been implemented. Production source
-changes remain outside this note.
+This is the design and evidence contract for source-preserving OPC topology
+publication. The prepared-topology API and its borrowed candidate callback are
+implemented in the current worktree and remain under OPC/DOCX review. This
+note does not grant production approval or make a performance claim; the
+required evidence below remains the acceptance checklist.
 
 The immediate consumer is the source-backed DOCX SVG attach/detach lifecycle.
 The same boundary is intended for later source-preserving owners that need to
@@ -38,7 +39,7 @@ relationship, content-type binding, and payload that the owner can observe.
 It does not by itself validate ZIP framing or prove that a later physical
 writer emitted the intended bytes; those are separate publication checks below.
 
-## Proposed OPC seam
+## OPC seam
 
 The smallest ownership-preserving API is a one-shot prepared topology:
 
@@ -53,9 +54,24 @@ PreparedTopology::with_candidate(|candidate: &EffectiveTopology| {
 }) -> Result<T>
 
 PreparedTopology::publish_to_stream(writer) -> Result<()>
+
+SourceBackedPackage::with_prepared_topology(
+    &self,
+    SourceTopologyPlan,
+    |candidate: &EffectiveTopology| owner_readback(candidate),
+) -> Result<T>
 ```
 
-The names are provisional. The important properties are:
+The owning and borrowed forms share one preparation implementation. The
+borrowed callback lets an edit validate its complete candidate before returning
+a commit while leaving the source package usable. It retains overlays and
+reservations through the callback, checks destination and transferred source
+freshness before and after it, and writes no external bytes. Candidate views
+cannot escape the callback. Publication prepares again against its consuming
+source boundary. Both forms refuse candidate callbacks for an exact empty plan;
+the owning publication path still copies that source exactly.
+
+The important properties are:
 
 * `prepare_topology` consumes the source package and plan once. It performs the
   existing topology preflight, including operation limits, canonical versus
@@ -257,6 +273,6 @@ historical logs must not be relabeled as evidence for this API.
 * if physical scratch support is added, low scratch limits and scratch-store
   failures are covered without affecting the caller's output accounting.
 
-Until these API, semantic, physical, and resource checks are materialized, the
-prepared-topology work remains design-only and the DOCX lifecycle cannot claim
-complete candidate readback under the source-preserving managed profile.
+Until these API, semantic, physical, and resource checks are materialized and
+reviewed, the implementation remains pending acceptance. Passing focused tests
+does not establish the complete managed-memory or performance contract.
