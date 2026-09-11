@@ -1,0 +1,15 @@
+source_manifest_before_sha256=7ec0186ee8825ca1a55828a077434bd380f0d934b153e80437cc1ec8f6c29dc5
+source_manifest_after_sha256=7ec0186ee8825ca1a55828a077434bd380f0d934b153e80437cc1ec8f6c29dc5
+git_head=9d52321b46076fffd0dd2b3d87a0608ab899e17a
+source_sha256:
+64fc9d360311af9347d2b523ab6bf051509d3a9748835b939f0c86a74123d9b3  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx/src/presentation/source.rs
+13f14f752a286ca288ff682c55b29ce3891e136c303f430f501519c960d75a46  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx/src/presentation/source/svg_lifecycle.rs
+5d06ae7165581d13a438ee1ea12c69ab35d3c2bf4c5ad2d776f0b10c1a9e75be  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx/src/presentation/source/svg_lifecycle/owner.rs
+cf001af64320c54aea46376c834c8a4612e7d06f6c0782891ceba4a68cd178be  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/src/source_backed.rs
+2ddaf604cb6a3ef8e24cad38158608dd5feab056cf45978f2ef292a1ab8e0e20  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-opc/src/phys_pkg.rs
+fc0f59310a83d8cb8f8e5faa4340f5587adc3c06a54bfaf443c77809a53d6ead  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx/src/lib.rs
+e2b00960560433d7179737f7bc15479cd1918138d7fb3f3342f652c067340657  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-pptx/src/presentation/mod.rs
+harness_sha256:
+b34d66bff058fbcebab8bd0c83dcadef341b016a400b5b5e952c33ed73a84df9  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle-performance/harness/Cargo.lock
+ef31a071d2b58f2a5b6fc40c2406683823a6c32c0580f57deb170ff437f8a665  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle-performance/harness/Cargo.toml
+81fa90d98e19e5698001b0395ebc3924553a1e0aecc5032b57749f46834dc986  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle-performance/harness/main.rs
