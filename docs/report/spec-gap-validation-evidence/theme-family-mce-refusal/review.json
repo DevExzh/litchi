@@ -1,0 +1,10 @@
+{
+  "verdict": "approved",
+  "reviewer": "theme_family_final_review",
+  "scope": "Bounded MCE ownership mutation refusal, including empty containers, foreign ancestry exclusion, and removal before absent-owner no-op.",
+  "source_hashes": {
+    "crates/litchi-drawingml/src/theme/family/part.rs": "c1a1adb3ff6c74b234dbef2cf0a1a23b5b7aaa24486e8bb49efa38339b900333",
+    "crates/litchi-xlsb/src/theme.rs": "9193d579c2951940b4943b396fd6249a35a0c1743dff183e168f3556a5a0a8f8",
+    "crates/litchi-xlsb/src/theme/lifecycle.rs": "c663b8cde2191539a554cadf78987c3f2d51a9faddbc2bd5813aecbad685dd70"
+  }
+}

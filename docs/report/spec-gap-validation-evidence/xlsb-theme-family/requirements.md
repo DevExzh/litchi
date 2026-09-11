@@ -28,6 +28,10 @@ It does not claim completion of the broader specification audit.
 1. Read only an unambiguous, namespace-resolved direct family owner under the
    two supported outer extension identifiers. Foreign ancestry and unprocessed
    MCE branches must not become direct typed owners through descendant scans.
+   Selective mutations must refuse relevant MCE-wrapped lists/extensions even
+   when empty, and MCE children directly inside admitted extensions. Foreign
+   ancestry and unrecognized URI subtrees remain opaque; see
+   `../theme-family-mce-refusal/`.
 2. Support optional read, add, scalar update, and removal through the existing
    isolated XLSB Theme transaction, including edits combined with base-theme
    values. Reopen the resulting XML before publishing a commit.

@@ -1,5 +1,9 @@
 # Theme-family removal closure
 
+The later [MCE refusal follow-up](../theme-family-mce-refusal/README.md) adds
+selective-mutation guards. Receipts here describe the closure revision recorded
+in their source hashes; use the follow-up for current MCE validation.
+
 This follow-up supersedes the wrapper-retention policy recorded in commit
 `9facb6057` and its `xlsb-theme-family` evidence. It implements the later explicit
 requirement to close semantically empty owned extension containers.

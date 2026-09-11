@@ -453,38 +453,33 @@ fn family_ownership_does_not_cross_foreign_or_ignored_mce_ancestry() {
 }
 
 #[test]
-fn adding_family_never_edits_an_ignored_mce_extlst_branch() {
+fn adding_family_refuses_an_ignored_mce_extlst_branch_without_source_mutation() {
     let source = theme_bytes(&native_workbook());
     let hidden = compact_xml(with_mce_hidden_extlst(&source));
     let hidden_family = theme_family_fragment(&hidden).to_vec();
     let mut workbook = native_workbook();
     replace_theme_blob(&mut workbook, hidden);
+    let before_bytes = theme_bytes(&workbook);
     let before = theme_snapshot(&workbook);
     assert!(before.family().is_none());
 
     let mut edit = before.edit();
     edit.set_family(family_value("Fresh Direct Family"))
         .expect("stage direct family");
-    let Ok(commit) = edit.commit() else {
-        // A safe refusal is permitted when a hidden branch contains a family.
-        return;
-    };
-    if workbook.apply_theme(&commit).is_err() {
-        return;
-    }
+    assert!(
+        edit.commit().is_err(),
+        "a hidden MCE family must refuse the package mutation"
+    );
     let changed = theme_bytes(&workbook);
+    assert_eq!(
+        changed, before_bytes,
+        "failed mutation changed Theme source"
+    );
     assert!(
         changed
             .windows(hidden_family.len())
             .any(|window| window == hidden_family.as_slice()),
         "the hidden branch must retain its original family bytes"
-    );
-    assert_eq!(
-        theme_snapshot(&workbook)
-            .family()
-            .expect("new direct family")
-            .name(),
-        "Fresh Direct Family"
     );
 }
 

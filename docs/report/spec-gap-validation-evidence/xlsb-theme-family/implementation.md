@@ -40,8 +40,10 @@ Only the direct namespace-resolved `theme/extLst/ext/themeFamily` path under an
 admitted extension identifier is typed. Identifiers follow their XML Schema
 `token` normalization, while their original spelling survives in the source.
 Multiple admitted owners and malformed recognized content are refused.
-Family insertion refuses a detected hidden MCE extension-list owner rather
-than guessing which branch should be edited. Direct owned extension containers
+Selective family add, replacement, and removal refuse MCE-wrapped owned
+extension lists or admitted extensions, even when empty, and MCE children
+inside admitted extensions. Read-only projection keeps these branches opaque.
+See `../theme-family-mce-refusal/` for the expanded boundary and fresh checks. Direct owned extension containers
 reject non-whitespace text, CDATA, and references. A validated standalone UTF-8
 BOM is stripped before fragment embedding; XML declarations remain refused
 when inserting a child.

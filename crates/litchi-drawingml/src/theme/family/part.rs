@@ -458,17 +458,17 @@ fn remove_family_source_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<V
         return Err(limit("theme XML bytes", MAX_XML_BYTES));
     }
     let scanned = scan(xml)?;
+    if scanned.hidden_owner {
+        return Err(invalid(
+            "Theme Family ownership is hidden in an MCE or unsupported branch; removal is ambiguous",
+        ));
+    }
     let Some(candidate) = scanned.candidate.as_ref() else {
         if xml.len() > max_xml_bytes {
             return Err(limit("patched Theme XML bytes", max_xml_bytes));
         }
         return Ok(xml.to_vec());
     };
-    if scanned.hidden_owner {
-        return Err(invalid(
-            "Theme Family owner is also hidden in an MCE branch; removal is ambiguous",
-        ));
-    }
     // Validate the recognized fragment before deleting its source span. A
     // malformed supported owner must refuse the edit rather than being
     // silently sanitized by removal.
@@ -1026,16 +1026,26 @@ fn classify_start(
     start_end: usize,
 ) -> Result<Kind> {
     let expected = root_namespace(classifier.root)?;
-    let in_mce_branch = stack
-        .iter()
-        .any(|frame| matches!(frame.kind, Kind::MceChoice | Kind::MceFallback));
+    let in_mce_branch = stack.iter().any(|frame| {
+        matches!(
+            frame.kind,
+            Kind::MceOther | Kind::MceChoice | Kind::MceFallback
+        )
+    });
     let direct_recognized_extension = stack
         .last()
         .is_some_and(|frame| recognized_extension_kind(&frame.kind, classifier.extensions));
     let recognized_extension_ancestor = stack
         .iter()
         .any(|frame| recognized_extension_kind(&frame.kind, classifier.extensions));
+    let mce_ownership_context = recognized_extension_ancestor || mce_container_context(stack);
+    if in_mce_branch && mce_ownership_context && mce_owner_container(local, namespace, element)? {
+        *classifier.hidden_owner = true;
+    }
     if namespace == MCE_NAMESPACE.as_bytes() && local == b"AlternateContent" {
+        if direct_recognized_extension {
+            *classifier.hidden_owner = true;
+        }
         return Ok(Kind::MceOther);
     }
     if matches!(stack.last().map(|frame| frame.kind), Some(Kind::MceOther))
@@ -1054,7 +1064,7 @@ fn classify_start(
         && namespace == FAMILY_NAMESPACE.as_bytes()
         && (in_mce_branch || !direct_recognized_extension)
     {
-        if in_mce_branch || recognized_extension_ancestor {
+        if (in_mce_branch && mce_ownership_context) || recognized_extension_ancestor {
             *classifier.hidden_owner = true;
         }
         if !direct_recognized_extension {
@@ -1137,9 +1147,8 @@ fn classify_start(
             "recognized Theme extension contains a Theme Family lookalike in another namespace",
         ));
     }
-    if stack
-        .iter()
-        .any(|frame| matches!(frame.kind, Kind::MceChoice | Kind::MceFallback))
+    if in_mce_branch
+        && mce_ownership_context
         && local == b"extLst"
         && is_drawingml_namespace(namespace)
     {
@@ -1181,16 +1190,26 @@ fn classify_empty(
     end: usize,
 ) -> Result<Kind> {
     let expected = root_namespace(classifier.root)?;
-    let in_mce_branch = stack
-        .iter()
-        .any(|frame| matches!(frame.kind, Kind::MceChoice | Kind::MceFallback));
+    let in_mce_branch = stack.iter().any(|frame| {
+        matches!(
+            frame.kind,
+            Kind::MceOther | Kind::MceChoice | Kind::MceFallback
+        )
+    });
     let direct_recognized_extension = stack
         .last()
         .is_some_and(|frame| recognized_extension_kind(&frame.kind, classifier.extensions));
     let recognized_extension_ancestor = stack
         .iter()
         .any(|frame| recognized_extension_kind(&frame.kind, classifier.extensions));
+    let mce_ownership_context = recognized_extension_ancestor || mce_container_context(stack);
+    if in_mce_branch && mce_ownership_context && mce_owner_container(local, namespace, element)? {
+        *classifier.hidden_owner = true;
+    }
     if namespace == MCE_NAMESPACE.as_bytes() && local == b"AlternateContent" {
+        if direct_recognized_extension {
+            *classifier.hidden_owner = true;
+        }
         return Ok(Kind::MceOther);
     }
     if matches!(stack.last().map(|frame| frame.kind), Some(Kind::MceOther))
@@ -1209,7 +1228,7 @@ fn classify_empty(
         && namespace == FAMILY_NAMESPACE.as_bytes()
         && (in_mce_branch || !direct_recognized_extension)
     {
-        if in_mce_branch || recognized_extension_ancestor {
+        if (in_mce_branch && mce_ownership_context) || recognized_extension_ancestor {
             *classifier.hidden_owner = true;
         }
         if !direct_recognized_extension {
@@ -1292,9 +1311,8 @@ fn classify_empty(
             "recognized Theme extension contains a Theme Family lookalike in another namespace",
         ));
     }
-    if stack
-        .iter()
-        .any(|frame| matches!(frame.kind, Kind::MceChoice | Kind::MceFallback))
+    if in_mce_branch
+        && mce_ownership_context
         && local == b"extLst"
         && is_drawingml_namespace(namespace)
     {
@@ -1321,6 +1339,36 @@ fn classify_empty(
         *classifier.hidden_owner = true;
     }
     Ok(Kind::Other)
+}
+
+fn mce_container_context(stack: &[Frame]) -> bool {
+    // MCE can wrap the root-owned list/extension path. An intervening foreign
+    // element or unrecognized extension keeps its subtree opaque.
+    stack.iter().all(|frame| {
+        matches!(
+            frame.kind,
+            Kind::Root
+                | Kind::ExtList
+                | Kind::HiddenExtList
+                | Kind::MceOther
+                | Kind::MceChoice
+                | Kind::MceFallback
+        )
+    })
+}
+
+fn mce_owner_container(local: &[u8], namespace: &[u8], element: &BytesStart<'_>) -> Result<bool> {
+    if !is_drawingml_namespace(namespace) {
+        return Ok(false);
+    }
+    // Even an empty effective list/recognized extension can conflict with a
+    // second direct owner after insertion. Do not wait for a family child.
+    Ok(local == b"extLst"
+        || (local == b"ext"
+            && extension_uri(element)?
+                .as_deref()
+                .and_then(ExtensionProfile::from_uri)
+                .is_some()))
 }
 
 fn root_namespace(root: &Option<Root>) -> Result<&[u8]> {
