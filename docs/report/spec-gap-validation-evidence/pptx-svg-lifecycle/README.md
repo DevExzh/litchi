@@ -35,6 +35,13 @@ the production file is not part of this feature change. Gate receipts include
 only logs executed by that invocation, and the verifier recomputes test totals
 from the retained test log.
 
+The standalone `harness/` exercises the ordinary fallible `commit()` API. It
+checks exact no-op publication, attach/save/reopen, detach/save/reopen, retained
+in-memory inverse patches, and preservation of raster and opaque package data.
+It writes the three slide XML inputs used by the offline schema validator.
+Running this example is a smoke check until the source-bound gate and probe
+receipts described above are sealed.
+
 Exact patch inverse means applying the retained inverse to its authorized
 in-memory target snapshot restores the stored source state. An independently
 reopened saved package does not carry that patch provenance. A fresh detach after

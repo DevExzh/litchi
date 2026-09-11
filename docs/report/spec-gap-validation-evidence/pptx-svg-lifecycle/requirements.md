@@ -16,6 +16,7 @@ not evidence of an Office application accepting newly generated output.
 | Select an existing picture without raw IDs in the ordinary attach call | Public downstream example using slide/picture positions and automatic names |
 | Preserve caller payload on rejected insertion | Borrowed ordinary input and retained advanced request on failure; validate limits before copying |
 | Represent attached and detached states honestly | Optional SVG snapshot state and checked state transitions |
+| Validate the changed dependency closure at commit | Ordinary fallible `commit()` using an editor-borrowed edit; malformed closure refusal before publication, with publication rebuilding its plan after a freshness check |
 | Preserve PNG fallback and unrelated XML/media | Exact source/member assertions through save/reopen |
 | Publish slide markup, SVG relationship, and media atomically | OPC topology plan, reopened graph checks, failure-before-output tests |
 | Detach only the selected owner | Shared relationship-ID and shared media tests, including character-reference-encoded IDs on another owner |

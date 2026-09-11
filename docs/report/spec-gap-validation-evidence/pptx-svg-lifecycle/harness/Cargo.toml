@@ -1,0 +1,16 @@
+[package]
+name = "pptx-svg-lifecycle-evidence"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-core = { path = "../../../../../crates/litchi-core" }
+
+[[bin]]
+name = "pptx-svg-lifecycle-evidence"
+path = "main.rs"
