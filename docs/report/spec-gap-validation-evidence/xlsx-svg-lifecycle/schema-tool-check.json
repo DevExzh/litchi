@@ -1,0 +1,99 @@
+{
+  "passed": true,
+  "scope": "Validator smoke checks; no XLSX lifecycle implementation evidence",
+  "inputs": {
+    "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
+    "docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle/validate_schema.py": "34cb44b094dd86ab1369370a57814f6bf1e8ad21ec63a6da615d0607089cc856",
+    "docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle/check_schema_tool.py": "684e78cae72ba5c8be272d8d022f5a8d8f242e4c59ba3988fd029a8731297b0d"
+  },
+  "ecma_archive_sha256": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd",
+  "svg_schema_source_sha256": "30ae3393d282bb2f66291e17bf37db3ac98f574f3c4b0443ff449fe3c1067736",
+  "lxml_version": [
+    6,
+    0,
+    2,
+    0
+  ],
+  "accepted": [
+    {
+      "path": "native:xl/drawings/drawing1.xml",
+      "sha256": "c9d4149c14d847d4979239fc9771de0f34383c5e01ee505e270aea1bce05ffe8",
+      "bytes": 2718,
+      "valid": true,
+      "anchor_counts": {
+        "twoCellAnchor": 2,
+        "oneCellAnchor": 0,
+        "absoluteAnchor": 0
+      },
+      "svg_owners": [
+        {
+          "anchor": "twoCellAnchor",
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          }
+        },
+        {
+          "anchor": "twoCellAnchor",
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          }
+        }
+      ]
+    },
+    {
+      "path": "synthetic:oneCellAnchor",
+      "sha256": "1c35641abcc7982c28f2c7297d6421a92d039fac1deb60ce89aa4fb615bb4395",
+      "bytes": 2552,
+      "valid": true,
+      "anchor_counts": {
+        "twoCellAnchor": 1,
+        "oneCellAnchor": 1,
+        "absoluteAnchor": 0
+      },
+      "svg_owners": [
+        {
+          "anchor": "oneCellAnchor",
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          }
+        },
+        {
+          "anchor": "twoCellAnchor",
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          }
+        }
+      ]
+    },
+    {
+      "path": "synthetic:absoluteAnchor",
+      "sha256": "6d2a23223db0fa1942ad01aa448446e4364d419c60a2b6199ad053210529169c",
+      "bytes": 2455,
+      "valid": true,
+      "anchor_counts": {
+        "twoCellAnchor": 1,
+        "oneCellAnchor": 0,
+        "absoluteAnchor": 1
+      },
+      "svg_owners": [
+        {
+          "anchor": "absoluteAnchor",
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          }
+        },
+        {
+          "anchor": "twoCellAnchor",
+          "attributes": {
+            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed": "rId2"
+          }
+        }
+      ]
+    }
+  ],
+  "rejected": [
+    "missing-marker",
+    "container-text",
+    "duplicate-svg-owner"
+  ]
+}
