@@ -219,3 +219,34 @@ fn insertion_wrappers_obey_exact_complete_part_output_limit() {
         assert!(part::add_family_with_limit(source.as_bytes(), &family, output.len() - 1).is_err());
     }
 }
+
+#[test]
+fn native_family_name_edit_preserves_exact_future_cdata_payload() {
+    let native = include_str!("fixtures/theme-part-native.xml");
+    let start = native.find("<thm15:themeFamily").expect("native family");
+    let end = start + native[start..].find("/>").expect("self-closing family");
+    let payload = r#"<x:future xmlns:x="urn:vendor"><![CDATA[<?x]]></x:future>"#;
+    let source = format!(
+        "{}>{payload}</thm15:themeFamily>{}",
+        &native[..end],
+        &native[end + 2..]
+    );
+    let snapshot = part::read(source.as_bytes()).expect("native family with CDATA");
+    let mut replacement = snapshot.family().expect("family projection").clone();
+    replacement
+        .set_name("Updated CDATA Theme")
+        .expect("valid name");
+    let changed = snapshot
+        .replace_family(&replacement)
+        .expect("CDATA is not a PI");
+    let expected = format!(
+        "{}{}",
+        &source[..start],
+        source[start..].replacen("name=\"Office Theme\"", "name=\"Updated CDATA Theme\"", 1)
+    );
+    assert_eq!(changed, expected.as_bytes());
+    assert_eq!(
+        part::read(&changed).expect("readback").family(),
+        Some(&replacement)
+    );
+}
