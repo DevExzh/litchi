@@ -1,9 +1,10 @@
 # Contextual SVG source correction
 
-Status: implementation and independent verification pending. This note records
-the correction criteria for the retained-source amplification reproduced in
-`retained-scope-probe.rs`; it does not supersede the prerequisite correctness
-review or claim lifecycle approval.
+Status: shared contextual codec implemented and independently reviewed;
+host integration and allocation verification remain pending. The scoped codec
+evidence is in `contextual-codec-verification.json`. This note records the
+correction criteria for the retained-source amplification reproduced in
+`retained-scope-probe.rs`; it does not claim lifecycle approval.
 
 The recorded 149,433-byte input produces 32 owned SVG values whose standalone
 sources total 4,205,334 bytes. That count excludes retained namespace models.
