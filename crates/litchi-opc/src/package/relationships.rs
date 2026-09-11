@@ -59,8 +59,59 @@ impl OwnedRelationships {
     /// existing member, even when the collection becomes empty. This edits only
     /// the edge; the format owner must validate and edit its dependency closure.
     pub fn without_relationship(&self, id: &str, max_output_bytes: usize) -> Result<Self> {
+        self.without_relationships(&[id], max_output_bytes)
+    }
+
+    /// Remove a bounded batch of edges by collecting matches in one source
+    /// scan and applying one batched XML update while preserving every
+    /// unrelated source byte. The generic [`OwnedXmlPart`] update performs
+    /// its own structural validation scan before the single output
+    /// allocation.
+    ///
+    /// Missing IDs and duplicate selectors are idempotent. The borrowed
+    /// selectors are deduplicated before source ranges are collected, and the
+    /// default 100,000 relationship-per-part ceiling bounds the unique
+    /// selector index; the generic XML batch edit ceiling of 65,536 matched
+    /// removals applies in addition. The result must fit both
+    /// `max_output_bytes` and the default OPC relationship XML ceiling.
+    /// Removal keeps an existing member, including when the collection becomes
+    /// empty.
+    pub fn without_relationships(&self, ids: &[&str], max_output_bytes: usize) -> Result<Self> {
         let maximum = max_output_bytes.min(ReadLimits::default().max_relationship_xml_bytes());
+        if ids.is_empty() {
+            if self.bytes().len() > maximum {
+                return Err(invalid("relationship XML exceeds output limit"));
+            }
+            return Ok(self.clone());
+        }
+
+        let maximum_selectors = ReadLimits::default().max_relationships_per_part();
+        let mut selected_ids: HashSet<&str> = HashSet::new();
+        selected_ids
+            .try_reserve(ids.len().min(maximum_selectors))
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship removal IDs",
+                source,
+            })?;
+        for id in ids {
+            if !selected_ids.contains(id) && selected_ids.len() >= maximum_selectors {
+                return Err(invalid(
+                    "relationship removal batch exceeds the package limit",
+                ));
+            }
+            selected_ids.insert(*id);
+        }
+
+        let mut updates = Vec::new();
+        updates
+            .try_reserve_exact(selected_ids.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship removal updates",
+                source,
+            })?;
         let mut reader = NsReader::from_reader(self.bytes());
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
         let mut depth = 0usize;
         loop {
             let start = reader.buffer_position() as usize;
@@ -70,35 +121,26 @@ impl OwnedRelationships {
             match event {
                 Event::Start(element) | Event::Empty(element) => {
                     if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                        let mut remove = false;
                         for attribute in element.attributes().with_checks(true) {
                             let attribute =
                                 attribute.map_err(|error| invalid(error.to_string()))?;
-                            if attribute.key.as_ref() == b"Id"
-                                && attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )?
-                                    .as_ref()
-                                    == id
-                            {
-                                let xml = self.xml.update_elements(
-                                    &[OwnedElementUpdate {
-                                        start_tag: start..end,
-                                        edit: OwnedElementEdit::Remove,
-                                    }],
-                                    maximum,
+                            if attribute.key.as_ref() == b"Id" {
+                                let value = attribute.decoded_and_normalized_value(
+                                    quick_xml::XmlVersion::Implicit1_0,
+                                    reader.decoder(),
                                 )?;
-                                crate::pkgreader::PackageReader::parse_owned_relationships(
-                                    xml.bytes(),
-                                    &self.owner,
-                                )?;
-                                return Ok(Self {
-                                    owner: self.owner.clone(),
-                                    xml,
-                                    member_present: self.member_present,
-                                });
+                                if selected_ids.contains(value.as_ref()) {
+                                    remove = true;
+                                    break;
+                                }
                             }
+                        }
+                        if remove {
+                            updates.push(OwnedElementUpdate {
+                                start_tag: start..end,
+                                edit: OwnedElementEdit::Remove,
+                            });
                         }
                     }
                     if !empty {
@@ -114,10 +156,19 @@ impl OwnedRelationships {
                 _ => {},
             }
         }
-        if self.bytes().len() > maximum {
-            return Err(invalid("relationship XML exceeds output limit"));
+        if updates.is_empty() {
+            if self.bytes().len() > maximum {
+                return Err(invalid("relationship XML exceeds output limit"));
+            }
+            return Ok(self.clone());
         }
-        Ok(self.clone())
+        let xml = self.xml.update_elements(&updates, maximum)?;
+        crate::pkgreader::PackageReader::parse_owned_relationships(xml.bytes(), &self.owner)?;
+        Ok(Self {
+            owner: self.owner.clone(),
+            xml,
+            member_present: self.member_present,
+        })
     }
 
     /// Append one validated internal or external relationship while retaining
@@ -629,6 +680,112 @@ mod tests {
         );
         package.try_replace_relationships(&before, &after).unwrap();
         assert_eq!(package.source_relationships(&owner).unwrap(), after);
+    }
+
+    #[test]
+    fn relationship_batch_removal_preserves_pi_comments_namespaces_and_paired_tags() {
+        let xml = br#"<?xml version='1.0'?>
+<?before?>
+<r:Relationships xmlns:r='http://schemas.openxmlformats.org/package/2006/relationships'>
+ <!-- before --> <r:Relationship TargetMode='External' Target='https://example.test/a' Type='urn:test' Id='rId1'></r:Relationship>
+ <?middle?> <r:Relationship Id='rId2' Type='urn:test' Target='https://example.test/b' TargetMode='External'/>
+ <!-- after -->
+</r:Relationships>
+<?after?>
+"#;
+        let package = OpcPackage::from_bytes(&source(xml)).unwrap();
+        let owner = PackURI::new("/").unwrap();
+        let before = package.source_relationships(&owner).unwrap();
+        let after = before
+            .without_relationships(&["rId1", "missing", "rId2", "rId2"], xml.len())
+            .unwrap();
+
+        assert!(after.member_present());
+        assert!(
+            !after
+                .bytes()
+                .windows(b"rId1".len())
+                .any(|window| window == b"rId1")
+        );
+        assert!(
+            !after
+                .bytes()
+                .windows(b"rId2".len())
+                .any(|window| window == b"rId2")
+        );
+        for marker in [
+            b"<?before?>".as_slice(),
+            b"<?middle?>",
+            b"<?after?>",
+            b"<!-- before -->",
+            b"<!-- after -->",
+        ] {
+            assert!(
+                after
+                    .bytes()
+                    .windows(marker.len())
+                    .any(|window| window == marker)
+            );
+        }
+        let sequential = before
+            .without_relationship("rId1", xml.len())
+            .unwrap()
+            .without_relationship("rId2", xml.len())
+            .unwrap();
+        assert_eq!(after.bytes(), sequential.bytes());
+        assert!(
+            before
+                .without_relationships(&["rId1", "rId2"], after.bytes().len() - 1)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn relationship_batch_removal_missing_duplicate_and_empty_batches_are_bounded_noops() {
+        let bytes = source(XML);
+        let package = OpcPackage::from_bytes(&bytes).unwrap();
+        let owner = PackURI::new("/").unwrap();
+        let before = package.source_relationships(&owner).unwrap();
+
+        let missing = before
+            .without_relationships(&["missing", "missing"], XML.len())
+            .unwrap();
+        assert_eq!(missing, before);
+        assert!(Arc::ptr_eq(&before.xml.bytes, &missing.xml.bytes));
+        assert!(
+            before
+                .without_relationships(&["missing"], before.bytes().len() - 1)
+                .is_err()
+        );
+        assert!(
+            before
+                .without_relationships(&[], before.bytes().len() - 1)
+                .is_err()
+        );
+        let exact_empty = before
+            .without_relationships(&[], before.bytes().len())
+            .unwrap();
+        assert_eq!(exact_empty, before);
+        assert!(Arc::ptr_eq(&before.xml.bytes, &exact_empty.xml.bytes));
+    }
+
+    #[test]
+    fn relationship_batch_removal_keeps_absent_member_presence_on_noop() {
+        let mut package = OpcPackage::new();
+        let owner = PackURI::new("/custom/no-rels.bin").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            owner.clone(),
+            "application/octet-stream".into(),
+            vec![],
+        )));
+        let before = package.source_relationships(&owner).unwrap();
+        assert!(!before.member_present());
+        let after = before
+            .without_relationships(&["missing"], before.bytes().len())
+            .unwrap();
+        assert_eq!(after, before);
+        assert!(!after.member_present());
+        assert!(Arc::ptr_eq(&before.xml.bytes, &after.xml.bytes));
     }
 
     #[test]
