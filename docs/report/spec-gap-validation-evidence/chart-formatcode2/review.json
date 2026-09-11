@@ -1,0 +1,14 @@
+{
+  "verdict": "approved",
+  "scope": "Shared formatcode2 element and qualified attribute codecs, explicit caller-selected start-tag context, bounded XML/ST_Xstring preservation. No chart placement or native Office acceptance claim.",
+  "reviewer": "/root/formatcode2_spec_review",
+  "source_hashes": {
+    "crates/litchi-drawingml/src/chart/extension/formatcode2.rs": "7064c49368c525b03b2d3d819426af85d32da99d44fddf4c8b7a587f40ce2959"
+  },
+  "basis": [
+    "Independent normative review of MS-ODRAWXML 2.44/5.42 and MS-OI29500 2.1.1747.",
+    "Namespace entity decoding, Office whitespace, declaration grammar, inherited bindings, PI/comment XML validity, surrogate handling and output bounds reviewed.",
+    "Final empty named namespace prefix correction approved at exact recorded source hash."
+  ],
+  "reviewer_ran_gates": false
+}

@@ -1,0 +1,15 @@
+[package]
+name = "litchi-chart-formatcode2-profile"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "chart-formatcode2-profile"
+path = "main.rs"
+
+[dependencies]
+litchi-drawingml = { path = "../../../../../crates/litchi-drawingml" }

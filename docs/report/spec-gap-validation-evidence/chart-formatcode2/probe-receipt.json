@@ -1,0 +1,54 @@
+{
+  "passed": true,
+  "source_unchanged": true,
+  "revision": "625b7e121a10ee46b502a07ffe008fabc922201e",
+  "binary_sha256": "f2789b8cd13cb8b8474a5ce64221a7d0251a10064ba58f772af53f961a927f4a",
+  "gate_source_files_checked_before_and_after": 876,
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "--offline",
+        "--manifest-path",
+        "docs/report/spec-gap-validation-evidence/chart-formatcode2/harness/Cargo.toml",
+        "--",
+        "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs"
+      ],
+      "exit_code": 0
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "docs/report/spec-gap-validation-evidence/chart-formatcode2/validate_schema.py",
+        "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/source.xml",
+        "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/edited.xml",
+        "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/authored.xml"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "inputs": {
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/run_probe.py": "31ab46b987b18ef6b656e67e939130d79e475b3597763c4b78c1439bee9088ca",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/gates/source-hashes.json": "0d0ff42b4a5e084b784148e4fe28fc37b737cdd43a949f69db2584e0e3377334",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/validate_schema.py": "3c6b60bb9e9e8928c181685a124fd5f0ecf7fcc051a7f5016ce7f163196a8012",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/harness/Cargo.toml": "62c8c9bed97c933edbda556eef2515ae9f90ca51637618c178a9963647dafb09",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/harness/Cargo.lock": "1b08537b04d12a5ecc9e8897aa5210e7de2d43e1a6ae0f7f212abdcc819df605",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/harness/main.rs": "6af4c9a6d5441579971890a9f3c9d7fb9c72ac0fa594a94e18057d5950fc3050",
+    "3rdparty/specs/[MS-ODRAWXML]/2 Structures/2.44 http---schemas.microsoft.com-office-drawing-2015-06-chart.md": "f3f8ac9e2e1eee29cce7738b2c1b552e40c6afe2e94b833541c61f477d585d72",
+    "3rdparty/specs/[MS-ODRAWXML]/5 Appendix A - Full XML Schemas/5.42 http---schemas.microsoft.com-office-drawing-2015-06-chart Schema.md": "d84e92a98633c3b25d3f30c85d4ea31bcf71e5db6fe6c56beeecdb3d1d33ec3f",
+    "3rdparty/specs/[MS-OI29500]/2 Conformance Statements/2.1 Normative Variations.md": "f3fa6c8456b2e6ca05f6471f98851a8cbf73b18fb7393f02a712c02ae62733ce",
+    "3rdparty/specs/ECMA-376/ECMA-376-4_5th_edition_december_2016.zip": "bd25da1109f73762356596918bf5ff8b74a1331642dba5f1c1d1dfc6bed34ecd"
+  },
+  "outputs": {
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/attribute-inherited-start-tag.xml": "32d805a341fc2c4d2ab33faaa6b24d37ea6205a8f32f957b4476a6eeb9a0c88c",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/attribute-start-tag.xml": "46bcadd062c96d32169ba874e855403b85ca3c4251d090b54d60091a82462622",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/authored.xml": "3e6b707c6b885a9d264d514a681d10a7d261ab6b105a1eeaa35cc1f9896a117a",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/edited.xml": "9deed7418f4cf33f4a9265c2869de25ee6d37015817c918ce8e5f2d8ea55706f",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/outputs/source.xml": "8de11e6b899f05c344da54a4ef64a24c2c753a0494ff0585ec1df36f2b157367",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/probe.log": "3c76147fd9e596f6e7409a201ec4b13698b9d1317f8a77ed021e5c620ceb2f98",
+    "docs/report/spec-gap-validation-evidence/chart-formatcode2/schema-validation.json": "2d9f2e97dd231647f8fc7a1f0222968dad3eb42991ead886d1e5f2e73cffb000"
+  },
+  "scope": "Downstream element and attribute examples; XSD only for the three element outputs"
+}
