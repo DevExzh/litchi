@@ -26,7 +26,7 @@ not evidence of an Office application accepting newly generated output.
 | Reject unsafe graph/signature/limit changes before writing | Counting/failing sink and finite-limit tests; exact precharge for self-closing blip/container expansion and namespace-complete fragments |
 | Preserve producer-formatted relationship XML | OPC removal regression with declarations, whitespace, comments, and remaining relationships |
 | Emit valid supported markup | Offline complete-slide ECMA XSD plus direct SVG MS-ODRAWXML XSD |
-| Make resource behavior inspectable | Source-bound fresh-process allocation/timing samples, recomputed reports |
+| Make resource behavior inspectable | Source-bound fresh-process allocation/timing samples, recomputed reports, many-picture scaling, and large shared namespace contexts with distinct local declarations |
 
 ADR 0003 governs immutable snapshots, atomic commits, dependency closure and
 reversible patches; ADR 0004 governs typed semantic verbs; ADR 0005 requires

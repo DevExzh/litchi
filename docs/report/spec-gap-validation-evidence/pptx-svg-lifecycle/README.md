@@ -8,7 +8,9 @@ source-bound review records (`opc-review.json` and `svg-namespace-review.json`).
 The host operation selects an existing direct slide picture with an internal PNG
 fallback. Attachment adds the native SVG extension, an owning slide relationship,
 and an internal SVG media part. Detachment removes the selected owner and retains
-resources referenced elsewhere. External resources remain inert. Selection and
+resources referenced elsewhere. SVG media bytes are retained as opaque payloads;
+the host validates package ownership and slide markup, not the SVG image grammar.
+External resources remain inert. Selection and
 rewrite ranges come from the original XML, with resolved inherited namespaces.
 Unrelated opaque extension payloads and package members must remain unchanged.
 
@@ -39,3 +41,14 @@ The corpus scan records local producer fixtures and explicit refusals, not nativ
 Office acceptance of newly generated files. Rendering, rasterization, external
 fetching, picture creation/reordering, and durable cross-process patch transport
 remain separate work. No performance improvement is claimed without measurements.
+
+The raw owner scanner has an explicit bounded profile: at most 32 MiB of slide
+XML, depth 256, one million element nodes, 256 attributes and namespace
+declarations per element, 16,384 active namespace bindings, and 4 KiB decoded
+names/prefixes/namespace URIs. Namespace declaration lexical values have a 16 KiB
+preflight bound. Namespace-complete parser fragments are admitted before their
+output allocation and also respect the caller limit passed by the host. These
+are support limits, not claims that larger documents are invalid XML. Namespace
+lookup uses a bounded reverse search; this does not imply fully linear runtime.
+The many-picture profile is required to assess host scan amplification separately
+from payload size and inherited-namespace cost.
