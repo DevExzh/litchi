@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "compile_first": true,
+  "source_files_checked": 871,
+  "reviewed_source_files": 7,
+  "test_totals_including_doctests": {
+    "passed": 1156,
+    "failed": 0,
+    "ignored": 12
+  },
+  "receipt_sha256": "7055a7a353907986fd61bbbd4d775bd51f645f88b42561537bbf57f6384d88d0",
+  "standalone_receipt_sha256": "7a76d72c6ee87705fc4e21175947abeebe8d869be5eee9b553d643c34c1e2394",
+  "standalone_probe_cases": 17,
+  "schema_valid_outputs": 4
+}

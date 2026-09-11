@@ -1,0 +1,5 @@
+# Run from the repository root with the shared Cargo target directory.
+cargo fmt --manifest-path docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/Cargo.toml -- --check
+CARGO_TARGET_DIR=target cargo check --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/Cargo.toml
+CARGO_TARGET_DIR=target cargo run --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/Cargo.toml
+python3 docs/report/spec-gap-validation-evidence/xlsb-theme-family/validate_schema.py docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/updated.xml docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/removed.xml docs/report/spec-gap-validation-evidence/theme-family-hardening/standalone/outputs/added.xml

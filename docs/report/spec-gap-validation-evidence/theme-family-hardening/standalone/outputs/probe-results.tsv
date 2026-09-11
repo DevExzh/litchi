@@ -1,0 +1,19 @@
+case	detail
+native_fixture_theme_source	bytes=8390; date_and_hyperlink_theme_equal=true
+native_scalar_name_edit	bytes=8396
+native_removal_closes_semantically_empty_wrappers	bytes=8112; extLst=false; ext=false
+normative_add_after_removal	bytes=8469; profile=normative
+standalone_bom_is_stripped_before_embedding	bytes=8390; embedded_bom_count=0
+standalone_declaration_and_processing_instruction_policy	declaration_parses_but_embedding_refuses; actual_pi_refused
+opaque_comment_and_cdata_processing_tokens	preserved; diagnostic output intentionally excluded from XSD claims
+reserved_and_empty_namespace_bindings	standalone and complete-part readers reject invalid bindings and oversized prefixes
+rejects_ext-text	read/add/replace all returned Err
+rejects_ext-reference	read/add/replace all returned Err
+rejects_ext-cdata	read/add/replace all returned Err
+rejects_extlst-text	read/add/replace all returned Err
+rejects_extlst-reference	read/add/replace all returned Err
+rejects_extlst-cdata	read/add/replace all returned Err
+rejects_extlst-foreign-child	read/add/replace all returned Err
+mce_ignored_owner_refuses_all_mutations	read-only projection opaque; add/replace/remove refused
+caller_specific_output_caps	replace_limit=8396; remove_limit=8112; add_limit=8469
+all_cases_passed	true
