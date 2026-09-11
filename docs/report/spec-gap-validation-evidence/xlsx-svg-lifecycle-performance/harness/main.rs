@@ -1,78 +1,33 @@
-//! Process-isolated XLSX SVG lifecycle profile scaffold.
+//! Process-isolated XLSX ordinary-worksheet SVG lifecycle profile adapter.
 //!
-//! This binary intentionally has no `litchi-xlsx` dependency while the
-//! source-backed owner and public API are provisional. The future adapter will
-//! retain the lane names and receipt support, then wire the timed closures to
-//! the frozen API. Running this binary today is an explicit refusal rather
-//! than a synthetic or guessed measurement.
+//! This binary is deliberately kept under the evidence tree. It links the
+//! current public `litchi_xlsx` selector, source scanner, and transaction
+//! methods, while the shell runner still requires an explicit freeze gate
+//! before it may collect any receipt.
 
-#![allow(clippy::print_stderr)]
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::print_stdout,
+    clippy::shadow_reuse,
+    reason = "the opt-in profile owns synthetic fixtures and emits JSON"
+)]
+
+mod adapter;
+mod support;
 
 use std::env;
 use std::process::ExitCode;
 
-#[path = "support.rs"]
-mod support;
-
 const DEFAULT_WARMUP: usize = 2;
 const DEFAULT_SAMPLES: usize = 20;
 
-const LANES: &[&str] = &[
-    "capture_raster_two_cell_small",
-    "capture_raster_two_cell_large",
-    "capture_raster_one_cell_small",
-    "capture_raster_one_cell_large",
-    "capture_raster_absolute_small",
-    "capture_raster_absolute_large",
-    "capture_attached_two_cell_small",
-    "capture_attached_two_cell_large",
-    "capture_attached_one_cell_small",
-    "capture_attached_one_cell_large",
-    "capture_attached_absolute_small",
-    "capture_attached_absolute_large",
-    "clone_raster_small",
-    "clone_raster_large",
-    "clone_attached_small",
-    "clone_attached_large",
-    "inventory_shared_256",
-    "inventory_shared_1024",
-    "inventory_distinct_256",
-    "inventory_distinct_1024",
-    "namespace_heavy",
-    "namespace_limit_refusal",
-    "attach_end_to_end_two_cell_small",
-    "attach_end_to_end_two_cell_large",
-    "attach_end_to_end_one_cell_small",
-    "attach_end_to_end_one_cell_large",
-    "attach_end_to_end_absolute_small",
-    "attach_end_to_end_absolute_large",
-    "detach_end_to_end_shared_first_two_cell",
-    "detach_end_to_end_shared_first_one_cell",
-    "detach_end_to_end_shared_first_absolute",
-    "detach_end_to_end_shared_final_two_cell",
-    "detach_end_to_end_shared_final_one_cell",
-    "detach_end_to_end_shared_final_absolute",
-    "detach_end_to_end_distinct_two_cell_small",
-    "detach_end_to_end_distinct_two_cell_large",
-    "detach_end_to_end_distinct_one_cell_small",
-    "detach_end_to_end_distinct_one_cell_large",
-    "detach_end_to_end_distinct_absolute_small",
-    "detach_end_to_end_distinct_absolute_large",
-    "noop_detach_two_cell",
-    "noop_detach_one_cell",
-    "noop_detach_absolute",
-    "limit_small",
-    "limit_large",
-    "malformed_duplicate_owner",
-    "malformed_mce_owner",
-    "malformed_linked_owner",
-    "malformed_unknown_uri",
-];
-
 fn usage() {
     println!(
-        "usage: xlsx-svg-lifecycle-profile --lane NAME [--warmup N] [--samples N]\n\n{} lanes are reserved; API wiring is pending",
-        LANES.len()
+        "usage: xlsx-svg-lifecycle-profile --lane NAME [--warmup N] [--samples N]\n\n{} acceptance lanes plus {} exploratory lanes are wired to the current XLSX API; the shell runner remains freeze-gated",
+        adapter::LANES.len(),
+        adapter::EXPLORATORY_LANES.len(),
     );
 }
 
@@ -106,7 +61,7 @@ fn parse_args() -> Result<(String, usize, usize), String> {
         }
     }
     let lane = lane.ok_or("--lane is required")?;
-    if !LANES.contains(&lane.as_str()) {
+    if !adapter::is_known_lane(&lane) {
         return Err(format!("unknown lane: {lane}"));
     }
     if samples == 0 {
@@ -125,11 +80,14 @@ fn main() -> ExitCode {
         },
     };
     let (lane, warmup, samples) = arguments;
-    eprintln!(
-        "api-wiring-pending: lane={lane} warmup={warmup} samples={samples}; no XLSX API is called"
-    );
-    eprintln!(
-        "wire the frozen source-backed worksheet selector/attach/detach API before collecting receipts"
-    );
-    ExitCode::from(2)
+    match adapter::run(&lane, warmup, samples) {
+        Ok(receipt) => {
+            println!("{receipt}");
+            ExitCode::SUCCESS
+        },
+        Err(error) => {
+            eprintln!("profile fixture or adapter setup failed: {error}");
+            ExitCode::from(1)
+        },
+    }
 }
