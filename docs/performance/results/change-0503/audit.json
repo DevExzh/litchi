@@ -1,0 +1,145 @@
+{
+  "artifacts": {
+    "docs/performance/claim-registry-v1.json": {
+      "bytes": 38560,
+      "sha256": "b8847b7e2fe2c5d15d5fe091f7f7f6bca8f2ec38a25decfe20a36a76f5eef955"
+    },
+    "docs/performance/results/change-0501/captures/R1-normal/corpus-catalog.json": {
+      "bytes": 221922,
+      "sha256": "ff0c14cd9511358d81e29bc504f83b8a4847bf4bbdcb5bb95e3055205aa2e630"
+    },
+    "docs/performance/results/change-0501/captures/R1-normal/report.json": {
+      "bytes": 1158662,
+      "sha256": "ce1dd3e273e696884508e8eb0c8e21d3e46fe8941c224b29fd1ebc14c32a9126"
+    },
+    "docs/performance/results/change-0501/captures/R2-normal/corpus-catalog.json": {
+      "bytes": 221922,
+      "sha256": "ff0c14cd9511358d81e29bc504f83b8a4847bf4bbdcb5bb95e3055205aa2e630"
+    },
+    "docs/performance/results/change-0501/captures/R2-normal/report.json": {
+      "bytes": 1158464,
+      "sha256": "75e35ee0620548b04af57ec9b6df952293393150cf9b7b244d4726bfdb3daca6"
+    },
+    "docs/performance/results/change-0501/verification-final.json": {
+      "bytes": 41170,
+      "sha256": "d1cfb61fb5c437e48da440f1e9db40b24fa92f9b7efee912652f9d9dce875605"
+    },
+    "docs/performance/results/change-0502/after/metadata-large-r1.json": {
+      "bytes": 3583,
+      "sha256": "9ab64595cd35f558cd07e05bba7b066aecb8712fdf2b8aad99d6addcaf10bd1a"
+    },
+    "docs/performance/results/change-0502/after/metadata-large-r2.json": {
+      "bytes": 3583,
+      "sha256": "4a35389463ea49f4d00fb613e82e765ed48ed041ba31ba92b96d65b1431552af"
+    },
+    "docs/performance/results/change-0502/after/metadata-small-r1.json": {
+      "bytes": 3372,
+      "sha256": "05a6ee0ea6d79883c30754b5a54c6db92e02a77c3252b836405c1decb90a1416"
+    },
+    "docs/performance/results/change-0502/after/metadata-small-r2.json": {
+      "bytes": 3373,
+      "sha256": "d430f3de970082a92b11dbec77869c96b9bfdecdf6ad2aee5f3d4e14f1ea1b6f"
+    },
+    "docs/performance/results/change-0502/after/plain-large-r1.json": {
+      "bytes": 3580,
+      "sha256": "3fe4206b05f2c0faa7b5a1ef3886bbfffcb2583fe16d0d98ea8c7e947247b11d"
+    },
+    "docs/performance/results/change-0502/after/plain-large-r2.json": {
+      "bytes": 3581,
+      "sha256": "a638bbf3577de3098a361a26ce5da31e94fc5714374c0f0d4c190c8dfa6f87e0"
+    },
+    "docs/performance/results/change-0502/after/plain-small-r1.json": {
+      "bytes": 3370,
+      "sha256": "f1f8e214830155842db58196323695ee046e43e270f107c48e750f42bb763aa6"
+    },
+    "docs/performance/results/change-0502/after/plain-small-r2.json": {
+      "bytes": 3370,
+      "sha256": "bce0b46944a40d23b1d8a65b7b3c3e842247f7e3d7f5c4d9a6455280feb19d55"
+    },
+    "docs/performance/results/change-0502/before/metadata-large-r1.json": {
+      "bytes": 3596,
+      "sha256": "d0c226fb77af56785ad3673d12a6e76dd86ef6f515faffe8a258dc16ad9bf26f"
+    },
+    "docs/performance/results/change-0502/before/metadata-large-r2.json": {
+      "bytes": 3595,
+      "sha256": "e4d46fc549069510d6290b93a1c2c010c69121b3aac75755695f1c12d56086fb"
+    },
+    "docs/performance/results/change-0502/before/metadata-small-r1.json": {
+      "bytes": 3385,
+      "sha256": "f1b00448461f3b6530fdce204c0b78c80a0ad6956c475b4b316211b009047bba"
+    },
+    "docs/performance/results/change-0502/before/metadata-small-r2.json": {
+      "bytes": 3386,
+      "sha256": "b5c98b5adb26f73178b8d2d5ad4015bc816ec41a5f4e6c0901e0edcf59b46697"
+    },
+    "docs/performance/results/change-0502/before/plain-large-r1.json": {
+      "bytes": 3594,
+      "sha256": "202109dfb50a5cc03cc28ed50e2424a8ac772ebed2058dcf46d8cbec6138cae9"
+    },
+    "docs/performance/results/change-0502/before/plain-large-r2.json": {
+      "bytes": 3595,
+      "sha256": "edd6e2d647cfa6fe410ac11f5ae9edc4600c9062c44c9464d40aaa093d3edd8d"
+    },
+    "docs/performance/results/change-0502/before/plain-small-r1.json": {
+      "bytes": 3384,
+      "sha256": "a414bf9acc162d2ce6bbb1169ed1f67d9c6e4d6e945622e6be9803745c7bd968"
+    },
+    "docs/performance/results/change-0502/before/plain-small-r2.json": {
+      "bytes": 3382,
+      "sha256": "9aa74be0d9ec19691098ae96281d3c9d2f98b65cc9a96f306d44256294f6469d"
+    },
+    "docs/performance/results/change-0502/summarize.py": {
+      "bytes": 7135,
+      "sha256": "b93be14ce4f1878ea36640df23d2ca43c12a07589eb75eefc9d897b65cfbeda1"
+    },
+    "docs/performance/results/change-0502/summary.json": {
+      "bytes": 5515,
+      "sha256": "37cbd5db586ac2f36e2345a471533f88a47e47f3c723274fa6ee91a82035dea5"
+    }
+  },
+  "checks": [
+    {
+      "check": "0501 retained full-run report/catalog validation",
+      "command_template": "python3 -B tools/validate_crud_coverage_index.py --catalog docs/performance/results/change-0501/captures/<lane>/corpus-catalog.json --report docs/performance/results/change-0501/captures/<lane>/report.json",
+      "lanes": [
+        "R1-normal",
+        "R2-normal"
+      ],
+      "status": "passed"
+    },
+    {
+      "check": "CRUD coverage unit tests",
+      "command": "python3 -B -m unittest discover -s tools -p test_crud_coverage_index.py",
+      "status": "passed",
+      "tests": 38
+    },
+    {
+      "check": "performance claim registry",
+      "claims": 10,
+      "command": "python3 -B tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict",
+      "status": "passed"
+    },
+    {
+      "check": "0502 deterministic summary recomputation",
+      "comparison": "summarize.py summarize(root) == json.loads(summary.json)",
+      "includes_bootstrap_intervals": true,
+      "measured_samples": 3200,
+      "pairs": 8,
+      "status": "passed"
+    },
+    {
+      "check": "0501 complete final verifier replay",
+      "command": "python3 -B docs/performance/results/change-0501/verify-final.py",
+      "error": "before: frozen binary is missing",
+      "exit_code": 1,
+      "historical_receipt_preserved": true,
+      "status": "unavailable"
+    }
+  ],
+  "date_utc": "2026-09-11",
+  "goal_status": "incomplete",
+  "performance_claim": "none",
+  "revision": "a9d0ded5ac483a7fb9e6899279bce732e851652e",
+  "schema": "litchi.performance.evidence-reconciliation.v1",
+  "scope": "retained evidence verification; no benchmark capture or production changes"
+}

@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## Review queue reconciled through 0502
+
+The retained evidence changes the next investigations. These priorities concern
+measured scenarios; the full taxonomy and provider matrix remain required.
+
+| Priority | Observed cost | Next evidence needed |
+| --- | --- | --- |
+| P0 | ODG open p50 regresses 5.9–6.4% on plain and 53.4–111.1% on metadata corpora in 0502. | Profile the current richer parser and attribute repeated scanning and retained metadata costs before another change; preserve all newly supported state and validation. The older parser is not a semantics-equivalent replacement. |
+| P1 | 0499 many-small local Part batches remain slower than serial despite worker reuse; delayed batch-8 p99 rises 30.79%. | Isolate queue/wave overhead and delayed-provider tails with matched operation-local observations before changing admission policy. |
+| P1 | 0500 K=1 p128 owned batch lifecycle p50 rises 7.34%; p512 K=8 warm-file RSS rises 5.77%. | Recheck the publication-phase association and memory in matched repeated runs; larger batches do not erase these flags. |
+| P1 | The 0501 full-run reports validate 48 measured mappings but leave 22 mappings correctness-only. | Extend measured CRUD/provider coverage from the checked taxonomy, retaining source, output, and preservation oracles. |
+
+The 2026-09-11 evidence audit reproduces the 0502 summary, including its
+bootstrap intervals, from all 16 raw timing reports. It also validates both
+0501 full-run report/catalog pairs. These are retained-data checks, not new
+benchmark runs or current-worktree performance measurements.
+
 ## 0502: ODG metadata open; regressions and heap reduction retained
 
 [0502](changes/0502-odg-metadata-open.md) records four deterministic ODG
@@ -20,7 +37,7 @@ a CRUD speedup or complete the broader performance goal.
 and chart decoded-byte contribution to private `digest_touched`, retaining
 exact payload equality, candidate reread, graph/metadata proof, and 64 KiB
 cancellation checks. The fresh before media-rich API p50 is 24.297/24.337 ms
-owned and 28.588/28.910 ms warm-file. The final supplementary profile reports
+owned and 28.588/28.910 ms warm-file. The before supplementary profile reports
 SHA-256 compression at 31.01% for owned and 30.08% for warm-file whole-child
 samples; setup, untimed work, and incomplete callgraph coverage prevent
 touched-digest attribution. The first owned export reused the same recorded
@@ -38,10 +55,12 @@ both 201-row lanes (6,030 measured samples; 38 static coverage tests), with
 the current timing-report baseline only. The scoped gates also pass: default
 all-targets 848, all-features library 552, doctests 6 with 2 ignored, focused
 58, private guards 5, plus Clippy, fmt, rustdoc, downstream, and boundaries.
-Independent strict verification passes. Final cleanup removed 2,154,708,992
-unique-inode allocated bytes and retained eight replay files in local tmpfs:
-two binaries and six raw perf files, including two failed attempts. The full
-goal remains open.
+The retained final verification receipt passed at capture time. On 2026-09-11,
+rerunning that verifier stops because the frozen control binary is missing;
+this is distinct from the independently revalidated retained report/catalog
+pairs. The historical cleanup receipt records 2,154,708,992 unique-inode
+allocated bytes removed and eight replay files retained in local tmpfs at that
+time, not a durable binary archive. The full goal remains open.
 
 ## 0500: repeated managed reconstruction is the measured hotspot
 
