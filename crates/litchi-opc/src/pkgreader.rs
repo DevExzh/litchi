@@ -241,11 +241,29 @@ pub(crate) struct DeferredPart {
     pub(crate) srels: SmallVec<[SerializedRelationship; 8]>,
 }
 
+/// Facts collected while an admitted relationship manifest is parsed.
+///
+/// The source-backed topology validator uses these values to account for
+/// untouched `.rels` members without decompressing them a second time.  The
+/// record deliberately retains no XML bytes; the source relationship cache
+/// remains a separate, eager-reader-only concern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RelationshipXmlMetrics {
+    pub(crate) uncompressed_bytes: u64,
+    pub(crate) event_count: u64,
+    pub(crate) relationship_count: u64,
+}
+
 /// Fully validated package catalog whose ordinary part payloads remain in ZIP.
 #[derive(Debug)]
 pub(crate) struct SourceCatalog {
     pub(crate) pkg_srels: SmallVec<[SerializedRelationship; 8]>,
     pub(crate) parts: Vec<DeferredPart>,
+    /// Metrics for each relationship owner whose manifest was admitted and
+    /// parsed during catalog construction.  The package pseudo-part `/` is
+    /// included when it has a `.rels` member.  The map is bounded by the
+    /// admitted relationship-member limit and retains only scalar facts.
+    pub(crate) relationship_xml_metrics: HashMap<PackURI, RelationshipXmlMetrics>,
     pub(crate) non_part_members: Vec<NonPartMember>,
     /// Exact spelling of the reserved content-types member in the source ZIP.
     pub(crate) content_types_member: String,
@@ -950,12 +968,32 @@ impl PackageReader {
                 ledger.preflight_xml_bytes(limits, metadata.uncompressed_size())?;
                 let rels_xml = read_structural_member(archive, rels_path)?;
                 ledger.retain_xml_bytes(limits, rels_xml.as_bytes().len() as u64)?;
+                let event_start = ledger.xml_events;
                 let relationships = Self::parse_rels_xml_with_source(
                     rels_xml.as_bytes(),
                     source_uri.base_uri(),
                     Some(source_uri.as_str()),
                     limits,
                     ledger,
+                )?;
+                let event_count = ledger.xml_events.checked_sub(event_start).ok_or_else(|| {
+                    OpcError::InvalidRelationshipsManifest(
+                        "relationship XML event metrics underflow".to_string(),
+                    )
+                })?;
+                let relationship_count = u64::try_from(relationships.len()).map_err(|_| {
+                    OpcError::InvalidRelationshipsManifest(
+                        "relationship count exceeds u64 metrics range".to_string(),
+                    )
+                })?;
+                ledger.record_relationship_xml_metrics(
+                    source_uri,
+                    RelationshipXmlMetrics {
+                        uncompressed_bytes: metadata.uncompressed_size(),
+                        event_count,
+                        relationship_count,
+                    },
+                    limits,
                 )?;
                 if let Some(source_xml) = ledger.source_xml.as_mut() {
                     source_xml
@@ -1365,6 +1403,7 @@ impl PackageReader {
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),
         })
@@ -1435,6 +1474,7 @@ impl PackageReader {
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),
         })
@@ -1603,6 +1643,7 @@ impl PackageReader {
 #[derive(Default)]
 struct RelationshipLedger {
     source_xml: Option<HashMap<PackURI, Arc<Vec<u8>>>>,
+    relationship_xml_metrics: HashMap<PackURI, RelationshipXmlMetrics>,
     declared_xml_bytes: u64,
     retained_xml_bytes: u64,
     relationships: u64,
@@ -1615,6 +1656,30 @@ impl RelationshipLedger {
             source_xml: Some(HashMap::new()),
             ..Self::default()
         }
+    }
+
+    fn record_relationship_xml_metrics(
+        &mut self,
+        owner: &PackURI,
+        metrics: RelationshipXmlMetrics,
+        limits: ReadLimits,
+    ) -> Result<()> {
+        // A relationship owner can be encountered more than once while the
+        // graph and typed-part catalog are assembled. Keep one scalar record
+        // per owner and avoid charging duplicate map entries.
+        if self.relationship_xml_metrics.contains_key(owner) {
+            return Ok(());
+        }
+        checked_increment(
+            self.relationship_xml_metrics.len(),
+            limits.max_relationship_parts(),
+            ReadResource::RelationshipParts,
+        )?;
+        self.relationship_xml_metrics
+            .try_reserve(1)
+            .map_err(|source| allocation("OPC relationship XML metrics", source))?;
+        self.relationship_xml_metrics.insert(owner.clone(), metrics);
+        Ok(())
     }
 
     fn preflight_xml_bytes(&mut self, limits: ReadLimits, bytes: u64) -> Result<()> {
@@ -2399,6 +2464,61 @@ mod tests {
                 Err(OpcError::InvalidRelationshipsManifest(_))
             ));
         }
+    }
+
+    #[test]
+    fn relationship_metrics_follow_trimmed_ingress_event_policy() {
+        // The source catalog parser intentionally trims whitespace-only text
+        // between markup.  Keep a noncanonical prefix, indentation, and an
+        // opaque comment here so the metric proves that it is the ingress
+        // parser's event ledger rather than a later raw-byte scan.  The six
+        // admitted events are Decl, Start, Empty, Comment, End, and Eof.
+        let xml = br#"<?xml version="1.0" encoding="UTF-8"?>
+<r:Relationships xmlns:r="http://schemas.openxmlformats.org/package/2006/relationships">
+    <!-- retained source metadata -->
+    <r:Relationship Id="rId1" Type="urn:test:type" Target="document.xml" />
+</r:Relationships>
+"#;
+        let limits = ReadLimits::default();
+        let mut ledger = RelationshipLedger::default();
+        ledger
+            .preflight_xml_bytes(limits, xml.len() as u64)
+            .unwrap();
+        ledger.retain_xml_bytes(limits, xml.len() as u64).unwrap();
+        let event_start = ledger.xml_events;
+        let relationships =
+            PackageReader::parse_rels_xml_with_source(xml, "/", Some("/"), limits, &mut ledger)
+                .unwrap();
+        let event_count = ledger.xml_events.checked_sub(event_start).unwrap();
+        ledger
+            .record_relationship_xml_metrics(
+                &PackURI::new("/").unwrap(),
+                RelationshipXmlMetrics {
+                    uncompressed_bytes: xml.len() as u64,
+                    event_count,
+                    relationship_count: relationships.len() as u64,
+                },
+                limits,
+            )
+            .unwrap();
+
+        assert_eq!(relationships.len(), 1);
+        assert_eq!(event_count, 6);
+        assert_eq!(ledger.xml_events, event_count);
+        assert_eq!(ledger.relationships, 1);
+        assert_eq!(
+            ledger
+                .relationship_xml_metrics
+                .get(&PackURI::new("/").unwrap()),
+            Some(&RelationshipXmlMetrics {
+                uncompressed_bytes: xml.len() as u64,
+                event_count: 6,
+                relationship_count: 1,
+            })
+        );
+        // Metrics retain scalar facts only.  No relationship XML cache is
+        // created by the deferred/source-catalog ledger.
+        assert!(ledger.source_xml.is_none());
     }
 
     #[test]
