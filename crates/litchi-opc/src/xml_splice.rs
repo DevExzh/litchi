@@ -351,6 +351,16 @@ impl fmt::Debug for AuthoredXmlFragment {
 }
 
 impl AuthoredXmlFragment {
+    /// Construct an audited zero-byte fragment for an exact source deletion.
+    ///
+    /// Empty fragments are intentionally separate from [`Self::text`]: they
+    /// carry no XML character data and therefore cannot introduce a schema
+    /// content-model token while a source range is removed.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
     /// Audit one or more compact authored markup nodes.
     pub fn markup(bytes: impl Into<Vec<u8>>) -> Result<Self> {
         let bytes = bytes.into();
