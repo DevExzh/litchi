@@ -1,0 +1,9 @@
+{
+  "scope": "owned /tmp/litchi-goal-0515 only",
+  "removed": true,
+  "removed_utc": "2026-09-11T23:27:51.956968+00:00",
+  "file_count": 1768,
+  "unique_inode_allocated_bytes": 1040297984,
+  "process_references_before_removal": [],
+  "retained_evidence": "docs/performance/results/change-0515; source/binary hashes, raw durations/profiles/logs retained; executable and target files removed"
+}

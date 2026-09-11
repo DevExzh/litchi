@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0515/target/release/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0515/preflight-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0515/preflight-catalog.json"
+  ],
+  "started_utc": "2026-09-11T23:06:12.027975+00:00",
+  "elapsed_seconds": 2.3570798309956444,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "4d5193b285544315399425800903a669700f7bfba5b4f51645df289525bc3106",
+  "scope": "Native existing per-case timer; setup, generator, expected-output generation, verification and drops excluded according to runner",
+  "artifacts": {
+    "preflight-report.json": "4a012afc045954144d7f4ddf2728e48d1f407ca029e0a444e9bc98b267ee8b83",
+    "preflight-catalog.json": "02ce3b9af76d49e03a6ecabb0da1d0c789245d1885f63bee1cee4195a384dbe0",
+    "preflight.log": "681bcad7aee93eb7e741fd90ab4ecbe58cd60808e98f8b294e5a107c5751782d"
+  }
+}

@@ -1,16 +1,39 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current priority after 0514: OLE2 and OOXML
+## Current priority after 0515: OLE2 and OOXML
 
 Per the user's September 11 instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
 deferred until then. This overrides the ordering of older entries below.
 CFB profiling and FAT batching are complete in 0511; the 0514 speculative
-XLSX source-pass fusion is rejected. Larger changed-output XLSX work and DOCX
+XLSX source-pass fusion is rejected. 0515 isolates the changed-output XLSX costs; its production work and DOCX
 publication attribution remain open. This investigation queue is not a
 completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
+
+## 0515: isolate XLSX changed-output work
+
+[0515](changes/0515-xlsx-output-attribution.md) separates changed-output parsing
+from source Store parsing with caller-context profiles and captures compaction
+alone. The unchanged-source commit profiles differ by 0.008% in simulated
+instructions. Output parsing remains about 25.8% of commit work and compaction
+about 20.4%, but sharing the reader directly targets only about 6.9% of commit
+instructions. Semantic cell processing, materialization and namespace resolution
+remain required; the full validation share is not a removable-work estimate.
+The 720 normal samples show p50 repeat drift from −1.01% to +1.10%, with no
+frozen latency or RSS review flag. Whole-child RSS is 138,480/135,732 KiB;
+this is repeatability context, not an optimization or document-memory result.
+
+The next implementation should investigate feeding emitted-equivalent events
+from compaction into the existing parser only for effective changed outputs.
+Reuse needs a proof for actual normalized bytes, exact-output x14ac/MCE/UTF-8
+checks, deferred error ordering and an authoritative fallback. Style checks,
+web validation, change readback, package reopen and the bounded Store handoff
+remain intact. See the [semantic review](results/change-0515/output-semantics-review.md)
+and [scope review](results/change-0515/scope-review.md). This evidence-only batch
+makes no speedup or new phase-memory/hardware/cache/scaling claim. The full
+OLE2/OOXML goal remains active; ODF is deferred and iWork excluded.
 
 ## 0514: reject speculative XLSX parser/layout fusion
 

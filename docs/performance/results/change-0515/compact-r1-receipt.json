@@ -1,0 +1,41 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*litchi_xlsx::raw::compact::changed_worksheet",
+    "--zero-before=*litchi_perf_baseline::run_xlsx_update_commit",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r1.out",
+    "/tmp/litchi-goal-0515/target/release/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_percent_commit",
+    "--xlsx-shape",
+    "dense-wide",
+    "--samples",
+    "3",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0515/compact-r1-catalog.json"
+  ],
+  "started_utc": "2026-09-11T23:09:50.639312+00:00",
+  "elapsed_seconds": 64.81717286600178,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "4d5193b285544315399425800903a669700f7bfba5b4f51645df289525bc3106",
+  "scope": "Changed worksheet compaction bodies only; 6 measured calls for 2 changed sheets x 3 commits, reset at runner entry. Grid validation, setup and readback excluded.",
+  "artifacts": {
+    "compact-r1-report.json": "54fe47de0e0c7993d251813362119de939f09c3088f76a9a6bbc3ba9eb1fe445",
+    "compact-r1-catalog.json": "77ac211697106d33f5525c9da7c3dd8b275df8a8382a54d4b7d97b4dd624f893",
+    "compact-r1.log": "eb71f9d60913ee6cc141cec4057508d1a3ece94b390d12b213b6d86c3f7a0623",
+    "compact-r1.out": "a1ca644d3ff934a15210dfff5148ee080a02c6860c0da3bb0006950b2f8fd2f6"
+  }
+}

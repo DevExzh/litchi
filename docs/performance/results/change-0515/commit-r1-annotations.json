@@ -1,0 +1,34 @@
+{
+  "exclusive": {
+    "command": [
+      "callgrind_annotate",
+      "--inclusive=no",
+      "--tree=both",
+      "--threshold=100",
+      "--auto=no",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1.out"
+    ],
+    "started_utc": "2026-09-11T23:09:50.225587+00:00",
+    "exit_code": 0,
+    "stderr": "",
+    "output": "commit-r1-exclusive.txt",
+    "output_sha256": "2cffda06a68fa392cf3675477244be6791039596dd45159e8205e5dee7c4a0ca",
+    "profile_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0"
+  },
+  "inclusive": {
+    "command": [
+      "callgrind_annotate",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=100",
+      "--auto=no",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0515/commit-r1.out"
+    ],
+    "started_utc": "2026-09-11T23:09:50.315448+00:00",
+    "exit_code": 0,
+    "stderr": "",
+    "output": "commit-r1-inclusive.txt",
+    "output_sha256": "8ba91aec0cd5e07135d0aa5f933b61cfdf8fd834c40c003c50bd0636e2823fd9",
+    "profile_sha256": "2e7abe22e431fd71d2ebc25edbf4e580f3589c7eced37ce4b2757658706c64c0"
+  }
+}

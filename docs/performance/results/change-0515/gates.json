@@ -1,0 +1,86 @@
+{
+  "source_bound_receipts": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "started_utc": "2026-09-11T23:02:15.859671+00:00",
+      "elapsed_seconds": 17.69626074199914,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "boundaries": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "started_utc": "2026-09-11T23:02:33.720949+00:00",
+      "elapsed_seconds": 254.34076628400362,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+      "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9"
+    },
+    "claims": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_perf_claims.py",
+        "--registry",
+        "docs/performance/claim-registry-v1.json",
+        "--repo-root",
+        ".",
+        "--evidence-root",
+        ".",
+        "--mode",
+        "strict"
+      ],
+      "started_utc": "2026-09-11T23:06:48.225223+00:00",
+      "elapsed_seconds": 70.15380602599907,
+      "exit_code": 0,
+      "source_unchanged": true,
+      "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+      "log_sha256": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+    }
+  },
+  "additional_checks": {
+    "report_classification": {
+      "command": [
+        "python3",
+        "-B",
+        "tools/check_report_claim_classification.py",
+        "--repo-root",
+        "."
+      ],
+      "started_utc": "2026-09-11T23:15:10.166082+00:00",
+      "elapsed_seconds": 0.06071037799847545,
+      "exit_code": 0,
+      "log_sha256": "fe726fd897a26fff241693eb6a9e1c1d8149ce10363909d4945f9c8b3b6a88c8"
+    },
+    "python_syntax": {
+      "method": "ast.parse every retained Python script",
+      "receipt": "python-syntax.json",
+      "receipt_sha256": "ff88d8dec9093f90357a062f07eda50ef74489542c4f16ae9fa5cbe6194f8a86",
+      "exit_code": 0
+    },
+    "annotation_replay": {
+      "receipt": "annotation-replay.json",
+      "receipt_sha256": "551e84684f61f72a969831f46387c78109f59649a104e1060136f1bf47f72912",
+      "exit_code": 0,
+      "scope": "All eight complete function blocks and incoming/outgoing edges regenerate from retained raw profiles, independent of equal-cost display order"
+    },
+    "authored_diff_check": {
+      "receipt": "authored-diff-check.json",
+      "receipt_sha256": "5fa442af1f74507241abbdc101c219267d4d0757060248f05f35051cc2c9bbb9",
+      "exit_code": 0
+    }
+  },
+  "rust_test_scope": "No Rust source changes and no new owner suite, fuzz campaign or native Office run claimed. Fresh benchmark semantic/output oracles and evidence/tooling checks cover this attribution batch."
+}
