@@ -1,0 +1,8 @@
+{
+  "docs/performance/BASELINE.md": "08274c9950e14a890381dcab7c447c6f0c4c043897adf1bc3b0962ce7c2acc4d",
+  "docs/performance/HOTSPOTS.md": "cca2cfde1619aff6fe2c64658a8cf628447032e477db2c909d1ce15b99c5d848",
+  "docs/performance/REPORT.md": "4ad490d091f5fc068ad5ccb188b0593a9e6711991c1661f3c9f468e4e52d4452",
+  "docs/performance/GOAL_AUDIT.md": "ca5fb36ddc7d4b4ec51a03bf495870b360b9e8eb21c6ec433a0bf9db79ffd07f",
+  "docs/performance/ADR_COMPLIANCE.md": "de41765710cdb53cd72a00a1e760a8177e7cfba761a489c4b0d2063a4ea81ffc",
+  "docs/performance/changes/0509-odt-sink-buffer-reuse.md": "d7707b56717e1f774942c38247edc038849624437b548b5fc7e606bbbc3b6de8"
+}

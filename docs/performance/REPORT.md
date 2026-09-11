@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0509: bounded ODT sink paragraph buffer reuse
+
+[0509](changes/0509-odt-sink-buffer-reuse.md) reduces stack-attributed buffer
+allocations from 10,000 to one per large export while preserving exact output,
+nested order, limits, and sink failure progress. The spare retains at most
+4 KiB actual capacity. Initial native medians fall 0.96–2.55%; the original
+large p99 +9.14% flag remains documented alongside a longer follow-up at
++2.18%/+2.78%. This supports allocation-churn reduction with modest timing
+changes, not a peak-memory or tail-latency improvement. All 1,491 Rust tests/
+doctests pass, with one existing producer test ignored. The unchanged strict
+registry still contains ten entries; this record does not add a registry claim.
+
 ## 0508: measured default text-export coverage
 
 [0508](changes/0508-default-semantic-text-export.md) promotes four existing

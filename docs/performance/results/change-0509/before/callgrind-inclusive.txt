@@ -1,0 +1,54 @@
+--------------------------------------------------------------------------------
+Profile data file 'docs/performance/results/change-0509/before/callgrind.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 189654257
+Trigger: Program termination
+Profiled target:  /tmp/litchi-goal-0509/before/litchi-perf-baseline --case odt_semantic_text_to_sink --semantic-shape large --warmup 0 --samples 5 --json docs/performance/results/change-0509/before/callgrind-report.json --corpus-manifest docs/performance/results/change-0509/before/callgrind-catalog.json (PID 1648932, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       95
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+304,455,496 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+304,455,496 (100.0%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+304,455,496 (100.0%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+304,455,496 (100.0%)  ???:(below main) [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+304,455,496 (100.0%)  ???:litchi_odt::elements::text::codec::Elements::write_text_to [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:litchi_odt::elements::text::write_text_blocks_to_writer [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:litchi_perf_baseline::main [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:litchi_perf_baseline::run [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:litchi_perf_baseline::run_case_with_config [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:main [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:std::rt::lang_start::{{closure}} [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:std::rt::lang_start_internal [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+304,455,496 (100.0%)  ???:std::sys::backtrace::__rust_begin_short_backtrace [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+162,860,730 (53.49%)  ???:litchi_odt::elements::text::PendingSinkBlocks::complete [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+155,460,730 (51.06%)  ???:litchi_core::text_output::SequentialTextWriter<W>::write_object [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+151,960,830 (49.91%)  ???:litchi_core::text_output::SequentialTextWriter<W>::write_bytes [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+146,461,105 (48.11%)  ???:<litchi_perf_baseline::HashingDiscardSink as std::io::Write>::write [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+131,944,680 (43.34%)  ???:sha2::sha256::compress256 [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+131,710,320 (43.26%)  ???:sha2::sha256::soft::unroll::compress [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+ 37,103,869 (12.19%)  ???:quick_xml::reader::Reader<R>::read_event_impl [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+ 35,537,500 (11.67%)  ???:litchi_odt::elements::text::normalized_xml10_decoded_len [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+ 14,375,000 ( 4.72%)  ???:core::str::converts::from_utf8 [/tmp/litchi-goal-0509/before/litchi-perf-baseline]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./csu/../csu/libc-start.c
+  ./csu/../sysdeps/nptl/libc_start_call_main.h
+

@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0509: matched ODT sink allocation reduction
+
+[0509](changes/0509-odt-sink-buffer-reuse.md) uses the unchanged ODT export
+selector and corpus generator for 6,000 matched native samples plus an
+8,000-sample large-only tail follow-up. Stack-attributed paragraph-buffer
+allocations fall from 10,000 to one per large export, with a 4 KiB spare cap.
+Initial median reductions are 0.96–2.55%; an initial large p99 +9.14% flag is
+retained, with longer follow-up p99 +2.18%/+2.78%. Whole-child RSS changes stay
+below 1%; rounded peak heap is unchanged. This advances a measured scenario
+without changing the 41-case/213-row/43-corpus default identity.
+
 ## 0508: semantic text export joins the default baseline
 
 [0508](changes/0508-default-semantic-text-export.md) expands the checked default

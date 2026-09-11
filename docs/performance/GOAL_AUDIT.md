@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0509: profiled ODT export allocation reduction
+
+[0509](changes/0509-odt-sink-buffer-reuse.md) follows fresh allocation evidence
+with one bounded operation-local paragraph buffer. Stack allocation calls
+fall 99.99% in the large synthetic export, with exact output/sink identities
+and 1,491 passing Rust tests/doctests. Native captures retain 14,000 samples,
+including a longer tail follow-up after an initial +9.14% large p99 flag.
+The follow-up stays below 5%, but no tail-latency or peak-memory improvement
+is claimed. This is scoped implementation progress; the remaining 18
+correctness-only selectors, provider overhead, native-producer coverage,
+historical comparisons and full non-iWork requirements remain open. The
+program goal remains active.
+
 ## 0508: concrete default conversion coverage expansion
 
 [0508](changes/0508-default-semantic-text-export.md) preserves all 201 prior

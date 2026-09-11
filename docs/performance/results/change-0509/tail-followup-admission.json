@@ -1,0 +1,7 @@
+{
+  "reason": "initial large R1 p99 +9.140224576246458 percent crosses5percent threshold; R2 +1.3751036010232864",
+  "initial_summary_sha256": "0d327c7f31fc06ba394b7892ec3de5f98bbc84eb0461f2ded25cfc41a06f6f4e",
+  "decision": "retain original capture; run large-only A1/B1/B2/A2 with2000samples each and10warmups, CPU2, samebinaries/sink",
+  "source_change": false,
+  "posthoc": "follow-up motivated by initial tail flag; not a pre-registered independent confirmation"
+}

@@ -1,0 +1,16 @@
+{
+  "recorded_utc": "2026-09-11T18:18:38.483554+00:00",
+  "receipt_kind": "post-capture artifact custody; command and successful exit observed by coordinator tools",
+  "binary_sha256": "ab874929448dfa3a4c17fd9072e702081b4e78b84cae39f3be120518a0c7f6f2",
+  "source_manifest_sha256": "e4851370dd14cbd5f052edb27792858de75bd26e594fa1a9bec34a9191f77eed",
+  "samples": 20,
+  "warmups": 0,
+  "scope": "whole child",
+  "artifacts": {
+    "heaptrack-catalog.json": "17d35ed51dd9b61dfbba000f479440aff047655955318837e391b42a0e38055d",
+    "heaptrack-print.txt": "101e4d2effecd8c3ba29b635b450c0ac233b77b756352ab14378ba49c846659e",
+    "heaptrack-report.json": "dd795f190399222e3ba351aeb9eafe9a555e3eecd8c4f4b90b123ef594ca6a5e",
+    "heaptrack.log": "68333650cb9b7211a09cce7bf2ac74b8c279a247f9b803b4cbcfd151e6f16e43",
+    "heaptrack.zst": "32abd42f65ba0efd981fe429b5c4e636c592a561bb7fb2f9118638457591ec5f"
+  }
+}

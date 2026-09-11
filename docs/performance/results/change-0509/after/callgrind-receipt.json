@@ -1,0 +1,35 @@
+{
+  "command": [
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*write_text_blocks_to_writer*",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0509/after/callgrind.out",
+    "/tmp/litchi-goal-0509/after/litchi-perf-baseline",
+    "--case",
+    "odt_semantic_text_to_sink",
+    "--semantic-shape",
+    "large",
+    "--warmup",
+    "0",
+    "--samples",
+    "5",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0509/after/callgrind-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0509/after/callgrind-catalog.json"
+  ],
+  "started_utc": "2026-09-11T18:22:42.661465+00:00",
+  "elapsed_seconds": 3.9605805070023052,
+  "exit_code": 0,
+  "binary_sha256": "4808a9d6e1d0f1c5c1aa903f1c88ff7713d41584a1a920336e2d99c862ebeb24",
+  "build_receipt_sha256": "3ad0895fec96215631dbe56de953a22e9cf43511a700d527f0166344f2a47544",
+  "source_manifest_sha256": "67350cdab498e1138adaeca3f858dbbd49b39a3fa25b1ef21adfabdb71629b8c",
+  "current_source_unchanged": true,
+  "scope": "instrumented, excluded from latency comparison",
+  "artifacts": {
+    "callgrind.log": "d4239596366605f701d56d2cb1f9eb5355bc2cfbaa2cc3acaa8f67815b09f795",
+    "callgrind-report.json": "d6bd8ca5d7c90396a467a4ea9ebccc833af8c403dcdc30ca13521cf91f55020e",
+    "callgrind-catalog.json": "17d35ed51dd9b61dfbba000f479440aff047655955318837e391b42a0e38055d"
+  }
+}

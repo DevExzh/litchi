@@ -1,0 +1,19 @@
+{
+  "before": {
+    "append_sink_precharged_allocation_calls": 200000,
+    "exports": 20,
+    "buffer_allocations_per_export": 10000.0,
+    "callgrind_export_samples": 5,
+    "callgrind_instruction_references": 304455496
+  },
+  "after": {
+    "append_sink_precharged_allocation_calls": 20,
+    "exports": 20,
+    "buffer_allocations_per_export": 1.0,
+    "callgrind_export_samples": 5,
+    "callgrind_instruction_references": 298891534
+  },
+  "instruction_reference_change_percent": -1.8275124190893277,
+  "buffer_allocation_change_percent": -99.99,
+  "scope_notes": "Allocation counts are stack-filtered to append_sink_precharged. Callgrind collection is scoped to the parser including the hashing sink; no hardware or native elapsed-time claim. Whole-child peak heap rounds to 9.91 MB for both; no peak-memory reduction claim."
+}

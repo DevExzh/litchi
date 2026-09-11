@@ -33,6 +33,8 @@ const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_TEXT_BLOCKS: usize = 1_000_000;
 const MAX_TEXT_DEPTH: usize = 4_096;
 const MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
+/// Maximum actual capacity retained by the one-buffer sink reuse slot.
+const MAX_SINK_TEXT_REUSE_CAPACITY: usize = 4_096;
 const MAX_SPACE_COUNT: usize = 1_000_000;
 /// Qualified name of the unnumbered leading block of an ODF list.
 const LIST_HEADER_TAG: &str = "text:list-header";
@@ -1973,6 +1975,9 @@ struct PendingSinkBlocks {
     next_slot: usize,
     next_emit: usize,
     block_count: usize,
+    // One cleared buffer is retained only after successful frontier emission;
+    // the actual capacity bound keeps this operation-local spare finite.
+    reusable: Option<String>,
 }
 
 impl PendingSinkBlocks {
@@ -1982,6 +1987,26 @@ impl PendingSinkBlocks {
             next_slot: 0,
             next_emit: 0,
             block_count: 0,
+            reusable: None,
+        }
+    }
+
+    fn take_reusable(&mut self) -> String {
+        self.reusable.take().unwrap_or_default()
+    }
+
+    fn recycle(&mut self, mut value: String) {
+        let capacity = value.capacity();
+        if capacity > MAX_SINK_TEXT_REUSE_CAPACITY {
+            return;
+        }
+        value.clear();
+        if self
+            .reusable
+            .as_ref()
+            .is_none_or(|spare| spare.capacity() < capacity)
+        {
+            self.reusable = Some(value);
         }
     }
 
@@ -2040,6 +2065,7 @@ impl PendingSinkBlocks {
                 .checked_add(1)
                 .ok_or_else(|| Error::InvalidFormat("ODF text block slot overflow".to_string()))
                 .map_err(|error| writer.document_error(error))?;
+            self.recycle(value);
         }
         Ok(())
     }
@@ -2265,7 +2291,7 @@ pub(crate) fn write_text_blocks_to_writer<'options, 'output, W: Write + ?Sized>(
                     let slot = parse!(pending.reserve());
                     active.push(ActiveTextBlockText {
                         depth: 1,
-                        text: String::new(),
+                        text: pending.take_reusable(),
                         slot,
                     });
                 } else if skipped_depth > 0 {
@@ -3064,7 +3090,104 @@ fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{self, Write};
     use std::path::{Path, PathBuf};
+
+    struct FailingSink;
+
+    impl Write for FailingSink {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("injected sink failure"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn text_writer<'output, W: Write + ?Sized>(
+        output: &'output mut W,
+    ) -> SequentialTextWriter<'static, 'output, W> {
+        SequentialTextWriter::new(
+            output,
+            litchi_core::TextOutputOptions::new("\n", "\n\n", 64, 8),
+        )
+    }
+
+    #[test]
+    fn pending_sink_reuses_successfully_emitted_text_after_clearing() {
+        let mut pending = PendingSinkBlocks::new();
+        let slot = pending.reserve().unwrap();
+        let mut value = String::with_capacity(32);
+        value.push_str("payload");
+        let capacity = value.capacity();
+        let mut output = Vec::new();
+        let mut writer = text_writer(&mut output);
+
+        pending.complete(slot, value, &mut writer).unwrap();
+
+        let spare = pending.take_reusable();
+        assert!(spare.is_empty());
+        assert_eq!(spare.capacity(), capacity);
+        assert_eq!(output, b"payload");
+        assert_eq!(pending.next_emit, 1);
+    }
+
+    #[test]
+    fn pending_sink_drops_short_value_with_oversized_capacity() {
+        let mut pending = PendingSinkBlocks::new();
+        let slot = pending.reserve().unwrap();
+        let mut value = String::with_capacity(MAX_SINK_TEXT_REUSE_CAPACITY + 1);
+        value.push('x');
+        assert_eq!(value.len(), 1);
+        assert!(value.capacity() > MAX_SINK_TEXT_REUSE_CAPACITY);
+        let mut output = Vec::new();
+        let mut writer = text_writer(&mut output);
+
+        pending.complete(slot, value, &mut writer).unwrap();
+
+        assert!(pending.reusable.is_none());
+        assert_eq!(output, b"x");
+    }
+
+    #[test]
+    fn pending_sink_keeps_larger_spare_after_nested_completion() {
+        let mut pending = PendingSinkBlocks::new();
+        let outer_slot = pending.reserve().unwrap();
+        let nested_slot = pending.reserve().unwrap();
+        let mut outer = String::with_capacity(64);
+        outer.push_str("outer");
+        let outer_capacity = outer.capacity();
+        let mut output = Vec::new();
+        let mut writer = text_writer(&mut output);
+
+        pending
+            .complete(nested_slot, String::new(), &mut writer)
+            .unwrap();
+        assert!(pending.reusable.is_none());
+        pending.complete(outer_slot, outer, &mut writer).unwrap();
+
+        let spare = pending.take_reusable();
+        assert!(spare.is_empty());
+        assert_eq!(spare.capacity(), outer_capacity);
+        assert_eq!(output, b"outer\n");
+    }
+
+    #[test]
+    fn pending_sink_does_not_recycle_after_writer_failure() {
+        let mut pending = PendingSinkBlocks::new();
+        let slot = pending.reserve().unwrap();
+        let mut value = String::with_capacity(32);
+        value.push_str("failed");
+        let mut output = FailingSink;
+        let mut writer = text_writer(&mut output);
+
+        let error = pending.complete(slot, value, &mut writer).unwrap_err();
+
+        assert!(matches!(error, TextOutputError::Sink { .. }));
+        assert!(pending.reusable.is_none());
+        assert_eq!(pending.next_emit, 0);
+    }
 
     // ========== Paragraph Tests ==========
     #[test]
