@@ -362,6 +362,17 @@ impl OwnedXmlPart {
         &self.bytes
     }
 
+    /// Share the validated XML allocation without copying its bytes.
+    ///
+    /// This is useful when retaining byte guards alongside the source token
+    /// in a host patch. Mutating the returned value with `Arc::make_mut`
+    /// creates a separate allocation and leaves this token unchanged. The
+    /// returned bytes do not themselves carry source-replacement authority.
+    #[must_use]
+    pub fn shared_bytes(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.bytes)
+    }
+
     /// Append one complete compact authored element to an exact source parent.
     /// Empty parents are expanded without changing their existing attributes.
     pub fn append_element(&self, parent_tag: Range<usize>, element: &[u8]) -> Result<Self> {
@@ -717,6 +728,28 @@ mod tests {
         writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#).unwrap();
         writer.write_stored("part.xml", xml).unwrap();
         OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn shared_xml_bytes_retain_allocation_without_exposing_token_mutation() {
+        let xml = b"<r><original/></r>";
+        let package = source(xml);
+        let token = package
+            .source_xml_part(&PackURI::new("/part.xml").unwrap())
+            .unwrap();
+        let retained = token.shared_bytes();
+        let mut editable = token.shared_bytes();
+        assert!(Arc::ptr_eq(&retained, &editable));
+        assert_eq!(retained.as_ptr(), token.bytes().as_ptr());
+
+        Arc::make_mut(&mut editable).clear();
+        assert_eq!(token.bytes(), xml);
+        assert_eq!(retained.as_slice(), xml);
+        assert!(editable.is_empty());
+
+        drop(token);
+        drop(package);
+        assert_eq!(retained.as_slice(), xml);
     }
 
     #[test]
