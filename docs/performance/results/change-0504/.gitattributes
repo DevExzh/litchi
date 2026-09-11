@@ -1,0 +1,5 @@
+# Preserve tool output and patch context byte-for-byte in this evidence bundle.
+*.out -whitespace
+*.patch -whitespace
+*.log -whitespace
+*.txt -whitespace

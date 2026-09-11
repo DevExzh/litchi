@@ -1,0 +1,13 @@
+   Compiling litchi-odg v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odg)
+    Finished `test` profile [unoptimized] target(s) in 0.26s
+     Running tests/transition_cache.rs (/tmp/litchi-goal-0504/test-target/debug/deps/transition_cache-9df631c79fd6b51b)
+
+running 5 tests
+test inherited_alias_transition_and_sound_reads_for_many_pages ... ok
+test shared_direct_transition_reads_and_exact_noop_stay_consistent ... ok
+test malformed_referenced_transition_owners_are_not_accepted_from_cache ... ok
+test content_style_shadowing_and_independent_sources_keep_values_local ... ok
+test cyclic_and_overdeep_transition_inheritance_remain_rejected ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+

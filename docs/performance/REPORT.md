@@ -1,5 +1,18 @@
 # Performance program phase report
 
+## 0504: scoped ODG direct transition reuse
+
+[0504](changes/0504-odg-direct-transition-reuse.md) records 3,200 fresh samples
+in serial A1/B1/B2/A2 blocks using the same richer metadata parser on both
+sides. Metadata-large open plus traversal p50 falls 38.340 → 25.139 ms and
+37.931 → 24.914 ms; metadata-small falls about 10%. Plain p50 changes stay
+within 1.24%, and no paired latency/throughput/RSS regression exceeds 5%.
+Whole-child instruction references fall 28.62%; heaptrack's rounded peak
+remains 6.98M. The private operation-local cache retains inheritance checks,
+source shadowing and exact preservation. Raw evidence, bootstrap intervals,
+resource limits and unmeasured intersections remain explicit in the change
+record. This does not close the older-parser 0502 regression or the full goal.
+
 ## 0502: ODG metadata open; regressions and heap reduction retained
 
 [0502](changes/0502-odg-metadata-open.md) records four deterministic ODG

@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0504: matched richer-parser ODG baseline
+
+[0504](changes/0504-odg-direct-transition-reuse.md) refreshes the four 0502
+owned-byte corpora against clean `aeb9e229a` before local transition reuse.
+The formal before p50 pairs are 2.139/2.145 ms plain-small,
+66.078/65.844 ms plain-large, 1.951/1.959 ms metadata-small, and
+38.340/37.931 ms metadata-large. The retained A1/B1/B2/A2 capture includes
+3,200 total before/after samples, 25 warmups per child, CPU 2 affinity,
+raw RSS receipts, source/build identities, and instruction/heaptrack profiles.
+Hardware counters remain unavailable. See the change record for measured
+improvements and the limits of these synthetic open/traversal baselines.
+
 ## 0502: ODG metadata open; regressions and heap reduction retained
 
 [0502](changes/0502-odg-metadata-open.md) records four deterministic ODG

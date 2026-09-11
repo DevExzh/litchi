@@ -1,5 +1,18 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## Current audit: 0504 reduces a measured ODG open bottleneck
+
+[0504](changes/0504-odg-direct-transition-reuse.md) implements local reuse of
+successfully parsed direct page-transition values. The 3,200-sample matched
+richer-parser comparison reduces metadata-large open/traversal p50 by about
+34% and metadata-small by about 10%, with no paired >5% adverse latency or
+whole-child RSS flag. Per-page inheritance validation remains in force.
+This is production and scoped measurement progress, not completion of the
+ODG regression review: `parse_content` remains the dominant profiled subtree,
+unique-style-heavy input is unmeasured, and the older 0502 baseline exposed
+less metadata. Full CRUD, provider, memory-attribution and scaling requirements
+remain open; the ten-entry strict registry is unchanged.
+
 ## Current audit: 0502 adds bounded ODG metadata but retains large open regressions; the full goal remains open
 
 [0502](changes/0502-odg-metadata-open.md) adds typed ODG transitions and

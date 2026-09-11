@@ -1,0 +1,63 @@
+{
+  "scope": "ODG crate and downstream umbrella; not a full-workspace build, fuzz campaign or live native-application test",
+  "cargo_environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0504/test-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "gates": [
+    {
+      "command": "cargo test -p litchi-odg --all-targets",
+      "exit_code": 0,
+      "log": "test-all-targets.log",
+      "passed_test_count": 87
+    },
+    {
+      "command": "cargo test -p litchi-odg --test transition_cache",
+      "exit_code": 0,
+      "log": "test-transition-cache-final.log",
+      "passed_test_count": 5
+    },
+    {
+      "command": "cargo clippy -p litchi-odg --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "clippy-final.log",
+      "passed_test_count": null
+    },
+    {
+      "command": "cargo fmt -p litchi-odg -- --check",
+      "exit_code": 0,
+      "log": "fmt.log",
+      "passed_test_count": null
+    },
+    {
+      "command": "cargo test -p litchi-odg --doc",
+      "exit_code": 0,
+      "log": "doctests.log",
+      "passed_test_count": 0
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo doc -p litchi-odg --no-deps",
+      "exit_code": 0,
+      "log": "rustdoc.log",
+      "passed_test_count": null
+    },
+    {
+      "command": "cargo check -p litchi-odf --no-default-features --features odg",
+      "exit_code": 0,
+      "log": "downstream.log",
+      "passed_test_count": null
+    },
+    {
+      "command": "python3 -B tools/check_crate_boundaries.py",
+      "exit_code": 0,
+      "log": "boundaries.log",
+      "passed_test_count": null
+    }
+  ],
+  "unique_rust_tests": 92,
+  "doctests_present": 0,
+  "review": "Independent source review found no blocking correctness or resource issue; cache retains successful direct values only, with recursion and first-error order unchanged."
+}

@@ -1,0 +1,62 @@
+diff --git a/crates/litchi-odg/src/package/snapshot.rs b/crates/litchi-odg/src/package/snapshot.rs
+index 2170d7865..99216e1f1 100644
+--- a/crates/litchi-odg/src/package/snapshot.rs
++++ b/crates/litchi-odg/src/package/snapshot.rs
+@@ -8002,22 +8002,34 @@ fn resolve_page_transitions(
+         // styles.xml, including their parent-style closure.
+         definitions.insert(definition.style.name(), (definition, Some(content)));
+     }
++    // Direct transition attributes are source-scoped but independent of the
++    // page whose inheritance chain reaches them. Keep only successful direct
++    // parses for this resolution pass; recursive results remain per-page so
++    // cycle and depth checks still run for every page.
++    let mut direct_transitions = BTreeMap::new();
+     pages
+         .iter()
+         .map(|page| -> Result<Option<Transition>> {
+             let Some(name) = page.style_name() else {
+                 return Ok(None);
+             };
+-            resolve_transition_style(name, &definitions, &mut BTreeSet::new(), 0)
++            resolve_transition_style(
++                name,
++                &definitions,
++                &mut BTreeSet::new(),
++                0,
++                &mut direct_transitions,
++            )
+         })
+         .collect()
+ }
+ 
+-fn resolve_transition_style(
++fn resolve_transition_style<'a>(
+     name: &str,
+-    definitions: &BTreeMap<&str, (&ParsedStyleDefinition, Option<&str>)>,
++    definitions: &BTreeMap<&'a str, (&'a ParsedStyleDefinition, Option<&'a str>)>,
+     visiting: &mut BTreeSet<String>,
+     depth: usize,
++    direct_transitions: &mut BTreeMap<&'a str, Transition>,
+ ) -> Result<Option<Transition>> {
+     if depth > MAX_DEPTH {
+         return invalid("ODG drawing-page style inheritance exceeds the limit");
+@@ -8028,10 +8040,17 @@ fn resolve_transition_style(
+     if !visiting.insert(name.to_owned()) {
+         return invalid("ODG drawing-page style inheritance is cyclic");
+     }
+-    let mut transition = transition_values_from_style(&definition.style, source)?;
++    let mut transition = match direct_transitions.get(definition.style.name()) {
++        Some(transition) => transition.clone(),
++        None => {
++            let transition = transition_values_from_style(&definition.style, source)?;
++            direct_transitions.insert(definition.style.name(), transition.clone());
++            transition
++        },
++    };
+     if let Some(parent) = definition.style.parent()
+         && let Some(parent_transition) =
+-            resolve_transition_style(parent, definitions, visiting, depth + 1)?
++            resolve_transition_style(parent, definitions, visiting, depth + 1, direct_transitions)?
+     {
+         transition.inherit_from(&parent_transition);
+     }

@@ -1,0 +1,9 @@
+plain-small r1 p50 -0.43% RSS +0.33%
+plain-small r2 p50 -1.00% RSS +0.77%
+plain-large r1 p50 -1.24% RSS +0.18%
+plain-large r2 p50 -0.39% RSS +0.02%
+metadata-small r1 p50 -9.77% RSS +0.16%
+metadata-small r2 p50 -10.15% RSS +0.22%
+metadata-large r1 p50 -34.43% RSS +1.42%
+metadata-large r2 p50 -34.32% RSS -3.51%
+0 adverse >5% flags retained
