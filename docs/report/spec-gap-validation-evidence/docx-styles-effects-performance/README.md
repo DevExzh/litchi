@@ -63,8 +63,7 @@ aggregate bytes at commit and adds the focused regression. The fresh
 [clean 46c456848 capture](results/clean-46c456848/) passes all 52 lanes,
 including the existing-owner commit-time cap and opaque-member checks. The
 runner and root verifier replays agree. This closes the correctness-smoke
-gate for that recorded source; a measurement harness and matched runtime
-evidence remain necessary before making performance claims.
+gate for that recorded source; the smoke itself is not performance evidence.
 
 The separate performance scaffold passed independent review and uses a
 refusal-by-default runner. It requires a reviewed committed descendant, fresh
@@ -80,5 +79,15 @@ target; cleanup happens only after a matching post-verification sentinel.
 The generated fixture paths and result/target paths are checked for exact
 hashes and external disjointness during replay. The current scaffold
 does not authorize a timing run; those environment gates are set only for a
-separately authorized clean
-run. It does not produce a before/after or speedup claim.
+separately authorized clean run. It does not produce a before/after or speedup
+claim.
+
+The initial authorized [profile capture](results/profile-clean-96958498f/)
+is retained in `470bbf288`: 31 lane/scale rows, 93 fresh processes, and 1,860
+measured samples at native, 64 KiB, and 1 MiB sizes. Independent review and
+root replay passed. Commit `ecc2ce802` additionally verifies restoration of
+all 307 raw files from Git, replay at their recorded paths, and cleanup of
+external duplicates. A verified source bundle preserves the isolated capture
+commit. These are bounded absolute observations of the pinned source; the
+report records the shared-host evidence limits. They establish neither a
+before/after improvement nor performance of later production changes.
