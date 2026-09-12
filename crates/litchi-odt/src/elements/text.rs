@@ -2261,7 +2261,7 @@ impl TextNamespaceMemo {
 
 /// Parse every `text:p` and `text:h`, retaining only the collected text.
 ///
-/// Behaves exactly like [`parse_text_blocks_owned`] followed by
+/// Behaves exactly like the test oracle `parse_text_blocks_owned` followed by
 /// `Block::into_text` on every block — same event handling, suppression
 /// rules, limits, and start-ordered output — but validates each block's
 /// attributes without building the retained `Element`, using the established
