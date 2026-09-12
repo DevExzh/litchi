@@ -1,0 +1,119 @@
+{
+  "base_head": "6651d961210fc8f99e6d5969f0b4b3ea7e07fd35",
+  "toolchain": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "source_sha256": {
+    "crates/soapberry-zip/src/office.rs": "21343815bdb8a54b70e30791897ca0616cb7254932b1141e970d2a361b142463",
+    "crates/litchi-opc/src/pkgreader.rs": "0767a9cb9ae2c6d2286401263b117c6cf2c838ca5f3a87cb70ca40f63a14e13b",
+    "crates/litchi-opc/src/phys_pkg.rs": "acaad72ed10bf2f3eb139d5f537c3affbecb0f2b8cf38bcf90acf8df0d001c6c",
+    "crates/litchi-opc/src/source_backed.rs": "6803b21e606a03b8b51367e80bfe320c1e9f4564414fc2b8d6b14c48a3944bb6",
+    "crates/litchi-opc/tests/phys_pkg_borrowed.rs": "81b5d2a441f6f94fa1851f7b51961b91aa1bdeb9d390797a7c8ba298834ebdbe",
+    "crates/litchi-opc/tests/source_backed_topology.rs": "2a7e0147086c5060f078e5a2293e3881c6c8dbbde8a005c2ad1bc216236b6e19",
+    "crates/litchi-opc/tests/source_part_transfer.rs": "c677bcf75898c5047c0b4284eac0cd1471ad9fb6fc531d10558dd8182a3681a7"
+  },
+  "environment": {
+    "TMPDIR": "/var/tmp",
+    "RUSTFLAGS": "unset",
+    "RUSTDOCFLAGS_for_rustdoc": "-D warnings"
+  },
+  "gates": [
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "7b87077d4c2fa4a283f3a3498b41b83d2015be82f396e7182559bba533635033",
+      "summaries": [
+        "test result: ok. 424 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.36s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 432 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.13s",
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+        "test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "test result: ok. 30 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.15s"
+      ]
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--all-targets",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "42c1d4c1c85a6e99524bbf5dae0286dcacec74ea52bc08a3ea7778f06f070ba5"
+    },
+    {
+      "name": "rustdoc",
+      "command": [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "-p",
+        "litchi-opc",
+        "--no-deps",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "258b79a75220f9b05491c7dc0fde02282fe7d712446bbc2dfe1f0ee43d7eb790"
+    },
+    {
+      "name": "rustfmt",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/soapberry-zip/src/office.rs",
+        "crates/litchi-opc/src/pkgreader.rs",
+        "crates/litchi-opc/src/phys_pkg.rs",
+        "crates/litchi-opc/src/source_backed.rs",
+        "crates/litchi-opc/tests/phys_pkg_borrowed.rs",
+        "crates/litchi-opc/tests/source_backed_topology.rs",
+        "crates/litchi-opc/tests/source_part_transfer.rs"
+      ],
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "source_stable_during_gates": true
+}

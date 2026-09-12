@@ -920,38 +920,15 @@ fn signed_synthetic_source_bytes() -> Vec<u8> {
 }
 
 #[test]
-fn encrypted_store_with_zero_crc_is_refused_before_token_or_output() {
-    let (source_bytes, expected) = synthetic_source_bytes();
+fn encrypted_store_with_zero_crc_is_refused_during_admission() {
+    let (source_bytes, _expected) = synthetic_source_bytes();
     let source_bytes =
         mark_encrypted_with_compatibility_crc_zero(source_bytes, "custom/source.bin");
-    let source = SourceBackedPackage::from_vec(source_bytes.clone()).unwrap();
-    let view = source.part(&pack(SOURCE_PART)).unwrap();
-    let error = view
-        .authorize_precompressed(Arc::new(expected))
-        .unwrap_err();
-    assert!(matches!(
-        error,
-        OpcError::SourceBackedOverlayUnavailable { .. }
-    ));
-    drop(source);
-
-    let mut plan = SourceTopologyPlan::new();
-    plan.try_add_part(
-        pack(DESTINATION_PART),
-        SOURCE_CONTENT_TYPE,
-        b"decoded fallback is still policy-refused".to_vec(),
-    )
-    .unwrap();
-    let package = SourceBackedPackage::from_vec(source_bytes).unwrap();
-    let mut output = Vec::new();
-    let error = package
-        .write_topology_to_stream(&mut output, plan)
-        .unwrap_err();
-    assert!(matches!(
-        error,
-        OpcError::SourceBackedOverlayUnavailable { .. }
-    ));
-    assert!(output.is_empty());
+    let error = match SourceBackedPackage::from_vec(source_bytes) {
+        Ok(_) => panic!("encrypted source must be refused during admission"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, OpcError::ZipError(_)));
 }
 
 #[test]
@@ -1282,12 +1259,19 @@ fn combined_capture_retains_signed_encrypted_and_corrupt_refusals() {
     ];
     for (i, bytes) in cases.into_iter().enumerate() {
         let (budget, _cancel, context) = managed_context(65536);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = match SourceBackedPackage::from_read_at_with_execution_context(
             TestSource::new(bytes),
             ReadLimits::default(),
             context,
-        )
-        .unwrap();
+        ) {
+            Ok(package) => package,
+            Err(error) if i == 1 => {
+                assert!(matches!(error, OpcError::ZipError(_)));
+                assert_eq!(budget.used(Resource::Memory), 0);
+                continue;
+            },
+            Err(error) => panic!("unexpected source admission error: {error:?}"),
+        };
         let result = package
             .part(&pack(SOURCE_PART))
             .unwrap()
