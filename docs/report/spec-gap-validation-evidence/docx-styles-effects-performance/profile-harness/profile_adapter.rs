@@ -35,6 +35,8 @@ use zip::ZipArchive;
 use zip::ZipWriter;
 use zip::write::SimpleFileOptions;
 
+use crate::support::{self, AllocDelta, AllocSnapshot};
+
 pub type BoxError = Box<dyn StdError + Send + Sync>;
 type Result<T> = std::result::Result<T, BoxError>;
 
@@ -134,14 +136,28 @@ pub struct PhaseTimes {
     pub stage_ns: u64,
     pub commit_ns: u64,
     pub publish_ns: u64,
+    /// Disjoint clocks inside `publish_ns`.  The outer publication clock is
+    /// retained so receipts can distinguish public-operation time from these
+    /// two attribution slices.
+    pub apply_ns: u64,
+    pub serialize_ns: u64,
     pub reopen_ns: u64,
     pub inverse_reopen_ns: u64,
     pub inverse_ns: u64,
+    pub inverse_apply_ns: u64,
+    pub inverse_serialize_ns: u64,
     pub projection_ns: u64,
     pub opaque_ns: u64,
     pub graph_ns: u64,
     pub readback_ns: u64,
     pub validation_ns: u64,
+    /// Optional allocation deltas for the corresponding subphase.  These are
+    /// populated only for publication lanes with attribution enabled; the
+    /// operation-level allocator delta remains in the outer receipt.
+    pub apply_alloc: Option<AllocDelta>,
+    pub serialize_alloc: Option<AllocDelta>,
+    pub inverse_apply_alloc: Option<AllocDelta>,
+    pub inverse_serialize_alloc: Option<AllocDelta>,
 }
 
 #[derive(Clone, Debug)]
@@ -667,6 +683,55 @@ fn run_native_capture(lane: &str, fixture: &Fixture) -> Result<RunResult> {
     })
 }
 
+struct PublicationMeasurement<T> {
+    effect: T,
+    output: Vec<u8>,
+    publish_ns: u64,
+    apply_ns: u64,
+    serialize_ns: u64,
+    apply_alloc: AllocDelta,
+    serialize_alloc: AllocDelta,
+}
+
+/// Measure the public mutation and subsequent package serialization as two
+/// disjoint attribution slices inside the retained outer publication clock.
+/// Preparation, reopen/validation, member inspection, receipt hashing, and
+/// the returned output ownership all remain outside these slices.  The
+/// subphase allocator peak is reset independently so it cannot overwrite the
+/// outer operation peak.
+fn timed_publication<T, F>(package: &mut Package, apply: F) -> Result<PublicationMeasurement<T>>
+where
+    F: FnOnce(&mut Package) -> Result<T>,
+{
+    let publish_start = Instant::now();
+
+    support::begin_phase_window();
+    let apply_before = AllocSnapshot::now();
+    let apply_start = Instant::now();
+    let effect = apply(package)?;
+    let apply_ns = elapsed(apply_start);
+    let apply_after = AllocSnapshot::now();
+    let apply_alloc = apply_before.phase_delta(apply_after);
+
+    support::begin_phase_window();
+    let serialize_before = AllocSnapshot::now();
+    let serialize_start = Instant::now();
+    let output = package_bytes(package)?;
+    let serialize_ns = elapsed(serialize_start);
+    let serialize_after = AllocSnapshot::now();
+    let serialize_alloc = serialize_before.phase_delta(serialize_after);
+
+    Ok(PublicationMeasurement {
+        effect,
+        output,
+        publish_ns: elapsed(publish_start),
+        apply_ns,
+        serialize_ns,
+        apply_alloc,
+        serialize_alloc,
+    })
+}
+
 fn run_noop(prepared: &mut Prepared, owner: Owner) -> Result<RunResult> {
     let fixture = &prepared.fixture;
     let package = prepared
@@ -691,16 +756,18 @@ fn run_noop(prepared: &mut Prepared, owner: Owner) -> Result<RunResult> {
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
     let commit_ns = elapsed(commit_phase);
-    let publish = Instant::now();
-    let applied = package.apply_styles_with_effects_patch(owner, &patch)?;
-    let no_op = applied
-        .resource()
-        .cloned()
-        .map(|resource| package.put_styles_with_effects(owner, resource))
-        .transpose()?
-        .is_none_or(|changed| !changed);
-    let output = package_bytes(package)?;
-    let publish_ns = elapsed(publish);
+    let publication = timed_publication(package, |package| {
+        let applied = package.apply_styles_with_effects_patch(owner, &patch)?;
+        let no_op = applied
+            .resource()
+            .cloned()
+            .map(|resource| package.put_styles_with_effects(owner, resource))
+            .transpose()?
+            .is_none_or(|changed| !changed);
+        Ok(no_op)
+    })?;
+    let no_op = publication.effect;
+    let output = publication.output;
     let validation = Instant::now();
     let output_members = member_hashes(&output)?;
     let semantic_ok = !commit.changed()
@@ -729,7 +796,11 @@ fn run_noop(prepared: &mut Prepared, owner: Owner) -> Result<RunResult> {
             snapshot_ns,
             stage_ns,
             commit_ns,
-            publish_ns,
+            publish_ns: publication.publish_ns,
+            apply_ns: publication.apply_ns,
+            serialize_ns: publication.serialize_ns,
+            apply_alloc: Some(publication.apply_alloc),
+            serialize_alloc: Some(publication.serialize_alloc),
             graph_ns,
             validation_ns,
             ..PhaseTimes::default()
@@ -829,10 +900,11 @@ fn run_replace(prepared: &mut Prepared, owner: Owner, inverse: bool) -> Result<R
     let commit = edit.commit()?;
     let commit_ns = elapsed(commit_start);
     let patch = commit.patch().clone();
-    let publish = Instant::now();
-    package.apply_styles_with_effects_patch(owner, &patch)?;
-    let changed = package_bytes(package)?;
-    let publish_ns = elapsed(publish);
+    let publication = timed_publication(package, |package| {
+        package.apply_styles_with_effects_patch(owner, &patch)?;
+        Ok(())
+    })?;
+    let changed = publication.output;
     let reopen_start = Instant::now();
     let reopened = Package::from_reader(Cursor::new(changed.as_slice()))?;
     let reopened_snapshot = reopened.styles_with_effects(owner)?;
@@ -854,18 +926,32 @@ fn run_replace(prepared: &mut Prepared, owner: Owner, inverse: bool) -> Result<R
         snapshot_ns,
         stage_ns,
         commit_ns,
-        publish_ns,
+        publish_ns: publication.publish_ns,
+        apply_ns: publication.apply_ns,
+        serialize_ns: publication.serialize_ns,
+        apply_alloc: Some(publication.apply_alloc),
+        serialize_alloc: Some(publication.serialize_alloc),
         reopen_ns,
         opaque_ns,
         validation_ns,
         ..PhaseTimes::default()
     };
-    let (final_bytes, exact_inverse_ok, inverse_reopen_ns, inverse_ns) = if inverse {
-        let inverse_start = Instant::now();
-        let inverse_patch = patch.inverse();
-        package.apply_styles_with_effects_patch(owner, &inverse_patch)?;
-        let restored = package_bytes(package)?;
-        let inverse_ns = elapsed(inverse_start);
+    let (
+        final_bytes,
+        exact_inverse_ok,
+        inverse_reopen_ns,
+        inverse_ns,
+        inverse_apply_ns,
+        inverse_serialize_ns,
+        inverse_apply_alloc,
+        inverse_serialize_alloc,
+    ) = if inverse {
+        let inverse_publication = timed_publication(package, |package| {
+            let inverse_patch = patch.inverse();
+            package.apply_styles_with_effects_patch(owner, &inverse_patch)?;
+            Ok(())
+        })?;
+        let restored = inverse_publication.output;
         let inverse_reopen_start = Instant::now();
         let restored_package = Package::from_reader(Cursor::new(restored.as_slice()))?;
         let restored_snapshot = restored_package.styles_with_effects(owner)?;
@@ -876,12 +962,25 @@ fn run_replace(prepared: &mut Prepared, owner: Owner, inverse: bool) -> Result<R
                     .resource()
                     .is_some_and(|base| value.xml_bytes() == base.xml_bytes())
             });
-        (restored, exact, inverse_reopen_ns, inverse_ns)
+        (
+            restored,
+            exact,
+            inverse_reopen_ns,
+            inverse_publication.publish_ns,
+            inverse_publication.apply_ns,
+            inverse_publication.serialize_ns,
+            Some(inverse_publication.apply_alloc),
+            Some(inverse_publication.serialize_alloc),
+        )
     } else {
-        (changed, true, 0, 0)
+        (changed, true, 0, 0, 0, 0, None, None)
     };
     phases.inverse_reopen_ns = inverse_reopen_ns;
     phases.inverse_ns = inverse_ns;
+    phases.inverse_apply_ns = inverse_apply_ns;
+    phases.inverse_serialize_ns = inverse_serialize_ns;
+    phases.inverse_apply_alloc = inverse_apply_alloc;
+    phases.inverse_serialize_alloc = inverse_serialize_alloc;
     let graph = Instant::now();
     let input_metrics = package_metrics(baseline)?;
     let output_members = member_hashes(&final_bytes)?;
@@ -933,10 +1032,11 @@ fn run_remove(prepared: &mut Prepared, owner: Owner, inverse: bool) -> Result<Ru
     let commit = edit.commit()?;
     let commit_ns = elapsed(commit_start);
     let patch = commit.patch().clone();
-    let publish = Instant::now();
-    package.apply_styles_with_effects_patch(owner, &patch)?;
-    let removed = package_bytes(package)?;
-    let publish_ns = elapsed(publish);
+    let publication = timed_publication(package, |package| {
+        package.apply_styles_with_effects_patch(owner, &patch)?;
+        Ok(())
+    })?;
+    let removed = publication.output;
     let reopen_start = Instant::now();
     let reopened = Package::from_reader(Cursor::new(removed.as_slice()))?;
     let removed_snapshot = reopened.styles_with_effects(owner)?;
@@ -961,17 +1061,32 @@ fn run_remove(prepared: &mut Prepared, owner: Owner, inverse: bool) -> Result<Ru
         snapshot_ns,
         stage_ns,
         commit_ns,
-        publish_ns,
+        publish_ns: publication.publish_ns,
+        apply_ns: publication.apply_ns,
+        serialize_ns: publication.serialize_ns,
+        apply_alloc: Some(publication.apply_alloc),
+        serialize_alloc: Some(publication.serialize_alloc),
         reopen_ns,
         opaque_ns,
         validation_ns,
         ..PhaseTimes::default()
     };
-    let (final_bytes, exact_inverse_ok, inverse_reopen_ns, inverse_ns) = if inverse {
-        let inverse_start = Instant::now();
-        package.apply_styles_with_effects_patch(owner, &patch.inverse())?;
-        let restored = package_bytes(package)?;
-        let inverse_ns = elapsed(inverse_start);
+    let (
+        final_bytes,
+        exact_inverse_ok,
+        inverse_reopen_ns,
+        inverse_ns,
+        inverse_apply_ns,
+        inverse_serialize_ns,
+        inverse_apply_alloc,
+        inverse_serialize_alloc,
+    ) = if inverse {
+        let inverse_publication = timed_publication(package, |package| {
+            let inverse_patch = patch.inverse();
+            package.apply_styles_with_effects_patch(owner, &inverse_patch)?;
+            Ok(())
+        })?;
+        let restored = inverse_publication.output;
         let inverse_reopen_start = Instant::now();
         let restored_package = Package::from_reader(Cursor::new(restored.as_slice()))?;
         let restored_snapshot = restored_package.styles_with_effects(owner)?;
@@ -982,12 +1097,25 @@ fn run_remove(prepared: &mut Prepared, owner: Owner, inverse: bool) -> Result<Ru
                     .resource()
                     .is_some_and(|base| value.xml_bytes() == base.xml_bytes())
             });
-        (restored, exact, inverse_reopen_ns, inverse_ns)
+        (
+            restored,
+            exact,
+            inverse_reopen_ns,
+            inverse_publication.publish_ns,
+            inverse_publication.apply_ns,
+            inverse_publication.serialize_ns,
+            Some(inverse_publication.apply_alloc),
+            Some(inverse_publication.serialize_alloc),
+        )
     } else {
-        (removed, true, 0, 0)
+        (removed, true, 0, 0, 0, 0, None, None)
     };
     phases.inverse_reopen_ns = inverse_reopen_ns;
     phases.inverse_ns = inverse_ns;
+    phases.inverse_apply_ns = inverse_apply_ns;
+    phases.inverse_serialize_ns = inverse_serialize_ns;
+    phases.inverse_apply_alloc = inverse_apply_alloc;
+    phases.inverse_serialize_alloc = inverse_serialize_alloc;
     let graph = Instant::now();
     let input_metrics = package_metrics(baseline)?;
     let output_members = member_hashes(&final_bytes)?;
@@ -1045,10 +1173,11 @@ fn run_add_absent(prepared: &mut Prepared) -> Result<RunResult> {
     let commit_start = Instant::now();
     let commit = edit.commit()?;
     let commit_ns = elapsed(commit_start);
-    let publish = Instant::now();
-    package.apply_styles_with_effects_patch(Owner::MainDocument, commit.patch())?;
-    let output = package_bytes(package)?;
-    let publish_ns = elapsed(publish);
+    let publication = timed_publication(package, |package| {
+        package.apply_styles_with_effects_patch(Owner::MainDocument, commit.patch())?;
+        Ok(())
+    })?;
+    let output = publication.output;
     let reopen_start = Instant::now();
     let reopened = Package::from_reader(Cursor::new(output.as_slice()))?;
     let snapshot_after = reopened.styles_with_effects(Owner::MainDocument)?;
@@ -1092,7 +1221,11 @@ fn run_add_absent(prepared: &mut Prepared) -> Result<RunResult> {
             snapshot_ns,
             stage_ns,
             commit_ns,
-            publish_ns,
+            publish_ns: publication.publish_ns,
+            apply_ns: publication.apply_ns,
+            serialize_ns: publication.serialize_ns,
+            apply_alloc: Some(publication.apply_alloc),
+            serialize_alloc: Some(publication.serialize_alloc),
             reopen_ns,
             opaque_ns,
             graph_ns,
@@ -1391,10 +1524,11 @@ fn run_independent(prepared: &mut Prepared, owner: Owner) -> Result<RunResult> {
     let commit_start = Instant::now();
     let commit = edit.commit()?;
     let commit_ns = elapsed(commit_start);
-    let publish = Instant::now();
-    package.apply_styles_with_effects_patch(owner, commit.patch())?;
-    let output = package_bytes(package)?;
-    let publish_ns = elapsed(publish);
+    let publication = timed_publication(package, |package| {
+        package.apply_styles_with_effects_patch(owner, commit.patch())?;
+        Ok(())
+    })?;
+    let output = publication.output;
     let reopen_start = Instant::now();
     let reopened = Package::from_reader(Cursor::new(output.as_slice()))?;
     let reopened_owner = reopened.styles_with_effects(owner)?;
@@ -1433,7 +1567,11 @@ fn run_independent(prepared: &mut Prepared, owner: Owner) -> Result<RunResult> {
             snapshot_ns,
             stage_ns,
             commit_ns,
-            publish_ns,
+            publish_ns: publication.publish_ns,
+            apply_ns: publication.apply_ns,
+            serialize_ns: publication.serialize_ns,
+            apply_alloc: Some(publication.apply_alloc),
+            serialize_alloc: Some(publication.serialize_alloc),
             reopen_ns,
             opaque_ns,
             graph_ns,

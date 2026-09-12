@@ -17,6 +17,43 @@ import verify_profile
 
 
 class ProfileScaffoldTests(unittest.TestCase):
+    def test_publication_attribution_split_and_subphase_allocator_gate_are_wired(self):
+        adapter = (HERE / "profile-harness/profile_adapter.rs").read_text()
+        support = (HERE / "harness/support.rs").read_text()
+        main = (HERE / "profile-harness/main.rs").read_text()
+        runner = (HERE / "run_profile.sh").read_text()
+        self.assertIn("fn timed_publication", adapter)
+        self.assertIn("support::begin_phase_window()", adapter)
+        self.assertIn("apply_before.phase_delta", adapter)
+        self.assertIn("serialize_before.phase_delta", adapter)
+        self.assertIn("static PHASE_PEAK_BYTES", support)
+        self.assertIn('"apply_allocation"', main)
+        self.assertIn('"serialize_allocation"', main)
+        self.assertIn(verify_profile.PROFILE_SOURCE_COMMIT, main)
+        self.assertIn(f"SOURCE_COMMIT={verify_profile.PROFILE_SOURCE_COMMIT}", runner)
+
+        valid = {field: 0 for field in verify_profile.ALLOCATION_FIELDS}
+        valid.update(
+            {
+                "direct_allocated_bytes": 2,
+                "requested_alloc_bytes": 2,
+                "live_before": 3,
+                "live_after": 5,
+                "peak_live_delta": 2,
+                "alloc_balance_ok": True,
+                "alloc_invalid": False,
+            }
+        )
+        verify_profile.verify_allocation_delta(valid, "apply_allocation")
+
+        impossible_peak = dict(valid, peak_live_delta=1)
+        with self.assertRaisesRegex(AssertionError, "peak live delta"):
+            verify_profile.verify_allocation_delta(impossible_peak, "apply_allocation")
+
+        unbalanced = dict(valid, live_after=6)
+        with self.assertRaisesRegex(AssertionError, "live-byte equation"):
+            verify_profile.verify_allocation_delta(unbalanced, "apply_allocation")
+
     def test_host_probe_executes_and_emits_parseable_observations(self):
         with TemporaryDirectory(prefix="litchi-docx-styles-host-") as directory:
             output = Path(directory) / "host-before.txt"

@@ -1,10 +1,15 @@
 # `stylesWithEffects` performance scaffold plan
 
-Status: **plan only**. This file defines a future absolute profile. It does
-not contain timings, allocation results, RSS results, scaling claims, native
-Office acceptance, or an optimization claim. The committed correctness smoke
-and its receipts remain the gate for building the profile harness; they are not
-part of a timed sample.
+Status: **reviewed, unrun attribution split**. The profile has no new timing,
+allocation, RSS, scaling, native Office acceptance, or optimization result.
+The committed correctness smoke and its receipts remain the gate for the
+profile; they are not part of a timed sample. The profile harness now has the
+reviewable `apply_ns`/`serialize_ns` split and matching subphase allocator
+peaks described below. The bounded scaffold review and timing-free checks are
+complete; a later clean capture requires its separate gate. The receipt
+schema advances to `docx-styles-effects-profile-scaffold-v2`; retained v1
+historical receipts remain byte unchanged and are replayed with their captured
+source bundle.
 
 The profile measures the public `litchi_docx::styles::effects` package owner
 through the `Package` facade. It reports named end-to-end operations on a
@@ -14,15 +19,15 @@ effects vocabulary.
 
 ## Source and evidence boundary
 
-The frozen production source is
+The retained correctness smoke is bound to
 `d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119`. The reviewed correctness smoke
 descendant is `8444e88baaaca128eed50a2eed26e0ecd25063c9`; its committed result
-tree at `results/clean-46c456848/` is retained unchanged. A performance
-scaffold must be built in a new clean descendant of that reviewed source
-baseline, with a new external result and Cargo target directory. It must not
-run from the active worktree or from a checkout that includes later unrelated
-production changes. If a later production baseline is needed, it requires an
-explicit new source pin and a new review; the runner must not repin itself.
+tree at `results/clean-46c456848/` is retained unchanged. The current
+attribution baseline is the separately approved full commit
+`8702fd4db8723acceb7deb51bcb40ff66604bf10`, which includes the current OPC
+publication changes. A future profile must use a new clean descendant of that
+exact baseline and retain the old smoke source identity separately; it must not
+run from the active worktree or silently repin itself.
 
 The performance harness is separate from `run_smoke.sh` and must not overwrite
 the smoke harness, corpus manifest, or frozen receipts. Its source manifest
@@ -163,11 +168,11 @@ correctness evidence required by the owner contract.
 * `add_{fixture}_{owner}_{scale}` adds a resource to an absent owner on a
   fixture whose package permits that owner. The missing-glossary case is a
   separate refusal and never seeds a glossary implicitly.
-* `inverse_replace_{fixture}_{owner}_{scale}` and
-  `inverse_remove_add_{fixture}_{owner}_{scale}` publish a changed patch,
-  start the inverse reopen clock before `Package::from_reader` on the restored
-  bytes, apply the source-checked inverse, reopen the result, and require the
-  original package/member/owner hashes.
+* `inverse_replace_main` and `inverse_remove_main` publish a changed patch,
+  construct and apply the source-checked inverse and serialize its output under
+  `inverse_ns`, then start `inverse_reopen_ns` immediately before
+  `Package::from_reader` on the restored bytes. Reopening and loading the owner
+  must recover the original package/member/owner hashes.
 * `independent_{fixture}_{owner}_{scale}` changes one owner while hashing the
   other owner before and after. Main and glossary observations never combine
   into one anonymous “effects resource” row.
@@ -258,7 +263,7 @@ no greater than `elapsed_ns`. The phase contract is:
 | `commit_ns` | exactly `Transaction::commit` source/graph validation and commit formation | edit construction and patch publication |
 | `publish_ns` | exactly the public patch/commit application and candidate publication | post-publication reopen |
 | `reopen_ns` | ordinary reopen of published bytes and selected owner load | semantic/opaque checks |
-| `inverse_ns` | inverse patch construction, source validation, and publication | restored package reopen |
+| `inverse_ns` | inverse patch construction, source validation, and inverse publication | restored package reopen |
 | `inverse_reopen_ns` | restored `Package::from_reader` and owner load, timed from before the call | inverse setup and post-checks |
 | `projection_ns` | typed projection and selected scalar lookups when the lane names them | owner capture |
 | `opaque_ns` | complete unchanged-member checks, including ordinary `Package` validation cost | graph metrics |
@@ -275,13 +280,48 @@ unnamed validation bucket. The operation clock includes the designated
 readback and API-result checks; report serialization, fixture creation, and
 receipt writing are outside it.
 
-The exact inverse clock begins before the restored `Package::from_reader`.
+The unrun attribution split refines `publish_ns` without replacing it. The
+current bounded scaffold emits the split for successful prepared publication
+lanes: `noop_main`, `noop_glossary`, `replace_main` and `replace_glossary` at
+all three resource scales, `remove_main`, `remove_glossary`,
+`add_main_absent`, `inverse_replace_main`, `inverse_remove_main`,
+`independent_main`, and `independent_glossary`. Capture, projection, refusal,
+and signed lanes retain null split fields; this does not expand the timing
+matrix. For a source no-op, `apply_ns` includes both
+`apply_styles_with_effects_patch` and the resulting `put_styles_with_effects`
+call; `serialize_ns` remains the subsequent package serialization.
+
+`apply_ns` covers the public mutation call, and `serialize_ns` covers only
+`Package::to_stream` into the in-memory output cursor. Their sums must fit
+within `publish_ns`; they are child clocks and are excluded from the outer
+phase sum so work is not double-counted. Inverse mutation carries
+`inverse_apply_ns` and `inverse_serialize_ns` under `inverse_ns`; inverse patch
+construction is inside `inverse_apply_ns`. The complete observed inverse cost
+is `inverse_ns + inverse_reopen_ns`: the former contains inverse construction,
+public publication, and serialization, while the latter contains the restored
+`Package::from_reader` and owner load. These clocks are disjoint. The harness
+uses a separate allocator peak baseline for each child while preserving the
+outer allocation counters and peak. Hashing, opaque checks, graph metrics,
+and receipt construction remain outside these child clocks.
+
+The `inverse_reopen_ns` clock begins before the restored `Package::from_reader`.
 Starting it after parsing would under-report the inverse operation and fails
 profile verification. Refusal timing separates typed classification from
 `readback_ns`, and source readback reads the package after the actual failed
 public call rather than comparing a captured snapshot with an immutable fixture.
 
 ## Allocation, live memory, and RSS accounting
+
+The executable allocator regressions share process-global counters. Run the
+profile harness tests serially from the repository root:
+
+```sh
+cargo test --locked --offline --manifest-path \
+  docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml \
+  -- --test-threads=1
+```
+
+Concurrent test execution is not a supported allocator verification mode.
 
 The profile binary uses the existing process-local `CountingAllocator` observer
 and emits raw per-sample counters. Before each measured operation, the harness
@@ -295,6 +335,14 @@ records independently:
   the checked live-byte equation; and
 * `elapsed_ns`, all phase values, output bytes, input/package/member hashes,
   and process/sample identity.
+
+Publication lanes additionally carry `apply_allocation` and
+`serialize_allocation` objects with the same checked counters and the
+subphase-specific `peak_live_delta`. Inverse lanes carry the corresponding
+`inverse_apply_allocation` and `inverse_serialize_allocation` objects. A
+non-publication lane records these objects as null. These child counters are
+allocator traffic for the named child only; process RSS remains the separate
+fresh-process maximum from `/usr/bin/time -v`.
 
 The verifier rejects negative, boolean, fractional, string, overflowing, or
 impossible numeric values. It checks unsigned phase types, disjoint phase

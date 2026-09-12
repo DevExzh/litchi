@@ -23,7 +23,8 @@ sys.path.insert(0, str(HERE))
 from verify import (  # noqa: E402
     MANIFEST_FORMAT,
     NATIVE_FIXTURES,
-    SOURCE_COMMIT,
+    PROFILE_SOURCE_COMMIT,
+    SOURCE_COMMIT as SMOKE_SOURCE_COMMIT,
     verify_manifest,
 )
 
@@ -47,7 +48,11 @@ NATIVE_EFFECTS_MEMBERS = {
 SMOKE_COMMIT = "8444e88baaaca128eed50a2eed26e0ecd25063c9"
 SMOKE_RESULT_DIR = "results/clean-46c456848"
 
-PROFILE_SCHEMA = "docx-styles-effects-profile-scaffold-v1"
+# Compatibility name for the profile scaffold tests and receipt builders. The
+# smoke verifier uses the explicit SMOKE_SOURCE_COMMIT alias above.
+SOURCE_COMMIT = PROFILE_SOURCE_COMMIT
+
+PROFILE_SCHEMA = "docx-styles-effects-profile-scaffold-v2"
 GENERATED_SCHEMA = "docx-styles-effects-generated-fixtures-v1"
 HOST_SCHEMA = "docx-styles-effects-host-v1"
 U64_MAX = (1 << 64) - 1
@@ -67,6 +72,28 @@ PHASES = (
     "readback_ns",
     "validation_ns",
 )
+SUBPHASES = (
+    "apply_ns",
+    "serialize_ns",
+    "inverse_apply_ns",
+    "inverse_serialize_ns",
+)
+ALLOCATION_FIELDS = {
+    "direct_allocated_bytes",
+    "realloc_old_bytes",
+    "realloc_new_bytes",
+    "deallocated_bytes",
+    "requested_alloc_bytes",
+    "live_before",
+    "live_after",
+    "peak_live_delta",
+    "allocation_calls",
+    "reallocation_calls",
+    "deallocation_calls",
+    "allocation_failed",
+    "alloc_balance_ok",
+    "alloc_invalid",
+}
 METRICS = (
     "parts",
     "total_part_bytes",
@@ -116,6 +143,10 @@ SAMPLE_FIELDS = {
     "process_index",
     "elapsed_ns",
     "phases",
+    "apply_allocation",
+    "serialize_allocation",
+    "inverse_apply_allocation",
+    "inverse_serialize_allocation",
     "actual_success",
     "semantic_ok",
     "opaque_ok",
@@ -181,6 +212,19 @@ SPECS = (
     ("independent_main", "native"),
     ("independent_glossary", "native"),
 )
+SPLIT_LANES = {
+    "noop_main",
+    "noop_glossary",
+    "replace_main",
+    "replace_glossary",
+    "remove_main",
+    "remove_glossary",
+    "add_main_absent",
+    "inverse_replace_main",
+    "inverse_remove_main",
+    "independent_main",
+    "independent_glossary",
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -254,13 +298,13 @@ def verify_smoke_retention(root: Path, evidence: Path) -> None:
     require(smoke.is_dir(), f"retained smoke result directory is missing: {smoke}")
     verification = parse_receipt(smoke / "root-verification.json")
     require(verification.get("passed") is True, "retained smoke verification did not pass")
-    require(verification.get("source_commit") == SOURCE_COMMIT, "retained smoke source changed")
+    require(verification.get("source_commit") == SMOKE_SOURCE_COMMIT, "retained smoke source changed")
     receipts = sorted(smoke.glob("smoke-*-p1.json"))
     require(len(receipts) == 52, f"retained smoke receipt count changed: {len(receipts)}")
     for receipt in receipts:
         value = parse_receipt(receipt)
         require(value.get("schema") == "docx-styles-effects-smoke-v1", f"retained smoke schema changed: {receipt.name}")
-        require(value.get("source_commit") == SOURCE_COMMIT, f"retained smoke receipt source changed: {receipt.name}")
+        require(value.get("source_commit") == SMOKE_SOURCE_COMMIT, f"retained smoke receipt source changed: {receipt.name}")
         require(isinstance(value.get("lane"), str) and value["lane"], f"retained smoke lane missing: {receipt.name}")
     relative_root = smoke.relative_to(root).as_posix()
     tracked = subprocess.check_output(
@@ -364,7 +408,7 @@ def verify_build_receipts(results: Path, target: Path, current_head: str) -> Non
         "build provenance keys changed",
     )
     require(provenance["binary"] == str(before_binary), "provenance binary path changed")
-    require(provenance["source_commit"] == SOURCE_COMMIT, "provenance source changed")
+    require(provenance["source_commit"] == PROFILE_SOURCE_COMMIT, "provenance source changed")
     require(provenance["git_head"] == current_head, "provenance Git head changed")
     require(provenance["rustc"] and provenance["cargo"], "toolchain provenance is empty")
     target_value = Path(provenance["target"])
@@ -454,10 +498,47 @@ def verify_member_digest(value: Any, label: str, *, required: bool) -> None:
     hash_value(value["sha256"], f"{label}.sha256")
 
 
+def verify_allocation_delta(value: Any, label: str) -> None:
+    require(type(value) is dict and set(value) == ALLOCATION_FIELDS, f"{label} fields changed")
+    counters = (
+        "direct_allocated_bytes",
+        "realloc_old_bytes",
+        "realloc_new_bytes",
+        "deallocated_bytes",
+        "requested_alloc_bytes",
+        "live_before",
+        "live_after",
+        "peak_live_delta",
+        "allocation_calls",
+        "reallocation_calls",
+        "deallocation_calls",
+        "allocation_failed",
+    )
+    for field in counters:
+        unsigned(value[field], f"{label}.{field}")
+    require(value["allocation_failed"] == 0, f"{label} allocator reported failure")
+    require(boolean(value["alloc_balance_ok"], f"{label}.alloc_balance_ok"), f"{label} allocation equation failed")
+    require(not boolean(value["alloc_invalid"], f"{label}.alloc_invalid"), f"{label} allocator underflow flag set")
+    require(
+        value["live_before"] + value["direct_allocated_bytes"] + value["realloc_new_bytes"]
+        == value["live_after"] + value["realloc_old_bytes"] + value["deallocated_bytes"],
+        f"{label} live-byte equation does not balance",
+    )
+    require(
+        value["requested_alloc_bytes"]
+        == value["direct_allocated_bytes"] + value["realloc_new_bytes"],
+        f"{label} requested allocation total changed",
+    )
+    require(
+        value["peak_live_delta"] >= max(0, value["live_after"] - value["live_before"]),
+        f"{label} peak live delta is impossible",
+    )
+
+
 def verify_sample(sample: dict[str, Any], lane: str, scale: str, expected_process: int, generated: dict[tuple[str, str], dict[str, Any]]) -> None:
     require(set(sample) == SAMPLE_FIELDS, "sample fields changed")
     require(sample.get("schema") == PROFILE_SCHEMA, "sample schema changed")
-    require(sample.get("source_commit") == SOURCE_COMMIT, "sample source changed")
+    require(sample.get("source_commit") == PROFILE_SOURCE_COMMIT, "sample source changed")
     require(sample.get("lane") == lane and sample.get("scale") == scale, "sample lane/scale changed")
     for field in ("fixture_native", "fixture_signed", "fixture_main_present", "fixture_glossary_present"):
         boolean(sample.get(field), field)
@@ -472,9 +553,19 @@ def verify_sample(sample: dict[str, Any], lane: str, scale: str, expected_proces
     require(sample["allocation_failed"] == 0, "allocator reported failure")
     require(boolean(sample["alloc_invalid"], "alloc_invalid") is False, "allocator underflow flag set")
     phases = sample.get("phases")
-    require(type(phases) is dict and set(phases) == set(PHASES), "phase fields changed")
+    require(type(phases) is dict and set(phases) == set(PHASES) | set(SUBPHASES), "phase fields changed")
     phase_values = [unsigned(phases[field], f"phases.{field}") for field in PHASES]
     require(sum(phase_values) <= sample["elapsed_ns"], "disjoint phases exceed elapsed")
+    for field in SUBPHASES:
+        unsigned(phases[field], f"phases.{field}")
+    require(
+        phases["apply_ns"] + phases["serialize_ns"] <= phases["publish_ns"],
+        "forward attribution slices exceed publication clock",
+    )
+    require(
+        phases["inverse_apply_ns"] + phases["inverse_serialize_ns"] <= phases["inverse_ns"],
+        "inverse attribution slices exceed inverse clock",
+    )
     require(
         sample["live_before"] + sample["direct_allocated_bytes"] + sample["realloc_new_bytes"]
         == sample["live_after"] + sample["realloc_old_bytes"] + sample["deallocated_bytes"],
@@ -482,6 +573,27 @@ def verify_sample(sample: dict[str, Any], lane: str, scale: str, expected_proces
     )
     require(sample["requested_alloc_bytes"] == sample["direct_allocated_bytes"] + sample["realloc_new_bytes"], "requested allocation total changed")
     require(sample["peak_live_delta"] >= max(0, sample["live_after"] - sample["live_before"]), "peak live delta is impossible")
+    for field in (
+        "apply_allocation",
+        "serialize_allocation",
+        "inverse_apply_allocation",
+        "inverse_serialize_allocation",
+    ):
+        value = sample.get(field)
+        if value is not None:
+            verify_allocation_delta(value, field)
+    if lane in SPLIT_LANES:
+        require(sample["apply_allocation"] is not None, f"apply attribution missing for {lane}")
+        require(sample["serialize_allocation"] is not None, f"serialize attribution missing for {lane}")
+    else:
+        require(sample["apply_allocation"] is None, f"unexpected apply attribution for {lane}")
+        require(sample["serialize_allocation"] is None, f"unexpected serialize attribution for {lane}")
+    if lane.startswith("inverse_"):
+        require(sample["inverse_apply_allocation"] is not None, f"inverse apply attribution missing for {lane}")
+        require(sample["inverse_serialize_allocation"] is not None, f"inverse serialize attribution missing for {lane}")
+    else:
+        require(sample["inverse_apply_allocation"] is None, f"unexpected inverse apply attribution for {lane}")
+        require(sample["inverse_serialize_allocation"] is None, f"unexpected inverse serialize attribution for {lane}")
     for field in ("input_sha256", "input_member_digest", "output_member_digest"):
         hash_value(sample.get(field), field)
     hash_value(sample.get("output_sha256"), "output_sha256")
@@ -546,7 +658,7 @@ def verify_sample(sample: dict[str, Any], lane: str, scale: str, expected_proces
 def verify_generated(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
     value = parse_receipt(path)
     require(value.get("schema") == GENERATED_SCHEMA, "generated fixture schema changed")
-    require(value.get("source_commit") == SOURCE_COMMIT, "generated fixture source changed")
+    require(value.get("source_commit") == PROFILE_SOURCE_COMMIT, "generated fixture source changed")
     rows = value.get("fixtures")
     require(type(rows) is list and len(rows) == 4, "generated fixture count changed")
     result: dict[tuple[str, str], dict[str, Any]] = {}
@@ -702,7 +814,7 @@ def main() -> None:
     current_head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     require(
         subprocess.run(
-            ["git", "-C", str(root), "merge-base", "--is-ancestor", SOURCE_COMMIT, current_head],
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", PROFILE_SOURCE_COMMIT, current_head],
             check=False,
         ).returncode
         == 0,
@@ -712,7 +824,13 @@ def main() -> None:
     status = subprocess.check_output(["git", "-C", str(root), "status", "--porcelain", "--untracked-files=all"], text=True)
     require(status == (results / "git-status-before.txt").read_text(), "current Git status differs from captured before status")
     require(status == (results / "git-status-after.txt").read_text(), "current Git status differs from captured after status")
-    manifest_summary = verify_manifest(args.manifest_before, root, args.metadata_before, evidence)
+    manifest_summary = verify_manifest(
+        args.manifest_before,
+        root,
+        args.metadata_before,
+        evidence,
+        source_commit=PROFILE_SOURCE_COMMIT,
+    )
     require(args.manifest_after.read_text() == args.manifest_before.read_text(), "source closure changed")
     require(sha256(args.metadata_before) == sha256(args.metadata_after), "Cargo metadata changed")
     source = parse_kv(results / "source-provenance.txt", "source provenance")
@@ -737,7 +855,7 @@ def main() -> None:
             path = results / f"{stem}.json"
             value = parse_receipt(path)
             require(value.get("schema") == PROFILE_SCHEMA, f"receipt schema changed: {path}")
-            require(value.get("source_commit") == SOURCE_COMMIT, f"receipt source changed: {path}")
+            require(value.get("source_commit") == PROFILE_SOURCE_COMMIT, f"receipt source changed: {path}")
             require(value.get("lane") == lane and value.get("scale") == scale, f"receipt identity changed: {path}")
             require(unsigned(value.get("warmup"), "receipt warmup") == 2, f"receipt warmup changed: {path}")
             require(unsigned(value.get("sample_count"), "receipt sample count") == 20, f"receipt sample count changed: {path}")
@@ -751,7 +869,7 @@ def main() -> None:
         "schema": "docx-styles-effects-profile-verification-v1",
         "passed": True,
         "timed_claim": "bounded absolute observations only; no before-after or speedup claim",
-        "source_commit": SOURCE_COMMIT,
+        "source_commit": PROFILE_SOURCE_COMMIT,
         "git_head": current_head,
         "manifest": manifest_summary,
         "processes": 3,

@@ -25,6 +25,10 @@ static REALLOC_NEW: AtomicU64 = AtomicU64::new(0);
 static DEALLOC_BYTES: AtomicU64 = AtomicU64::new(0);
 static LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
 static PEAK_BYTES: AtomicU64 = AtomicU64::new(0);
+// This peak is reset only at a subphase boundary.  The outer peak remains in
+// PEAK_BYTES for the complete measured operation, so subphase attribution
+// cannot erase the operation-level peak receipt.
+static PHASE_PEAK_BYTES: AtomicU64 = AtomicU64::new(0);
 static ALLOC_FAILED: AtomicU64 = AtomicU64::new(0);
 static INVALID: AtomicBool = AtomicBool::new(false);
 
@@ -95,9 +99,14 @@ fn observe_growth(size: usize) {
     let live = LIVE_BYTES
         .fetch_add(size, Ordering::Relaxed)
         .saturating_add(size);
-    let mut old = PEAK_BYTES.load(Ordering::Relaxed);
+    observe_peak(&PEAK_BYTES, live);
+    observe_peak(&PHASE_PEAK_BYTES, live);
+}
+
+fn observe_peak(peak: &AtomicU64, live: u64) {
+    let mut old = peak.load(Ordering::Relaxed);
     while live > old {
-        match PEAK_BYTES.compare_exchange_weak(old, live, Ordering::Relaxed, Ordering::Relaxed) {
+        match peak.compare_exchange_weak(old, live, Ordering::Relaxed, Ordering::Relaxed) {
             Ok(_) => break,
             Err(observed) => old = observed,
         }
@@ -123,6 +132,7 @@ pub struct AllocSnapshot {
     pub deallocated: u64,
     pub live: u64,
     pub peak: u64,
+    pub phase_peak: u64,
     pub failed: u64,
     pub invalid: bool,
 }
@@ -140,6 +150,7 @@ impl AllocSnapshot {
             deallocated: DEALLOC_BYTES.load(Ordering::Acquire),
             live: LIVE_BYTES.load(Ordering::Acquire),
             peak: PEAK_BYTES.load(Ordering::Acquire),
+            phase_peak: PHASE_PEAK_BYTES.load(Ordering::Acquire),
             failed: ALLOC_FAILED.load(Ordering::Acquire),
             invalid: INVALID.load(Ordering::Acquire),
         }
@@ -161,6 +172,17 @@ impl AllocSnapshot {
             failed: after.failed.saturating_sub(self.failed),
             invalid: self.invalid || after.invalid,
         }
+    }
+
+    /// Return a counter delta whose peak is bounded to the subphase window
+    /// marked by [`begin_phase_window`].  All allocation traffic counters and
+    /// the live-byte equation still use the same process-global snapshots as
+    /// the outer operation window.
+    #[must_use]
+    pub fn phase_delta(self, after: Self) -> AllocDelta {
+        let mut delta = self.delta(after);
+        delta.peak_delta = after.phase_peak.saturating_sub(self.phase_peak);
+        delta
     }
 }
 
@@ -201,7 +223,9 @@ impl AllocDelta {
 /// The baseline is necessary because fixture and runtime allocations exist
 /// outside the timed operation.
 pub fn begin_window() {
-    PEAK_BYTES.store(LIVE_BYTES.load(Ordering::Acquire), Ordering::Release);
+    let live = LIVE_BYTES.load(Ordering::Acquire);
+    PEAK_BYTES.store(live, Ordering::Release);
+    PHASE_PEAK_BYTES.store(live, Ordering::Release);
     ALLOC_CALLS.store(0, Ordering::Release);
     REALLOC_CALLS.store(0, Ordering::Release);
     DEALLOC_CALLS.store(0, Ordering::Release);
@@ -211,6 +235,13 @@ pub fn begin_window() {
     DEALLOC_BYTES.store(0, Ordering::Release);
     ALLOC_FAILED.store(0, Ordering::Release);
     INVALID.store(false, Ordering::Release);
+}
+
+/// Start an allocation subphase without resetting the outer operation's
+/// counters or peak.  The live-byte baseline is retained so the subphase peak
+/// reports only growth above the bytes live at its own start.
+pub fn begin_phase_window() {
+    PHASE_PEAK_BYTES.store(LIVE_BYTES.load(Ordering::Acquire), Ordering::Release);
 }
 
 /// Reset counters before any warm-up or measured sample.

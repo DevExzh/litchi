@@ -69,12 +69,19 @@ scenario must be named separately.
 ## Minimum attribution capture
 
 Keep the existing bounded matrix and 3 fresh processes × 2 warmups × 20
-samples. Add only two disjoint operation clocks to the replacement and inverse
-success lanes:
+samples. Add only two disjoint operation clocks to the successful prepared
+publication lanes currently covered by the scaffold: `noop_main`,
+`noop_glossary`, `replace_main`, `replace_glossary`, `remove_main`,
+`remove_glossary`, `add_main_absent`, `inverse_replace_main`,
+`inverse_remove_main`, `independent_main`, and `independent_glossary`.
+Capture, projection, refusal, and signed lanes retain null split fields.
+The two clocks are:
 
-1. `apply_ns`: from immediately before the public
-   `apply_styles_with_effects_patch` call until it returns, before output
-   serialization; and
+1. `apply_ns`: from immediately before the public mutation closure until it
+   returns, before output serialization. In source no-op lanes this closure
+   includes `apply_styles_with_effects_patch` followed by
+   `put_styles_with_effects`; in inverse lanes it also constructs the inverse
+   patch inside this clock; and
 2. `serialize_ns`: from immediately before `Package::to_stream` until the
    output cursor is complete.
 
@@ -105,6 +112,18 @@ the dominant stack. Do not add counters to the public API or record document
 content. Any internal counters or writer diagnostics must be test/feature-gated
 with zero default production overhead, or collected externally through tools
 such as `perf` or callgrind.
+
+The current seam inspection leaves the OPC writer record unimplemented. The
+public `OpcOperationAccounting` report covers source-backed cold Part reads,
+exact source copies, and the single-Part overlay publisher; ordinary
+`OpcPackage::to_stream` and `PackageWriter::to_bytes` do not accept that report,
+and the preservation writer keeps its ZIP counters internal. The attribution
+scaffold therefore records only the DOCX apply/serialize split and allocator
+subpeaks. If the next evidence gate assigns the dominant work to OPC, add one
+opt-in diagnostic writer entry point or feature-gated callback that returns
+writer mode, member counts, and accepted-byte counters without recording
+document content. The normal writer path must retain zero accounting overhead;
+this seam is not part of the current profile or an optimization claim.
 
 The minimum controls are:
 
