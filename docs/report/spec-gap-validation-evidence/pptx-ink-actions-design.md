@@ -52,7 +52,7 @@ fill the missing action fields by analogy.
 | Area | Established result | Design consequence |
 | --- | --- | --- |
 | Action XML | `iact:actions` in `http://schemas.microsoft.com/office/powerpoint/2014/inkAction`, with the `[MS-ODRAWXML]` §2.21 grammar | Reuse the shared detached profile after package closure has been validated |
-| PresentationML anchor | Ink extension is an MCE `Choice` requiring the PowerPoint 2010 main URI and the 2014 `inkAction` URI; its child is `p:contentPart`; fallback is `p:pic` | The owner is the enclosing shape tree/group and its selected MCE branch, not the action XML alone |
+| PresentationML anchor | Ink extension is an MCE `Choice` in the fixed MCE namespace `http://schemas.openxmlformats.org/markup-compatibility/2006`, requiring the PowerPoint 2010 main URI and the 2014 `inkAction` URI; its child is `p:contentPart`; fallback is `p:pic` | The owner is the enclosing shape tree/group and its selected MCE branch, not the action XML alone; this MCE namespace is unchanged in Strict packages |
 | Generic relation | ISO/IEC 29500 `contentPart` requires the package dialect's custom-XML relationship type | Infer Strict versus Transitional from package conformance/root namespaces, require the exact matching URI, and reject a mismatch; do not derive it from the InkML owner |
 | Action part content type | No action-specific MIME is enumerated; ECMA-376 supplies `text/xml` as the value to declare when no explicit XML MIME exists and says the root namespace identifies the content | Require an effective `[Content_Types].xml` declaration of `text/xml` or another explicitly supported XML MIME; missing mapping is an error and `application/inkml+xml` is not inferred |
 | Action target path | No fixed path is specified and no native action fixture was found | Resolve the explicit relationship target and retain its URI; a fresh producer path requires an explicit policy and carries no native-acceptance claim |
@@ -83,6 +83,20 @@ the complete `AlternateContent` source, including every inactive choice and the
 fallback, even when an active branch is available. The active projection used
 by a normal MCE helper is not enough for a lossless editor because it discards
 source that the fallback or another consumer may need.
+
+The MCE namespace itself does not vary with package conformance. ECMA-376
+Part 3, fifth edition (December 2015), §7.1 (Markup Compatibility and
+Extensibility), in the local source archive
+`3rdparty/specs/ECMA-376/ECMA-376-3_5th_edition_december_2015.zip`, requires
+all MCE elements and attributes to use
+`http://schemas.openxmlformats.org/markup-compatibility/2006`. This fixed URI
+therefore applies to both Transitional and Strict packages, including
+`AlternateContent`, `Choice`, `Fallback`, and `mc:Ignorable`. Strict
+conformance changes the PresentationML namespace and the applicable
+relationship URI; it does not substitute a second Strict-only MCE namespace.
+The owner scanner must accept the fixed MCE URI under a Strict PML root and
+must not classify a `purl.oclc.org/ooxml/markup-compatibility/2006` URI as the
+normative Strict MCE namespace.
 
 The companion `[MS-PPTX]` Part Enumerations file has no InkAction part
 enumeration. Its absence is evidence about the checked local contract, not a
@@ -137,6 +151,11 @@ root namespace declarations, then requires the exact matching URI. A
 relationship URI from the other dialect is a mismatch; no InkML analogy or
 producer-specific profile is needed to select between these normative
 substitutions.
+
+This relationship substitution is independent of MCE namespace resolution:
+the owner uses the fixed ECMA-376 MCE URI above in either dialect, while it
+uses the Strict or Transitional PresentationML and custom-XML relationship
+URIs according to the package conformance.
 
 The local `[MS-ODRAWXML]` §2.1.4 Ink Content Part enumeration is concrete but
 limited to an InkML part:

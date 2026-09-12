@@ -474,6 +474,15 @@ impl Profile {
     pub fn source(&self) -> &[u8] {
         &self.source
     }
+    /// Share the retained exact source allocation with a source-backed owner.
+    ///
+    /// Readers which need to retain both the parsed profile and the original
+    /// bytes should clone this handle instead of copying `source()`.  The
+    /// allocation is immutable and remains bounded by the profile reader.
+    #[must_use]
+    pub fn shared_source(&self) -> Arc<[u8]> {
+        Arc::clone(&self.source)
+    }
     /// Optional root `xml:id` lexical value.
     #[must_use]
     pub fn xml_id(&self) -> Option<&str> {

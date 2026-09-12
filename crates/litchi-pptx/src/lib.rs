@@ -173,6 +173,7 @@ pub use opened::{
     SlideCopyPart, SlideCopyPlan, SlideRemovalPatch, SlideRemovalPlan,
 };
 pub use package::Package;
+pub use presentation::embedded::ink_actions;
 pub use presentation::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedCrossSlideCopyPlan,
     SourceBackedCrossSlideCopySnapshot, SourceBackedPresentation, SourceBackedPresentationEditor,
