@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0530: MCE namespace search is a concrete planning follow-up
+
+[0530](changes/0530-xlsx-planning-attribution.md) demotes catalog reuse (0.250089% planning Ir) and identifies the naive namespace-presence scan within MCE preprocessing (5.179072%, nested in parsing). Evaluate exact memchr substring search under fresh native/consumer gates. Do not add nested costs or revive rejected scanner/arena/XML-attribute probes.
+
 ## 0529: fewer attribute allocations do not establish native usefulness
 
 [0529](changes/0529-xml-attribute-probe-pilot.md) reduces publication allocation calls to 414 in both shapes, yet fails the total/native publication contract and regresses the managed noncompact repeat-1 guard total p50 by 5.3910%. The probe is rejected. Attribute XLSX planning next before selecting another candidate; do not infer wall-time gains from allocation counts or revive earlier rejected mechanisms.

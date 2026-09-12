@@ -1,0 +1,29 @@
+{
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+  "candidates": {
+    "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets": [
+      "0000000001276f50 t litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+      "0000000001277120 t litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+    ],
+    "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": [
+      "0000000001574730 t litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+      "0000000001574730 t litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+      "0000000001575510 t litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+      "0000000001574730 t litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+      "0000000001574730 t litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+      "0000000001576490 t litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+      "0000000001574730 t litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+    ]
+  },
+  "binary_sha256": "e9e77be0dbc9ea4f75666e7db0814b943bdfa6fa7958102b15bad6c7be1a6729",
+  "plan_sha256": "18c516de7aa700c7e256de75c195fe183dd1fa8c1cdb277f4e8318f3912f9754",
+  "command": [
+    "nm",
+    "-C",
+    "/tmp/litchi-goal-0530/baseline-normal"
+  ],
+  "receipt_sha256": "d8f455f8d3423cf035f08bdfefe9a11266e320eb5cd01250a99d2a57f71e179c",
+  "stdout_sha256": "490a373dc447f9737dc7d2cf36a8b38010e3143d71350e5102bbae54786f68b1",
+  "selection": "First exact symbol present in the predeclared preference order.",
+  "selected_utc": "2026-09-12T13:04:53.268780+00:00"
+}

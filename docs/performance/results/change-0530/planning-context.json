@@ -1,0 +1,523 @@
+{
+  "schema": "litchi-0530-xlsx-planning-context-v1",
+  "status": "pass",
+  "scope": "0529 retained baseline primary XLSX source-backed cell-values planning phase sums, arithmetic means, and elapsed shares",
+  "method": {
+    "source": "change-0529 baseline primary timing vectors after current analyzer validation",
+    "phases_in_share_denominator": [
+      "open_ns",
+      "plan_ns",
+      "commit_ns",
+      "publication_ns"
+    ],
+    "excluded_phases": {
+      "reopen_ns": "reported separately; excluded from elapsed lifecycle phase shares"
+    },
+    "equation": "share_percent = sum(phase_ns) / sum(elapsed_ns) * 100",
+    "mean_equation": "mean_ns = sum(phase_ns) / sample_count",
+    "sample_count": 200,
+    "repeats": 2,
+    "used_medians": false,
+    "used_latency_instruction_conversion": false,
+    "used_profile_or_Ir_data": false
+  },
+  "validation": {
+    "analyzer": "docs/performance/results/change-0529/analyze.py",
+    "analyzer_sha256": "1228b45f44c273666c65a9ffa4f146ccf6a11c58539f76ae60ca02fbcf3ac10e",
+    "analyzer_status": "pass",
+    "plan_sha256": "17988e94a8d0993a6b453ca8c3ec3c46689bc89f2f823cace045a47f92b06a33",
+    "source_manifest_sha256": "3d511612ae1d8fa20b8da57db42f70ea70dc5712b844f7b73e62ceab6397e709",
+    "primary_rows_validated": 4,
+    "source_identity_and_corpus_validated": true
+  },
+  "primary_rows": [
+    {
+      "label": "primary 1/dense-sparse",
+      "sample_count": 200,
+      "elapsed": {
+        "sum_ns": 8530402717,
+        "sample_count": 200,
+        "mean_ns": 42652013.585
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 18404020,
+          "sample_count": 200,
+          "mean_ns": 92020.1,
+          "share_of_elapsed_percent": 0.21574620343917814,
+          "denominator_elapsed_sum_ns": 8530402717
+        },
+        "plan_ns": {
+          "sum_ns": 2704918204,
+          "sample_count": 200,
+          "mean_ns": 13524591.02,
+          "share_of_elapsed_percent": 31.709150127337416,
+          "denominator_elapsed_sum_ns": 8530402717
+        },
+        "commit_ns": {
+          "sum_ns": 3074264726,
+          "sample_count": 200,
+          "mean_ns": 15371323.63,
+          "share_of_elapsed_percent": 36.03891666067985,
+          "denominator_elapsed_sum_ns": 8530402717
+        },
+        "publication_ns": {
+          "sum_ns": 2732815767,
+          "sample_count": 200,
+          "mean_ns": 13664078.835,
+          "share_of_elapsed_percent": 32.03618700854355,
+          "denominator_elapsed_sum_ns": 8530402717
+        }
+      },
+      "reopen": {
+        "sum_ns": 7984716341,
+        "sample_count": 200,
+        "mean_ns": 39923581.705,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      },
+      "repeat": 1,
+      "shape": "dense-sparse",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "name": "native-r1-primary-dense-sparse",
+      "identity_sha256": "fb1619c1b8d7cbe93ad9c71d85c4ed2546f8ec244449b5edb6e82c39f8e6486e",
+      "corpus": {
+        "name": "xlsx-cell-values-dense-sparse",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "shape": "dense-sparse",
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "target_entry": "Sheet1!A1"
+      },
+      "validation": "Source identity, corpus identity, output/sink identity, phase vectors, and report statistics were validated by the retained 0529 analyzer before these sums were computed."
+    },
+    {
+      "label": "primary 1/medium",
+      "sample_count": 200,
+      "elapsed": {
+        "sum_ns": 4386767115,
+        "sample_count": 200,
+        "mean_ns": 21933835.575
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 17138425,
+          "sample_count": 200,
+          "mean_ns": 85692.125,
+          "share_of_elapsed_percent": 0.3906846329133203,
+          "denominator_elapsed_sum_ns": 4386767115
+        },
+        "plan_ns": {
+          "sum_ns": 1428087334,
+          "sample_count": 200,
+          "mean_ns": 7140436.67,
+          "share_of_elapsed_percent": 32.55443693641348,
+          "denominator_elapsed_sum_ns": 4386767115
+        },
+        "commit_ns": {
+          "sum_ns": 1595493028,
+          "sample_count": 200,
+          "mean_ns": 7977465.14,
+          "share_of_elapsed_percent": 36.37058877696999,
+          "denominator_elapsed_sum_ns": 4386767115
+        },
+        "publication_ns": {
+          "sum_ns": 1346048328,
+          "sample_count": 200,
+          "mean_ns": 6730241.64,
+          "share_of_elapsed_percent": 30.684289653703217,
+          "denominator_elapsed_sum_ns": 4386767115
+        }
+      },
+      "reopen": {
+        "sum_ns": 6277047866,
+        "sample_count": 200,
+        "mean_ns": 31385239.33,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      },
+      "repeat": 1,
+      "shape": "medium",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "name": "native-r1-primary-medium",
+      "identity_sha256": "8ee494162228cd4ad369dfc8720bbdd33b9d562a9fabd6e6f1744ac75d06d6c6",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "shape": "medium",
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1"
+      },
+      "validation": "Source identity, corpus identity, output/sink identity, phase vectors, and report statistics were validated by the retained 0529 analyzer before these sums were computed."
+    },
+    {
+      "label": "primary 2/dense-sparse",
+      "sample_count": 200,
+      "elapsed": {
+        "sum_ns": 8633788852,
+        "sample_count": 200,
+        "mean_ns": 43168944.26
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 21739004,
+          "sample_count": 200,
+          "mean_ns": 108695.02,
+          "share_of_elapsed_percent": 0.25178985000269266,
+          "denominator_elapsed_sum_ns": 8633788852
+        },
+        "plan_ns": {
+          "sum_ns": 2708380141,
+          "sample_count": 200,
+          "mean_ns": 13541900.705,
+          "share_of_elapsed_percent": 31.369543400086847,
+          "denominator_elapsed_sum_ns": 8633788852
+        },
+        "commit_ns": {
+          "sum_ns": 3039368689,
+          "sample_count": 200,
+          "mean_ns": 15196843.445,
+          "share_of_elapsed_percent": 35.20318531181054,
+          "denominator_elapsed_sum_ns": 8633788852
+        },
+        "publication_ns": {
+          "sum_ns": 2864301018,
+          "sample_count": 200,
+          "mean_ns": 14321505.09,
+          "share_of_elapsed_percent": 33.17548143809992,
+          "denominator_elapsed_sum_ns": 8633788852
+        }
+      },
+      "reopen": {
+        "sum_ns": 9229996595,
+        "sample_count": 200,
+        "mean_ns": 46149982.975,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      },
+      "repeat": 2,
+      "shape": "dense-sparse",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "name": "native-r2-primary-dense-sparse",
+      "identity_sha256": "fb1619c1b8d7cbe93ad9c71d85c4ed2546f8ec244449b5edb6e82c39f8e6486e",
+      "corpus": {
+        "name": "xlsx-cell-values-dense-sparse",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "shape": "dense-sparse",
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "target_entry": "Sheet1!A1"
+      },
+      "validation": "Source identity, corpus identity, output/sink identity, phase vectors, and report statistics were validated by the retained 0529 analyzer before these sums were computed."
+    },
+    {
+      "label": "primary 2/medium",
+      "sample_count": 200,
+      "elapsed": {
+        "sum_ns": 4453496477,
+        "sample_count": 200,
+        "mean_ns": 22267482.385
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 17658113,
+          "sample_count": 200,
+          "mean_ns": 88290.565,
+          "share_of_elapsed_percent": 0.3964999880699356,
+          "denominator_elapsed_sum_ns": 4453496477
+        },
+        "plan_ns": {
+          "sum_ns": 1432098717,
+          "sample_count": 200,
+          "mean_ns": 7160493.585,
+          "share_of_elapsed_percent": 32.15672729047945,
+          "denominator_elapsed_sum_ns": 4453496477
+        },
+        "commit_ns": {
+          "sum_ns": 1589214293,
+          "sample_count": 200,
+          "mean_ns": 7946071.465,
+          "share_of_elapsed_percent": 35.6846424198934,
+          "denominator_elapsed_sum_ns": 4453496477
+        },
+        "publication_ns": {
+          "sum_ns": 1414525354,
+          "sample_count": 200,
+          "mean_ns": 7072626.77,
+          "share_of_elapsed_percent": 31.762130301557214,
+          "denominator_elapsed_sum_ns": 4453496477
+        }
+      },
+      "reopen": {
+        "sum_ns": 6276947729,
+        "sample_count": 200,
+        "mean_ns": 31384738.645,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      },
+      "repeat": 2,
+      "shape": "medium",
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "name": "native-r2-primary-medium",
+      "identity_sha256": "8ee494162228cd4ad369dfc8720bbdd33b9d562a9fabd6e6f1744ac75d06d6c6",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "shape": "medium",
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1"
+      },
+      "validation": "Source identity, corpus identity, output/sink identity, phase vectors, and report statistics were validated by the retained 0529 analyzer before these sums were computed."
+    }
+  ],
+  "shape_aggregates": [
+    {
+      "label": "shape dense-sparse",
+      "sample_count": 400,
+      "elapsed": {
+        "sum_ns": 17164191569,
+        "sample_count": 400,
+        "mean_ns": 42910478.9225
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 40143024,
+          "sample_count": 400,
+          "mean_ns": 100357.56,
+          "share_of_elapsed_percent": 0.2338765786819913,
+          "denominator_elapsed_sum_ns": 17164191569
+        },
+        "plan_ns": {
+          "sum_ns": 5413298345,
+          "sample_count": 400,
+          "mean_ns": 13533245.8625,
+          "share_of_elapsed_percent": 31.53832397662632,
+          "denominator_elapsed_sum_ns": 17164191569
+        },
+        "commit_ns": {
+          "sum_ns": 6113633415,
+          "sample_count": 400,
+          "mean_ns": 15284083.5375,
+          "share_of_elapsed_percent": 35.61853403012435,
+          "denominator_elapsed_sum_ns": 17164191569
+        },
+        "publication_ns": {
+          "sum_ns": 5597116785,
+          "sample_count": 400,
+          "mean_ns": 13992791.9625,
+          "share_of_elapsed_percent": 32.60926541456734,
+          "denominator_elapsed_sum_ns": 17164191569
+        }
+      },
+      "reopen": {
+        "sum_ns": 17214712936,
+        "sample_count": 400,
+        "mean_ns": 43036782.34,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      }
+    },
+    {
+      "label": "shape medium",
+      "sample_count": 400,
+      "elapsed": {
+        "sum_ns": 8840263592,
+        "sample_count": 400,
+        "mean_ns": 22100658.98
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 34796538,
+          "sample_count": 400,
+          "mean_ns": 86991.345,
+          "share_of_elapsed_percent": 0.39361425864596555,
+          "denominator_elapsed_sum_ns": 8840263592
+        },
+        "plan_ns": {
+          "sum_ns": 2860186051,
+          "sample_count": 400,
+          "mean_ns": 7150465.1275,
+          "share_of_elapsed_percent": 32.35408108858119,
+          "denominator_elapsed_sum_ns": 8840263592
+        },
+        "commit_ns": {
+          "sum_ns": 3184707321,
+          "sample_count": 400,
+          "mean_ns": 7961768.3025,
+          "share_of_elapsed_percent": 36.0250267184567,
+          "denominator_elapsed_sum_ns": 8840263592
+        },
+        "publication_ns": {
+          "sum_ns": 2760573682,
+          "sample_count": 400,
+          "mean_ns": 6901434.205,
+          "share_of_elapsed_percent": 31.227277934316145,
+          "denominator_elapsed_sum_ns": 8840263592
+        }
+      },
+      "reopen": {
+        "sum_ns": 12553995595,
+        "sample_count": 400,
+        "mean_ns": 31384988.9875,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      }
+    }
+  ],
+  "repeat_aggregates": [
+    {
+      "label": "repeat 1",
+      "sample_count": 400,
+      "elapsed": {
+        "sum_ns": 12917169832,
+        "sample_count": 400,
+        "mean_ns": 32292924.58
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 35542445,
+          "sample_count": 400,
+          "mean_ns": 88856.1125,
+          "share_of_elapsed_percent": 0.2751565974765609,
+          "denominator_elapsed_sum_ns": 12917169832
+        },
+        "plan_ns": {
+          "sum_ns": 4133005538,
+          "sample_count": 400,
+          "mean_ns": 10332513.845,
+          "share_of_elapsed_percent": 31.99621582555345,
+          "denominator_elapsed_sum_ns": 12917169832
+        },
+        "commit_ns": {
+          "sum_ns": 4669757754,
+          "sample_count": 400,
+          "mean_ns": 11674394.385,
+          "share_of_elapsed_percent": 36.151554982512515,
+          "denominator_elapsed_sum_ns": 12917169832
+        },
+        "publication_ns": {
+          "sum_ns": 4078864095,
+          "sample_count": 400,
+          "mean_ns": 10197160.2375,
+          "share_of_elapsed_percent": 31.577072594457473,
+          "denominator_elapsed_sum_ns": 12917169832
+        }
+      },
+      "reopen": {
+        "sum_ns": 14261764207,
+        "sample_count": 400,
+        "mean_ns": 35654410.5175,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      }
+    },
+    {
+      "label": "repeat 2",
+      "sample_count": 400,
+      "elapsed": {
+        "sum_ns": 13087285329,
+        "sample_count": 400,
+        "mean_ns": 32718213.3225
+      },
+      "phases": {
+        "open_ns": {
+          "sum_ns": 39397117,
+          "sample_count": 400,
+          "mean_ns": 98492.7925,
+          "share_of_elapsed_percent": 0.3010335299460483,
+          "denominator_elapsed_sum_ns": 13087285329
+        },
+        "plan_ns": {
+          "sum_ns": 4140478858,
+          "sample_count": 400,
+          "mean_ns": 10351197.145,
+          "share_of_elapsed_percent": 31.63741565888496,
+          "denominator_elapsed_sum_ns": 13087285329
+        },
+        "commit_ns": {
+          "sum_ns": 4628582982,
+          "sample_count": 400,
+          "mean_ns": 11571457.455,
+          "share_of_elapsed_percent": 35.36702123964214,
+          "denominator_elapsed_sum_ns": 13087285329
+        },
+        "publication_ns": {
+          "sum_ns": 4278826372,
+          "sample_count": 400,
+          "mean_ns": 10697065.93,
+          "share_of_elapsed_percent": 32.69452957152685,
+          "denominator_elapsed_sum_ns": 13087285329
+        }
+      },
+      "reopen": {
+        "sum_ns": 15506944324,
+        "sample_count": 400,
+        "mean_ns": 38767360.81,
+        "excluded_from_lifecycle_share": true,
+        "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+      }
+    }
+  ],
+  "overall": {
+    "label": "all primary rows",
+    "sample_count": 800,
+    "elapsed": {
+      "sum_ns": 26004455161,
+      "sample_count": 800,
+      "mean_ns": 32505568.95125
+    },
+    "phases": {
+      "open_ns": {
+        "sum_ns": 74939562,
+        "sample_count": 800,
+        "mean_ns": 93674.4525,
+        "share_of_elapsed_percent": 0.28817970434693085,
+        "denominator_elapsed_sum_ns": 26004455161
+      },
+      "plan_ns": {
+        "sum_ns": 8273484396,
+        "sample_count": 800,
+        "mean_ns": 10341855.495,
+        "share_of_elapsed_percent": 31.81564214584315,
+        "denominator_elapsed_sum_ns": 26004455161
+      },
+      "commit_ns": {
+        "sum_ns": 9298340736,
+        "sample_count": 800,
+        "mean_ns": 11622925.92,
+        "share_of_elapsed_percent": 35.756721986412245,
+        "denominator_elapsed_sum_ns": 26004455161
+      },
+      "publication_ns": {
+        "sum_ns": 8357690467,
+        "sample_count": 800,
+        "mean_ns": 10447113.08375,
+        "share_of_elapsed_percent": 32.139456163397675,
+        "denominator_elapsed_sum_ns": 26004455161
+      }
+    },
+    "reopen": {
+      "sum_ns": 29768708531,
+      "sample_count": 800,
+      "mean_ns": 37210885.66375,
+      "excluded_from_lifecycle_share": true,
+      "reason": "post-publication verification is outside elapsed_ns phase-sum denominator"
+    }
+  },
+  "phase_ranking_by_elapsed_share": [
+    {
+      "phase": "commit_ns",
+      "share_of_elapsed_percent": 35.756721986412245
+    },
+    {
+      "phase": "publication_ns",
+      "share_of_elapsed_percent": 32.139456163397675
+    },
+    {
+      "phase": "plan_ns",
+      "share_of_elapsed_percent": 31.81564214584315
+    },
+    {
+      "phase": "open_ns",
+      "share_of_elapsed_percent": 0.28817970434693085
+    }
+  ]
+}

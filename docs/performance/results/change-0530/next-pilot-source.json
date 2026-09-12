@@ -1,0 +1,10 @@
+{
+  "status": "unapplied-unmeasured-draft",
+  "revision": "655410c7b657dcf1b8fa4fe4dda071f37e6c3031",
+  "file": "crates/litchi-ooxml-common/src/mce/codec.rs",
+  "baseline_sha256": "e5911cdcd94116474b09062af96d639b8f08d80a09a26d90c86a931a7344fa74",
+  "draft_sha256": "6eea3e365d3f173a96541b4c87bad1f609b17eb5891dbfac19a9154d8cef22b6",
+  "patch": "namespace-search.patch",
+  "patch_sha256": "a809d1e41f99451c66f4d751bc3c9368ca6f7be6b0a02f1e52f7d01090bb2c8b",
+  "scope": "Only process_markup_compatibility namespace-presence predicate; find_bytes and all limits/parser logic unchanged. New pilot must freeze litchi-ooxml-common source scope and native/OOXML consumer gates; no draft build or runtime retention in0530."
+}

@@ -1,0 +1,44 @@
+{
+  "revision": "655410c7b657dcf1b8fa4fe4dda071f37e6c3031",
+  "created_utc": "2026-09-12T12:57:19.865454+00:00",
+  "status": "frozen-before-build-and-capture",
+  "hypothesis": "Attribute XLSX edit-planning work to select a materially useful OLE2/OOXML optimization; no runtime change or speedup claim.",
+  "priority": "OLE2/OOXML active; ODF deferred; iWork excluded",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ]
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner_candidates": [
+      "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+      "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+    ],
+    "selection": "Select first exact demangled symbol present in nm -C after build, before any capture; bind in symbol-observation.json. No other fallback without a new plan.",
+    "scope": "Preferred edit_sheets matches native planning method; fallback excludes wrapper execution check and empty staged map construction. Selector vector creation is outside native planning. Retain every lifecycle dump and prove unique measured-parent edge; do not assume dump count."
+  },
+  "cpu": 2,
+  "owned_paths": [
+    "/tmp/litchi-goal-0530",
+    "/home/zhuhe/litchi-goal-0530-target"
+  ],
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/"
+  ],
+  "capture_lanes": [
+    "build-normal",
+    "profile"
+  ],
+  "quality": "Reuse exact full source manifest and 14 passing final checks from0529; fresh release build and profile output/lifecycle oracles required.",
+  "admission": "Attribution only; require exact raw owner/direct/self equations, repeat/corpus/source identity and custody. No Ir-to-latency or allocation claim.",
+  "native_reference": "Sealed0529baseline phase-vector context only, with identical production runtime but added final public tests. No timing/profile equivalence."
+}

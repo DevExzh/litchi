@@ -1,0 +1,6 @@
+{
+  "previous_turn": "progress",
+  "revision": "655410c7b657dcf1b8fa4fe4dda071f37e6c3031",
+  "reason": "0529 measured/rejected runtime probe, retained counters/tests, final checks and cleanup passed.",
+  "priority": "OLE2/OOXML active; ODF deferred; iWork excluded"
+}
