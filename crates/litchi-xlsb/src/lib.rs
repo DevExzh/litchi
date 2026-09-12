@@ -113,6 +113,7 @@ pub mod cell_watches;
 pub mod chart;
 pub mod comments;
 pub mod conditional_formatting;
+pub mod custom_data;
 pub mod data_model;
 pub mod data_validation;
 pub mod date_utils;
@@ -143,6 +144,14 @@ pub use litchi_opc::{ReadLimits, SourceCacheDiagnostics, SourceCacheLimits};
 pub mod writer;
 
 pub use raw::Error;
+
+pub use custom_data::{
+    Commit as CustomDataCommit, CustomData, CustomDataView, ExtensionList,
+    Limits as CustomDataLimits, Part as CustomDataPart, Patch as CustomDataPatch, Properties,
+    RemovalDisposition, Snapshot as CustomDataSnapshot, Storage, StorageId, StorageSelector,
+    StorageSelectorInput, Transaction as CustomDataTransaction, parse_properties,
+    validate_workbook_root, write_properties,
+};
 
 pub use package::scenarios;
 pub use package::{Cell, FormulaOpacityReason, FormulaResolutionStatus, Package};

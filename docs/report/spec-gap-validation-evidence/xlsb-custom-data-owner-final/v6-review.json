@@ -1,0 +1,19 @@
+{
+  "verdict": "approved for synthetic source-bound XLSB Custom Data lifecycle",
+  "independent_audit": "xlsb_custom_data_owner_final_review cleared functional findings and all audited temporary collections except final union reservation at package hash bd2a2178df8f0bba88f48f7195ed0696abd33640ac81873c6e8227ef5cbe9dc9",
+  "final_delta_reviewer": "root",
+  "final_package_sha256": "86f40bf91677e0f25b659ea50dca1d949811e61855015d7306e3c0c1b0f92777",
+  "final_delta_proof": "Before+after entry counts are checked-added and fully try_reserved before iteration. The loop appends at most one ID per entry, so it cannot exceed the reserved union bound.",
+  "root_validation": {
+    "library_passed": 654,
+    "lifecycle_passed": 18,
+    "ignored": 1,
+    "all_target_clippy_exit": 0,
+    "rustdoc_exit": 0
+  },
+  "scope_exclusions": [
+    "native producer/application acceptance",
+    "runtime performance improvement",
+    "unrelated integration targets"
+  ]
+}
