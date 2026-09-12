@@ -1,0 +1,80 @@
+
+/tmp/litchi-goal-0536/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f1b210 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE>:
+ 2f1b210:	41 57                	push   %r15
+ 2f1b212:	41 56                	push   %r14
+ 2f1b214:	41 55                	push   %r13
+ 2f1b216:	41 54                	push   %r12
+ 2f1b218:	53                   	push   %rbx
+ 2f1b219:	48 83 ec 20          	sub    $0x20,%rsp
+ 2f1b21d:	48 89 f8             	mov    %rdi,%rax
+ 2f1b220:	48 89 f3             	mov    %rsi,%rbx
+ 2f1b223:	48 c1 eb 06          	shr    $0x6,%rbx
+ 2f1b227:	89 f7                	mov    %esi,%edi
+ 2f1b229:	83 e7 3f             	and    $0x3f,%edi
+ 2f1b22c:	48 83 ff 01          	cmp    $0x1,%rdi
+ 2f1b230:	48 83 db ff          	sbb    $0xffffffffffffffff,%rbx
+ 2f1b234:	48 85 f6             	test   %rsi,%rsi
+ 2f1b237:	75 2f                	jne    2f1b268 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0x58>
+ 2f1b239:	41 be 08 00 00 00    	mov    $0x8,%r14d
+ 2f1b23f:	31 db                	xor    %ebx,%ebx
+ 2f1b241:	31 c9                	xor    %ecx,%ecx
+ 2f1b243:	48 89 58 08          	mov    %rbx,0x8(%rax)
+ 2f1b247:	4c 89 70 10          	mov    %r14,0x10(%rax)
+ 2f1b24b:	48 89 48 18          	mov    %rcx,0x18(%rax)
+ 2f1b24f:	48 89 70 20          	mov    %rsi,0x20(%rax)
+ 2f1b253:	48 c7 00 0b 00 00 00 	movq   $0xb,(%rax)
+ 2f1b25a:	48 83 c4 20          	add    $0x20,%rsp
+ 2f1b25e:	5b                   	pop    %rbx
+ 2f1b25f:	41 5c                	pop    %r12
+ 2f1b261:	41 5d                	pop    %r13
+ 2f1b263:	41 5e                	pop    %r14
+ 2f1b265:	41 5f                	pop    %r15
+ 2f1b267:	c3                   	ret
+ 2f1b268:	49 89 d5             	mov    %rdx,%r13
+ 2f1b26b:	49 89 ce             	mov    %rcx,%r14
+ 2f1b26e:	49 89 f4             	mov    %rsi,%r12
+ 2f1b271:	49 89 c7             	mov    %rax,%r15
+ 2f1b274:	48 8d 7c 24 08       	lea    0x8(%rsp),%rdi
+ 2f1b279:	ba 08 00 00 00       	mov    $0x8,%edx
+ 2f1b27e:	41 b8 08 00 00 00    	mov    $0x8,%r8d
+ 2f1b284:	41 b9 08 00 00 00    	mov    $0x8,%r9d
+ 2f1b28a:	31 f6                	xor    %esi,%esi
+ 2f1b28c:	48 89 d9             	mov    %rbx,%rcx
+ 2f1b28f:	e8 0c 2d 03 00       	call   2f4dfa0 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>
+ 2f1b294:	83 7c 24 08 01       	cmpl   $0x1,0x8(%rsp)
+ 2f1b299:	75 1e                	jne    2f1b2b9 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0xa9>
+ 2f1b29b:	0f 10 44 24 10       	movups 0x10(%rsp),%xmm0
+ 2f1b2a0:	4c 89 f8             	mov    %r15,%rax
+ 2f1b2a3:	49 c7 07 01 00 00 00 	movq   $0x1,(%r15)
+ 2f1b2aa:	4d 89 6f 08          	mov    %r13,0x8(%r15)
+ 2f1b2ae:	4d 89 77 10          	mov    %r14,0x10(%r15)
+ 2f1b2b2:	41 0f 11 47 18       	movups %xmm0,0x18(%r15)
+ 2f1b2b7:	eb a1                	jmp    2f1b25a <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0x4a>
+ 2f1b2b9:	4c 8b 74 24 10       	mov    0x10(%rsp),%r14
+ 2f1b2be:	b9 01 00 00 00       	mov    $0x1,%ecx
+ 2f1b2c3:	4c 89 f0             	mov    %r14,%rax
+ 2f1b2c6:	48 83 fb 02          	cmp    $0x2,%rbx
+ 2f1b2ca:	72 1e                	jb     2f1b2ea <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0xda>
+ 2f1b2cc:	48 8d 14 dd f8 ff ff 	lea    -0x8(,%rbx,8),%rdx
+ 2f1b2d3:	ff 
+ 2f1b2d4:	4c 89 f7             	mov    %r14,%rdi
+ 2f1b2d7:	31 f6                	xor    %esi,%esi
+ 2f1b2d9:	ff 15 91 9f 1a 00    	call   *0x1a9f91(%rip)        # 30c5270 <memset@GLIBC_2.2.5>
+ 2f1b2df:	49 8d 04 de          	lea    (%r14,%rbx,8),%rax
+ 2f1b2e3:	48 83 c0 f8          	add    $0xfffffffffffffff8,%rax
+ 2f1b2e7:	48 89 d9             	mov    %rbx,%rcx
+ 2f1b2ea:	48 c7 00 00 00 00 00 	movq   $0x0,(%rax)
+ 2f1b2f1:	4c 89 f8             	mov    %r15,%rax
+ 2f1b2f4:	4c 89 e6             	mov    %r12,%rsi
+ 2f1b2f7:	e9 47 ff ff ff       	jmp    2f1b243 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0x33>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

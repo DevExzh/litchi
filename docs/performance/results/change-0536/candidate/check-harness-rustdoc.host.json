@@ -1,0 +1,21 @@
+{
+  "observed_utc": "2026-09-12T18:20:08.517983+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3854072,
+      "comm": "cargo",
+      "cwd": "/var/tmp/litchi-odt-flat-root-dy0eswd2/worktree"
+    },
+    {
+      "pid": 3854199,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-0.8.57"
+    },
+    {
+      "pid": 3854946,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/chrono-0.4.45"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

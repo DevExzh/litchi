@@ -1,0 +1,71 @@
+{
+  "observed_utc": "2026-09-12T18:24:28.299381+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3867264,
+      "comm": "cargo",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870093,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870169,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870552,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870557,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870584,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870588,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870600,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870604,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870607,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870611,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870639,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3870642,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

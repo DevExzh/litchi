@@ -1,0 +1,21 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 3926263
+cmd:  /tmp/litchi-goal-0536/candidate/normal --case xls_owned_source_open_one_cell --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0536/candidate/profile-r2-xls-owned.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0536/candidate/profile-r2-xls-owned.catalog.json
+part: 6
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 79437046 - 132529980
+desc: Trigger: Program termination
+
+positions: instr
+events: Ir
+summary: 0
+
+
+totals: 0

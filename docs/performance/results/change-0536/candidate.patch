@@ -1,0 +1,152 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 9441de203..50a8147fb 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -2796,6 +2796,64 @@ impl SectorChainScratch {
+         Ok(())
+     }
+ 
++    #[cold]
++    #[inline(never)]
++    fn chain_error_empty(table_name: &str) -> OleError {
++        OleError::CorruptedFile(format!(
++            "Empty {table_name} chain must start with ENDOFCHAIN"
++        ))
++    }
++
++    #[cold]
++    #[inline(never)]
++    fn chain_error_invalid_start(table_name: &str) -> OleError {
++        OleError::CorruptedFile(format!("Invalid start marker for {table_name} chain"))
++    }
++
++    #[cold]
++    #[inline(never)]
++    fn chain_error_length(table_name: &str) -> OleError {
++        OleError::CorruptedFile(format!(
++            "{table_name} chain length exceeds its allocation table"
++        ))
++    }
++
++    #[cold]
++    #[inline(never)]
++    fn chain_error_index(table_name: &str, sector: u32) -> OleError {
++        OleError::CorruptedFile(format!("Invalid sector index {sector} in {table_name}"))
++    }
++
++    #[cold]
++    #[inline(never)]
++    fn chain_error_cycle(table_name: &str, sector: u32) -> OleError {
++        OleError::CorruptedFile(format!(
++            "Cycle detected in {table_name} chain at sector {sector}"
++        ))
++    }
++
++    #[cold]
++    #[inline(never)]
++    fn chain_error_exceeds(table_name: &str) -> OleError {
++        OleError::CorruptedFile(format!("{table_name} chain exceeds its declared length"))
++    }
++
++    #[cold]
++    #[inline(never)]
++    fn chain_error_early_end(table_name: &str) -> OleError {
++        OleError::CorruptedFile(format!(
++            "{table_name} chain ends before its declared length"
++        ))
++    }
++
++    #[cold]
++    #[inline(never)]
++    fn chain_error_marker(table_name: &str, next: u32) -> OleError {
++        OleError::CorruptedFile(format!(
++            "Invalid sector marker 0x{next:08X} in {table_name} chain"
++        ))
++    }
++
+     fn collect_exact(
+         &mut self,
+         allocation_table: &[u32],
+@@ -2807,21 +2865,15 @@ impl SectorChainScratch {
+         let result = (|| {
+             if expected_count == 0 {
+                 if start_sector != ENDOFCHAIN {
+-                    return Err(OleError::CorruptedFile(format!(
+-                        "Empty {table_name} chain must start with ENDOFCHAIN"
+-                    )));
++                    return Err(Self::chain_error_empty(table_name));
+                 }
+                 return Ok(());
+             }
+             if start_sector >= MAXREGSECT {
+-                return Err(OleError::CorruptedFile(format!(
+-                    "Invalid start marker for {table_name} chain"
+-                )));
++                return Err(Self::chain_error_invalid_start(table_name));
+             }
+             if expected_count > allocation_table.len() {
+-                return Err(OleError::CorruptedFile(format!(
+-                    "{table_name} chain length exceeds its allocation table"
+-                )));
++                return Err(Self::chain_error_length(table_name));
+             }
+ 
+             // Preserve the original allocation order: the chain vector is
+@@ -2835,47 +2887,32 @@ impl SectorChainScratch {
+             self.prepare_visited(allocation_table.len())?;
+             let mut sector = start_sector;
+             for index in 0..expected_count {
+-                let slot = usize::try_from(sector).map_err(|_err| {
+-                    OleError::CorruptedFile(format!(
+-                        "Invalid sector index {sector} in {table_name}"
+-                    ))
+-                })?;
++                let slot = usize::try_from(sector)
++                    .map_err(|_err| Self::chain_error_index(table_name, sector))?;
+                 if slot >= allocation_table.len() {
+-                    return Err(OleError::CorruptedFile(format!(
+-                        "Invalid sector index {sector} in {table_name}"
+-                    )));
++                    return Err(Self::chain_error_index(table_name, sector));
+                 }
+                 if self.visited.contains(slot) {
+-                    return Err(OleError::CorruptedFile(format!(
+-                        "Cycle detected in {table_name} chain at sector {sector}"
+-                    )));
++                    return Err(Self::chain_error_cycle(table_name, sector));
+                 }
+                 self.visited.insert(slot)?;
+                 // The fallible exact reservation above covers this loop's
+                 // exactly `expected_count` pushes; keep allocation failure at
+                 // that established boundary.
+                 self.sectors.push(sector);
+-                let next = *allocation_table.get(slot).ok_or_else(|| {
+-                    OleError::CorruptedFile(format!(
+-                        "Invalid sector index {sector} in {table_name}"
+-                    ))
+-                })?;
++                let next = *allocation_table
++                    .get(slot)
++                    .ok_or_else(|| Self::chain_error_index(table_name, sector))?;
+                 if index + 1 == expected_count {
+                     if next != ENDOFCHAIN {
+-                        return Err(OleError::CorruptedFile(format!(
+-                            "{table_name} chain exceeds its declared length"
+-                        )));
++                        return Err(Self::chain_error_exceeds(table_name));
+                     }
+                 } else {
+                     if next == ENDOFCHAIN {
+-                        return Err(OleError::CorruptedFile(format!(
+-                            "{table_name} chain ends before its declared length"
+-                        )));
++                        return Err(Self::chain_error_early_end(table_name));
+                     }
+                     if next >= MAXREGSECT {
+-                        return Err(OleError::CorruptedFile(format!(
+-                            "Invalid sector marker 0x{next:08X} in {table_name} chain"
+-                        )));
++                        return Err(Self::chain_error_marker(table_name, next));
+                     }
+                     sector = next;
+                 }

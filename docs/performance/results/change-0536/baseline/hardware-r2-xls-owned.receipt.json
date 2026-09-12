@@ -1,0 +1,52 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x",
+    ",",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0536/baseline/hardware-r2-xls-owned.csv",
+    "-e",
+    "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "--",
+    "/tmp/litchi-goal-0536/baseline/normal",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--warmup",
+    "0",
+    "--samples",
+    "1000",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0536/baseline/hardware-r2-xls-owned.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0536/baseline/hardware-r2-xls-owned.catalog.json"
+  ],
+  "start_utc": "2026-09-12T18:12:53.198257+00:00",
+  "end_utc": "2026-09-12T18:12:54.134443+00:00",
+  "seconds": 0.9362084710010095,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "9d6a53738f299107582b71e5ddab03922b9646771df4d77b639b3fdc7fd6ff75",
+  "binary_sha256": "9989ed63418b17fef7f0d73bf87af2c20e070864679478a68fedeabb254a4b5a",
+  "source_manifest_sha256": "9d6a53738f299107582b71e5ddab03922b9646771df4d77b639b3fdc7fd6ff75",
+  "script_sha256": "23393f226d91f08c5682127380eb4eedba28f6598f4c3de3b9918dca58befa2b",
+  "plan_sha256": "06299b4b64b2956103ff7f8fba6ddbe788d3bbc1c694ec4af7f304302270a6f4",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "hardware-r2-xls-owned.catalog.json": "1d26d26001f05cb60e880017552a1971d9615a33383421b599f9f91a5765b528",
+    "hardware-r2-xls-owned.csv": "f24c56e6ddf8bd36f5181a605088ef500fee5e1a12d625a3bbc19821a8b267f2",
+    "hardware-r2-xls-owned.host.json": "74b1d84afe7982dae1d45e116ffee153c0906b369b611b4ca07be0cb866e38a2",
+    "hardware-r2-xls-owned.json": "8cd5b7564a3ab46484c1f1cfd0b9cace49ba3186c4f5b7f01ba7ddae432150e0",
+    "hardware-r2-xls-owned.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hardware-r2-xls-owned.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
