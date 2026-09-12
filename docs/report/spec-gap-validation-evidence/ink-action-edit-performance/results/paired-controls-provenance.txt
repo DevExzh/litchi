@@ -1,0 +1,65 @@
+InkAction paired-control profile provenance
+===========================================
+capture_status=verified_paired_full_capture
+captured_at_utc=2026-09-12T02:18:06.286813+00:00
+Both arms were run sequentially from clean detached checkouts after independent review approved the common 03def guard. The original clean baseline f1cb checkout and raw receipts remain separate and untouched.
+The reports contain absolute per-arm observations only. No generic speedup or package-wide performance claim is made.
+
+pair_identity
+approved_base=079cbbcbfc00c8d2412a38586a9688ae7eb0009e
+guard_commit=03defc9d46a2f8ad2d9e5e0943586dec242e96a6
+baseline_source_pin=f1cb119361af9ea2227d27050e41915a9a92ae04
+baseline_control_head=e5c18ca02e120ea1d91e495d4cf58df6d66573be
+candidate_source_pin=ab94a4d7a02053765bf4c70b4af5022273b821e5
+candidate_control_head=251d361f951a0cfc24fb57e0e0ad0f76044143a0
+candidate_source_isolated_child_of_baseline=true
+candidate_source_change_commit=c8d60d5632d79351c325e3e6f1eace2d901b312c
+candidate_source_change_scope=three paths, 28 lines: actions.rs, actions_edit.rs, ink_action_edit.rs
+
+original_baseline_preservation
+original_baseline_checkout=/tmp/litchi-ink-action-baseline-f1cb
+original_baseline_head=f1cb119361af9ea2227d27050e41915a9a92ae04
+original_baseline_status=clean
+original_baseline_receipts=/tmp/litchi-ink-action-profile-receipts-f1cb and results/clean-f1cb11936
+original_baseline_receipts_not_overwritten=true
+
+common_harness_toolchain_equality
+Cargo.toml	baseline=650c381d29558d9f818fa98fb0c1afcd412a83cd7edb846779ce89afb9c2e1c8	candidate=650c381d29558d9f818fa98fb0c1afcd412a83cd7edb846779ce89afb9c2e1c8	equal=true
+crates/litchi-drawingml/Cargo.toml	baseline=22d5aba613de0f1322b9ae7efa4cc333e6d95d1bffaddb2487c2c107101995fe	candidate=22d5aba613de0f1322b9ae7efa4cc333e6d95d1bffaddb2487c2c107101995fe	equal=true
+docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.toml	baseline=3168aa1bf74a0b419299c6317440f9d2cbf54de9ed5882b250a70e8d8b6b175c	candidate=3168aa1bf74a0b419299c6317440f9d2cbf54de9ed5882b250a70e8d8b6b175c	equal=true
+docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.lock	baseline=efad8e8dfdbf8d115d43e34d73b2757792bf768f45f9bc9918c0136c2748ba1a	candidate=efad8e8dfdbf8d115d43e34d73b2757792bf768f45f9bc9918c0136c2748ba1a	equal=true
+docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/main.rs	baseline=2b6dbc5ef06d9181e5e8abb42fbd4ee2078619a76f08319e8c111c17bfb93863	candidate=2b6dbc5ef06d9181e5e8abb42fbd4ee2078619a76f08319e8c111c17bfb93863	equal=true
+rust-toolchain.toml	baseline=e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310	candidate=e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310	equal=true
+profile_pins_baseline_sha256=d6593e82a96423cc54b41f9f945f70219ffc2bd5506de520dbf114ec6afd709d
+profile_pins_candidate_sha256=d6593e82a96423cc54b41f9f945f70219ffc2bd5506de520dbf114ec6afd709d
+profile_pins_equal=True
+toolchain=Rust/Cargo 1.95.0
+cargo_flags=--release --locked --offline
+environment_flags=CARGO_INCREMENTAL=0; RUSTFLAGS/CARGO_ENCODED_RUSTFLAGS/RUSTC_BOOTSTRAP/RUSTDOCFLAGS unset
+lanes=34
+fresh_processes_per_lane=3
+warmups_per_process=2
+measured_samples_per_process=20
+fixtures=deterministic inline harness fixtures from byte-equal harness/main.rs
+allocator=process-local counting allocator from byte-equal harness/main.rs
+
+production_source_hashes
+crates/litchi-drawingml/src/ink/mod.rs	baseline=a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7	candidate=a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7	equal=true
+crates/litchi-drawingml/src/ink/actions.rs	baseline=4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628	candidate=4d15cfd25456115bb750622096573118c7f1a652bc499be093db1fd93863a724	equal=false
+crates/litchi-drawingml/src/ink/actions_edit.rs	baseline=b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850	candidate=8262d2701e497b85c49024640bcaf4d8aaa1b3f856fa2d0956efa2a6f80534bb	equal=false
+crates/litchi-drawingml/tests/ink_action_edit.rs	baseline=af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640	candidate=dc565061ccdce79f8eac369ed092f37b608763bd35b91a8079089fb2b8bd2404	equal=false
+crates/litchi-drawingml/tests/ink_action_id_boundaries.rs	baseline=f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06	candidate=f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06	equal=true
+
+result_closure
+baseline_results=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/results/paired-baseline-e5c18ca
+candidate_results=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/results/paired-candidate-251d361f
+each_arm_verifier_passed=true
+each_arm_source_manifest_before_after_equal=true
+each_arm_binary_before_after_equal=true
+each_arm_full_checkout_clean_before_capture=true
+each_arm_raw_receipts=102 lane JSON + 102 /usr/bin/time -v files + 102 empty stderr files; metadata/verification JSON are additional
+each_arm_target_cleanup=target paths removed by runner exit trap after verification
+binary_live_path_after_cleanup=absent_by_design; binary.sha256 and binary-after.sha256 retained and bound in build-provenance.txt
+report_claim_scope=absolute arm observations only; no speedup/native/package-wide claim
+paired_control_checkouts_removed_after_capture=true
+original_baseline_checkout_retained=true
