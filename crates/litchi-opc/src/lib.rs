@@ -90,5 +90,5 @@ pub use validation::{validate_read_at, validate_read_at_with_limits};
 pub use xml_splice::{
     AuthoredXmlFragment, OwnedAttributeUpdate, OwnedChildElement, OwnedElementEdit,
     OwnedElementUpdate, OwnedXmlPart, SourceXmlPart, XmlSourceRange, XmlSplicePublication,
-    authored_xml_requires_source_proof,
+    authored_xml_requires_source_proof, validate_source_xml_bytes,
 };

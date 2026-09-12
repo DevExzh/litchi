@@ -1224,6 +1224,31 @@ impl OpcPackage {
         Ok(())
     }
 
+    /// Replace one existing XML part with a validated source-preserving
+    /// payload while checking the caller's expected current bytes.
+    ///
+    /// This is the byte-oriented companion to
+    /// [`Self::try_replace_owned_xml_part`].  Format-owned callers use it when
+    /// their source-backed resource already retains the replacement allocation
+    /// but does not expose the OPC token type.  The expected bytes remain the
+    /// stale-source guard; the replacement is validated with the current
+    /// part's content type before its source provenance is installed.
+    pub fn try_replace_owned_xml_part_bytes(
+        &mut self,
+        partname: &PackURI,
+        expected: &[u8],
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        let content_type = self.get_part(partname)?.content_type().to_owned();
+        let token = crate::OwnedXmlPart::capture_with_limits(
+            partname.clone(),
+            content_type,
+            replacement,
+            self.read_limits,
+        )?;
+        self.try_replace_owned_xml_part(expected, token)
+    }
+
     /// Add previously validated source XML, for exact restoration or transfer.
     /// Relationships remain the responsibility of the format-owned graph edit.
     pub fn try_add_owned_xml_part(&mut self, source: crate::OwnedXmlPart) -> Result<()> {
@@ -1235,6 +1260,22 @@ impl OpcPackage {
             source.content_type,
             source.bytes,
         )))
+    }
+
+    /// Add a validated source-preserving XML part from its shared payload.
+    ///
+    /// This is the byte-oriented companion to [`Self::try_add_owned_xml_part`]
+    /// for format-owned resources whose source token is represented by the
+    /// retained allocation itself.
+    pub fn try_add_owned_xml_part_bytes(
+        &mut self,
+        name: PackURI,
+        content_type: String,
+        bytes: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        let source =
+            crate::OwnedXmlPart::capture_with_limits(name, content_type, bytes, self.read_limits)?;
+        self.try_add_owned_xml_part(source)
     }
 
     /// Get a reference to the main document part.
