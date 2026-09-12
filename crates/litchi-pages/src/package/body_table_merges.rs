@@ -5,20 +5,23 @@
 //! no native identifier or generated protobuf value crosses this module's
 //! public boundary.
 
-use std::fmt;
-
 use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_core::RawMessage;
 use litchi_numbers_wire::table_merges::{self, ReadLimits};
+use std::fmt;
 use thiserror::Error;
 
-use super::{Package, table_lock};
+use super::{Package, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
 use crate::table::merge::Region;
 
 mod reader;
+mod transaction;
 
 pub use reader::MergeReader;
+pub use transaction::{
+    BodyTableMergesCommit, BodyTableMergesDiagnostics, BodyTableMergesEdit, BodyTableMergesPatch,
+};
 
 /// A finite resource governed by one body-table merge read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -103,6 +106,12 @@ pub enum BodyTableMergesError {
     /// The selected rooted graph or merge formula is malformed.
     #[error("the selected Pages body-table merge source is invalid")]
     InvalidSource,
+    /// A requested region is outside the selected table dimensions.
+    #[error("the requested Pages body-table merge region is outside the table bounds")]
+    InvalidRegion,
+    /// A requested region overlaps an already staged merged-cell rectangle.
+    #[error("the requested Pages body-table merge region overlaps an existing merge")]
+    OverlappingRegion,
     /// A finite read resource ceiling was exceeded.
     #[error(
         "Pages body-table merges {kind} limit exceeded: observed {observed}, maximum {maximum}"
@@ -121,6 +130,12 @@ pub enum BodyTableMergesError {
         /// Requested units.
         amount: usize,
     },
+    /// Complete candidate reopening did not reproduce the requested regions.
+    #[error("the edited Pages body-table merges failed semantic verification")]
+    Verification,
+    /// The supplied patch was not created from this exact package artifact.
+    #[error("the Pages body-table merge patch does not match the exact source package")]
+    PatchConflict,
 }
 
 fn select_reader_target(
@@ -178,30 +193,37 @@ impl Package {
         let target = self
             .resolve_body_table_with_budget(selector.into(), &mut budget)
             .map_err(map_lock_error)?;
-        let message = model_message(self, &target)?;
-        let limits = read_limits(&budget)?;
-        let read =
-            table_merges::read_table_merges(&message.data, limits).map_err(map_merge_error)?;
-
-        // The shared reader reports the selected message and formula passes
-        // separately. Charge each pass once in the enclosing Pages budget;
-        // the returned regions were bounded by max_regions before the reader
-        // reserved its result vector.
-        budget
-            .charge_payload_work(read.report.input_bytes())
-            .map_err(map_lock_error)?;
-        budget
-            .charge_codec_report(read.report.fields(), read.report.work(), 0, 0)
-            .map_err(map_lock_error)?;
-
-        for region in &read.regions {
-            if region.end_row() >= target.table_rows || region.end_column() >= target.table_columns
-            {
-                return Err(BodyTableMergesError::InvalidSource);
-            }
-        }
-        Ok(read.regions)
+        read_regions(self, &target, &mut budget)
     }
+}
+
+fn read_regions(
+    package: &Package,
+    target: &table_lock::BodyTableTarget,
+    budget: &mut table_lock::WireBudget,
+) -> Result<Vec<Region>, BodyTableMergesError> {
+    table_lock::validate_body_table_target(package, target, budget).map_err(map_lock_error)?;
+    let message = model_message(package, target)?;
+    let limits = read_limits(budget)?;
+    let read = table_merges::read_table_merges(&message.data, limits).map_err(map_merge_error)?;
+
+    // The shared reader reports the selected message and formula passes
+    // separately. Charge each pass once in the enclosing Pages budget; the
+    // returned regions were bounded by max_regions before its result vector
+    // was reserved.
+    budget
+        .charge_payload_work(read.report.input_bytes())
+        .map_err(map_lock_error)?;
+    budget
+        .charge_codec_report(read.report.fields(), read.report.work(), 0, 0)
+        .map_err(map_lock_error)?;
+
+    for region in &read.regions {
+        if region.end_row() >= target.table_rows || region.end_column() >= target.table_columns {
+            return Err(BodyTableMergesError::InvalidSource);
+        }
+    }
+    Ok(read.regions)
 }
 
 fn model_message<'source>(

@@ -114,6 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/package_metadata_codec.rs");
     println!("cargo:rerun-if-changed=src/package_metadata_media_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_formula_codec.rs");
+    println!("cargo:rerun-if-changed=src/table_merge_formula_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_media_codec.rs");
     println!("cargo:rerun-if-changed=src/drawable_parent_codec.rs");
@@ -2201,6 +2202,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         ),
         (
             "src/numbers_formula_codec.rs",
+            "crate::buffa_formula_generated::",
+            "mod buffa_formula_generated {",
+        ),
+        (
+            "src/table_merge_formula_codec.rs",
             "crate::buffa_formula_generated::",
             "mod buffa_formula_generated {",
         ),

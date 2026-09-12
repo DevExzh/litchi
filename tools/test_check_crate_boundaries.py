@@ -49888,6 +49888,175 @@ fn rewrite_movie_title_operation(
         self.assertIn("+ audit_iwa_chart_data_source_topology()", main_source)
         self.assertIn("+ audit_iwa_chart_data_write_source_topology()", main_source)
 
+    def _copy_table_merge_transaction_fixture(
+        self, root: Path, spec: dict
+    ) -> None:
+        for key in ("owner_path", "transaction_path", "package_path", "library_path"):
+            relative = spec[key]
+            source = boundaries.ROOT / relative
+            self.assertTrue(source.is_file(), source)
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    def test_table_merge_transaction_boundaries_accept_checked_in_owners(self) -> None:
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                self.assertEqual(
+                    boundaries._audit_table_merge_transaction_source_topology(root, spec),
+                    [],
+                )
+
+    def test_table_merge_transaction_boundaries_reject_public_native_surface(self) -> None:
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                transaction = root / spec["transaction_path"]
+                prefix = spec["prefix"]
+                transaction.write_text(
+                    transaction.read_text(encoding="utf-8")
+                    + f"\nimpl {prefix}Edit<'_> {{\n"
+                    + "    pub fn leaked(&self, object_id: u64, bytes: &[u8]) "
+                    + "-> Result<Archive, Error> { todo!() }\n"
+                    + "}\n",
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(
+                    root, spec
+                )
+                self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+                self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+                self.assertTrue(any("physical/model type Archive" in item for item in violations), violations)
+
+    def test_table_merge_transaction_boundaries_require_private_child_and_ordered_selection(
+        self,
+    ) -> None:
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                owner = root / spec["owner_path"]
+                owner.write_text(
+                    owner.read_text(encoding="utf-8").replace(
+                        "mod transaction;", "pub mod transaction;", 1
+                    ),
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(
+                    root, spec
+                )
+                self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+                owner.write_text(
+                    owner.read_text(encoding="utf-8").replace(
+                        "pub mod transaction;", "mod transaction;", 1
+                    ),
+                    encoding="utf-8",
+                )
+                transaction = root / spec["transaction_path"]
+                transaction_source = transaction.read_text(encoding="utf-8")
+                for marker in spec["admission_markers"]:
+                    transaction_source = transaction_source.replace(
+                        marker, "removed_selector_admission"
+                    )
+                transaction.write_text(transaction_source, encoding="utf-8")
+                violations = boundaries._audit_table_merge_transaction_source_topology(
+                    root, spec
+                )
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+    def test_numbers_wire_table_merge_writer_boundary_rejects_unbounded_or_peer_codec(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE,
+                boundaries.IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_SOURCE,
+            ):
+                source = boundaries.ROOT / relative
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            writer = root / boundaries.IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_SOURCE
+            original = writer.read_text(encoding="utf-8")
+            writer.write_text(
+                original.replace("gather_source", "gather_source_removed")
+                + "\nuse litchi_pages::Package;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_merge_writer_source_topology(root)
+            self.assertTrue(any("source-preserving walk" in item for item in violations), violations)
+            self.assertTrue(any("concrete format/protobuf owner" in item for item in violations), violations)
+
+            writer.write_text(
+                original.replace(
+                    "merge_formula_codec::encode_merge_formula",
+                    "manual_formula_encoder",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_merge_writer_source_topology(root)
+            self.assertTrue(any("delegate formula encoding" in item for item in violations), violations)
+
+    def test_table_merge_formula_codec_boundary_is_strict_once_wired(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            codec = root / boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "use buffa::DecodeOptions;\n"
+                "pub struct EncodeOptions;\n"
+                "pub struct EncodeReport;\n"
+                "pub enum EncodeLimit { OutputBytes }\n"
+                "pub enum EncodeError { Unsupported }\n"
+                "pub fn encode_merge_formula(source: &[u8]) -> Result<(Vec<u8>, EncodeReport), EncodeError> {\n"
+                "    preflight(source);\n"
+                "    let _ = DecodeOptions::new().decode_lazy_view(source);\n"
+                "    try_encode_to_vec(source)\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True, exist_ok=True)
+            facade.write_text(
+                "#[doc(hidden)]\npub mod table_merge_formula_codec;\n",
+                encoding="utf-8",
+            )
+            build = root / boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_SOURCE
+            build.parent.mkdir(parents=True, exist_ok=True)
+            build.write_text(
+                boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_RERUN_MARKER
+                + "\nconst CODECS: &[(&str, &str, &str)] = &[\n"
+                + '    ("src/table_merge_formula_codec.rs",\n'
+                + '     "crate::buffa_formula_generated::",\n'
+                + '     "mod buffa_formula_generated {"),\n'
+                + "];\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_table_merge_formula_codec_source_topology(root),
+                [],
+            )
+            valid_build = build.read_text(encoding="utf-8")
+            build.write_text(
+                boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_RERUN_MARKER + "\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_table_merge_formula_codec_source_topology(root)
+            self.assertTrue(
+                any("production-ingress inventory" in item for item in violations),
+                violations,
+            )
+            build.write_text(valid_build, encoding="utf-8")
+            codec.write_text(
+                codec.read_text(encoding="utf-8") + "use prost::Message;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_table_merge_formula_codec_source_topology(root)
+            self.assertTrue(any("must not use Prost" in item for item in violations), violations)
+
     def test_table_merge_boundaries_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         for name in (
@@ -49898,6 +50067,11 @@ fn rewrite_movie_title_operation(
             "audit_keynote_table_merge_source_topology",
             "audit_keynote_table_merge_reader_source_topology",
             "audit_numbers_table_merge_source_topology",
+            "audit_iwa_numbers_wire_table_merge_writer_source_topology",
+            "audit_numbers_table_merge_transaction_source_topology",
+            "audit_pages_table_merge_transaction_source_topology",
+            "audit_keynote_table_merge_transaction_source_topology",
+            "audit_iwa_table_merge_formula_codec_source_topology",
             "audit_iwa_table_merge_host_read_delegation_source_topology",
         ):
             self.assertIn(f"+ {name}()", main_source)

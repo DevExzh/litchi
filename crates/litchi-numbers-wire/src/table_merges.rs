@@ -15,6 +15,9 @@ use litchi_iwa_protos::numbers_formula_codec::{
     self, FormulaRenderCfuuid, FormulaRenderColonTract, FormulaRenderEvent, FormulaRenderVisitor,
 };
 
+mod writer;
+pub use writer::{MergeWrite, rewrite_table_merges};
+
 const TABLE_MODEL_TABLE_ID_FIELD: u32 = 1;
 const TABLE_MODEL_ROWS_FIELD: u32 = 6;
 const TABLE_MODEL_COLUMNS_FIELD: u32 = 7;
@@ -729,6 +732,16 @@ impl Decoder {
         if source.is_empty() {
             return Err(invalid("iWork merge formula is empty"));
         }
+        // The compatibility renderer performs a preflight pass and a
+        // callback pass. Text observations are charged once per pass, while
+        // the source and rewrite ledgers remain aggregate. Permit the
+        // callback doubling without making this sub-budget unbounded: a
+        // single pass may account for at most the remaining input profile,
+        // and the resulting two-pass text is still bounded by remaining work.
+        let max_text_bytes = remaining_input
+            .checked_mul(2)
+            .ok_or_else(|| invalid("iWork merge formula text limit overflows"))?
+            .min(remaining_work);
         // Account for the nested FormulaArchive before entering the decoder.
         // This keeps attempted-cost accounting monotonic even when Buffa
         // rejects the formula before it can return a successful report.
@@ -740,7 +753,7 @@ impl Decoder {
             remaining_work,
             max_depth,
             WireLimits::MAX_FIELDS,
-            source.len(),
+            max_text_bytes,
         )
         .with_opaque_unknown_fields(true)
         .with_render_recursion_limit(max_depth);

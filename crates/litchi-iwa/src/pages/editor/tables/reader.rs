@@ -65,6 +65,28 @@ pub(super) fn regions_in_editor(editor: &PagesEditor, model_object_id: u64) -> R
         .map_err(map_focused_merges_error)
 }
 
+/// Resolve a body-table model identifier to its focused positional selector
+/// using the cached component catalog.
+///
+/// This entry point is used by mutation adapters before constructing a
+/// focused writable package. It keeps the preadmission scan metadata-only and
+/// avoids the semantic `PagesEditor::tables` projection, which would decode
+/// complete table models before the focused transaction is admitted.
+pub(super) fn focused_table_position_for_mutation(
+    editor: &PagesEditor,
+    model_object_id: u64,
+) -> Result<Option<usize>> {
+    let (components, _) = editor
+        .package()
+        .shared_component_catalog(map_catalog_error)?;
+    focused_table_position(
+        editor.package(),
+        components.as_ref(),
+        editor.body_storage_id.get(),
+        model_object_id,
+    )
+}
+
 /// Resolve a compatibility model identifier to the position used by the
 /// focused Pages reader.  This scan projects only storage table entries,
 /// attachment references, and `TableInfoArchive` ownership; in particular it

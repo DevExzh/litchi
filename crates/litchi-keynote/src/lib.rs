@@ -519,7 +519,8 @@ pub use package::{
     SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
 };
 pub use package::{
-    MergeReader, SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath,
+    MergeReader, SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
+    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPatch, SlideTableMergesPath,
 };
 pub use package::{
     SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,

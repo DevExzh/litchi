@@ -153,7 +153,10 @@ pub use table_lock::{
     TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind,
     TableLockPatch,
 };
-pub use table_merges::{MergeReader, TableMergesError, TableMergesLimitKind};
+pub use table_merges::{
+    MergeReader, TableMergesCommit, TableMergesDiagnostics, TableMergesEdit, TableMergesError,
+    TableMergesLimitKind, TableMergesPatch,
+};
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHEET_MESSAGE_TYPE: u32 = 2;

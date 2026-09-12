@@ -100,6 +100,46 @@ pub(super) fn regions_in_editor(
     }
 }
 
+/// Resolve a model identifier to its focused slide-table position for a
+/// mutation preadmission scan.
+///
+/// The position proof is metadata-only. A legacy model role is returned as
+/// compatibility scope so the host can use its bounded source-preserving
+/// writer; only the canonical model message is admitted to the focused
+/// writable transaction.
+pub(super) fn focused_table_position_for_mutation(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+) -> Result<Option<usize>> {
+    let (components, _) = editor
+        .package()
+        .shared_component_catalog(map_catalog_error)?;
+    let Some(position) = focused_table_position(
+        editor.package(),
+        components.as_ref(),
+        slide_index,
+        model_object_id,
+    )?
+    else {
+        return Ok(None);
+    };
+    let mut budget = SelectorBudget::new(editor.package(), components.as_ref())?;
+    let locations = ObjectLocations::build(components.as_ref(), &mut budget)?;
+    let model = locations.object(model_object_id)?;
+    let canonical = model
+        .messages
+        .iter()
+        .filter(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+        .count();
+    if canonical > 1 {
+        return Err(invalid_source(
+            "Keynote table model has multiple canonical model payloads",
+        ));
+    }
+    Ok((canonical == 1).then_some(position))
+}
+
 /// Resolve a native model identifier to the positional selector expected by
 /// the focused Keynote reader. Only rooted slide metadata and `TableInfo`
 /// references are projected; a `TableModelArchive` payload is never decoded

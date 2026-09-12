@@ -131,6 +131,82 @@ fn focused_package_to_editor(
     NumbersEditor::from_bytes(&output.bytes)
 }
 
+fn parse_focused_merge_source(editor: &NumbersEditor) -> Result<FocusedNumbersPackage> {
+    let source = editor.package.exact_source_owner().ok_or_else(|| {
+        Error::InvalidFormat("focused Numbers merge source is not exact".to_owned())
+    })?;
+    let (_, limits) = editor
+        .package
+        .shared_component_catalog(|error| Error::InvalidFormat(error.to_string()))?;
+    FocusedNumbersPackage::__from_shared_source_with_options(
+        source,
+        litchi_numbers::PackageReadOptions::new(
+            limits,
+            litchi_numbers::PackageSemanticLimits::default(),
+        ),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("focused Numbers merge source failed: {error}")))
+}
+
+/// Reopen a focused merge commit with the host package's resource profile.
+///
+/// Focused transactions own their own immutable package snapshot, but the
+/// host editor remains responsible for retaining the caller's ingress and
+/// archive ceilings after publication.  Reusing those limits also keeps a
+/// successful focused commit from silently widening later host mutations.
+fn focused_merge_package_to_editor(
+    package: &FocusedNumbersPackage,
+    source_len: usize,
+    package_limits: crate::package::PackageLimits,
+) -> Result<NumbersEditor> {
+    let mut output = FalliblePackageBytes::with_capacity(source_len)?;
+    if let Err(error) = package.write_to(&mut output) {
+        if let Some(amount) = output.allocation_failure {
+            return Err(focused_allocation_error(amount));
+        }
+        return Err(Error::Io(error.into_io_error()));
+    }
+    let package = IWorkPackage::from_bytes_with_limits(&output.bytes, package_limits)?;
+    NumbersEditor::from_package(package)
+}
+
+struct FocusedMergeLocation {
+    source: FocusedNumbersPackage,
+    sheet: litchi_numbers::SheetSelector<'static>,
+    table: litchi_numbers::TableSelector<'static>,
+    source_len: usize,
+}
+
+/// Admit only canonical, rooted exact sources to the focused merge owner.
+///
+/// Legacy model aliases and source-built snapshots deliberately remain on the
+/// host's bounded compatibility writer.  Once this preadmission succeeds,
+/// focused transaction errors are terminal and are never reclassified as a
+/// compatibility request.
+fn focused_merge_location(
+    editor: &NumbersEditor,
+    table_id: u64,
+) -> Result<Option<FocusedMergeLocation>> {
+    // Source-built and normalized packages intentionally use the bounded
+    // compatibility writer.  Check provenance before the metadata selector so
+    // they never get misclassified as canonical focused sources.
+    let Some(source_bytes) = editor.package.exact_source_bytes() else {
+        return Ok(None);
+    };
+    let Some((sheet_position, table_position)) =
+        selectors::focused_merge_table_indices(editor, table_id)?
+    else {
+        return Ok(None);
+    };
+    let source_len = source_bytes.len();
+    Ok(Some(FocusedMergeLocation {
+        source: parse_focused_merge_source(editor)?,
+        sheet: litchi_numbers::SheetSelector::index(sheet_position),
+        table: litchi_numbers::TableSelector::index(table_position),
+        source_len,
+    }))
+}
+
 fn focused_control_format(
     editor: &NumbersEditor,
     table_id: u64,
@@ -2852,9 +2928,36 @@ impl NumbersEditor {
 
     /// Merge one non-overlapping rectangular cell region transactionally.
     pub fn merge_cells(&mut self, table_id: u64, region: Region) -> Result<()> {
+        let package_limits = self.package.limits();
+        if let Some(FocusedMergeLocation {
+            source,
+            sheet,
+            table,
+            source_len,
+        }) = focused_merge_location(self, table_id)?
+        {
+            let mut edit = source
+                .edit_table_merges(sheet, table)
+                .map_err(Error::from)?;
+            edit.merge(region).map_err(Error::from)?;
+            let commit = edit.commit().map_err(Error::from)?;
+            if commit.patch().is_noop() {
+                return Ok(());
+            }
+            let verified =
+                focused_merge_package_to_editor(commit.package(), source_len, package_limits)?;
+            if !verified.table_cell_merges(table_id)?.contains(&region) {
+                return Err(Error::InvalidFormat(
+                    "focused Numbers table-cell merge failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+            return Ok(());
+        }
+
         let mut staged = self.package.clone();
         cell_merge::merge_in_package(&mut staged, table_id, region)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_package(staged)?;
         if !verified.table_cell_merges(table_id)?.contains(&region) {
             return Err(Error::InvalidFormat(
                 "Numbers table-cell merge failed package validation".to_owned(),
@@ -2866,12 +2969,42 @@ impl NumbersEditor {
 
     /// Remove one exact merged-cell rectangle, returning whether it existed.
     pub fn unmerge_cells(&mut self, table_id: u64, region: Region) -> Result<bool> {
+        let package_limits = self.package.limits();
+        if let Some(FocusedMergeLocation {
+            source,
+            sheet,
+            table,
+            source_len,
+        }) = focused_merge_location(self, table_id)?
+        {
+            let mut edit = source
+                .edit_table_merges(sheet, table)
+                .map_err(Error::from)?;
+            let changed = edit.unmerge(region).map_err(Error::from)?;
+            if !changed {
+                return Ok(false);
+            }
+            let commit = edit.commit().map_err(Error::from)?;
+            if commit.patch().is_noop() {
+                return Ok(false);
+            }
+            let verified =
+                focused_merge_package_to_editor(commit.package(), source_len, package_limits)?;
+            if verified.table_cell_merges(table_id)?.contains(&region) {
+                return Err(Error::InvalidFormat(
+                    "focused Numbers table-cell unmerge failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+            return Ok(true);
+        }
+
         let mut staged = self.package.clone();
         let changed = cell_merge::unmerge_in_package(&mut staged, table_id, region)?;
         if !changed {
             return Ok(false);
         }
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_package(staged)?;
         if verified.table_cell_merges(table_id)?.contains(&region) {
             return Err(Error::InvalidFormat(
                 "Numbers table-cell unmerge failed package validation".to_owned(),
