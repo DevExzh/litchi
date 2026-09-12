@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0529: XML attribute probe rejected
+
+[0529](changes/0529-xml-attribute-probe-pilot.md) retains a complete repeated pilot with all output oracles passing. Publication allocation calls fall about 98–99%, but total mean reductions stay below 2% in every pair and first-repeat publication p50 is flat. Production is restored; instrumentation, four compatible tests and adverse/drift evidence remain. No runtime speedup is retained or claimed.
+
 ## 0528: publication profile redirects the next optimization
 
 [0528](changes/0528-xlsx-publication-attribution.md) Four source-bound captures locate 56.2257% of aggregate publication instructions in OPC overlay XML validation. Attribute inspection is a nested 11.6093%, not an additive fraction. The measured owner excludes returned-snapshot destruction; native phase context is separate. No production optimization, native gain, allocator reduction or scaling improvement is adopted.

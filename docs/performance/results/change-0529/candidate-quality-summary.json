@@ -1,0 +1,91 @@
+{
+  "status": "pass",
+  "stage": "candidate",
+  "checks": [
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "90bbce2ee2847cd746edd017d2f2d9aa9e7d38fafc63f08e249301b746fe112a",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "b69d5005ca4e9aee39a0cc82c2c993ec1891c52071fa4c7b855f03b2a8a089f3",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-clippy.receipt.json",
+      "receipt_sha256": "f3bd04405ba8d60e62e5bb27f8c1d0140a5be50de0b167faa0314933e4b91d3e",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "18b52c1de5813c5b216ac2d9b360e1aee04d679d3dcfd54638c41db7aa664a30",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "5779367369145ebb93dbb27c89bb7287b461de713cb2ea4d3d9230b749ebb9f1",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-existing-metrics-tests.receipt.json",
+      "receipt_sha256": "6104d68a7b3fa0523f20bf089e39f8908803ba5d53a4753e8cbfc4c6cfab6001",
+      "exit_code": 0,
+      "executed_tests": 3
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "7e5c95b67443c95ec92270ebfe67853e39de15ce7a26ecd4762f252ee0ee8991",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-noncompact-test.receipt.json",
+      "receipt_sha256": "4bbc319f9999e7867816bfb51e005e0031da4a58cd8fb41350fbc35bea776591",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-harness-test.receipt.json",
+      "receipt_sha256": "6cebc657db8144d269182e402df7968e8f3b605eaa103478934dc9da7f6bccd4",
+      "exit_code": 0,
+      "executed_tests": 2
+    },
+    {
+      "name": "check-opc-tests.receipt.json",
+      "receipt_sha256": "4297e305d4af4bd83ce1580d19e05b8d351d37c7ce39020f48a1687e9bab7265",
+      "exit_code": 0,
+      "executed_tests": 676
+    },
+    {
+      "name": "check-rustdoc.receipt.json",
+      "receipt_sha256": "6e2a609ba10198cbaf1e969b971abc17bf3632f72518e533a2bbe6e2e29c8e4f",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "00fa50b81c1a55ca86c58c215262595ebccc2cb5709cdfc53d7e2b1feacccc6c",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xlsx-tests.receipt.json",
+      "receipt_sha256": "d78a12a3d5c97bf953716ade4ded0caa9d42d59defcd6587ae7d34c3f592748a",
+      "exit_code": 0,
+      "executed_tests": 1292
+    },
+    {
+      "name": "check-xml-tests.receipt.json",
+      "receipt_sha256": "2b3927d763ef623b586895432994724b71cdc6d9ff5860b5547dad5148d836e1",
+      "exit_code": 0,
+      "executed_tests": 51
+    }
+  ],
+  "executed_tests": 2025
+}

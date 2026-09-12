@@ -1,0 +1,7 @@
+
+running 2 tests
+test tests::xlsx_source_cell_values_commit_allocation_metrics_align_with_phases ... ok
+test tests::xlsx_source_cell_values_publication_allocation_metrics_align_with_phases ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 489 filtered out; finished in 12.31s
+

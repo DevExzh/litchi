@@ -1,0 +1,40 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0529/candidate-alloc",
+    "--warmup",
+    "0",
+    "--samples",
+    "5",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0529/candidate/alloc-r2-medium.json"
+  ],
+  "start_utc": "2026-09-12T12:38:32.714743+00:00",
+  "end_utc": "2026-09-12T12:38:33.952512+00:00",
+  "seconds": 1.2377694850001717,
+  "exit_code": 0,
+  "binary_sha256": "f0e60ec574060370953915bf9e182d7d7c3451929c274eb9d1c5c75fa9cf3a30",
+  "source_manifest_sha256": "25e9c91458bad414bdb1b2c2536e7705b9998de56ad792d7b9a9e263e95f7a6f",
+  "working_source_manifest_sha256": "25e9c91458bad414bdb1b2c2536e7705b9998de56ad792d7b9a9e263e95f7a6f",
+  "script_sha256": "92f2039bd788f1fc93c46d767930e0d2928104678fa7a2c7453263770aff8af4",
+  "plan_sha256": "17988e94a8d0993a6b453ca8c3ec3c46689bc89f2f823cace045a47f92b06a33",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0529-target/test-tmp"
+  },
+  "artifacts": {
+    "alloc-r2-medium.json": "8f56ce365d1d14f58576d529bb7835a4e9fc53ca387da9b26d714f7790676ec9",
+    "alloc-r2-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "alloc-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

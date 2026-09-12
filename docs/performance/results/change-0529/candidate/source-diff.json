@@ -1,0 +1,17 @@
+{
+  "baseline_manifest_sha256": "3d511612ae1d8fa20b8da57db42f70ea70dc5712b844f7b73e62ceab6397e709",
+  "candidate_manifest_sha256": "25e9c91458bad414bdb1b2c2536e7705b9998de56ad792d7b9a9e263e95f7a6f",
+  "candidate_source_roots": [
+    "crates/xml-minifier/"
+  ],
+  "changed_files": {
+    "crates/xml-minifier/src/audit.rs": {
+      "baseline_sha256": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+      "candidate_sha256": "b5a56c6ebe85079670c2ee5ddac1c7870b8f1f4541b767911d8bbd3739af0d5c"
+    },
+    "crates/xml-minifier/tests/stream_audit.rs": {
+      "baseline_sha256": "d0152fcffb883c0611c40c73933b52c0ddfc47223705202964dc8a0d933b5f2f",
+      "candidate_sha256": "b44929d36d2db850e4fc43d310ca32253c67ec67fcb5c5ada047ce93ce908832"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "path": "/tmp/litchi-goal-0529/baseline-alloc",
+  "sha256": "eaf955bdaa69be2ca626dbcafdbae41847f577e5dcfd318eea3b4d1f36fa9553",
+  "bytes": 60000016,
+  "build_receipt_sha256": "ac01849f2158edcafeb462c8ebf65c783d723dda401bd40465af623c5de20307",
+  "source_manifest_sha256": "3d511612ae1d8fa20b8da57db42f70ea70dc5712b844f7b73e62ceab6397e709"
+}

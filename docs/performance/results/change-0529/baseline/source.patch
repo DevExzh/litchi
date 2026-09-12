@@ -1,0 +1,163 @@
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 3e7b26bf8..abb9efe8d 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -5895,6 +5895,8 @@ struct XlsxCellValuesSourceSummary {
+     #[serde(skip_serializing_if = "Vec::is_empty")]
+     commit_allocation_metrics: Vec<allocation_metrics::Sample>,
+     publication_ns: Vec<u64>,
++    #[serde(skip_serializing_if = "Vec::is_empty")]
++    publication_allocation_metrics: Vec<allocation_metrics::Sample>,
+     reopen_ns: Vec<u64>,
+     source_read_calls: Vec<u64>,
+     source_read_bytes: Vec<u64>,
+@@ -6106,6 +6108,7 @@ struct XlsxCellValuesIterationEvidence {
+     commit_ns: u64,
+     commit_allocation_metrics: Option<allocation_metrics::Sample>,
+     publication_ns: u64,
++    publication_allocation_metrics: Option<allocation_metrics::Sample>,
+     reopen_ns: u64,
+     source: SourceSnapshot,
+     diagnostics: SourceCacheDiagnostics,
+@@ -8128,6 +8131,11 @@ impl SourceSummary {
+                 .push(commit_allocation_metrics);
+         }
+         summary.publication_ns.push(evidence.publication_ns);
++        if let Some(publication_allocation_metrics) = evidence.publication_allocation_metrics {
++            summary
++                .publication_allocation_metrics
++                .push(publication_allocation_metrics);
++        }
+         summary.reopen_ns.push(evidence.reopen_ns);
+         summary.source_read_calls.push(source.read_calls);
+         summary.source_read_bytes.push(source.read_bytes);
+@@ -41322,6 +41330,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics: None,
+                 publication_ns,
++                publication_allocation_metrics: None,
+                 reopen_ns: 0,
+                 source,
+                 diagnostics,
+@@ -41381,6 +41390,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics: None,
+                 publication_ns,
++                publication_allocation_metrics: None,
+                 reopen_ns: 0,
+                 source: SourceSnapshot::default(),
+                 diagnostics: SourceCacheDiagnostics::default(),
+@@ -41892,6 +41902,7 @@ fn run_xlsx_cell_values_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics,
+                 publication_ns,
++                publication_allocation_metrics,
+                 budget_used_after_package_drop,
+             ) = {
+                 let allocation_region = allocation_metrics::begin();
+@@ -41944,12 +41955,17 @@ fn run_xlsx_cell_values_edit_save(
+                         "XLSX unmanaged cell CRUD reported nonzero managed budget evidence".into(),
+                     );
+                 }
++                let publication_allocation_region = allocation_metrics::begin();
+                 let publication_started = Instant::now();
+                 {
+                     let _published = editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
+                 }
+                 let publication_duration = publication_started.elapsed();
+                 let publication_ns = elapsed_ns(publication_duration)?;
++                let publication_allocation_metrics = match publication_allocation_region.finish() {
++                    Some(sample) => sample,
++                    None => allocation_metrics::unavailable_sample(),
++                };
+                 duration += publication_duration;
+                 let post_publication_budget =
+                     xlsx_cell_values_post_publication_budget_snapshot(budget.as_ref());
+@@ -41961,6 +41977,7 @@ fn run_xlsx_cell_values_edit_save(
+                     commit_ns,
+                     commit_allocation_metrics,
+                     publication_ns,
++                    publication_allocation_metrics,
+                     budget_used_after_package_drop,
+                 )
+             };
+@@ -42016,6 +42033,7 @@ fn run_xlsx_cell_values_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics: Some(commit_allocation_metrics),
+                 publication_ns,
++                publication_allocation_metrics: Some(publication_allocation_metrics),
+                 reopen_ns: 0,
+                 source: source_metrics
+                     .as_ref()
+@@ -66645,6 +66663,71 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn xlsx_source_cell_values_publication_allocation_metrics_align_with_phases() {
++        // The normal test binary does not install the allocator wrapper, so
++        // source-backed publication samples must carry explicit unavailable
++        // status. The allocator-only capture validates measured nonzero
++        // counters using the wrapper binary.
++        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
++        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
++        let sample_count = 3;
++        let measured = run_case(
++            Case::XlsxSourceBackedCellValuesOneEditSave,
++            &corpus,
++            1,
++            sample_count,
++        )
++        .unwrap();
++        let evidence = measured
++            .source
++            .as_ref()
++            .and_then(|source| source.xlsx_cell_values.as_ref())
++            .expect("source-backed cell-values evidence");
++
++        assert_eq!(evidence.publication_allocation_metrics.len(), sample_count);
++        assert!(
++            evidence
++                .publication_allocation_metrics
++                .iter()
++                .all(|sample| sample.status == super::allocation_metrics::Status::Unavailable)
++        );
++        let serialized_summary = serde_json::to_value(evidence).unwrap();
++        let serialized_metrics = serialized_summary
++            .get("publication_allocation_metrics")
++            .expect("publication allocation metrics field is serialized");
++        let serialized_samples = serialized_metrics
++            .as_array()
++            .expect("publication allocation metrics serialize as an array");
++        assert_eq!(serialized_samples.len(), sample_count);
++        for sample in serialized_samples {
++            assert_eq!(sample.as_object().map(|object| object.len()), Some(2));
++            assert_eq!(sample["status"], "unavailable");
++            assert_eq!(sample["scope"], "operation_global_system_allocator");
++        }
++        assert_eq!(evidence.open_ns.len(), sample_count);
++        assert_eq!(evidence.plan_ns.len(), sample_count);
++        assert_eq!(evidence.commit_ns.len(), sample_count);
++        assert_eq!(evidence.publication_ns.len(), sample_count);
++        assert_eq!(
++            evidence.publication_allocation_metrics.len(),
++            evidence.publication_ns.len()
++        );
++        assert_eq!(measured.elapsed_ns.sample_order.len(), sample_count);
++        for (sorted_index, &acquisition_index) in
++            measured.elapsed_ns.sample_order.iter().enumerate()
++        {
++            let phase_sum = evidence.open_ns[acquisition_index]
++                + evidence.plan_ns[acquisition_index]
++                + evidence.commit_ns[acquisition_index]
++                + evidence.publication_ns[acquisition_index];
++            assert_eq!(
++                phase_sum, measured.elapsed_ns.samples[sorted_index],
++                "source cell-values phase sum changed at acquisition index {acquisition_index}"
++            );
++        }
++    }
++
+     #[test]
+     fn xlsx_noncompact_cell_reference_guard_is_deterministic_and_editable() {
+         let first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Noncompact).unwrap();

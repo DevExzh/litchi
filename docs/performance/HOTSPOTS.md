@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0529: fewer attribute allocations do not establish native usefulness
+
+[0529](changes/0529-xml-attribute-probe-pilot.md) reduces publication allocation calls to 414 in both shapes, yet fails the total/native publication contract and regresses the managed noncompact repeat-1 guard total p50 by 5.3910%. The probe is rejected. Attribute XLSX planning next before selecting another candidate; do not infer wall-time gains from allocation counts or revive earlier rejected mechanisms.
+
 ## 0528: shared authored-XML audit is the next publication lead
 
 [0528](changes/0528-xlsx-publication-attribution.md) The complete scanner resolver edge is only 4.0274% of commit Ir and is not wholly removable. Fresh publication profiles identify validate_overlay_xml at 56.2257% aggregate publication Ir, including attribute inspection at 11.6093%. Investigate reusable attribute-check scratch while retaining both original/replacement audits and exact errors/limits. The prior scanner fusion and row arena remain rejected.

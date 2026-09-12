@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0529: source-bound publication allocation and native comparison
+
+[0529](changes/0529-xml-attribute-probe-pilot.md) retains 2,440 native durations and 40 publication allocation samples, plus 40 separate commit diagnostics, under identical harness builds. Allocation calls drop 97.8489–98.8695% in the rejected candidate, but total mean fails the 2% gate in every pair. Conditional profiles/hardware/eager remain unmeasured.
+
 ## 0528: new XLSX publication instruction baseline
 
 [0528](changes/0528-xlsx-publication-attribution.md) Four unchanged-source profiles isolate the publication method after five lifecycle calls. Overlay XML validation accounts for 53.8232–57.5571% of publication Ir; physical writing accounts for 41.8816–45.4039%. Returned-snapshot destruction is excluded from the method profile but included in native publication timing. No speedup is claimed.

@@ -1,0 +1,108 @@
+diff --git a/crates/xml-minifier/src/audit.rs b/crates/xml-minifier/src/audit.rs
+index fb1ee70..c07204d 100644
+--- a/crates/xml-minifier/src/audit.rs
++++ b/crates/xml-minifier/src/audit.rs
+@@ -2181,4 +2181,103 @@ mod stream_tests {
+             "token-window arithmetic must fail closed on usize overflow"
+         );
+     }
++
++    #[test]
++    fn unchecked_attribute_probe_matches_checked_oracle_without_state_effects() {
++        let cases: &[(&[u8], usize, Space)] = &[
++            (b"<root/>", 256, Space::Default),
++            (br#"<root a="1"/>"#, 256, Space::Default),
++            (br#"<root xml:space="preserve"/>"#, 256, Space::Default),
++            (br#"<root xml:space="default"/>"#, 256, Space::Preserve),
++            (br#"<root a="1" b="2" c="3"/>"#, 256, Space::Default),
++            (
++                br#"<root a="1" xml:space="preserve" b="2">
++</root>"#,
++                256,
++                Space::Default,
++            ),
++            (
++                br#"<p:root xmlns:p="urn:test" p:value="v"/>"#,
++                256,
++                Space::Default,
++            ),
++            (
++                br#"<root xml:space="preserve" xml:space="keep"/>"#,
++                256,
++                Space::Default,
++            ),
++            (
++                br#"<root bad=unquoted good="ok"/>"#,
++                256,
++                Space::Default,
++            ),
++            (
++                br#"<root good="ok" bad=unquoted/>"#,
++                256,
++                Space::Default,
++            ),
++            (
++                br#"<root xml:space="preserve" bad=unquoted/>"#,
++                256,
++                Space::Default,
++            ),
++            (br#"<root a="1" b="2"/>"#, 1, Space::Default),
++            (br#"<root a="1"/>"#, 0, Space::Default),
++            (br#"<root xml:space="keep"/>"#, 256, Space::Default),
++        ];
++
++        let check = |xml: &[u8], max_attributes: usize, inherited: Space| {
++            let limits = Limits::new(
++                xml.len(),
++                32,
++                256,
++                max_attributes,
++                xml.len().max(1),
++                xml.len(),
++            )
++            .expect("focused attribute profile");
++            let text = core::str::from_utf8(xml).expect("focused XML is UTF-8");
++            let mut reader = Reader::from_str(text);
++            reader.config_mut().trim_text(false);
++            let event = reader.read_event().expect("attribute fixture event");
++            let tag = match event {
++                Event::Start(tag) | Event::Empty(tag) => tag,
++                other => panic!("expected a tag event, got {other:?}"),
++            };
++            let decoder = reader.decoder();
++            let mut probed = State::new();
++            let mut checked = State::new();
++            let result = inspect_attributes(&tag, decoder, inherited, &mut probed, limits, 0);
++            let oracle =
++                inspect_attributes_checked(&tag, decoder, inherited, &mut checked, limits, 0);
++
++            assert_eq!(result, oracle, "attribute result changed for {xml:?}");
++            assert_eq!(
++                probed.ambiguous_space_offset,
++                checked.ambiguous_space_offset
++            );
++            assert_eq!(probed.attributes, checked.attributes, "count for {xml:?}");
++            assert_eq!(probed.depth, checked.depth);
++            assert_eq!(probed.events, checked.events);
++            assert_eq!(probed.max_depth, checked.max_depth);
++            assert_eq!(probed.roots, checked.roots);
++            assert_eq!(probed.spaces, checked.spaces);
++            assert_eq!(probed.text_bytes, checked.text_bytes);
++            assert_eq!(
++                probed.text_run_has_explicit_content,
++                checked.text_run_has_explicit_content
++            );
++        };
++
++        for &(xml, max_attributes, inherited) in cases {
++            check(xml, max_attributes, inherited);
++        }
++
++        let mut many = b"<root".to_vec();
++        for index in 0..40 {
++            many.extend_from_slice(format!(" a{index}=\"v\"").as_bytes());
++        }
++        many.extend_from_slice(b"/>");
++        check(&many, 256, Space::Default);
++    }
+ }

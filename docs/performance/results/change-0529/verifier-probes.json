@@ -1,0 +1,32 @@
+{
+  "schema": "litchi-0529-verifier-negative-probes-v1",
+  "status": "pass",
+  "checks": [
+    {
+      "case": "unsafe_relative_path",
+      "rejected": true,
+      "reason": "probe path escapes its root"
+    },
+    {
+      "case": "inverted_receipt_interval",
+      "rejected": true,
+      "reason": "probe receipt interval is inverted"
+    },
+    {
+      "case": "publication_vector_cannot_fallback_to_commit",
+      "rejected": true,
+      "reason": "probe row publication allocation lane is missing"
+    },
+    {
+      "case": "invalid_allocation_balance",
+      "rejected": true,
+      "reason": "probe invalid allocation allocation balance differs"
+    },
+    {
+      "case": "incomplete_abba",
+      "rejected": true,
+      "reason": "native ABBA blocks differ: [('baseline', 1)]"
+    }
+  ],
+  "scope": "In-memory custody, interval, allocation, publication-channel, and ABBA validator probes."
+}

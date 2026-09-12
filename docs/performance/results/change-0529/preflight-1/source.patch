@@ -1,0 +1,579 @@
+diff --git a/crates/xml-minifier/src/audit.rs b/crates/xml-minifier/src/audit.rs
+index fb1ee700a..fadf8bcee 100644
+--- a/crates/xml-minifier/src/audit.rs
++++ b/crates/xml-minifier/src/audit.rs
+@@ -14,6 +14,7 @@ use core::{fmt, mem::size_of};
+ use quick_xml::Reader;
+ use quick_xml::XmlVersion;
+ use quick_xml::encoding::Decoder;
++use quick_xml::events::attributes::Attribute;
+ use quick_xml::events::{BytesStart, Event};
+ use std::io::{self, BufRead, Read};
+ 
+@@ -1508,37 +1509,78 @@ fn inspect_attributes(
+     state: &mut State,
+     limits: Limits,
+     offset: usize,
++) -> Result<Space, Error> {
++    let mut probe = tag.attributes();
++    probe.with_checks(false);
++    match probe.next() {
++        None => return Ok(inherited),
++        Some(Err(_)) => {
++            drop(probe);
++        },
++        Some(Ok(attribute)) => {
++            if probe.next().is_none() {
++                drop(probe);
++                let mut space = inherited;
++                inspect_attribute(attribute, decoder, &mut space, state, limits, offset)?;
++                return Ok(space);
++            }
++            drop(probe);
++        },
++    }
++
++    inspect_attributes_checked(tag, decoder, inherited, state, limits, offset)
++}
++
++fn inspect_attributes_checked(
++    tag: &BytesStart<'_>,
++    decoder: Decoder,
++    inherited: Space,
++    state: &mut State,
++    limits: Limits,
++    offset: usize,
+ ) -> Result<Space, Error> {
+     let mut space = inherited;
+     for attribute_result in tag.attributes() {
+         let attribute =
+             attribute_result.map_err(|error| Error::malformed(offset, error.to_string()))?;
+-        state.attributes = checked_add(
+-            state.attributes,
+-            1,
+-            Resource::Attributes,
+-            limits.attributes,
+-            offset,
+-        )?;
+-        if attribute.key.as_ref() == b"xml:space" {
+-            let value = attribute
+-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+-                .map_err(|error| Error::malformed(offset, error.to_string()))?;
+-            space = match value.as_ref() {
+-                "default" => Space::Default,
+-                "preserve" => Space::Preserve,
+-                _ => {
+-                    return Err(Error::malformed(
+-                        offset,
+-                        "xml:space must be 'default' or 'preserve'",
+-                    ));
+-                },
+-            };
+-        }
++        inspect_attribute(attribute, decoder, &mut space, state, limits, offset)?;
+     }
+     Ok(space)
+ }
+ 
++fn inspect_attribute(
++    attribute: Attribute<'_>,
++    decoder: Decoder,
++    space: &mut Space,
++    state: &mut State,
++    limits: Limits,
++    offset: usize,
++) -> Result<(), Error> {
++    state.attributes = checked_add(
++        state.attributes,
++        1,
++        Resource::Attributes,
++        limits.attributes,
++        offset,
++    )?;
++    if attribute.key.as_ref() == b"xml:space" {
++        let value = attribute
++            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
++            .map_err(|error| Error::malformed(offset, error.to_string()))?;
++        *space = match value.as_ref() {
++            "default" => Space::Default,
++            "preserve" => Space::Preserve,
++            _ => {
++                return Err(Error::malformed(
++                    offset,
++                    "xml:space must be 'default' or 'preserve'",
++                ));
++            },
++        };
++    }
++    Ok(())
++}
++
+ fn check_declaration(raw: &[u8], offset: usize) -> Result<(), Error> {
+     let Some(inner) = raw
+         .strip_prefix(b"<?")
+@@ -2181,4 +2223,95 @@ mod stream_tests {
+             "token-window arithmetic must fail closed on usize overflow"
+         );
+     }
++
++    #[test]
++    fn unchecked_attribute_probe_matches_checked_oracle_without_state_effects() {
++        let cases: &[(&[u8], usize, Space)] = &[
++            (b"<root/>", 256, Space::Default),
++            (br#"<root a="1"/>"#, 256, Space::Default),
++            (br#"<root xml:space="preserve"/>"#, 256, Space::Default),
++            (br#"<root xml:space="default"/>"#, 256, Space::Preserve),
++            (br#"<root a="1" b="2" c="3"/>"#, 256, Space::Default),
++            (
++                br#"<root a="1" xml:space="preserve" b="2">
++</root>"#,
++                256,
++                Space::Default,
++            ),
++            (
++                br#"<p:root xmlns:p="urn:test" p:value="v"/>"#,
++                256,
++                Space::Default,
++            ),
++            (
++                br#"<root xml:space="preserve" xml:space="keep"/>"#,
++                256,
++                Space::Default,
++            ),
++            (br#"<root bad=unquoted good="ok"/>"#, 256, Space::Default),
++            (br#"<root good="ok" bad=unquoted/>"#, 256, Space::Default),
++            (
++                br#"<root xml:space="preserve" bad=unquoted/>"#,
++                256,
++                Space::Default,
++            ),
++            (br#"<root a="1" b="2"/>"#, 1, Space::Default),
++            (br#"<root a="1"/>"#, 0, Space::Default),
++            (br#"<root xml:space="keep"/>"#, 256, Space::Default),
++        ];
++
++        let check = |xml: &[u8], max_attributes: usize, inherited: Space| {
++            let limits = Limits::new(
++                xml.len(),
++                32,
++                256,
++                max_attributes,
++                xml.len().max(1),
++                xml.len(),
++            )
++            .expect("focused attribute profile");
++            let text = core::str::from_utf8(xml).expect("focused XML is UTF-8");
++            let mut reader = Reader::from_str(text);
++            reader.config_mut().trim_text(false);
++            let event = reader.read_event().expect("attribute fixture event");
++            let tag = match event {
++                Event::Start(tag) | Event::Empty(tag) => tag,
++                other => panic!("expected a tag event, got {other:?}"),
++            };
++            let decoder = reader.decoder();
++            let mut probed = State::new();
++            let mut checked = State::new();
++            let result = inspect_attributes(&tag, decoder, inherited, &mut probed, limits, 0);
++            let oracle =
++                inspect_attributes_checked(&tag, decoder, inherited, &mut checked, limits, 0);
++
++            assert_eq!(result, oracle, "attribute result changed for {xml:?}");
++            assert_eq!(
++                probed.ambiguous_space_offset,
++                checked.ambiguous_space_offset
++            );
++            assert_eq!(probed.attributes, checked.attributes, "count for {xml:?}");
++            assert_eq!(probed.depth, checked.depth);
++            assert_eq!(probed.events, checked.events);
++            assert_eq!(probed.max_depth, checked.max_depth);
++            assert_eq!(probed.roots, checked.roots);
++            assert_eq!(probed.spaces, checked.spaces);
++            assert_eq!(probed.text_bytes, checked.text_bytes);
++            assert_eq!(
++                probed.text_run_has_explicit_content,
++                checked.text_run_has_explicit_content
++            );
++        };
++
++        for &(xml, max_attributes, inherited) in cases {
++            check(xml, max_attributes, inherited);
++        }
++
++        let mut many = b"<root".to_vec();
++        for index in 0..40 {
++            many.extend_from_slice(format!(" a{index}=\"v\"").as_bytes());
++        }
++        many.extend_from_slice(b"/>");
++        check(&many, 256, Space::Default);
++    }
+ }
+diff --git a/crates/xml-minifier/tests/stream_audit.rs b/crates/xml-minifier/tests/stream_audit.rs
+index cee29f508..4ff448b3a 100644
+--- a/crates/xml-minifier/tests/stream_audit.rs
++++ b/crates/xml-minifier/tests/stream_audit.rs
+@@ -62,6 +62,48 @@ fn assert_same_result(input: &[u8], authored: bool) {
+     }
+ }
+ 
++fn assert_authored_with_limits(input: &[u8], limits: Limits) {
++    let expected = audit::verify_authored(input, limits);
++
++    for chunks in [
++        &[1usize][..],
++        &[2usize][..],
++        &[3usize][..],
++        &[7usize][..],
++        &[31usize, 1, 5, 2][..],
++    ] {
++        let actual = audit::verify_authored_reader(Chunked::new(input, chunks), limits);
++        match (&expected, actual) {
++            (Ok(expected), Ok(actual)) => assert_eq!(expected, &actual, "chunks {chunks:?}"),
++            (Err(expected), Err(StreamError::Audit(actual))) => {
++                assert_error_kind_and_offset(expected, &actual, chunks);
++            },
++            (Err(expected), Err(StreamError::Input(actual))) => {
++                panic!("slice error {expected:?} became input error {actual}")
++            },
++            (Err(_), Err(_)) => panic!("slice error became an unknown stream error"),
++            (Ok(expected), Err(actual)) => {
++                panic!("slice success {expected:?} became stream error {actual:?}")
++            },
++            (Err(expected), Ok(actual)) => {
++                panic!("slice error {expected:?} became stream success {actual:?}")
++            },
++        }
++    }
++}
++
++fn authored_limits(input: &[u8], max_attributes: usize) -> Limits {
++    Limits::new(
++        input.len(),
++        32,
++        128,
++        max_attributes,
++        input.len().max(1),
++        input.len(),
++    )
++    .unwrap()
++}
++
+ fn assert_same_category(input: &[u8], authored: bool) {
+     let expected = if authored {
+         audit::verify_authored(input, limits_for(input))
+@@ -316,6 +358,153 @@ fn authored_space_and_entity_state_survive_every_chunk_boundary() {
+     }
+ }
+ 
++#[test]
++fn authored_attribute_probe_covers_zero_one_many_and_namespace_attributes() {
++    let zero = b"<root><child/></root>";
++    let one = br#"<root a="1"/>"#;
++    let many = br#"<root a="1" b="2" c="3"/>"#;
++    let namespaced = br#"<p:root xmlns:p="urn:test" p:value="v"/>"#;
++
++    for (xml, attributes) in [
++        (zero.as_slice(), 0),
++        (one.as_slice(), 1),
++        (many.as_slice(), 3),
++        (namespaced.as_slice(), 2),
++    ] {
++        let report =
++            audit::verify_authored(xml, limits_for(xml)).expect("valid authored attribute fixture");
++        assert_eq!(report.attributes(), attributes, "fixture {xml:?}");
++        assert_same_result(xml, true);
++    }
++}
++
++#[test]
++fn authored_attribute_probe_preserves_xml_space_state_and_limit_precedence() {
++    let preserved = b"<root xml:space=\"preserve\">\n<child/></root>";
++    let report = audit::verify_authored(preserved, limits_for(preserved))
++        .expect("xml:space=preserve must carry into the child text run");
++    assert_eq!(report.attributes(), 1);
++    assert_same_result(preserved, true);
++
++    let many_preserved = b"<root a=\"1\" xml:space=\"preserve\" b=\"2\">\n</root>";
++    let report = audit::verify_authored(many_preserved, limits_for(many_preserved))
++        .expect("checked multi-attribute path must carry xml:space state");
++    assert_eq!(report.attributes(), 3);
++    assert_same_result(many_preserved, true);
++
++    let reset = b"<root xml:space=\"preserve\"><child xml:space=\"default\">\n</child></root>";
++    let error = audit::verify_authored(reset, limits_for(reset)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::NotCompact(violation) if violation.kind() == Kind::FormattingWhitespace
++    ));
++    assert_same_result(reset, true);
++
++    let normalized = br#"<root xml:space="pre&#115;erve">
++</root>"#;
++    audit::verify_authored(normalized, limits_for(normalized))
++        .expect("normalized xml:space value must preserve the text run");
++    assert_same_result(normalized, true);
++
++    let invalid = br#"<root xml:space="keep"/>"#;
++    let error = audit::verify_authored(invalid, limits_for(invalid)).unwrap_err();
++    assert!(matches!(error, Error::Malformed { ref detail, .. } if detail.contains("xml:space")));
++    assert_same_result(invalid, true);
++
++    let limited = b"<root xml:space=\"default\">\n</root>";
++    let limits = authored_limits(limited, 0);
++    let error = audit::verify_authored(limited, limits).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 0,
++            actual: 1,
++            ..
++        }
++    ));
++    assert_authored_with_limits(limited, limits);
++}
++
++#[test]
++fn authored_attribute_probe_keeps_duplicate_and_value_error_order() {
++    let cases = [
++        (
++            br#"<root xml:space="preserve" xml:space="keep"/>"#.as_slice(),
++            "duplicated attribute",
++        ),
++        (
++            br#"<root xml:space="keep"/>"#.as_slice(),
++            "xml:space must be 'default' or 'preserve'",
++        ),
++        (
++            br#"<root a="ok" xml:space="keep"/>"#.as_slice(),
++            "xml:space must be 'default' or 'preserve'",
++        ),
++    ];
++
++    for (xml, detail) in cases {
++        let error = audit::verify_authored(xml, limits_for(xml)).unwrap_err();
++        assert!(
++            matches!(error, Error::Malformed { detail: ref actual, .. } if actual.contains(detail)),
++            "unexpected malformed ordering for {xml:?}: {error:?}"
++        );
++        assert_authored_with_limits(xml, limits_for(xml));
++    }
++}
++
++#[test]
++fn authored_attribute_limits_remain_aggregate_and_inclusive() {
++    let same_tag = br#"<root a="1" b="2"/>"#;
++    let accepted = audit::verify_authored(same_tag, authored_limits(same_tag, 2))
++        .expect("the inclusive attribute limit must accept its boundary");
++    assert_eq!(accepted.attributes(), 2);
++    assert_authored_with_limits(same_tag, authored_limits(same_tag, 2));
++
++    let error = audit::verify_authored(same_tag, authored_limits(same_tag, 1)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 1,
++            actual: 2,
++            ..
++        }
++    ));
++    assert_authored_with_limits(same_tag, authored_limits(same_tag, 1));
++
++    let one = br#"<root a="1"/>"#;
++    let error = audit::verify_authored(one, authored_limits(one, 0)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 0,
++            actual: 1,
++            ..
++        }
++    ));
++    assert_authored_with_limits(one, authored_limits(one, 0));
++
++    let aggregate = br#"<root a="1"><child b="2"/><leaf c="3"/></root>"#;
++    let report = audit::verify_authored(aggregate, authored_limits(aggregate, 3))
++        .expect("aggregate attributes across one-attribute tags must be counted");
++    assert_eq!(report.attributes(), 3);
++    assert_authored_with_limits(aggregate, authored_limits(aggregate, 3));
++
++    let error = audit::verify_authored(aggregate, authored_limits(aggregate, 2)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 2,
++            actual: 3,
++            ..
++        }
++    ));
++    assert_authored_with_limits(aggregate, authored_limits(aggregate, 2));
++}
++
+ #[test]
+ fn accumulated_text_and_entity_bytes_match() {
+     let xml = b"<a>abc&amp;def<![CDATA[ghi]]></a>";
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 3e7b26bf8..abb9efe8d 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -5895,6 +5895,8 @@ struct XlsxCellValuesSourceSummary {
+     #[serde(skip_serializing_if = "Vec::is_empty")]
+     commit_allocation_metrics: Vec<allocation_metrics::Sample>,
+     publication_ns: Vec<u64>,
++    #[serde(skip_serializing_if = "Vec::is_empty")]
++    publication_allocation_metrics: Vec<allocation_metrics::Sample>,
+     reopen_ns: Vec<u64>,
+     source_read_calls: Vec<u64>,
+     source_read_bytes: Vec<u64>,
+@@ -6106,6 +6108,7 @@ struct XlsxCellValuesIterationEvidence {
+     commit_ns: u64,
+     commit_allocation_metrics: Option<allocation_metrics::Sample>,
+     publication_ns: u64,
++    publication_allocation_metrics: Option<allocation_metrics::Sample>,
+     reopen_ns: u64,
+     source: SourceSnapshot,
+     diagnostics: SourceCacheDiagnostics,
+@@ -8128,6 +8131,11 @@ impl SourceSummary {
+                 .push(commit_allocation_metrics);
+         }
+         summary.publication_ns.push(evidence.publication_ns);
++        if let Some(publication_allocation_metrics) = evidence.publication_allocation_metrics {
++            summary
++                .publication_allocation_metrics
++                .push(publication_allocation_metrics);
++        }
+         summary.reopen_ns.push(evidence.reopen_ns);
+         summary.source_read_calls.push(source.read_calls);
+         summary.source_read_bytes.push(source.read_bytes);
+@@ -41322,6 +41330,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics: None,
+                 publication_ns,
++                publication_allocation_metrics: None,
+                 reopen_ns: 0,
+                 source,
+                 diagnostics,
+@@ -41381,6 +41390,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics: None,
+                 publication_ns,
++                publication_allocation_metrics: None,
+                 reopen_ns: 0,
+                 source: SourceSnapshot::default(),
+                 diagnostics: SourceCacheDiagnostics::default(),
+@@ -41892,6 +41902,7 @@ fn run_xlsx_cell_values_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics,
+                 publication_ns,
++                publication_allocation_metrics,
+                 budget_used_after_package_drop,
+             ) = {
+                 let allocation_region = allocation_metrics::begin();
+@@ -41944,12 +41955,17 @@ fn run_xlsx_cell_values_edit_save(
+                         "XLSX unmanaged cell CRUD reported nonzero managed budget evidence".into(),
+                     );
+                 }
++                let publication_allocation_region = allocation_metrics::begin();
+                 let publication_started = Instant::now();
+                 {
+                     let _published = editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
+                 }
+                 let publication_duration = publication_started.elapsed();
+                 let publication_ns = elapsed_ns(publication_duration)?;
++                let publication_allocation_metrics = match publication_allocation_region.finish() {
++                    Some(sample) => sample,
++                    None => allocation_metrics::unavailable_sample(),
++                };
+                 duration += publication_duration;
+                 let post_publication_budget =
+                     xlsx_cell_values_post_publication_budget_snapshot(budget.as_ref());
+@@ -41961,6 +41977,7 @@ fn run_xlsx_cell_values_edit_save(
+                     commit_ns,
+                     commit_allocation_metrics,
+                     publication_ns,
++                    publication_allocation_metrics,
+                     budget_used_after_package_drop,
+                 )
+             };
+@@ -42016,6 +42033,7 @@ fn run_xlsx_cell_values_edit_save(
+                 commit_ns,
+                 commit_allocation_metrics: Some(commit_allocation_metrics),
+                 publication_ns,
++                publication_allocation_metrics: Some(publication_allocation_metrics),
+                 reopen_ns: 0,
+                 source: source_metrics
+                     .as_ref()
+@@ -66645,6 +66663,71 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn xlsx_source_cell_values_publication_allocation_metrics_align_with_phases() {
++        // The normal test binary does not install the allocator wrapper, so
++        // source-backed publication samples must carry explicit unavailable
++        // status. The allocator-only capture validates measured nonzero
++        // counters using the wrapper binary.
++        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
++        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
++        let sample_count = 3;
++        let measured = run_case(
++            Case::XlsxSourceBackedCellValuesOneEditSave,
++            &corpus,
++            1,
++            sample_count,
++        )
++        .unwrap();
++        let evidence = measured
++            .source
++            .as_ref()
++            .and_then(|source| source.xlsx_cell_values.as_ref())
++            .expect("source-backed cell-values evidence");
++
++        assert_eq!(evidence.publication_allocation_metrics.len(), sample_count);
++        assert!(
++            evidence
++                .publication_allocation_metrics
++                .iter()
++                .all(|sample| sample.status == super::allocation_metrics::Status::Unavailable)
++        );
++        let serialized_summary = serde_json::to_value(evidence).unwrap();
++        let serialized_metrics = serialized_summary
++            .get("publication_allocation_metrics")
++            .expect("publication allocation metrics field is serialized");
++        let serialized_samples = serialized_metrics
++            .as_array()
++            .expect("publication allocation metrics serialize as an array");
++        assert_eq!(serialized_samples.len(), sample_count);
++        for sample in serialized_samples {
++            assert_eq!(sample.as_object().map(|object| object.len()), Some(2));
++            assert_eq!(sample["status"], "unavailable");
++            assert_eq!(sample["scope"], "operation_global_system_allocator");
++        }
++        assert_eq!(evidence.open_ns.len(), sample_count);
++        assert_eq!(evidence.plan_ns.len(), sample_count);
++        assert_eq!(evidence.commit_ns.len(), sample_count);
++        assert_eq!(evidence.publication_ns.len(), sample_count);
++        assert_eq!(
++            evidence.publication_allocation_metrics.len(),
++            evidence.publication_ns.len()
++        );
++        assert_eq!(measured.elapsed_ns.sample_order.len(), sample_count);
++        for (sorted_index, &acquisition_index) in
++            measured.elapsed_ns.sample_order.iter().enumerate()
++        {
++            let phase_sum = evidence.open_ns[acquisition_index]
++                + evidence.plan_ns[acquisition_index]
++                + evidence.commit_ns[acquisition_index]
++                + evidence.publication_ns[acquisition_index];
++            assert_eq!(
++                phase_sum, measured.elapsed_ns.samples[sorted_index],
++                "source cell-values phase sum changed at acquisition index {acquisition_index}"
++            );
++        }
++    }
++
+     #[test]
+     fn xlsx_noncompact_cell_reference_guard_is_deterministic_and_editable() {
+         let first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Noncompact).unwrap();

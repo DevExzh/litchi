@@ -1,0 +1,77 @@
+
+running 12 tests
+test audit::stream_tests::reader_matches_slice_bom_rejection ... ok
+test audit::stream_tests::authored_reader_preserves_authored_whitespace_policy ... ok
+test audit::stream_tests::aggregate_attribute_budget_remains_independent_of_token_scratch ... ok
+test audit::stream_tests::streaming_memory_bound_caps_per_event_attribute_scratch_at_token_window ... ok
+test audit::stream_tests::reader_matches_slice_report_across_one_byte_chunks ... ok
+test audit::stream_tests::streaming_memory_bound_reports_checked_arithmetic_overflow ... ok
+test audit::stream_tests::streaming_memory_bound_accounts_for_depth_and_token_windows ... ok
+test audit::stream_tests::token_window_fails_before_unbounded_parser_growth ... ok
+test audit::stream_tests::total_window_fails_with_audit_limit ... ok
+test audit::stream_tests::unchecked_attribute_probe_matches_checked_oracle_without_state_effects ... ok
+test audit::stream_tests::source_failures_are_distinguished_from_audit_failures ... ok
+test audit::stream_tests::streamed_encoding_offsets_include_markup_prefixes ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 14 tests
+test configuration_ceiling_is_inclusive_and_ceiling_plus_one_fails ... ok
+test authored_publication_refuses_ambiguous_spaces_but_preserves_explicit_content ... ok
+test accepts_semantically_meaningful_content_without_rewriting ... ok
+test inherited_xml_space_preserves_whitespace_and_default_resets_it ... ok
+test malformed_and_invalid_encoding_are_typed ... ok
+test limits_are_inclusive_and_fail_with_typed_accounting ... ok
+test preserves_pi_comment_cdata_and_entity_events ... ok
+test package_xml_classification_uses_names_and_media_types ... ok
+test preserves_plain_space_nodes_and_mixed_boundaries ... ok
+test package_helper_borrows_parts_and_enforces_aggregate_limits ... ok
+test rejects_all_whitespace_outside_the_document_element ... ok
+test rejects_cdata_outside_the_document_element ... ok
+test rejects_doctype_without_resolving_entities ... ok
+test rejects_each_lexical_whitespace_defect ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test update_checked_in_assets ... ignored, explicit checked-in asset regeneration
+test registry_covers_every_checked_in_generated_xml_asset ... ok
+test explicitly_registered_compact_assets_are_compact ... ok
+test checked_in_assets_match_minifier_output ... ok
+test production_xml_includes_are_registered_compact_assets ... ok
+test streaming_audits_match_registered_producer_assets ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.00s
+
+
+running 20 tests
+test accumulated_text_and_entity_bytes_match ... ok
+test bom_raw_event_boundaries_match_slice_for_all_prefix_chunkings ... ok
+test bom_token_limit_offsets_match_slice_for_all_prefix_chunkings ... ok
+test authored_attribute_probe_covers_zero_one_many_and_namespace_attributes ... ok
+test authored_attribute_probe_keeps_duplicate_and_value_error_order ... ok
+test depth_and_event_boundaries_match_slice ... ok
+test authored_space_and_entity_state_survive_every_chunk_boundary ... ok
+test authored_attribute_limits_remain_aggregate_and_inclusive ... ok
+test invalid_utf8_offsets_match_slice_for_each_event_kind ... ok
+test oversized_token_is_rejected_at_bounded_lookahead ... ok
+test interrupted_input_retries_and_permanent_input_error_is_typed ... ok
+test resource_limit_offsets_are_absolute_and_stream_ordered ... ok
+test streaming_memory_bound_is_finite_and_monotonic ... ok
+test malformed_inputs_keep_typed_category ... ok
+test exact_resource_boundaries_match_and_one_under_fails ... ok
+test authored_attribute_probe_preserves_xml_space_state_and_limit_precedence ... ok
+test truncated_token_kinds_are_rejected_before_unbounded_growth ... ok
+test raw_layout_cases_match_slice_for_arbitrary_tiny_chunks ... ok
+test successful_reports_match_slice_for_arbitrary_tiny_chunks ... ok
+test deterministic_ascii_mutations_keep_reader_transport_parity ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

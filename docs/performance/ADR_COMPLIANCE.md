@@ -1,5 +1,9 @@
 # Performance optimization ADR-compliance matrix
 
+## 0529: restore the auditor after a failed performance pilot
+
+[0529](changes/0529-xml-attribute-probe-pilot.md) The candidate preserved checked fallback, aggregate limits, xml:space and exact errors across slice/stream auditing, but native gates failed. The production auditor is restored exactly. Separate publication counters and compatible public tests remain; no public API, dependency, unsafe code or validation policy changes.
+
 ## 0528: attribute publication without weakening validation
 
 [0528](changes/0528-xlsx-publication-attribution.md) No runtime source changes. Source/dependency and accepted ADR bindings accompany fresh publication profiles. OPC authored-XML audits have a different contract from XLSX semantic validation and cannot be skipped on that basis. Any attribute-scratch candidate must preserve duplicate/error precedence, limits, source/execution fences and output classification.

@@ -1,0 +1,5 @@
+{
+  "reason": "Disk-backed storage chosen before any build/capture; prior /tmp quota issue.",
+  "scratch_symlink": "/tmp/litchi-goal-0529",
+  "target": "/home/zhuhe/litchi-goal-0529-target/retained-binaries"
+}
