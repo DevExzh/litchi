@@ -1,0 +1,9 @@
+{
+  "previous_goal_turn": "progress",
+  "previous_commit": "b6e0b05e6c01ce6205d4dc32a4c4cf37a2c7afda",
+  "plan_sha256": "9762d905e3a197edd173d4c50ad508124a8a3577afcec25e5f179801c8781950",
+  "draft_patch_sha256": "28269e6051f9ee9453ccfd590a0f89269c400529d973a84f0ac908eb6730c5e9",
+  "decision_boundary": "Production retention requires every frozen pilot gate plus conditional profile/eager and quality gates; failure rejects the candidate.",
+  "priority": "OLE2/OOXML; ODF deferred; iWork excluded",
+  "baseline_source": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096"
+}

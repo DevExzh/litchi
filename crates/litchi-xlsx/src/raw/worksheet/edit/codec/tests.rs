@@ -450,6 +450,38 @@ fn snapshot_scan_reports_cell_address_errors_before_compact_tag_errors() {
     );
 }
 
+#[test]
+fn snapshot_scan_preserves_malformed_error_order_after_prior_primary_spans() {
+    let cases: &[&[u8]] = &[
+        br#"<c r="A1" future="&missing;"/>"#,
+        br#"<c r="A1" future="one" future="two"/>"#,
+        br#"<c r="not-a-cell" future="&missing;"/>"#,
+        b"<c r=\"\xff\" future=\"&missing;\"/>",
+        b"<c r=\"A1\" future=\"\xff\"/>",
+    ];
+
+    for cell in cases {
+        let expected = legacy_cell_pipeline_error(cell);
+        let mut source = format!(
+            r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1"><c r="A1"><v>prior-number</v><!--prior-sentinel--><f>prior-formula</f><is><t>prior-text</t></is></c>"#
+        )
+        .into_bytes();
+        source.extend_from_slice(cell);
+        source.extend_from_slice(b"</row></sheetData></worksheet>");
+        let error = scan(&source).expect_err("malformed cell should be rejected");
+        assert_eq!(
+            format!("{error:?}"),
+            expected.0,
+            "typed error changed after prior primary spans for {cell:?}"
+        );
+        assert_eq!(
+            error.to_string(),
+            expected.1,
+            "display error changed after prior primary spans for {cell:?}"
+        );
+    }
+}
+
 fn assert_tag_results_match(xml: &[u8]) {
     let (old_element, old_decoder) = start_element(xml);
     let old_result = owned_tag(&old_element, old_decoder);

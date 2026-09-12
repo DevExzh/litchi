@@ -1,0 +1,97 @@
+{
+  "schema": "litchi-0527-pilot-verification-v1",
+  "status": "pass",
+  "scope": "builds",
+  "performance_claim": "none",
+  "components": {
+    "builds": {
+      "status": "pass",
+      "result": {
+        "status": "pass",
+        "stages": {
+          "baseline": {
+            "manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+            "normal": {
+              "kind": "normal",
+              "path": "/tmp/litchi-goal-0527/baseline-normal",
+              "sha256": "a367b75393c861523c5673da00361d037aa00961aae967fc6f2a8de88442a3cd",
+              "bytes": 60129024,
+              "identity_sha256": "3e51561798b3fed7b6e566b7f95450b4b400777a9ab591c0ed3846d2aadfe9f5",
+              "build_receipt_sha256": "508656dbdeafcedeec93eab3c935b640c37ea979beaf57a7d4843b7eefe38e95"
+            },
+            "allocator": {
+              "kind": "alloc",
+              "path": "/tmp/litchi-goal-0527/baseline-alloc",
+              "sha256": "f534ece45de84ff66a0944049db31b5c74569aaa89356415c6cb69f808aac963",
+              "bytes": 59997664,
+              "identity_sha256": "852c2f0eb2f8a4de0b3badcc883a2a765d33464c4bdc997df9b326a7c06eaec3",
+              "build_receipt_sha256": "701e3564aad1f730bc0f5f7d47e16f1509ec396b075de97a923912268eea0363"
+            },
+            "build_receipts": [
+              {
+                "path": "baseline/build-normal.receipt.json",
+                "name": "build-normal",
+                "start_utc": "2026-09-12T10:45:21.243333+00:00",
+                "end_utc": "2026-09-12T10:52:41.250889+00:00",
+                "exit_code": 0,
+                "sha256": "508656dbdeafcedeec93eab3c935b640c37ea979beaf57a7d4843b7eefe38e95"
+              },
+              {
+                "path": "baseline/build-alloc.receipt.json",
+                "name": "build-alloc",
+                "start_utc": "2026-09-12T10:53:09.714655+00:00",
+                "end_utc": "2026-09-12T10:54:37.761152+00:00",
+                "exit_code": 0,
+                "sha256": "701e3564aad1f730bc0f5f7d47e16f1509ec396b075de97a923912268eea0363"
+              }
+            ],
+            "storage_recovery": {
+              "path": "storage-recovery.json",
+              "sha256": "9790949123583784455eb00857ab1bbab131e97daa38ea860206d306f347a921",
+              "target": "/home/zhuhe/litchi-goal-0527-target/retained-binaries/baseline-normal"
+            }
+          },
+          "candidate": {
+            "manifest_sha256": "1d81835f8aa8827d38b21a0f730d1448f494d06049098d2eddda1c5381e13548",
+            "normal": {
+              "kind": "normal",
+              "path": "/tmp/litchi-goal-0527/candidate-normal",
+              "sha256": "4afb049310f6c04eafa728897e64e04b2b18989de3f6b3810cd2c6a3287d5f46",
+              "bytes": 60127736,
+              "identity_sha256": "5d4a38a96f31371902f0782cff13ce46a32d286803ded003b12c97a47c782fcf",
+              "build_receipt_sha256": "2f6e098222d25b30435a4e2583b098575e07fe81fe721c9ae4a9bf3f90d83b1a"
+            },
+            "allocator": {
+              "kind": "alloc",
+              "path": "/tmp/litchi-goal-0527/candidate-alloc",
+              "sha256": "23efa50d5c02843883085d847db28520a022bb25371db289fdc7e5baacea6c96",
+              "bytes": 59994896,
+              "identity_sha256": "aef36345f6e0482004652ed170fb234b47ccab661cb43773f3c1fafb3e64b133",
+              "build_receipt_sha256": "fad58b49288215dd35fb7c4a38e0ef413fcfef1a2c7e6d9892cdaff3d03275b3"
+            },
+            "build_receipts": [
+              {
+                "path": "candidate/build-normal.receipt.json",
+                "name": "build-normal",
+                "start_utc": "2026-09-12T10:58:37.559567+00:00",
+                "end_utc": "2026-09-12T11:00:54.935343+00:00",
+                "exit_code": 0,
+                "sha256": "2f6e098222d25b30435a4e2583b098575e07fe81fe721c9ae4a9bf3f90d83b1a"
+              },
+              {
+                "path": "candidate/build-alloc.receipt.json",
+                "name": "build-alloc",
+                "start_utc": "2026-09-12T11:00:58.803436+00:00",
+                "end_utc": "2026-09-12T11:02:26.669693+00:00",
+                "exit_code": 0,
+                "sha256": "fad58b49288215dd35fb7c4a38e0ef413fcfef1a2c7e6d9892cdaff3d03275b3"
+              }
+            ],
+            "storage_recovery": null
+          }
+        }
+      }
+    }
+  },
+  "cleanup_seal_pending": true
+}

@@ -1,0 +1,136 @@
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
+index a1dfb08..f52b408 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
+@@ -1,16 +1,21 @@
+ //! Focused regression tests for the worksheet codec seams.
+ 
++use std::collections::BTreeMap;
+ use std::mem::size_of;
+ 
+ use litchi_ooxml_common::xml::unqualified_attribute_value;
++use litchi_sheet::Cell as Address;
+ use quick_xml::encoding::Decoder;
+ use quick_xml::events::{BytesStart, Event};
+ use quick_xml::reader::NsReader;
+ 
+ use super::wire::{cell_tag, tag as owned_tag, write_cell_tag};
+-use super::{Attribute, Tag, scan, scan_with_event_limit, sibling_name, write_tag};
++use super::{
++    Attribute, Tag, scan, scan_with_event_limit, sibling_name, write_sheet_data, write_tag,
++};
+ use crate::raw::worksheet::model::MAX_XML_DEPTH;
+ use crate::raw::worksheet::parse_a1;
++use crate::raw::worksheet::edit::Action;
+ 
+ const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+ 
+@@ -492,6 +497,108 @@ fn assert_tag_errors_match(xml: &[u8]) {
+     );
+ }
+ 
++#[test]
++fn snapshot_scan_resolves_each_row_arena_range_to_its_own_payload_markers() {
++    let source = format!(
++        r#"<x:worksheet xmlns:x="{MAIN}"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>row-one-a</x:v><!--row-one-gap--><x:f>row-one-f</x:f></x:c><x:c r="B1"><x:v>row-one-b</x:v></x:c><x:c r="C1"/></x:row><q:row xmlns:q="{MAIN}" r="2"><q:c r="A2"><q:v>row-two-a</q:v><q:is><q:t>row-two-is</q:t></q:is></q:c><q:c r="B2"/></q:row><x:row r="3"/></x:sheetData></x:worksheet>"#
++    )
++    .into_bytes();
++    let layout = scan(&source).expect("worksheet scan");
++    assert_eq!(layout.sheet_data.rows.len(), 3);
++
++    let row_one = &layout.sheet_data.rows[0];
++    assert_eq!(row_one.primary.len(), 3);
++    let a1 = &row_one.cells[0];
++    let a1_spans = row_one
++        .primary
++        .get(a1.primary.clone())
++        .expect("A1 arena range");
++    assert_eq!(a1_spans.len(), 2);
++    assert_eq!(
++        &source[a1_spans[0].start..a1_spans[0].end],
++        b"<x:v>row-one-a</x:v>"
++    );
++    assert_eq!(
++        &source[a1_spans[1].start..a1_spans[1].end],
++        b"<x:f>row-one-f</x:f>"
++    );
++    assert!(a1_spans.windows(2).all(|pair| pair[0].end <= pair[1].start));
++    assert!(a1_spans
++        .iter()
++        .all(|span| span.start >= a1.tag_end && span.end <= a1.close_start));
++
++    let b1 = &row_one.cells[1];
++    let b1_spans = row_one
++        .primary
++        .get(b1.primary.clone())
++        .expect("B1 arena range");
++    assert_eq!(b1_spans.len(), 1);
++    assert_eq!(
++        &source[b1_spans[0].start..b1_spans[0].end],
++        b"<x:v>row-one-b</x:v>"
++    );
++    assert!(b1_spans[0].start >= b1.tag_end && b1_spans[0].end <= b1.close_start);
++
++    let c1 = &row_one.cells[2];
++    assert!(c1.empty);
++    assert_eq!(c1.primary.start, c1.primary.end);
++
++    let row_two = &layout.sheet_data.rows[1];
++    assert_eq!(row_two.primary.len(), 2);
++    let a2 = &row_two.cells[0];
++    let a2_spans = row_two
++        .primary
++        .get(a2.primary.clone())
++        .expect("A2 arena range");
++    assert_eq!(a2_spans.len(), 2);
++    assert_eq!(
++        &source[a2_spans[0].start..a2_spans[0].end],
++        b"<q:v>row-two-a</q:v>"
++    );
++    assert_eq!(
++        &source[a2_spans[1].start..a2_spans[1].end],
++        b"<q:is><q:t>row-two-is</q:t></q:is>"
++    );
++    let b2 = &row_two.cells[1];
++    assert!(b2.empty);
++    assert_eq!(b2.primary.start, b2.primary.end);
++
++    let row_three = &layout.sheet_data.rows[2];
++    assert!(row_three.empty);
++    assert!(row_three.cells.is_empty());
++    assert!(row_three.primary.is_empty());
++}
++
++#[test]
++fn snapshot_writer_rejects_primary_range_outside_owning_row() {
++    let source = format!(
++        r#"<x:worksheet xmlns:x="{MAIN}"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>one</x:v></x:c></x:row></x:sheetData></x:worksheet>"#
++    )
++    .into_bytes();
++    let mut layout = scan(&source).expect("worksheet scan");
++    let row = layout.sheet_data.rows.first_mut().expect("row 1");
++    let arena_len = row.primary.len();
++    row.cells[0].primary = arena_len..arena_len + 1;
++
++    let mut output = Vec::new();
++    let result = write_sheet_data(
++        &mut output,
++        &source,
++        &layout.sheet_data,
++        BTreeMap::from([(
++            Address::from_a1("A1").expect("A1"),
++            Action::set(2_i32.into()),
++        )]),
++        BTreeMap::new(),
++        "",
++    );
++    assert!(matches!(
++        result,
++        Err(crate::error::Error::Invalid(message))
++            if message == "worksheet cell primary span range exceeds its owning row"
++    ));
++}
++
+ #[test]
+ fn compact_cell_tag_keeps_attribute_error_order_and_messages() {
+     let duplicate_cases: &[&[u8]] = &[

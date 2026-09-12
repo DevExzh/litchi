@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0527: row-primary storage fails the frozen total gate
+
+[0527](changes/0527-xlsx-row-primary-arena-pilot.md) The row-owned arena reduced measured allocation calls but dense repeat 2 delivered only 1.8214% total median and 1.8105% mean reduction, below both 2% gates. Reject the production draft and retain its evidence. Quantify another avoidable scanner cost, including the unused end-event namespace subset, before a fresh candidate; do not silently revive this layout patch.
+
 ## 0526: row-owned primary spans selected for a bounded pilot
 
 [0526](changes/0526-xlsx-primary-span-layout-audit.md) The 0525 scanner owner remains the first XLSX lead. A row-owned arena can replace per-cell span vectors while preserving all spans and both writer paths. Keep the 0522 combined cell-reference/tag scan rejected; do not aggregate nested costs or infer allocation counts from Callgrind call metadata. End-tag namespace lookup is a separate source observation, not part of the arena candidate. Native usefulness remains unproven.

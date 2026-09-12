@@ -1,0 +1,44 @@
+{
+  "schema": "litchi-0527-pilot-verification-v1",
+  "status": "pass",
+  "scope": "probes",
+  "performance_claim": "none",
+  "components": {
+    "probes": {
+      "status": "pass",
+      "result": {
+        "schema": "litchi-0527-verifier-negative-probes-v1",
+        "status": "pass",
+        "checks": [
+          {
+            "case": "unsafe_relative_path",
+            "rejected": true,
+            "reason": "probe path contains an unsafe path"
+          },
+          {
+            "case": "inverted_native_abba",
+            "rejected": true,
+            "reason": "native ABBA blocks differ: [('baseline', 1), ('candidate', 1)]"
+          },
+          {
+            "case": "review_unbound_row",
+            "rejected": true,
+            "reason": "probe review review count differs"
+          },
+          {
+            "case": "cleanup_binding",
+            "rejected": true,
+            "reason": "cleanup plan binding differs"
+          },
+          {
+            "case": "pilot_acceptance_without_gate",
+            "rejected": true,
+            "reason": "accepted decision lacks pilot gate"
+          }
+        ],
+        "scope": "Bounded in-memory custody/schema probes; no build, capture, or artifact mutation."
+      }
+    }
+  },
+  "cleanup_seal_pending": true
+}

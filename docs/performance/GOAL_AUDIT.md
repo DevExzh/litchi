@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0527: progress through measured rejection
+
+[0527](changes/0527-xlsx-row-primary-arena-pilot.md) The fresh XLSX pilot completed 2,440 native durations and 40 allocation samples. A failed dense repeat-2 gate caused restoration of production and retention of compatible tests/evidence. OLE2/OOXML performance remains the active priority; ODF is deferred until that optimization goal completes and iWork stays excluded. Overall completion is not claimed.
+
 ## 0526: next scanner experiment prepared; full goal remains open
 
 [0526](changes/0526-xlsx-primary-span-layout-audit.md) The previous turn made progress through accepted commit `67028ab60`. This batch revalidates its source/evidence and prepares a concrete scanner-storage experiment with independent cost/design/test reviews. No production optimization is retained here. Fresh before/after measurements and correctness gates are the next action; broader CRUD, provider, cold/range and scaling requirements remain open. OLE2/OOXML continues ahead of deferred ODF; iWork is excluded.
