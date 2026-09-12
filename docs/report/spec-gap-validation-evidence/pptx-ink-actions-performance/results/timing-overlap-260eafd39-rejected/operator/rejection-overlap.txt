@@ -1,0 +1,6 @@
+REJECTED PPTX TIMING CAPTURE
+A separate controlled Cargo/compiler workload was observed during the run; ownership and exact phase overlap are uncertain.
+No timing result from this partial tree is admissible.
+The operator was terminated before continuing after lane-package_read_large_shared-p1.
+Observed process commands and exact timestamps are in rejection-overlap.json.
+The full raw results and target remain retained for root audit.
