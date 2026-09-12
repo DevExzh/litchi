@@ -34,6 +34,7 @@ mod binding_tracker;
 mod error;
 
 pub mod custom;
+pub mod custom_data;
 pub mod custom_xml;
 pub mod embedded;
 pub mod external_link;

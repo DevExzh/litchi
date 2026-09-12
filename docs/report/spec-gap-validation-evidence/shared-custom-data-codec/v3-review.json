@@ -1,0 +1,13 @@
+{
+  "verdict": "approved",
+  "scope": "Shared OOXML Custom Data model/codec and XLSX delegation",
+  "reviewer": "custom_data_common_final_review",
+  "codec_sha256": "147b4f94c9b7d7b1aae286aec6f4f0c469f45134b19316823e0215cbad21d2f8",
+  "prior_blockers_cleared": 7,
+  "independent_focused_tests": 22,
+  "root_common_tests": 300,
+  "root_xlsx_tests": 26,
+  "strict_clippy_exit": 0,
+  "rustdoc_exit": 0,
+  "separate_followup": "XLSX package-level XML/UID limit exposure"
+}

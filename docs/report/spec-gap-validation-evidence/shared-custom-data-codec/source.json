@@ -1,0 +1,18 @@
+{
+  "base": "8e3ad310426a534c0bb17a789eb2c42a96e61310",
+  "directory": "/var/tmp/litchi-common-custom-data-final-da_vuj5h",
+  "checkout": "/var/tmp/litchi-common-custom-data-final-da_vuj5h/worktree",
+  "target": "/var/tmp/litchi-common-custom-data-final-da_vuj5h/target",
+  "sha256": {
+    "crates/litchi-ooxml-common/src/lib.rs": "206d3d69db848fec86b1fc0dbd18a73970b8f336b1c766ab3434b2a5cf87184c",
+    "crates/litchi-ooxml-common/tests/custom_data.rs": "4403c09f0d68c90777d21a11f58145ec8bbbb0f737b053579b02b7b825862bd8",
+    "crates/litchi-ooxml-common/src/custom_data/codec.rs": "0173046040bf4088e7261c6c1d44bad7c5820c5b279800b25780e0fca30020fc",
+    "crates/litchi-ooxml-common/src/custom_data/model.rs": "23ae721cf2d404411926cd691d1f8bb4d4f2368e7b6066cdec237b20c97781df",
+    "crates/litchi-ooxml-common/src/custom_data/mod.rs": "f572177a758132bec1bb65a4c063ddc3db2ac6a64aaa4dc6119c5d7e99b4df5c",
+    "crates/litchi-xlsx/src/custom_data/codec.rs": "c2dd5438ba805d17958f7277432fa28daabe47275c3a614e801758593f39faac",
+    "crates/litchi-xlsx/src/custom_data/package.rs": "94f2addb62cd37f15bb17b2c0528711f041422ee25bfb90d18f04f3d2149b102",
+    "crates/litchi-xlsx/src/custom_data/model.rs": "6ccacf6963a29852c3de8f0c736b25f6ccd99315f5e656575d3978f952bd64b0",
+    "crates/litchi-xlsx/src/custom_data/mod.rs": "de0e98f47ba92747f092ce1888c60e246920836a9cfd1e87f0810f6fded0e803"
+  },
+  "cargo_lock_sha256": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02"
+}
