@@ -16,7 +16,8 @@ use crate::connections::embedded_data::Bindings;
 use crate::error::{Error, Result, invalid};
 
 use super::codec::{
-    canonical_extension, parse_properties, rewrite_extension_list, rewrite_id, write_properties,
+    canonical_extension, parse_properties, rewrite_extension_list, rewrite_id,
+    validate_source_properties, write_properties,
 };
 use super::{
     CustomData, CustomDataView, DATA_CONTENT_TYPE, DATA_RELATIONSHIP_TYPE, PROPERTIES_CONTENT_TYPE,
@@ -834,7 +835,7 @@ fn validate_value(value: &CustomDataView, limits: &Limits) -> Result<()> {
     if value.data.len() > limits.max_payload_bytes() {
         return Err(invalid("Custom Data payload exceeds the size limit"));
     }
-    write_properties(&value.properties).map(|_xml| ())
+    validate_source_properties(&value.properties)
 }
 
 fn validate_entries(package: &OpcPackage, entries: &[Part], limits: &Limits) -> Result<()> {
@@ -2491,7 +2492,7 @@ mod tests {
         let mut package = fixture();
         let properties = PackURI::new("/xl/customData/item1.xml").unwrap();
         let original = format!(
-            r#"<?preserve-root?><p:datastoreItem xmlns:p="{x14}" xmlns:s="{sml}" id = 'Storage-1'><!--before--><p:extLst><!--old--><s:ext uri='urn:old'/></p:extLst><!--after--></p:datastoreItem>"#,
+            r#"<?preserve-root?><p:datastoreItem xmlns:p="{x14}" xmlns:s="{sml}" xmlns:v="urn:vendor" id = 'Storage-1'><!--before--><p:extLst><!--old--><s:ext uri='urn:old'><v:opaque/></s:ext></p:extLst><!--after--></p:datastoreItem>"#,
             x14 = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
             sml = SML,
         );
@@ -2520,8 +2521,9 @@ mod tests {
         assert_eq!(package.get_part(&properties).unwrap().blob(), before_bytes);
 
         let replacement = format!(
-            r#"<p:extLst xmlns:p="{x14}" xmlns:v="urn:vendor"><p:ext uri='urn:new'><v:opaque/></p:ext></p:extLst>"#,
+            r#"<p:extLst xmlns:p="{x14}" xmlns:s="{sml}" xmlns:v="urn:vendor"><s:ext uri='urn:new'><v:opaque/></s:ext></p:extLst>"#,
             x14 = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+            sml = SML,
         );
         let mut transaction = Transaction::new(&mut package).unwrap();
         transaction

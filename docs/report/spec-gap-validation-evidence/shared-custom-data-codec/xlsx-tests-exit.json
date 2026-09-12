@@ -1,0 +1,1 @@
+{"command": ["cargo", "test", "--locked", "-p", "litchi-xlsx", "--lib", "--offline", "custom_data"], "exit_code": 0}
