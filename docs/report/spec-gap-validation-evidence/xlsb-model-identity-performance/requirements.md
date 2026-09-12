@@ -43,6 +43,54 @@ by subtracting unlike end-to-end samples. Fixture construction, expected output
 derivation, source hashes, semantic comparisons, and receipt serialization stay
 outside the measured interval unless a lane explicitly names them.
 
+Every profile receipt records `recipe.id`, `recipe.version`, the source fixture
+path, the selected scale case, endpoint layout, name profile, and the complete
+caller-limit object used for admission. It also records `source_bytes`,
+`staged_bytes`, `candidate_bytes`, and `output_bytes` as separate values. A
+value is `null` when the public API does not expose that boundary; the harness
+must not infer candidate or staged bytes from an unrelated serialized package
+size. The phase object always contains the seven named fields
+`open_ns`, `stage_ns`, `commit_ns`, `save_ns`, `reopen_ns`, `inverse_ns`, and
+`validation_ns`. Each timed field covers only its named operation, and
+validation, semantic comparison, hashing, and receipt encoding run after the
+timed operation unless explicitly called out in the lane.
+
+The correctness receipt also records the separate `OlapProofLimits::DEFAULT`
+object (`max_items`, `max_string_bytes`, `max_source_bytes`, and
+`max_work=4_000_000`). These graph-proof quotas are distinct from the XLSB
+`Limits::DEFAULT` caller limits and must not be folded into the latter.
+
+The semantic receipt contains the source and observed table identities,
+relationship IDs, relationship metadata paths, endpoint fields, and
+time-grouping source/calculated IDs. A successful changed lane must report
+separate equality gates for table IDs, table names, relationship IDs,
+relationship endpoints, relationship metadata paths, and time-grouping IDs.
+The relationship ID is the generated `RelId` identity from the admitted XLDM
+metadata member; an outer relationship ordinal is not sufficient evidence.
+The complete identity vectors are compared after save/reopen and inverse, not
+only their counts.
+
+The correctness verifier independently recomputes the expected renamed vector
+from the source vector and selected name profile. Producer-supplied equality
+booleans are checked against that recomputation rather than accepted as proof.
+Each successful correctness result carries complete source and forward
+member-hash manifests for OPC parts, relationship XML, content types, and
+XLDM inner members. Only the admitted workbook/model and declared identity
+metadata paths may differ; native, generated, opaque, and unrelated members
+must remain byte-hash identical.
+For the table-name lane, the mutable inner-path set is derived independently
+from the selected `T1` table metadata, relationships whose containing or
+primary endpoint is `T1`/`Table1`, and the structural `BackupLog`; all other
+table and relationship metadata remain preservation-gated.
+The verifier also regenerates the relationship pair recipe for the selected
+or distributed endpoint layout, including generated `RelN` identities and the
+closure's containing-dimension projection order. A source vector that changes
+a dimension ID, table metadata path, relationship index key, relationship
+endpoint/path, or time-group identity coherently in every reported vector is
+still rejected unless it matches that independent recipe. The receipt's
+mutable-path list must equal the derived closure exactly; it cannot be widened
+by adding an unrelated member such as `Model.1.db.xml` or a `T2` table file.
+
 ## Deterministic complete-XLDM-140 corpus
 
 The adapter must generate one deterministic source recipe and report its byte
@@ -72,6 +120,24 @@ The primary scaling matrix is a bounded Cartesian matrix:
 | `small` | 4 | 0, 3, 8 | table-only and sparse/dense closure controls |
 | `medium` | 16 | 0, 15, 32, 64 | separate table and relationship growth |
 | `large` | 64 | 0, 63, 128, 256 | bounded stress shape; no unbounded corpus claim |
+
+The checked-in corpus catalog names these twelve cases and the two endpoint
+layouts (`selected_table` and `distributed`). The correctness runner emits all
+`12 × 2 × 5 = 120` points with complete source/candidate/readback/inverse
+semantic gates and no timing or allocator sampling. Under the public host's
+default OLAP graph-work ceiling, the ten `T=64,R=256` points are expected
+typed `limit_exceeded` refusals after generation and package admission; they
+must remain visible in the receipt rather than being omitted or counted as
+successful renames. This correctness run does not constitute a performance
+measurement or a native XLSB acceptance result. Performance sampling may begin
+only after the source/semantic gates below have been reviewed on a clean
+committed source pin.
+
+The scaled fixture retains the optional `Year` grouping through the medium
+family, where time-group identity checks are exercised, and uses a compact
+Key-only table shape for `T=64` points. That fixture choice keeps the bounded
+graph proof focused on the requested table/relationship growth; it does not
+claim that large native models omit time groupings.
 
 Every relationship has a validated containing table, primary table and column,
 foreign column, generated relationship identity, and closed relationship-index
@@ -151,6 +217,10 @@ unknown XLDM members, and opaque model payload bytes.
 - `reject_incomplete_closure_{T,R}`: remove or corrupt one required
   native/generated/OLAP owner or mapping. The operation must return a typed
   refusal and leave the source untouched.
+  A graph-work limit refusal records
+  `source_proof_status=unavailable_graph_work_limit`; it must not emit a
+  partial semantic vector or claim that the full closure was independently
+  established.
 - `reject_ambiguous_identity_{T,R}`: duplicate or ambiguously bind a table
   XML name, relationship endpoint, or closure owner. No order-based choice is
   allowed.
