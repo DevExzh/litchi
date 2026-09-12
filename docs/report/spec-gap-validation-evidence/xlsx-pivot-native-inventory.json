@@ -1,0 +1,233 @@
+{
+  "generated": "2026-09-12",
+  "roots": [
+    {
+      "path": "test-data/ooxml/xlsx",
+      "patterns": [
+        "ExcelPivotTableSample.xlsx",
+        "Pivot1_*.xlsx",
+        "Pivot2_*.xlsx",
+        "Pivot3_*.xlsx",
+        "Pivot4_*.xlsx"
+      ]
+    },
+    {
+      "path": "test-data/poi/test-data/spreadsheet",
+      "patterns": [
+        "ExcelPivotTableSample.xlsx"
+      ]
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet",
+      "patterns": [
+        "OlapPivotA3.xlsx",
+        "OlapPivotC3.xlsx",
+        "RelationalPivotA*.xlsx",
+        "RelationalPivotB*.xlsx",
+        "NativePivotSourceWorkbook.xlsx",
+        "Pivot*.xlsx"
+      ]
+    }
+  ],
+  "archive_count": 29,
+  "member_count": 581,
+  "xml_member_count": 573,
+  "tokens": [
+    "implicitMeasureSupport",
+    "aggregationInfo",
+    "featureSupportInfo",
+    "autoRefresh",
+    "pivotAreaReferenceSubtotals",
+    "pivotCacheDataSource",
+    "pivotFieldSubtotalLineItems",
+    "pivotFieldSubtotals",
+    "pivotNov2020",
+    "pivot2023Calculation",
+    "pivotAutoRefresh",
+    "pivotDataSource"
+  ],
+  "hits": [],
+  "archive_manifest_sha256": "3eeb82092c9a54776ffa855b1b19d13a5c9709561663ae4fb5d3a07989649cad",
+  "method": "Python stdlib zipfile; sorted explicit glob union; read every .xml/.rels/.vml member as bytes; search target local names and target namespace suffixes encoded as UTF-8, UTF-16LE, and UTF-16BE; no filename-only inference.",
+  "archives": [
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/NativePivotSourceWorkbook.xlsx",
+      "sha256": "88114c7ece3dad57bb3cb32a40017ac23382224dbacf1df701cee8453c4e47b9",
+      "member_count": 12,
+      "xml_member_count": 12
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/OlapPivotA3.xlsx",
+      "sha256": "fdb22077a8b530f012cd4b87161312094f4bfd6cee0c710d4d8b60a921663a32",
+      "member_count": 20,
+      "xml_member_count": 20
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/OlapPivotC3.xlsx",
+      "sha256": "fda340f24cb5ece2c8e3372348bf2d11d8f4077afac36c0f7c0fabac350e0f1d",
+      "member_count": 32,
+      "xml_member_count": 32
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/Pivot.xlsx",
+      "sha256": "3775909266b336d7825b15f2b7e8985e7cb27408a6424114cae2c1f8771a2b90",
+      "member_count": 19,
+      "xml_member_count": 19
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/Pivot2.xlsx",
+      "sha256": "bd5e61ebf5e8fa09841668984257a970e6ec001e5f47b6247bdf2c0313bdfd36",
+      "member_count": 28,
+      "xml_member_count": 27
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/Pivot3.xlsx",
+      "sha256": "03f3fe25836d165c08fd27be43010e55b372514a9ccaed966913e536465492d5",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/Pivot4.xlsx",
+      "sha256": "ae1a228d33253a63a170b55dc77fb81db5e21b8833367e4f1e49b9f4b4edbc52",
+      "member_count": 18,
+      "xml_member_count": 18
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotA1.xlsx",
+      "sha256": "cee369f42a1821b53b2ad3ad2fffa61ca17ca7739f48c5f5c9da68363b82ad30",
+      "member_count": 20,
+      "xml_member_count": 19
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotA2.xlsx",
+      "sha256": "515668de3d0db10936a644f0cffc1233e1133a18d3ea8cba620557ab0662ffe5",
+      "member_count": 23,
+      "xml_member_count": 22
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotA3.xlsx",
+      "sha256": "dcafd9d23e31c24715f7634e55def8263f0526c5a1b69bf40993580327f8d97d",
+      "member_count": 20,
+      "xml_member_count": 19
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotA4.xlsx",
+      "sha256": "589d69b59d8e5df04a015e98025527b1ab140a7540654397dee88ec9bd31afe7",
+      "member_count": 20,
+      "xml_member_count": 19
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotA5.xlsx",
+      "sha256": "ed136c2dfab140280fb37adfc434e91bb46166b491998f34688601ad851430ea",
+      "member_count": 20,
+      "xml_member_count": 19
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotB1.xlsx",
+      "sha256": "dd710b820aad9f58a69db1204242140cbb08c5bd5007cba27cae8af9ee274dfe",
+      "member_count": 25,
+      "xml_member_count": 24
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotB2.xlsx",
+      "sha256": "52caf34990f0e252af5f946d0e1af1528b52726b08b41e5085088a6fbc3b6251",
+      "member_count": 22,
+      "xml_member_count": 22
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotB5.xlsx",
+      "sha256": "105a6f007eacd9642bdddc8f59126e33e100ceceed5eaf91159ba8e1bdb66a61",
+      "member_count": 24,
+      "xml_member_count": 24
+    },
+    {
+      "path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/v2FxTestFiles/spreadsheet/RelationalPivotB6.xlsx",
+      "sha256": "5960a634aeda8c393ac6f0e342e4f3ae7759a83330954c9a39d83623c5f16290",
+      "member_count": 20,
+      "xml_member_count": 19
+    },
+    {
+      "path": "test-data/ooxml/xlsx/ExcelPivotTableSample.xlsx",
+      "sha256": "f0ef1d61c9f3d8b27b18a876b8e24676314c6450ed64a725a7bfaa603fdd67e3",
+      "member_count": 27,
+      "xml_member_count": 27
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot1_Row.xlsx",
+      "sha256": "20bc9d2d0d6ce374c8bd9474b71c8b8b5834f6211c796536a9facebfa3ce019d",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot1_Row_Grand.xlsx",
+      "sha256": "f164de0ab220dd90f93881b34f544280de31d0d5210957f682fdfd72853edf18",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot1_Row_Grand_Subtotals.xlsx",
+      "sha256": "8b79786249227e34d695411ad110c90c7424ebf4dfcbd56693b26366aff6eaf1",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot2_Row.xlsx",
+      "sha256": "95570d3eb7d3b8dcb3ee8f4e6005100d257210b5a480808a68aaa5f306caff96",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Compact.xlsx",
+      "sha256": "e9481b8149b30637de37ae04c8ea8180a10e127d0af03f5277a421651a73980d",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Grand.xlsx",
+      "sha256": "8957ceaf8f5054435fa88bcd1d78699a3702681346fb63fbfc01f6fb694bba1d",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Grand_Subtotals.xlsx",
+      "sha256": "25e8f5ab83fe4b0b01a783421232647c1f2f9aaba09cc627ab0ac9748fa13c8a",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Subtotals.xlsx",
+      "sha256": "b8d8de7ad06f91e71a5b30db40e33ba857cd6787d3e070fb35a69184b136245f",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot2_Row_Subtotals_SortDescendingAll.xlsx",
+      "sha256": "5730cf1ae3db9d5a528dcb875a085360d267a9975035a4a5faa8b654356c7a0b",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot3_Column_Grand_Subtotals.xlsx",
+      "sha256": "4d5821b12415636f340bb541f6d9eea20ffc6885c9484e8f4a648d8cc6f66749",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/ooxml/xlsx/Pivot4_Column_Grand_Subtotals_SortDescending.xlsx",
+      "sha256": "70bc07b95094138b97ff41b6e39ba2b349d9473a2d4c8a4c9f70c7f5a30b0eab",
+      "member_count": 17,
+      "xml_member_count": 17
+    },
+    {
+      "path": "test-data/poi/test-data/spreadsheet/ExcelPivotTableSample.xlsx",
+      "sha256": "f0ef1d61c9f3d8b27b18a876b8e24676314c6450ed64a725a7bfaa603fdd67e3",
+      "member_count": 27,
+      "xml_member_count": 27
+    }
+  ],
+  "token_encodings": [
+    "utf-8",
+    "utf-16le",
+    "utf-16be"
+  ]
+}
