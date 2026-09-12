@@ -1,0 +1,75 @@
+{
+  "revision": "bb5bfaa7be4fdffeae3fddaee3ed1266c3417520",
+  "created_utc": "2026-09-12T17:31:16.282338+00:00",
+  "previous_turn": "progress:0534 rejected slower physical paired-prefix loop, retained independent tests, committed and cleaned",
+  "scope": "Instruction-address attribution and generated-code inspection of the existing CFB exact chain collector",
+  "priority": "OLE2/OOXML active; ODF deferred until that goal completes; iWork excluded",
+  "status": "frozen-before-build-and-captures",
+  "cpu": 2,
+  "groups": {
+    "xls": {
+      "cases": [
+        "xls_owned_source_open_one_cell"
+      ]
+    },
+    "cfb": {
+      "cases": [
+        "cfb_open"
+      ],
+      "shapes": [
+        "few-large"
+      ],
+      "payload": "incompressible"
+    }
+  },
+  "native": {
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 1000,
+    "scope": "fresh binary identity/corpus guards and baseline timing only; no candidate or speedup claim"
+  },
+  "profile": {
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "jobs": [
+      "xls-owned",
+      "cfb-few-large"
+    ],
+    "xls_owner": "litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "cfb_owner": "litchi_cfb::file::OleFile<R>::open",
+    "options": [
+      "--dump-instr=yes",
+      "--dump-line=no",
+      "--compress-pos=no",
+      "--collect-jumps=yes"
+    ],
+    "scope": "Exact constructor toggles; classify setup by incoming edge; map exclusive collector instruction addresses to bound binary assembly. Call/jump metadata can include collection-off activity and is not a timed count."
+  },
+  "assembly": {
+    "owners": [
+      "SectorChainScratch",
+      "CheckedBitSet"
+    ],
+    "required": [
+      "collect_exact",
+      "insert"
+    ],
+    "scope": "Record all matching functions; map physical instruction offsets only after consistent relocation and exact instruction validation"
+  },
+  "quality_reuse": {
+    "bundle": "change-0534",
+    "stage": "final",
+    "manifest_sha256": "9d6a53738f299107582b71e5ddab03922b9646771df4d77b639b3fdc7fd6ff75",
+    "summary_sha256": "816f28d3926d119972dbc45de1ac8960d93cd6bc370eb1333dca802dfe6fb2b7",
+    "verification_sha256": "106c12e5e76a555186915df053a9b708c27d5836a6c17b963a9d6a238cec5db7",
+    "seal_sha256": "ec37ed38e7e974a7b77659b5791fe2241d7c83dc3edb188de0ff59e548d5a6b4",
+    "scope": "No production or harness source changes; reuse exact-final-source14 quality gates/4382 tests only after custody replay"
+  },
+  "owned_paths": [
+    "/tmp/litchi-goal-0535",
+    "/home/zhuhe/litchi-goal-0535-target"
+  ],
+  "temporary_storage": "Owned target/tmp and vgdb=no from first child following confirmed prior /tmp EDQUOT",
+  "performance_claim": "none; diagnostic prerequisite to a separate measured candidate"
+}

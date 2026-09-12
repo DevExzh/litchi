@@ -1,0 +1,10 @@
+{
+  "created_utc": "2026-09-12T17:31:16.283490+00:00",
+  "files": {
+    "plan.json": "6f1fa017c41d2e9e48043795509479dc28e566508c4eb7545c847fece4611d34",
+    "run.py": "488da431bd8c0c5ac335041ea7fcb67e52683a158fe409a1f1c9bd3d0595f770",
+    "capture.py": "855004225fc67ffea04acfdaf258a259fa55b7f3f4a0be596a552a0b25b53c16",
+    "inspect_assembly.py": "c5aed5bd83a1f56d12d22bb77f51467b70fd1f94b8338b9187f4b1d6ac433719",
+    "adr-manifest.json": "8aed97d378425650f3b355a3bd0ec5d2eb8000b9d28ba2a900cd8f35585e541f"
+  }
+}

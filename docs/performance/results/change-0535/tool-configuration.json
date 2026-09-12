@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-12T17:35:52.386498+00:00",
+  "VALGRIND_OPTS": null,
+  "configs": [
+    {
+      "path": "/home/zhuhe/.valgrindrc",
+      "exists": false,
+      "sha256": null
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/.valgrindrc",
+      "exists": false,
+      "sha256": null
+    }
+  ]
+}

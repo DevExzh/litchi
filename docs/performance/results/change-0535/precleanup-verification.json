@@ -1,0 +1,12 @@
+{
+  "performance_claim": "none; baseline diagnostics only",
+  "result": {
+    "receipt_names_sha256": "8ce7e5c8a10b723823314c953d70da9b93ac754bd4c1b7063e120d2a665a8808",
+    "receipts": 19,
+    "status": "pass"
+  },
+  "schema": "litchi-0535-diagnostic-verification-v1",
+  "scope": "inventory",
+  "status": "pass",
+  "verifier_sha256": "2cf1894886fd46a880416af9de3268b1fc9e25661fb8ea313a829d4c70fc03a4"
+}

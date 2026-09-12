@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0535: CFB collector instruction-address baseline
+
+[0535](changes/0535-cfb-collector-instruction-attribution.md) completes a
+CFB collector diagnostic with unchanged final-0534 production and harness
+source. All 19 serial receipts, 4,000 native samples, 20 timed instruction
+dumps and two setup dumps passed evidence verification. The mapped ordinary
+loop accounts for 99.9325% of XLS collector self Ir and 99.9723% of CFB
+collector self Ir. Checked bitset updates and vector append already occur
+inside that loop. A cold-error-layout experiment remains conditional on
+fresh native, allocation and correctness gates; no optimization or speedup
+is accepted here.
+
+All 13 same-build variation flags remain retained, including CFB few-large
+p50 drift of +10.0959%. Exact-source custody confirms reuse of 14 prior
+quality gates and 4,382 Rust test executions; no new Rust tests are claimed.
+Full postcleanup verification and five verifier tamper probes passed. Both
+owned scratch paths were removed, and the evidence is sealed. OLE2 and OOXML
+remain the active optimization priority and the broader goal remains open.
+ODF is deferred until that goal completes; iWork is excluded.
+
 ## 0534: rejected CFB physical role/FAT paired-prefix comparison
 
 [0534](changes/0534-cfb-physical-paired-prefix-rejected.md) retains the
