@@ -1,0 +1,15 @@
+binary=/var/tmp/litchi-ink-action-profile-target-f1cb/release/ink-action-edit-profile
+b5759ef5cd271a455c70be98bbd68ff00c4db6ace063ce7505596c5ba21a33f4  /var/tmp/litchi-ink-action-profile-target-f1cb/release/ink-action-edit-profile
+rustc -vV:
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/litchi-ink-action-profile-target-f1cb
+cargo_incremental=0
+flags=none
+allocator=CountingAllocator (process-local GlobalAlloc observer)

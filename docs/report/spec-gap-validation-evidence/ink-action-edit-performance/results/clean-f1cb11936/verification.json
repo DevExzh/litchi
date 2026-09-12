@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "schema": "ink-action-edit-profile-v2",
+  "lanes": 34,
+  "processes_per_lane": 3,
+  "samples_per_process": 20,
+  "source_manifest_sha256": "c4c6f0996244608f4fd84700baf413b0c38b505d1347ccd1e0829fdece141015",
+  "manifest_inputs_checked": 4276,
+  "source_hashes_checked": 11,
+  "binary_sha256": "b5759ef5cd271a455c70be98bbd68ff00c4db6ace063ce7505596c5ba21a33f4",
+  "expected_rejections": [
+    "cap_refusal_near_1024",
+    "cap_refusal_scaled_128",
+    "cap_refusal_small_8"
+  ],
+  "report_recomputed_from_samples": true
+}
