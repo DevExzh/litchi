@@ -264,6 +264,15 @@
   },
   "native_fixture": null,
   "native_powerpoint_claim": false,
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "semantic_owner_design": {
+    "commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+    "git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "path": "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md",
+    "sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+  },
+  "source_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
   "owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
   "owner_limits": {
     "max_anchors": 4096,
@@ -546,10 +555,10 @@
     }
   ],
   "retained_opc_generator": {
-    "git_blob": "56193d860c4d0fa6b3d338c8662da5b53d1cc671",
+    "git_blob": "c8a2d960f7159d91d7cecee8df731361fa9dd018",
     "kind": "bounded_synthetic_complete_opc_generator",
     "path": "harness/adapter.rs",
-    "sha256": "fcdc83652e17a51fa91d47cab304461aef0559a7afd918cdeae3fd506330dc19"
+    "sha256": "5b65ba8cffa530068ee96d17534b18de607810d21ae93b7d2fa90b9ff99c53cf"
   },
   "retained_opc_limits": {
     "policy": "ReadLimits::default() for positive lanes; every field is serialized in a future receipt",

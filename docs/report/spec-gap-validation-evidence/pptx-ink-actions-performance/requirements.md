@@ -171,7 +171,10 @@ bytes.
 Each sample records at least:
 
 ```text
-schema, lane, recipe_id, source_commit, helper_sha256, generator_sha256,
+schema, lane, recipe_id, source_commit, semantic_owner_commit,
+production_source_baseline_commit, capture_head, helper_sha256, generator_sha256,
+semantic_owner_design_path, semantic_owner_design_sha256,
+semantic_owner_design_git_blob,
 fixture_bytes, fixture_fnv1a64, fixture_sha256,
 retained_opc_limits, owner_limits,
 source_bytes, owner_xml_bytes, unique_target_bytes, output_bytes,

@@ -17,11 +17,25 @@ import subprocess
 from pathlib import Path
 
 
-SOURCE_COMMIT = "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd"
+SEMANTIC_OWNER_COMMIT = "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd"
+PRODUCTION_SOURCE_BASELINE_COMMIT = "2a2ffa1cae4e6b7070082768ce84483e5d411dc8"
+SEMANTIC_OWNER_DESIGN_PATH = "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md"
+SEMANTIC_OWNER_DESIGN_SHA256 = "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+SEMANTIC_OWNER_DESIGN_GIT_BLOB = "597400950b1027c47cd6e4cbbedd23915bc0980e"
+CAPTURE_CONTEXT_EXTRAS = {
+    "docs/adr/0001-priorities-and-api-layers.md",
+    "docs/adr/0003-snapshots-edits-and-patches.md",
+    "docs/adr/0005-io-memory-and-performance.md",
+    "docs/adr/0006-validation-security-and-compatibility.md",
+}
+# Compatibility name for receipts written before the dual-pin fields were
+# introduced.  It always denotes the semantic owner, never the production
+# source baseline.
+SOURCE_COMMIT = SEMANTIC_OWNER_COMMIT
 HELPER_SHA256 = "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e"
 SCHEMA = "pptx-ink-actions-performance-v1"
 SOURCE_FORMAT = "pptx-ink-actions-profile-build-source-v1"
-OWNER_WORKSPACE_EXTRAS = {
+PRODUCTION_WORKSPACE_EXTRAS = {
     "Cargo.toml",
     "rust-toolchain.toml",
     ".cargo/config.toml",
@@ -29,6 +43,7 @@ OWNER_WORKSPACE_EXTRAS = {
     "clippy.toml",
     "deny.toml",
 }
+PRODUCTION_PACKAGE_EXCLUDES = {"litchi-pptx-ink-actions-performance"}
 
 
 def require(condition: bool, message: str) -> None:
@@ -64,22 +79,56 @@ def blob_sha256(root: Path, commit: str, shown: str) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def verify_manifest(path: Path, root: Path) -> str:
+def blob_id(root: Path, commit: str, shown: str) -> str:
+    return subprocess.check_output(
+        [
+            "git",
+            "--no-replace-objects",
+            "-C",
+            str(root),
+            "rev-parse",
+            f"{commit}:{shown}",
+        ],
+        text=True,
+    ).strip()
+
+
+def verify_manifest(path: Path, root: Path) -> tuple[str, str, str]:
     lines = path.read_text().splitlines()
     require(lines and lines[0] == f"format={SOURCE_FORMAT}", f"source manifest format: {path}")
     commit: str | None = None
+    semantic_owner_commit: str | None = None
+    production_source_baseline_commit: str | None = None
+    source_commit_alias: str | None = None
     owner_commit: str | None = None
     packages: dict[tuple[str, str, str], tuple[str, int, str]] = {}
     files: dict[tuple[str, str, str], list[tuple[str, str]]] = {}
     extras: list[tuple[str, str]] = []
-    owner_extras: list[tuple[str, str]] = []
+    context_extras: list[tuple[str, str]] = []
+    production_extras: list[tuple[str, str]] = []
+    semantic_extras: list[tuple[str, str, str]] = []
+    production_excludes: set[str] = set()
     for line in lines[1:]:
         if line.startswith("git_commit="):
             require(commit is None, "duplicate source manifest git_commit")
             commit = line.split("=", 1)[1]
+        elif line.startswith("semantic_owner_commit="):
+            require(semantic_owner_commit is None, "duplicate source manifest semantic owner pin")
+            semantic_owner_commit = line.split("=", 1)[1]
+        elif line.startswith("production_source_baseline_commit="):
+            require(
+                production_source_baseline_commit is None,
+                "duplicate source manifest production baseline pin",
+            )
+            production_source_baseline_commit = line.split("=", 1)[1]
+        elif line.startswith("source_commit="):
+            require(source_commit_alias is None, "duplicate source manifest source_commit alias")
+            source_commit_alias = line.split("=", 1)[1]
         elif line.startswith("owner_commit="):
             require(owner_commit is None, "duplicate source manifest owner_commit")
             owner_commit = line.split("=", 1)[1]
+        elif line.startswith("production_exclude_package="):
+            production_excludes.add(line.split("=", 1)[1])
         elif line.startswith("metadata_sha256="):
             digest = line.split("=", 1)[1]
             require(len(digest) == 64 and all(c in "0123456789abcdef" for c in digest), "bad metadata hash")
@@ -98,28 +147,69 @@ def verify_manifest(path: Path, root: Path) -> str:
             fields = line.split("\t")
             require(len(fields) == 3, f"malformed extra line: {line}")
             extras.append((fields[1], fields[2]))
-        elif line.startswith("owner_extra=\t"):
+        elif line.startswith("context_extra=\t"):
+            fields = line.split("\t")
+            require(len(fields) == 3, f"malformed capture context extra line: {line}")
+            context_extras.append((fields[1], fields[2]))
+        elif line.startswith("semantic_extra=\t"):
+            fields = line.split("\t")
+            require(len(fields) == 4, f"malformed semantic owner extra line: {line}")
+            semantic_extras.append((fields[1], fields[2], fields[3]))
+        elif line.startswith("production_extra=\t") or line.startswith("owner_extra=\t"):
             fields = line.split("\t")
             require(len(fields) == 3, f"malformed owner extra line: {line}")
-            owner_extras.append((fields[1], fields[2]))
+            production_extras.append((fields[1], fields[2]))
         else:
             raise AssertionError(f"unknown source manifest line: {line}")
-    require(commit is not None and len(commit) == 40, "source manifest commit is malformed")
-    require(owner_commit == SOURCE_COMMIT, "source manifest owner pin changed")
+    require(
+        commit is not None
+        and len(commit) == 40
+        and all(char in "0123456789abcdef" for char in commit),
+        "source manifest capture HEAD is malformed",
+    )
+    require(semantic_owner_commit == SEMANTIC_OWNER_COMMIT, "source manifest semantic owner pin changed")
+    require(
+        production_source_baseline_commit == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "source manifest production baseline pin changed",
+    )
+    require(source_commit_alias == semantic_owner_commit, "source manifest source_commit alias changed")
+    require(owner_commit == semantic_owner_commit, "source manifest owner alias changed")
+    require(
+        {shown for shown, _ in context_extras} == CAPTURE_CONTEXT_EXTRAS,
+        "source manifest capture context inputs changed",
+    )
+    require(
+        semantic_extras == [
+            (
+                SEMANTIC_OWNER_DESIGN_PATH,
+                SEMANTIC_OWNER_DESIGN_SHA256,
+                SEMANTIC_OWNER_DESIGN_GIT_BLOB,
+            )
+        ],
+        "source manifest semantic owner design input changed",
+    )
+    require(
+        production_excludes == PRODUCTION_PACKAGE_EXCLUDES,
+        f"source manifest production package exclusions changed: {sorted(production_excludes)}",
+    )
     require(set(packages) == set(files), "source package/file keys differ")
     local_paths: list[Path] = []
+    production_paths: list[Path] = []
     checked = 0
     for key, (source, count, tree) in packages.items():
         entries = files[key]
         require(len(entries) == count, f"source package file count changed: {key}")
         payload = "\n".join(f"{name}\t{digest}" for name, digest in entries)
         require(hashlib.sha256(payload.encode()).hexdigest() == tree, f"source package tree changed: {key}")
+        package_name = key[0]
         for shown, digest in entries:
             path_value = resolve(root, shown)
             require(path_value.is_file(), f"source file missing: {shown}")
             require(sha256(path_value) == digest, f"source file changed: {shown}")
             if source == "path":
                 local_paths.append(path_value)
+                if package_name not in production_excludes:
+                    production_paths.append(path_value)
             checked += 1
     for shown, digest in extras:
         path_value = resolve(root, shown)
@@ -127,15 +217,27 @@ def verify_manifest(path: Path, root: Path) -> str:
         require(sha256(path_value) == digest, f"source extra changed: {shown}")
         local_paths.append(path_value)
         checked += 1
-    owner_extra_names = {shown for shown, _ in owner_extras}
-    require(
-        owner_extra_names == OWNER_WORKSPACE_EXTRAS,
-        f"workspace owner extras are incomplete: {sorted(owner_extra_names)}",
-    )
-    for shown, digest in owner_extras:
+    for shown, digest in context_extras:
         path_value = resolve(root, shown)
-        require(path_value.is_file(), f"owner source extra missing: {shown}")
-        require(sha256(path_value) == digest, f"owner source extra changed: {shown}")
+        require(path_value.is_file(), f"capture context input missing: {shown}")
+        require(sha256(path_value) == digest, f"capture context input changed: {shown}")
+        local_paths.append(path_value)
+        checked += 1
+    for shown, digest, expected_blob in semantic_extras:
+        path_value = resolve(root, shown)
+        require(path_value.is_file(), f"semantic owner design input missing: {shown}")
+        require(sha256(path_value) == digest, f"semantic owner design input changed: {shown}")
+        local_paths.append(path_value)
+        checked += 1
+    production_extra_names = {shown for shown, _ in production_extras}
+    require(
+        production_extra_names == PRODUCTION_WORKSPACE_EXTRAS,
+        f"workspace production extras are incomplete: {sorted(production_extra_names)}",
+    )
+    for shown, digest in production_extras:
+        path_value = resolve(root, shown)
+        require(path_value.is_file(), f"production source extra missing: {shown}")
+        require(sha256(path_value) == digest, f"production source extra changed: {shown}")
         local_paths.append(path_value)
         checked += 1
     require(checked > 20, f"source manifest is too small: {checked}")
@@ -154,28 +256,97 @@ def verify_manifest(path: Path, root: Path) -> str:
             sha256(path_value) == blob_sha256(root, commit, relative),
             f"local source input differs from committed tree: {relative}",
         )
-    for shown, digest in owner_extras:
+    for shown, digest in production_extras:
         path_value = resolve(root, shown)
         require(
-            sha256(path_value) == blob_sha256(root, owner_commit, shown),
-            f"owner workspace input differs from approved tree: {shown}",
+            sha256(path_value) == blob_sha256(root, PRODUCTION_SOURCE_BASELINE_COMMIT, shown),
+            f"production workspace input differs from approved baseline: {shown}",
         )
-    return commit
+    for path_value in sorted(set(production_paths), key=str):
+        relative = path_value.resolve().relative_to(root.resolve()).as_posix()
+        require(
+            sha256(path_value) == blob_sha256(root, PRODUCTION_SOURCE_BASELINE_COMMIT, relative),
+            f"production path-package input differs from approved baseline: {relative}",
+        )
+    for shown, digest, expected_blob in semantic_extras:
+        require(
+            digest == SEMANTIC_OWNER_DESIGN_SHA256,
+            f"semantic owner design SHA-256 changed: {shown}",
+        )
+        require(
+            blob_id(root, SEMANTIC_OWNER_COMMIT, shown) == expected_blob == SEMANTIC_OWNER_DESIGN_GIT_BLOB,
+            f"semantic owner design Git blob changed: {shown}",
+        )
+        require(
+            sha256(resolve(root, shown)) == blob_sha256(root, SEMANTIC_OWNER_COMMIT, shown),
+            f"semantic owner design differs from semantic owner commit: {shown}",
+        )
+    require(
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "merge-base",
+                "--is-ancestor",
+                SEMANTIC_OWNER_COMMIT,
+                commit,
+            ],
+            check=False,
+        ).returncode
+        == 0,
+        "capture HEAD does not descend from semantic owner pin",
+    )
+    require(
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "merge-base",
+                "--is-ancestor",
+                PRODUCTION_SOURCE_BASELINE_COMMIT,
+                commit,
+            ],
+            check=False,
+        ).returncode
+        == 0,
+        "capture HEAD does not descend from production baseline pin",
+    )
+    return commit, semantic_owner_commit, production_source_baseline_commit
 
 
 def verify_corpus(path: Path) -> tuple[dict[str, dict[str, object]], dict[str, dict[str, object]], str]:
     corpus = json.loads(path.read_text())
-    require(corpus["owner_commit"] == SOURCE_COMMIT, "corpus owner pin changed")
+    require(corpus["semantic_owner_commit"] == SEMANTIC_OWNER_COMMIT, "corpus semantic owner pin changed")
+    require(
+        corpus["production_source_baseline_commit"] == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "corpus production baseline pin changed",
+    )
+    require(corpus["owner_commit"] == corpus["semantic_owner_commit"], "corpus owner alias changed")
+    require(corpus["source_commit"] == corpus["semantic_owner_commit"], "corpus source_commit alias changed")
+    design = corpus["semantic_owner_design"]
+    require(design["commit"] == SEMANTIC_OWNER_COMMIT, "corpus semantic design commit changed")
+    require(design["path"] == SEMANTIC_OWNER_DESIGN_PATH, "corpus semantic design path changed")
+    require(design["sha256"] == SEMANTIC_OWNER_DESIGN_SHA256, "corpus semantic design SHA-256 changed")
+    require(design["git_blob"] == SEMANTIC_OWNER_DESIGN_GIT_BLOB, "corpus semantic design Git blob changed")
     root = path.parent.parent.parent.parent.parent
     fixture = corpus["fixture_authority"]
     fixture_path = root / str(fixture["path"])
     require(fixture_path.is_file(), "fixture authority is missing")
     require(sha256(fixture_path) == fixture["sha256"], "fixture authority hash changed")
     fixture_blob = subprocess.check_output(
-        ["git", "-C", str(root), "rev-parse", f"{SOURCE_COMMIT}:{fixture['path']}"],
+        ["git", "-C", str(root), "rev-parse", f"{SEMANTIC_OWNER_COMMIT}:{fixture['path']}"],
         text=True,
     ).strip()
     require(fixture_blob == fixture["git_blob"], "fixture authority Git blob changed")
+    design_path = root / SEMANTIC_OWNER_DESIGN_PATH
+    require(design_path.is_file(), "semantic owner design input is missing")
+    require(sha256(design_path) == SEMANTIC_OWNER_DESIGN_SHA256, "semantic owner design input hash changed")
+    require(
+        blob_id(root, SEMANTIC_OWNER_COMMIT, SEMANTIC_OWNER_DESIGN_PATH) == SEMANTIC_OWNER_DESIGN_GIT_BLOB,
+        "semantic owner design authority Git blob changed",
+    )
     generator = corpus["retained_opc_generator"]
     require(generator["path"] == "harness/adapter.rs", "generator path changed")
     require(
@@ -336,12 +507,22 @@ def verify_receipt(
     recipe: dict[str, object],
     lane: dict[str, object],
     generator_sha256: str,
+    capture_head: str,
 ) -> tuple[int, list[int], list[int], list[int], dict[str, str]]:
     receipt = json.loads(path.read_text())
     require(receipt["schema"] == SCHEMA, f"receipt schema changed: {path}")
     require(receipt["lane"] == lane["id"], f"receipt lane mismatch: {path}")
     require(receipt["recipe_id"] == recipe["id"], f"receipt recipe mismatch: {path}")
-    require(receipt["source_commit"] == SOURCE_COMMIT, f"receipt owner pin changed: {path}")
+    require(receipt["source_commit"] == SEMANTIC_OWNER_COMMIT, f"receipt semantic owner pin changed: {path}")
+    require(
+        receipt.get("semantic_owner_commit") == SEMANTIC_OWNER_COMMIT,
+        f"receipt semantic owner pin changed: {path}",
+    )
+    require(
+        receipt.get("production_source_baseline_commit") == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        f"receipt production baseline pin changed: {path}",
+    )
+    require(receipt.get("capture_head") == capture_head, f"receipt capture HEAD changed: {path}")
     require(receipt["helper_sha256"] == HELPER_SHA256, f"receipt helper hash changed: {path}")
     require(receipt.get("generator_sha256") == generator_sha256, f"generator hash changed: {path}")
     require(receipt.get("generator_source_sha256") == generator_sha256, f"generator hash changed: {path}")
@@ -503,10 +684,16 @@ def verify_receipt(
     return next(iter(process_ids)), values, latencies, operation_allocations, timing_values
 
 
-def verify_host_probe(path: Path) -> None:
+def verify_host_probe(path: Path, capture_head: str) -> None:
     probe = json.loads(path.read_text())
     require(probe["schema"] == "pptx-ink-actions-host-probe-v1", "host probe schema changed")
-    require(probe["source_commit"] == SOURCE_COMMIT, "host probe source changed")
+    require(probe["source_commit"] == SEMANTIC_OWNER_COMMIT, "host probe semantic owner changed")
+    require(probe["semantic_owner_commit"] == SEMANTIC_OWNER_COMMIT, "host probe semantic owner changed")
+    require(
+        probe["production_source_baseline_commit"] == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "host probe production baseline changed",
+    )
+    require(probe["capture_head"] == capture_head, "host probe capture HEAD changed")
     require(probe["helper_sha256"] == HELPER_SHA256, "host probe helper changed")
     require(probe["native_powerpoint_claim"] is False, "host probe made a native PowerPoint claim")
     require(probe["synthetic_complete_opc"] is True, "host probe fixture authority changed")
@@ -526,10 +713,16 @@ def verify_host_probe(path: Path) -> None:
         require(probe.get(field) is True, f"opaque host probe failed: {field}")
 
 
-def verify_host_metadata(path: Path) -> None:
+def verify_host_metadata(path: Path, capture_head: str) -> None:
     lines = path.read_text().splitlines()
     required = (
         "source_commit=",
+        "semantic_owner_commit=",
+        "production_source_baseline_commit=",
+        "semantic_owner_design_path=",
+        "semantic_owner_design_sha256=",
+        "semantic_owner_design_git_blob=",
+        "capture_head=",
         "git_head=",
         "processes=",
         "warmup=",
@@ -545,6 +738,17 @@ def verify_host_metadata(path: Path) -> None:
     for prefix in required:
         matches = [line for line in lines if line.startswith(prefix)]
         require(len(matches) == 1 and matches[0].split("=", 1)[1].strip(), f"host metadata missing {prefix}")
+    values = read_host_metadata(path)
+    require(values["source_commit"] == SEMANTIC_OWNER_COMMIT, "host metadata semantic owner changed")
+    require(values["semantic_owner_commit"] == SEMANTIC_OWNER_COMMIT, "host metadata semantic owner changed")
+    require(
+        values["production_source_baseline_commit"] == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "host metadata production baseline changed",
+    )
+    require(values["semantic_owner_design_path"] == SEMANTIC_OWNER_DESIGN_PATH, "host metadata semantic design path changed")
+    require(values["semantic_owner_design_sha256"] == SEMANTIC_OWNER_DESIGN_SHA256, "host metadata semantic design SHA-256 changed")
+    require(values["semantic_owner_design_git_blob"] == SEMANTIC_OWNER_DESIGN_GIT_BLOB, "host metadata semantic design Git blob changed")
+    require(values["capture_head"] == capture_head and values["git_head"] == capture_head, "host metadata HEAD changed")
 
 
 def read_host_metadata(path: Path) -> dict[str, str]:
@@ -555,6 +759,32 @@ def read_host_metadata(path: Path) -> dict[str, str]:
         key, value = line.split("=", 1)
         values[key] = value
     return values
+
+
+def verify_provenance_file(path: Path, capture_head: str) -> None:
+    values = read_host_metadata(path)
+    require(values.get("semantic_owner_commit") == SEMANTIC_OWNER_COMMIT, f"provenance semantic owner changed: {path}")
+    require(
+        values.get("production_source_baseline_commit") == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        f"provenance production baseline changed: {path}",
+    )
+    require(values.get("semantic_owner_design_path") == SEMANTIC_OWNER_DESIGN_PATH, f"provenance semantic design path changed: {path}")
+    require(values.get("semantic_owner_design_sha256") == SEMANTIC_OWNER_DESIGN_SHA256, f"provenance semantic design SHA-256 changed: {path}")
+    require(values.get("semantic_owner_design_git_blob") == SEMANTIC_OWNER_DESIGN_GIT_BLOB, f"provenance semantic design Git blob changed: {path}")
+    require(values.get("capture_head") == capture_head, f"provenance capture HEAD changed: {path}")
+
+
+def verify_guard_output(path: Path, capture_head: str) -> None:
+    values = read_host_metadata(path)
+    require(values.get("semantic_owner_commit") == SEMANTIC_OWNER_COMMIT, "guard semantic owner changed")
+    require(values.get("production_source_baseline_commit") == PRODUCTION_SOURCE_BASELINE_COMMIT, "guard production baseline changed")
+    require(values.get("source_commit") == SEMANTIC_OWNER_COMMIT, "guard source_commit alias changed")
+    require(values.get("capture_head") == capture_head, "guard capture HEAD changed")
+    require(
+        values.get("semantic_owner_extra")
+        == f"{SEMANTIC_OWNER_DESIGN_PATH}\t{SEMANTIC_OWNER_DESIGN_SHA256}\t{SEMANTIC_OWNER_DESIGN_GIT_BLOB}",
+        "guard semantic owner design authority changed",
+    )
 
 
 def main() -> None:
@@ -574,24 +804,56 @@ def main() -> None:
     evidence = args.evidence.resolve()
     results = args.results.resolve()
     recipes, lanes, generator_sha256 = verify_corpus(args.corpus.resolve())
-    before_commit = verify_manifest(args.manifest.resolve(), root)
-    after_commit = verify_manifest(args.manifest_after.resolve(), root)
+    before_manifest = verify_manifest(args.manifest.resolve(), root)
+    after_manifest = verify_manifest(args.manifest_after.resolve(), root)
+    before_commit, before_semantic_owner, before_production_baseline = before_manifest
+    after_commit, after_semantic_owner, after_production_baseline = after_manifest
     require(before_commit == after_commit, "source manifests use different commits")
+    require(before_semantic_owner == after_semantic_owner == SEMANTIC_OWNER_COMMIT, "source manifests use different semantic owners")
+    require(
+        before_production_baseline
+        == after_production_baseline
+        == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "source manifests use different production baselines",
+    )
     require(
         subprocess.run(
-            ["git", "-C", str(root), "merge-base", "--is-ancestor", SOURCE_COMMIT, before_commit],
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", SEMANTIC_OWNER_COMMIT, before_commit],
             check=False,
         ).returncode == 0,
-        "full source manifest commit does not descend from approved owner pin",
+        "capture HEAD does not descend from approved semantic owner pin",
+    )
+    require(
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "merge-base",
+                "--is-ancestor",
+                PRODUCTION_SOURCE_BASELINE_COMMIT,
+                before_commit,
+            ],
+            check=False,
+        ).returncode
+        == 0,
+        "capture HEAD does not descend from approved production baseline pin",
     )
     require(args.metadata_before.read_bytes() == args.metadata_after.read_bytes(), "Cargo metadata changed")
-    verify_host_probe(results / "host-probe.json")
-    verify_host_metadata(results / "host.txt")
+    verify_host_probe(results / "host-probe.json", before_commit)
+    verify_host_metadata(results / "host.txt", before_commit)
     host_metadata = read_host_metadata(results / "host.txt")
     require((results / "host-probe.stderr").read_text() == "", "host probe wrote stderr")
     require((results / "matrix-correctness.json").is_file(), "correctness matrix receipt missing")
     matrix = json.loads((results / "matrix-correctness.json").read_text())
     require(matrix.get("timings_collected") is False, "matrix correctness receipt claims timing")
+    require(matrix.get("source_commit") == SEMANTIC_OWNER_COMMIT, "matrix semantic owner changed")
+    require(matrix.get("semantic_owner_commit") == SEMANTIC_OWNER_COMMIT, "matrix semantic owner changed")
+    require(
+        matrix.get("production_source_baseline_commit") == PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "matrix production baseline changed",
+    )
+    require(matrix.get("capture_head") == before_commit, "matrix capture HEAD changed")
     require(matrix.get("recipe_count") == 23 and matrix.get("lane_count") == 42, "matrix count receipt changed")
     require(matrix.get("accepted_lanes") == 42, "correctness matrix did not accept every lane")
     require(matrix.get("failed_lanes") == 0, "correctness matrix reports failed lanes")
@@ -599,6 +861,10 @@ def main() -> None:
     require((results / "build-provenance.txt").is_file(), "build provenance missing")
     require((results / "host.txt").is_file(), "host metadata missing")
     require((results / "source-provenance.txt").is_file(), "source provenance missing")
+    require((results / "committed-inputs-guard.stdout").is_file(), "committed input guard output missing")
+    verify_provenance_file(results / "build-provenance.txt", before_commit)
+    verify_provenance_file(results / "source-provenance.txt", before_commit)
+    verify_guard_output(results / "committed-inputs-guard.stdout", before_commit)
     command_records = [
         json.loads(line)
         for line in (results / "commands.jsonl").read_text().splitlines()
@@ -641,6 +907,10 @@ def main() -> None:
         environment = record.get("environment", {})
         require(environment.get("CARGO_INCREMENTAL") == "0", "command metadata missed CARGO_INCREMENTAL=0")
         require(environment.get("LC_ALL") == "C", "command metadata missed LC_ALL=C")
+        require(
+            environment.get("PPTX_INK_ACTIONS_CAPTURE_HEAD") == before_commit,
+            "command metadata missed the exact capture HEAD",
+        )
         require(
             isinstance(environment.get("CARGO_TARGET_DIR"), str)
             and environment["CARGO_TARGET_DIR"],
@@ -713,7 +983,7 @@ def main() -> None:
                 missing.append(f"{lane_id}-p{process}")
                 continue
             process_id, rss_values, latency_values, allocation_values, timing_values = verify_receipt(
-                receipt, timing, stderr, recipe, lane, generator_sha256
+                receipt, timing, stderr, recipe, lane, generator_sha256, before_commit
             )
             lane_process_ids.setdefault(lane_id, set()).add(process_id)
             all_rss.extend(rss_values)
@@ -734,7 +1004,15 @@ def main() -> None:
     )
     report = {
         "schema": "pptx-ink-actions-performance-verification-v1",
-        "source_commit": SOURCE_COMMIT,
+        "source_commit": SEMANTIC_OWNER_COMMIT,
+        "semantic_owner_commit": SEMANTIC_OWNER_COMMIT,
+        "production_source_baseline_commit": PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "semantic_owner_design": {
+            "path": SEMANTIC_OWNER_DESIGN_PATH,
+            "sha256": SEMANTIC_OWNER_DESIGN_SHA256,
+            "git_blob": SEMANTIC_OWNER_DESIGN_GIT_BLOB,
+        },
+        "capture_head": before_commit,
         "helper_sha256": HELPER_SHA256,
         "recipes": len(recipes),
         "lanes": len(lanes),

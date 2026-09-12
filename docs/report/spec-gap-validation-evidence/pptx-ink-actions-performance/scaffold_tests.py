@@ -21,6 +21,9 @@ CLEANUP = HERE / "cleanup_target.sh"
 VERIFY = HERE / "verify.py"
 COMMITTED_INPUTS = HERE / "committed_inputs.py"
 SOURCE_MANIFEST = HERE / "source_manifest.py"
+SEMANTIC_OWNER_DESIGN_PATH = "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md"
+SEMANTIC_OWNER_DESIGN_SHA256 = "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d"
+SEMANTIC_OWNER_DESIGN_GIT_BLOB = "597400950b1027c47cd6e4cbbedd23915bc0980e"
 
 CHECKS = 0
 
@@ -232,6 +235,7 @@ def git_fixture() -> tuple[Path, str, Path, str]:
         "crates/local/src/lib.rs": "pub mod extra;\npub fn value() -> u32 { 1 }\n",
         "crates/local/src/extra.rs": "pub const EXTRA: u32 = 2;\n",
         "fixture_helper.rs": "// committed fixture helper\n",
+        SEMANTIC_OWNER_DESIGN_PATH: "# committed semantic-owner design fixture\n",
     }
     for relative, content in files.items():
         path = root / relative
@@ -272,14 +276,38 @@ def git_fixture() -> tuple[Path, str, Path, str]:
     return temporary, commit, metadata_path, helper_sha256
 
 
+def semantic_owner_design_args(root: Path, semantic_owner_commit: str) -> list[str]:
+    """Return the real semantic-owner receipt for the classified design path."""
+    blob = subprocess.check_output(
+        ["git", "rev-parse", f"{semantic_owner_commit}:{SEMANTIC_OWNER_DESIGN_PATH}"],
+        cwd=root,
+        text=True,
+    ).strip()
+    content = subprocess.check_output(
+        ["git", "cat-file", "blob", f"{semantic_owner_commit}:{SEMANTIC_OWNER_DESIGN_PATH}"],
+        cwd=root,
+    )
+    digest = hashlib.sha256(content).hexdigest()
+    return [
+        "--semantic-owner-extra",
+        SEMANTIC_OWNER_DESIGN_PATH,
+        "--semantic-owner-extra-sha256",
+        digest,
+        "--semantic-owner-extra-blob",
+        blob,
+    ]
+
+
 def source_guard_args(
     root: Path,
-    commit: str,
+    semantic_owner_commit: str,
+    production_source_baseline_commit: str,
     metadata: Path,
     helper_sha256: str,
     *,
     include_root_paths: bool = True,
-    owner_extras: tuple[str, ...] = (),
+    include_semantic_owner_design: bool = False,
+    production_extras: tuple[str, ...] = (),
 ) -> list[str]:
     args = [
         sys.executable,
@@ -287,8 +315,10 @@ def source_guard_args(
         str(COMMITTED_INPUTS),
         "--root",
         str(root),
-        "--commit",
-        commit,
+        "--semantic-owner-commit",
+        semantic_owner_commit,
+        "--production-source-baseline-commit",
+        production_source_baseline_commit,
         "--helper",
         "fixture_helper.rs",
         "--helper-sha256",
@@ -303,19 +333,23 @@ def source_guard_args(
         # argparse requires at least one explicit path; keep this probe's
         # ordinary source input stable so owner-extra is the failing seam.
         args.extend(("--path", "crates/local/src/lib.rs"))
-    for path in owner_extras:
-        args.extend(("--owner-extra", path))
+    if include_semantic_owner_design:
+        args.extend(semantic_owner_design_args(root, semantic_owner_commit))
+    for path in production_extras:
+        args.extend(("--production-extra", path))
     return args
 
 
 def source_manifest_args(
     root: Path,
-    commit: str,
+    capture_head: str,
     metadata: Path,
     output: Path,
     *,
-    owner_commit: str | None = None,
-    owner_extras: tuple[str, ...] = (),
+    semantic_owner_commit: str,
+    production_source_baseline_commit: str,
+    include_semantic_owner_design: bool = False,
+    production_extras: tuple[str, ...] = (),
 ) -> list[str]:
     args = [
         sys.executable,
@@ -328,9 +362,11 @@ def source_manifest_args(
         "--output",
         str(output),
         "--git-commit",
-        commit,
-        "--owner-commit",
-        owner_commit or commit,
+        capture_head,
+        "--semantic-owner-commit",
+        semantic_owner_commit,
+        "--production-source-baseline-commit",
+        production_source_baseline_commit,
         "--extra",
         "Cargo.toml",
         "--extra",
@@ -340,19 +376,29 @@ def source_manifest_args(
         "--extra",
         "fixture_helper.rs",
     ]
-    for path in owner_extras:
-        args.extend(("--owner-extra", path))
+    if include_semantic_owner_design:
+        args.extend(semantic_owner_design_args(root, semantic_owner_commit))
+    for path in production_extras:
+        args.extend(("--production-extra", path))
     return args
 
 
 def source_pin_tamper_tests() -> None:
-    """Reject transitive local and root build-input drift in an isolated repo."""
-    temporary, commit, metadata, helper_sha256 = git_fixture()
+    """Exercise separate semantic-owner, production-baseline, and capture pins."""
+    temporary, semantic_owner_commit, metadata, helper_sha256 = git_fixture()
     try:
         root = temporary / "repo"
         manifest_output = temporary / "source-manifest.txt"
+        production_extras = ("Cargo.toml", "rust-toolchain.toml", ".cargo/config.toml")
         baseline_guard = subprocess.run(
-            source_guard_args(root, commit, metadata, helper_sha256),
+            source_guard_args(
+                root,
+                semantic_owner_commit,
+                semantic_owner_commit,
+                metadata,
+                helper_sha256,
+                production_extras=production_extras,
+            ),
             cwd=root,
             check=False,
             capture_output=True,
@@ -360,7 +406,15 @@ def source_pin_tamper_tests() -> None:
         )
         check(baseline_guard.returncode == 0, "source guard accepts committed fixture")
         baseline_manifest = subprocess.run(
-            source_manifest_args(root, commit, metadata, manifest_output),
+            source_manifest_args(
+                root,
+                semantic_owner_commit,
+                metadata,
+                manifest_output,
+                semantic_owner_commit=semantic_owner_commit,
+                production_source_baseline_commit=semantic_owner_commit,
+                production_extras=production_extras,
+            ),
             cwd=root,
             check=False,
             capture_output=True,
@@ -387,7 +441,14 @@ def source_pin_tamper_tests() -> None:
             path.write_text(content)
             try:
                 guard = subprocess.run(
-                    source_guard_args(root, commit, metadata, helper_sha256),
+                    source_guard_args(
+                        root,
+                        semantic_owner_commit,
+                        semantic_owner_commit,
+                        metadata,
+                        helper_sha256,
+                        production_extras=production_extras,
+                    ),
                     cwd=root,
                     check=False,
                     capture_output=True,
@@ -397,7 +458,15 @@ def source_pin_tamper_tests() -> None:
                 check(relative in guard.stderr, f"guard identifies {relative} tamper")
 
                 manifest = subprocess.run(
-                    source_manifest_args(root, commit, metadata, manifest_output),
+                    source_manifest_args(
+                        root,
+                        semantic_owner_commit,
+                        metadata,
+                        manifest_output,
+                        semantic_owner_commit=semantic_owner_commit,
+                        production_source_baseline_commit=semantic_owner_commit,
+                        production_extras=production_extras,
+                    ),
                     cwd=root,
                     check=False,
                     capture_output=True,
@@ -412,7 +481,14 @@ def source_pin_tamper_tests() -> None:
         untracked.write_text("pub const UNTRACKED: u32 = 3;\n")
         try:
             guard = subprocess.run(
-                source_guard_args(root, commit, metadata, helper_sha256),
+                source_guard_args(
+                    root,
+                    semantic_owner_commit,
+                    semantic_owner_commit,
+                    metadata,
+                    helper_sha256,
+                    production_extras=production_extras,
+                ),
                 cwd=root,
                 check=False,
                 capture_output=True,
@@ -423,15 +499,15 @@ def source_pin_tamper_tests() -> None:
         finally:
             untracked.unlink(missing_ok=True)
 
-        descendant_changes = {
-            "Cargo.toml": "[workspace]\nmembers = [\"crates/local\"]\n# capture descendant\n",
-            "rust-toolchain.toml": "[toolchain]\nchannel = \"stable\"\n# capture descendant\n",
-            ".cargo/config.toml": "[build]\ntarget-dir = \"capture-target\"\n",
+        production_changes = {
+            "Cargo.toml": "[workspace]\nmembers = [\"crates/local\"]\n# production baseline\n",
+            "rust-toolchain.toml": "[toolchain]\nchannel = \"stable\"\n# production baseline\n",
+            ".cargo/config.toml": "[build]\ntarget-dir = \"production-target\"\n",
         }
-        for relative, content in descendant_changes.items():
+        for relative, content in production_changes.items():
             (root / relative).write_text(content)
         subprocess.run(
-            ["git", "add", *descendant_changes],
+            ["git", "add", *production_changes],
             cwd=root,
             check=True,
             capture_output=True,
@@ -444,75 +520,351 @@ def source_pin_tamper_tests() -> None:
             capture_output=True,
             text=True,
         )
-        capture_commit = subprocess.check_output(
+        production_baseline_commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=root, text=True
         ).strip()
-        owner_extras = ("Cargo.toml", "rust-toolchain.toml", ".cargo/config.toml")
 
-        capture_guard = subprocess.run(
-            source_guard_args(root, capture_commit, metadata, helper_sha256),
+        production_mutation = root / "crates/local/src/extra.rs"
+        production_mutation.write_text("pub const EXTRA: u32 = 99;\n")
+        subprocess.run(
+            ["git", "add", "crates/local/src/extra.rs"],
             cwd=root,
-            check=False,
+            check=True,
             capture_output=True,
             text=True,
         )
-        check(capture_guard.returncode == 0, "ordinary capture commit accepts descendant workspace inputs")
+        subprocess.run(
+            ["git", "commit", "--quiet", "-m", "capture production mutation"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        production_mutation_capture_head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True
+        ).strip()
+        check(
+            production_mutation_capture_head != production_baseline_commit,
+            "capture HEAD is distinct from production baseline",
+        )
 
-        owner_guard = subprocess.run(
+        production_guard = subprocess.run(
             source_guard_args(
                 root,
-                commit,
+                semantic_owner_commit,
+                production_baseline_commit,
                 metadata,
                 helper_sha256,
                 include_root_paths=False,
-                owner_extras=owner_extras,
+                production_extras=production_extras,
             ),
             cwd=root,
             check=False,
             capture_output=True,
             text=True,
         )
-        check(owner_guard.returncode != 0, "owner-extra guard rejects descendant workspace inputs")
-        check("Cargo.toml" in owner_guard.stderr, "owner-extra guard identifies owner drift")
+        check(
+            production_guard.returncode != 0,
+            "committed production mutation is rejected against baseline",
+        )
+        check("production baseline" in production_guard.stderr, "guard identifies production baseline drift")
+        tracked_production_mutation = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", "crates/local/src/extra.rs"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(
+            tracked_production_mutation.returncode == 0,
+            "production mutation is tracked before baseline rejection",
+        )
 
-        owner_manifest = subprocess.run(
+        production_manifest = subprocess.run(
             source_manifest_args(
                 root,
-                capture_commit,
+                production_mutation_capture_head,
                 metadata,
                 manifest_output,
-                owner_commit=commit,
-                owner_extras=owner_extras,
+                semantic_owner_commit=semantic_owner_commit,
+                production_source_baseline_commit=production_baseline_commit,
+                production_extras=production_extras,
             ),
             cwd=root,
             check=False,
             capture_output=True,
             text=True,
         )
-        check(owner_manifest.returncode != 0, "source manifest owner-extra pin rejects descendant inputs")
         check(
-            any(path in owner_manifest.stderr for path in owner_extras),
-            "source manifest identifies owner-extra drift",
+            production_manifest.returncode != 0,
+            "source manifest rejects committed production mutation",
+        )
+        check(
+            "production baseline" in production_manifest.stderr,
+            "source manifest identifies production baseline drift",
+        )
+
+        wrong_baseline_manifest = subprocess.run(
+            source_manifest_args(
+                root,
+                production_mutation_capture_head,
+                metadata,
+                manifest_output,
+                semantic_owner_commit=semantic_owner_commit,
+                production_source_baseline_commit=semantic_owner_commit,
+                production_extras=production_extras,
+            ),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(wrong_baseline_manifest.returncode != 0, "wrong production baseline receipt is rejected")
+        check(
+            "production baseline" in wrong_baseline_manifest.stderr,
+            "wrong production baseline is identified",
+        )
+
+        wrong_capture_manifest = subprocess.run(
+            source_manifest_args(
+                root,
+                production_baseline_commit,
+                metadata,
+                manifest_output,
+                semantic_owner_commit=semantic_owner_commit,
+                production_source_baseline_commit=production_baseline_commit,
+                production_extras=production_extras,
+            ),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(wrong_capture_manifest.returncode != 0, "wrong capture HEAD receipt is rejected")
+        check("source HEAD changed" in wrong_capture_manifest.stderr, "wrong capture HEAD is identified")
+
+        owner_mutation = root / "fixture_helper.rs"
+        owner_mutation.write_text("// committed semantic owner mutation\n")
+        subprocess.run(
+            ["git", "add", "fixture_helper.rs"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "--quiet", "-m", "capture semantic owner mutation"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        owner_mutation_capture_head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True
+        ).strip()
+        owner_guard = subprocess.run(
+            source_guard_args(
+                root,
+                semantic_owner_commit,
+                production_baseline_commit,
+                metadata,
+                helper_sha256,
+                include_root_paths=False,
+                production_extras=production_extras,
+            ),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(owner_guard.returncode != 0, "semantic owner guard rejects committed owner mutation")
+        check(
+            "semantic owner" in owner_guard.stderr,
+            "semantic owner guard identifies owner drift",
+        )
+        tracked_owner_mutation = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", "fixture_helper.rs"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(
+            tracked_owner_mutation.returncode == 0,
+            "semantic owner mutation is tracked before owner rejection",
         )
     finally:
         # The fixture is the only temporary tree owned by this test.
         shutil.rmtree(temporary)
 
 
+def semantic_owner_design_tamper_test() -> None:
+    """Reject a committed mutation of the classified semantic design input."""
+    temporary, semantic_owner_commit, metadata, helper_sha256 = git_fixture()
+    try:
+        root = temporary / "repo"
+        manifest_output = temporary / "source-manifest.txt"
+        production_extras = ("Cargo.toml", "rust-toolchain.toml", ".cargo/config.toml")
+        baseline_guard = subprocess.run(
+            source_guard_args(
+                root,
+                semantic_owner_commit,
+                semantic_owner_commit,
+                metadata,
+                helper_sha256,
+                include_semantic_owner_design=True,
+                production_extras=production_extras,
+            ),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(baseline_guard.returncode == 0, "guard accepts pinned semantic design input")
+
+        baseline_manifest = subprocess.run(
+            source_manifest_args(
+                root,
+                semantic_owner_commit,
+                metadata,
+                manifest_output,
+                semantic_owner_commit=semantic_owner_commit,
+                production_source_baseline_commit=semantic_owner_commit,
+                include_semantic_owner_design=True,
+                production_extras=production_extras,
+            ),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(
+            baseline_manifest.returncode == 0,
+            "source manifest accepts pinned semantic design input",
+        )
+
+        design = root / SEMANTIC_OWNER_DESIGN_PATH
+        design.write_text(design.read_text() + "\n# committed semantic-owner tamper\n")
+        subprocess.run(
+            ["git", "add", SEMANTIC_OWNER_DESIGN_PATH],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "--quiet", "-m", "capture semantic design mutation"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        capture_head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True
+        ).strip()
+        check(capture_head != semantic_owner_commit, "design tamper advances capture HEAD")
+        tracked = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", SEMANTIC_OWNER_DESIGN_PATH],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(tracked.returncode == 0, "design tamper is committed and tracked")
+
+        guard = subprocess.run(
+            source_guard_args(
+                root,
+                semantic_owner_commit,
+                semantic_owner_commit,
+                metadata,
+                helper_sha256,
+                include_semantic_owner_design=True,
+                production_extras=production_extras,
+            ),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(guard.returncode != 0, "guard rejects committed semantic design tamper")
+        check(
+            SEMANTIC_OWNER_DESIGN_PATH in guard.stderr,
+            "guard identifies committed semantic design tamper",
+        )
+
+        manifest = subprocess.run(
+            source_manifest_args(
+                root,
+                capture_head,
+                metadata,
+                manifest_output,
+                semantic_owner_commit=semantic_owner_commit,
+                production_source_baseline_commit=semantic_owner_commit,
+                include_semantic_owner_design=True,
+                production_extras=production_extras,
+            ),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(manifest.returncode != 0, "source manifest rejects committed semantic design tamper")
+        check(
+            SEMANTIC_OWNER_DESIGN_PATH in manifest.stderr,
+            "source manifest identifies committed semantic design tamper",
+        )
+    finally:
+        shutil.rmtree(temporary)
+
+
 def owner_extra_runner_wiring_test() -> None:
-    """Keep the runner's owner-extra arguments coupled to the real guard."""
+    """Keep the runner's dual source pins coupled to the real guards."""
     runner = RUNNER.read_text()
-    check("OWNER_WORKSPACE_EXTRAS=(" in runner, "runner declares owner workspace extras")
-    for path in ("$ROOT/Cargo.toml", "$ROOT/rust-toolchain.toml", "$ROOT/.cargo/config.toml"):
-        check(path in runner, f"runner owns {path} as an owner extra")
+    check("SEMANTIC_OWNER_COMMIT=" in runner, "runner declares semantic owner pin")
     check(
-        'GUARD_ARGS+=(--owner-extra "$path")' in runner,
-        "runner passes owner extras to committed-input guard",
+        "PRODUCTION_SOURCE_BASELINE_COMMIT=" in runner,
+        "runner declares production baseline pin",
     )
     check(
-        'MANIFEST_ARGS+=(--owner-extra "$extra")' in runner
-        and 'MANIFEST_ARGS_AFTER+=(--owner-extra "$extra")' in runner,
-        "runner passes owner extras to both source manifests",
+        "PRODUCTION_WORKSPACE_EXTRAS=(" in runner,
+        "runner declares production workspace extras",
+    )
+    for path in ("$ROOT/Cargo.toml", "$ROOT/rust-toolchain.toml", "$ROOT/.cargo/config.toml"):
+        check(path in runner, f"runner owns {path} as a production extra")
+    check(
+        'GUARD_ARGS+=(--production-extra "$path")' in runner,
+        "runner passes production extras to committed-input guard",
+    )
+    check(
+        'MANIFEST_ARGS+=(--production-extra "$extra")' in runner
+        and 'MANIFEST_ARGS_AFTER+=(--production-extra "$extra")' in runner,
+        "runner passes production extras to both source manifests",
+    )
+    check(
+        '--semantic-owner-commit "$SEMANTIC_OWNER_COMMIT"' in runner
+        and '--production-source-baseline-commit "$PRODUCTION_SOURCE_BASELINE_COMMIT"' in runner,
+        "runner passes both source pins to committed-input and manifest commands",
+    )
+    check(
+        "SEMANTIC_OWNER_DESIGN_PATH=docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md"
+        in runner,
+        "runner declares the classified semantic design path",
+    )
+    check(
+        "SEMANTIC_OWNER_DESIGN_SHA256=" in runner
+        and "SEMANTIC_OWNER_DESIGN_GIT_BLOB=" in runner,
+        "runner declares semantic design hash and Git blob receipts",
+    )
+    check(
+        'GUARD_ARGS+=(--semantic-owner-extra "$ROOT/$SEMANTIC_OWNER_DESIGN_PATH"' in runner,
+        "runner passes semantic design receipt to committed-input guard",
+    )
+    check(
+        'MANIFEST_ARGS+=(--semantic-owner-extra "$ROOT/$SEMANTIC_OWNER_DESIGN_PATH"' in runner
+        and 'MANIFEST_ARGS_AFTER+=(--semantic-owner-extra "$ROOT/$SEMANTIC_OWNER_DESIGN_PATH"'
+        in runner,
+        "runner passes semantic design receipt to both source manifests",
     )
 
 
@@ -593,7 +945,10 @@ def verifier_tamper_tests(corpus: dict[str, object]) -> None:
 
     opaque_probe = {
         "schema": "pptx-ink-actions-host-probe-v1",
-        "source_commit": verifier.SOURCE_COMMIT,
+        "source_commit": verifier.SEMANTIC_OWNER_COMMIT,
+        "semantic_owner_commit": verifier.SEMANTIC_OWNER_COMMIT,
+        "production_source_baseline_commit": verifier.PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "capture_head": "capture-head-test",
         "helper_sha256": verifier.HELPER_SHA256,
         "native_powerpoint_claim": False,
         "synthetic_complete_opc": True,
@@ -613,7 +968,7 @@ def verifier_tamper_tests(corpus: dict[str, object]) -> None:
     with tempfile.TemporaryDirectory(prefix="pptx-ink-actions-receipt-") as raw:
         receipt = Path(raw) / "host-probe.json"
         receipt.write_text(json.dumps(opaque_probe, sort_keys=True))
-        verifier.verify_host_probe(receipt)
+        verifier.verify_host_probe(receipt, "capture-head-test")
         check(True, "valid opaque/source host receipt is accepted")
         receipt_mutations = (
             ("opaque_choice_preserved", False),
@@ -627,13 +982,16 @@ def verifier_tamper_tests(corpus: dict[str, object]) -> None:
             ("opaque_manifest_preserved", False),
             ("opaque_patch_publication_preserved", False),
             ("source_commit", "0" * 40),
+            ("semantic_owner_commit", "0" * 40),
+            ("production_source_baseline_commit", "0" * 40),
+            ("capture_head", "wrong-capture-head"),
             ("helper_sha256", "0" * 64),
         )
         for field, value in receipt_mutations:
             mutated = dict(opaque_probe, **{field: value})
             receipt.write_text(json.dumps(mutated, sort_keys=True))
             try:
-                verifier.verify_host_probe(receipt)
+                verifier.verify_host_probe(receipt, "capture-head-test")
             except AssertionError:
                 check(True, f"modified {field} receipt is rejected")
             else:
@@ -649,9 +1007,57 @@ def main() -> None:
     check({item["recipe"] for item in lanes} == recipes, "every recipe is used")
     check(len({item["id"] for item in lanes}) == 42, "lane IDs are unique")
     check(corpus["native_powerpoint_claim"] is False, "native host claim")
+    check(
+        corpus["semantic_owner_commit"] == "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+        "semantic owner pin",
+    )
+    check(
+        corpus["production_source_baseline_commit"] == "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+        "production source baseline pin",
+    )
+    check(corpus["owner_commit"] == corpus["semantic_owner_commit"], "owner alias pin")
 
     contract = json.loads((HERE / "source-contract.json").read_text())
     check(contract["owner_commit"] == corpus["owner_commit"], "contract owner pin")
+    check(
+        contract["semantic_owner_commit"] == corpus["semantic_owner_commit"],
+        "contract semantic owner pin",
+    )
+    check(
+        contract["production_source_baseline_commit"] == corpus["production_source_baseline_commit"],
+        "contract production source baseline pin",
+    )
+    design_corpus = corpus["semantic_owner_design"]
+    check(
+        design_corpus["commit"] == corpus["semantic_owner_commit"],
+        "corpus semantic design owner pin",
+    )
+    check(design_corpus["path"] == SEMANTIC_OWNER_DESIGN_PATH, "corpus semantic design path")
+    check(
+        design_corpus["sha256"] == SEMANTIC_OWNER_DESIGN_SHA256,
+        "corpus semantic design SHA-256",
+    )
+    check(
+        design_corpus["git_blob"] == SEMANTIC_OWNER_DESIGN_GIT_BLOB,
+        "corpus semantic design Git blob",
+    )
+    design_contract = contract["semantic_owner_design"]
+    check(
+        design_contract["commit"] == corpus["semantic_owner_commit"],
+        "contract semantic design owner pin",
+    )
+    check(
+        design_contract["path"] == SEMANTIC_OWNER_DESIGN_PATH,
+        "contract classified semantic design path",
+    )
+    check(
+        design_contract["sha256"] == SEMANTIC_OWNER_DESIGN_SHA256,
+        "contract semantic design SHA-256",
+    )
+    check(
+        design_contract["git_blob"] == SEMANTIC_OWNER_DESIGN_GIT_BLOB,
+        "contract semantic design Git blob",
+    )
     check(contract["goal_reference"]["committed_at_owner_pin"] is False, "untracked GOAL admission")
     check(contract["goal_reference"]["profile_input"] is False, "untracked GOAL source input")
 
@@ -670,6 +1076,7 @@ def main() -> None:
     capture_gate_test()
     owner_extra_runner_wiring_test()
     source_pin_tamper_tests()
+    semantic_owner_design_tamper_test()
     verifier_tamper_tests(corpus)
     print(
         "PPTX InkAction scaffold tests passed (timing-free); "
