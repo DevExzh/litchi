@@ -613,6 +613,45 @@ struct ContentTypeFingerprint {
     content_type: String,
 }
 
+/// The immutable byte layout needed to project one picture operation.
+///
+/// This is deliberately detached from `PictureSource<'a>`: the scanner's
+/// borrowed records cannot outlive the source slice returned by a scan, while
+/// a batch edit must reuse the same ranges for every staged operation.  The
+/// namespace prefixes are the only source bytes copied into this compact
+/// layout; the picture and extension payloads remain in `source_xml`.
+#[derive(Clone)]
+struct PictureLayout {
+    blip_range: ByteRange,
+    blip_prefix: Box<[u8]>,
+    blip_close_start: Option<usize>,
+    ext_list_range: Option<ByteRange>,
+    ext_list_prefix: Option<Box<[u8]>>,
+    ext_list_close_start: Option<usize>,
+    svg_extension_range: Option<ByteRange>,
+    owner_state: SvgPictureOwnerState,
+    post_detach_owner_state: SvgPictureOwnerState,
+}
+
+/// Shared source facts for the lifetime of a batch edit.
+///
+/// Every selected picture points into one immutable source scan.  Staging
+/// looks up these compact layouts instead of reparsing the whole projected
+/// story for each operation.
+#[derive(Clone)]
+struct BatchSourceContext {
+    source_xml: litchi_opc::SourceXmlPart,
+    source_version: SourceVersion,
+    lineage: litchi_opc::SourceLineage,
+    layouts: Arc<[PictureLayout]>,
+}
+
+#[derive(Clone)]
+struct ProjectionEdit {
+    range: ByteRange,
+    replacement_len: usize,
+}
+
 /// Immutable source-bound state for one selected picture.
 #[derive(Clone)]
 pub struct SourceBackedSvgAttachmentSnapshot {
@@ -699,7 +738,11 @@ pub struct SourceBackedSvgAttachmentBatchEdit<'a> {
     package: &'a super::Package,
     source: SourceBackedSvgAttachmentBatchSnapshot,
     current: SourceBackedSvgAttachmentBatchSnapshot,
+    context: Arc<BatchSourceContext>,
     operations: Vec<BatchOperation>,
+    projection_edits: Vec<ProjectionEdit>,
+    staged_attach_count: usize,
+    staged_payload_bytes: u64,
     next_relationship_index: usize,
     next_part_index: usize,
 }
@@ -708,6 +751,8 @@ pub struct SourceBackedSvgAttachmentBatchEdit<'a> {
 #[derive(Clone)]
 pub struct SourceBackedSvgAttachmentBatchSnapshot {
     states: Vec<SnapshotState>,
+    story: StoryPayload,
+    context: Option<Arc<BatchSourceContext>>,
 }
 
 impl SourceBackedSvgAttachmentBatchSnapshot {
@@ -734,13 +779,16 @@ impl SourceBackedSvgAttachmentBatchSnapshot {
             .iter()
             .find(|state| state.selector == selector)
             .cloned()
-            .map(|state| SourceBackedSvgAttachmentSnapshot { state })
+            .map(|mut state| {
+                state.xml = self.story.clone();
+                SourceBackedSvgAttachmentSnapshot { state }
+            })
     }
 
     /// Exact staged story bytes shared by every selected picture.
     #[must_use]
     pub fn story_xml(&self) -> Option<&[u8]> {
-        self.states.first().map(|state| state.xml.as_bytes())
+        self.states.first().map(|_| self.story.as_bytes())
     }
 
     fn state(&self, selector: PictureSelector) -> Result<&SnapshotState> {
@@ -987,6 +1035,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         requested_part_uri: Option<&PackURI>,
         requested_payload: Option<Arc<Vec<u8>>>,
     ) -> Result<bool> {
+        self.ensure_source_current()?;
         self.check_selector_operation(selector, "attach_svg")?;
         let current = self.current.state(selector)?.clone();
         if current.svg.is_some() {
@@ -1053,7 +1102,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
             payload: Arc::new(Vec::new()),
             reservation,
         };
-        let xml = self.stage_operation(&operation)?;
+        let (xml, projection) = self.stage_operation(&operation)?;
         let owned_payload = if let Some(payload) = requested_payload {
             payload
         } else {
@@ -1070,13 +1119,14 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         if let BatchOperation::Attach { payload, .. } = &mut operation {
             *payload = owned_payload;
         }
-        self.finish_operation(operation, xml)?;
+        self.finish_operation(operation, xml, projection)?;
         Ok(true)
     }
 
     /// Detach one selected embedded SVG owner while retaining its raster.
     pub fn detach_svg(&mut self, selector: impl Into<PictureSelector>) -> Result<bool> {
         let selector = selector.into();
+        self.ensure_source_current()?;
         self.check_selector_operation(selector, "detach_svg")?;
         let current = self.current.state(selector)?.clone();
         if current.svg.is_none() {
@@ -1094,14 +1144,14 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
             return Ok(false);
         }
         let operation = BatchOperation::Detach { selector };
-        let xml = self.stage_operation(&operation)?;
-        self.finish_operation(operation, xml)?;
+        let (xml, projection) = self.stage_operation(&operation)?;
+        self.finish_operation(operation, xml, projection)?;
         Ok(true)
     }
 
     /// Validate the complete changed story/dependency closure and freeze it.
     pub fn commit(mut self) -> Result<SourceBackedSvgAttachmentBatchCommit> {
-        self.package.package.check_execution()?;
+        self.ensure_source_current()?;
         if !self.operations.is_empty() {
             // Intermediate projections are raw source bytes because an OPC
             // `SourceXmlPart` may issue only one source splice. Apply the
@@ -1112,12 +1162,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                 &self.operations,
                 self.limits(),
             )?;
-            let final_drawing = scan_story(final_xml.bytes(), self.limits())?;
-            for state in &mut self.current.states {
-                state.owner_state =
-                    map_owner_state(final_drawing.picture(state.selector.picture)?.svg_owner());
-                state.xml = StoryPayload::Edited(final_xml.clone());
-            }
+            self.current.story = StoryPayload::Edited(final_xml);
         }
         let patch = SourceBackedSvgAttachmentBatchPatch {
             before: self.source,
@@ -1261,43 +1306,191 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
     }
 
     fn original_xml_part(&self) -> Result<&litchi_opc::SourceXmlPart> {
-        self.source
-            .states
-            .first()
-            .map(|state| state.xml.source_xml())
-            .ok_or_else(|| Error::Invalid("SVG batch has no source story".into()))
+        Ok(&self.context.source_xml)
     }
 
     fn projected_bytes(&self) -> Result<&[u8]> {
-        self.current
-            .states
-            .first()
-            .map(|state| state.xml.as_bytes())
-            .ok_or_else(|| Error::Invalid("SVG batch has no projected story".into()))
+        Ok(self.current.story.as_bytes())
     }
 
-    fn stage_operation(&mut self, operation: &BatchOperation) -> Result<Vec<u8>> {
-        // Apply exactly one source-checked replacement to the current
-        // projection.  This keeps projected().story_xml() truthful after
-        // every staged operation while making a K-picture batch O(K * S)
-        // rather than replaying all K intents for every operation.
-        rewrite_story_xml_bytes(self.projected_bytes()?, operation, self.limits())
+    fn ensure_source_current(&self) -> Result<()> {
+        self.package.package.check_execution()?;
+        if self.package.package.source_version()? != self.context.source_version
+            || self.package.package.source_lineage() != self.context.lineage
+        {
+            return Err(Error::Invalid(
+                "DOCX SVG batch source changed during staging".into(),
+            ));
+        }
+        Ok(())
     }
 
-    fn finish_operation(&mut self, operation: BatchOperation, xml: Vec<u8>) -> Result<()> {
+    fn layout(&self, selector: PictureSelector) -> Result<&PictureLayout> {
+        if selector.drawing != 0 {
+            return Err(Error::OutOfBounds {
+                object: "DOCX main-story drawing",
+                index: selector.drawing,
+                len: 1,
+            });
+        }
+        self.context
+            .layouts
+            .get(selector.picture)
+            .ok_or_else(|| Error::OutOfBounds {
+                object: "DOCX main-story picture",
+                index: selector.picture,
+                len: self.context.layouts.len(),
+            })
+    }
+
+    fn shifted_offset(&self, offset: usize) -> Result<usize> {
+        let mut shifted = offset;
+        for edit in &self.projection_edits {
+            if edit.range.end > offset || (edit.range.is_empty() && edit.range.start > offset) {
+                continue;
+            }
+            let removed = edit.range.len()?;
+            if edit.replacement_len >= removed {
+                shifted = shifted
+                    .checked_add(edit.replacement_len - removed)
+                    .ok_or_else(|| {
+                        Error::Invalid("DOCX projected story offset overflows".into())
+                    })?;
+            } else {
+                shifted = shifted
+                    .checked_sub(removed - edit.replacement_len)
+                    .ok_or_else(|| {
+                        Error::Invalid("DOCX projected story offset underflows".into())
+                    })?;
+            }
+        }
+        Ok(shifted)
+    }
+
+    fn shifted_range(&self, range: ByteRange) -> Result<ByteRange> {
+        let start = self.shifted_offset(range.start)?;
+        let end = self.shifted_offset(range.end)?;
+        if end < start {
+            return Err(Error::Invalid(
+                "DOCX projected SVG range is no longer ordered".into(),
+            ));
+        }
+        Ok(ByteRange::new(start, end))
+    }
+
+    fn stage_operation(&self, operation: &BatchOperation) -> Result<(Vec<u8>, ProjectionEdit)> {
+        // The layout and namespace context are captured once from the
+        // immutable source story.  Staging therefore avoids both the scan of
+        // the projected story and the second scan previously used to recover
+        // the selected owner state.
+        let layout = self.layout(operation.selector())?;
+        let (original_range, replacement) = match operation {
+            BatchOperation::Attach {
+                relationship_id, ..
+            } => {
+                if matches!(
+                    layout.owner_state,
+                    SvgPictureOwnerState::Linked
+                        | SvgPictureOwnerState::Ambiguous
+                        | SvgPictureOwnerState::Refused
+                        | SvgPictureOwnerState::Embedded
+                ) {
+                    return Err(unsafe_edit(
+                        "attach_svg",
+                        "selected picture has an existing recognized SVG owner",
+                    ));
+                }
+                generated_attachment_replacement_from_layout(
+                    layout,
+                    relationship_id,
+                    self.context.source_xml.bytes(),
+                    self.limits(),
+                )?
+            },
+            BatchOperation::Detach { .. } => {
+                let range = layout.svg_extension_range.ok_or_else(|| {
+                    Error::Invalid("selected picture has no admitted embedded SVG owner".into())
+                })?;
+                (range, Vec::new())
+            },
+        };
+        let projected_range = self.shifted_range(original_range)?;
+        let projected = self.projected_bytes()?;
+        if projected_range.end > projected.len() || projected_range.start > projected_range.end {
+            return Err(Error::Invalid(
+                "DOCX projected SVG replacement range is outside the story".into(),
+            ));
+        }
+        let output_len = projected
+            .len()
+            .checked_sub(projected_range.len()?)
+            .and_then(|value| value.checked_add(replacement.len()))
+            .ok_or_else(|| Error::Invalid("DOCX story output size overflows".into()))?;
+        if output_len as u64 > self.limits().max_part_bytes() {
+            return Err(Error::Invalid(
+                "DOCX story output exceeds the Part limit".into(),
+            ));
+        }
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(output_len)
+            .map_err(|source| Error::Allocation {
+                resource: "DOCX projected SVG story",
+                source,
+            })?;
+        output.extend_from_slice(&projected[..projected_range.start]);
+        output.extend_from_slice(&replacement);
+        output.extend_from_slice(&projected[projected_range.end..]);
+        Ok((
+            output,
+            ProjectionEdit {
+                range: original_range,
+                replacement_len: replacement.len(),
+            },
+        ))
+    }
+
+    fn finish_operation(
+        &mut self,
+        operation: BatchOperation,
+        xml: Vec<u8>,
+        projection: ProjectionEdit,
+    ) -> Result<()> {
         let selector = operation.selector();
-        // Finish all fallible projection work before mutating the edit.  The
-        // selected owner is re-read from the new source so a later operation
-        // in the same batch never relies on stale byte ranges.
-        let projected = scan_story(&xml, self.limits())?;
-        let projected_owner_state =
-            map_owner_state(projected.picture(selector.picture)?.svg_owner());
         self.operations
             .try_reserve_exact(1)
             .map_err(|source| Error::Allocation {
                 resource: "DOCX SVG batch operations",
                 source,
             })?;
+        self.projection_edits
+            .try_reserve_exact(1)
+            .map_err(|source| Error::Allocation {
+                resource: "DOCX SVG batch projections",
+                source,
+            })?;
+        let next_attach_count = self
+            .staged_attach_count
+            .checked_add(usize::from(matches!(
+                &operation,
+                BatchOperation::Attach { .. }
+            )))
+            .ok_or_else(|| Error::Invalid("DOCX SVG attachment count overflows".into()))?;
+        let next_payload_bytes = self
+            .staged_payload_bytes
+            .checked_add(match &operation {
+                BatchOperation::Attach { payload, .. } => payload.len() as u64,
+                BatchOperation::Detach { .. } => 0,
+            })
+            .ok_or_else(|| Error::Invalid("DOCX SVG staged payload bytes overflow".into()))?;
+        let post_detach_owner_state = matches!(&operation, BatchOperation::Detach { .. })
+            .then(|| {
+                self.layout(selector)
+                    .map(|layout| layout.post_detach_owner_state)
+            })
+            .transpose()?
+            .unwrap_or(SvgPictureOwnerState::None);
+        let projected_xml = Arc::new(xml);
         let state = self.current.state_mut(selector)?;
         match &operation {
             BatchOperation::Attach {
@@ -1319,13 +1512,13 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
             },
             BatchOperation::Detach { .. } => {
                 state.svg = None;
-                state.owner_state = projected_owner_state;
+                state.owner_state = post_detach_owner_state;
             },
         }
-        let projected_xml = Arc::new(xml);
-        for state in &mut self.current.states {
-            state.xml = StoryPayload::Projected(Arc::clone(&projected_xml));
-        }
+        self.current.story = StoryPayload::Projected(projected_xml);
+        self.staged_attach_count = next_attach_count;
+        self.staged_payload_bytes = next_payload_bytes;
+        self.projection_edits.push(projection);
         self.operations.push(operation);
         Ok(())
     }
@@ -1342,12 +1535,8 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         let budget = &current.package_budget;
         let payload_len_u64 = u64::try_from(payload_len)
             .map_err(|_| Error::Invalid("DOCX SVG payload length exceeds u64".into()))?;
-        let staged_attaches = self
-            .operations
-            .iter()
-            .filter(|operation| matches!(operation, BatchOperation::Attach { .. }))
-            .count();
-        let attach_count = staged_attaches
+        let attach_count = self
+            .staged_attach_count
             .checked_add(1)
             .ok_or_else(|| Error::Invalid("DOCX SVG attachment count overflows".into()))?;
         let operation_count = self
@@ -1370,18 +1559,9 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                 "DOCX SVG attachment count exceeds the Part limit".into(),
             ));
         }
-        let staged_bytes = self.operations.iter().try_fold(0u64, |total, operation| {
-            let bytes = match operation {
-                BatchOperation::Attach { payload, .. } => payload.len() as u64,
-                BatchOperation::Detach { .. } => 0,
-            };
-            total
-                .checked_add(bytes)
-                .ok_or_else(|| Error::Invalid("DOCX SVG staged payload bytes overflow".into()))
-        })?;
         let total_part_bytes = budget
             .total_part_bytes
-            .checked_add(staged_bytes)
+            .checked_add(self.staged_payload_bytes)
             .and_then(|value| value.checked_add(payload_len_u64))
             .ok_or_else(|| Error::Invalid("DOCX SVG total Part bytes overflow".into()))?;
         if total_part_bytes > limits.max_total_part_bytes() {
@@ -1747,11 +1927,19 @@ impl super::Package {
                 "selected picture has a refused SVG or raster owner state",
             ));
         }
+        let context = snapshot
+            .context
+            .clone()
+            .ok_or_else(|| Error::Invalid("SVG batch has no source layout context".into()))?;
         Ok(SourceBackedSvgAttachmentBatchEdit {
             package: self,
             source: snapshot.clone(),
             current: snapshot,
+            context,
             operations: Vec::new(),
+            projection_edits: Vec::new(),
+            staged_attach_count: 0,
+            staged_payload_bytes: 0,
             next_relationship_index: 0,
             next_part_index: 0,
         })
@@ -1808,9 +1996,13 @@ impl super::Package {
         let original_artifact = self.package.source_artifact();
         let before = SourceBackedSvgAttachmentBatchSnapshot {
             states: vec![current.clone()],
+            story: current.xml.clone(),
+            context: None,
         };
         let expected = SourceBackedSvgAttachmentBatchSnapshot {
             states: vec![target.state.clone()],
+            story: target.state.xml.clone(),
+            context: None,
         };
         let published_fingerprint = if target_state_changed(&current, &target.state) {
             let plan = build_batch_topology_plan(&self.package, &before, &expected)?;
@@ -2036,11 +2228,7 @@ fn validate_effective_candidate(
     // potentially large source read and XML scan for every selected picture.
     let story_part = candidate.part(&story_uri)?;
     let story_data = story_part.data()?;
-    if expected
-        .states
-        .iter()
-        .any(|state| !same_bytes(story_data.as_bytes(), state.xml.as_bytes()))
-    {
+    if !same_bytes(story_data.as_bytes(), expected.story.as_bytes()) {
         return Err(unsafe_edit(
             "SVG lifecycle publication",
             "prepared candidate story bytes differ from the staged source projection",
@@ -2321,7 +2509,7 @@ fn expected_transition_fingerprints(
         }
     }
     if !detached.is_empty() {
-        let drawing = scan_story(source.xml.as_bytes(), candidate.read_limits())?;
+        let drawing = scan_story(before.story.as_bytes(), candidate.read_limits())?;
         for (id, target) in &detached {
             let total_references = drawing
                 .relationship_references()
@@ -2483,12 +2671,32 @@ fn capture_batch(
         )?;
         states.push(state);
     }
+    let mut layouts = Vec::new();
+    layouts
+        .try_reserve_exact(drawing.pictures().len())
+        .map_err(|source| Error::Allocation {
+            resource: "DOCX SVG batch picture layouts",
+            source,
+        })?;
+    for picture in drawing.pictures() {
+        layouts.push(layout_from_picture(picture)?);
+    }
     if package.package.source_version()? != inventory_version {
         return Err(Error::Invalid(
             "DOCX SVG selected-picture capture source changed during capture".into(),
         ));
     }
-    Ok(SourceBackedSvgAttachmentBatchSnapshot { states })
+    let context = Arc::new(BatchSourceContext {
+        source_xml: source.clone(),
+        source_version: inventory_version,
+        lineage: package.package.source_lineage(),
+        layouts: Arc::from(layouts.into_boxed_slice()),
+    });
+    Ok(SourceBackedSvgAttachmentBatchSnapshot {
+        states,
+        story: StoryPayload::Original(source),
+        context: Some(context),
+    })
 }
 
 fn capture_picture(package: &super::Package, selector: PictureSelector) -> Result<SnapshotState> {
@@ -2765,6 +2973,52 @@ fn map_owner_state(state: &SvgOwnerState<'_>) -> SvgPictureOwnerState {
     }
 }
 
+fn copy_layout_prefix(prefix: &[u8]) -> Result<Box<[u8]>> {
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(prefix.len())
+        .map_err(|source| Error::Allocation {
+            resource: "DOCX SVG picture namespace prefix",
+            source,
+        })?;
+    owned.extend_from_slice(prefix);
+    Ok(owned.into_boxed_slice())
+}
+
+fn layout_from_picture(picture: &PictureSource<'_>) -> Result<PictureLayout> {
+    let blip = picture
+        .blip_range()
+        .ok_or_else(|| Error::Invalid("direct picture has no raster blip range".into()))?;
+    let ext_list = picture.ext_list_range();
+    let owner_state = map_owner_state(picture.svg_owner());
+    let svg_extension_range = match picture.svg_owner() {
+        SvgOwnerState::Embedded(owner) => Some(owner.extension_range()),
+        SvgOwnerState::None
+        | SvgOwnerState::Linked(_)
+        | SvgOwnerState::Ambiguous
+        | SvgOwnerState::Refused
+        | SvgOwnerState::Opaque => None,
+    };
+    let post_detach_owner_state = if picture.has_opaque_svg_extension() {
+        SvgPictureOwnerState::Opaque
+    } else {
+        SvgPictureOwnerState::None
+    };
+    Ok(PictureLayout {
+        blip_range: blip.range(),
+        blip_prefix: copy_layout_prefix(blip.prefix())?,
+        blip_close_start: blip.close_start(),
+        ext_list_range: ext_list.map(|range| range.range()),
+        ext_list_prefix: ext_list
+            .map(|range| copy_layout_prefix(range.prefix()))
+            .transpose()?,
+        ext_list_close_start: ext_list.and_then(|range| range.close_start()),
+        svg_extension_range,
+        owner_state,
+        post_detach_owner_state,
+    })
+}
+
 fn scan_story<'a>(bytes: &'a [u8], limits: litchi_opc::ReadLimits) -> Result<SourceDrawing<'a>> {
     let max = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
     let mut scan = ScanLimits::default();
@@ -2890,79 +3144,6 @@ fn closure_inventory(
         Arc::from(relationships.into_boxed_slice()),
         Arc::from(content_types.into_boxed_slice()),
     ))
-}
-
-/// Apply a single lifecycle operation to a raw projected story. Intermediate
-/// projections intentionally use an ordinary bounded byte buffer rather than
-/// an OPC `SourceXmlPart`, whose provenance token is single-use by design.
-fn rewrite_story_xml_bytes(
-    source: &[u8],
-    operation: &BatchOperation,
-    limits: litchi_opc::ReadLimits,
-) -> Result<Vec<u8>> {
-    let drawing = scan_story(source, limits)?;
-    let picture = drawing.picture(operation.selector().picture)?;
-    let (range, replacement) = match operation {
-        BatchOperation::Attach {
-            relationship_id, ..
-        } => {
-            if picture.svg_owner().is_refused()
-                || matches!(picture.svg_owner(), SvgOwnerState::Embedded(_))
-            {
-                return Err(unsafe_edit(
-                    "attach_svg",
-                    "selected picture has an existing recognized SVG owner",
-                ));
-            }
-            generated_attachment_replacement(picture, relationship_id, source, limits)?
-        },
-        BatchOperation::Detach { .. } => {
-            let owner = match picture.svg_owner() {
-                SvgOwnerState::Embedded(owner) => owner,
-                SvgOwnerState::Linked(_) | SvgOwnerState::Ambiguous | SvgOwnerState::Refused => {
-                    return Err(unsafe_edit(
-                        "detach_svg",
-                        "selected picture has a refused SVG owner state",
-                    ));
-                },
-                SvgOwnerState::None | SvgOwnerState::Opaque => {
-                    return Err(Error::Invalid(
-                        "selected picture has no admitted embedded SVG owner".into(),
-                    ));
-                },
-            };
-            (owner.extension_range(), Vec::new())
-        },
-    };
-    let range_len = range.len()?;
-    let output_len = source
-        .len()
-        .checked_sub(range_len)
-        .and_then(|value| value.checked_add(replacement.len()))
-        .ok_or_else(|| Error::Invalid("DOCX story output size overflows".into()))?;
-    if output_len as u64 > limits.max_part_bytes() {
-        return Err(Error::Invalid(
-            "DOCX story output exceeds the Part limit".into(),
-        ));
-    }
-    let start = range.start;
-    let end = range.end;
-    if end > source.len() || start > end {
-        return Err(Error::Invalid(
-            "DOCX SVG replacement range is outside the story source".into(),
-        ));
-    }
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(output_len)
-        .map_err(|source| Error::Allocation {
-            resource: "DOCX projected SVG story",
-            source,
-        })?;
-    output.extend_from_slice(&source[..start]);
-    output.extend_from_slice(&replacement);
-    output.extend_from_slice(&source[end..]);
-    Ok(output)
 }
 
 /// Apply all staged operations once to the immutable original source and
@@ -3117,6 +3298,78 @@ fn generated_attachment_replacement(
         ));
     }
     Ok((range, replacement))
+}
+
+fn generated_attachment_replacement_from_layout(
+    layout: &PictureLayout,
+    relationship_id: &str,
+    source: &[u8],
+    limits: litchi_opc::ReadLimits,
+) -> Result<(ByteRange, Vec<u8>)> {
+    let (range, replacement_len) =
+        generated_attachment_replacement_bounds_from_layout(layout, relationship_id, source)?;
+    let drawing_prefix = layout.blip_prefix.as_ref();
+    let ext_prefix = layout.ext_list_prefix.as_deref().unwrap_or(drawing_prefix);
+    let ext = generated_svg_extension(ext_prefix, relationship_id)?;
+    let replacement = if let Some(ext_list_range) = layout.ext_list_range {
+        if layout.ext_list_close_start.is_some() {
+            ext
+        } else {
+            let old = ext_list_range.slice(source)?;
+            generated_ext_list_from_empty(old, ext_prefix, ext)?
+        }
+    } else if layout.blip_close_start.is_some() {
+        generated_ext_list(drawing_prefix, ext)?
+    } else {
+        let old = layout.blip_range.slice(source)?;
+        generated_nonempty_blip(old, drawing_prefix, ext)?
+    };
+    if replacement.len() != replacement_len {
+        return Err(Error::Invalid(
+            "DOCX generated SVG replacement length drifted during construction".into(),
+        ));
+    }
+    if source
+        .len()
+        .checked_sub(range.len()?)
+        .and_then(|value| value.checked_add(replacement.len()))
+        .is_none_or(|length| length as u64 > limits.max_part_bytes())
+    {
+        return Err(Error::Invalid(
+            "DOCX story output exceeds the Part limit".into(),
+        ));
+    }
+    Ok((range, replacement))
+}
+
+fn generated_attachment_replacement_bounds_from_layout(
+    layout: &PictureLayout,
+    relationship_id: &str,
+    source: &[u8],
+) -> Result<(ByteRange, usize)> {
+    validate_relationship_id(relationship_id)?;
+    let drawing_prefix = layout.blip_prefix.as_ref();
+    let ext_prefix = layout.ext_list_prefix.as_deref().unwrap_or(drawing_prefix);
+    let extension_len = generated_svg_extension_len(ext_prefix, relationship_id)?;
+    if let Some(ext_list_range) = layout.ext_list_range {
+        if let Some(close_start) = layout.ext_list_close_start {
+            return Ok((ByteRange::new(close_start, close_start), extension_len));
+        }
+        let old = ext_list_range.slice(source)?;
+        return Ok((
+            ext_list_range,
+            generated_ext_list_from_empty_len(old, ext_prefix, extension_len)?,
+        ));
+    }
+    let ext_list_len = generated_ext_list_len(drawing_prefix, extension_len)?;
+    if let Some(close_start) = layout.blip_close_start {
+        return Ok((ByteRange::new(close_start, close_start), ext_list_len));
+    }
+    let old = layout.blip_range.slice(source)?;
+    Ok((
+        layout.blip_range,
+        generated_nonempty_blip_len(old, drawing_prefix, ext_list_len)?,
+    ))
 }
 
 fn generated_attachment_replacement_bounds(
@@ -3367,27 +3620,24 @@ fn same_batch_source(
     if left_batch.states.len() != right_batch.states.len() {
         return false;
     }
-    let Some((left_first, right_first)) = left_batch.states.first().zip(right_batch.states.first())
-    else {
-        return true;
-    };
-    same_source(left_first, right_first)
-        && left_batch
-            .states
-            .iter()
-            .skip(1)
-            .zip(right_batch.states.iter().skip(1))
-            .all(|(left, right)| {
-                same_source_core(left, right)
-                    && (Arc::ptr_eq(
-                        &left.relationship_fingerprint,
-                        &right.relationship_fingerprint,
-                    ) || left.relationship_fingerprint == right.relationship_fingerprint)
-                    && (Arc::ptr_eq(
-                        &left.content_type_fingerprint,
-                        &right.content_type_fingerprint,
-                    ) || left.content_type_fingerprint == right.content_type_fingerprint)
-            })
+    if !same_bytes(left_batch.story.as_bytes(), right_batch.story.as_bytes()) {
+        return false;
+    }
+    left_batch
+        .states
+        .iter()
+        .zip(right_batch.states.iter())
+        .all(|(left, right)| {
+            same_source_core(left, right)
+                && (Arc::ptr_eq(
+                    &left.relationship_fingerprint,
+                    &right.relationship_fingerprint,
+                ) || left.relationship_fingerprint == right.relationship_fingerprint)
+                && (Arc::ptr_eq(
+                    &left.content_type_fingerprint,
+                    &right.content_type_fingerprint,
+                ) || left.content_type_fingerprint == right.content_type_fingerprint)
+        })
 }
 
 fn same_batch_state(
@@ -3397,16 +3647,11 @@ fn same_batch_state(
     if left_batch.states.len() != right_batch.states.len() {
         return false;
     }
-    let Some((left_first, right_first)) = left_batch.states.first().zip(right_batch.states.first())
-    else {
-        return true;
-    };
-    same_state(left_first, right_first)
+    same_bytes(left_batch.story.as_bytes(), right_batch.story.as_bytes())
         && left_batch
             .states
             .iter()
-            .skip(1)
-            .zip(right_batch.states.iter().skip(1))
+            .zip(right_batch.states.iter())
             .all(|(left, right)| same_state_core(left, right))
 }
 
@@ -3478,10 +3723,10 @@ fn build_batch_topology_plan(
             "SVG lifecycle batch spans multiple story parts".into(),
         ));
     }
-    let story_bytes = after.states[0].xml.as_bytes();
+    let story_bytes = after.story.as_bytes();
     let drawing = scan_story(story_bytes, before.states[0].limits)?;
     let mut plan = SourceTopologyPlan::new();
-    plan.try_replace_source_xml_part(owner.clone(), after.states[0].xml.source_xml().clone())?;
+    plan.try_replace_source_xml_part(owner.clone(), after.story.source_xml().clone())?;
 
     let mut removed_relationships: Vec<(String, PackURI)> = Vec::new();
     for (before, after) in before.states.iter().zip(&after.states) {
