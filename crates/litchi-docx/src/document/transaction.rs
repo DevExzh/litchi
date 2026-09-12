@@ -781,6 +781,17 @@ impl SourceIdentity {
             && self.version == other.version
             && self.partname.is_equivalent_to(&other.partname)
     }
+
+    fn matches_parts(
+        &self,
+        lineage: &SourceLineage,
+        version: SourceVersion,
+        partname: &PackURI,
+    ) -> bool {
+        self.lineage.eq(lineage)
+            && self.version == version
+            && self.partname.is_equivalent_to(partname)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1194,6 +1205,40 @@ impl Snapshot {
 
     pub(crate) fn source_xml(&self) -> Option<SourceXmlPart> {
         self.xml.source_xml()
+    }
+
+    pub(crate) fn source_identity_matches(
+        &self,
+        lineage: &SourceLineage,
+        version: SourceVersion,
+        partname: &PackURI,
+    ) -> bool {
+        self.xml
+            .identity()
+            .is_some_and(|identity| identity.matches_parts(lineage, version, partname))
+    }
+
+    pub(crate) fn reuse_if_source_xml_matches(
+        &self,
+        source_xml: &SourceXmlPart,
+        lineage: &SourceLineage,
+        version: SourceVersion,
+        partname: &PackURI,
+    ) -> Option<Self> {
+        if !self.source_identity_matches(lineage, version, partname) {
+            return None;
+        }
+        let before_bytes = self.xml.bytes();
+        let current_bytes = source_xml.bytes();
+        // The OPC proof retains immutable bytes. Pointer identity is therefore
+        // an exact equality proof and avoids a second full comparison on a
+        // cache hit; distinct allocations still receive the byte check.
+        if before_bytes.len() != current_bytes.len()
+            || (before_bytes.as_ptr() != current_bytes.as_ptr() && before_bytes != current_bytes)
+        {
+            return None;
+        }
+        Some(self.clone())
     }
 
     fn source_identity(&self) -> Option<Arc<SourceIdentity>> {

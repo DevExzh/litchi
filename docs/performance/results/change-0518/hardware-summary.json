@@ -1,0 +1,651 @@
+{
+  "scope": "Whole child includes fixture/preflight and output oracles; one child per arm/build; diagnostic only, not publication-local or native latency evidence",
+  "baseline": [
+    {
+      "case": "p128-k1-owned-batch",
+      "events": {
+        "cycles": {
+          "value": 305844810,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 952014535,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 168757839,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 356223,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 2889747,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 1,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 1229,
+          "runtime_ns": 68239954,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.1127372571730088
+    },
+    {
+      "case": "p128-k1-owned-repeated",
+      "events": {
+        "cycles": {
+          "value": 339058342,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 1020604868,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 180535881,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 428643,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3205450,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 1,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 13982,
+          "runtime_ns": 111892547,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.010115787093656
+    },
+    {
+      "case": "p512-k1-owned-batch",
+      "events": {
+        "cycles": {
+          "value": 859968972,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 3282496171,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 628575521,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 1084324,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3167062,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 3,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 21165,
+          "runtime_ns": 191719457,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.8169937263736533
+    },
+    {
+      "case": "p512-k1-owned-repeated",
+      "events": {
+        "cycles": {
+          "value": 864376020,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 3278063183,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 627714310,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 1095692,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3073157,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 0,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 21177,
+          "runtime_ns": 192597426,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.792404124075538
+    },
+    {
+      "case": "p512-k32-owned-batch",
+      "events": {
+        "cycles": {
+          "value": 900960843,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 3403609187,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 653915806,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 1331032,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3550872,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 1,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 18712,
+          "runtime_ns": 200782503,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.7777548418938336
+    },
+    {
+      "case": "p512-k32-owned-repeated",
+      "events": {
+        "cycles": {
+          "value": 5253706719,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 21617938958,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 4231651021,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 9037487,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3914911,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 7,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 18551,
+          "runtime_ns": 1169582010,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 4.114797440028171
+    }
+  ],
+  "candidate": [
+    {
+      "case": "p128-k1-owned-batch",
+      "events": {
+        "cycles": {
+          "value": 261917003,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 754014827,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 129755695,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 277146,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3190030,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 0,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 1231,
+          "runtime_ns": 58467098,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 2.878831150186916
+    },
+    {
+      "case": "p128-k1-owned-repeated",
+      "events": {
+        "cycles": {
+          "value": 263686372,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 753798816,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 129724939,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 274084,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 2938384,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 2,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 1230,
+          "runtime_ns": 87052007,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 2.8586946313630497
+    },
+    {
+      "case": "p512-k1-owned-batch",
+      "events": {
+        "cycles": {
+          "value": 686409073,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 2495666587,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 473650486,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 857000,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3285514,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 1,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 21141,
+          "runtime_ns": 152986381,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.6358298355418155
+    },
+    {
+      "case": "p512-k1-owned-repeated",
+      "events": {
+        "cycles": {
+          "value": 678887510,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 2494945317,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 473469757,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 841420,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3122391,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 0,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 21135,
+          "runtime_ns": 151287782,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.6750496661810734
+    },
+    {
+      "case": "p512-k32-owned-batch",
+      "events": {
+        "cycles": {
+          "value": 727866482,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 2622766816,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 500126949,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 1022662,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 3510221,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 0,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 18711,
+          "runtime_ns": 162183687,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 3.6033625408787544
+    },
+    {
+      "case": "p512-k32-owned-repeated",
+      "events": {
+        "cycles": {
+          "value": 5074944633,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        },
+        "instructions": {
+          "value": 20816366027,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        },
+        "branches": {
+          "value": 4074232751,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        },
+        "branch-misses": {
+          "value": 9038714,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        },
+        "cache-misses": {
+          "value": 2956716,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        },
+        "context-switches": {
+          "value": 4,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        },
+        "cpu-migrations": {
+          "value": 0,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        },
+        "page-faults": {
+          "value": 14865,
+          "runtime_ns": 1129171395,
+          "coverage_percent": 100.0
+        }
+      },
+      "IPC": 4.101791749931787
+    }
+  ],
+  "comparisons": [
+    {
+      "case": "p128-k1-owned-batch",
+      "percent_change": {
+        "cycles": -14.362776664413568,
+        "instructions": -20.797971115010338,
+        "branches": -23.11130803233383,
+        "branch-misses": -22.198735062025754,
+        "cache-misses": 10.391324915295353,
+        "context-switches": -100.0,
+        "cpu-migrations": null,
+        "page-faults": 0.16273393002441683
+      },
+      "IPC_before": 3.1127372571730088,
+      "IPC_after": 2.878831150186916
+    },
+    {
+      "case": "p128-k1-owned-repeated",
+      "percent_change": {
+        "cycles": -22.229793714970736,
+        "instructions": -26.141953694855392,
+        "branches": -28.14451161650243,
+        "branch-misses": -36.05774502324779,
+        "cache-misses": -8.33162270508041,
+        "context-switches": 100.0,
+        "cpu-migrations": null,
+        "page-faults": -91.20297525389786
+      },
+      "IPC_before": 3.010115787093656,
+      "IPC_after": 2.8586946313630497
+    },
+    {
+      "case": "p512-k1-owned-batch",
+      "percent_change": {
+        "cycles": -20.18211175646928,
+        "instructions": -23.97046464064253,
+        "branches": -24.647004190288857,
+        "branch-misses": -20.96458254174951,
+        "cache-misses": 3.7401225489112733,
+        "context-switches": -66.66666666666667,
+        "cpu-migrations": null,
+        "page-faults": -0.1133947554925574
+      },
+      "IPC_before": 3.8169937263736533,
+      "IPC_after": 3.6358298355418155
+    },
+    {
+      "case": "p512-k1-owned-repeated",
+      "percent_change": {
+        "cycles": -21.459238306958117,
+        "instructions": -23.88965136673511,
+        "branches": -24.572413045673592,
+        "branch-misses": -23.206521540724946,
+        "cache-misses": 1.6020658885959937,
+        "context-switches": null,
+        "cpu-migrations": null,
+        "page-faults": -0.1983283751239573
+      },
+      "IPC_before": 3.792404124075538,
+      "IPC_after": 3.6750496661810734
+    },
+    {
+      "case": "p512-k32-owned-batch",
+      "percent_change": {
+        "cycles": -19.212195773529306,
+        "instructions": -22.941598993868272,
+        "branches": -23.518143404534865,
+        "branch-misses": -23.167737514950804,
+        "cache-misses": -1.1448173857013133,
+        "context-switches": -100.0,
+        "cpu-migrations": null,
+        "page-faults": -0.005344164172726984
+      },
+      "IPC_before": 3.7777548418938336,
+      "IPC_after": 3.6033625408787544
+    },
+    {
+      "case": "p512-k32-owned-repeated",
+      "percent_change": {
+        "cycles": -3.402589743989859,
+        "instructions": -3.7079063483217323,
+        "branches": -3.7200201344297024,
+        "branch-misses": 0.013576783015012417,
+        "cache-misses": -24.47552447552448,
+        "context-switches": -42.85714285714286,
+        "cpu-migrations": null,
+        "page-faults": -19.86954881138483
+      },
+      "IPC_before": 4.114797440028171,
+      "IPC_after": 4.101791749931787
+    }
+  ]
+}

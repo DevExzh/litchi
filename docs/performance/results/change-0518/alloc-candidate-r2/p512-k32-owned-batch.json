@@ -1,0 +1,42 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0518/allocation-candidate",
+    "--paragraphs",
+    "512",
+    "--replacements",
+    "32",
+    "--source",
+    "owned",
+    "--mode",
+    "batch",
+    "--samples",
+    "1",
+    "--warmups",
+    "0",
+    "--repeats",
+    "1",
+    "--artifact-dir",
+    "/tmp/litchi-goal-0518/corpora/alloc-candidate-r2-p512-k32-owned-batch",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0518/alloc-candidate-r2/p512-k32-owned-batch.csv"
+  ],
+  "started_utc": "2026-09-12T03:10:36.914509+00:00",
+  "elapsed_seconds": 0.011456840991741046,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "binary_sha256": "a0faf7a0bf524b73b0eb18bf5df8b67dcbce23a10487b558f230de0a5e58822f",
+  "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+  "probe_manifest_sha256": "5211945d5b9b43938391dc3d0c3f8626f1f52c136bfd4e65e1fef54230622f7d",
+  "candidate_plan_sha256": "4d8f0fcf52b1ba598ee98d5072b8ae33640725789763af2455d8206fc6b1759f",
+  "cleanup_verified": true,
+  "artifacts": {
+    "p512-k32-owned-batch.csv": "c16065b4e9cf56c5ecc28daba75ef60cc952ffad787e3ab126f6deb5b633edc7",
+    "p512-k32-owned-batch.stdout": "47a71cd04851b3c7c0c82880144352bbd516c87f51594f71b7ed717f370b8e29",
+    "p512-k32-owned-batch.stderr": "237608f9b5d9cb54a8639b7a296e9b020918ee6092ca0aa6f331ba3b020a3924"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "scope": "Show that foreign and derived hints still enter full source XML validation.\n\nThese are debug integration-test guard profiles, not latency or speedup data.\nThe test executable is taken from the completed all-feature OOXML test log.\n",
+  "function": "litchi_opc::source_backed::PartView::source_xml_with_hint",
+  "cases": [
+    "equal_version_foreign_lineage_falls_back_to_current_original",
+    "derived_hint_returns_current_original_and_keeps_derived_bytes_live"
+  ],
+  "test_log_sha256": "99b963023749600205c57614e51263174fe5e9433a662f8415e2ef01aad5ced0",
+  "binary": "/home/zhuhe/litchi-goal-0518-target/debug/deps/source_xml_hint-7af9f94fe8d8f1dc",
+  "binary_sha256": "7148673fb1d1d934fa533869050b9abc6ff2ed56e805a972907922d4d2251deb"
+}

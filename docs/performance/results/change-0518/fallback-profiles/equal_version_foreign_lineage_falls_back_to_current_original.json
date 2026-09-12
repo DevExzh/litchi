@@ -1,0 +1,33 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*litchi_opc::source_backed::PartView::source_xml_with_hint",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0518/fallback-profiles/equal_version_foreign_lineage_falls_back_to_current_original.callgrind",
+    "/home/zhuhe/litchi-goal-0518-target/debug/deps/source_xml_hint-7af9f94fe8d8f1dc",
+    "--exact",
+    "equal_version_foreign_lineage_falls_back_to_current_original",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "started_utc": "2026-09-12T03:22:50.683393+00:00",
+  "elapsed_seconds": 0.46923590199730825,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+  "binary_sha256": "7148673fb1d1d934fa533869050b9abc6ff2ed56e805a972907922d4d2251deb",
+  "artifacts": {
+    "equal_version_foreign_lineage_falls_back_to_current_original.callgrind": "ed5a584ad6c32e1da66f16b652caa2452e2665b78a997fe32f6e3974f96dcee9",
+    "equal_version_foreign_lineage_falls_back_to_current_original.stdout": "a0ef6f30be9bf8fe90dd9c0beed57ecde555a6cea2406f73b2da7e0202afbd31",
+    "equal_version_foreign_lineage_falls_back_to_current_original.stderr": "92e1142c60af7172fdb49dd77b9b53963312366cc6a9ac91d87f0177e08db32e"
+  },
+  "samples": 1,
+  "warmups": 0,
+  "repeats": 1,
+  "cleanup_verified": true,
+  "fixture_scope": "In-memory integration-test fixtures; no scratch corpus files"
+}

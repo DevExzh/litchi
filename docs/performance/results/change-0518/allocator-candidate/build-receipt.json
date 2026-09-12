@@ -1,0 +1,29 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0518/allocator-probe/Cargo.toml",
+    "--features",
+    "allocator-metrics"
+  ],
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0518-target/allocator",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0518"
+  },
+  "started_utc": "2026-09-12T03:08:32.048287+00:00",
+  "elapsed_seconds": 59.66475966999133,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "probe_unchanged": true,
+  "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+  "probe_manifest_sha256": "5211945d5b9b43938391dc3d0c3f8626f1f52c136bfd4e65e1fef54230622f7d",
+  "log_sha256": "4d170b1cb7bdf6ac9fc4df0e2492e29dc9afb5a4928bbfb7dfc2d18ed7e662f6",
+  "binary": "/tmp/litchi-goal-0518/allocation-candidate",
+  "binary_sha256": "a0faf7a0bf524b73b0eb18bf5df8b67dcbce23a10487b558f230de0a5e58822f"
+}

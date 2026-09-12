@@ -1,0 +1,57 @@
+   Compiling zeroize v1.9.0
+   Compiling generic-array v0.14.9
+   Compiling const-oid v0.9.6
+   Compiling subtle v2.6.1
+   Compiling getrandom v0.2.17
+   Compiling base64ct v1.6.0
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling pem-rfc7468 v0.7.0
+   Compiling digest v0.10.7
+   Compiling rand_core v0.6.4
+   Compiling der v0.7.10
+   Compiling syn v2.0.114
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling ff v0.13.1
+   Compiling base16ct v0.2.0
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling crypto-bigint v0.5.5
+   Compiling sha2 v0.10.9
+   Compiling thiserror-impl v2.0.18
+   Compiling elliptic-curve v0.13.8
+   Compiling hmac v0.12.1
+   Compiling bitflags v2.13.1
+   Compiling rustix v1.1.4
+   Compiling thiserror v2.0.18
+   Compiling rfc6979 v0.4.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling signature v2.2.0
+   Compiling smallvec v1.16.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling tempfile v3.27.0
+   Compiling ecdsa v0.16.9
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling primeorder v0.13.6
+   Compiling p256 v0.13.2
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized] target(s) in 5.69s
+     Running tests/source_xml_hint.rs (/home/zhuhe/litchi-goal-0518-target/debug/deps/source_xml_hint-1cc0187f3a884c12)
+
+running 11 tests
+test derived_hint_returns_current_original_and_keeps_derived_bytes_live ... ok
+test cancellation_before_and_during_hint_read_remains_typed_and_budgeted ... ok
+test different_content_type_hint_falls_back_even_with_equal_source_version ... ok
+test different_limits_hint_falls_back_to_validation_under_current_limits ... ok
+test different_part_and_content_type_hints_return_the_target_original ... ok
+test equal_version_foreign_lineage_falls_back_to_current_original ... ok
+test malformed_current_source_is_revalidated_after_foreign_hint_mismatch ... ok
+test matching_original_hint_reuses_exact_bytes_without_extra_budget_work ... ok
+test source_revision_change_before_hint_read_is_refused ... ok
+test signed_and_encrypted_packages_refuse_hints_before_payload_transfer ... ok
+test source_revision_change_during_hint_read_is_refused_after_read ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

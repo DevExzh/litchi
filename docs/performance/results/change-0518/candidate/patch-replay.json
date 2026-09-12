@@ -1,0 +1,32 @@
+{
+  "base_revision": "afb62ab7a70859dad4a4b9c8eea91402d1ef4052",
+  "source_patch_sha256": "a57c25219417f7baae601874ad1153601a1c23182b723555f5c5acb4f9f7f7a5",
+  "files": {
+    "crates/litchi-docx/src/document/transaction.rs": {
+      "before_sha256": "3f238fa24187e94fbaec6cbb0f7167454a7456d28bfb0f5ef9310ba3873aee81",
+      "after_sha256": "cc0e53d038d919d67479ad4e0d74319ba8422447c15ed6818deb3034b3ba1752"
+    },
+    "crates/litchi-docx/src/source_backed.rs": {
+      "before_sha256": "0d3e29d545381ed39c41c81b32483afb619d1474e1be525ba484fa6584260ab6",
+      "after_sha256": "32faf52b3b242e86955ec3c998f309a83efbf2925d9defc30f19b5919b5b7d12"
+    },
+    "crates/litchi-docx/tests/source_backed_managed_document_edit.rs": {
+      "before_sha256": "15b539fff492ea4b6d164fa1341a4ce0383a1f79a7f1e757a0fd5dfe0ea36480",
+      "after_sha256": "f64a501fff48ef88aa41fd56da11d380cef65da0f0232af6a7e8657d69984fd1"
+    },
+    "crates/litchi-opc/src/source_backed.rs": {
+      "before_sha256": "444ca5d86b0b8f3498d8460c4f77255479c40c3ac730160dbb88ecc0cc3ad543",
+      "after_sha256": "b71ecf3e030632f1317a4ba44301c294d0c566f06107b01cd5e3d6c163693958"
+    },
+    "crates/litchi-opc/src/source_xml_hint_tests.rs": {
+      "before_sha256": null,
+      "after_sha256": "e9d0e6adf8e17a764b9c1d6836c71fa23f91ff0c1a0238a835a5641d3c8c9f7c"
+    },
+    "crates/litchi-opc/tests/source_xml_hint.rs": {
+      "before_sha256": null,
+      "after_sha256": "3316d6f994b707780e1786211058e4a8135357a836e3465f444f5943853f0c87"
+    }
+  },
+  "exact_replay": true,
+  "temporary_removed": true
+}

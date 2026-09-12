@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## 0518: reuse an opaque original-source proof and immutable DOCX layout
+
+The [0518 matrix](results/change-0518/adr-review.md) and
+[source review](results/change-0518/final-source-review.md) keep proof reuse
+inside the OPC and DOCX owners. The public low-level hint accepts only an
+opaque `SourceXmlPart`; it adds no archive implementation type or ordinary
+CRUD surface. Current Part reads, security, source/context fences, equal
+limits, and exact bytes precede reuse. Derived or unsuitable hints use full
+validation of the same fresh read. Eligible comparisons retain a conservative
+Work charge and bounded cancellation checks. Shared proof/snapshot clones
+retain their existing reservations. Candidate reconstruction, reparse,
+semantic readback, `Patch::apply`, policy, topology, and sink guards remain.
+No unsafe code, dependency, global cache, or executor change is introduced.
+The 30 accepted ADR/index hashes are unchanged. ODF remains deferred behind
+the full OLE2/OOXML optimization goal.
+
 ## 0517: reuse a proof within one immutable publication call
 
 The [0517 proof matrix](results/change-0517/publication-map.md) and

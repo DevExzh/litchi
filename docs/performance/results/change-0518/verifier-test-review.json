@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "reported_by": "/root/docx_evidence_verify_0517",
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0518/verify_test.py"
+  ],
+  "result": "Tamper tests passed, including dynamic Callgrind-summary mutation.",
+  "verifier_sha256": "6d14f8242f24ea5880242256a8b97eebd3c3aff0ec46408b2999a44ad73bbce3",
+  "test_sha256": "97937f1d3a03eeb4995a41b05a74416c2f233368f22dc6e70c52a01ca4521d68"
+}

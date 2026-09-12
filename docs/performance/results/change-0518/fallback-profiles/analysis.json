@@ -1,0 +1,93 @@
+{
+  "scope": "Show that foreign and derived hints still enter full source XML validation.\n\nThese are debug integration-test guard profiles, not latency or speedup data.\nThe test executable is taken from the completed all-feature OOXML test log.\n",
+  "profiles": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0518/fallback-profiles/equal_version_foreign_lineage_falls_back_to_current_original.callgrind",
+      "sha256": "ed5a584ad6c32e1da66f16b652caa2452e2665b78a997fe32f6e3974f96dcee9",
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0518/fallback-profiles/equal_version_foreign_lineage_falls_back_to_current_original.json",
+      "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+      "binary_sha256": "7148673fb1d1d934fa533869050b9abc6ff2ed56e805a972907922d4d2251deb",
+      "selected_function": "litchi_opc::source_backed::PartView::source_xml_with_hint",
+      "selected_function_id": 4082,
+      "summary_ir": 225021,
+      "positive_incoming_edges": [
+        {
+          "caller_id": 1298,
+          "caller": "source_xml_hint::equal_version_foreign_lineage_falls_back_to_current_original",
+          "calls": 1,
+          "inclusive_ir": 225021,
+          "line": 5317
+        }
+      ],
+      "selected_call_count": 1,
+      "selected_inclusive_ir": 225021,
+      "selected_self_ir": 11,
+      "selected_direct_ir": 225010,
+      "selected_direct_callees": [
+        {
+          "callee_id": 3718,
+          "callee": "litchi_opc::source_backed::SourceBackedPackage::source_xml_part_with_hint",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 225010
+        }
+      ],
+      "validation": {
+        "exactly_one_positive_call": true,
+        "selected_self_plus_direct_equals_inclusive": true,
+        "publication_total_scoped_to_summary": true,
+        "receipt": {
+          "exit_code_zero": true,
+          "cleanup_verified": true,
+          "samples_one": true,
+          "warmups_zero": true,
+          "repeats_one": true
+        }
+      }
+    },
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0518/fallback-profiles/derived_hint_returns_current_original_and_keeps_derived_bytes_live.callgrind",
+      "sha256": "b61dab102dc5266ef81f547239b375483b2eb7f78a504b52e7a276fceb7facde",
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0518/fallback-profiles/derived_hint_returns_current_original_and_keeps_derived_bytes_live.json",
+      "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+      "binary_sha256": "7148673fb1d1d934fa533869050b9abc6ff2ed56e805a972907922d4d2251deb",
+      "selected_function": "litchi_opc::source_backed::PartView::source_xml_with_hint",
+      "selected_function_id": 4188,
+      "summary_ir": 180632,
+      "positive_incoming_edges": [
+        {
+          "caller_id": 1298,
+          "caller": "source_xml_hint::derived_hint_returns_current_original_and_keeps_derived_bytes_live",
+          "calls": 1,
+          "inclusive_ir": 180632,
+          "line": 5201
+        }
+      ],
+      "selected_call_count": 1,
+      "selected_inclusive_ir": 180632,
+      "selected_self_ir": 11,
+      "selected_direct_ir": 180621,
+      "selected_direct_callees": [
+        {
+          "callee_id": 3702,
+          "callee": "litchi_opc::source_backed::SourceBackedPackage::source_xml_part_with_hint",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 180621
+        }
+      ],
+      "validation": {
+        "exactly_one_positive_call": true,
+        "selected_self_plus_direct_equals_inclusive": true,
+        "publication_total_scoped_to_summary": true,
+        "receipt": {
+          "exit_code_zero": true,
+          "cleanup_verified": true,
+          "samples_one": true,
+          "warmups_zero": true,
+          "repeats_one": true
+        }
+      }
+    }
+  ]
+}

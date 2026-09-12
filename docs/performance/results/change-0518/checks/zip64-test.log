@@ -1,0 +1,42 @@
+   Compiling syn v2.0.114
+   Compiling num-traits v0.2.19
+   Compiling ff v0.13.1
+   Compiling group v0.13.0
+   Compiling crypto-bigint v0.5.5
+   Compiling rand_chacha v0.3.1
+   Compiling num-integer v0.1.47
+   Compiling signature v2.2.0
+   Compiling chrono v0.4.45
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling der_derive v0.7.3
+   Compiling thiserror-impl v2.0.18
+   Compiling der v0.7.10
+   Compiling thiserror v2.0.18
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling sec1 v0.7.3
+   Compiling elliptic-curve v0.13.8
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling pkcs1 v0.7.5
+   Compiling num-bigint-dig v0.8.6
+   Compiling zerocopy-derive v0.8.56
+   Compiling rsa v0.9.10
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling p256 v0.13.2
+   Compiling x509-cert v0.2.5
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized] target(s) in 7.95s
+     Running tests/external_zip64_source.rs (/home/zhuhe/litchi-goal-0518-target/debug/deps/external_zip64_source-94425982ecf9a6c6)
+
+running 1 test
+test independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

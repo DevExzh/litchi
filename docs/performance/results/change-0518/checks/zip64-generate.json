@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0415/interop.py",
+    "generate",
+    "/tmp/litchi-goal-0518/independent-zip64.zip"
+  ],
+  "started_utc": "2026-09-12T03:20:41.985014+00:00",
+  "elapsed_seconds": 16.304008905994124,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+  "log_sha256": "db11f4a2e6e55cf38b58152457b52c6e4608355a8aac33159585ad769d703f6b",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0518-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0518",
+    "RUSTDOCFLAGS": "-D warnings",
+    "LITCHI_0415_PYTHON_ZIP": "/tmp/litchi-goal-0518/independent-zip64.zip"
+  }
+}

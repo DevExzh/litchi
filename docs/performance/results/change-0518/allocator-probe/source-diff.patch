@@ -1,0 +1,153 @@
+--- crates/litchi-docx/examples/managed_paragraph_batch_perf.rs
++++ docs/performance/results/change-0518/allocator-probe/src/main.rs
+@@ -13,6 +13,18 @@
+ //! forward/inverse oracles, and managed resource gauges are checked outside
+ //! the timed lifecycle.
+ 
++extern crate self as litchi_perf_baseline;
++
++#[allow(
++    dead_code,
++    reason = "The shared observer includes harness-only identity helpers."
++)]
++#[path = "../../../../../../tools/perf-baseline/src/allocation_metrics.rs"]
++pub mod allocation_metrics;
++#[cfg(feature = "allocator-metrics")]
++#[path = "../../../../../../tools/perf-baseline/src/bin/support/counting_allocator.rs"]
++mod counting_allocator;
++
+ use std::error::Error;
+ use std::fmt::Write as _;
+ use std::fs;
+@@ -34,6 +46,7 @@
+ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+ use litchi_opc::{OpcPackage, PackURI, SourceCacheDiagnostics, SourceCacheLimits};
+ use sha2::{Digest, Sha256};
++use serde::Serialize;
+ use soapberry_zip::office::StreamingArchiveWriter;
+ 
+ const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+@@ -230,6 +243,7 @@
+     edit_ns: u64,
+     commit_ns: u64,
+     publish_ns: u64,
++    allocation_sample: allocation_metrics::Sample,
+     drop_ns: u64,
+     output_bytes: usize,
+     output_sha256: String,
+@@ -288,6 +302,8 @@
+ }
+ 
+ fn main() -> AnyResult<()> {
++    #[cfg(feature = "allocator-metrics")]
++    allocation_metrics::enable();
+     let config = parse_args(std::env::args_os().skip(1))?;
+     if config.output.starts_with(&config.artifact_dir) {
+         return Err("--output must be outside the owned --artifact-dir".into());
+@@ -312,7 +328,7 @@
+     let mut rows = Vec::new();
+     for repeat in 0..config.repeats {
+         for ordinal in 0..config.warmups {
+-            rows.push(run_sample(
++            rows.push(run_sample_and_emit(
+                 &config,
+                 &fixture,
+                 &preflight,
+@@ -323,7 +339,7 @@
+             )?);
+         }
+         for ordinal in 0..config.samples {
+-            rows.push(run_sample(
++            rows.push(run_sample_and_emit(
+                 &config,
+                 &fixture,
+                 &preflight,
+@@ -632,6 +648,68 @@
+     Ok(Arc::new(CountingSource::new(inner)))
+ }
+ 
++#[derive(Serialize)]
++struct AllocationSampleRecord<'a> {
++    tag: &'static str,
++    scope: &'static str,
++    case: String,
++    repeat: usize,
++    ordinal: usize,
++    warmup: bool,
++    #[serde(rename = "allocationSample")]
++    allocation_sample: &'a allocation_metrics::Sample,
++}
++
++fn allocation_case(config: &Config) -> String {
++    format!(
++        "p{}-k{}-{}-{}",
++        config.paragraphs,
++        config.replacements,
++        config.source.name(),
++        config.mode.name()
++    )
++}
++
++fn emit_allocation_sample(config: &Config, sample: &Sample) -> AnyResult<()> {
++    let record = AllocationSampleRecord {
++        tag: "allocationSample",
++        scope: "publish_document_commit_to_stream_method_only_before_returned_snapshot_drop",
++        case: allocation_case(config),
++        repeat: sample.repeat,
++        ordinal: sample.ordinal,
++        warmup: sample.warmup,
++        allocation_sample: &sample.allocation_sample,
++    };
++    let stdout = io::stdout();
++    let mut output = stdout.lock();
++    serde_json::to_writer(&mut output, &record)?;
++    output.write_all(b"\n")?;
++    output.flush()?;
++    Ok(())
++}
++
++fn run_sample_and_emit(
++    config: &Config,
++    fixture: &Fixture,
++    preflight: &Preflight,
++    fixture_path: &Path,
++    repeat: usize,
++    ordinal: usize,
++    warmup: bool,
++) -> AnyResult<Sample> {
++    let sample = run_sample(
++        config,
++        fixture,
++        preflight,
++        fixture_path,
++        repeat,
++        ordinal,
++        warmup,
++    )?;
++    emit_allocation_sample(config, &sample)?;
++    Ok(sample)
++}
++
+ fn run_sample(
+     config: &Config,
+     fixture: &Fixture,
+@@ -671,7 +749,11 @@
+     let budget_live = BudgetSnapshot::from_budget(&budget);
+ 
+     let phase_started = Instant::now();
++    let allocation_region = allocation_metrics::begin();
+     let published = package.publish_document_commit_to_stream(&mut output, &commit)?;
++    let allocation_sample = allocation_region
++        .finish()
++        .unwrap_or_else(allocation_metrics::unavailable_sample);
+     drop(published);
+     let publish_ns = elapsed_ns(phase_started)?;
+ 
+@@ -722,6 +804,7 @@
+         edit_ns,
+         commit_ns,
+         publish_ns,
++        allocation_sample,
+         drop_ns,
+         output_bytes: output.len(),
+         output_sha256,

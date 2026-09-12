@@ -1,0 +1,12 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized] target(s) in 3.84s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0518-target/debug/deps/litchi_opc-5e5ec62e7ad589c6)
+
+running 4 tests
+test source_backed::source_xml_hint_tests::eligible_hint_comparison_consumes_its_bounded_work_charge ... ok
+test source_backed::source_xml_hint_tests::each_identity_and_policy_field_is_required_for_a_hint_hit ... ok
+test source_backed::source_xml_hint_tests::original_bytes_are_checked_after_all_metadata_matches ... ok
+test source_backed::source_xml_hint_tests::equal_bytes_in_a_distinct_allocation_still_take_the_hint_hit ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 391 filtered out; finished in 0.00s
+
