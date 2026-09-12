@@ -1,0 +1,44 @@
+{
+  "stage": "before",
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*litchi_perf_baseline::xlsx_commit_save_operation",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/profile.out",
+    "/tmp/litchi-goal-0516/before/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "dense-wide",
+    "--samples",
+    "3",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/profile-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/profile-catalog.json"
+  ],
+  "started_utc": "2026-09-11T23:55:07.104579+00:00",
+  "elapsed_seconds": 106.19983932699688,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "active_source_roles": [
+    "before"
+  ],
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "58ce287eb09dd5fa107be2baf02051b2b89d5146e323866075ee42004efb756f",
+  "scope": "Three xlsx_commit_save_operation helper calls only; fixture and expected-output commits/writes excluded; helper returns Commit before caller drop",
+  "artifacts": {
+    "profile-report.json": "ca71c59853684d346d2c209328adeeffe857fa14d697ec9f43f423072a5f55be",
+    "profile-catalog.json": "202de89d64fa38a24d3e33719f2c5df223540747f2ffab0f5930964e3c0fe9af",
+    "profile.log": "e1a942e71cfda6582e933361625b14d402193ca2383f7fd404b6894a3b7d54aa",
+    "profile.out": "402742339c4658e7786431f57d1f573dddb9e62ba503181fda5c971011837c6e"
+  }
+}

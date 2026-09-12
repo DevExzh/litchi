@@ -1,0 +1,57 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+error[E0106]: missing lifetime specifier
+   --> crates/litchi-xlsx/src/raw/compact.rs:373:68
+    |
+373 | fn normalized_start(element: &BytesStart<'_>) -> Result<BytesStart<'_>> {
+    |                              ---------------                       ^^ expected named lifetime parameter
+    |
+    = help: this function's return type contains a borrowed value, but the signature does not say which one of `element`'s 2 lifetimes it is borrowed from
+help: consider introducing a named lifetime parameter
+    |
+373 - fn normalized_start(element: &BytesStart<'_>) -> Result<BytesStart<'_>> {
+373 + fn normalized_start<'a>(element: &'a BytesStart<'a>) -> Result<BytesStart<'a>> {
+    |
+
+error: unnecessary qualification
+  --> crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs:97:14
+   |
+97 |         Some(crate::cell::Cell::Value(Value::Number(value))) if value.as_str() == "9"
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+   |
+97 -         Some(crate::cell::Cell::Value(Value::Number(value))) if value.as_str() == "9"
+97 +         Some(Cell::Value(Value::Number(value))) if value.as_str() == "9"
+   |
+
+error: unnecessary qualification
+   --> crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs:101:14
+    |
+101 |         Some(crate::cell::Cell::Formula(formula)) if formula.text() == "A1*2"
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: remove the unnecessary path segments
+    |
+101 -         Some(crate::cell::Cell::Formula(formula)) if formula.text() == "A1*2"
+101 +         Some(Cell::Formula(formula)) if formula.text() == "A1*2"
+    |
+
+error[E0277]: `WorksheetOutput` doesn't implement `Debug`
+   --> crates/litchi-xlsx/src/raw/compact_output_tests.rs:387:10
+    |
+387 |         .expect_err("compaction must reject the malformed tail first");
+    |          ^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `Debug` is not implemented for `WorksheetOutput`
+   --> crates/litchi-xlsx/src/raw/compact.rs:56:1
+    |
+ 56 | pub(crate) struct WorksheetOutput {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `WorksheetOutput` or manually `impl Debug for WorksheetOutput`
+note: required by a bound in `std::result::Result::<T, E>::expect_err`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/result.rs:1293:4
+
+Some errors have detailed explanations: E0106, E0277.
+For more information about an error, try `rustc --explain E0106`.
+error: could not compile `litchi-xlsx` (lib test) due to 4 previous errors

@@ -1,0 +1,17 @@
+{
+  "started_utc": "2026-09-12T00:21:38.594670+00:00",
+  "elapsed_seconds": 5.070620678001433,
+  "logical_target": "/tmp/litchi-goal-0516/target",
+  "physical_target": "/home/zhuhe/litchi-goal-0516-target",
+  "reason": "tmpfs Disk quota exceeded while linking all-features tests",
+  "process_references_before_move": [],
+  "file_count": 4967,
+  "file_bytes": 3258649588,
+  "all_bytes_and_links_verified_after_move": true,
+  "inventory_sha256": "6d96fdb4f72fe42960de1a4f79d6c0b452cd41dcda9eb3cc4a40832e835d0499",
+  "cargo_environment_unchanged": true,
+  "cleanup_required": [
+    "/tmp/litchi-goal-0516/target",
+    "/home/zhuhe/litchi-goal-0516-target"
+  ]
+}

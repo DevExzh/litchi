@@ -1,0 +1,21 @@
+{
+  "status": "complete",
+  "completed_utc": "2026-09-12T01:23:29.942569+00:00",
+  "removed_owned_roots": [
+    "/tmp/litchi-goal-0516",
+    "/home/zhuhe/litchi-goal-0516-target"
+  ],
+  "removed_registered_worktree": "/tmp/litchi-goal-0516/worktree",
+  "worktree_candidate_files_verified": 9,
+  "additional_worktree_review_preserved": "docs/performance/results/change-0516/baseline-test-review.md",
+  "live_process_references_before_removal": [],
+  "owned_unique_inode_inventory": {
+    "files": 76087,
+    "logical_bytes": 9393180968,
+    "allocated_bytes": 9565888512,
+    "scope": "Inventory of owned file inodes before removal; not a filesystem-wide free-space claim"
+  },
+  "final_source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+  "final_source_unchanged": true,
+  "registered_worktree_removed": true
+}

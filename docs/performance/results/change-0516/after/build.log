@@ -1,0 +1,27 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `release` profile [optimized] target(s) in 2m 19s
+	Command being timed: "cargo build --release --locked --manifest-path tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline"
+	User time (seconds): 249.04
+	System time (seconds): 3.40
+	Percent of CPU this job got: 181%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:19.13
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2246132
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 4844
+	Minor (reclaiming a frame) page faults: 2515503
+	Voluntary context switches: 13079
+	Involuntary context switches: 1379
+	Swaps: 0
+	File system inputs: 981320
+	File system outputs: 649856
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

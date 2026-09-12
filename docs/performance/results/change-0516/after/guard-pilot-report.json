@@ -1,0 +1,3180 @@
+{
+  "schema_version": 1,
+  "probe": "litchi-xlsx-public-commit-guard-v1",
+  "timer_scope": "Edit::commit or first public Worksheet::cell Store load only; fresh Workbook open, Store warming, edit preparation, output/readback oracles, and Commit/View drop are outside the clock",
+  "allocation": {
+    "binary": "litchi-xlsx-commit-guard",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  },
+  "samples": 20,
+  "warmups": 2,
+  "shapes": [
+    {
+      "shape": "tiny",
+      "sheet_count": 2,
+      "rows_per_sheet": 8,
+      "columns_per_sheet": 8,
+      "cells": 128,
+      "one_percent_update_count": 2,
+      "corpus_bytes": 2978,
+      "corpus_sha256": "3ed5efeed06ea0c2ff1941af6c6cffdaf7215adaff4e157ef0b2ce4d22cefcda",
+      "scenarios": [
+        {
+          "scenario": "cold-first-cell-read",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 0,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            35510,
+            35060,
+            35200,
+            35000,
+            35421,
+            35270,
+            34650,
+            35381,
+            35110,
+            34400,
+            35241,
+            34750,
+            34840,
+            34631,
+            35070,
+            35030,
+            35120,
+            34930,
+            34910,
+            34920
+          ],
+          "stats": {
+            "min_ns": 34400,
+            "p50_ns": 35030,
+            "p95_ns": 35421,
+            "p99_ns": 35421,
+            "max_ns": 35510,
+            "mean_ns": 35022.2
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": null,
+            "source_bytes_equal": null,
+            "changed_readback": null,
+            "first_cell_readback": true
+          }
+        },
+        {
+          "scenario": "cold-same-one-cell",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            36860,
+            36100,
+            36800,
+            36520,
+            36390,
+            36701,
+            36680,
+            36780,
+            36631,
+            36390,
+            36670,
+            36471,
+            37100,
+            36730,
+            36890,
+            36650,
+            36760,
+            36750,
+            36340,
+            36651
+          ],
+          "stats": {
+            "min_ns": 36100,
+            "p50_ns": 36670,
+            "p95_ns": 36890,
+            "p99_ns": 36890,
+            "max_ns": 37100,
+            "mean_ns": 36643.2
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "cold-same-one-percent",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 2,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            74100,
+            73361,
+            73540,
+            73221,
+            72880,
+            73351,
+            74890,
+            79611,
+            73350,
+            73521,
+            73410,
+            77951,
+            73530,
+            73341,
+            73730,
+            80191,
+            73640,
+            73571,
+            73720,
+            73961
+          ],
+          "stats": {
+            "min_ns": 72880,
+            "p50_ns": 73540,
+            "p95_ns": 79611,
+            "p99_ns": 79611,
+            "max_ns": 80191,
+            "mean_ns": 74443.5
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-same-one-cell",
+          "warm_store": true,
+          "changed": false,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            1040,
+            1000,
+            1030,
+            1000,
+            990,
+            970,
+            940,
+            970,
+            950,
+            970,
+            940,
+            970,
+            990,
+            1000,
+            1000,
+            1030,
+            980,
+            950,
+            950,
+            980
+          ],
+          "stats": {
+            "min_ns": 940,
+            "p50_ns": 980,
+            "p95_ns": 1030,
+            "p99_ns": 1030,
+            "max_ns": 1040,
+            "mean_ns": 982.5
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-same-one-percent",
+          "warm_store": true,
+          "changed": false,
+          "update_count": 2,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            1360,
+            1440,
+            1330,
+            1390,
+            1360,
+            1260,
+            1410,
+            1350,
+            1430,
+            1420,
+            1400,
+            1350,
+            1300,
+            1320,
+            1340,
+            1280,
+            1300,
+            1270,
+            1300,
+            1340
+          ],
+          "stats": {
+            "min_ns": 1260,
+            "p50_ns": 1340,
+            "p95_ns": 1430,
+            "p99_ns": 1430,
+            "max_ns": 1440,
+            "mean_ns": 1347.5
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            143311,
+            149171,
+            138921,
+            136401,
+            134741,
+            132810,
+            137770,
+            132360,
+            135700,
+            135060,
+            154270,
+            132830,
+            134040,
+            132500,
+            133371,
+            134191,
+            134541,
+            131981,
+            132771,
+            141661
+          ],
+          "stats": {
+            "min_ns": 131981,
+            "p50_ns": 134541,
+            "p95_ns": 149171,
+            "p99_ns": 149171,
+            "max_ns": 154270,
+            "mean_ns": 136920.05
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "changed_readback": true,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 2,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            256991,
+            251131,
+            244271,
+            246481,
+            242881,
+            251151,
+            246731,
+            243481,
+            254111,
+            243691,
+            244851,
+            243761,
+            244451,
+            254061,
+            247691,
+            242731,
+            244951,
+            242721,
+            250261,
+            242911
+          ],
+          "stats": {
+            "min_ns": 242721,
+            "p50_ns": 244851,
+            "p95_ns": 254111,
+            "p99_ns": 254111,
+            "max_ns": 256991,
+            "mean_ns": 246965.5
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "changed_readback": true,
+            "first_cell_readback": null
+          }
+        }
+      ]
+    },
+    {
+      "shape": "medium",
+      "sheet_count": 2,
+      "rows_per_sheet": 32,
+      "columns_per_sheet": 32,
+      "cells": 2048,
+      "one_percent_update_count": 21,
+      "corpus_bytes": 8549,
+      "corpus_sha256": "7313f236ad4829de42e38252bb1b3a0e21917e72485d92f42fb4c1d2f1bf27d3",
+      "scenarios": [
+        {
+          "scenario": "cold-first-cell-read",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 0,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            456952,
+            466212,
+            456321,
+            467542,
+            473782,
+            470261,
+            463332,
+            456642,
+            462182,
+            455781,
+            462742,
+            455732,
+            463562,
+            458642,
+            463402,
+            457112,
+            455902,
+            463912,
+            454522,
+            465192
+          ],
+          "stats": {
+            "min_ns": 454522,
+            "p50_ns": 462182,
+            "p95_ns": 470261,
+            "p99_ns": 470261,
+            "max_ns": 473782,
+            "mean_ns": 461486.35
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": null,
+            "source_bytes_equal": null,
+            "changed_readback": null,
+            "first_cell_readback": true
+          }
+        },
+        {
+          "scenario": "cold-same-one-cell",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            465352,
+            470451,
+            465132,
+            470952,
+            469512,
+            468992,
+            472242,
+            462182,
+            470422,
+            462742,
+            470382,
+            463422,
+            472492,
+            471122,
+            466092,
+            473302,
+            465052,
+            468362,
+            465692,
+            468892
+          ],
+          "stats": {
+            "min_ns": 462182,
+            "p50_ns": 468892,
+            "p95_ns": 472492,
+            "p99_ns": 472492,
+            "max_ns": 473302,
+            "mean_ns": 468139.45
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "cold-same-one-percent",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 21,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            944784,
+            942053,
+            940824,
+            937864,
+            941534,
+            942374,
+            942044,
+            937134,
+            937684,
+            944044,
+            942234,
+            931904,
+            940904,
+            946004,
+            938474,
+            937254,
+            946324,
+            949284,
+            938114,
+            942134
+          ],
+          "stats": {
+            "min_ns": 931904,
+            "p50_ns": 941534,
+            "p95_ns": 946324,
+            "p99_ns": 946324,
+            "max_ns": 949284,
+            "mean_ns": 941148.45
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-same-one-cell",
+          "warm_store": true,
+          "changed": false,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            1470,
+            1390,
+            1390,
+            1380,
+            1490,
+            1350,
+            1350,
+            1540,
+            1400,
+            1420,
+            1340,
+            1400,
+            1490,
+            1400,
+            1370,
+            1390,
+            1380,
+            1370,
+            1350,
+            1400
+          ],
+          "stats": {
+            "min_ns": 1340,
+            "p50_ns": 1390,
+            "p95_ns": 1490,
+            "p99_ns": 1490,
+            "max_ns": 1540,
+            "mean_ns": 1403.5
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-same-one-percent",
+          "warm_store": true,
+          "changed": false,
+          "update_count": 21,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            3960,
+            4000,
+            3980,
+            3900,
+            4000,
+            3870,
+            3981,
+            3920,
+            4170,
+            3850,
+            3930,
+            3850,
+            3910,
+            3860,
+            4200,
+            3920,
+            4060,
+            3980,
+            4101,
+            3990
+          ],
+          "stats": {
+            "min_ns": 3850,
+            "p50_ns": 3960,
+            "p95_ns": 4170,
+            "p99_ns": 4170,
+            "max_ns": 4200,
+            "mean_ns": 3971.6
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            1426666,
+            1382396,
+            1394436,
+            1407555,
+            1445086,
+            1386886,
+            1397995,
+            1392496,
+            1398996,
+            1388966,
+            1440876,
+            1400406,
+            1402986,
+            1395266,
+            1388675,
+            1391976,
+            1396766,
+            1387676,
+            1391785,
+            1389586
+          ],
+          "stats": {
+            "min_ns": 1382396,
+            "p50_ns": 1394436,
+            "p95_ns": 1440876,
+            "p99_ns": 1440876,
+            "max_ns": 1445086,
+            "mean_ns": 1400373.8
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "changed_readback": true,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 21,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            2820532,
+            2858632,
+            2823192,
+            2852742,
+            2792221,
+            2855532,
+            2813231,
+            2858832,
+            2825422,
+            2875352,
+            2830131,
+            2875072,
+            2840582,
+            2876782,
+            2840062,
+            2872792,
+            2823972,
+            2866712,
+            2829222,
+            2852052
+          ],
+          "stats": {
+            "min_ns": 2792221,
+            "p50_ns": 2840582,
+            "p95_ns": 2875352,
+            "p99_ns": 2875352,
+            "max_ns": 2876782,
+            "mean_ns": 2844153.35
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "changed_readback": true,
+            "first_cell_readback": null
+          }
+        }
+      ]
+    },
+    {
+      "shape": "dense-wide",
+      "sheet_count": 2,
+      "rows_per_sheet": 256,
+      "columns_per_sheet": 256,
+      "cells": 131072,
+      "one_percent_update_count": 1311,
+      "corpus_bytes": 384523,
+      "corpus_sha256": "b384cbf41f12dc84e225885c00b46fda8bc887275d3049f88148fd7ac35637b3",
+      "scenarios": [
+        {
+          "scenario": "cold-first-cell-read",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 0,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            28876810,
+            28956291,
+            28938561,
+            29103401,
+            29140191,
+            29239162,
+            29073772,
+            29076281,
+            29055661,
+            29140391,
+            29118931,
+            29103941,
+            29414533,
+            29101271,
+            29191022,
+            29112762,
+            29196102,
+            29194121,
+            29240042,
+            29268242
+          ],
+          "stats": {
+            "min_ns": 28876810,
+            "p50_ns": 29112762,
+            "p95_ns": 29268242,
+            "p99_ns": 29268242,
+            "max_ns": 29414533,
+            "mean_ns": 29127074.4
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": null,
+            "source_bytes_equal": null,
+            "changed_readback": null,
+            "first_cell_readback": true
+          }
+        },
+        {
+          "scenario": "cold-same-one-cell",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            29933624,
+            29732783,
+            29783214,
+            29673674,
+            29646044,
+            29623823,
+            29588233,
+            29529963,
+            29580593,
+            29505803,
+            29759964,
+            29582223,
+            29524283,
+            29511703,
+            29461433,
+            29611413,
+            29535543,
+            29495033,
+            29789184,
+            29518393
+          ],
+          "stats": {
+            "min_ns": 29461433,
+            "p50_ns": 29582223,
+            "p95_ns": 29789184,
+            "p99_ns": 29789184,
+            "max_ns": 29933624,
+            "mean_ns": 29619346.3
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "cold-same-one-percent",
+          "warm_store": false,
+          "changed": false,
+          "update_count": 1311,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            59547458,
+            59069396,
+            59436158,
+            59103086,
+            59417587,
+            59934679,
+            60286301,
+            59869930,
+            59540979,
+            59236527,
+            59984090,
+            60097580,
+            59588659,
+            59269597,
+            59760629,
+            59175437,
+            59572579,
+            59591808,
+            59613228,
+            59265877
+          ],
+          "stats": {
+            "min_ns": 59069396,
+            "p50_ns": 59547458,
+            "p95_ns": 60097580,
+            "p99_ns": 60097580,
+            "max_ns": 60286301,
+            "mean_ns": 59568079.25
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-same-one-cell",
+          "warm_store": true,
+          "changed": false,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            11370,
+            10710,
+            18780,
+            11450,
+            12210,
+            11690,
+            12380,
+            13640,
+            12360,
+            13620,
+            12080,
+            11330,
+            11590,
+            11270,
+            12490,
+            11210,
+            13300,
+            11170,
+            11340,
+            15170
+          ],
+          "stats": {
+            "min_ns": 10710,
+            "p50_ns": 11690,
+            "p95_ns": 15170,
+            "p99_ns": 15170,
+            "max_ns": 18780,
+            "mean_ns": 12458.0
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-same-one-percent",
+          "warm_store": true,
+          "changed": false,
+          "update_count": 1311,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            814884,
+            842733,
+            856664,
+            823364,
+            805294,
+            818593,
+            797203,
+            829064,
+            821744,
+            816963,
+            829234,
+            815034,
+            818243,
+            824244,
+            811943,
+            804413,
+            829533,
+            815444,
+            928914,
+            890143
+          ],
+          "stats": {
+            "min_ns": 797203,
+            "p50_ns": 818593,
+            "p95_ns": 890143,
+            "p99_ns": 890143,
+            "max_ns": 928914,
+            "mean_ns": 829682.55
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": true,
+            "source_bytes_equal": true,
+            "changed_readback": null,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            85022504,
+            84663193,
+            85345185,
+            84685123,
+            86769562,
+            84610962,
+            84794033,
+            85228056,
+            85474087,
+            85232895,
+            85383485,
+            84943324,
+            85374406,
+            84877074,
+            84816283,
+            84811923,
+            84785984,
+            84913644,
+            84871664,
+            85030774
+          ],
+          "stats": {
+            "min_ns": 84610962,
+            "p50_ns": 84913644,
+            "p95_ns": 85474087,
+            "p99_ns": 85474087,
+            "max_ns": 86769562,
+            "mean_ns": 85081708.05
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "changed_readback": true,
+            "first_cell_readback": null
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1311,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            175567782,
+            177391159,
+            174905709,
+            175130300,
+            176471966,
+            175726043,
+            175590692,
+            177847201,
+            175949373,
+            175640812,
+            175416281,
+            177983472,
+            175530691,
+            176293685,
+            175873173,
+            177456310,
+            174836529,
+            173951455,
+            174360227,
+            174652548
+          ],
+          "stats": {
+            "min_ns": 173951455,
+            "p50_ns": 175590692,
+            "p95_ns": 177847201,
+            "p99_ns": 177847201,
+            "max_ns": 177983472,
+            "mean_ns": 175828770.4
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "changed_readback": true,
+            "first_cell_readback": null
+          }
+        }
+      ]
+    }
+  ]
+}

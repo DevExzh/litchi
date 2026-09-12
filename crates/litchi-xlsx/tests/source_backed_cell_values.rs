@@ -29,10 +29,9 @@ const CALC_CHAIN: &str = "/xl/calcChain.xml";
 const CALC_CHAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
 const CALC_CHAIN_REL_ID: &str = "rIdCalculationChain";
-// Source-backed publication retains one fixed OPC chunk for streaming even
-// when the selected overlay is an exact no-op. Keep this transient window
-// separate from the retained source payload budget below.
-const MANAGED_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
+// Exact source publication uses one bounded 64 KiB copy window in addition to
+// the selected Part payloads retained by the managed cache.
+const MANAGED_EXACT_NOOP_SCRATCH_BYTES: u64 = 64 * 1024;
 static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(1_000);
 
 struct VersionedSource {
@@ -248,7 +247,7 @@ fn fixture_package(sheet_xml: String, signed: bool) -> OpcPackage {
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(UNUSED).unwrap(),
             "application/octet-stream".to_owned(),
-            (0..256 * 1024).map(|value| (value % 251) as u8).collect(),
+            incompressible_payload(256 * 1024),
         )))
         .unwrap();
     package
@@ -278,6 +277,18 @@ fn fixture_package(sheet_xml: String, signed: bool) -> OpcPackage {
 
 fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
     PackageWriter::to_bytes(&fixture_package(sheet_xml, signed)).unwrap()
+}
+
+fn incompressible_payload(length: usize) -> Vec<u8> {
+    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+    let mut payload = Vec::with_capacity(length);
+    for _ in 0..length {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        payload.push((state >> 24).to_le_bytes()[0]);
+    }
+    payload
 }
 
 fn replace_sheet_with_cancel_on_blob_arc(
@@ -1324,8 +1335,10 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
 fn managed_scalar_exact_noop_publishes_without_detaching_source() {
     let bytes = three_cells();
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
-    let (budget, _cancellation_source, context) =
-        managed_context(managed_publication_memory(exact));
+    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
+    assert!(part_len(&bytes, UNUSED) > available_memory);
+    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
+    let (budget, _cancellation_source, context) = managed_context(available_memory);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::ReadLimits::default(),
@@ -1563,8 +1576,10 @@ fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
     let exact = part_len(&bytes, MAIN)
         + part_len(&bytes, SHEET)
         + part_len(&bytes, "/xl/worksheets/sheet2.xml");
-    let (budget, _cancellation_source, context) =
-        managed_context(managed_publication_memory(exact));
+    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
+    assert!(part_len(&bytes, UNUSED) > available_memory);
+    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
+    let (budget, _cancellation_source, context) = managed_context(available_memory);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::ReadLimits::default(),

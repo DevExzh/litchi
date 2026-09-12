@@ -1,0 +1,26 @@
+{
+  "decision": "reject",
+  "candidate_manifest_sha256": "38007ba3313a420bf1f5823fa8aafb2232d9f3f74bc0874ab416e302263b1df6",
+  "final_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+  "production_restored_from": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+  "restored_paths": [
+    "crates/litchi-xlsx/src/raw/compact.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs"
+  ],
+  "removed_candidate_paths": [
+    "crates/litchi-xlsx/src/raw/compact_output_tests.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs"
+  ],
+  "retained_test_fixes": [
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs",
+    "crates/litchi-xlsx/tests/source_backed_row_visibility.rs"
+  ],
+  "exact_final_source_match": true,
+  "candidate_patch_retained": {
+    "path": "after/candidate.patch",
+    "sha256": "9b3cf124904ed5970a376c26a4aabd900c212d34755490f916c60f367c8f9b3f"
+  }
+}

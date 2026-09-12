@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0516/after/guard-alloc",
+    "--samples",
+    "10",
+    "--warmup",
+    "1",
+    "--shape",
+    "tiny,medium,dense-wide",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/after/guard-allocator-r2-report.json"
+  ],
+  "started_utc": "2026-09-12T01:08:18.659329+00:00",
+  "elapsed_seconds": 9.460144436001428,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "38007ba3313a420bf1f5823fa8aafb2232d9f3f74bc0874ab416e302263b1df6",
+  "guard_manifest_sha256": "3e4df7e2bd766ca0337acc6f6e28ec0166deea1dc04b8dc566992fc37274e57e",
+  "artifacts": {
+    "guard-allocator-r2-report.json": "8cba334f2a800c0217b17e08206bd1461f7b776c0fd83261b19a2e3a0a47ec0b",
+    "guard-allocator-r2.log": "7103c1ea617b0667319b2aaf42edaa637808fc406f8f10930d8306ec4f27aed6"
+  },
+  "probe": "guard",
+  "active_source_roles": [
+    "after"
+  ],
+  "scope": "Separate public guard; per-scenario commit or first-cell clock excludes setup, warming, oracles and result drop; allocator timing/RSS excluded.",
+  "binary_sha256": "3a132808473754183ae9841cbce6cbb23563a7d8a6b3c51f7aafb0fdaf5f4b57"
+}

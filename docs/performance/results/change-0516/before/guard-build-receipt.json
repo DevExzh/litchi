@@ -1,0 +1,39 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--offline",
+    "--manifest-path",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/guard-probe/Cargo.toml",
+    "--bin",
+    "litchi-xlsx-commit-guard"
+  ],
+  "started_utc": "2026-09-11T23:43:14.650040+00:00",
+  "elapsed_seconds": 91.46839536100015,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "guard_manifest_sha256": "3e4df7e2bd766ca0337acc6f6e28ec0166deea1dc04b8dc566992fc37274e57e",
+  "artifacts": {
+    "guard-build.log": "acd7fe2c37ab2a86497a9a3d97db2c61edc51b1b251e58da318adc61d3d218d0"
+  },
+  "probe": "guard",
+  "active_source_roles": [
+    "before"
+  ],
+  "scope": "Separate public guard; per-scenario commit or first-cell clock excludes setup, warming, oracles and result drop; allocator timing/RSS excluded.",
+  "binary_sha256": "1077267e9efb1a7be0285472a2753bfa646cf9c2f7d4025571b380598e9d0b71",
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0516/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0516"
+  }
+}

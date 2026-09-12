@@ -1,0 +1,84 @@
+{
+  "schema": "litchi-0516-verifier-decision-v1",
+  "decision": "reject",
+  "final_epoch": "baseline-tests",
+  "candidate_epoch": "after",
+  "baseline_epoch": "before",
+  "baseline_test_epoch": "baseline-tests",
+  "source": {
+    "final_manifest": "baseline-tests/source-manifest.json",
+    "candidate_manifest": "after/source-manifest.json",
+    "baseline_test_manifest": "baseline-tests/source-manifest.json",
+    "production_restored": true,
+    "baseline_test_fixes_retained": true,
+    "sealed_sha256sums": "SHA256SUMS"
+  },
+  "tests": {
+    "required_receipts": [
+      "after/boundaries-receipt.json",
+      "after/clippy-receipt.json",
+      "after/fmt-receipt.json",
+      "after/owner-check-receipt.json",
+      "after/rustdoc-receipt.json",
+      "after/xlsx-features-receipt.json",
+      "baseline-tests/boundaries-receipt.json",
+      "baseline-tests/claims-receipt.json",
+      "baseline-tests/clippy-receipt.json",
+      "baseline-tests/fmt-receipt.json",
+      "baseline-tests/owner-check-receipt.json",
+      "baseline-tests/rustdoc-receipt.json",
+      "baseline-tests/xlsx-features-receipt.json",
+      "fifth-unit/xlsx-features-receipt.json",
+      "fifth-unit/xlsx-unit-receipt.json"
+    ]
+  },
+  "builds": {
+    "required_receipts": [
+      "after/allocator-build-receipt.json",
+      "after/build-receipt.json",
+      "after/fallback-build-allocator-receipt.json",
+      "after/fallback-build-receipt.json",
+      "after/guard-build-allocator-receipt.json",
+      "after/guard-build-receipt.json",
+      "before/allocator-build-receipt.json",
+      "before/build-receipt.json",
+      "before/fallback-build-allocator-receipt.json",
+      "before/fallback-build-receipt.json",
+      "before/guard-build-allocator-receipt.json",
+      "before/guard-build-receipt.json"
+    ]
+  },
+  "captures": {
+    "required_lanes": [
+      "after/allocator-r1-receipt.json",
+      "after/allocator-r2-receipt.json",
+      "after/fallback-allocator-r1-receipt.json",
+      "after/fallback-allocator-r2-receipt.json",
+      "after/fallback-pilot-receipt.json",
+      "after/fallback-preflight-receipt.json",
+      "after/guard-allocator-r1-receipt.json",
+      "after/guard-allocator-r2-receipt.json",
+      "after/guard-pilot-receipt.json",
+      "after/guard-preflight-receipt.json",
+      "after/pilot-receipt.json",
+      "after/preflight-receipt.json",
+      "after/profile-receipt.json",
+      "before/allocator-r1-receipt.json",
+      "before/allocator-r2-receipt.json",
+      "before/fallback-allocator-r1-receipt.json",
+      "before/fallback-allocator-r2-receipt.json",
+      "before/fallback-pilot-receipt.json",
+      "before/fallback-preflight-receipt.json",
+      "before/guard-allocator-r1-receipt.json",
+      "before/guard-allocator-r2-receipt.json",
+      "before/guard-pilot-receipt.json",
+      "before/guard-preflight-receipt.json",
+      "before/pilot-receipt.json",
+      "before/preflight-receipt.json",
+      "before/profile-receipt.json"
+    ],
+    "formal_abba": false
+  },
+  "performance_claim": "none",
+  "claim_authorized": false
+}

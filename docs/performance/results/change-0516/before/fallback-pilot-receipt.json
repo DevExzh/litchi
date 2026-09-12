@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0516/before/fallback",
+    "--samples",
+    "20",
+    "--warmup",
+    "2",
+    "--shape",
+    "tiny,medium,dense-wide",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/fallback-pilot-report.json"
+  ],
+  "started_utc": "2026-09-11T23:49:31.354293+00:00",
+  "elapsed_seconds": 106.934551999002,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "guard_manifest_sha256": "b3ea1457eeab4add292ce4dddb913dff23605ddbb73cf4349e1bc8cfb29e4271",
+  "artifacts": {
+    "fallback-pilot-report.json": "d1184f37c639a034f27dc286b30a91fd1b036a9ad986c744c85123e12c989f90",
+    "fallback-pilot.log": "034d5dd61cb632f6be4b2c8cec5449d31d014cd9debf7cc111a86493c5c07a4a"
+  },
+  "probe": "fallback",
+  "active_source_roles": [
+    "before"
+  ],
+  "scope": "Separate public guard; per-scenario commit or first-cell clock excludes setup, warming, oracles and result drop; allocator timing/RSS excluded.",
+  "binary_sha256": "955a8f1dbf8de15d4c3bd64c5aad3c514913d96e9086823cd5529aedaadf191c"
+}

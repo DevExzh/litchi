@@ -1,0 +1,38 @@
+{
+  "stage": "before",
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0516/before/litchi-perf-baseline-alloc",
+    "--case",
+    "xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide",
+    "--samples",
+    "10",
+    "--warmup",
+    "1",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/allocator-r1-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/allocator-r1-catalog.json"
+  ],
+  "started_utc": "2026-09-11T23:51:18.521486+00:00",
+  "elapsed_seconds": 15.006838617999165,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "active_source_roles": [
+    "before"
+  ],
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "binary_sha256": "9d6f75aced8f21ea39be395f23892e4f5a7da428681f21e6249a5793890eae7a",
+  "scope": "Allocation region begins before Instant and ends after elapsed; operation only, no setup/oracles/returned-result drop; instrumented elapsed and RSS excluded",
+  "artifacts": {
+    "allocator-r1-report.json": "9e7dde801549cb80cada2a028b05981b8fd2d1fae18806b5170fbaefe91f1503",
+    "allocator-r1-catalog.json": "2b58a5e6a6c054c0f29b4d95b72381b95c544d6e2b49407f4fa62ae521254ddc",
+    "allocator-r1.log": "cf5992d2e7aea1b0b5a71e21abd1c68ad106a9505d67f7bd0d3248d82a427efb"
+  }
+}

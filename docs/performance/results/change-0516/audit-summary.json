@@ -1,0 +1,121 @@
+{
+  "epochs": {
+    "after": "38007ba3313a420bf1f5823fa8aafb2232d9f3f74bc0874ab416e302263b1df6",
+    "baseline-tests": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+    "before": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+    "fifth-unit": "a08915252157449f2aba4c4fc491a0c59d0849aa82df5657a7180bd0d32db3c6",
+    "fourth-unit": "9127ae1530b3892f4d0f7b4cc7e608b0e678617827bf2b4754b5fca33e04fdc9",
+    "initial-unit": "2d67bb1df8aa57d5cb662169cfa57f6d60ef9ab1ca08e0e6728e671fe732024e",
+    "second-unit": "bc1c4a34a174785a42877822c05463e84dd4183588af9a122cce2b496fe9cb29",
+    "third-unit": "2bc53ff4c5f8d85db66b2243517c30c03d0a9ec350f523dc89cfdd7705e854e2"
+  },
+  "receipt_count": 70,
+  "receipts": [
+    "after/allocator-build-receipt.json",
+    "after/allocator-r1-receipt.json",
+    "after/allocator-r2-receipt.json",
+    "after/boundaries-receipt.json",
+    "after/build-receipt.json",
+    "after/clippy-receipt.json",
+    "after/fallback-allocator-r1-receipt.json",
+    "after/fallback-allocator-r2-receipt.json",
+    "after/fallback-build-allocator-receipt.json",
+    "after/fallback-build-receipt.json",
+    "after/fallback-pilot-receipt.json",
+    "after/fallback-preflight-receipt.json",
+    "after/fmt-receipt.json",
+    "after/guard-allocator-r1-receipt.json",
+    "after/guard-allocator-r2-receipt.json",
+    "after/guard-build-allocator-receipt.json",
+    "after/guard-build-receipt.json",
+    "after/guard-pilot-receipt.json",
+    "after/guard-preflight-receipt.json",
+    "after/owner-check-receipt.json",
+    "after/pilot-receipt.json",
+    "after/preflight-receipt.json",
+    "after/profile-receipt.json",
+    "after/rustdoc-receipt.json",
+    "after/xlsx-features-receipt.json",
+    "baseline-tests/boundaries-receipt.json",
+    "baseline-tests/claims-receipt.json",
+    "baseline-tests/clippy-receipt.json",
+    "baseline-tests/fmt-receipt.json",
+    "baseline-tests/owner-check-receipt.json",
+    "baseline-tests/rustdoc-receipt.json",
+    "baseline-tests/xlsx-features-receipt.json",
+    "before/allocator-build-receipt.json",
+    "before/allocator-r1-receipt.json",
+    "before/allocator-r2-receipt.json",
+    "before/build-receipt.json",
+    "before/fallback-allocator-r1-receipt.json",
+    "before/fallback-allocator-r2-receipt.json",
+    "before/fallback-build-allocator-receipt.json",
+    "before/fallback-build-receipt.json",
+    "before/fallback-pilot-receipt.json",
+    "before/fallback-preflight-receipt.json",
+    "before/guard-allocator-r1-receipt.json",
+    "before/guard-allocator-r2-receipt.json",
+    "before/guard-build-allocator-receipt.json",
+    "before/guard-build-receipt.json",
+    "before/guard-pilot-receipt.json",
+    "before/guard-preflight-receipt.json",
+    "before/pilot-receipt.json",
+    "before/preflight-receipt.json",
+    "before/profile-receipt.json",
+    "before/xlsx-features-known-receipt.json",
+    "before/xlsx-features-known2-receipt.json",
+    "before/xlsx-source-backed-values-receipt.json",
+    "before/xlsx-unit-receipt.json",
+    "fifth-unit/boundaries-receipt.json",
+    "fifth-unit/clippy-receipt.json",
+    "fifth-unit/fmt-receipt.json",
+    "fifth-unit/owner-check-receipt.json",
+    "fifth-unit/rustdoc-receipt.json",
+    "fifth-unit/xlsx-features-receipt.json",
+    "fifth-unit/xlsx-unit-receipt.json",
+    "fourth-unit/xlsx-features-receipt.json",
+    "fourth-unit/xlsx-features-retry-receipt.json",
+    "fourth-unit/xlsx-unit-receipt.json",
+    "initial-unit/xlsx-unit-receipt.json",
+    "second-unit/clippy-receipt.json",
+    "second-unit/xlsx-unit-receipt.json",
+    "third-unit/clippy-receipt.json",
+    "third-unit/xlsx-unit-receipt.json"
+  ],
+  "recorded_operations_serial": true,
+  "recorded_expected_failures": {
+    "initial-unit/xlsx-unit-receipt.json": {
+      "exit_code": 101,
+      "reason": "Initial candidate snapshot did not compile: normalized_start return lifetime, two unnecessary test qualifications, and expect_err requiring WorksheetOutput Debug. Isolated fixes requested; final epoch must pass."
+    },
+    "second-unit/xlsx-unit-receipt.json": {
+      "exit_code": 101,
+      "reason": "Compiled candidate: 961 tests passed, five new differential tests failed because their fixtures/expectations assumed stricter compaction/web behavior than the unchanged reference owners. Reference-based corrections requested; final epoch must pass."
+    },
+    "second-unit/clippy-receipt.json": {
+      "exit_code": 101,
+      "reason": "Warning-denied production build found write_start now used only by cfg(test) reference compactor. Requested cfg(test) on helper; final epoch must pass."
+    },
+    "third-unit/xlsx-unit-receipt.json": {
+      "exit_code": 101,
+      "reason": "966 tests passed including dense feed eligibility; one new x14ac fixture omitted required defaultRowHeight and failed the exact reference parser. Fixture correction requested; final epoch must pass."
+    },
+    "fourth-unit/xlsx-features-receipt.json": {
+      "exit_code": 101,
+      "reason": "Integration/example linking failed with Disk quota exceeded (os error 122) in the tmpfs target, followed by linker SIGBUS. The owned target cache was moved to disk-backed storage behind the same logical path; settings and source were retained for the retry."
+    },
+    "fourth-unit/xlsx-features-retry-receipt.json": {
+      "exit_code": 101,
+      "reason": "57 tests passed and two managed no-op publication budget tests failed. Both identical typed errors were confirmed on unchanged control production; see baseline-failures.json."
+    },
+    "before/xlsx-source-backed-values-receipt.json": {
+      "exit_code": 101,
+      "reason": "Unchanged control reproduces the same two managed no-op publication memory-budget errors: 57 passed, two failed. These failures were not introduced by the candidate."
+    },
+    "before/xlsx-features-known-receipt.json": {
+      "exit_code": 101,
+      "reason": "Unchanged control with two explicit known cell-test exclusions found two analogous stale-budget failures, each exceeding its limit by 65,536 bytes, in source_backed_row_visibility (15 passed, two failed). The investigation extended to the same copy-scratch test contract."
+    }
+  },
+  "scope": "Existing receipts only; lane completeness and semantic metrics are verified separately."
+}

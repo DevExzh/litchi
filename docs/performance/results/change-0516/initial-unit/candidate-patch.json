@@ -1,0 +1,24 @@
+{
+  "base_revision": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+  "paths": [
+    "crates/litchi-xlsx/src/raw/compact.rs",
+    "crates/litchi-xlsx/src/raw/compact_output_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs"
+  ],
+  "candidate_file_sha256": {
+    "crates/litchi-xlsx/src/raw/compact.rs": "5e2d2a382fa429f942d0302127d3eace06664b20cdd97c7d2c2d6bfd0131baef",
+    "crates/litchi-xlsx/src/raw/compact_output_tests.rs": "a19cad0b91ffd135e5545d4a5a60251733e04aeb4bd1d1700559c9d3b38b969f",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "0b049890c57410791f1f4d07a32988d42b747e3ba51ec34239c93360bf202faf",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": "68b177bd3283b924f34c237a20fa91959c92a4a18e147a66da9960964fc4fd5e",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "3f66444e3f76a7dc885a0da987d35420be6cfde93271e157f7f41003ee20dc1d",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs": "987a3f31a791efce93d3ffc5d340b5e7765591059c781e351d8aa88e1232bb1e",
+    "crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs": "d190375bf9d229705db48a3df373e7794ccc5b7a68d14954e8fb72f9c1be9416"
+  },
+  "patch_sha256": "731b9966857ccc2d325372336745b0d7a7e263c825e0c0fc6727a4ab566c4e5b",
+  "source_manifest_sha256": "2d67bb1df8aa57d5cb662169cfa57f6d60ef9ab1ca08e0e6728e671fe732024e",
+  "scope": "Initial snapshot while isolated implementation review continues; not final benchmark epoch"
+}

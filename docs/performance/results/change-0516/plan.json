@@ -1,0 +1,39 @@
+{
+  "base_revision": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+  "previous_turn": "progress:0515 committed repeated output attribution and cleaned owned scratch",
+  "priority": "OLE2/OOXML until full optimization goal complete; ODF deferred; iWork excluded",
+  "frozen_utc": "2026-09-11T23:34:03.728542+00:00",
+  "scope": "Existing worksheet Parser fed emitted-equivalent events during effective changed-output compaction; no source Layout fusion",
+  "hypothesis": "Remove duplicate output XML event reading and namespace reader maintenance (~6.9% of0515 commit instructions), retain required semantic work and validation/error order",
+  "protocol": {
+    "normal_cases": [
+      "xlsx_one_cell_commit",
+      "xlsx_one_percent_commit",
+      "xlsx_one_cell_commit_save",
+      "xlsx_one_percent_commit_save"
+    ],
+    "shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "pin": "CPU2,one worker; serial captures, no simultaneous local builds or heavy checks",
+    "preflight": "each role, all12rows,1sample0warmups",
+    "pilot": "each role,all12rows,20samples2warmups",
+    "guard": "unchanged0514 public seven-scenario guard across3shapes; eachrole1/0preflight20/2pilot",
+    "allocator": "eachrole main+guard10samples1warmup,two repeats; separate allocator binary; timing/RSS excluded",
+    "profile": "eachrole3samples0warmup,dense one-percent commit-save,exact existing xlsx_commit_save_operation toggle;instructiondiagnostic only",
+    "admission": "Stop and archive/revert on correctness failure, cold no-op or changed-output latency regression >approximately5%, RSS >5% or material incremental peak increase unless independently explained and justified; no full formal repeats before pilot and correctness admission",
+    "formal_if_admitted": "ABBA: before/r1,after/r1,after/r2,before/r2; main500samples5warmups12rows;guard100samples3warmups21rows; retain individual rows, uncertainty and adverse observations",
+    "drift_review_percent": {
+      "p50": 5,
+      "mean": 5,
+      "p95": 10,
+      "p99": 15,
+      "RSS": 5
+    },
+    "claim": "No speedup before matched formal admission; pilot/profile alone descriptive",
+    "tests": "XLSX unit/integration/doc, adversarial and differential emitted-byte/error/order/fallback/no-op/inverse cases; fmt, Clippy, ownercheck/rustdoc,boundaries,strictclaims; full heavy work before formal native lanes"
+  },
+  "cleanup": "Only owned /tmp/litchi-goal-0516 worktree/targets/executables and generated task caches; all raw evidence retained"
+}

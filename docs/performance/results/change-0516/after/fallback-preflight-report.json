@@ -1,0 +1,331 @@
+{
+  "schema_version": 1,
+  "probe": "litchi-xlsx-public-commit-fallback-guard-v1",
+  "corpus_variant": {
+    "name": "numeric-two-sheet-public-default-descent-x14ac-v1",
+    "source_generator": "public Workbook/Edit two-sheet numeric generator",
+    "default_height": 15.0,
+    "default_descent": 0.2,
+    "metadata_application": "public WorksheetEdit::defaults().height(15).descent(0.2) before initial commit"
+  },
+  "timer_scope": "Edit::commit only; fresh Workbook open, complete public Store warming, edit preparation, output serialization, source-marker/readback/cell oracles, and Commit/View drop are outside the clock",
+  "allocation": {
+    "binary": "litchi-xlsx-commit-guard",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  },
+  "samples": 1,
+  "warmups": 0,
+  "shapes": [
+    {
+      "corpus_variant": "numeric-two-sheet-public-default-descent-x14ac-v1",
+      "shape": "tiny",
+      "sheet_count": 2,
+      "rows_per_sheet": 8,
+      "columns_per_sheet": 8,
+      "cells": 128,
+      "one_percent_update_count": 2,
+      "corpus_bytes": 3221,
+      "corpus_sha256": "cf6f7d69f9ab031b9ff7426879b4c7e082a38deea4380887989c1d69c4546a7a",
+      "source_markers": {
+        "worksheet_parts_checked": 2,
+        "x14ac_namespace_bindings": 2,
+        "mce_namespace_bindings": 2,
+        "mce_ignorable_attributes": 2,
+        "dy_descent_attributes": 2
+      },
+      "descent_readback": {
+        "expected": 0.2,
+        "sheets_checked": 2,
+        "all_sheets_match": true
+      },
+      "scenarios": [
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 0,
+          "sample_count": 1,
+          "sample_indices": [
+            0
+          ],
+          "elapsed_ns": [
+            518872
+          ],
+          "stats": {
+            "min_ns": 518872,
+            "p50_ns": 518872,
+            "p95_ns": 518872,
+            "p99_ns": 518872,
+            "max_ns": 518872,
+            "mean_ns": 518872.0
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 1,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 2,
+          "warmup_iterations": 0,
+          "sample_count": 1,
+          "sample_indices": [
+            0
+          ],
+          "elapsed_ns": [
+            926524
+          ],
+          "stats": {
+            "min_ns": 926524,
+            "p50_ns": 926524,
+            "p95_ns": 926524,
+            "p99_ns": 926524,
+            "max_ns": 926524,
+            "mean_ns": 926524.0
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 1,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        }
+      ]
+    },
+    {
+      "corpus_variant": "numeric-two-sheet-public-default-descent-x14ac-v1",
+      "shape": "medium",
+      "sheet_count": 2,
+      "rows_per_sheet": 32,
+      "columns_per_sheet": 32,
+      "cells": 2048,
+      "one_percent_update_count": 21,
+      "corpus_bytes": 8866,
+      "corpus_sha256": "63f7b3db7fddc4908b026f93a1a6182502b077171fe0b8e5cd37c3a112658434",
+      "source_markers": {
+        "worksheet_parts_checked": 2,
+        "x14ac_namespace_bindings": 2,
+        "mce_namespace_bindings": 2,
+        "mce_ignorable_attributes": 2,
+        "dy_descent_attributes": 2
+      },
+      "descent_readback": {
+        "expected": 0.2,
+        "sheets_checked": 2,
+        "all_sheets_match": true
+      },
+      "scenarios": [
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 0,
+          "sample_count": 1,
+          "sample_indices": [
+            0
+          ],
+          "elapsed_ns": [
+            6334687
+          ],
+          "stats": {
+            "min_ns": 6334687,
+            "p50_ns": 6334687,
+            "p95_ns": 6334687,
+            "p99_ns": 6334687,
+            "max_ns": 6334687,
+            "mean_ns": 6334687.0
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 1,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 21,
+          "warmup_iterations": 0,
+          "sample_count": 1,
+          "sample_indices": [
+            0
+          ],
+          "elapsed_ns": [
+            12190401
+          ],
+          "stats": {
+            "min_ns": 12190401,
+            "p50_ns": 12190401,
+            "p95_ns": 12190401,
+            "p99_ns": 12190401,
+            "max_ns": 12190401,
+            "mean_ns": 12190401.0
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 1,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        }
+      ]
+    },
+    {
+      "corpus_variant": "numeric-two-sheet-public-default-descent-x14ac-v1",
+      "shape": "dense-wide",
+      "sheet_count": 2,
+      "rows_per_sheet": 256,
+      "columns_per_sheet": 256,
+      "cells": 131072,
+      "one_percent_update_count": 1311,
+      "corpus_bytes": 384944,
+      "corpus_sha256": "1b0fc05fe0620473eee84d73a1262ee5c6f325637d7d2c70ac3ad83e3893c035",
+      "source_markers": {
+        "worksheet_parts_checked": 2,
+        "x14ac_namespace_bindings": 2,
+        "mce_namespace_bindings": 2,
+        "mce_ignorable_attributes": 2,
+        "dy_descent_attributes": 2
+      },
+      "descent_readback": {
+        "expected": 0.2,
+        "sheets_checked": 2,
+        "all_sheets_match": true
+      },
+      "scenarios": [
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 0,
+          "sample_count": 1,
+          "sample_indices": [
+            0
+          ],
+          "elapsed_ns": [
+            393791308
+          ],
+          "stats": {
+            "min_ns": 393791308,
+            "p50_ns": 393791308,
+            "p95_ns": 393791308,
+            "p99_ns": 393791308,
+            "max_ns": 393791308,
+            "mean_ns": 393791308.0
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 1,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1311,
+          "warmup_iterations": 0,
+          "sample_count": 1,
+          "sample_indices": [
+            0
+          ],
+          "elapsed_ns": [
+            796080192
+          ],
+          "stats": {
+            "min_ns": 796080192,
+            "p50_ns": 796080192,
+            "p95_ns": 796080192,
+            "p99_ns": 796080192,
+            "max_ns": 796080192,
+            "mean_ns": 796080192.0
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 1,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        }
+      ]
+    }
+  ]
+}
