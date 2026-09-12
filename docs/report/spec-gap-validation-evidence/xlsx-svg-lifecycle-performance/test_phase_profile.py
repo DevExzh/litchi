@@ -3,11 +3,55 @@
 import json
 import hashlib
 from pathlib import Path
+import re
+import shlex
+import shutil
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
 import phase_summarize
 import phase_verify
+
+
+class HostProbeTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("awk"), "host metadata reader requires awk")
+    def test_phase_host_metadata_awk_programs_execute_fixture_fields(self):
+        script = Path(__file__).with_name("run_phase_profile.sh").read_text()
+        cases = [
+            (r"awk -F: '([^']+)'", ["-F:"], "model name : Fixture CPU\n", "Fixture CPU"),
+            (r"awk '([^']+)'", [], "MemTotal: 12345 kB\n", "12345 kB"),
+        ]
+        for pattern, options, source, expected in cases:
+            with self.subTest(expected=expected):
+                program = re.search(pattern, script)
+                self.assertIsNotNone(program, "phase host metadata program is missing")
+                run = subprocess.run(
+                    ["awk", *options, program.group(1)],
+                    input=source,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stdout.strip(), expected)
+
+    @unittest.skipUnless(
+        shutil.which("df") and shutil.which("tail"),
+        "storage metadata readers require df and tail",
+    )
+    def test_phase_storage_probe_executes_against_fixture_path(self):
+        script = Path(__file__).with_name("run_phase_profile.sh").read_text()
+        line = next(
+            line for line in script.splitlines() if 'storage=$(df -P "$ROOT"' in line
+        )
+        with TemporaryDirectory(prefix="litchi-xlsx-phase-host-") as directory:
+            run = subprocess.run(
+                ["bash", "-c", f"ROOT={shlex.quote(directory)}\n{line}\n"],
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertRegex(run.stdout, r"^storage=\S.*\n$")
 
 
 class PhaseReceiptTests(unittest.TestCase):
