@@ -1,0 +1,29 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "-p",
+    "litchi-docx",
+    "--example",
+    "managed_paragraph_batch_perf"
+  ],
+  "started_utc": "2026-09-12T03:04:15.068656+00:00",
+  "elapsed_seconds": 43.93041739700129,
+  "exit_code": 0,
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0518-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0518"
+  },
+  "source_unchanged": true,
+  "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+  "log_sha256": "bcccc65e1408937763f4b59f8191285657a55d102da690251783143fcff30967",
+  "binary": "/tmp/litchi-goal-0518/managed-paragraph-candidate",
+  "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374"
+}

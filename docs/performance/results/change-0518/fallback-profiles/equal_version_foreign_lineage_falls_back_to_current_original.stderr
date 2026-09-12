@@ -1,0 +1,11 @@
+==80435== Callgrind, a call-graph generating cache profiler
+==80435== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==80435== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==80435== Command: /home/zhuhe/litchi-goal-0518-target/debug/deps/source_xml_hint-7af9f94fe8d8f1dc --exact equal_version_foreign_lineage_falls_back_to_current_original --nocapture --test-threads=1
+==80435== 
+==80435== For interactive control, run 'callgrind_control -h'.
+==80435== 
+==80435== Events    : Ir
+==80435== Collected : 225021
+==80435== 
+==80435== I   refs:      225,021

@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0518: reuse the retained DOCX source snapshot at publication
+
+[0518](changes/0518-docx-source-snapshot-reuse.md) reuses the immutable
+patch source after OPC checks the current Part, source identity, exact bytes,
+limits, and security state. Candidate reparse/readback and destination
+publication validation remain intact. Across 48 same-API comparisons,
+lifecycle p50 improves 1.42–34.59% and publication p50 improves 43.75–67.42%.
+Method instruction counts fall about 54–66%. In the separate instrumented
+probe, publication allocation calls fall 96.65–99.13%, while incremental
+region peaks improve only 2.70–6.55%.
+All lifecycle/publication tails improve; RSS stays within the 5% review
+threshold. The 69 adverse open/commit/drop flags remain explicit, with causes
+unproven. These results cover the named synthetic DOCX matrix only.
+
+The repeated current-snapshot owner is now negligible in these profiles;
+topology publication dominates the remainder and is the next proof-review
+candidate. Historical 0499/0500 flags, broader CRUD/corpus coverage, cold/range
+and scaling requirements remain open. OLE2/OOXML work continues, ODF is
+deferred until that goal is complete, and iWork is excluded.
+
 ## 0517: remove a duplicate shared OPC source-XML validation pass
 
 [0517](changes/0517-opc-source-xml-validation.md) retains the initial complete

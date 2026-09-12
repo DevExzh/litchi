@@ -1,0 +1,71 @@
+{
+  "schema": "managed_docx_callgrind_annotations_v1",
+  "profile_count": 2,
+  "profiles": [
+    {
+      "raw": "derived_hint_returns_current_original_and_keeps_derived_bytes_live.callgrind",
+      "raw_sha256": "b61dab102dc5266ef81f547239b375483b2eb7f78a504b52e7a276fceb7facde",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0518/fallback-profiles/derived_hint_returns_current_original_and_keeps_derived_bytes_live.callgrind"
+          ],
+          "path": "derived_hint_returns_current_original_and_keeps_derived_bytes_live-exclusive.txt",
+          "sha256": "ec878e93a1b86613ea011f3a03284005a368602a08dddd7cbc47bcafd32a4998"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0518/fallback-profiles/derived_hint_returns_current_original_and_keeps_derived_bytes_live.callgrind"
+          ],
+          "path": "derived_hint_returns_current_original_and_keeps_derived_bytes_live-inclusive.txt",
+          "sha256": "dfead0797ca68247f822e6c534d8de067316b58b078615e9a06942e0918d0773"
+        }
+      }
+    },
+    {
+      "raw": "equal_version_foreign_lineage_falls_back_to_current_original.callgrind",
+      "raw_sha256": "ed5a584ad6c32e1da66f16b652caa2452e2665b78a997fe32f6e3974f96dcee9",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0518/fallback-profiles/equal_version_foreign_lineage_falls_back_to_current_original.callgrind"
+          ],
+          "path": "equal_version_foreign_lineage_falls_back_to_current_original-exclusive.txt",
+          "sha256": "3fae8a9b7ec7123b920d64c4f38b17593675607ebf63bf149a7c9e0a600f2346"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0518/fallback-profiles/equal_version_foreign_lineage_falls_back_to_current_original.callgrind"
+          ],
+          "path": "equal_version_foreign_lineage_falls_back_to_current_original-inclusive.txt",
+          "sha256": "f60f074bfa2d9621e6c5fa9092bd1088f0ba2a8f0a56f7130a5ada2e152d0514"
+        }
+      }
+    }
+  ],
+  "scope": "Existing debug source_xml_with_hint guard profiles; inclusive and exclusive callgrind_annotate tree=both views; no new capture; no performance claim"
+}

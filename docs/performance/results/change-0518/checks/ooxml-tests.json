@@ -1,0 +1,37 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-pptx",
+    "-p",
+    "litchi-xlsb",
+    "--all-features",
+    "--",
+    "--test-threads=2"
+  ],
+  "started_utc": "2026-09-12T03:11:23.388775+00:00",
+  "elapsed_seconds": 183.31470751900633,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+  "log_sha256": "99b963023749600205c57614e51263174fe5e9433a662f8415e2ef01aad5ced0",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0518-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0518",
+    "RUSTDOCFLAGS": "-D warnings",
+    "LITCHI_0415_PYTHON_ZIP": "/tmp/litchi-goal-0518/independent-zip64.zip"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0518/allocation-baseline",
+    "--paragraphs",
+    "512",
+    "--replacements",
+    "8",
+    "--source",
+    "owned",
+    "--mode",
+    "repeated",
+    "--samples",
+    "1",
+    "--warmups",
+    "0",
+    "--repeats",
+    "1",
+    "--artifact-dir",
+    "/tmp/litchi-goal-0518/corpora/alloc-baseline-r1-p512-k8-owned-repeated",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0518/alloc-baseline-r1/p512-k8-owned-repeated.csv"
+  ],
+  "started_utc": "2026-09-12T02:47:00.702630+00:00",
+  "elapsed_seconds": 0.02240152400918305,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "binary_sha256": "a8e9a02e96c438d2466ff8939f5a5f29795cba53619d106e34a24c6bf0ad00e2",
+  "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+  "probe_manifest_sha256": "5211945d5b9b43938391dc3d0c3f8626f1f52c136bfd4e65e1fef54230622f7d",
+  "candidate_plan_sha256": "4d8f0fcf52b1ba598ee98d5072b8ae33640725789763af2455d8206fc6b1759f",
+  "cleanup_verified": true,
+  "artifacts": {
+    "p512-k8-owned-repeated.csv": "6854f1eaac57d6cbca3769de34677bcb200c68e7196db88590995b03cf5d586b",
+    "p512-k8-owned-repeated.stdout": "2f34db6c183bc8d54f0335eef61d89c38974aca5bb5a09eed64b85fec4ac421a",
+    "p512-k8-owned-repeated.stderr": "dca19dbb822439c8b2eef5e0c3e12f5df34f8ad2ec73d2a4b7ce834a9abcbe51"
+  }
+}

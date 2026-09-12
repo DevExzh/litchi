@@ -1,0 +1,5 @@
+{
+  "reason": "The first completed guard capture was valid, but the shared profile parser required explicit sample/cleanup fields absent from its receipt.",
+  "action": "Add truthful single-test and in-memory-fixture descriptors to the receipt; retain and verify raw hashes, command, timing, and binary; resume only the not-yet-run derived-hint case.",
+  "recaptured_completed_case": false
+}

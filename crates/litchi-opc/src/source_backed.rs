@@ -57,6 +57,10 @@ mod batch;
 pub use batch::PartBatch;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+
+#[cfg(test)]
+#[path = "source_xml_hint_tests.rs"]
+mod source_xml_hint_tests;
 /// Fixed part of the ZIP preservation writer's bounded generated-member
 /// capacity. The payload and target-name terms are charged separately using
 /// the same checked formula as `soapberry_zip::preserve::generated_entry`.
@@ -3484,6 +3488,24 @@ impl<'package> PartView<'package> {
         self.package.source_xml_part(self.index)
     }
 
+    /// Capture this XML Part, optionally reusing an earlier original-source proof.
+    ///
+    /// The current Part is read through the normal bounded source path. The
+    /// hint is reused only when its original payload, source identity, Part,
+    /// content type, limits, and exact bytes match. Other hints, including
+    /// derived splice payloads, fall back to complete XML validation of that
+    /// same read. Source, cancellation, encryption, and signature checks still
+    /// apply; the hint never authorizes different current bytes.
+    ///
+    /// # Errors
+    /// Returns the same source, resource, package-policy, and XML errors as
+    /// [`Self::source_xml`]. Checking an eligible hint consumes a conservative
+    /// byte-length charge from the current execution context's work budget.
+    pub fn source_xml_with_hint(&self, hint: &SourceXmlPart) -> Result<SourceXmlPart> {
+        self.package
+            .source_xml_part_with_hint(self.index, Some(hint))
+    }
+
     /// Capture this Part's verified Store/Deflate payload for a new OPC
     /// member while proving it decodes to `expected_decoded`.
     ///
@@ -5879,6 +5901,14 @@ impl SourceBackedPackage {
     /// are validated for bounded well-formedness, never normalized or passed
     /// through the authored compactness audit.
     pub(crate) fn source_xml_part(&self, index: usize) -> Result<SourceXmlPart> {
+        self.source_xml_part_with_hint(index, None)
+    }
+
+    fn source_xml_part_with_hint(
+        &self,
+        index: usize,
+        hint: Option<&SourceXmlPart>,
+    ) -> Result<SourceXmlPart> {
         self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -5902,6 +5932,56 @@ impl SourceBackedPackage {
         let data = self.read_part(index)?;
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
+        if let Some(hint) = hint.filter(|hint| {
+            hint.source_lineage == *self.source.lineage()
+                && hint.source_version == self.source.version()
+                && hint.source.lineage() == &hint.source_lineage
+                && hint.source.version() == hint.source_version
+                && hint.source_partname.is_equivalent_to(&part.partname)
+                && hint.content_type() == part.content_type
+                && hint.limits == self.limits
+                && Arc::ptr_eq(&hint.payload, &hint.original.shared_bytes())
+        }) {
+            // Retain the constructor's fresh-state fences. Only the immutable
+            // original proof is eligible; a candidate payload is never the
+            // current source. Its existing metadata and payload reservations
+            // remain shared with the returned clone.
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            self.limits.check(
+                ReadResource::PartBytes,
+                data.as_bytes().len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            // Charge the bounded comparison even when immutable allocation
+            // identity proves equality without examining individual bytes.
+            if let Some(context) = self.source.context_ref() {
+                context
+                    .consume(Resource::Work, data.as_bytes().len() as u64)
+                    .map_err(map_execution_error)?;
+            }
+            let mut matches = hint.original.shares_allocation_with(&data);
+            if !matches && hint.bytes().len() == data.as_bytes().len() {
+                matches = true;
+                for (original, current) in hint
+                    .bytes()
+                    .chunks(SOURCE_PUBLICATION_CHUNK_BYTES)
+                    .zip(data.as_bytes().chunks(SOURCE_PUBLICATION_CHUNK_BYTES))
+                {
+                    self.source.ensure_current()?;
+                    self.cache.check_context().map_err(map_execution_error)?;
+                    if original != current {
+                        matches = false;
+                        break;
+                    }
+                }
+            }
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            if matches {
+                return Ok(hint.clone());
+            }
+        }
         SourceXmlPart::from_source_parts(
             self.source.clone(),
             self.limits,

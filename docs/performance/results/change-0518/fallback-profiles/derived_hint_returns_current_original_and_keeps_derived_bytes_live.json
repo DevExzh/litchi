@@ -1,0 +1,33 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=*litchi_opc::source_backed::PartView::source_xml_with_hint",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0518/fallback-profiles/derived_hint_returns_current_original_and_keeps_derived_bytes_live.callgrind",
+    "/home/zhuhe/litchi-goal-0518-target/debug/deps/source_xml_hint-7af9f94fe8d8f1dc",
+    "--exact",
+    "derived_hint_returns_current_original_and_keeps_derived_bytes_live",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "started_utc": "2026-09-12T03:23:52.269521+00:00",
+  "elapsed_seconds": 0.4659576819976792,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+  "binary_sha256": "7148673fb1d1d934fa533869050b9abc6ff2ed56e805a972907922d4d2251deb",
+  "artifacts": {
+    "derived_hint_returns_current_original_and_keeps_derived_bytes_live.callgrind": "b61dab102dc5266ef81f547239b375483b2eb7f78a504b52e7a276fceb7facde",
+    "derived_hint_returns_current_original_and_keeps_derived_bytes_live.stdout": "6cb97c1cf3403f0bbd13a779d52cf6225b994d1e74b2349abe53e24eff1edfc8",
+    "derived_hint_returns_current_original_and_keeps_derived_bytes_live.stderr": "4fbe486580c3e6601122799cdc07a1f074c44717cefbee649e815c97175f1fa3"
+  },
+  "samples": 1,
+  "warmups": 0,
+  "repeats": 1,
+  "cleanup_verified": true,
+  "fixture_scope": "In-memory integration-test fixtures; no scratch corpus files"
+}

@@ -1,0 +1,10 @@
+{
+  "base": "afb62ab7a70859dad4a4b9c8eea91402d1ef4052",
+  "previous_turn": "progress: committed0517optimization,4,985executedtests,validated48nativecomparisons,cleanedownedtemps",
+  "priority": "OLE2/OOXML;ODFdeferred;iWorkexcluded",
+  "owned_paths": [
+    "/tmp/litchi-goal-0518",
+    "/home/zhuhe/litchi-goal-0518-target"
+  ],
+  "initial_tree_clean": true
+}

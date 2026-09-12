@@ -1,0 +1,8 @@
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `test` profile [unoptimized] target(s) in 3.80s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0518-target/debug/deps/litchi_opc-5e5ec62e7ad589c6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 391 filtered out; finished in 0.00s
+

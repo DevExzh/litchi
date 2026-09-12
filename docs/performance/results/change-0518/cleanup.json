@@ -1,0 +1,11 @@
+{
+  "completed_utc": "2026-09-12T03:34:16.514779+00:00",
+  "owned_paths": [
+    "/tmp/litchi-goal-0518",
+    "/home/zhuhe/litchi-goal-0518-target"
+  ],
+  "accessible_process_references_before_removal": [],
+  "process_fd_directories_unavailable": 429,
+  "owned_paths_absent": true,
+  "owned_python_cache_absent": true
+}

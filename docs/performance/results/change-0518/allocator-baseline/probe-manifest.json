@@ -1,0 +1,9 @@
+{
+  "docs/performance/results/change-0518/allocator-probe/Cargo.lock": "d8a88e97ece917c671a4fe5acd3a859945ccc7349e54e42e229817cae5873a9c",
+  "docs/performance/results/change-0518/allocator-probe/Cargo.toml": "f013ec1ed6b2ab1871fe9e69354221d110f69bd28483ccf50c47a61a748f5979",
+  "docs/performance/results/change-0518/allocator-probe/README.md": "435c78ca910b4ac6cb477d88da030165fc52e0e1cbbddfe173a87989ce089089",
+  "docs/performance/results/change-0518/allocator-probe/generate.py": "2256a4df6694901093692acb47d99915c6687af543683474515333b01179d15a",
+  "docs/performance/results/change-0518/allocator-probe/source-binding.json": "95f76ba49ff06f4b77ab8eb4c4021d70773927206f3a5cbe48026be980a1ae57",
+  "docs/performance/results/change-0518/allocator-probe/source-diff.patch": "c18e67e7e2452f5e3d31b55f3804cb8eb392f56e7adf86d5f877b825fad651eb",
+  "docs/performance/results/change-0518/allocator-probe/src/main.rs": "40f06c12173b0d5552f200cb1ef98b3e8172402094be8afae352f8b4ef9da768"
+}

@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## 0518: reuse the retained DOCX source snapshot at publication
+
+[0518](changes/0518-docx-source-snapshot-reuse.md) reuses the immutable
+patch source after OPC checks the current Part, source identity, exact bytes,
+limits, and security state. Candidate reparse/readback and destination
+publication validation remain intact. Across 48 same-API comparisons,
+lifecycle p50 improves 1.42–34.59% and publication p50 improves 43.75–67.42%.
+Method instruction counts fall about 54–66%. In the separate instrumented
+probe, publication allocation calls fall 96.65–99.13%, while incremental
+region peaks improve only 2.70–6.55%.
+All lifecycle/publication tails improve; RSS stays within the 5% review
+threshold. The 69 adverse open/commit/drop flags remain explicit, with causes
+unproven. These results cover the named synthetic DOCX matrix only.
+
+The repeated current-snapshot owner is now negligible in these profiles;
+topology publication dominates the remainder and is the next proof-review
+candidate. Historical 0499/0500 flags, broader CRUD/corpus coverage, cold/range
+and scaling requirements remain open. OLE2/OOXML work continues, ODF is
+deferred until that goal is complete, and iWork is excluded.
+
 ## 0517: remove a duplicate shared OPC source-XML validation pass
 
 [0517](changes/0517-opc-source-xml-validation.md) retains the initial complete
@@ -26,16 +46,17 @@ production is restored. Two independent no-op fixture fixes remain, with
 1,263 tests passing on unchanged production. OLE2/OOXML work remains active;
 ODF is deferred and iWork excluded.
 
-## Current priority after 0517: OLE2 and OOXML
+## Current priority after 0518: OLE2 and OOXML
 
 Per the user's instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
 deferred until then. This overrides the ordering of older entries below.
 CFB profiling and FAT batching are complete in 0511. The 0514 source-pass
-fusion and 0516 emitted-output fusion are rejected. The 0517 DOCX publication
-profile supports removing duplicate OPC XML validation; next investigate the
-remaining current-source snapshot construction while retaining the 0499/0500
-review flags. This investigation queue is not a completion checklist. The broader requirements and
+fusion and 0516 emitted-output fusion are rejected. The 0517 and 0518 DOCX publication
+changes remove repeated XML and current-snapshot construction work. The
+remaining topology/XML publication owner needs a proof review before further
+optimization; required candidate validation and readback must remain intact.
+Retain the 0499/0500 review flags. This investigation queue is not a completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
 

@@ -10,7 +10,7 @@
 
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use litchi_core::{
@@ -22,7 +22,7 @@ use litchi_docx::paragraph::{Collapsed, Inline, Symbols};
 use litchi_docx::{Error, ReadLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::rel::Relationships;
-use litchi_opc::{OpcError, OpcPackage, PackURI};
+use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const MAIN: &str = "word/document.xml";
@@ -450,6 +450,8 @@ fn is_dtd_document_refusal(error: &TransactionError) -> bool {
 struct MutableSource {
     bytes: Mutex<Vec<u8>>,
     revision: AtomicU64,
+    revision_on_read: AtomicBool,
+    cancellation_on_read: Mutex<Option<CancellationSource>>,
 }
 
 impl MutableSource {
@@ -457,11 +459,21 @@ impl MutableSource {
         Self {
             bytes: Mutex::new(bytes),
             revision: AtomicU64::new(0),
+            revision_on_read: AtomicBool::new(false),
+            cancellation_on_read: Mutex::new(None),
         }
     }
 
     fn bump_revision(&self) {
         self.revision.fetch_add(1, Ordering::AcqRel);
+    }
+
+    fn arm_revision_on_read(&self) {
+        self.revision_on_read.store(true, Ordering::Release);
+    }
+
+    fn arm_cancellation_on_read(&self, cancellation: CancellationSource) {
+        *self.cancellation_on_read.lock().unwrap() = Some(cancellation);
     }
 }
 
@@ -477,15 +489,32 @@ impl ReadAt for MutableSource {
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
         let offset = usize::try_from(offset)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflows usize"))?;
-        let bytes = self
-            .bytes
-            .lock()
-            .map_err(|_| io::Error::other("mutable source mutex poisoned"))?;
-        if offset >= bytes.len() || output.is_empty() {
-            return Ok(0);
+        let count = {
+            let bytes = self
+                .bytes
+                .lock()
+                .map_err(|_| io::Error::other("mutable source mutex poisoned"))?;
+            if offset >= bytes.len() || output.is_empty() {
+                0
+            } else {
+                let count = output.len().min(bytes.len() - offset);
+                output[..count].copy_from_slice(&bytes[offset..offset + count]);
+                count
+            }
+        };
+        if count > 0 {
+            if self.revision_on_read.swap(false, Ordering::AcqRel) {
+                self.bump_revision();
+            }
+            let cancellation = self
+                .cancellation_on_read
+                .lock()
+                .map_err(|_| io::Error::other("mutable source cancellation mutex poisoned"))?
+                .take();
+            if let Some(cancellation) = cancellation {
+                cancellation.cancel();
+            }
         }
-        let count = output.len().min(bytes.len() - offset);
-        output[..count].copy_from_slice(&bytes[offset..offset + count]);
         Ok(count)
     }
 
@@ -1868,6 +1897,141 @@ fn managed_publication_reports_a_partial_sink_failure() {
         ))) if written > 0
     ));
     assert!(!sink.bytes.is_empty());
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_changed_publication_preserves_readback_and_releases_snapshot_budget() {
+    let source = fixture("before", "second");
+    let original_main = part_bytes(&source, MAIN);
+    let original_media = part_bytes(&source, MEDIA);
+    let original_opaque = part_bytes(&source, OPAQUE);
+    let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(
+        commit.patch().source().xml_bytes(),
+        original_main.as_slice()
+    );
+    assert_eq!(
+        commit
+            .snapshot()
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "changed"
+    );
+    assert!(budget.used(Resource::Memory) > 0);
+
+    let mut output = Vec::new();
+    let published = package
+        .publish_document_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(
+        published
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "changed"
+    );
+    assert_eq!(part_bytes(&output, MAIN), published.xml_bytes());
+    assert_eq!(part_bytes(&output, MEDIA), original_media);
+    assert_eq!(part_bytes(&output, OPAQUE), original_opaque);
+    assert!(budget.used(Resource::Memory) > 0);
+
+    drop(published);
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_foreign_equal_main_xml_refuses_commit_before_output() {
+    let main_xml = document_xml("before", "second");
+    let first = fixture_with_document(main_xml.clone(), 37, 13);
+    let second = fixture_with_document(main_xml, 41, 29);
+    assert_eq!(part_bytes(&first, MAIN), part_bytes(&second, MAIN));
+    assert_ne!(part_bytes(&first, MEDIA), part_bytes(&second, MEDIA));
+    assert_ne!(part_bytes(&first, OPAQUE), part_bytes(&second, OPAQUE));
+
+    let (first_budget, _first_cancellation, first_package) = managed(first, 1 << 20);
+    let mut edit = first_package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "first package change")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    drop(first_package);
+
+    let (second_budget, _second_cancellation, second_package) = managed(second, 1 << 20);
+    let mut output = Vec::new();
+    let result = second_package.publish_document_commit_to_stream(&mut output, &commit);
+    assert!(matches!(result, Err(TransactionError::StaleSource)));
+    assert!(output.is_empty());
+
+    drop(commit);
+    assert_eq!(first_budget.used(Resource::Memory), 0);
+    assert_eq!(second_budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_source_change_during_current_part_read_refuses_before_output() {
+    let source_bytes = fixture("before", "second");
+    let source = Arc::new(MutableSource::new(source_bytes));
+    let (budget, _cancellation_source, context) = managed_context(1 << 20);
+    let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
+    let package =
+        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            cache_limits,
+            context,
+        )
+        .unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    source.arm_revision_on_read();
+
+    let mut output = Vec::new();
+    let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    assert!(result.as_ref().is_err_and(is_source_changed));
+    assert!(output.is_empty());
+
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_cancellation_during_current_part_read_refuses_before_output() {
+    let source_bytes = fixture("before", "second");
+    let source = Arc::new(MutableSource::new(source_bytes));
+    let (budget, cancellation_source, context) = managed_context(1 << 20);
+    let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
+    let package =
+        source_backed::Package::from_read_at_with_limits_and_cache_limits_and_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            cache_limits,
+            context,
+        )
+        .unwrap();
+    let mut edit = package.edit_document().unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    source.arm_cancellation_on_read(cancellation_source);
+
+    let mut output = Vec::new();
+    let result = package.publish_document_commit_to_stream(&mut output, &commit);
+    assert!(result.as_ref().is_err_and(is_cancelled));
+    assert!(output.is_empty());
+
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
 }

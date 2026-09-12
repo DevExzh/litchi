@@ -1295,9 +1295,10 @@ impl Package {
         writer: W,
         commit: &Commit,
     ) -> TransactionResult<Snapshot> {
-        let (main, current) = self.main_document_snapshot(
+        let (main, current) = self.main_document_snapshot_with_before(
             "publish_document_commit_to_stream",
             commit.patch().changed(),
+            Some(commit.patch().source()),
         )?;
         let target = commit.patch().apply(&current)?;
         if commit
@@ -1738,6 +1739,15 @@ impl Package {
         operation: &'static str,
         source_authorized: bool,
     ) -> TransactionResult<(PackURI, Snapshot)> {
+        self.main_document_snapshot_with_before(operation, source_authorized, None)
+    }
+
+    fn main_document_snapshot_with_before(
+        &self,
+        operation: &'static str,
+        source_authorized: bool,
+        before: Option<&Snapshot>,
+    ) -> TransactionResult<(PackURI, Snapshot)> {
         self.package.source_version().map_err(Error::from)?;
         let result = (|| {
             self.package.check_execution().map_err(Error::from)?;
@@ -1750,30 +1760,53 @@ impl Package {
             let source_lineage = self.package.source_lineage();
             let snapshot = if managed {
                 if source_authorized {
-                    match main.source_xml() {
-                        Ok(source) => {
-                            ensure_source_document_xml(
-                                source.bytes(),
-                                self.package.execution_context().as_ref(),
-                            )?;
-                            Snapshot::from_source_xml(
-                                source,
-                                source_lineage.clone(),
+                    let hinted_before = before
+                        .filter(|snapshot| {
+                            snapshot.source_identity_matches(
+                                &source_lineage,
                                 source_version,
                                 partname,
-                                context.clone().ok_or_else(|| {
-                                    Error::InvalidFormat(
-                                        "managed document context is unavailable".into(),
-                                    )
-                                })?,
-                            )?
+                            )
+                        })
+                        .and_then(|snapshot| snapshot.source_xml().map(|hint| (snapshot, hint)));
+                    let source = match &hinted_before {
+                        Some((_, hint)) => main.source_xml_with_hint(hint),
+                        None => main.source_xml(),
+                    };
+                    match source {
+                        Ok(source) => {
+                            // The retained layout was admitted when the edit
+                            // captured its original source. Reuse it only after
+                            // OPC has checked the current Part and the exact
+                            // snapshot source precondition still matches.
+                            let reused = hinted_before.and_then(|(before, _)| {
+                                before.reuse_if_source_xml_matches(
+                                    &source,
+                                    &source_lineage,
+                                    source_version,
+                                    partname,
+                                )
+                            });
+                            if let Some(snapshot) = reused {
+                                snapshot
+                            } else {
+                                ensure_source_document_xml(source.bytes(), context.as_ref())?;
+                                Snapshot::from_source_xml(
+                                    source,
+                                    source_lineage.clone(),
+                                    source_version,
+                                    partname,
+                                    context.clone().ok_or_else(|| {
+                                        Error::InvalidFormat(
+                                            "managed document context is unavailable".into(),
+                                        )
+                                    })?,
+                                )?
+                            }
                         },
                         Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy) => {
                             let data = main.data().map_err(Error::from)?;
-                            ensure_source_document_xml(
-                                data.as_bytes(),
-                                self.package.execution_context().as_ref(),
-                            )?;
+                            ensure_source_document_xml(data.as_bytes(), context.as_ref())?;
                             Snapshot::from_managed_part(
                                 data,
                                 source_lineage.clone(),
