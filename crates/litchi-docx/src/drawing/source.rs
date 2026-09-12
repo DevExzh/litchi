@@ -34,7 +34,6 @@ const STRICT_RELATIONSHIPS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/
 const SVG_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/drawing/2016/SVG/main";
 const SVG_EXTENSION_URI: &[u8] = b"{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const XMLNS_NAMESPACE: &[u8] = b"http://www.w3.org/2000/xmlns/";
 
@@ -91,7 +90,6 @@ fn known_namespace(value: &[u8]) -> Option<&'static [u8]> {
         STRICT_RELATIONSHIPS,
         SVG_NAMESPACE,
         MCE,
-        STRICT_MCE,
     ]
     .into_iter()
     .find(|candidate| *candidate == value)
@@ -2199,7 +2197,7 @@ fn classify(
     element: &BytesStart<'_>,
     decoder: Decoder,
 ) -> Result<Kind> {
-    if is_namespace(resolved, MCE, STRICT_MCE) {
+    if is_exact_namespace(resolved, MCE) {
         return Ok(Kind::Mce);
     }
     if first
@@ -2414,6 +2412,10 @@ fn is_name(
 
 fn is_namespace(namespace: &Resolved, transitional: &[u8], strict: &[u8]) -> bool {
     matches!(namespace, Resolved::Known(value) if *value == transitional || *value == strict)
+}
+
+fn is_exact_namespace(namespace: &Resolved, expected: &[u8]) -> bool {
+    matches!(namespace, Resolved::Known(value) if *value == expected)
 }
 
 fn project_svg_owner<'a>(
