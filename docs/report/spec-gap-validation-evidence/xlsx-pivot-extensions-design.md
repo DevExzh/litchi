@@ -483,6 +483,9 @@ used by the source-preserving data-type-icon owner
   lexical owner is unambiguous. It keeps ext siblings, prefix choices,
   attribute order, whitespace, and unrelated cache-field markup. It may not
   reorder or regenerate the whole cache definition.
+  The required `name` attribute must remain present, but its `ST_Xstring`
+  value may be empty: setting `""` writes `name=""`; it does not remove the
+  attribute. Missing `name` is invalid; empty `name` is not.
 * Insertion, deletion, or index changes are a separate structural operation.
   They are allowed only after the writer proves the `cachedUniqueNames`
   sequence, its parent `ext`, and the resolved cache-field item-count
