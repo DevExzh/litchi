@@ -1,0 +1,16 @@
+{
+  "verdict": "approved for documented XLSB Custom Data owner scope",
+  "reviewer": "xlsb_custom_data_owner_final_review",
+  "commit": "16102fe751d7c5492042330f1bd1f49c304495f0",
+  "package_sha256": "86f40bf91677e0f25b659ea50dca1d949811e61855015d7306e3c0c1b0f92777",
+  "source_manifest": "source-v6.json",
+  "validation": {
+    "library": 654,
+    "lifecycle": 18,
+    "ignored": 1,
+    "strict_clippy": "pass",
+    "rustdoc": "pass",
+    "owner_rustfmt": "pass"
+  },
+  "allocation_scope": "Audited growable vectors/maps use checked counts and fallible reservation. BTreeMap semantic UID staging maps are indirectly bounded by max_storages/max_bindings; they are not source/output buffers and do not bypass byte precharge."
+}
