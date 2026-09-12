@@ -1,0 +1,12 @@
+capture_head=732f3beca1418553c1db8ae4dcb5899e06b7a7db
+semantic_owner_commit=cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd
+production_source_baseline_commit=2a2ffa1cae4e6b7070082768ce84483e5d411dc8
+semantic_owner_design_path=docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md
+semantic_owner_design_sha256=30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d
+semantic_owner_design_git_blob=597400950b1027c47cd6e4cbbedd23915bc0980e
+uname=Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux
+hostname=ip-172-31-39-190
+loadavg=1.74 1.65 2.01 9/1261 1953148
+cpu_model=AMD EPYC 9R45
+memory=129447068 kB
+working_tree_status_lines=0
