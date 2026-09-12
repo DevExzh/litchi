@@ -36,6 +36,34 @@ form-control mutation API and establishes no native editing interoperability.
 No timing run, throughput improvement, allocation-count result, or peak-memory
 measurement is reported. The complete audit goal remains unfinished.
 
+### Subsequent independent review of this captured candidate
+
+Review confirmed that separate authored-row, authored-cell, and retained-byte
+admission is missing. The decoded strings are also copied into semantic views,
+transaction state, and snapshot clones without aggregate retained accounting.
+The C510 metadata expansion used for format-index diagnostics belongs within
+that accounting. Parent-local row/cell traversal was reviewed and has no
+remaining cross-row quadratic-scan finding. Logical dimensions must not be
+charged as a dense `rowCount * columnCount` allocation; count actual authored
+elements as the design requires.
+
+Semantic review found four additional blockers in this candidate:
+
+1. Bound every recognized duplicate C444 extension and payload before choosing
+   one for diagnostic reading; checking only the first extension is insufficient.
+2. Validate and emit `bc`/`fc` as exactly eight hexadecimal digits. Root checked
+   the vendored ECMA archive's `sml.xsd`: `ST_UnsignedIntHex` is `hexBinary` with
+   length four bytes. Short hexadecimal fixtures in this candidate are invalid.
+3. Reject non-whitespace character content in element-only C444 containers and
+   the empty C983 reference type. Preserve valid whitespace and the intentional
+   string content of `v`; lexical event kind alone is not the grammar test.
+4. A cache with neither F057 nor explicit `connectionId` must not load or capture
+   an unrelated connections part as a dependency.
+
+These findings supersede any interpretation of the passing gates as approval.
+Fixes and regressions are assigned; the archive intentionally retains the
+pre-fix candidate so the findings and subsequent corrections can be compared.
+
 ## Reproduction
 
 `root-gates.json` records the commands, toolchain, source hashes, exit statuses,
