@@ -86,7 +86,8 @@ external results and Cargo target paths, and the explicit `PROFILE_FROZEN=1` plu
 `DOCX_STYLES_EFFECTS_PROFILE_API_WIRED=1` gates. Its reviewed invocation is
 `bash run_profile.sh`; it uses three fresh processes, two warmups, and twenty
 samples over the bounded representative success matrix. The current scaffold
-re-verifies the retained clean-46 smoke before building, writes generated
+checks the approved current smoke's exact file set and bytes against
+`fa927a8a9` before building, writes generated
 64 KiB/1 MiB XML and DOCX bytes once to a fresh external manifest, and records
 actual source status, toolchain, target, linker, environment, and process-time
 receipts. A failed build, process, or verifier retains the disposable Cargo

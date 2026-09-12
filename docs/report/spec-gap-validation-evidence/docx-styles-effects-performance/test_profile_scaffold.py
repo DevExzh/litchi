@@ -17,6 +17,151 @@ import verify_profile
 
 
 class ProfileScaffoldTests(unittest.TestCase):
+    def _write_smoke_checkout(self, directory: Path, source_commit: str) -> tuple[Path, Path, str]:
+        """Create a tiny committed smoke tree for the retention gate tests."""
+        root = directory / "checkout"
+        evidence = root / "docs/report/spec-gap-validation-evidence/docx-styles-effects-performance"
+        smoke = evidence / verify_profile.CURRENT_SMOKE_RESULT_DIR
+        root.mkdir(parents=True)
+        subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+        smoke.mkdir(parents=True)
+        (smoke / "root-verification.json").write_text(
+            json.dumps(
+                {
+                    "passed": True,
+                    "schema": "docx-styles-effects-smoke-verification-v1",
+                    "source_commit": source_commit,
+                }
+            )
+            + "\n"
+        )
+        for index in range(52):
+            (smoke / f"smoke-lane-{index:02d}-p1.json").write_text(
+                json.dumps(
+                    {
+                        "lane": f"lane-{index:02d}",
+                        "schema": "docx-styles-effects-smoke-v1",
+                        "source_commit": source_commit,
+                    }
+                )
+                + "\n"
+            )
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Profile verifier test",
+                "-c",
+                "user.email=profile-verifier@example.invalid",
+                "commit",
+                "-qm",
+                "retained current smoke",
+            ],
+            check=True,
+        )
+        commit = subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+        return root, evidence, commit
+
+    def _commit_checkout(self, root: Path, message: str) -> str:
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Profile verifier test",
+                "-c",
+                "user.email=profile-verifier@example.invalid",
+                "commit",
+                "-qm",
+                message,
+            ],
+            check=True,
+        )
+        return subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+
+    def _set_current_smoke_constants(self, commit: str):
+        original = (
+            verify_profile.CURRENT_SMOKE_COMMIT,
+            verify_profile.CURRENT_SMOKE_RESULT_DIR,
+            verify_profile.CURRENT_SMOKE_SOURCE_COMMIT,
+        )
+        verify_profile.CURRENT_SMOKE_COMMIT = commit
+        verify_profile.CURRENT_SMOKE_SOURCE_COMMIT = verify_profile.PROFILE_SOURCE_COMMIT
+        return original
+
+    def _restore_current_smoke_constants(self, original) -> None:
+        (
+            verify_profile.CURRENT_SMOKE_COMMIT,
+            verify_profile.CURRENT_SMOKE_RESULT_DIR,
+            verify_profile.CURRENT_SMOKE_SOURCE_COMMIT,
+        ) = original
+
+    def test_profile_smoke_gate_binds_file_set_and_blobs_to_approved_commit(self):
+        """Descendant rewrites, removals, and additions cannot replace smoke evidence."""
+        with TemporaryDirectory(prefix="litchi-docx-styles-profile-smoke-blob-") as directory:
+            root, evidence, approved_commit = self._write_smoke_checkout(
+                Path(directory),
+                verify_profile.PROFILE_SOURCE_COMMIT,
+            )
+            original = self._set_current_smoke_constants(approved_commit)
+            try:
+                # The initial committed current-source capture is accepted.
+                verify_profile.verify_smoke_retention(root, evidence)
+
+                smoke = evidence / verify_profile.CURRENT_SMOKE_RESULT_DIR
+                changed = smoke / "smoke-lane-00-p1.json"
+                receipt = json.loads(changed.read_text())
+                receipt["payload"] = "descendant rewrite"
+                changed.write_text(json.dumps(receipt) + "\n")
+                self._commit_checkout(root, "rewrite retained smoke payload")
+                with self.assertRaisesRegex(AssertionError, "blob changed from approved smoke commit"):
+                    verify_profile.verify_smoke_retention(root, evidence)
+
+                subprocess.run(
+                    ["git", "-C", str(root), "reset", "--hard", "-q", approved_commit],
+                    check=True,
+                )
+                (smoke / "smoke-lane-00-p1.json").unlink()
+                self._commit_checkout(root, "remove retained smoke receipt")
+                with self.assertRaisesRegex(AssertionError, "retained smoke receipt count changed"):
+                    verify_profile.verify_smoke_retention(root, evidence)
+
+                subprocess.run(
+                    ["git", "-C", str(root), "reset", "--hard", "-q", approved_commit],
+                    check=True,
+                )
+                (smoke / "smoke-extra.txt").write_text("unapproved evidence\n")
+                self._commit_checkout(root, "add retained smoke file")
+                with self.assertRaisesRegex(AssertionError, "file set changed from approved smoke commit"):
+                    verify_profile.verify_smoke_retention(root, evidence)
+            finally:
+                self._restore_current_smoke_constants(original)
+
+    def test_profile_smoke_gate_rejects_historical_source_receipts(self):
+        """A d1/clean-46-style receipt cannot satisfy the current profile gate."""
+        with TemporaryDirectory(prefix="litchi-docx-styles-profile-smoke-bind-") as directory:
+            root, evidence, commit = self._write_smoke_checkout(
+                Path(directory),
+                "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119",
+            )
+            original = self._set_current_smoke_constants(commit)
+            try:
+                with self.assertRaisesRegex(AssertionError, "retained current-source smoke source changed"):
+                    verify_profile.verify_smoke_retention(root, evidence)
+            finally:
+                self._restore_current_smoke_constants(original)
+
     def test_publication_attribution_split_and_subphase_allocator_gate_are_wired(self):
         adapter = (HERE / "profile-harness/profile_adapter.rs").read_text()
         support = (HERE / "harness/support.rs").read_text()

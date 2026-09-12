@@ -24,7 +24,6 @@ from verify import (  # noqa: E402
     MANIFEST_FORMAT,
     NATIVE_FIXTURES,
     PROFILE_SOURCE_COMMIT,
-    SOURCE_COMMIT as SMOKE_SOURCE_COMMIT,
     verify_manifest,
 )
 
@@ -45,11 +44,16 @@ NATIVE_EFFECTS_MEMBERS = {
     },
 }
 
-SMOKE_COMMIT = "8444e88baaaca128eed50a2eed26e0ecd25063c9"
-SMOKE_RESULT_DIR = "results/clean-46c456848"
+# The profile prerequisite is the separately reviewed current-source smoke.
+# The historical d1/clean-46 smoke remains owned by verify.py/run_smoke.sh and
+# is intentionally not accepted as this profile's correctness gate.
+CURRENT_SMOKE_COMMIT = "fa927a8a9de94891858a6bb3d44c21d5fa63697d"
+CURRENT_SMOKE_RESULT_DIR = "results/smoke-current-637082e31"
+CURRENT_SMOKE_SOURCE_COMMIT = PROFILE_SOURCE_COMMIT
 
-# Compatibility name for the profile scaffold tests and receipt builders. The
-# smoke verifier uses the explicit SMOKE_SOURCE_COMMIT alias above.
+# Compatibility name for profile receipt builders.  Keep the profile source
+# pin explicit so a historical smoke source cannot satisfy this gate by
+# accident.
 SOURCE_COMMIT = PROFILE_SOURCE_COMMIT
 
 PROFILE_SCHEMA = "docx-styles-effects-profile-scaffold-v2"
@@ -281,45 +285,71 @@ def verify_smoke_retention(root: Path, evidence: Path) -> None:
     """Verify the reviewed correctness capture remains replayable in Git.
 
     The profile is allowed to run only from a descendant of the reviewed
-    smoke commit, with the retained clean-46 result subtree still bound to
-    the current Git blobs.  This prevents a later profile from silently
-    replacing or weakening the 52-lane prerequisite.
+    current-source smoke commit, with its retained 52-lane result subtree
+    still bound to the current Git blobs.  The historical smoke has a separate
+    verifier contract and cannot silently replace this prerequisite.
     """
     head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     require(
         subprocess.run(
-            ["git", "-C", str(root), "merge-base", "--is-ancestor", SMOKE_COMMIT, head],
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", CURRENT_SMOKE_COMMIT, head],
             check=False,
         ).returncode
         == 0,
-        f"profile checkout does not descend from reviewed smoke commit {SMOKE_COMMIT}",
+        f"profile checkout does not descend from reviewed current-source smoke commit {CURRENT_SMOKE_COMMIT}",
     )
-    smoke = evidence / SMOKE_RESULT_DIR
+    smoke = evidence / CURRENT_SMOKE_RESULT_DIR
     require(smoke.is_dir(), f"retained smoke result directory is missing: {smoke}")
     verification = parse_receipt(smoke / "root-verification.json")
     require(verification.get("passed") is True, "retained smoke verification did not pass")
-    require(verification.get("source_commit") == SMOKE_SOURCE_COMMIT, "retained smoke source changed")
+    require(
+        verification.get("source_commit") == CURRENT_SMOKE_SOURCE_COMMIT,
+        "retained current-source smoke source changed",
+    )
     receipts = sorted(smoke.glob("smoke-*-p1.json"))
     require(len(receipts) == 52, f"retained smoke receipt count changed: {len(receipts)}")
     for receipt in receipts:
         value = parse_receipt(receipt)
         require(value.get("schema") == "docx-styles-effects-smoke-v1", f"retained smoke schema changed: {receipt.name}")
-        require(value.get("source_commit") == SMOKE_SOURCE_COMMIT, f"retained smoke receipt source changed: {receipt.name}")
+        require(
+            value.get("source_commit") == CURRENT_SMOKE_SOURCE_COMMIT,
+            f"retained current-source smoke receipt source changed: {receipt.name}",
+        )
         require(isinstance(value.get("lane"), str) and value["lane"], f"retained smoke lane missing: {receipt.name}")
     relative_root = smoke.relative_to(root).as_posix()
+    approved_files = subprocess.check_output(
+        [
+            "git",
+            "-C",
+            str(root),
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "-z",
+            CURRENT_SMOKE_COMMIT,
+            "--",
+            relative_root,
+        ],
+    ).split(b"\0")
+    approved_files = {entry.decode() for entry in approved_files if entry}
+    require(approved_files, "approved current-source smoke subtree is empty")
     tracked = subprocess.check_output(
         ["git", "-C", str(root), "ls-files", "-z", "--", relative_root],
     ).split(b"\0")
     tracked = {entry.decode() for entry in tracked if entry}
     require(tracked, "retained smoke subtree is not tracked")
+    require(tracked == approved_files, "retained smoke file set changed from approved smoke commit")
     all_paths = list(smoke.rglob("*"))
     require(all(not path.is_symlink() for path in all_paths), "retained smoke subtree contains a symlink")
     disk_files = {path.relative_to(root).as_posix() for path in all_paths if path.is_file()}
     require(disk_files == tracked, "retained smoke file set changed")
-    for relative in sorted(tracked):
+    for relative in sorted(approved_files):
         path = root / relative
         require(not path.is_symlink() and path.is_file(), f"retained smoke path is missing or a symlink: {relative}")
-        require(sha256(path) == git_blob_sha256(root, head, relative), f"retained smoke blob changed: {relative}")
+        require(
+            sha256(path) == git_blob_sha256(root, CURRENT_SMOKE_COMMIT, relative),
+            f"retained smoke blob changed from approved smoke commit: {relative}",
+        )
 
 
 def parse_kv(path: Path, label: str) -> dict[str, str]:

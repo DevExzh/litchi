@@ -1,11 +1,13 @@
 # DOCX `stylesWithEffects` performance and memory measurement contract
 
-Status: **plan only**. The current `stylesWithEffects` implementation and its
-tests are still work in progress, so this document defines the correctness and
-measurement contract without building a profiler or recording timings. A
-profile may start only after the production source, transitive local inputs,
-fixture copies, and harness are frozen in a clean committed checkout and the
-smoke receipts have been independently reviewed.
+Status: **measurement contract; current attribution timing remains gated**.
+The production baseline `8702fd4db` passed the fresh 52-lane correctness smoke
+retained in `fa927a8a9`, with independent review. A current profile may start
+only after its production source, transitive local inputs, fixture copies,
+and harness are frozen in a clean committed checkout. Its prerequisite must
+match the approved current smoke's exact committed file set and bytes.
+Historical captures remain separate evidence; they do not establish timings
+for the current attribution harness.
 
 The profile is an absolute, scenario-scoped observation of the public
 `litchi_docx::styles::effects` API. It must not be presented as a native Word
@@ -19,8 +21,8 @@ public owner facade at
 `crates/litchi-docx/src/package/package/styles_with_effects.rs`, the owner
 implementation at `crates/litchi-docx/src/styles/effects.rs`, and
 `crates/litchi-docx/tests/styles_with_effects.rs`. Their source hashes must be
-recorded when the implementation leaves WIP; this plan does not freeze a
-moving source tree.
+recorded for each frozen capture; this contract does not approve a moving
+source tree.
 
 ## Contract under test
 

@@ -19,15 +19,20 @@ effects vocabulary.
 
 ## Source and evidence boundary
 
-The retained correctness smoke is bound to
+The historical correctness smoke is bound to
 `d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119`. The reviewed correctness smoke
 descendant is `8444e88baaaca128eed50a2eed26e0ecd25063c9`; its committed result
 tree at `results/clean-46c456848/` is retained unchanged. The current
 attribution baseline is the separately approved full commit
 `8702fd4db8723acceb7deb51bcb40ff66604bf10`, which includes the current OPC
-publication changes. A future profile must use a new clean descendant of that
-exact baseline and retain the old smoke source identity separately; it must not
-run from the active worktree or silently repin itself.
+publication changes. Its fresh 52-lane correctness smoke is retained at
+`results/smoke-current-637082e31/` in commit
+`fa927a8a9de94891858a6bb3d44c21d5fa63697d`. The current profile prerequisite
+checks that exact approved file set and its Git blob hashes; a committed
+descendant rewrite cannot replace the approved evidence. A future profile
+must use a new clean descendant of both the production baseline and the
+current smoke retention commit. The historical smoke source identity stays
+separate; neither the active worktree nor silent repinning is admissible.
 
 The performance harness is separate from `run_smoke.sh` and must not overwrite
 the smoke harness, corpus manifest, or frozen receipts. Its source manifest
