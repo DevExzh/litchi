@@ -168,7 +168,7 @@ cmp -s "$RESULTS/binary.sha256" "$RESULTS/binary-after.sha256"
     printf '%s\n' 'harness_sha256:'
     find "$HERE/harness" -type f -print0 | sort -z | xargs -0 sha256sum
     printf '%s\n' 'test_sha256:'
-    sha256sum "$HERE/test_verify.py" "$HERE/test_smoke_target.py"
+    sha256sum "$HERE/test_verify.py" "$HERE/test_smoke_target.py" "$HERE/test_source_snapshot.py"
 } >"$RESULTS/source-provenance.txt"
 
 python3 - "$RESULTS" "$LANES" <<'PY'

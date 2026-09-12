@@ -5,6 +5,11 @@ and its semantic tests are frozen. The run must satisfy all of these gates:
 
 - the source manifest is byte-identical before and after the build and all
   retained source hashes still match;
+- the runner executes from an isolated clean committed Git checkout and
+  rejects every local path-backed package or extra input that is modified,
+  untracked, or outside that checkout without a retained source snapshot;
+- the isolated harness `Cargo.lock` is the authoritative lockfile; the root
+  `Cargo.lock` and `docs/GOAL.md` are not build inputs;
 - all 34 lanes have exactly three fresh-process JSON receipts with twenty measured
   samples after two warm-ups;
 - allocator requested-byte accounting, reallocations, deallocations, live

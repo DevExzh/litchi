@@ -19,8 +19,16 @@ payloads. Commits are checked after timing through their source-checked patch
 and inverse, while no-ops also require source byte identity and source
 allocation sharing.
 
-The repeated runner remains intentionally gated until final-profile approval;
-the frozen owner and semantic tests have already passed their repository gates:
+The repeated runner is intentionally gated and must be run from an isolated
+detached clean Git checkout at the approved committed head; the shared
+worktree is not a valid build source. Before building, it resolves Cargo
+metadata and rejects every path-backed package file and retained extra that is
+modified or untracked relative to that checkout's `HEAD`. Registry packages
+remain external dependencies. The isolated harness's committed
+`harness/Cargo.lock` is authoritative; the repository root `Cargo.lock` and
+`docs/GOAL.md` are not build inputs.
+
+The frozen owner and semantic tests have already passed their repository gates:
 
 ```sh
 PROFILE_FROZEN=1 \

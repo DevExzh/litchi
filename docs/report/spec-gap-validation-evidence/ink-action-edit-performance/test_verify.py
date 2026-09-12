@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import os
 import hashlib
+import json
 import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+import source_manifest
 import verify
 
 
@@ -39,6 +41,8 @@ def valid_sample() -> dict[str, object]:
         "opaque_preserved": True,
         "output_exact": True,
         "rejection_ok": None,
+        "rejection_source_unchanged": None,
+        "rejection_state_unchanged": None,
         "rejection_resource": None,
         "rejection_limit": None,
     }
@@ -129,6 +133,127 @@ class ReceiptChecks(unittest.TestCase):
         binary.write_bytes(b"tampered profile binary")
         with self.assertRaisesRegex(AssertionError, "live profile executable hash"):
             verify.verify_binary_receipts(self.root)
+
+    def _git_fixture(self) -> tuple[Path, str, Path]:
+        repository = self.root / "git-source"
+        repository.mkdir()
+        tracked = repository / "tracked.rs"
+        tracked.write_text("fn source() {}\n")
+        subprocess.run(["git", "-C", str(repository), "init", "-q"], check=True)
+        subprocess.run(
+            ["git", "-C", str(repository), "config", "user.email", "profile@example.invalid"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(repository), "config", "user.name", "Profile Test"],
+            check=True,
+        )
+        subprocess.run(["git", "-C", str(repository), "add", "tracked.rs"], check=True)
+        subprocess.run(["git", "-C", str(repository), "commit", "-qm", "source"], check=True)
+        commit = subprocess.check_output(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"], text=True
+        ).strip()
+        return repository, commit, tracked
+
+    def test_local_manifest_inputs_must_match_committed_git_blobs(self) -> None:
+        repository, commit, tracked = self._git_fixture()
+        source_manifest.verify_git_inputs([tracked], repository, commit)
+
+        tracked.write_text("fn changed() {}\n")
+        with self.assertRaisesRegex(SystemExit, "differ from committed Git blobs"):
+            source_manifest.verify_git_inputs([tracked], repository, commit)
+
+        tracked.write_text("fn source() {}\n")
+        untracked = repository / "untracked.rs"
+        untracked.write_text("fn untracked() {}\n")
+        with self.assertRaisesRegex(SystemExit, "not tracked in the committed checkout"):
+            source_manifest.verify_git_inputs([untracked], repository, commit)
+
+    def test_local_manifest_inputs_outside_checkout_require_snapshot(self) -> None:
+        repository, commit, _ = self._git_fixture()
+        outside = self.root / "outside.rs"
+        outside.write_text("fn outside() {}\n")
+        with self.assertRaisesRegex(SystemExit, "retained source snapshot"):
+            source_manifest.verify_git_inputs([outside], repository, commit)
+
+    def test_v2_manifest_with_git_commit_parses_and_rechecks_inputs(self) -> None:
+        repository = self.root / "manifest-source"
+        repository.mkdir()
+        subprocess.run(["git", "-C", str(repository), "init", "-q"], check=True)
+        subprocess.run(
+            ["git", "-C", str(repository), "config", "user.email", "profile@example.invalid"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(repository), "config", "user.name", "Profile Test"],
+            check=True,
+        )
+        package = repository / "fixture"
+        source_dir = package / "src"
+        source_dir.mkdir(parents=True)
+        manifest_path = package / "Cargo.toml"
+        manifest_path.write_text("[package]\nname = \"fixture\"\nversion = \"0.0.0\"\n")
+        for number in range(9):
+            (source_dir / f"module{number}.rs").write_text(f"pub const N: u8 = {number};\n")
+        extra = repository / "extra-input.txt"
+        extra.write_text("retained extra\n")
+        subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repository),
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-qm",
+                "manifest source",
+            ],
+            check=True,
+        )
+        commit = subprocess.check_output(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"], text=True
+        ).strip()
+        metadata = self.root / "metadata.json"
+        metadata.write_text(
+            json.dumps(
+                {
+                    "packages": [
+                        {
+                            "name": "fixture",
+                            "version": "0.0.0",
+                            "manifest_path": str(manifest_path),
+                            "source": None,
+                            "targets": [{"src_path": str(source_dir / "module0.rs")}],
+                        }
+                    ]
+                }
+            )
+        )
+        output = self.root / "source-manifest.txt"
+        with patch(
+            "sys.argv",
+            [
+                "source_manifest.py",
+                "--metadata",
+                str(metadata),
+                "--root",
+                str(repository),
+                "--output",
+                str(output),
+                "--git-commit",
+                commit,
+                "--extra",
+                str(extra),
+            ],
+        ):
+            source_manifest.main()
+
+        checked, parsed_commit = verify.verify_source_manifest(output, repository)
+        self.assertEqual(parsed_commit, commit)
+        self.assertEqual(checked, 11)
 
     @unittest.skipUnless(Path("/usr/bin/time").is_file(), "runner requires GNU time")
     def test_runner_cleanup_preserves_unrelated_evidence(self) -> None:

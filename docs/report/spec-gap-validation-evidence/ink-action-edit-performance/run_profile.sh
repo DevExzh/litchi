@@ -167,11 +167,12 @@ unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP RUSTDOCFLAGS
     if command -v lscpu >/dev/null 2>&1; then lscpu | sed -n '1,32p'; fi
 } >"$RESULTS/host.txt"
 
-metadata_args=(--metadata "$RESULTS/metadata-before.json" --root "$ROOT" --output "$RESULTS/source-manifest-before.txt")
-for extra in "$ROOT/Cargo.toml" "$ROOT/Cargo.lock" "$HARNESS" "$HERE/harness/Cargo.lock" \
+metadata_args=(--metadata "$RESULTS/metadata-before.json" --root "$ROOT" --output "$RESULTS/source-manifest-before.txt" --git-commit "$CURRENT_COMMIT")
+for extra in "$ROOT/Cargo.toml" "$HARNESS" "$HERE/harness/Cargo.lock" \
     "$MANIFEST_TOOL" "$HERE/run_profile.sh" "$HERE/smoke.sh" "$HERE/summarize.py" \
     "$HERE/verify.py" "$HERE/test_verify.py" "$HERE/test_smoke_target.py" \
-    "$HERE/README.md" "$HERE/requirements.md" "$ROOT/docs/GOAL.md"; do
+    "$HERE/test_source_snapshot.py" \
+    "$HERE/README.md" "$HERE/requirements.md"; do
     metadata_args+=(--extra "$extra")
 done
 if [[ -f "$ROOT/rust-toolchain.toml" ]]; then
@@ -220,11 +221,12 @@ cmp -s "$RESULTS/binary.sha256" "$RESULTS/binary-after.sha256"
 
 cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS" \
     >"$RESULTS/metadata-after.json"
-metadata_args_after=(--metadata "$RESULTS/metadata-after.json" --root "$ROOT" --output "$RESULTS/source-manifest-after.txt")
-for extra in "$ROOT/Cargo.toml" "$ROOT/Cargo.lock" "$HARNESS" "$HERE/harness/Cargo.lock" \
+metadata_args_after=(--metadata "$RESULTS/metadata-after.json" --root "$ROOT" --output "$RESULTS/source-manifest-after.txt" --git-commit "$CURRENT_COMMIT")
+for extra in "$ROOT/Cargo.toml" "$HARNESS" "$HERE/harness/Cargo.lock" \
     "$MANIFEST_TOOL" "$HERE/run_profile.sh" "$HERE/smoke.sh" "$HERE/summarize.py" \
     "$HERE/verify.py" "$HERE/test_verify.py" "$HERE/test_smoke_target.py" \
-    "$HERE/README.md" "$HERE/requirements.md" "$ROOT/docs/GOAL.md"; do
+    "$HERE/test_source_snapshot.py" \
+    "$HERE/README.md" "$HERE/requirements.md"; do
     metadata_args_after+=(--extra "$extra")
 done
 if [[ -f "$ROOT/rust-toolchain.toml" ]]; then
@@ -246,7 +248,7 @@ cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt
     printf '%s\n' 'harness_sha256:'
     find "$HERE/harness" -type f -print0 | sort -z | xargs -0 sha256sum
     printf '%s\n' 'test_sha256:'
-    sha256sum "$HERE/test_verify.py" "$HERE/test_smoke_target.py"
+    sha256sum "$HERE/test_verify.py" "$HERE/test_smoke_target.py" "$HERE/test_source_snapshot.py"
 } >"$RESULTS/source-provenance.txt"
 
 python3 "$HERE/summarize.py" --results "$RESULTS" --output "$REPORT_OUTPUT"
