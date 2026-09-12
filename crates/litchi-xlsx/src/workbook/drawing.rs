@@ -7,20 +7,219 @@
 //! IDs part of the selector API.  Media payloads are read only by the
 //! explicit `read_*` methods and are returned as borrowed package bytes.
 
+use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{Part, Relationships, TargetMode};
+use litchi_opc::{PackURI, Part, Relationship, Relationships, TargetMode};
 
-use crate::drawing::source::{self, PictureSource, SourceDrawing, SvgOwner, SvgOwnerState};
+use crate::drawing::source::{
+    self, ContentPartProfile, ContentPartSource, PictureSource, SourceDrawing, SvgOwner,
+    SvgOwnerState,
+};
 use crate::drawing::worksheet_source::{WorksheetSourceLimits, WorksheetSourceScan};
-use crate::drawing::{Drawing, DrawingAnchor, Picture, PictureSelector};
+use crate::drawing::{
+    ContentPartSelector, Drawing, DrawingAnchor, Picture, PictureSelector, UnknownKind,
+};
 use crate::error::{Error, Result, allocation, invalid};
 
 use super::model::{Inner, Workbook, Worksheet, WorksheetKind};
 
 const MAX_OUTPUT_MEDIA_BYTES: usize = 32 * 1024 * 1024;
+const MAX_CONTENT_PART_PAYLOAD_BYTES: usize = 32 * 1024 * 1024;
+const MAX_CONTENT_PART_RELATIONSHIPS: usize = 4_096;
+
+const STRICT_CUSTOM_XML_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/customXml";
+
+/// Package relationship metadata for one resolved core SpreadsheetDrawing
+/// content part.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct WorksheetContentPartRelationship {
+    relationship_id: Box<str>,
+    relationship_type: Box<str>,
+    target_ref: Box<str>,
+    target_mode: TargetMode,
+    target_uri: PackURI,
+    content_type: Box<str>,
+}
+
+impl WorksheetContentPartRelationship {
+    /// Relationship ID authored by the drawing owner, retained for diagnostics.
+    #[must_use]
+    pub fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    /// Exact relationship type URI.
+    #[must_use]
+    pub fn relationship_type(&self) -> &str {
+        &self.relationship_type
+    }
+
+    /// Original relationship target reference.
+    #[must_use]
+    pub fn target_ref(&self) -> &str {
+        &self.target_ref
+    }
+
+    /// Validated target mode. Core SpreadsheetDrawing content parts are
+    /// always internal in this read profile.
+    #[must_use]
+    pub const fn target_mode(&self) -> TargetMode {
+        self.target_mode
+    }
+
+    /// Canonical resolved OPC target part name.
+    #[must_use]
+    pub const fn target_uri(&self) -> &PackURI {
+        &self.target_uri
+    }
+
+    /// Actual OPC content type declared for the target part.
+    #[must_use]
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
+}
+
+/// One source-backed, semantically owned core SpreadsheetDrawing content part.
+///
+/// The primary target bytes are deferred until [`Self::read_payload`].  The
+/// owner still validates the drawing relationship, target part, content type,
+/// and bounded outbound relationship count before this view is returned.
+pub struct WorksheetContentPart<'a> {
+    owner: &'a Inner,
+    source: Arc<SourceDrawing<'a>>,
+    source_index: usize,
+    relationship: WorksheetContentPartRelationship,
+}
+
+impl<'a> WorksheetContentPart<'a> {
+    /// Source-preserving direct core content-part projection.
+    pub fn source(&self) -> &ContentPartSource<'a> {
+        self.source
+            .content_parts()
+            .get(self.source_index)
+            .expect("worksheet content-part source index is validated at construction")
+    }
+
+    /// Recognized profile. Group extensions are not returned by this read
+    /// owner and remain opaque source markup.
+    #[must_use]
+    pub fn profile(&self) -> ContentPartProfile {
+        self.source().profile()
+    }
+
+    /// Complete direct anchor geometry containing this owner.
+    #[must_use]
+    pub fn anchor(&self) -> &DrawingAnchor {
+        self.source().anchor()
+    }
+
+    /// Validated package relationship metadata.
+    pub const fn relationship(&self) -> &WorksheetContentPartRelationship {
+        &self.relationship
+    }
+
+    /// Borrow the exact owner element bytes from the paired drawing source.
+    pub fn owner_bytes(&self) -> Result<&'a [u8]> {
+        self.source().owner_bytes(self.source.source())
+    }
+
+    /// Read and validate the bounded XML payload while retaining a borrow into
+    /// the immutable package part.
+    pub fn read_payload(&self) -> Result<WorksheetContentPartPayload<'a>> {
+        let part = self
+            .owner
+            .package
+            .get_part(self.relationship.target_uri())?;
+        let caller_limit = usize::try_from(self.owner.package.read_limits().max_part_bytes())
+            .unwrap_or(usize::MAX);
+        let maximum = MAX_CONTENT_PART_PAYLOAD_BYTES.min(caller_limit);
+        if part.blob().len() > maximum {
+            return Err(invalid(format!(
+                "worksheet content-part payload exceeds {maximum} bytes"
+            )));
+        }
+        validate_content_part_xml(part, self.owner.package.read_limits())?;
+        let outbound_relationships = copy_outbound_relationships(
+            part.rels(),
+            self.owner
+                .package
+                .read_limits()
+                .max_relationships_per_part(),
+        )?;
+        Ok(WorksheetContentPartPayload {
+            bytes: part.blob(),
+            outbound_relationships,
+        })
+    }
+
+    /// Alias emphasizing that payload access is deferred and bounded.
+    pub fn payload(&self) -> Result<WorksheetContentPartPayload<'a>> {
+        self.read_payload()
+    }
+}
+
+/// Bounded payload borrowed from a resolved core SpreadsheetDrawing content
+/// part target.
+#[derive(Debug)]
+#[must_use]
+pub struct WorksheetContentPartPayload<'a> {
+    bytes: &'a [u8],
+    outbound_relationships: Box<[WorksheetContentPartOutboundRelationship<'a>]>,
+}
+
+impl<'a> WorksheetContentPartPayload<'a> {
+    /// Borrow exact target XML bytes without copying.
+    #[must_use]
+    pub const fn bytes(&self) -> &'a [u8] {
+        self.bytes
+    }
+
+    /// Bounded relationship metadata authored by the target part.
+    pub fn outbound_relationships(&self) -> &[WorksheetContentPartOutboundRelationship<'a>] {
+        &self.outbound_relationships
+    }
+}
+
+/// Opaque outbound relationship metadata retained for a content-part target.
+/// The read slice records it but does not recursively follow or interpret the
+/// target graph.  Its strings remain borrowed from the immutable OPC package.
+#[derive(Debug)]
+#[must_use]
+pub struct WorksheetContentPartOutboundRelationship<'a> {
+    relationship: &'a Relationship,
+}
+
+impl WorksheetContentPartOutboundRelationship<'_> {
+    /// Relationship identifier in the target's `.rels` member.
+    #[must_use]
+    pub fn relationship_id(&self) -> &str {
+        self.relationship.r_id()
+    }
+
+    /// Exact relationship type URI.
+    #[must_use]
+    pub fn relationship_type(&self) -> &str {
+        self.relationship.reltype()
+    }
+
+    /// Original target reference.
+    #[must_use]
+    pub fn target_ref(&self) -> &str {
+        self.relationship.target_ref()
+    }
+
+    /// Target mode retained without following the edge.
+    #[must_use]
+    pub fn target_mode(&self) -> TargetMode {
+        self.relationship.target_mode()
+    }
+}
 
 /// A worksheet drawing with paired source and typed inventories.
 ///
@@ -103,6 +302,68 @@ impl<'a> WorksheetDrawing<'a> {
             pictures.push(self.picture(position)?);
         }
         Ok(pictures)
+    }
+
+    /// Number of direct core SpreadsheetDrawing content parts in this drawing.
+    #[must_use]
+    pub fn content_part_count(&self) -> usize {
+        self.source.content_parts().len()
+    }
+
+    /// Select one direct core content part by source order and validate its
+    /// owning drawing relationship before returning the view.
+    pub fn content_part(&self, position: usize) -> Result<WorksheetContentPart<'a>> {
+        let source = self.source.content_part(position)?;
+        let relationship = self
+            .relationships
+            .get(source.relationship_id())
+            .ok_or_else(|| invalid("worksheet content-part relationship is missing"))?;
+        let relationship = validate_content_part_relationship(self.owner, source, relationship)?;
+        Ok(WorksheetContentPart {
+            owner: self.owner,
+            source: Arc::clone(&self.source),
+            source_index: position,
+            relationship,
+        })
+    }
+
+    /// Resolve every direct core content part in source order.
+    pub fn content_parts(&self) -> Result<Vec<WorksheetContentPart<'a>>> {
+        if self.content_part_count() == 0 {
+            return Ok(Vec::new());
+        }
+        let targets = ContentPartTargetIndex::build(self.owner)?;
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(self.content_part_count())
+            .map_err(|source| allocation("worksheet content parts", source))?;
+        for position in 0..self.content_part_count() {
+            parts.push(self.content_part_with_targets(position, &targets)?);
+        }
+        Ok(parts)
+    }
+
+    fn content_part_with_targets(
+        &self,
+        position: usize,
+        targets: &ContentPartTargetIndex<'a>,
+    ) -> Result<WorksheetContentPart<'a>> {
+        let source = self.source.content_part(position)?;
+        let relationship = self
+            .relationships
+            .get(source.relationship_id())
+            .ok_or_else(|| invalid("worksheet content-part relationship is missing"))?;
+        validate_content_part_relationship_shape(source, relationship)?;
+        let target_uri = relationship.target_partname()?;
+        let target = targets.get(&target_uri)?;
+        let relationship =
+            validate_content_part_relationship_target(self.owner, relationship, target)?;
+        Ok(WorksheetContentPart {
+            owner: self.owner,
+            source: Arc::clone(&self.source),
+            source_index: position,
+            relationship,
+        })
     }
 }
 
@@ -209,7 +470,7 @@ impl<'a> WorksheetPicture<'a> {
 #[must_use]
 pub struct WorksheetImageReference {
     relationship_id: Box<str>,
-    part_uri: litchi_opc::PackURI,
+    part_uri: PackURI,
     content_type: Box<str>,
 }
 
@@ -222,7 +483,7 @@ impl WorksheetImageReference {
 
     /// Canonical package part URI.
     #[must_use]
-    pub const fn part_uri(&self) -> &litchi_opc::PackURI {
+    pub const fn part_uri(&self) -> &PackURI {
         &self.part_uri
     }
 
@@ -240,7 +501,7 @@ pub struct WorksheetSvgDescriptor<'a> {
     source: Arc<SourceDrawing<'a>>,
     source_picture_index: usize,
     relationship_id: Box<str>,
-    part_uri: litchi_opc::PackURI,
+    part_uri: PackURI,
     content_type: Box<str>,
 }
 
@@ -272,7 +533,7 @@ impl<'a> WorksheetSvgDescriptor<'a> {
 
     /// Canonical package part URI.
     #[must_use]
-    pub const fn part_uri(&self) -> &litchi_opc::PackURI {
+    pub const fn part_uri(&self) -> &PackURI {
         &self.part_uri
     }
 
@@ -328,6 +589,21 @@ impl Worksheet {
         .picture(selector.picture)
     }
 
+    /// Read one direct core worksheet content part by drawing and content-part
+    /// source-order positions.
+    pub fn content_part<'a>(
+        &'a self,
+        selector: ContentPartSelector,
+    ) -> Result<WorksheetContentPart<'a>> {
+        self.drawing(selector.drawing)?
+            .content_part(selector.content_part)
+    }
+
+    /// Read every direct core content part in one worksheet drawing.
+    pub fn content_parts<'a>(&'a self, drawing: usize) -> Result<Vec<WorksheetContentPart<'a>>> {
+        self.drawing(drawing)?.content_parts()
+    }
+
     /// Read one embedded SVG paired with a direct worksheet picture.
     pub fn read_svg_image<'a>(
         &'a self,
@@ -358,6 +634,26 @@ impl Workbook {
         .picture(picture.picture)
     }
 
+    /// Read one direct core worksheet content part by worksheet selector and
+    /// drawing/content-part source-order positions.
+    pub fn content_part<'a, 'selector>(
+        &'a self,
+        worksheet: impl Into<super::Selector<'selector>>,
+        content_part: ContentPartSelector,
+    ) -> Result<WorksheetContentPart<'a>> {
+        let worksheet = self
+            .sheet(worksheet)?
+            .ok_or_else(|| invalid("worksheet selector did not resolve"))?;
+        read_drawing(
+            &self.inner,
+            worksheet.kind(),
+            worksheet.name(),
+            worksheet.part_uri(),
+            content_part.drawing,
+        )?
+        .content_part(content_part.content_part)
+    }
+
     /// Read one embedded SVG paired with a direct worksheet picture.
     pub fn read_svg_image<'a, 'selector>(
         &'a self,
@@ -372,7 +668,7 @@ fn read_drawing<'a>(
     owner: &'a Inner,
     kind: WorksheetKind,
     sheet_name: &str,
-    sheet_uri: &litchi_opc::PackURI,
+    sheet_uri: &PackURI,
     ordinal: usize,
 ) -> Result<WorksheetDrawing<'a>> {
     if kind != WorksheetKind::Worksheet {
@@ -443,6 +739,44 @@ fn read_drawing<'a>(
             ));
         }
     }
+    let mut typed_content_part_indices = Vec::new();
+    typed_content_part_indices
+        .try_reserve_exact(source.content_parts().len())
+        .map_err(|source| allocation("worksheet typed content-part indexes", source))?;
+    for (index, object) in typed.objects().iter().enumerate() {
+        if matches!(
+            object,
+            crate::drawing::Object::Unknown(unknown)
+                if unknown.kind == UnknownKind::ContentPart
+        ) {
+            typed_content_part_indices.push(index);
+        }
+    }
+    if typed_content_part_indices.len() != source.content_parts().len() {
+        return Err(invalid(
+            "source and typed worksheet drawing content-part inventories disagree",
+        ));
+    }
+    for (position, source_content_part) in source.content_parts().iter().enumerate() {
+        let object_index = typed_content_part_indices[position];
+        let typed_content_part = match typed.objects().get(object_index) {
+            Some(crate::drawing::Object::Unknown(unknown))
+                if unknown.kind == UnknownKind::ContentPart =>
+            {
+                unknown
+            },
+            _ => {
+                return Err(invalid(
+                    "typed content-part index does not point to a content part",
+                ));
+            },
+        };
+        if typed_content_part.drawing_anchor() != source_content_part.anchor() {
+            return Err(invalid(
+                "source content part does not match the typed drawing inventory",
+            ));
+        }
+    }
     let relationships = drawing_part.rels();
     Ok(WorksheetDrawing {
         owner,
@@ -468,6 +802,9 @@ fn drawing_source_limits(owner: &Inner) -> source::ScanLimits {
         max_depth: defaults.max_depth.min(caller.max_xml_depth()),
         max_pictures: defaults
             .max_pictures
+            .min(caller.max_relationships_per_part()),
+        max_content_parts: defaults
+            .max_content_parts
             .min(caller.max_relationships_per_part()),
         max_relationship_references: defaults
             .max_relationship_references
@@ -555,7 +892,173 @@ fn validate_svg<'a>(
     })
 }
 
-fn ensure_media_uri(uri: &litchi_opc::PackURI, kind: &str) -> Result<()> {
+/// Operation-local case-insensitive OPC part-name index used by a batch
+/// content-part read.  `OpcPackage::get_part` intentionally keeps a linear
+/// fallback for one-off case variants; this bounded index prevents that
+/// fallback from multiplying across many owners in one batch.
+struct ContentPartTargetIndex<'a> {
+    parts: HashMap<String, &'a dyn Part>,
+}
+
+impl<'a> ContentPartTargetIndex<'a> {
+    fn build(owner: &'a Inner) -> Result<Self> {
+        let part_count = owner.package.part_count();
+        if part_count > owner.package.read_limits().max_parts() {
+            return Err(invalid(
+                "worksheet content-part target index exceeds the package part limit",
+            ));
+        }
+        let mut parts = HashMap::new();
+        parts
+            .try_reserve(part_count)
+            .map_err(|source| allocation("worksheet content-part target index", source))?;
+        for part in owner.package.iter_parts() {
+            let key = canonical_part_key(part.partname(), "worksheet content-part target index")?;
+            if parts.insert(key, part).is_some() {
+                return Err(invalid(
+                    "worksheet content-part target index has equivalent part names",
+                ));
+            }
+        }
+        Ok(Self { parts })
+    }
+
+    fn get(&self, requested: &PackURI) -> Result<&'a dyn Part> {
+        let key = canonical_part_key(requested, "worksheet content-part target lookup")?;
+        self.parts
+            .get(&key)
+            .copied()
+            .ok_or_else(|| invalid("worksheet content-part target part is missing"))
+    }
+}
+
+fn validate_content_part_relationship(
+    owner: &Inner,
+    owner_source: &ContentPartSource<'_>,
+    relationship: &Relationship,
+) -> Result<WorksheetContentPartRelationship> {
+    validate_content_part_relationship_shape(owner_source, relationship)?;
+    let target_uri = relationship.target_partname()?;
+    let target = owner.package.get_part(&target_uri)?;
+    validate_content_part_relationship_target(owner, relationship, target)
+}
+
+fn validate_content_part_relationship_shape(
+    owner_source: &ContentPartSource<'_>,
+    relationship: &Relationship,
+) -> Result<()> {
+    let expected_type = match owner_source.relationship_dialect() {
+        source::RelationshipDialect::Transitional => rt::CUSTOM_XML,
+        source::RelationshipDialect::Strict => STRICT_CUSTOM_XML_RELATIONSHIP,
+    };
+    if relationship.target_mode() != TargetMode::Internal {
+        return Err(invalid(
+            "worksheet core contentPart relationship must be internal",
+        ));
+    }
+    if relationship.reltype() != expected_type {
+        return Err(invalid(format!(
+            "worksheet core contentPart relationship has type '{}', expected '{expected_type}'",
+            relationship.reltype()
+        )));
+    }
+    if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
+        return Err(invalid(
+            "worksheet core contentPart relationship cannot contain a query or fragment",
+        ));
+    }
+    if relationship.r_id() != owner_source.relationship_id() {
+        return Err(invalid(
+            "worksheet contentPart relationship ID does not match its source owner",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_content_part_relationship_target(
+    owner: &Inner,
+    relationship: &Relationship,
+    target: &dyn Part,
+) -> Result<WorksheetContentPartRelationship> {
+    let canonical_target_uri = target.partname();
+    if !is_xml_content_type(target.content_type()) {
+        return Err(invalid(format!(
+            "worksheet contentPart target has unsupported non-XML content type '{}'",
+            target.content_type()
+        )));
+    }
+    let max_relationships = owner
+        .package
+        .read_limits()
+        .max_relationships_per_part()
+        .min(MAX_CONTENT_PART_RELATIONSHIPS);
+    if target.rels().len() > max_relationships {
+        return Err(invalid(format!(
+            "worksheet contentPart target has {} outbound relationships, exceeding {max_relationships}",
+            target.rels().len()
+        )));
+    }
+    Ok(WorksheetContentPartRelationship {
+        relationship_id: boxed_str(
+            relationship.r_id(),
+            "worksheet content-part relationship ID",
+        )?,
+        relationship_type: boxed_str(
+            relationship.reltype(),
+            "worksheet content-part relationship type",
+        )?,
+        target_ref: boxed_str(
+            relationship.target_ref(),
+            "worksheet content-part target reference",
+        )?,
+        target_mode: relationship.target_mode(),
+        target_uri: clone_pack_uri(canonical_target_uri, "worksheet content-part target URI")?,
+        content_type: boxed_str(
+            target.content_type(),
+            "worksheet content-part target content type",
+        )?,
+    })
+}
+
+fn copy_outbound_relationships<'a>(
+    relationships: &'a Relationships,
+    caller_limit: usize,
+) -> Result<Box<[WorksheetContentPartOutboundRelationship<'a>]>> {
+    let maximum = caller_limit.min(MAX_CONTENT_PART_RELATIONSHIPS);
+    if relationships.len() > maximum {
+        return Err(invalid(format!(
+            "worksheet contentPart target has too many outbound relationships ({} > {maximum})",
+            relationships.len()
+        )));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(relationships.len())
+        .map_err(|source| allocation("worksheet content-part outbound relationships", source))?;
+    for relationship in relationships.iter() {
+        output.push(WorksheetContentPartOutboundRelationship { relationship });
+    }
+    Ok(output.into_boxed_slice())
+}
+
+fn validate_content_part_xml(part: &dyn Part, limits: litchi_opc::ReadLimits) -> Result<()> {
+    litchi_opc::validate_source_xml_bytes(part.partname(), part.blob(), limits).map_err(|error| {
+        invalid(format!(
+            "worksheet contentPart target XML is invalid: {error}"
+        ))
+    })
+}
+
+fn is_xml_content_type(content_type: &str) -> bool {
+    let value = content_type.trim();
+    value.eq_ignore_ascii_case("text/xml")
+        || value.eq_ignore_ascii_case("application/xml")
+        || value
+            .get(value.len().saturating_sub(4)..)
+            .is_some_and(|suffix| suffix.eq_ignore_ascii_case("+xml"))
+}
+
+fn ensure_media_uri(uri: &PackURI, kind: &str) -> Result<()> {
     let mut segments = uri.as_str().split('/');
     let valid_prefix = segments.next() == Some("")
         && segments
@@ -586,13 +1089,21 @@ fn boxed_str(value: &str, resource: &'static str) -> Result<Box<str>> {
     Ok(copy.into_boxed_str())
 }
 
-fn clone_pack_uri(
-    uri: &litchi_opc::PackURI,
-    resource: &'static str,
-) -> Result<litchi_opc::PackURI> {
+fn canonical_part_key(uri: &PackURI, resource: &'static str) -> Result<String> {
+    let value = uri.as_str();
+    let mut key = String::new();
+    key.try_reserve_exact(value.len())
+        .map_err(|source| allocation(resource, source))?;
+    for byte in value.bytes() {
+        key.push(char::from(byte.to_ascii_lowercase()));
+    }
+    Ok(key)
+}
+
+fn clone_pack_uri(uri: &PackURI, resource: &'static str) -> Result<PackURI> {
     let mut copy = String::new();
     copy.try_reserve_exact(uri.as_str().len())
         .map_err(|source| allocation(resource, source))?;
     copy.push_str(uri.as_str());
-    litchi_opc::PackURI::new(copy).map_err(invalid)
+    PackURI::new(copy).map_err(invalid)
 }

@@ -2,8 +2,8 @@
 
 This note closes the design question behind the remaining
 `UnknownKind::ContentPart` inventory in `litchi-xlsx`. It is an evidence and
-implementation plan only. It does not change the production parser or the
-package model.
+implementation plan. The direct core read slice described below is now
+implemented; mutation and extension-profile work remain open.
 
 The word *content part* is overloaded in the OOXML family. The owner that
 matters here is the SpreadsheetDrawing owner in a worksheet drawing part. It
@@ -167,10 +167,16 @@ Closure requirements for a future typed owner are:
    active `Choice` and `Fallback` are part of the source graph even when only
    one branch is semantically selected.
 
-## What the current XLSX code actually does
+## Pre-implementation XLSX inventory
 
-`UnknownKind::ContentPart` is currently a structural inventory label, not a
-content-part owner:
+This section records the baseline that motivated the design. The direct core
+read slice now validates `CT_Rel` attributes in both parsers and pairs source
+and typed count/order/anchor geometry in the worksheet reader. The physical
+relationship ID remains in the source owner; the typed inventory retains the
+structural `UnknownKind::ContentPart` classification.
+
+At that baseline, `UnknownKind::ContentPart` was a structural inventory label,
+without a content-part owner:
 
 * [`model.rs`](../../../crates/litchi-xlsx/src/drawing/model.rs#L147-L176)
   has `Shape`, `Group`, `Connection`, `ContentPart`, and `Other`, but
@@ -215,9 +221,11 @@ content-part owner:
   and proves only the source/typed **picture** pairing. There is no
   content-part pairing or target graph closure.
 
-Therefore the current implementation neither claims that a content part is
-valid nor claims that it is safe to remove. It preserves the original drawing
-member only through the surrounding package's unchanged-member behavior.
+That baseline did not validate a content part or establish that it was safe
+to remove. It preserved the original drawing member only through the
+surrounding package's unchanged-member behavior. The new read slice validates
+the core owner and target on access; safe mutation still requires the later
+graph-closure work.
 
 ## Proposed public seams
 
@@ -399,8 +407,14 @@ no native example hash to report beyond the corpus manifest digest above.
 
 ## Staged implementation and verification slice
 
-The next implementation slice should be read-only direct-owner discovery,
-behind the existing package read limits:
+Steps 1 and 2 are the implemented read-only direct-owner slice, behind the
+existing package read limits. Its public entry points are
+`Worksheet::{content_part, content_parts}` and
+`WorksheetDrawing::{content_part, content_parts}`, selected with
+`drawing::ContentPartSelector`. Payload access is deferred through
+`WorksheetContentPart::read_payload`, which validates XML and borrows the
+package bytes. Outbound relationship metadata is borrowed and bounded; it is
+not recursively traversed. Steps 3 onward remain open:
 
 1. Add a source owner index for direct transitional/strict core
    `xdr:contentPart` in all three anchor kinds. Capture exact ranges, the

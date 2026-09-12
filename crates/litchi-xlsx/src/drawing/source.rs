@@ -47,6 +47,9 @@ pub const MAX_XML_NODES: usize = 1_000_000;
 pub const MAX_XML_DEPTH: usize = 256;
 /// The maximum direct picture candidates retained by one scan.
 pub const MAX_PICTURES: usize = 100_000;
+/// The maximum direct SpreadsheetDrawing content-part candidates retained by
+/// one scan.
+pub const MAX_CONTENT_PARTS: usize = 100_000;
 /// The maximum relationship references retained per direct picture.
 pub const MAX_RELATIONSHIP_REFERENCES: usize = 4_096;
 /// The maximum qualified-name or namespace lexical length retained by a scan.
@@ -213,6 +216,21 @@ pub enum RelationshipDialect {
     Transitional,
     /// Strict relationship namespace.
     Strict,
+}
+
+/// SpreadsheetDrawing content-part profile recognized by the source owner.
+///
+/// The Office 2010 group extension is deliberately represented by the enum
+/// for future compatibility, but this read slice publishes only
+/// [`Self::CoreAnchor`].  Its relationship profile remains unresolved by the
+/// local evidence and is therefore not guessed here.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ContentPartProfile {
+    /// Core `xdr:contentPart` directly hosted by an anchor.
+    CoreAnchor,
+    /// Office 2010 `xdr14:contentPart` hosted by a group.
+    GroupExtension,
 }
 
 impl RelationshipDialect {
@@ -653,6 +671,121 @@ impl<'a> PictureSource<'a> {
     }
 }
 
+/// One source-backed core SpreadsheetDrawing `contentPart` directly hosted by
+/// an anchor.
+///
+/// The owner retains the borrowed drawing source and immutable namespace
+/// provenance alongside every range.  A selector therefore cannot outlive or
+/// accidentally pair with a different drawing member.  Relationship and
+/// target validation belongs to the package-owned worksheet facade; this
+/// record only captures the source-authoritative owner edge and geometry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct ContentPartSource<'a> {
+    source: SourceLease<'a>,
+    drawing_ordinal: usize,
+    content_part_ordinal: usize,
+    profile: ContentPartProfile,
+    anchor: DrawingAnchor,
+    anchor_range: ByteRange,
+    owner: ElementRange,
+    relationship_id: Box<str>,
+    relationship_dialect: RelationshipDialect,
+    mce_ancestor: bool,
+    namespace_context: Arc<NamespaceContext>,
+}
+
+impl<'a> ContentPartSource<'a> {
+    /// Semantic drawing ordinal supplied by the worksheet selector.
+    #[must_use]
+    pub const fn drawing_ordinal(&self) -> usize {
+        self.drawing_ordinal
+    }
+
+    /// Source-order ordinal among direct core content-part owners.
+    #[must_use]
+    pub const fn content_part_ordinal(&self) -> usize {
+        self.content_part_ordinal
+    }
+
+    /// The recognized SpreadsheetDrawing content-part profile.
+    #[must_use]
+    pub const fn profile(&self) -> ContentPartProfile {
+        self.profile
+    }
+
+    /// Complete anchor geometry containing the owner.
+    #[must_use]
+    pub const fn anchor(&self) -> &DrawingAnchor {
+        &self.anchor
+    }
+
+    /// Exact enclosing anchor range in the source drawing member.
+    pub const fn anchor_range(&self) -> ByteRange {
+        self.anchor_range
+    }
+
+    /// Exact owner element range, including its opening and closing markup.
+    pub const fn owner_element(&self) -> &ElementRange {
+        &self.owner
+    }
+
+    /// Alias for [`Self::owner_element`] used by range-oriented callers.
+    pub const fn owner_range(&self) -> ByteRange {
+        self.owner.range()
+    }
+
+    /// Required `r:id` value authored by the owner.
+    #[must_use]
+    pub fn relationship_id(&self) -> &str {
+        &self.relationship_id
+    }
+
+    /// Relationship namespace dialect used by the required `r:id`.
+    #[must_use]
+    pub const fn relationship_dialect(&self) -> RelationshipDialect {
+        self.relationship_dialect
+    }
+
+    /// Whether the owner was encountered below markup-compatibility content.
+    ///
+    /// The direct core read profile refuses such ownership as ambiguous, so a
+    /// published source owner currently always returns `false`.  Keeping the
+    /// provenance bit makes that refusal explicit and leaves room for a later
+    /// branch-aware owner without changing the range model.
+    #[must_use]
+    pub const fn has_mce_ancestor(&self) -> bool {
+        self.mce_ancestor
+    }
+
+    /// Borrow the exact owner element bytes after checking source identity.
+    pub fn owner_bytes<'b>(&self, source: &'b [u8]) -> Result<&'b [u8]> {
+        self.checked_slice(source, self.owner.range())
+    }
+
+    /// Borrow the complete enclosing anchor bytes after checking source
+    /// identity.
+    pub fn anchor_bytes<'b>(&self, source: &'b [u8]) -> Result<&'b [u8]> {
+        self.checked_slice(source, self.anchor_range)
+    }
+
+    /// Borrow the exact drawing member used to create this source record.
+    #[must_use]
+    pub const fn source(&self) -> &'a [u8] {
+        self.source.bytes()
+    }
+
+    fn checked_slice<'b>(&self, source: &'b [u8], range: ByteRange) -> Result<&'b [u8]> {
+        let expected = self.source.bytes();
+        if !std::ptr::eq(source.as_ptr(), expected.as_ptr()) || source.len() != expected.len() {
+            return Err(invalid(
+                "content-part source does not match its scanned member",
+            ));
+        }
+        range.slice(source)
+    }
+}
+
 /// A complete source-backed drawing inventory.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[must_use]
@@ -662,6 +795,7 @@ pub struct SourceDrawing<'a> {
     dialect: DrawingDialect,
     relationship_dialect: RelationshipDialect,
     pictures: Vec<PictureSource<'a>>,
+    content_parts: Vec<ContentPartSource<'a>>,
     relationship_references: Vec<RelationshipReference>,
 }
 
@@ -708,6 +842,15 @@ impl<'a> SourceDrawing<'a> {
         &self.pictures
     }
 
+    /// Return direct core SpreadsheetDrawing content parts in source order.
+    ///
+    /// Group-extension `xdr14:contentPart` elements are intentionally absent:
+    /// their relationship profile is unresolved and they remain opaque source
+    /// markup until that profile is closed.
+    pub fn content_parts(&self) -> &[ContentPartSource<'a>] {
+        &self.content_parts
+    }
+
     /// Borrow the exact source member used to build this index.
     #[must_use]
     pub const fn source(&self) -> &'a [u8] {
@@ -726,6 +869,16 @@ impl<'a> SourceDrawing<'a> {
             Error::Invalid(format!(
                 "drawing picture ordinal {picture_ordinal} is outside {} pictures",
                 self.pictures.len()
+            ))
+        })
+    }
+
+    /// Resolve a checked source-order direct core content-part selector.
+    pub fn content_part(&self, content_part_ordinal: usize) -> Result<&ContentPartSource<'a>> {
+        self.content_parts.get(content_part_ordinal).ok_or_else(|| {
+            Error::Invalid(format!(
+                "drawing content-part ordinal {content_part_ordinal} is outside {} content parts",
+                self.content_parts.len()
             ))
         })
     }
@@ -864,6 +1017,7 @@ impl Marker {
 enum ObjectKind {
     Picture,
     Group,
+    ContentPart,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -886,6 +1040,7 @@ struct AnchorCapture {
     extent: Option<EmuExtent>,
     object_kind: Option<ObjectKind>,
     picture_index: Option<usize>,
+    content_part_index: Option<usize>,
     phase: u8,
     client_data_seen: bool,
 }
@@ -902,6 +1057,7 @@ impl AnchorCapture {
             extent: None,
             object_kind: None,
             picture_index: None,
+            content_part_index: None,
             phase: 0,
             client_data_seen: false,
         }
@@ -1004,6 +1160,7 @@ enum Kind {
     OpaqueExt,
     SvgBlip,
     Group,
+    ContentPart,
     Mce,
     Unknown,
 }
@@ -1050,6 +1207,17 @@ struct PendingPicture {
     grouped_or_foreign_descendant: bool,
 }
 
+#[derive(Clone, Debug)]
+struct PendingContentPart {
+    owner: ElementRange,
+    anchor_range: ByteRange,
+    anchor: Option<DrawingAnchor>,
+    relationship_id: Box<str>,
+    relationship_dialect: RelationshipDialect,
+    namespace_context: Arc<NamespaceContext>,
+    mce_ancestor: bool,
+}
+
 struct Scanner<'a> {
     source: &'a [u8],
     drawing_ordinal: usize,
@@ -1059,6 +1227,7 @@ struct Scanner<'a> {
     anchor: Option<AnchorCapture>,
     marker_text: String,
     pictures: Vec<PendingPicture>,
+    content_parts: Vec<PendingContentPart>,
     global_relationship_references: Vec<RelationshipReference>,
     root_seen: bool,
     root_closed: bool,
@@ -1081,6 +1250,7 @@ impl<'a> Scanner<'a> {
         if limits.max_nodes == 0
             || limits.max_depth == 0
             || limits.max_pictures == 0
+            || limits.max_content_parts == 0
             || limits.max_relationship_references == 0
             || limits.max_fragment_bytes == 0
         {
@@ -1091,6 +1261,9 @@ impl<'a> Scanner<'a> {
         }
         if limits.max_pictures > MAX_PICTURES {
             return Err(limit("drawing source direct pictures", MAX_PICTURES));
+        }
+        if limits.max_content_parts > MAX_CONTENT_PARTS {
+            return Err(limit("drawing source content parts", MAX_CONTENT_PARTS));
         }
         if limits.max_relationship_references > MAX_RELATIONSHIP_REFERENCES {
             return Err(limit(
@@ -1106,6 +1279,10 @@ impl<'a> Scanner<'a> {
         pictures
             .try_reserve(8.min(limits.max_pictures))
             .map_err(|source| allocation("drawing source picture index", source))?;
+        let mut content_parts = Vec::new();
+        content_parts
+            .try_reserve(8.min(limits.max_content_parts))
+            .map_err(|source| allocation("drawing source content-part index", source))?;
         let mut global_relationship_references = Vec::new();
         global_relationship_references
             .try_reserve(8)
@@ -1119,6 +1296,7 @@ impl<'a> Scanner<'a> {
             anchor: None,
             marker_text: String::new(),
             pictures,
+            content_parts,
             global_relationship_references,
             root_seen: false,
             root_closed: false,
@@ -1332,12 +1510,35 @@ impl<'a> Scanner<'a> {
                 ext_list_namespace_context: pending.ext_list_namespace_context,
             });
         }
+        let mut content_parts = Vec::new();
+        content_parts
+            .try_reserve_exact(self.content_parts.len())
+            .map_err(|source| allocation("drawing source content-part projection", source))?;
+        for (content_part_ordinal, pending) in self.content_parts.into_iter().enumerate() {
+            let anchor = pending
+                .anchor
+                .ok_or_else(|| invalid("source content part has no complete anchor geometry"))?;
+            content_parts.push(ContentPartSource {
+                source: SourceLease::new(self.source),
+                drawing_ordinal: self.drawing_ordinal,
+                content_part_ordinal,
+                profile: ContentPartProfile::CoreAnchor,
+                anchor,
+                anchor_range: pending.anchor_range,
+                owner: pending.owner,
+                relationship_id: pending.relationship_id,
+                relationship_dialect: pending.relationship_dialect,
+                mce_ancestor: pending.mce_ancestor,
+                namespace_context: pending.namespace_context,
+            });
+        }
         Ok(SourceDrawing {
             source: SourceLease::new(self.source),
             drawing_ordinal: self.drawing_ordinal,
             dialect,
             relationship_dialect,
             pictures,
+            content_parts,
             relationship_references: self.global_relationship_references,
         })
     }
@@ -1386,6 +1587,51 @@ impl<'a> Scanner<'a> {
         let parent = self.frames.last().map(|frame| frame.kind);
         let mce_ancestor = self.frames.iter().any(|frame| frame.kind == Kind::Mce);
         let mut kind = classify(resolved, element.name(), parent);
+        let core_content_part_name = is_spreadsheet(resolved, element.name(), b"contentPart");
+        let direct_anchor = matches!(parent, Some(Kind::Anchor(_)));
+        if parent == Some(Kind::ContentPart) {
+            return Err(invalid(
+                "core SpreadsheetDrawing contentPart must be childless",
+            ));
+        }
+        if direct_anchor
+            && element.name().local_name().as_ref() == b"contentPart"
+            && kind != Kind::ContentPart
+        {
+            return Err(invalid(
+                "direct anchor contentPart must use the core SpreadsheetDrawing QName",
+            ));
+        }
+        if core_content_part_name && mce_ancestor {
+            return Err(invalid(
+                "direct core contentPart ownership under MCE is ambiguous",
+            ));
+        }
+        if core_content_part_name && parent == Some(Kind::Group) {
+            return Err(invalid(
+                "core SpreadsheetDrawing contentPart has no group placement",
+            ));
+        }
+        if core_content_part_name
+            && !direct_anchor
+            && !matches!(parent, Some(Kind::Unknown | Kind::OpaqueExt))
+        {
+            return Err(invalid(
+                "core SpreadsheetDrawing contentPart must be a direct anchor object",
+            ));
+        }
+        if kind == Kind::ContentPart {
+            let expected = match self.dialect {
+                Some(DrawingDialect::Strict) => STRICT_SPREADSHEET_DRAWING,
+                Some(DrawingDialect::Transitional) => SPREADSHEET_DRAWING,
+                None => return Err(invalid("contentPart appears before the drawing root")),
+            };
+            if resolved != Some(expected) {
+                return Err(invalid(
+                    "core contentPart uses a different SpreadsheetDrawing dialect than its root",
+                ));
+            }
+        }
         if kind == Kind::Unknown && parent == Some(Kind::SvgExt) {
             // A recognized extension has a narrow grammar: one direct
             // `asvg:svgBlip` child, with comments/whitespace tolerated by the
@@ -1633,6 +1879,60 @@ impl<'a> Scanner<'a> {
                 picture_index = Some(index);
                 self.anchor_mut()?.picture_index = Some(index);
             },
+            Kind::ContentPart => {
+                let owner_namespace = namespace_uri_copy(resolved)?;
+                self.anchor_mut()?.take_child(AnchorChild::Object)?;
+                if self
+                    .anchor_mut()?
+                    .object_kind
+                    .replace(ObjectKind::ContentPart)
+                    .is_some()
+                {
+                    return Err(invalid("drawing anchor has duplicate objects"));
+                }
+                if self.content_parts.len() >= self.limits.max_content_parts {
+                    return Err(limit(
+                        "drawing source content parts",
+                        self.limits.max_content_parts,
+                    ));
+                }
+                self.content_parts.try_reserve(1).map_err(|source| {
+                    allocation("drawing source direct content-part index", source)
+                })?;
+                let (relationship_id, relationship_dialect) =
+                    required_core_content_part_relationship(
+                        element,
+                        &self.namespaces,
+                        decoder,
+                        self.dialect,
+                    )?;
+                let owner = ElementRange {
+                    range: ByteRange::new(event_start, event_end),
+                    start_end: event_end,
+                    close_start: None,
+                    prefix: qname_prefix(element.name().as_ref())?.into_boxed_slice(),
+                    namespace_uri: owner_namespace,
+                };
+                let anchor_range = self
+                    .anchor
+                    .as_ref()
+                    .map_or(ByteRange::new(event_start, event_end), |anchor| {
+                        anchor.range
+                    });
+                let pending = PendingContentPart {
+                    owner,
+                    anchor_range,
+                    anchor: None,
+                    relationship_id: relationship_id.into_boxed_str(),
+                    relationship_dialect,
+                    namespace_context: Arc::clone(&self.namespaces.context),
+                    mce_ancestor,
+                };
+                self.content_parts.push(pending);
+                let index = self.content_parts.len() - 1;
+                self.anchor_mut()?.content_part_index = Some(index);
+                picture_index = None;
+            },
             Kind::Group => {
                 if parent == Some(Kind::Anchor(AnchorKind::TwoCell))
                     || parent == Some(Kind::Anchor(AnchorKind::OneCell))
@@ -1853,6 +2153,7 @@ impl<'a> Scanner<'a> {
                     .ok_or_else(|| invalid("drawing anchor close has no pending anchor"))?;
                 let anchor_value = anchor.finish()?;
                 let picture_index = anchor.picture_index;
+                let content_part_index = anchor.content_part_index;
                 if let Some(index) = picture_index {
                     let picture = self
                         .pictures
@@ -1863,6 +2164,13 @@ impl<'a> Scanner<'a> {
                     if picture.raster_relationship_id.is_none() {
                         return Err(invalid("direct picture has no raster r:embed fallback"));
                     }
+                } else if let Some(index) = content_part_index {
+                    let content_part = self
+                        .content_parts
+                        .get_mut(index)
+                        .ok_or_else(|| invalid("anchor content-part index is outside source"))?;
+                    content_part.anchor = Some(anchor_value);
+                    content_part.anchor_range = ByteRange::new(anchor.range.start, event_end);
                 }
             },
             Kind::Picture => {
@@ -1949,6 +2257,21 @@ impl<'a> Scanner<'a> {
                     }
                 }
             },
+            Kind::ContentPart => {
+                let index = self
+                    .content_parts
+                    .iter()
+                    .position(|content_part| content_part.owner.range.start == frame.source_start)
+                    .ok_or_else(|| invalid("contentPart has no pending source owner"))?;
+                let pending = self
+                    .content_parts
+                    .get_mut(index)
+                    .ok_or_else(|| invalid("contentPart source index is outside the scan"))?;
+                if !empty {
+                    pending.owner.range.end = event_end;
+                    pending.owner.close_start = Some(event_start);
+                }
+            },
             Kind::Root
             | Kind::Position
             | Kind::Extent
@@ -2023,15 +2346,17 @@ impl<'a> Scanner<'a> {
         if found.is_empty() {
             return Ok(());
         }
-        let global_limit =
-            self.limits
-                .max_relationship_references
-                .checked_mul(
-                    self.limits.max_pictures.checked_add(1).ok_or_else(|| {
-                        limit("drawing source relationship references", usize::MAX)
-                    })?,
-                )
-                .ok_or_else(|| limit("drawing source relationship references", usize::MAX))?;
+        let max_relationship_owners = self
+            .limits
+            .max_pictures
+            .checked_add(self.limits.max_content_parts)
+            .and_then(|count| count.checked_add(1))
+            .ok_or_else(|| limit("drawing source relationship references", usize::MAX))?;
+        let global_limit = self
+            .limits
+            .max_relationship_references
+            .checked_mul(max_relationship_owners)
+            .ok_or_else(|| limit("drawing source relationship references", usize::MAX))?;
         let global_len = self
             .global_relationship_references
             .len()
@@ -2141,6 +2466,7 @@ impl<'a> Scanner<'a> {
                 | Kind::BlipFill
                 | Kind::Blip
                 | Kind::ExtList
+                | Kind::ContentPart
                 | Kind::SvgExt
         ) {
             return Err(invalid(
@@ -2216,6 +2542,9 @@ fn classify(namespace: Option<&[u8]>, name: QName<'_>, parent: Option<Kind>) -> 
     }
     if matches!(parent, Some(Kind::Anchor(_))) && is_spreadsheet(namespace, name, b"pic") {
         return Kind::Picture;
+    }
+    if matches!(parent, Some(Kind::Anchor(_))) && is_spreadsheet(namespace, name, b"contentPart") {
+        return Kind::ContentPart;
     }
     if matches!(parent, Some(Kind::Anchor(_) | Kind::Group))
         && is_spreadsheet(namespace, name, b"grpSp")
@@ -2385,6 +2714,8 @@ pub struct ScanLimits {
     pub max_depth: usize,
     /// Maximum direct picture candidates.
     pub max_pictures: usize,
+    /// Maximum direct core content-part candidates.
+    pub max_content_parts: usize,
     /// Maximum relationship references per picture.
     pub max_relationship_references: usize,
     /// Maximum raw SVG owner bytes accepted during contextual projection.
@@ -2399,6 +2730,7 @@ impl Default for ScanLimits {
             max_nodes: MAX_XML_NODES,
             max_depth: MAX_XML_DEPTH,
             max_pictures: MAX_PICTURES,
+            max_content_parts: MAX_CONTENT_PARTS,
             max_relationship_references: MAX_RELATIONSHIP_REFERENCES,
             max_fragment_bytes: MAX_FRAGMENT_BYTES,
         }
@@ -2876,6 +3208,68 @@ fn relationship_attribute(
         found = Some((value, dialect));
     }
     Ok(found)
+}
+
+fn required_core_content_part_relationship(
+    element: &BytesStart<'_>,
+    namespaces: &Namespaces,
+    decoder: Decoder,
+    drawing_dialect: Option<DrawingDialect>,
+) -> Result<(String, RelationshipDialect)> {
+    let expected = match drawing_dialect {
+        Some(DrawingDialect::Strict) => RelationshipDialect::Strict,
+        Some(DrawingDialect::Transitional) | None => RelationshipDialect::Transitional,
+    };
+    let mut found = None;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.key.as_namespace_binding().is_some() {
+            continue;
+        }
+        let namespace = namespaces.resolve_attribute(attribute.key)?;
+        let dialect = if namespace == Some(STRICT_RELATIONSHIPS) {
+            RelationshipDialect::Strict
+        } else if namespace == Some(RELATIONSHIPS) {
+            RelationshipDialect::Transitional
+        } else {
+            return Err(invalid(
+                "core SpreadsheetDrawing contentPart allows only a matching-dialect r:id",
+            ));
+        };
+        if attribute.key.local_name().as_ref() != b"id" {
+            return Err(invalid(
+                "core SpreadsheetDrawing contentPart allows only a matching-dialect r:id",
+            ));
+        }
+        if dialect != expected {
+            return Err(invalid(
+                "core SpreadsheetDrawing contentPart r:id uses the wrong relationship dialect",
+            ));
+        }
+        if found.is_some() {
+            return Err(invalid(
+                "core SpreadsheetDrawing contentPart has duplicate r:id",
+            ));
+        }
+        if attribute.value.len() > MAX_RELATIONSHIP_ID_BYTES.saturating_mul(4) {
+            return Err(limit(
+                "contentPart relationship ID lexical bytes",
+                MAX_RELATIONSHIP_ID_BYTES.saturating_mul(4),
+            ));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?
+            .into_owned();
+        if value.len() > MAX_RELATIONSHIP_ID_BYTES
+            || value.is_empty()
+            || !litchi_ooxml_common::xml_name::is_ncname(&value)
+        {
+            return Err(invalid("contentPart relationship ID is not an XML NCName"));
+        }
+        found = Some((value, dialect));
+    }
+    found.ok_or_else(|| invalid("core SpreadsheetDrawing contentPart is missing r:id"))
 }
 
 fn relationship_dialect_attribute(

@@ -1,0 +1,1 @@
+./crates/litchi-xlsx/tests/drawing_content_part.rs -> /home/zhuhe/code/litchi-spec-gaps/crates/litchi-xlsx/tests/drawing_content_part.rs

@@ -1,0 +1,277 @@
+$ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/home/zhuhe/xlsx-content-part-final-target-20260912 cargo clippy -p litchi-xlsx --all-features --locked --offline --lib --no-deps -- -D warnings
+    Checking zeroize v1.9.0
+    Checking hybrid-array v0.4.14
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+    Checking cmov v0.5.4
+    Checking ctutils v0.4.2
+    Checking zerofrom v0.1.4
+    Checking yoke v0.7.4
+    Checking digest v0.11.3
+    Checking zerovec v0.10.4
+    Checking thiserror v2.0.18
+    Checking tinystr v0.7.6
+    Checking icu_locid v1.5.0
+    Checking sha2 v0.11.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-core)
+    Checking icu_provider v1.5.0
+    Checking block-padding v0.4.2
+    Checking inout v0.2.2
+    Checking icu_locid_transform v1.5.0
+    Checking icu_collections v1.5.0
+    Checking icu_properties v1.5.1
+    Checking cipher v0.5.2
+    Checking encoding_rs v0.8.35
+    Checking fixedbitset v0.5.7
+    Checking icu_normalizer v1.5.0
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-cfb)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/xml-minifier-macros)
+    Checking idna_adapter v1.2.0
+    Checking cpubits v0.1.1
+    Checking aes v0.9.3
+    Checking idna v1.1.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/xml-minifier)
+    Checking unicode-normalization v0.1.25
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-ole-common)
+    Checking rc4 v0.2.0
+    Checking cbc v0.2.1
+    Checking md-5 v0.11.0
+    Checking hmac v0.13.0
+    Checking sha1 v0.11.0
+    Checking subtle v2.6.1
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-crypto)
+    Checking caseless v0.2.2
+    Checking litchi-opc v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-opc)
+    Checking url v2.5.8
+    Checking litchi-vba v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-vba)
+    Checking ryu v1.0.22
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xldm v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-xldm)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-sheet)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-xlsx)
+error: this function has too many arguments (8/7)
+    --> crates/litchi-xlsx/src/auto_filter/codec.rs:1707:1
+     |
+1707 | / pub(crate) fn validate_sort_condition(
+1708 | |     state_reference: &str,
+1709 | |     column_sort: bool,
+1710 | |     condition_reference: &str,
+...    |
+1715 | |     icon_id: Option<u32>,
+1716 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+     = note: `-D clippy::too-many-arguments` implied by `-D clippy::all`
+     = help: to override `-D clippy::all` add `#[allow(clippy::too_many_arguments)]`
+
+error: this function has too many arguments (8/7)
+    --> crates/litchi-xlsx/src/connections/codec.rs:1541:1
+     |
+1541 | / fn patch_connection_source(
+1542 | |     tree: &SourceTree,
+1543 | |     source: &[u8],
+1544 | |     node: usize,
+...    |
+1549 | |     extension_replacements: &mut Vec<PublishedExtension>,
+1550 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (11/7)
+    --> crates/litchi-xlsx/src/connections/codec.rs:1859:1
+     |
+1859 | / fn patch_child(
+1860 | |     tree: &SourceTree,
+1861 | |     source: &[u8],
+1862 | |     parent: usize,
+...    |
+1870 | |     extension_replacements: &mut Vec<PublishedExtension>,
+1871 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (9/7)
+    --> crates/litchi-xlsx/src/connections/codec.rs:2728:1
+     |
+2728 | / fn patch_sequence_source<T, Make, Patch>(
+2729 | |     tree: &SourceTree,
+2730 | |     source: &[u8],
+2731 | |     collection: usize,
+...    |
+2741 | |     Make: Fn(&T) -> Result<Vec<u8>>,
+2742 | |     Patch: FnMut(&SourceTree, &[u8], usize, &T, &T, &mut Vec<SourceEdit>) -> Result<bool>,
+     | |__________________________________________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/litchi-xlsx/src/hyperlinks/snapshot.rs:471:6
+    |
+471 | ) -> Result<(Box<[Hyperlink]>, Box<[Option<Box<str>>]>)> {
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+    = note: `-D clippy::type-complexity` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::type_complexity)]`
+
+error: this function has too many arguments (8/7)
+   --> crates/litchi-xlsx/src/ole_objects/codec.rs:850:1
+    |
+850 | / fn patch_anchor_marker(
+851 | |     source: &[u8],
+852 | |     edits: &mut Vec<Edit>,
+853 | |     raw: &RawSource,
+...   |
+858 | |     conformance: OleObjectConformance,
+859 | | ) -> Result<()> {
+    | |_______________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (9/7)
+    --> crates/litchi-xlsx/src/pivot/server_formats/mod.rs:1624:1
+     |
+1624 | / fn apply_planned_attribute_delta(
+1625 | |     source: &[u8],
+1626 | |     start_tag: &Range<usize>,
+1627 | |     name: &[u8],
+...    |
+1633 | |     maximum_attribute_bytes: usize,
+1634 | | ) -> Result<bool> {
+     | |_________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (9/7)
+    --> crates/litchi-xlsx/src/workbook/data_model/codec.rs:1921:1
+     |
+1921 | / fn opaque_capture(
+1922 | |     reader: &NsReader<&[u8]>,
+1923 | |     element: &BytesStart<'_>,
+1924 | |     source: &[u8],
+...    |
+1930 | |     node: &Node,
+1931 | | ) -> Result<OpaqueCapture> {
+     | |__________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (10/7)
+   --> crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:817:1
+    |
+817 | / pub(super) fn plan(
+818 | |     workbook: &Workbook,
+819 | |     intents: &[SvgLifecycleIntent],
+820 | |     base_part_bytes: usize,
+...   |
+827 | |     package_changes: &mut Vec<PackageChange>,
+828 | | ) -> Result<()> {
+    | |_______________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (9/7)
+    --> crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:2901:1
+     |
+2901 | / fn plan_composed(
+2902 | |     workbook: &Workbook,
+2903 | |     intents: &[SvgLifecycleIntent],
+2904 | |     ordinary_graph: &[super::model::GraphChange],
+...    |
+2910 | |     package_changes: &mut Vec<PackageChange>,
+2911 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (11/7)
+    --> crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:3611:1
+     |
+3611 | / fn plan_composed_replacement(
+3612 | |     workbook: &Workbook,
+3613 | |     detach: &SvgLifecycleIntent,
+3614 | |     attach: &SvgLifecycleIntent,
+...    |
+3622 | |     cleanup_targets: &mut CleanupTargets,
+3623 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (11/7)
+    --> crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:3784:1
+     |
+3784 | / fn plan_composed_mixed_batch(
+3785 | |     workbook: &Workbook,
+3786 | |     group: &[usize],
+3787 | |     intents: &[SvgLifecycleIntent],
+...    |
+3795 | |     cleanup_targets: &mut CleanupTargets,
+3796 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: this function has too many arguments (10/7)
+    --> crates/litchi-xlsx/src/workbook/edit/svg_lifecycle.rs:4207:1
+     |
+4207 | / fn plan_composed_attach_batch(
+4208 | |     workbook: &Workbook,
+4209 | |     group: &[usize],
+4210 | |     intents: &[SvgLifecycleIntent],
+...    |
+4217 | |     _manifest: &mut OwnedContentTypes,
+4218 | | ) -> Result<()> {
+     | |_______________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/litchi-xlsx/src/workbook/source_merge.rs:404:10
+    |
+404 |     ) -> Result<Option<(Self, Store, Option<Arc<[Text]>>)>> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/litchi-xlsx/src/workbook/source_merge.rs:1342:6
+     |
+1342 | ) -> Result<(Store, Option<Arc<[Text]>>, Option<SharedStringsState>)> {
+     |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/litchi-xlsx/src/workbook/source_merge.rs:1362:6
+     |
+1362 | ) -> Result<(Store, Option<Arc<[Text]>>, Option<SharedStringsState>)> {
+     |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/litchi-xlsx/src/workbook/source_merge.rs:1385:6
+     |
+1385 | ) -> Result<(Option<Box<[Text]>>, Option<SharedStringsState>)> {
+     |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/litchi-xlsx/src/workbook/source_merge.rs:1426:6
+     |
+1426 | ) -> Result<(Option<Box<[Text]>>, Option<SharedStringsState>)> {
+     |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: could not compile `litchi-xlsx` (lib) due to 18 previous errors
+exit=101
