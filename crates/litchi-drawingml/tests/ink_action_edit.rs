@@ -247,6 +247,11 @@ fn scalar_edits_preserve_source_spans_comments_and_opaque_descendants() {
     let commit = edit.finish().expect("scalar edit");
     let edited = commit.as_bytes();
     assert_ne!(edited, original.as_slice());
+    assert_eq!(
+        edited.as_ptr(),
+        commit.prepared().profile().source().as_ptr(),
+        "changed typed readback should reuse the emitted source allocation"
+    );
     for preserved in [
         b"<!--leading-->".as_slice(),
         b"<!--root comment-->".as_slice(),
