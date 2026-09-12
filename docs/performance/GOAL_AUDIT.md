@@ -1,5 +1,25 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0533: CFB candidate clears measured gates; full goal remains open
+
+[0533](changes/0533-cfb-claim-cold-error-layout.md) advances the active
+OLE2/OOXML goal with a source-bound CFB `claim_sector` code-layout candidate.
+The four frozen primary XLS p50 gates pass in both repeats at
+20.5382–24.5798% improvement, parent-constructor Ir falls in every profiled scenario,
+and all allocation vectors remain identical. Four matched adverse rows and 30
+same-build variations remain retained after individual review, including the
+owned-list repeat-2 maximum outlier; no uniform tail claim follows. The 14
+quality checks pass with 4,378 executed tests, and the independent adverse
+review permits adoption. Post-cleanup verification and sealing are complete;
+this batch still does not complete the full optimization goal.
+
+The measured scope is warm synthetic in-memory XLS/CFB. It does not close
+cold/range, physical-provider, native-producer, scaling, fuzz or broad CRUD
+requirements. A fresh paired walk of residual physical reconciliation is the
+next OLE2/OOXML hypothesis; rejected 0524 visited-bit fusion remains rejected.
+ODF stays deferred until OLE2/OOXML optimization completes, and iWork remains
+excluded.
+
 ## 0532: OLE2 attribution advances the goal; completion remains open
 
 [0532](changes/0532-cfb-claim-success-path-attribution.md) completes a fresh

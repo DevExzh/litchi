@@ -1,0 +1,10 @@
+{
+  "created_utc": "2026-09-12T15:54:41.415356+00:00",
+  "status": "frozen-before-captures",
+  "files": {
+    "capture_baseline.py": "6210076b25298765dc0445cba9ffb898974efa764d297edeba2f891aca49b854",
+    "capture_candidate.py": "c3296952d479d2937c9a19a76a90d20c5d7a17fc258a48012f82d73f24baaf5d",
+    "inspect_assembly.py": "1f04e5f79517628217d1585317c0b1ad58c9d12f21b3b7a2d570c14f3098985b",
+    "candidate.patch": "74bae8663608a633c85299a5fb8d1ee7c8a8fa25ea65efa91b3c7b93fa76a367"
+  }
+}

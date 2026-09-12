@@ -1,0 +1,17 @@
+{
+  "schema": "litchi-0533-assembly-plan-v1",
+  "status": "frozen-before-inspection",
+  "owners": [
+    "claim_sector",
+    "claim_sector_index_error",
+    "claim_sector_bounds_error",
+    "claim_sector_conflict_error",
+    "validate_stream_allocations",
+    "validate_physical_sector_layout",
+    "load_fat"
+  ],
+  "binary_sha256": "d7d935fca5066d647f67a2ef1b18e56fff2162b2f0726b5fd22094fd9910b819",
+  "source_manifest_sha256": "ce5a705508299624c2611d525940ce1502b3b9f20196814cf449e9286f8f11d6",
+  "script_sha256": "1f04e5f79517628217d1585317c0b1ad58c9d12f21b3b7a2d570c14f3098985b",
+  "scope": "Static code shape and explicit caller edges; no static-instruction latency inference"
+}

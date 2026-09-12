@@ -1,0 +1,37 @@
+
+/tmp/litchi-goal-0533/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f29250 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0d4d579b3c6cd775E>:
+ 2f29250:	53                   	push   %rbx
+ 2f29251:	48 89 fb             	mov    %rdi,%rbx
+ 2f29254:	ff 15 76 af 19 00    	call   *0x19af76(%rip)        # 30c41d0 <_DYNAMIC+0x298>
+ 2f2925a:	bf 18 00 00 00       	mov    $0x18,%edi
+ 2f2925f:	be 01 00 00 00       	mov    $0x1,%esi
+ 2f29264:	ff 15 6e af 19 00    	call   *0x19af6e(%rip)        # 30c41d8 <_DYNAMIC+0x2a0>
+ 2f2926a:	48 85 c0             	test   %rax,%rax
+ 2f2926d:	74 35                	je     2f292a4 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0d4d579b3c6cd775E+0x54>
+ 2f2926f:	0f 10 05 ac 89 60 fd 	movups -0x29f7654(%rip),%xmm0        # 531c22 <anon.e0572dd12dce1d6d78420bf0a335603a.8.llvm.17154920839617733857+0x131f>
+ 2f29276:	0f 11 00             	movups %xmm0,(%rax)
+ 2f29279:	48 b9 6f 76 65 72 66 	movabs $0x776f6c667265766f,%rcx
+ 2f29280:	6c 6f 77 
+ 2f29283:	48 89 48 10          	mov    %rcx,0x10(%rax)
+ 2f29287:	48 c7 43 08 18 00 00 	movq   $0x18,0x8(%rbx)
+ 2f2928e:	00 
+ 2f2928f:	48 89 43 10          	mov    %rax,0x10(%rbx)
+ 2f29293:	48 c7 43 18 18 00 00 	movq   $0x18,0x18(%rbx)
+ 2f2929a:	00 
+ 2f2929b:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f292a2:	5b                   	pop    %rbx
+ 2f292a3:	c3                   	ret
+ 2f292a4:	bf 01 00 00 00       	mov    $0x1,%edi
+ 2f292a9:	be 18 00 00 00       	mov    $0x18,%esi
+ 2f292ae:	ff 15 54 af 19 00    	call   *0x19af54(%rip)        # 30c4208 <_DYNAMIC+0x2d0>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

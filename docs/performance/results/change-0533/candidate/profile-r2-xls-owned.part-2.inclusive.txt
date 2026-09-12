@@ -1,0 +1,786 @@
+--------------------------------------------------------------------------------
+Profile data file '/home/zhuhe/code/litchi/docs/performance/results/change-0533/candidate/profile-r2-xls-owned.callgrind.2' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 76878760 - 77566983
+Trigger: --dump-after=litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits
+Profiled target:  /tmp/litchi-goal-0533/candidate/normal --case xls_owned_source_open_one_cell --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0533/candidate/profile-r2-xls-owned.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0533/candidate/profile-r2-xls-owned.catalog.json (PID 3172319, part 2)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       100
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir        
+--------------------------------------------------------------------------------
+2,263,025  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir         file:function
+--------------------------------------------------------------------------------
+
+2,263,025  *  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+2,263,025  *  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+2,263,025  *  ???:(below main) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+
+2,263,025  *  ???:litchi_perf_baseline::main [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:litchi_perf_baseline::run [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:litchi_perf_baseline::run_xls_owned_source_case [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,263,025  >   ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,263,025  *  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,156,251  >   ???:litchi_cfb::shared::SharedOleFile::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+  106,599  >   ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  >   ???:__rustc::__rust_alloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       30  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        1  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:main [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:std::rt::lang_start::{{closure}} [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:std::rt::lang_start_internal [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,263,025  *  ???:std::sys::backtrace::__rust_begin_short_backtrace [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,156,251  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,156,251  *  ???:litchi_cfb::shared::SharedOleFile::open_with_limits [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,156,244  >   ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,156,244  < ???:litchi_cfb::shared::SharedOleFile::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,156,244  *  ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,155,668  >   ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      189  >   ???:litchi_cfb::file::OleFile<R>::into_parsed_index (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      148  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       51  >   ???:alloc::boxed::box_new_uninit (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       15  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        4  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::len (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+2,155,668  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+2,155,668  *  ???:litchi_cfb::file::OleFile<R>::open_with_limits [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+1,531,552  >   ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+  398,342  >   ???:litchi_cfb::file::OleFile<R>::validate_physical_sector_layout (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+  121,420  >   ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   59,523  >   ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   33,579  >   ???:litchi_cfb::file::try_filled_vec (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   10,791  >   ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      152  >   ???:std::io::default_read_exact (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       65  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       50  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+1,531,552  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+1,531,552  *  ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+1,163,328  >   ???:litchi_cfb::file::SectorChainScratch::collect_exact (10x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,849  >   ???:litchi_cfb::file::collect_sector_chain_exact (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      401  >   ???:__rustc::__rust_dealloc (5x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       77  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+1,163,328  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (10x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+1,163,328  *  ???:litchi_cfb::file::SectorChainScratch::collect_exact [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   41,806  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (12x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,294  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (5x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+  398,342  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+  398,342  *  ???:litchi_cfb::file::OleFile<R>::validate_physical_sector_layout [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+  121,420  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+  121,420  *  ???:litchi_cfb::file::OleFile<R>::load_fat [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   66,482  >   ???:litchi_cfb::file::OleFile<R>::read_sector_into (262x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,115  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      290  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      271  >   ???:litchi_cfb::file::try_vec_with_capacity (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      161  >   ???:__rustc::__rust_dealloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   41,806  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   33,212  < ???:litchi_cfb::file::try_filled_vec (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   13,143  < ???:litchi_cfb::file::OleFile<R>::read_sector_into (263x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    8,342  < ???:litchi_cfb::file::collect_sector_chain_exact (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,171  < ???:litchi_cfb::file::collect_directory_sector_chain (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,115  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,115  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      106  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       99  < ???:litchi_xls::workbook::source::read_range (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       50  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       45  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+  109,204  *  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+  106,599  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+  106,599  *  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   47,211  >   ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   22,054  >   ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (68x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   10,372  >   ???:litchi_cfb::shared::SharedOleStreamCursor::skip_forward (68x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,639  >   ???:<litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next (69x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,878  >   ???:litchi_xls::workbook::source::read_range (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,795  >   ???:litchi_cfb::shared::SharedOleFile::stream_cursor_at (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,732  >   ???:litchi_cfb::shared::SharedOleFile::stream_len (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,294  >   ???:litchi_xls::records::BoundSheetRecord::parse (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      884  >   ???:core::ptr::drop_in_place<litchi_xls::workbook::source::SourceBackedError> (68x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      836  >   ???:alloc::raw_vec::RawVecInner<A>::try_reserve (7x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      631  >   ???:alloc::vec::Vec<T,A>::into_boxed_slice (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      554  >   ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      542  >   ???:hashbrown::map::HashMap<K,V,S,A>::insert (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      401  >   ???:<str>::to_lowercase (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      322  >   ???:__rustc::__rust_dealloc (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      321  >   ???:litchi_xls::workbook::source::ensure_current_parts (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      262  >   ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      196  >   ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      184  >   ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      180  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (6x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      170  >   ???:<alloc::string::String as core::clone::Clone>::clone (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      153  >   ???:alloc::boxed::box_new_uninit (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      126  >   ???:litchi_xls::workbook::source::SourceInner::ensure_current (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       96  >   ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       94  >   ???:alloc::vec::Vec<T,A>::push_mut (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       76  >   ???:__rustc::__rust_alloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       63  >   ???:litchi_xls::records::Encoding::from_codepage (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       57  >   ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       49  >   ???:litchi_xls::records::BofRecord::parse (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  >   ???:litchi_cfb::shared::SharedOleFile::source_version (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       25  >   ???:litchi_xls::records::scan_shared_string_records (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       21  >   ???:std::thread::local::LocalKey<T>::with (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        2  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   66,482  < ???:litchi_cfb::file::OleFile<R>::load_fat (262x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      247  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   66,729  *  ???:litchi_cfb::file::OleFile<R>::read_sector_into [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   39,910  >   ???:std::io::default_read_exact (263x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   13,143  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (263x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   59,523  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   59,523  *  ???:litchi_cfb::file::OleFile<R>::load_directory [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   21,633  >   ???:litchi_cfb::directory_name::directory_name_data (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    8,506  >   ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,972  >   ???:litchi_cfb::file::collect_directory_sector_chain (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,418  >   ???:<alloc::string::String>::from_utf16 (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,296  >   ???:litchi_cfb::file::try_push (38x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,800  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (60x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,540  >   ???:litchi_cfb::file::try_filled_vec (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      973  >   ???:__rustc::__rust_dealloc (18x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      948  >   ???:<u16 as core::slice::cmp::SliceContains>::slice_contains (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      884  >   ???:litchi_cfb::directory_name::DirectoryNameData::compare (11x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      689  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      625  >   ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      437  >   ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe (23x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      374  >   ???:litchi_cfb::file::OleFile<R>::validated_entry (22x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      248  >   ???:std::io::default_read_exact (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      240  >   ???:litchi_cfb::file::CheckedBitSet::insert (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      212  >   ???:litchi_cfb::file::try_vec_with_capacity (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      196  >   ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      152  >   ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      126  >   ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      106  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       60  >   ???:core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>> (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       23  >   ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>> (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       19  >   ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>> (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   47,211  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   47,211  *  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   28,576  >   ???:litchi_xls::number_format::codec::parse_number_format (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,033  >   ???:litchi_xls::number_format::codec::parse_xf (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,482  >   ???:alloc::raw_vec::RawVec<T,A>::grow_one (6x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,305  >   ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,785  >   ???:core::hash::BuildHasher::hash_one (15x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       30  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   39,910  < ???:litchi_cfb::file::OleFile<R>::read_sector_into (263x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      248  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      152  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   40,310  *  ???:std::io::default_read_exact [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   24,410  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at (265x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   33,579  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,540  < ???:litchi_cfb::file::OleFile<R>::load_directory (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   35,119  *  ???:litchi_cfb::file::try_filled_vec [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   33,212  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      900  >   ???:alloc::vec::Vec<T,A>::resize (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      836  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       30  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   21,628  < ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at (362x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,650  < ???:litchi_cfb::directory_name::directory_name_data (316x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,800  < ???:litchi_cfb::file::OleFile<R>::load_directory (60x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      623  < ???:0x0000000007956680 (21x) [???]
+      390  < ???:alloc::vec::Vec<T,A>::resize (13x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      360  < ???:litchi_cfb::file::try_push (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      180  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (6x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      148  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       65  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       39  < ???:<alloc::string::String as core::clone::Clone>::clone (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       36  < ???:litchi_xls::number_format::codec::parse_number_format (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       30  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       30  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       30  < ???:litchi_cfb::file::try_filled_vec (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       11  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   30,020  *  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   28,576  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   28,576  *  ???:litchi_xls::number_format::codec::parse_number_format [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   12,143  >   ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,114  >   ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      765  >   ???:__rustc::__rust_dealloc (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      226  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      152  >   ???:<core::iter::adapters::cloned::Cloned<I> as core::iter::traits::iterator::Iterator>::fold (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       72  >   ???:__rustc::__rust_alloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       36  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        2  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   24,410  < ???:std::io::default_read_exact (265x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,228  < ???:litchi_core::source::ReadAt::read_exact_at (97x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   26,638  *  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   21,628  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (362x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   21,633  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,224  < ???:litchi_cfb::shared::SharedOleFile::find_entry (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   25,857  *  ???:litchi_cfb::directory_name::directory_name_data [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,650  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (316x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,925  >   ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend (16x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,950  >   ???:<core::char::ToUppercase as core::iter::traits::iterator::Iterator>::next (316x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,800  >   ???:core::unicode::unicode_data::conversions::to_upper (158x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   22,054  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (68x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   22,054  *  ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,964  >   ???:litchi_core::source::ReadAt::read_exact_at (96x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,794  >   ???:litchi_cfb::shared::SharedOleStreamCursor::physical_span (98x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,518  >   ???:litchi_cfb::shared::SharedOleStreamCursor::advance_within (98x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,214  >   ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state (98x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      680  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (192x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    8,340  < ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (28x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,338  < ???:alloc::raw_vec::RawVec<T,A>::grow_one (6x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,294  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (5x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      894  < ???:litchi_cfb::file::try_push (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      879  < ???:litchi_cfb::file::collect_sector_chain_exact (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      836  < ???:litchi_cfb::file::try_filled_vec (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      689  < ???:litchi_cfb::file::OleFile<R>::load_directory (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      565  < ???:alloc::raw_vec::RawVecInner<A>::try_reserve (5x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      483  < ???:litchi_xls::workbook::source::read_range (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      417  < ???:litchi_cfb::file::collect_directory_sector_chain (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      398  < ???:litchi_cfb::file::try_vec_with_capacity (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      290  < ???:litchi_cfb::file::OleFile<R>::load_fat (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      158  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       81  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       77  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       77  < ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   17,816  *  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,917  >   ???:__rustc::__rust_realloc (23x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    5,093  >   ???:__rustc::__rust_alloc (47x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       46  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (47x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   12,143  < ???:litchi_xls::number_format::codec::parse_number_format (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       96  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   12,239  *  ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,722  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (16x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      453  >   ???:__rustc::__rust_alloc (9x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        9  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (9x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   10,791  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   10,791  *  ???:litchi_cfb::file::OleFile<R>::load_minifat [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,892  >   ???:litchi_cfb::file::collect_sector_chain_exact (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,115  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      247  >   ???:litchi_cfb::file::OleFile<R>::read_sector_into (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       81  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    9,917  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (23x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      566  < ???:alloc::vec::Vec<T,A>::into_boxed_slice (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   10,483  *  ???:__rustc::__rust_realloc [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   10,458  >   ???:__rustc::__rdl_realloc (25x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+   10,458  < ???:__rustc::__rust_realloc (25x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   10,458  *  ???:__rustc::__rdl_realloc [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,908  >   ./malloc/./malloc/malloc.c:realloc (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   10,372  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (68x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+   10,372  *  ???:litchi_cfb::shared::SharedOleStreamCursor::skip_forward [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,964  >   ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (91x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    9,964  < ???:litchi_cfb::shared::SharedOleStreamCursor::skip_forward (91x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,964  *  ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,716  >   ???:litchi_cfb::shared::SharedOleStreamCursor::physical_span (90x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,452  >   ???:litchi_cfb::shared::SharedOleStreamCursor::advance_within (90x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,163  >   ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state (90x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    9,908  < ???:__rustc::__rdl_realloc (25x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,908  *  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    8,075  >   ./malloc/./malloc/malloc.c:_int_realloc (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    4,892  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,849  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,741  *  ???:litchi_cfb::file::collect_sector_chain_exact [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    8,342  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      879  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      296  >   ???:__rustc::__rust_dealloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    7,722  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (16x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,170  < ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      230  < ???:litchi_xls::records::BoundSheetRecord::parse (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      226  < ???:litchi_xls::number_format::codec::parse_number_format (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,348  *  ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    8,340  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (28x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    9,033  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    9,033  *  ???:litchi_xls::number_format::codec::parse_xf [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,956  >   ???:litchi_xls::border_fill::parse_xf_border_fill (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,176  >   ???:litchi_xls::alignment::CellAlignment::parse (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    8,506  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    8,506  *  ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,055  >   ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (11x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      158  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       70  >   ???:__rustc::__rust_dealloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    8,075  < ./malloc/./malloc/malloc.c:realloc (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    8,075  *  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,900  >   ./malloc/./malloc/malloc.c:_int_free_chunk (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,811  >   ./malloc/./malloc/malloc.c:_int_malloc (21x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       38  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    5,093  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (47x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      480  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      476  < ???:<alloc::string::String>::from_utf16 (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      453  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (9x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      443  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      160  < ???:alloc::boxed::box_new_uninit (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      160  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      116  < ???:<alloc::string::String as core::clone::Clone>::clone (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       76  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       76  < ???:<str>::to_lowercase (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       72  < ???:litchi_xls::number_format::codec::parse_number_format (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,685  *  ???:__rustc::__rust_alloc [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,586  >   ???:__rustc::__rdl_alloc (105x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    7,055  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (11x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      625  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,680  *  ???:litchi_cfb::file::OleFile<R>::parse_directory_entry [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    5,760  >   ???:litchi_cfb::file::decode_utf16le (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      552  >   ???:litchi_cfb::file::format_clsid (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    7,586  < ???:__rustc::__rust_alloc (105x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,586  *  ???:__rustc::__rdl_alloc [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    6,695  >   ./malloc/./malloc/malloc.c:malloc (105x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    7,114  < ???:litchi_xls::number_format::codec::parse_number_format (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    7,114  *  ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,170  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    6,695  < ???:__rustc::__rdl_alloc (105x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    6,695  *  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,080  >   ./malloc/./malloc/malloc.c:__libc_malloc2 (19x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    3,666  < ./malloc/./malloc/malloc.c:__libc_malloc2 (19x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,811  < ./malloc/./malloc/malloc.c:_int_realloc (21x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    6,477  *  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      639  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    5,760  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    5,760  *  ???:litchi_cfb::file::decode_utf16le [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,356  >   ???:<alloc::string::String>::try_reserve (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    4,964  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (96x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      231  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    5,195  *  ???:litchi_core::source::ReadAt::read_exact_at [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,228  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at (97x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,714  < ???:litchi_cfb::shared::SharedOleFile::stream_len (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,714  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,714  < ???:litchi_cfb::shared::SharedOleFile::stream_cursor_at (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    5,142  *  ???:litchi_cfb::shared::SharedOleFile::find_entry [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,224  >   ???:litchi_cfb::directory_name::directory_name_data (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       60  >   ???:core::ptr::drop_in_place<litchi_cfb::file::OleError> (20x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    4,972  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,972  *  ???:litchi_cfb::file::collect_directory_sector_chain [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,171  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      417  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      148  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    4,956  < ???:litchi_xls::number_format::codec::parse_xf (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,956  *  ???:litchi_xls::border_fill::parse_xf_border_fill [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      294  >   ???:litchi_xls::border_fill::FillPattern::from_bits (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    2,900  < ./malloc/./malloc/malloc.c:_int_realloc (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,836  < ./malloc/./malloc/malloc.c:free (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,736  *  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,039  >   ./malloc/./malloc/malloc.c:_int_free_merge_chunk (50x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    4,639  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (69x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,639  *  ???:<litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    4,418  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    4,418  *  ???:<alloc::string::String>::from_utf16 [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      476  >   ???:__rustc::__rust_alloc (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       12  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    4,080  < ./malloc/./malloc/malloc.c:malloc (19x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,080  *  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    3,666  >   ./malloc/./malloc/malloc.c:_int_malloc (19x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    4,039  < ./malloc/./malloc/malloc.c:_int_free_chunk (50x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,039  *  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      984  >   ./malloc/./malloc/malloc.c:_int_free_maybe_trim (50x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      214  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (28,596x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      973  < ???:litchi_cfb::file::OleFile<R>::load_directory (18x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      765  < ???:litchi_xls::number_format::codec::parse_number_format (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      401  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (5x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      322  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      296  < ???:litchi_cfb::file::collect_sector_chain_exact (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      161  < ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      161  < ???:litchi_cfb::file::OleFile<R>::load_fat (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      148  < ???:litchi_cfb::file::collect_directory_sector_chain (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      126  < ???:litchi_cfb::file::OleFile<R>::into_parsed_index (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      105  < ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       70  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       70  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    3,703  *  ???:__rustc::__rust_dealloc [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    3,646  >   ???:__rustc::__rdl_dealloc (104x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    3,646  < ???:__rustc::__rust_dealloc (104x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    3,646  *  ???:__rustc::__rdl_dealloc [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    3,589  >   ./malloc/./malloc/malloc.c:free (104x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    3,589  < ???:__rustc::__rdl_dealloc (104x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    3,589  *  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,836  >   ./malloc/./malloc/malloc.c:_int_free_chunk (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    1,794  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (98x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,716  < ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (90x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    3,510  *  ???:litchi_cfb::shared::SharedOleStreamCursor::physical_span [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,785  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (15x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,190  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (10x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      372  < ???:hashbrown::map::HashMap<K,V,S,A>::insert (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    3,347  *  ???:core::hash::BuildHasher::hash_one [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,011  >   ???:<core::hash::sip::Hasher<S> as core::hash::Hasher>::write (30x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,518  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (98x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,452  < ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (90x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,970  *  ???:litchi_cfb::shared::SharedOleStreamCursor::advance_within [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    2,925  < ???:litchi_cfb::directory_name::directory_name_data (16x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,925  *  ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    2,878  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,878  *  ???:litchi_xls::workbook::source::read_range [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,237  >   ???:litchi_cfb::shared::SharedOleFile::read_stream_range (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      483  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       99  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    2,305  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      196  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,501  *  ???:hashbrown::raw::RawTable<T,A>::reserve_rehash [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,190  >   ???:core::hash::BuildHasher::hash_one (10x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      528  >   ???:hashbrown::raw::RawTableInner::fallible_with_capacity (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       70  >   ???:__rustc::__rust_dealloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    2,482  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (6x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,482  *  ???:alloc::raw_vec::RawVec<T,A>::grow_one [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,338  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (6x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,214  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (98x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,163  < ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (90x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,377  *  ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       48  >   ???:litchi_cfb::shared::next_chain_sector (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    2,296  < ???:litchi_cfb::file::OleFile<R>::load_directory (38x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,296  *  ???:litchi_cfb::file::try_push [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      894  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      360  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (12x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    2,237  < ???:litchi_xls::workbook::source::read_range (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    2,237  *  ???:litchi_cfb::shared::SharedOleFile::read_stream_range [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,714  >   ???:litchi_cfb::shared::SharedOleFile::find_entry (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      231  >   ???:litchi_core::source::ReadAt::read_exact_at (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       48  >   ???:litchi_cfb::shared::next_chain_sector (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       10  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,950  < ???:litchi_cfb::directory_name::directory_name_data (316x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,950  *  ???:<core::char::ToUppercase as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,800  < ???:litchi_cfb::directory_name::directory_name_data (158x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,800  *  ???:core::unicode::unicode_data::conversions::to_upper [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,795  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,795  *  ???:litchi_cfb::shared::SharedOleFile::stream_cursor_at [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,714  >   ???:litchi_cfb::shared::SharedOleFile::find_entry (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,732  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,732  *  ???:litchi_cfb::shared::SharedOleFile::stream_len [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,714  >   ???:litchi_cfb::shared::SharedOleFile::find_entry (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,356  < ???:litchi_cfb::file::decode_utf16le (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,356  *  ???:<alloc::string::String>::try_reserve [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      876  >   ???:<alloc::raw_vec::RawVecInner>::finish_grow (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,294  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,294  *  ???:litchi_xls::records::BoundSheetRecord::parse [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      271  >   ???:core::iter::traits::iterator::Iterator::try_fold (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      230  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      207  >   ???:core::iter::traits::iterator::Iterator::fold (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,176  < ???:litchi_xls::number_format::codec::parse_xf (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,176  *  ???:litchi_xls::alignment::CellAlignment::parse [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+    1,011  < ???:core::hash::BuildHasher::hash_one (30x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+    1,011  *  ???:<core::hash::sip::Hasher<S> as core::hash::Hasher>::write [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      984  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (50x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      984  *  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      948  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      948  *  ???:<u16 as core::slice::cmp::SliceContains>::slice_contains [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      900  < ???:litchi_cfb::file::try_filled_vec (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      900  *  ???:alloc::vec::Vec<T,A>::resize [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      390  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (13x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      639  < ./malloc/./malloc/malloc.c:_int_malloc (25x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      214  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (28,596x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       38  < ./malloc/./malloc/malloc.c:_int_realloc (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      891  *  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      884  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (68x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      884  *  ???:core::ptr::drop_in_place<litchi_xls::workbook::source::SourceBackedError> [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      884  < ???:litchi_cfb::file::OleFile<R>::load_directory (11x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      884  *  ???:litchi_cfb::directory_name::DirectoryNameData::compare [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      876  < ???:<alloc::string::String>::try_reserve (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      876  *  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      480  >   ???:__rustc::__rust_alloc (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       12  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      836  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (7x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      836  *  ???:alloc::raw_vec::RawVecInner<A>::try_reserve [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      565  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (5x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      680  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (192x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  < ???:litchi_xls::workbook::source::ensure_current_parts (16x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       25  < ???:litchi_cfb::shared::SharedOleFile::source_version (9x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       15  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       10  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      770  *  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      749  *  ./malloc/../string/bits/string_fortified.h:_int_realloc
+      665  >   ???:0x0000000007956680 (21x) [???]
+
+      665  < ./malloc/../string/bits/string_fortified.h:_int_realloc (21x)
+      665  *  ???:0x0000000007956680 [???]
+      623  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (21x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      631  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      631  *  ???:alloc::vec::Vec<T,A>::into_boxed_slice [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      566  >   ???:__rustc::__rust_realloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      554  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      554  *  ???:alloc::sync::Arc<T,A>::from_box_in [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      443  >   ???:__rustc::__rust_alloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       17  >   ???:alloc::sync::arcinner_layout_for_value_layout (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       11  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        1  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      552  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      552  *  ???:litchi_cfb::file::format_clsid [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      216  >   ???:litchi_core::simd::cmp::is_all_zero_avx2 (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      542  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      542  *  ???:hashbrown::map::HashMap<K,V,S,A>::insert [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      372  >   ???:core::hash::BuildHasher::hash_one (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      528  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      528  *  ???:hashbrown::raw::RawTableInner::fallible_with_capacity [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      160  >   ???:__rustc::__rust_alloc (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       45  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (4x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        4  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      271  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      212  < ???:litchi_cfb::file::OleFile<R>::load_directory (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      483  *  ???:litchi_cfb::file::try_vec_with_capacity [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      398  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      437  < ???:litchi_cfb::file::OleFile<R>::load_directory (23x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      437  *  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      321  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      107  < ???:litchi_xls::workbook::source::SourceInner::ensure_current (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      428  *  ???:litchi_xls::workbook::source::ensure_current_parts [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      160  >   ???:litchi_cfb::shared::SharedOleFile::source_version (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (16x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      401  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      401  *  ???:<str>::to_lowercase [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       76  >   ???:__rustc::__rust_alloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        2  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      374  < ???:litchi_cfb::file::OleFile<R>::load_directory (22x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      374  *  ???:litchi_cfb::file::OleFile<R>::validated_entry [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      294  < ???:litchi_xls::border_fill::parse_xf_border_fill (21x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      294  *  ???:litchi_xls::border_fill::FillPattern::from_bits [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      170  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      108  < ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      278  *  ???:<alloc::string::String as core::clone::Clone>::clone [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      116  >   ???:__rustc::__rust_alloc (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       39  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        3  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      271  < ???:litchi_xls::records::BoundSheetRecord::parse (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      271  *  ???:core::iter::traits::iterator::Iterator::try_fold [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      262  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      262  *  ???:litchi_xls::workbook::source::validate_sheet_offsets [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  >   ???:__rustc::__rust_alloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  >   ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        1  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      240  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      240  *  ???:litchi_cfb::file::CheckedBitSet::insert [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      216  < ???:litchi_cfb::file::format_clsid (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      216  *  ???:litchi_core::simd::cmp::is_all_zero_avx2 [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      152  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       57  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      209  *  ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      161  >   ???:__rustc::__rust_dealloc (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      207  < ???:litchi_xls::records::BoundSheetRecord::parse (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      207  *  ???:core::iter::traits::iterator::Iterator::fold [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      153  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       51  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      204  *  ???:alloc::boxed::box_new_uninit [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      160  >   ???:__rustc::__rust_alloc (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        4  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      160  < ???:litchi_xls::workbook::source::ensure_current_parts (8x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       40  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      200  *  ???:litchi_cfb::shared::SharedOleFile::source_version [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       25  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (9x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      196  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      196  *  ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      108  >   ???:<alloc::string::String as core::clone::Clone>::clone (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       29  >   ???:<T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      189  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      189  *  ???:litchi_cfb::file::OleFile<R>::into_parsed_index [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      126  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      184  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      184  *  ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      105  >   ???:__rustc::__rust_dealloc (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      152  < ???:litchi_xls::number_format::codec::parse_number_format (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      152  *  ???:<core::iter::adapters::cloned::Cloned<I> as core::iter::traits::iterator::Iterator>::fold [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      150  *  ./malloc/./malloc/arena.c:realloc
+
+      126  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      126  *  ???:litchi_cfb::file::CheckedBitSet::try_with_capacity [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       77  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+      126  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      126  *  ???:litchi_xls::workbook::source::SourceInner::ensure_current [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+      107  >   ???:litchi_xls::workbook::source::ensure_current_parts (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       46  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (47x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       12  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       12  < ???:<alloc::string::String>::from_utf16 (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        9  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (9x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        4  < ???:alloc::boxed::box_new_uninit (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        4  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        3  < ???:<alloc::string::String as core::clone::Clone>::clone (3x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        2  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        2  < ???:<str>::to_lowercase (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        2  < ???:litchi_xls::number_format::codec::parse_number_format (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        1  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        1  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        1  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       99  *  ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       48  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       48  < ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       96  *  ???:litchi_cfb::shared::next_chain_sector [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       94  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (4x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       94  *  ???:alloc::vec::Vec<T,A>::push_mut [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       63  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       63  *  ???:litchi_xls::records::Encoding::from_codepage [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       36  >   ???:litchi_codepage::Mbcs::require (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       60  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       60  *  ???:core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>> [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       60  < ???:litchi_cfb::shared::SharedOleFile::find_entry (20x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       60  *  ???:core::ptr::drop_in_place<litchi_cfb::file::OleError> [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       49  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       49  *  ???:litchi_xls::records::BofRecord::parse [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       14  >   ???:core::ptr::drop_in_place<litchi_xls::error::Error> (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       48  *  ./malloc/./malloc/arena.c:free
+
+       36  *  ./malloc/./malloc/arena.c:__libc_malloc2
+
+       36  < ???:litchi_xls::records::Encoding::from_codepage (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       36  *  ???:litchi_codepage::Mbcs::require [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       14  >   ???:litchi_codepage::Page::new (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       35  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       35  *  ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       29  < ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       29  *  ???:<T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       25  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       25  *  ???:litchi_xls::records::scan_shared_string_records [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       23  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       23  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>> [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       21  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       21  *  ???:std::thread::local::LocalKey<T>::with [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        8  >   ???:core::ops::function::FnOnce::call_once (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       19  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       19  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>> [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       17  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       17  *  ???:alloc::sync::arcinner_layout_for_value_layout [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       14  < ???:litchi_xls::records::BofRecord::parse (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       14  *  ???:core::ptr::drop_in_place<litchi_xls::error::Error> [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+       14  < ???:litchi_codepage::Mbcs::require (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+       14  *  ???:litchi_codepage::Page::new [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+        8  < ???:std::thread::local::LocalKey<T>::with (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        8  *  ???:core::ops::function::FnOnce::call_once [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
+        4  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+        4  *  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::len [/home/zhuhe/litchi-goal-0533-target/retained-binaries/candidate/normal]
+
