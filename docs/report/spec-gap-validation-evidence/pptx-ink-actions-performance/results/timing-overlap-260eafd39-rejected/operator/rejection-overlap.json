@@ -1,0 +1,53 @@
+{
+  "capture_head": "260eafd391237d49373ad0ea1d73bd9348ab6226",
+  "capture_root": "/var/tmp/pptx-ink-actions-profile-260eafd39.wTYD89",
+  "competing_workloads": [
+    {
+      "command": "python3 -B docs/performance/results/change-0529/checks.py --stage candidate",
+      "ownership": "unknown",
+      "pid": 2401240
+    },
+    {
+      "command": "cargo test --locked -p litchi-opc --all-features -- --test-threads=2",
+      "ownership": "unknown",
+      "pid": 2402545
+    },
+    {
+      "command": "cargo test --locked -p litchi-xlsx --all-features -- --test-threads=2",
+      "ownership": "unknown",
+      "pid": 2406615
+    },
+    {
+      "command": "cargo-fmt (observed by root census)",
+      "ownership": "unknown",
+      "pid": 2401898
+    },
+    {
+      "command": "cargo (observed by root census)",
+      "ownership": "unknown",
+      "pid": 2402027
+    },
+    {
+      "command": "rustc (observed by root census)",
+      "ownership": "unknown",
+      "pid": 2402068
+    }
+  ],
+  "completed_timed_receipts": 13,
+  "incomplete_started_lane": "lane-package_read_large_shared-p2",
+  "last_complete_timed_lane": "lane-package_read_large_shared-p1",
+  "operator_session": "54450",
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "reason": "A separate controlled Cargo/compiler workload was observed during the run; command ownership and exact phase overlap are uncertain, so timing interpretation is invalid and the run was terminated before continuing.",
+  "results": "/var/tmp/pptx-ink-actions-profile-260eafd39.wTYD89/results",
+  "schema": "pptx-ink-actions-rejected-timing-overlap-v1",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "source_checkout": "/var/tmp/pptx-ink-actions-profile-260eafd39-src.Q436KY",
+  "source_manifest_and_binary_receipts_retained": true,
+  "status": "rejected",
+  "target": "/var/tmp/pptx-ink-actions-profile-260eafd39.wTYD89/target",
+  "timed_lane_start": "lane-package_read_large_shared-p1",
+  "timed_lane_start_unix_ns": 1789215415212619658,
+  "timed_lane_start_utc": "2026-09-12T12:16:55.212620+00:00",
+  "timing_claim": false
+}
