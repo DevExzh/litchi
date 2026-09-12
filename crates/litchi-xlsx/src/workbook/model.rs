@@ -854,6 +854,95 @@ impl Workbook {
         &self.inner.pivot_caches
     }
 
+    /// Resolve the typed `pivotTableServerFormats` metadata for one semantic
+    /// workbook PivotTable.  XML source ranges and package identities remain
+    /// behind the low-level `pivot_table_server_formats_source` method.
+    pub fn pivot_table_server_formats<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableView> {
+        crate::pivot::server_formats::view_workbook(self, selector)
+    }
+
+    /// Read the source-bound owner for low-level diagnostics and exact source
+    /// patch construction.  Ordinary callers should use
+    /// [`Self::pivot_table_server_formats`].
+    pub fn pivot_table_server_formats_source<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
+        crate::pivot::load_pivot_server_formats(&self.inner.package, selector)
+    }
+
+    /// Resolve one semantic PivotTable through the ordinary workbook facade.
+    ///
+    /// The returned view exposes only typed server-format values.  Source XML,
+    /// relationship IDs, and Part names remain behind the source-bound owner.
+    pub fn pivot_table<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableView> {
+        crate::pivot::server_formats::view_workbook(self, selector)
+    }
+
+    /// Start an ordinary semantic PivotTable server-format edit.
+    pub fn edit_pivot_table<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
+        self.ensure_mutation_allowed("edit_pivot_table")?;
+        crate::pivot::server_formats::edit_workbook(self, selector)
+    }
+
+    /// Alias spelling that includes the edited extension name.
+    pub fn edit_pivot_table_server_formats<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
+        self.edit_pivot_table(selector)
+    }
+
+    /// Apply an exact ordinary Workbook server-format patch.
+    pub fn apply_pivot_table_server_formats_patch(
+        &self,
+        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
+    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
+        self.ensure_mutation_allowed("apply_pivot_table_server_formats_patch")?;
+        patch.apply(self)
+    }
+
+    /// Alias spelling for the pivot server-format owner.
+    pub fn apply_pivot_server_formats_patch(
+        &self,
+        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
+    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
+        self.apply_pivot_table_server_formats_patch(patch)
+    }
+
+    /// Alias for the typed extension collection view.
+    pub fn pivot_server_formats<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableView> {
+        self.pivot_table_server_formats(selector)
+    }
+
+    /// Low-level source-bound alias for the extension collection view.
+    pub fn pivot_server_formats_source<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
+        self.pivot_table_server_formats_source(selector)
+    }
+
+    pub(crate) fn pivot_package(&self) -> &OpcPackage {
+        &self.inner.package
+    }
+
+    pub(crate) fn adopt_published_package(&self, package: OpcPackage) -> Result<Self> {
+        Self::from_package_with_styles(package, Some(self))
+    }
+
     /// Inert external-workbook relationship IDs, for package diagnostics.
     #[must_use]
     pub fn external_reference_ids(&self) -> &[String] {
@@ -1067,7 +1156,7 @@ impl Workbook {
         Ok(())
     }
 
-    fn ensure_mutation_allowed(&self, operation: &'static str) -> Result<()> {
+    pub(crate) fn ensure_mutation_allowed(&self, operation: &'static str) -> Result<()> {
         self.ensure_ordinary_output(operation)
     }
 

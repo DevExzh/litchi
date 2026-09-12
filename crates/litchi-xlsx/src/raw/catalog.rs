@@ -91,7 +91,21 @@ impl WorkbookInfo {
 
     fn parse(content: &[u8]) -> Result<Self> {
         let processed = litchi_ooxml_common::mce::process_ooxml(content)?;
-        let content = std::str::from_utf8(processed.as_ref())
+        Self::parse_processed(processed.as_ref())
+    }
+
+    fn parse_with_mce(
+        content: &[u8],
+        capabilities: &litchi_ooxml_common::mce::Capabilities,
+        limits: &litchi_ooxml_common::mce::Limits,
+    ) -> Result<Self> {
+        let processed =
+            litchi_ooxml_common::mce::process_markup_compatibility(content, capabilities, limits)?;
+        Self::parse_processed(processed.xml.as_ref())
+    }
+
+    fn parse_processed(content: &[u8]) -> Result<Self> {
+        let content = std::str::from_utf8(content)
             .map_err(|error| invalid(format!("workbook XML is not UTF-8: {error}")))?;
         let mut reader = NsReader::from_reader(content.as_bytes());
         let mut info = Self::new();
@@ -518,6 +532,23 @@ impl WorkbookInfo {
 /// Parse and validate the workbook-level catalog from `workbook.xml` bytes.
 pub fn parse_catalog(content: &[u8]) -> Result<Catalog> {
     WorkbookInfo::parse(content).map(|info| Catalog {
+        sheets: info.sheets,
+        active_sheet_index: info.active_tab.unwrap_or(0),
+        uses_1904_date_system: info.uses_1904_date_system,
+        defined_names: info.defined_names,
+        pivot_caches: info.pivot_caches,
+        external_reference_ids: info.external_reference_ids,
+    })
+}
+
+/// Parse the workbook catalog with an explicit markup-compatibility profile
+/// and bounded preprocessing policy.
+pub fn parse_catalog_with_mce(
+    content: &[u8],
+    capabilities: &litchi_ooxml_common::mce::Capabilities,
+    limits: &litchi_ooxml_common::mce::Limits,
+) -> Result<Catalog> {
+    WorkbookInfo::parse_with_mce(content, capabilities, limits).map(|info| Catalog {
         sheets: info.sheets,
         active_sheet_index: info.active_tab.unwrap_or(0),
         uses_1904_date_system: info.uses_1904_date_system,

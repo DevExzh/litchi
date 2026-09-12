@@ -1,0 +1,3253 @@
+//! Source-bound support for the MS-XLSX `pivotTableServerFormats` extension.
+//!
+//! The extension is deliberately kept in a separate owner.  It is a payload
+//! of a PivotTable definition, but it is only meaningful when the workbook
+//! contains the `pivotTableReferences` relationship closure for a
+//! non-worksheet PivotTable and the associated cache is an external cache
+//! with a `pivotCacheIdVersion` extension.  The owner captures the original
+//! PivotTable XML in an `Arc` and retains byte ranges for the two scalar
+//! attributes which may be edited.  Unknown extension bytes and all other
+//! package members remain source material.
+//!
+//! The ordinary workbook surface is `Workbook::pivot_table_server_formats`
+//! (also available as `Workbook::pivot_server_formats`) for typed reads and
+//! `Workbook::edit_pivot_table` for a source-checked edit.  Selectors are a
+//! semantic PivotTable name or workbook position; callers do not provide OPC
+//! relationship IDs or Part names.  An edit stages `ServerFormat` values or
+//! explicit `AttributeEdit::{Keep,Set,Clear}` operations for `culture` and
+//! `format`, then publishes through `WorkbookCommit::workbook` and its exact
+//! reversible `WorkbookPatch`.
+//!
+//! This owner covers the C510 `pivotTableServerFormats` payload under a
+//! non-worksheet PivotTable and its required `pivotTableReferences`/external
+//! cache closure, including the recognized ABF5 cache-version extension.  It
+//! reads and writes only the two optional scalar attributes on existing
+//! `x15:serverFormat` leaves.  It does not infer newer extension URIs, invent
+//! list or index mappings, or claim native Excel PivotTable authoring or
+//! refresh semantics.
+
+use std::collections::{HashMap, HashSet};
+use std::ops::Range;
+use std::sync::Arc;
+
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, ReadLimits};
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
+
+use crate::Workbook;
+use crate::error::{Error, Result, invalid};
+use crate::raw;
+use crate::source_attributes::{
+    escaped_xstring_len, try_escaped_xstring, validate_xml_characters, value_span,
+};
+
+mod relationships;
+use relationships::RelationshipIndex;
+
+const CORE_NS: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT_CORE_NS: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const EXT_NS: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
+const X14_NS: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
+const MCE_NS: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+const REL_NS: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const STRICT_REL_NS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+const PIVOT_TABLE_SERVER_FORMATS_URI: &str = "{C510F80B-63DE-4267-81D5-13C33094786E}";
+const PIVOT_TABLE_DATA_URI: &str = "{44433962-1CF7-4059-B4EE-95C3D5FFCF73}";
+const PIVOT_TABLE_REFERENCES_URI: &str = "{983426D0-5260-488c-9760-48F4B6AC55F4}";
+const PIVOT_CACHE_DEFINITION_URI: &str = "{725AE2AE-9491-48BE-B2B4-4EB974FC3084}";
+const PIVOT_CACHE_ID_VERSION_URI: &str = "{ABF5C744-AB39-4b91-8756-CFA1BBC848D5}";
+const CACHE_SOURCE_URI: &str = "{F057638F-6D5F-4E77-A914-E7F072B9BCA8}";
+const CONNECTIONS_RELATIONSHIP: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections";
+const STRICT_CONNECTIONS_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/connections";
+const CONNECTIONS_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml";
+
+const MAX_PART_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 256;
+const MAX_NODES: usize = 100_000;
+const MAX_NAMESPACE_DECLARATIONS: usize = 256;
+const MAX_NAMESPACE_BYTES: usize = 16 * 1024;
+const MAX_NAME_BYTES: usize = 16 * 1024;
+const MAX_FRAGMENT_BYTES: usize = 1024 * 1024;
+const MAX_SERVER_FORMATS: usize = (1usize << 31) - 1;
+const MAX_REFERENCE_COUNT: usize = (1usize << 31) - 1;
+const MAX_ATTRIBUTE_TEXT_BYTES: usize = 1024 * 1024;
+
+#[derive(Clone, Copy)]
+struct XmlScanLimits {
+    part_bytes: usize,
+    events: usize,
+    depth: usize,
+    attribute_bytes: usize,
+    namespace_bytes: usize,
+    name_bytes: usize,
+    namespace_declarations: usize,
+}
+
+impl XmlScanLimits {
+    fn from_read_limits(limits: ReadLimits) -> Self {
+        let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
+        Self {
+            part_bytes: MAX_PART_BYTES.min(part_bytes),
+            events: MAX_NODES.min(limits.max_xml_events()),
+            depth: MAX_DEPTH.min(limits.max_xml_depth()),
+            attribute_bytes: MAX_ATTRIBUTE_TEXT_BYTES.min(limits.max_xml_attribute_bytes()),
+            namespace_bytes: MAX_NAMESPACE_BYTES.min(limits.max_xml_attribute_bytes()),
+            name_bytes: MAX_NAME_BYTES.min(limits.max_xml_attribute_bytes()),
+            namespace_declarations: MAX_NAMESPACE_DECLARATIONS,
+        }
+    }
+}
+
+/// Build the explicit MCE profile used for the workbook catalog.  The raw
+/// catalog parser is also used by callers outside this owner and therefore
+/// retains its compatibility wrapper, but this graph must never silently use
+/// an unbounded/default policy while admitting a package.
+fn catalog_mce_limits(limits: ReadLimits) -> litchi_ooxml_common::mce::Limits {
+    let part_bytes = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
+    let input = MAX_PART_BYTES.min(part_bytes);
+    let aggregate_bytes = usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX);
+    let caller_tokens = limits
+        .max_xml_events()
+        .min(limits.max_xml_attribute_bytes());
+    let directive_tokens = MAX_NODES.min(caller_tokens);
+    litchi_ooxml_common::mce::Limits {
+        max_input_bytes: input,
+        // MCE may expand a small source substantially while selecting a
+        // branch. Keep both the intermediate output and directive state
+        // within the caller's XML/Part policy before the raw catalog sees it.
+        max_output_bytes: MAX_PART_BYTES.min(aggregate_bytes),
+        max_depth: MAX_DEPTH.min(limits.max_xml_depth()),
+        max_namespace_bindings: MAX_NAMESPACE_DECLARATIONS.min(caller_tokens),
+        max_directive_tokens: directive_tokens,
+        max_choices_per_alternate: MAX_REFERENCE_COUNT.min(1024).min(directive_tokens),
+    }
+}
+
+/// Semantic selector for a workbook PivotTable.
+///
+/// `Name` and `Position` are workbook-facing identities.  OPC relationship
+/// IDs and Part URIs are intentionally not accepted here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PivotTableSelector<'a> {
+    /// Select the unique PivotTable name in the workbook.
+    Name(&'a str),
+    /// Select the zero-based position in the workbook's non-worksheet
+    /// `pivotTableReferences` collection.
+    Position(usize),
+}
+
+impl<'a> From<&'a str> for PivotTableSelector<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Name(value)
+    }
+}
+
+impl<'a> From<&'a String> for PivotTableSelector<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::Name(value.as_str())
+    }
+}
+
+impl From<usize> for PivotTableSelector<'static> {
+    fn from(value: usize) -> Self {
+        Self::Position(value)
+    }
+}
+
+/// A workbook-contextual, typed view of one semantic PivotTable.
+///
+/// This is the ordinary Workbook-facing read surface.  It intentionally
+/// contains only the resolved semantic collection; source XML, relationship
+/// IDs, and Part names remain private to the source-bound owner.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PivotTableView {
+    value: PivotTableServerFormats,
+}
+
+impl PivotTableView {
+    /// The resolved server-format collection.
+    #[must_use]
+    pub fn server_formats(&self) -> &PivotTableServerFormats {
+        &self.value
+    }
+
+    /// Alias for callers using the extension element's collection name.
+    #[must_use]
+    pub fn formats(&self) -> &[ServerFormat] {
+        self.value.formats()
+    }
+
+    /// Semantic PivotTable name.
+    #[must_use]
+    pub fn table_name(&self) -> &str {
+        self.value.table_name()
+    }
+
+    /// Logical workbook PivotCache ID.
+    #[must_use]
+    pub const fn cache_id(&self) -> u32 {
+        self.value.cache_id()
+    }
+}
+
+/// The optional `culture` or `format` value on one server format.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerFormat {
+    /// Opaque SpreadsheetML `ST_Xstring` culture value, when present.
+    pub culture: Option<String>,
+    /// Opaque SpreadsheetML `ST_Xstring` number-format value, when present.
+    pub format: Option<String>,
+}
+
+impl ServerFormat {
+    /// Build a server-format value from optional decoded attributes.
+    #[must_use]
+    pub const fn new(culture: Option<String>, format: Option<String>) -> Self {
+        Self { culture, format }
+    }
+}
+
+/// One explicit scalar edit.  `Keep`, `Set`, and `Clear` are intentionally
+/// distinct so an omitted field cannot accidentally clear or retain a value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttributeEdit {
+    /// Leave this attribute at its source value.
+    Keep,
+    /// Set or replace this attribute with decoded SpreadsheetML text.
+    Set(String),
+    /// Remove this attribute from the source start tag.
+    Clear,
+}
+
+impl AttributeEdit {
+    /// Construct a `Set` operation.
+    #[must_use]
+    pub fn set(value: impl Into<String>) -> Self {
+        Self::Set(value.into())
+    }
+
+    /// Construct a `Clear` operation.
+    #[must_use]
+    pub const fn clear() -> Self {
+        Self::Clear
+    }
+
+    /// Construct a `Keep` operation.
+    #[must_use]
+    pub const fn keep() -> Self {
+        Self::Keep
+    }
+}
+
+/// Explicit per-attribute update for one server format.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerFormatEdit {
+    /// `culture` update.
+    pub culture: AttributeEdit,
+    /// `format` update.
+    pub format: AttributeEdit,
+}
+
+impl ServerFormatEdit {
+    /// Keep both source attributes.
+    #[must_use]
+    pub const fn keep() -> Self {
+        Self {
+            culture: AttributeEdit::Keep,
+            format: AttributeEdit::Keep,
+        }
+    }
+
+    /// Set both optional attributes explicitly, clearing an omitted value.
+    #[must_use]
+    pub fn from_value(value: ServerFormat) -> Self {
+        Self {
+            culture: value
+                .culture
+                .map_or(AttributeEdit::Clear, AttributeEdit::Set),
+            format: value
+                .format
+                .map_or(AttributeEdit::Clear, AttributeEdit::Set),
+        }
+    }
+}
+
+/// A typed, source-bound read of one `pivotTableServerFormats` payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PivotTableServerFormats {
+    table_name: String,
+    cache_id: u32,
+    formats: Box<[ServerFormat]>,
+    diagnostic_index_boundary: bool,
+    mce_ambiguous: bool,
+}
+
+impl PivotTableServerFormats {
+    /// The semantic PivotTable name.
+    #[must_use]
+    pub fn table_name(&self) -> &str {
+        &self.table_name
+    }
+
+    /// The semantic workbook PivotCache ID closed by the table and cache
+    /// relationship graph.
+    #[must_use]
+    pub const fn cache_id(&self) -> u32 {
+        self.cache_id
+    }
+
+    /// The bounded ordered server-format list.
+    #[must_use]
+    pub fn formats(&self) -> &[ServerFormat] {
+        &self.formats
+    }
+
+    /// Alias for callers using the XML collection name.
+    #[must_use]
+    pub fn server_formats(&self) -> &[ServerFormat] {
+        self.formats()
+    }
+
+    /// Whether one `pivotValueCellExtra@in` used the unresolved inclusive
+    /// endpoint.  Such a source remains readable but cannot be changed.
+    #[must_use]
+    pub const fn has_diagnostic_index_boundary(&self) -> bool {
+        self.diagnostic_index_boundary
+    }
+
+    /// Whether the recognized payload is selected through an MCE branch.
+    /// Such a source is readable but scalar publication is conservatively
+    /// refused because branch selection cannot be proven by this owner.
+    #[must_use]
+    pub const fn has_ambiguous_mce_owner(&self) -> bool {
+        self.mce_ambiguous
+    }
+}
+
+/// An exact source-bound snapshot of the selected PivotTable extension.
+#[derive(Clone, Debug)]
+pub struct Snapshot {
+    value: PivotTableServerFormats,
+    table: SourcePart,
+    cache: SourcePart,
+    connections: Option<SourcePart>,
+    workbook: SourcePart,
+    workbook_owner: Arc<Vec<u8>>,
+    workbook_context: Arc<Vec<u8>>,
+    table_owner: Range<usize>,
+    extension_owner: Range<usize>,
+    entries: Box<[EntrySource]>,
+    selection: usize,
+}
+
+impl Snapshot {
+    /// Resolve and read a semantic PivotTable selector from an owned OPC
+    /// package.
+    pub fn load<'a>(
+        package: &OpcPackage,
+        selector: impl Into<PivotTableSelector<'a>>,
+    ) -> Result<Self> {
+        let selector = selector.into();
+        let graph = Graph::load(package)?;
+        graph.snapshot(selector)
+    }
+
+    /// Alias emphasizing that this state is tied to exact source bytes.
+    pub fn read<'a>(
+        package: &OpcPackage,
+        selector: impl Into<PivotTableSelector<'a>>,
+    ) -> Result<Self> {
+        Self::load(package, selector)
+    }
+
+    /// The typed server-format collection.
+    #[must_use]
+    pub fn server_formats(&self) -> &PivotTableServerFormats {
+        &self.value
+    }
+
+    /// Alias for callers that use the extension element's name.
+    #[must_use]
+    pub fn formats(&self) -> &[ServerFormat] {
+        self.value.formats()
+    }
+
+    /// Semantic PivotTable name.
+    #[must_use]
+    pub fn table_name(&self) -> &str {
+        self.value.table_name()
+    }
+
+    /// Logical PivotCache ID.
+    #[must_use]
+    pub const fn cache_id(&self) -> u32 {
+        self.value.cache_id()
+    }
+
+    /// Whether the source carries the unresolved `in == count` diagnostic.
+    #[must_use]
+    pub const fn has_diagnostic_index_boundary(&self) -> bool {
+        self.value.has_diagnostic_index_boundary()
+    }
+
+    /// Whether this source requires an MCE branch-preserving edit path.
+    #[must_use]
+    pub const fn has_ambiguous_mce_owner(&self) -> bool {
+        self.value.has_ambiguous_mce_owner()
+    }
+
+    /// Exact source XML for the PivotTable definition Part.
+    #[must_use]
+    pub fn source_xml(&self) -> &[u8] {
+        self.table.bytes.as_slice()
+    }
+
+    /// Share the exact source XML allocation.
+    #[must_use]
+    pub fn source_arc(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.table.bytes)
+    }
+
+    /// Internal physical identity retained for diagnostics and patch
+    /// verification.  Ordinary selectors never require callers to provide it.
+    #[must_use]
+    pub fn table_part(&self) -> &PackURI {
+        &self.table.name
+    }
+
+    /// The exact owner range containing the PivotTable definition root.
+    #[must_use]
+    pub fn source_owner_range(&self) -> Range<usize> {
+        self.table_owner.clone()
+    }
+
+    fn same_source(&self, other: &Self) -> bool {
+        self.selection == other.selection
+            && self.table.same_source(&other.table)
+            && self.cache.same_source(&other.cache)
+            && same_optional_source(&self.connections, &other.connections)
+            && self.workbook.same_source(&other.workbook)
+    }
+
+    fn same_readset(&self, other: &Self) -> bool {
+        self.selection == other.selection
+            && self.table.same_source(&other.table)
+            && self.cache.same_source(&other.cache)
+            && same_optional_source(&self.connections, &other.connections)
+            && self.workbook.same_closure(&other.workbook)
+            && self.workbook_owner.as_slice() == other.workbook_owner.as_slice()
+            && self.workbook_context.as_slice() == other.workbook_context.as_slice()
+    }
+
+    fn same_closure(&self, other: &Self) -> bool {
+        self.table.same_closure(&other.table)
+            && self.cache.same_closure(&other.cache)
+            && same_optional_closure(&self.connections, &other.connections)
+            && self.workbook.same_closure(&other.workbook)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct EntrySource {
+    culture: Option<AttributeSource>,
+    format: Option<AttributeSource>,
+    start_tag: Range<usize>,
+}
+
+#[derive(Clone, Debug)]
+struct AttributeSource {
+    value: Range<usize>,
+    whole: Range<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SourcePart {
+    name: PackURI,
+    content_type: String,
+    bytes: Arc<Vec<u8>>,
+    relationships: OwnedRelationships,
+    incoming: Vec<RelationshipState>,
+}
+
+impl SourcePart {
+    fn capture(index: &RelationshipIndex<'_>, part: &dyn Part) -> Result<Self> {
+        let name = part.partname().clone();
+        let relationships = if name.as_str() == "/" {
+            index.root_source().clone()
+        } else {
+            index.source(&name)?
+        };
+        let source_ref = index.source_ref(&name)?;
+        if relationships.owner() != source_ref.owner() {
+            return Err(invalid("PivotTable relationship source owner mismatch"));
+        }
+        let incoming = index.capture_incoming(&name)?;
+        Ok(Self {
+            name,
+            content_type: part.content_type().to_owned(),
+            bytes: part.blob_arc(),
+            relationships,
+            incoming,
+        })
+    }
+
+    fn same_source(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.content_type == other.content_type
+            && self.bytes.as_slice() == other.bytes.as_slice()
+            && self.same_closure(other)
+    }
+
+    fn same_closure(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.content_type == other.content_type
+            && self.relationships == other.relationships
+            && self.incoming == other.incoming
+    }
+}
+
+fn same_optional_source(left: &Option<SourcePart>, right: &Option<SourcePart>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => left.same_source(right),
+        _ => false,
+    }
+}
+
+fn same_optional_closure(left: &Option<SourcePart>, right: &Option<SourcePart>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => left.same_closure(right),
+        _ => false,
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct RelationshipState {
+    source: String,
+    id: String,
+    reltype: String,
+    target: String,
+    external: bool,
+}
+
+/// Failure-atomic edits over one PivotTable's server-format scalar metadata.
+pub struct Transaction<'a> {
+    target: &'a mut OpcPackage,
+    before: Snapshot,
+    staged: Vec<ServerFormat>,
+    selection: usize,
+}
+
+impl<'a> Transaction<'a> {
+    /// Resolve a semantic PivotTable selector and begin an isolated edit.
+    pub fn new<'selector>(
+        target: &'a mut OpcPackage,
+        selector: impl Into<PivotTableSelector<'selector>>,
+    ) -> Result<Self> {
+        let before = Snapshot::load(target, selector)?;
+        ensure_editable(&before)?;
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(before.formats().len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable staged server-format values",
+                source,
+            })?;
+        staged.extend_from_slice(before.formats());
+        Ok(Self {
+            selection: before.selection,
+            target,
+            before,
+            staged,
+        })
+    }
+
+    /// Exact source state captured at transaction start.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        &self.before
+    }
+
+    /// Currently staged ordered server-format values.
+    #[must_use]
+    pub fn server_formats(&self) -> &[ServerFormat] {
+        &self.staged
+    }
+
+    /// Set, replace, or clear both optional attributes explicitly.  `None`
+    /// means clear for this method; use [`Self::update_server_format`] when a
+    /// field must be retained.
+    pub fn set_server_format(&mut self, index: usize, value: ServerFormat) -> Result<bool> {
+        let slot = self
+            .staged
+            .get_mut(index)
+            .ok_or_else(|| invalid("server-format index is out of range"))?;
+        if *slot == value {
+            return Ok(false);
+        }
+        let text_limit = caller_attribute_limit(self.target.read_limits());
+        validate_text(&value.culture, text_limit)?;
+        validate_text(&value.format, text_limit)?;
+        *slot = value;
+        Ok(true)
+    }
+
+    /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
+    pub fn update_server_format(&mut self, index: usize, edit: ServerFormatEdit) -> Result<bool> {
+        let current = self
+            .staged
+            .get(index)
+            .cloned()
+            .ok_or_else(|| invalid("server-format index is out of range"))?;
+        let mut next = current;
+        let text_limit = caller_attribute_limit(self.target.read_limits());
+        apply_attribute(&mut next.culture, edit.culture, text_limit)?;
+        apply_attribute(&mut next.format, edit.format, text_limit)?;
+        self.set_server_format(index, next)
+    }
+
+    /// Set or clear only the `culture` attribute.
+    pub fn set_culture(&mut self, index: usize, value: Option<String>) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
+                format: AttributeEdit::Keep,
+            },
+        )
+    }
+
+    /// Set or clear only the `format` attribute.
+    pub fn set_format(&mut self, index: usize, value: Option<String>) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: AttributeEdit::Keep,
+                format: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
+            },
+        )
+    }
+
+    /// Clear the `culture` attribute.
+    pub fn clear_culture(&mut self, index: usize) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: AttributeEdit::Clear,
+                format: AttributeEdit::Keep,
+            },
+        )
+    }
+
+    /// Clear the `format` attribute.
+    pub fn clear_format(&mut self, index: usize) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: AttributeEdit::Keep,
+                format: AttributeEdit::Clear,
+            },
+        )
+    }
+
+    /// Whether the staged semantic list differs from the source list.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        self.before.formats() != self.staged.as_slice()
+    }
+
+    /// Validate, rewrite, reopen, and atomically publish the staged edit.
+    pub fn commit(self) -> Result<Commit> {
+        if !self.is_changed() {
+            let patch = Patch::new(self.before.clone(), self.before.clone());
+            return Ok(Commit::new(self.before, patch, false));
+        }
+        if self.target.is_signed() || self.target.requires_signature_edit_policy() {
+            return Err(Error::Signed);
+        }
+        let current = Snapshot::load(self.target, PivotTableSelector::Position(self.selection))?;
+        if !current.same_source(&self.before) {
+            return Err(Error::PatchConflict {
+                part: self.before.table_part().to_string(),
+            });
+        }
+        let output = rewrite_table(
+            &self.before,
+            &self.staged,
+            caller_part_limit(self.target.read_limits()),
+            self.target.read_limits().max_total_part_bytes(),
+            caller_attribute_limit(self.target.read_limits()),
+            package_total_bytes(self.target)?,
+        )?;
+        let mut candidate = self.target.clone();
+        candidate
+            .get_part_mut(self.before.table_part())?
+            .set_blob_shared(Arc::new(output));
+        validate_candidate_limits(&candidate)?;
+        let after = Snapshot::load(&candidate, PivotTableSelector::Position(self.selection))?;
+        if after.formats() != self.staged.as_slice()
+            || !after.same_closure(&self.before)
+            || after.table_owner.start != self.before.table_owner.start
+        {
+            return Err(invalid(
+                "PivotTable server-format publication changed semantic state or source closure",
+            ));
+        }
+        let patch = Patch::new(self.before, after.clone());
+        *self.target = candidate;
+        Ok(Commit::new(after, patch, true))
+    }
+}
+
+fn ensure_editable(before: &Snapshot) -> Result<()> {
+    if before.has_diagnostic_index_boundary() {
+        return Err(invalid(
+            "pivotTableServerFormats has an ambiguous pivotValueCellExtra@in == count boundary",
+        ));
+    }
+    if before.has_ambiguous_mce_owner() {
+        return Err(invalid(
+            "pivotTableServerFormats selected through an MCE branch is read-only",
+        ));
+    }
+    Ok(())
+}
+
+/// Load one source-bound PivotTable server-format snapshot.
+pub fn load<'a>(
+    package: &OpcPackage,
+    selector: impl Into<PivotTableSelector<'a>>,
+) -> Result<Snapshot> {
+    Snapshot::load(package, selector)
+}
+
+/// Start a source-bound PivotTable server-format transaction.
+pub fn edit<'package, 'selector>(
+    package: &'package mut OpcPackage,
+    selector: impl Into<PivotTableSelector<'selector>>,
+) -> Result<Transaction<'package>> {
+    Transaction::new(package, selector)
+}
+
+/// Apply an exact source-checked patch atomically.
+pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+    patch.apply(package)
+}
+
+/// An exact source-checked reversible edit.
+#[derive(Clone, Debug)]
+pub struct Patch {
+    before: Snapshot,
+    after: Snapshot,
+}
+
+impl Patch {
+    fn new(before: Snapshot, after: Snapshot) -> Self {
+        Self { before, after }
+    }
+
+    /// Required source state.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        &self.before
+    }
+
+    /// Exact state produced by application.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        &self.after
+    }
+
+    /// Whether this patch is an exact no-op.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.before.same_source(&self.after)
+    }
+
+    /// Return the exact source-bound inverse.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
+    /// Apply the patch after validating source closure and semantic readback.
+    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply_checked(package, false)
+    }
+
+    fn apply_readset(&self, package: &mut OpcPackage) -> Result<()> {
+        self.apply_checked(package, true)
+    }
+
+    fn apply_checked(
+        &self,
+        package: &mut OpcPackage,
+        allow_unrelated_workbook_changes: bool,
+    ) -> Result<()> {
+        let current = Snapshot::load(package, PivotTableSelector::Position(self.before.selection))?;
+        let source_matches = if allow_unrelated_workbook_changes {
+            current.same_readset(&self.before)
+        } else {
+            current.same_source(&self.before)
+        };
+        if !source_matches {
+            return Err(Error::PatchConflict {
+                part: self.before.table_part().to_string(),
+            });
+        }
+        if self.is_empty() {
+            return Ok(());
+        }
+        if package.is_signed() || package.requires_signature_edit_policy() {
+            return Err(Error::Signed);
+        }
+        let mut candidate = package.clone();
+        candidate
+            .get_part_mut(self.after.table_part())?
+            .set_blob_shared(Arc::clone(&self.after.table.bytes));
+        validate_candidate_limits(&candidate)?;
+        let resulting = Snapshot::load(
+            &candidate,
+            PivotTableSelector::Position(self.after.selection),
+        )?;
+        let target_matches = if allow_unrelated_workbook_changes {
+            resulting.same_readset(&self.after)
+        } else {
+            resulting.same_source(&self.after)
+        };
+        if resulting.formats() != self.after.formats() || !target_matches {
+            return Err(invalid(
+                "PivotTable server-format patch verification failed",
+            ));
+        }
+        *package = candidate;
+        Ok(())
+    }
+}
+
+/// A committed transaction and reversible patch.
+#[derive(Clone, Debug)]
+pub struct Commit {
+    snapshot: Snapshot,
+    patch: Patch,
+    changed: bool,
+}
+
+impl Commit {
+    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
+        Self {
+            snapshot,
+            patch,
+            changed,
+        }
+    }
+
+    /// Resulting immutable source-bound state.
+    #[must_use]
+    pub fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Exact reversible patch.
+    #[must_use]
+    pub fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Whether authored values changed.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// Consume the commit into its snapshot and patch.
+    pub fn into_parts(self) -> (Snapshot, Patch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+/// Start an ordinary semantic edit against an immutable [`Workbook`] snapshot.
+///
+/// The package owner and its source-bound ranges stay private.  Callers stage
+/// only typed server-format values and receive a new Workbook through
+/// [`WorkbookCommit::workbook`] after commit.
+pub struct WorkbookTransaction {
+    source: Workbook,
+    before: Snapshot,
+    staged: Vec<ServerFormat>,
+    selection: usize,
+}
+
+impl WorkbookTransaction {
+    pub(crate) fn new<'selector>(
+        source: &Workbook,
+        selector: impl Into<PivotTableSelector<'selector>>,
+    ) -> Result<Self> {
+        let before = Snapshot::load(source.pivot_package(), selector)?;
+        ensure_editable(&before)?;
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(before.formats().len())
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook staged pivot server-format values",
+                source,
+            })?;
+        staged.extend_from_slice(before.formats());
+        Ok(Self {
+            source: source.clone(),
+            selection: before.selection,
+            before,
+            staged,
+        })
+    }
+
+    /// Exact typed state captured at transaction start.
+    #[must_use]
+    pub fn before(&self) -> &PivotTableServerFormats {
+        self.before.server_formats()
+    }
+
+    /// Currently staged ordered server-format values.
+    #[must_use]
+    pub fn server_formats(&self) -> &[ServerFormat] {
+        &self.staged
+    }
+
+    /// Alias for callers using the extension element's name.
+    #[must_use]
+    pub fn formats(&self) -> &[ServerFormat] {
+        self.server_formats()
+    }
+
+    /// Set, replace, or clear both optional attributes explicitly.
+    pub fn set_server_format(&mut self, index: usize, value: ServerFormat) -> Result<bool> {
+        let slot = self
+            .staged
+            .get_mut(index)
+            .ok_or_else(|| invalid("server-format index is out of range"))?;
+        if *slot == value {
+            return Ok(false);
+        }
+        let text_limit = caller_attribute_limit(self.source.pivot_package().read_limits());
+        validate_text(&value.culture, text_limit)?;
+        validate_text(&value.format, text_limit)?;
+        *slot = value;
+        Ok(true)
+    }
+
+    /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
+    pub fn update_server_format(&mut self, index: usize, edit: ServerFormatEdit) -> Result<bool> {
+        let current = self
+            .staged
+            .get(index)
+            .cloned()
+            .ok_or_else(|| invalid("server-format index is out of range"))?;
+        let mut next = current;
+        let text_limit = caller_attribute_limit(self.source.pivot_package().read_limits());
+        apply_attribute(&mut next.culture, edit.culture, text_limit)?;
+        apply_attribute(&mut next.format, edit.format, text_limit)?;
+        self.set_server_format(index, next)
+    }
+
+    /// Set or clear only the `culture` attribute.
+    pub fn set_culture(&mut self, index: usize, value: Option<String>) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
+                format: AttributeEdit::Keep,
+            },
+        )
+    }
+
+    /// Set or clear only the `format` attribute.
+    pub fn set_format(&mut self, index: usize, value: Option<String>) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: AttributeEdit::Keep,
+                format: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
+            },
+        )
+    }
+
+    /// Clear the `culture` attribute.
+    pub fn clear_culture(&mut self, index: usize) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: AttributeEdit::Clear,
+                format: AttributeEdit::Keep,
+            },
+        )
+    }
+
+    /// Clear the `format` attribute.
+    pub fn clear_format(&mut self, index: usize) -> Result<bool> {
+        self.update_server_format(
+            index,
+            ServerFormatEdit {
+                culture: AttributeEdit::Keep,
+                format: AttributeEdit::Clear,
+            },
+        )
+    }
+
+    /// Whether the staged semantic list differs from the source list.
+    #[must_use]
+    pub fn is_changed(&self) -> bool {
+        self.before.formats() != self.staged.as_slice()
+    }
+
+    /// Validate, reopen, and publish a new immutable Workbook snapshot.
+    pub fn commit(self) -> Result<WorkbookCommit> {
+        let mut candidate = self.source.pivot_package().clone();
+        let mut transaction =
+            Transaction::new(&mut candidate, PivotTableSelector::Position(self.selection))?;
+        for (index, value) in self.staged.iter().cloned().enumerate() {
+            transaction.set_server_format(index, value)?;
+        }
+        let committed = transaction.commit()?;
+        let changed = committed.changed();
+        let low_patch = committed.patch().clone();
+        let workbook = self.source.adopt_published_package(candidate)?;
+        let patch = WorkbookPatch::new(self.source, workbook.clone(), low_patch);
+        Ok(WorkbookCommit::new(workbook, patch, changed))
+    }
+}
+
+/// An exact reversible patch over ordinary Workbook snapshots.
+#[derive(Clone, Debug)]
+pub struct WorkbookPatch {
+    before: Workbook,
+    after: Workbook,
+    source_patch: Patch,
+}
+
+impl WorkbookPatch {
+    fn new(before: Workbook, after: Workbook, source_patch: Patch) -> Self {
+        Self {
+            before,
+            after,
+            source_patch,
+        }
+    }
+
+    /// Typed semantic state required before application.
+    #[must_use]
+    pub fn before(&self) -> &PivotTableServerFormats {
+        self.source_patch.before().server_formats()
+    }
+
+    /// Typed semantic state produced by application.
+    #[must_use]
+    pub fn after(&self) -> &PivotTableServerFormats {
+        self.source_patch.after().server_formats()
+    }
+
+    /// Whether this patch preserves the complete source owner byte-for-byte.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.source_patch.is_empty()
+    }
+
+    /// Return the exact source-bound inverse.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+            source_patch: self.source_patch.inverse(),
+        }
+    }
+
+    /// Apply after checking the complete source-bound owner closure.
+    pub fn apply(&self, source: &Workbook) -> Result<WorkbookCommit> {
+        source.ensure_mutation_allowed("apply_pivot_table_server_formats_patch")?;
+        let mut candidate = source.pivot_package().clone();
+        self.source_patch.apply_readset(&mut candidate)?;
+        let workbook = source.adopt_published_package(candidate)?;
+        Ok(WorkbookCommit::new(
+            workbook.clone(),
+            Self::new(source.clone(), workbook, self.source_patch.clone()),
+            !self.is_empty(),
+        ))
+    }
+}
+
+/// A committed ordinary Workbook server-format edit.
+#[derive(Clone, Debug)]
+pub struct WorkbookCommit {
+    workbook: Workbook,
+    patch: WorkbookPatch,
+    changed: bool,
+}
+
+impl WorkbookCommit {
+    fn new(workbook: Workbook, patch: WorkbookPatch, changed: bool) -> Self {
+        Self {
+            workbook,
+            patch,
+            changed,
+        }
+    }
+
+    /// Resulting immutable Workbook snapshot.
+    #[must_use]
+    pub fn workbook(&self) -> &Workbook {
+        &self.workbook
+    }
+
+    /// Alias for callers using snapshot terminology.
+    #[must_use]
+    pub fn snapshot(&self) -> &PivotTableServerFormats {
+        self.patch.after()
+    }
+
+    /// Exact reversible Workbook patch.
+    #[must_use]
+    pub fn patch(&self) -> &WorkbookPatch {
+        &self.patch
+    }
+
+    /// Whether authored values changed.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// Consume the commit into its Workbook and patch.
+    pub fn into_parts(self) -> (Workbook, WorkbookPatch) {
+        (self.workbook, self.patch)
+    }
+}
+
+/// Resolve a semantic PivotTable through the ordinary Workbook facade.
+pub(crate) fn view_workbook<'selector>(
+    workbook: &Workbook,
+    selector: impl Into<PivotTableSelector<'selector>>,
+) -> Result<PivotTableView> {
+    let snapshot = Snapshot::load(workbook.pivot_package(), selector)?;
+    Ok(PivotTableView {
+        value: snapshot.server_formats().clone(),
+    })
+}
+
+/// Start a semantic Workbook edit without exposing its OPC owner.
+pub(crate) fn edit_workbook<'selector>(
+    workbook: &Workbook,
+    selector: impl Into<PivotTableSelector<'selector>>,
+) -> Result<WorkbookTransaction> {
+    WorkbookTransaction::new(workbook, selector)
+}
+
+struct Graph {
+    workbook: SourcePart,
+    connections: Option<SourcePart>,
+    workbook_owner: Arc<Vec<u8>>,
+    workbook_context: Arc<Vec<u8>>,
+    refs: Vec<Reference>,
+    caches: HashMap<u32, CacheInfo>,
+}
+
+struct Reference {
+    table_uri: PackURI,
+    name: String,
+    cache_id: u32,
+    table: TableInfo,
+}
+
+struct WorkbookReferences {
+    refs: Vec<Reference>,
+    owner: Arc<Vec<u8>>,
+    context: Arc<Vec<u8>>,
+}
+
+struct TableInfo {
+    name: String,
+    cache_id: u32,
+    cache_uri: PackURI,
+    source: SourcePart,
+    owner: Range<usize>,
+    payload: PayloadInfo,
+}
+
+struct CacheInfo {
+    uri: PackURI,
+    source: SourcePart,
+}
+
+#[derive(Debug)]
+struct ConnectionCatalog {
+    by_id: HashMap<u32, String>,
+    by_name: HashMap<String, u32>,
+}
+
+struct PayloadInfo {
+    entries: Vec<ParsedEntry>,
+    owner: Range<usize>,
+    diagnostic_index_boundary: bool,
+    mce_ambiguous: bool,
+}
+
+struct ParsedEntry {
+    value: ServerFormat,
+    source: EntrySource,
+}
+
+impl Graph {
+    fn load(package: &OpcPackage) -> Result<Self> {
+        validate_candidate_limits(package)?;
+        let relationship_index = RelationshipIndex::build(package)?;
+        let workbook_part = package.main_document_part()?;
+        if workbook_part.blob().len() > MAX_PART_BYTES
+            || workbook_part.blob().len() > caller_part_limit(package.read_limits())
+        {
+            return Err(invalid("workbook Part exceeds the caller's Part limit"));
+        }
+        let workbook = SourcePart::capture(&relationship_index, workbook_part)?;
+        // Run the owner scanner before the general catalog parser so caller
+        // XML event/depth/attribute ceilings admit the workbook bytes before
+        // any catalog projection can retain expanded values.
+        let workbook_references =
+            parse_workbook_references(package, workbook_part, &relationship_index)?;
+        let catalog = raw::parse_catalog_with_mce(
+            workbook_part.blob(),
+            &litchi_ooxml_common::mce::Capabilities::ooxml_baseline(),
+            &catalog_mce_limits(package.read_limits()),
+        )?;
+        let (connections, connection_catalog) =
+            match load_connections(package, workbook_part, &relationship_index)? {
+                Some((source, catalog)) => (Some(source), Some(catalog)),
+                None => (None, None),
+            };
+        let refs = workbook_references.refs;
+        if refs.is_empty() || refs.len() > MAX_REFERENCE_COUNT {
+            return Err(invalid(
+                "pivotTableReferences must contain between one and fewer than 2^31 references",
+            ));
+        }
+
+        validate_table_incoming_closure(package, workbook_part, &refs, &relationship_index)?;
+
+        let mut names = HashMap::<String, PackURI>::new();
+        names
+            .try_reserve(refs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable name index",
+                source,
+            })?;
+        for reference in &refs {
+            let table = &reference.table;
+            if table.name != reference.name || table.cache_id != reference.cache_id {
+                return Err(invalid(
+                    "workbook pivotTableReference does not match its PivotTable definition",
+                ));
+            }
+            if names
+                .insert(table.name.clone(), reference.table_uri.clone())
+                .is_some()
+            {
+                return Err(invalid("PivotTable name is not unique in the workbook"));
+            }
+        }
+
+        // The base workbook catalog supplies the semantic cache IDs.  Every
+        // referenced cache is then closed through the table relationship and
+        // the cache-definition owner.
+        let mut caches = HashMap::new();
+        caches
+            .try_reserve(catalog.pivot_caches.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotCache graph",
+                source,
+            })?;
+        for cache in &catalog.pivot_caches {
+            let relation = workbook_part
+                .rels()
+                .get(&cache.relationship_id)
+                .ok_or_else(|| invalid("workbook PivotCache relationship is missing"))?;
+            if relation.is_external()
+                || relation.target_query().is_some()
+                || relation.target_fragment().is_some()
+                || !matches!(
+                    relation.reltype(),
+                    rt::PIVOT_CACHE_DEFINITION | rt::STRICT_PIVOT_CACHE_DEFINITION
+                )
+            {
+                return Err(invalid("workbook PivotCache relationship is invalid"));
+            }
+            let uri = relation.target_partname()?;
+            let canonical_uri = relationship_index
+                .canonical_part(&uri)?
+                .ok_or_else(|| invalid("workbook PivotCache target is not a package Part"))?;
+            let part = package.get_part(canonical_uri)?;
+            if part.content_type() != ct::SML_PIVOT_CACHE_DEFINITION {
+                return Err(invalid(
+                    "workbook PivotCache relationship targets the wrong content type",
+                ));
+            }
+            caches.insert(
+                cache.cache_id,
+                CacheInfo {
+                    source: SourcePart::capture(&relationship_index, part)?,
+                    uri: canonical_uri.clone(),
+                },
+            );
+        }
+        let mut validated_cache_uris = HashMap::new();
+        validated_cache_uris
+            .try_reserve(refs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotCache validation index",
+                source,
+            })?;
+        for reference in &refs {
+            let table = &reference.table;
+            let cache = caches.get(&table.cache_id).ok_or_else(|| {
+                invalid("PivotTable cache ID is absent from workbook pivotCaches")
+            })?;
+            if cache.uri != table.cache_uri {
+                return Err(invalid(
+                    "PivotTable cache relationship does not match workbook cache ID",
+                ));
+            }
+            let cache_part = package.get_part(&cache.uri)?;
+            if cache_part.blob().len() > MAX_PART_BYTES
+                || cache_part.blob().len() > caller_part_limit(package.read_limits())
+            {
+                return Err(invalid("PivotCache Part exceeds the caller's Part limit"));
+            }
+            if let Some(previous_id) = validated_cache_uris.get(&cache.uri) {
+                if *previous_id != table.cache_id {
+                    return Err(invalid(
+                        "one PivotCache Part is bound to multiple semantic cache IDs",
+                    ));
+                }
+            } else {
+                validated_cache_uris.insert(cache.uri.clone(), table.cache_id);
+                validate_cache_closure(
+                    cache_part,
+                    table.cache_id,
+                    connection_catalog.as_ref(),
+                    package.read_limits(),
+                )?;
+            }
+        }
+
+        // All PivotTable names in worksheet-owned tables also participate in
+        // the workbook uniqueness rule.  Only the small root metadata is read
+        // here; worksheet tables never become typed server-format owners.
+        let worksheet_table_names = worksheet_pivot_names(package, &catalog, &relationship_index)?;
+        for name in worksheet_table_names {
+            if names.contains_key(&name) {
+                return Err(invalid("PivotTable name is not unique in the workbook"));
+            }
+        }
+
+        Ok(Self {
+            workbook,
+            connections,
+            workbook_owner: workbook_references.owner,
+            workbook_context: workbook_references.context,
+            refs,
+            caches,
+        })
+    }
+
+    fn snapshot<'s>(&'s self, selector: PivotTableSelector<'s>) -> Result<Snapshot> {
+        let index = match selector {
+            PivotTableSelector::Position(index) => {
+                if index >= self.refs.len() {
+                    return Err(invalid("PivotTable selector position is out of range"));
+                }
+                index
+            },
+            PivotTableSelector::Name(name) => {
+                let mut found = None;
+                for (index, reference) in self.refs.iter().enumerate() {
+                    if reference.name == name {
+                        if found.is_some() {
+                            return Err(invalid("PivotTable selector name is ambiguous"));
+                        }
+                        found = Some(index);
+                    }
+                }
+                found.ok_or_else(|| invalid("PivotTable selector name did not resolve"))?
+            },
+        };
+        let reference = self
+            .refs
+            .get(index)
+            .ok_or_else(|| invalid("PivotTable selector did not resolve"))?;
+        let table = &reference.table;
+        let cache_uri = self
+            .caches
+            .get(&table.cache_id)
+            .ok_or_else(|| invalid("PivotTable cache graph is incomplete"))?;
+        let table_source = table.source.clone();
+        let cache_source = cache_uri.source.clone();
+        let mut boxed = Vec::new();
+        boxed
+            .try_reserve_exact(table.payload.entries.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format semantic values",
+                source,
+            })?;
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(table.payload.entries.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format source ranges",
+                source,
+            })?;
+        for entry in &table.payload.entries {
+            boxed.push(entry.value.clone());
+            entries.push(entry.source.clone());
+        }
+        Ok(Snapshot {
+            value: PivotTableServerFormats {
+                table_name: table.name.clone(),
+                cache_id: table.cache_id,
+                formats: boxed.into_boxed_slice(),
+                diagnostic_index_boundary: table.payload.diagnostic_index_boundary,
+                mce_ambiguous: table.payload.mce_ambiguous,
+            },
+            table: table_source,
+            cache: cache_source,
+            connections: self.connections.clone(),
+            workbook: self.workbook.clone(),
+            workbook_owner: Arc::clone(&self.workbook_owner),
+            workbook_context: Arc::clone(&self.workbook_context),
+            table_owner: table.owner.clone(),
+            extension_owner: table.payload.owner.clone(),
+            entries: entries.into_boxed_slice(),
+            selection: index,
+        })
+    }
+}
+
+fn apply_attribute(
+    slot: &mut Option<String>,
+    edit: AttributeEdit,
+    maximum_text_bytes: usize,
+) -> Result<()> {
+    match edit {
+        AttributeEdit::Keep => {},
+        AttributeEdit::Set(value) => {
+            validate_text_value(&value, maximum_text_bytes)?;
+            *slot = Some(value);
+        },
+        AttributeEdit::Clear => *slot = None,
+    }
+    Ok(())
+}
+
+fn validate_text(value: &Option<String>, maximum_text_bytes: usize) -> Result<()> {
+    if let Some(value) = value {
+        validate_text_value(value, maximum_text_bytes)?;
+    }
+    Ok(())
+}
+
+fn validate_text_value(value: &str, maximum_text_bytes: usize) -> Result<()> {
+    if value.len() > MAX_ATTRIBUTE_TEXT_BYTES || value.len() > maximum_text_bytes {
+        return Err(invalid("server-format attribute exceeds its text limit"));
+    }
+    Ok(())
+}
+
+fn validate_candidate_limits(package: &OpcPackage) -> Result<()> {
+    let limits = package.read_limits();
+    if package.part_count() > limits.max_parts() {
+        return Err(invalid(
+            "PivotTable candidate exceeds the caller's Part count limit",
+        ));
+    }
+    let mut total = 0u64;
+    let maximum_part_bytes = caller_part_limit(limits);
+    for part in package.iter_parts() {
+        let bytes = part.blob().len();
+        if bytes > MAX_PART_BYTES || bytes > maximum_part_bytes {
+            return Err(invalid(
+                "PivotTable candidate Part exceeds the caller's Part limit",
+            ));
+        }
+        total = total
+            .checked_add(bytes as u64)
+            .ok_or_else(|| invalid("PivotTable candidate Part bytes overflow"))?;
+    }
+    if total > limits.max_total_part_bytes() {
+        return Err(invalid(
+            "PivotTable candidate exceeds the caller's aggregate Part limit",
+        ));
+    }
+    Ok(())
+}
+
+fn caller_part_limit(limits: ReadLimits) -> usize {
+    usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX)
+}
+
+fn caller_attribute_limit(limits: ReadLimits) -> usize {
+    MAX_ATTRIBUTE_TEXT_BYTES.min(limits.max_xml_attribute_bytes())
+}
+
+fn package_total_bytes(package: &OpcPackage) -> Result<u64> {
+    package.iter_parts().try_fold(0u64, |total, part| {
+        total
+            .checked_add(u64::try_from(part.blob().len()).unwrap_or(u64::MAX))
+            .ok_or_else(|| invalid("PivotTable candidate Part bytes overflow"))
+    })
+}
+
+fn rewrite_table(
+    before: &Snapshot,
+    staged: &[ServerFormat],
+    maximum_output_bytes: usize,
+    maximum_total_bytes: u64,
+    maximum_attribute_bytes: usize,
+    current_total_bytes: u64,
+) -> Result<Vec<u8>> {
+    if before.entries.len() != staged.len() {
+        return Err(invalid("server-format structural edits are not supported"));
+    }
+    let source = before.table.bytes.as_slice();
+    let owner = source
+        .get(before.extension_owner.clone())
+        .ok_or_else(|| invalid("PivotTable server-format owner range is invalid"))?;
+    if owner.len() > MAX_FRAGMENT_BYTES {
+        return Err(invalid(
+            "pivotTableServerFormats owner fragment exceeds limit",
+        ));
+    }
+    let mut output_len = source.len();
+    let mut owner_len = owner.len();
+    let mut has_edits = false;
+    for ((entry, previous), next) in before.entries.iter().zip(before.formats()).zip(staged) {
+        has_edits |= apply_planned_attribute_delta(
+            source,
+            &entry.start_tag,
+            b"culture",
+            entry.culture.as_ref(),
+            previous.culture.as_ref(),
+            next.culture.as_deref(),
+            &mut output_len,
+            &mut owner_len,
+            maximum_attribute_bytes,
+        )?;
+        has_edits |= apply_planned_attribute_delta(
+            source,
+            &entry.start_tag,
+            b"format",
+            entry.format.as_ref(),
+            previous.format.as_ref(),
+            next.format.as_deref(),
+            &mut output_len,
+            &mut owner_len,
+            maximum_attribute_bytes,
+        )?;
+    }
+    if !has_edits {
+        return Ok(source.to_vec());
+    }
+    if owner_len > MAX_FRAGMENT_BYTES {
+        return Err(invalid(
+            "rewritten pivotTableServerFormats owner fragment exceeds limit",
+        ));
+    }
+    if output_len > MAX_PART_BYTES || output_len > maximum_output_bytes {
+        return Err(invalid("PivotTable output exceeds the caller's Part limit"));
+    }
+    let output_len_u64 = u64::try_from(output_len).unwrap_or(u64::MAX);
+    let source_len = u64::try_from(source.len()).unwrap_or(u64::MAX);
+    let prospective_total = current_total_bytes
+        .checked_sub(source_len)
+        .and_then(|total| total.checked_add(output_len_u64))
+        .ok_or_else(|| invalid("PivotTable candidate aggregate bytes overflow"))?;
+    if prospective_total > maximum_total_bytes {
+        return Err(invalid(
+            "PivotTable output exceeds the caller's aggregate Part limit",
+        ));
+    }
+    let mut edits = Vec::<(Range<usize>, Vec<u8>)>::new();
+    for ((entry, previous), next) in before.entries.iter().zip(before.formats()).zip(staged) {
+        push_named_attribute_edit(
+            source,
+            &entry.start_tag,
+            b"culture",
+            entry.culture.as_ref(),
+            previous.culture.as_ref(),
+            next.culture.as_deref(),
+            &mut edits,
+        )?;
+        push_named_attribute_edit(
+            source,
+            &entry.start_tag,
+            b"format",
+            entry.format.as_ref(),
+            previous.format.as_ref(),
+            next.format.as_deref(),
+            &mut edits,
+        )?;
+    }
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0.start));
+    for pair in edits.windows(2) {
+        if pair[0].0.start < pair[1].0.end {
+            return Err(invalid("server-format source edit ranges overlap"));
+        }
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable server-format output",
+            source,
+        })?;
+    output.extend_from_slice(source);
+    for (range, value) in edits {
+        output.splice(range, value);
+    }
+    Ok(output)
+}
+
+fn apply_planned_attribute_delta(
+    source: &[u8],
+    start_tag: &Range<usize>,
+    name: &[u8],
+    current: Option<&AttributeSource>,
+    previous: Option<&String>,
+    next: Option<&str>,
+    output_len: &mut usize,
+    owner_len: &mut usize,
+    maximum_attribute_bytes: usize,
+) -> Result<bool> {
+    if previous.map(String::as_str) == next {
+        return Ok(false);
+    }
+    let (removed, added) = match (current, next) {
+        (Some(current), Some(next)) => (
+            current.value.end.saturating_sub(current.value.start),
+            escaped_attribute_len(next)?,
+        ),
+        (Some(current), None) => (current.whole.end.saturating_sub(current.whole.start), 0),
+        (None, Some(next)) => {
+            let end = start_tag.end;
+            let insertion = if end >= 2 && source.get(end - 2..end) == Some(b"/>") {
+                end - 2
+            } else {
+                end.checked_sub(1)
+                    .ok_or_else(|| invalid("server-format start tag range underflow"))?
+            };
+            if source.get(insertion) != Some(&b'>')
+                && source.get(insertion..insertion.saturating_add(2)) != Some(b"/>")
+            {
+                return Err(invalid(
+                    "server-format attribute insertion point is ambiguous",
+                ));
+            }
+            (
+                0,
+                name.len()
+                    .saturating_add(escaped_attribute_len(next)?)
+                    .saturating_add(4),
+            )
+        },
+        (None, None) => return Ok(false),
+    };
+    if let Some(next) = next {
+        let encoded_len = escaped_attribute_len(next)?;
+        let attribute_bytes = name
+            .len()
+            .checked_add(encoded_len)
+            .ok_or_else(|| invalid("server-format attribute length overflows"))?;
+        if attribute_bytes > maximum_attribute_bytes {
+            return Err(invalid("server-format attribute exceeds its text limit"));
+        }
+    }
+    *output_len = output_len
+        .checked_sub(removed)
+        .and_then(|length| length.checked_add(added))
+        .ok_or_else(|| invalid("server-format output length overflows"))?;
+    *owner_len = owner_len
+        .checked_sub(removed)
+        .and_then(|length| length.checked_add(added))
+        .ok_or_else(|| invalid("server-format owner length overflows"))?;
+    Ok(true)
+}
+
+fn escaped_attribute_len(value: &str) -> Result<usize> {
+    escaped_xstring_len(value)
+}
+
+// The generic attribute helper above intentionally refuses insertion because
+// the attribute name is part of the owner contract.  This named wrapper keeps
+// that decision explicit and avoids guessing from a missing semantic value.
+fn push_named_attribute_edit(
+    source: &[u8],
+    start_tag: &Range<usize>,
+    name: &[u8],
+    current: Option<&AttributeSource>,
+    previous: Option<&String>,
+    next: Option<&str>,
+    edits: &mut Vec<(Range<usize>, Vec<u8>)>,
+) -> Result<()> {
+    if previous.map(String::as_str) == next {
+        return Ok(());
+    }
+    let encoded = next.map(try_escaped_xstring).transpose()?;
+    match (current, encoded) {
+        (Some(current), Some(encoded)) => {
+            edits.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format edit list",
+                source,
+            })?;
+            edits.push((current.value.clone(), encoded));
+        },
+        (Some(current), None) => {
+            edits.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format edit list",
+                source,
+            })?;
+            edits.push((current.whole.clone(), Vec::new()));
+        },
+        (None, Some(encoded)) => {
+            let end = start_tag.end;
+            let insertion = if end >= 2 && source.get(end - 2..end) == Some(b"/>") {
+                end - 2
+            } else {
+                end.checked_sub(1)
+                    .ok_or_else(|| invalid("server-format start tag range underflow"))?
+            };
+            if source.get(insertion) != Some(&b'>')
+                && source.get(insertion..insertion.saturating_add(2)) != Some(b"/>")
+            {
+                return Err(invalid(
+                    "server-format attribute insertion point is ambiguous",
+                ));
+            }
+            let name = name.strip_prefix(b"@").unwrap_or(name);
+            let mut replacement = Vec::new();
+            replacement
+                .try_reserve_exact(name.len().saturating_add(encoded.len()).saturating_add(4))
+                .map_err(|source| Error::Allocation {
+                    resource: "PivotTable server-format attribute",
+                    source,
+                })?;
+            replacement.extend_from_slice(b" ");
+            replacement.extend_from_slice(name);
+            replacement.extend_from_slice(b"=\"");
+            replacement.extend_from_slice(&encoded);
+            replacement.extend_from_slice(b"\"");
+            edits.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format edit list",
+                source,
+            })?;
+            edits.push((insertion..insertion, replacement));
+        },
+        (None, None) => {},
+    }
+    Ok(())
+}
+
+fn load_connections(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+    relationship_index: &RelationshipIndex<'_>,
+) -> Result<Option<(SourcePart, ConnectionCatalog)>> {
+    let mut matches = workbook.rels().iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            CONNECTIONS_RELATIONSHIP | STRICT_CONNECTIONS_RELATIONSHIP
+        )
+    });
+    let Some(relationship) = matches.next() else {
+        return Ok(None);
+    };
+    if matches.next().is_some() {
+        return Err(invalid("workbook has multiple connections relationships"));
+    }
+    if relationship.is_external()
+        || relationship.target_query().is_some()
+        || relationship.target_fragment().is_some()
+    {
+        return Err(invalid(
+            "workbook connections relationship must target an internal Part",
+        ));
+    }
+    let uri = relationship.target_partname()?;
+    let canonical_uri = relationship_index
+        .canonical_part(&uri)?
+        .ok_or_else(|| invalid("workbook connections target is not a package Part"))?;
+    let part = package.get_part(canonical_uri)?;
+    if part.content_type() != CONNECTIONS_CONTENT_TYPE {
+        return Err(invalid(
+            "workbook connections relationship targets the wrong content type",
+        ));
+    }
+    if part.blob().len() > MAX_PART_BYTES
+        || part.blob().len() > caller_part_limit(package.read_limits())
+    {
+        return Err(invalid("connections Part exceeds the caller's Part limit"));
+    }
+    let scan = scan_xml(part.blob(), "connections", package.read_limits())?;
+    let root = scan
+        .elements
+        .iter()
+        .find(|element| element.parent_index.is_none())
+        .ok_or_else(|| invalid("connections Part has no root"))?;
+    if root.ns != CORE_NS && root.ns != STRICT_CORE_NS || root.local != b"connections" {
+        return Err(invalid("connections Part has an invalid root"));
+    }
+    let mut by_id = HashMap::new();
+    let connection_count = scan
+        .elements
+        .iter()
+        .filter(|element| {
+            element.parent_index == Some(root.index)
+                && element.ns == root.ns
+                && element.local == b"connection"
+        })
+        .count();
+    by_id
+        .try_reserve(connection_count)
+        .map_err(|source| Error::Allocation {
+            resource: "workbook connection ID index",
+            source,
+        })?;
+    let mut by_name = HashMap::new();
+    by_name
+        .try_reserve(connection_count)
+        .map_err(|source| Error::Allocation {
+            resource: "workbook connection name index",
+            source,
+        })?;
+    for element in scan.elements.iter().filter(|element| {
+        element.parent_index == Some(root.index)
+            && element.ns == root.ns
+            && element.local == b"connection"
+    }) {
+        let id = element
+            .attrs
+            .iter()
+            .find(|attr| attr.ns.is_empty() && attr.local == b"id")
+            .map(|attr| parse_u32(&attr.value, "connection id"))
+            .transpose()?
+            .ok_or_else(|| invalid("connection requires id"))?;
+        if by_id.insert(id, String::new()).is_some() {
+            return Err(invalid("connections contains a duplicate id"));
+        }
+        if let Some(name_attr) = element
+            .attrs
+            .iter()
+            .find(|attr| attr.ns.is_empty() && attr.local == b"name")
+        {
+            let name = decode_spreadsheet_text(&name_attr.value)?;
+            if name.is_empty() {
+                return Err(invalid("connection name cannot be empty"));
+            }
+            if by_name.insert(name.clone(), id).is_some() {
+                return Err(invalid("connections contains a duplicate name"));
+            }
+            if let Some(stored) = by_id.get_mut(&id) {
+                *stored = name;
+            }
+        }
+    }
+    if by_id.is_empty() {
+        return Err(invalid("connections Part has no connection entries"));
+    }
+    Ok(Some((
+        SourcePart::capture(relationship_index, part)?,
+        ConnectionCatalog { by_id, by_name },
+    )))
+}
+
+fn validate_table_incoming_closure(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+    references: &[Reference],
+    relationship_index: &RelationshipIndex<'_>,
+) -> Result<()> {
+    for reference in references {
+        if relationship_index
+            .canonical_part(&reference.table_uri)?
+            .is_none()
+        {
+            return Err(invalid(
+                "PivotTable incoming relationship target is not a package Part",
+            ));
+        }
+        let incoming = relationship_index.incoming(&reference.table_uri)?;
+        let mut workbook_pivot_count = 0usize;
+        for incoming in incoming {
+            let relationship = incoming.relationship();
+            if incoming.source() == workbook.partname().as_str() {
+                if relationship.target_query().is_some() || relationship.target_fragment().is_some()
+                {
+                    return Err(invalid(
+                        "PivotTable relationship cannot target a URI suffix",
+                    ));
+                }
+                if matches!(
+                    relationship.reltype(),
+                    rt::PIVOT_TABLE | rt::STRICT_PIVOT_TABLE
+                ) {
+                    workbook_pivot_count =
+                        workbook_pivot_count.checked_add(1).ok_or_else(|| {
+                            invalid("PivotTable incoming relationship count overflows")
+                        })?;
+                } else {
+                    return Err(invalid(
+                        "PivotTable has an unexpected incoming workbook relationship",
+                    ));
+                }
+                continue;
+            }
+            if incoming.source() == "/" {
+                return Err(invalid(
+                    "PivotTable cannot have an incoming package-root relationship",
+                ));
+            }
+            let source = PackURI::new(incoming.source()).map_err(|error| {
+                invalid(format!("incoming relationship source is invalid: {error}"))
+            })?;
+            let canonical_source = relationship_index
+                .canonical_part(&source)?
+                .ok_or_else(|| invalid("incoming relationship source is not a package Part"))?;
+            let source_part = package.get_part(canonical_source)?;
+            if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
+                return Err(invalid(
+                    "PivotTable relationship cannot target a URI suffix",
+                ));
+            }
+            if source_part.content_type() == ct::SML_WORKSHEET
+                || matches!(
+                    relationship.reltype(),
+                    rt::PIVOT_TABLE | rt::STRICT_PIVOT_TABLE
+                )
+            {
+                return Err(invalid(
+                    "Non-Worksheet PivotTable cannot have an incoming worksheet relationship",
+                ));
+            }
+            return Err(invalid(
+                "PivotTable has an unexpected incoming Part relationship",
+            ));
+        }
+        if workbook_pivot_count != 1 {
+            return Err(invalid(
+                "PivotTable must have exactly one incoming workbook PivotTable relationship",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_workbook_references(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+    relationship_index: &RelationshipIndex<'_>,
+) -> Result<WorkbookReferences> {
+    let scan = scan_xml(workbook.blob(), "workbook", package.read_limits())?;
+    let root = scan
+        .elements
+        .iter()
+        .find(|element| element.parent_index.is_none())
+        .ok_or_else(|| invalid("workbook has no root"))?;
+    let owner_exts = direct_exts(&scan, root, PIVOT_TABLE_REFERENCES_URI)?;
+    if owner_exts.len() > 1 {
+        return Err(invalid("duplicate workbook pivotTableReferences extension"));
+    }
+    let Some(ext) = owner_exts.first().copied() else {
+        return Err(invalid("workbook has no pivotTableReferences extension"));
+    };
+    let payloads = scan.elements.iter().filter(|candidate| {
+        candidate.parent_index == Some(ext.index)
+            && candidate.ns == EXT_NS
+            && candidate.local == b"pivotTableReferences"
+    });
+    let mut payloads = payloads;
+    let references = payloads
+        .next()
+        .ok_or_else(|| invalid("pivotTableReferences extension has no payload"))?;
+    if payloads.next().is_some() {
+        return Err(invalid("duplicate workbook pivotTableReferences payload"));
+    }
+    let reference_count = scan
+        .elements
+        .iter()
+        .filter(|candidate| {
+            candidate.parent_index == Some(references.index)
+                && candidate.ns == EXT_NS
+                && candidate.local == b"pivotTableReference"
+        })
+        .count();
+    if reference_count == 0 || reference_count > MAX_REFERENCE_COUNT {
+        return Err(invalid(
+            "pivotTableReferences collection cardinality is invalid",
+        ));
+    }
+    let mut refs = Vec::new();
+    refs.try_reserve_exact(reference_count)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable reference collection",
+            source,
+        })?;
+    let mut targets = HashSet::new();
+    targets
+        .try_reserve(reference_count)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable reference targets",
+            source,
+        })?;
+    for child in scan.elements.iter().filter(|candidate| {
+        candidate.parent_index == Some(references.index)
+            && candidate.ns == EXT_NS
+            && candidate.local == b"pivotTableReference"
+    }) {
+        let rid = required_rel_id(child, "pivotTableReference")?;
+        let relation = workbook.rels().get(&rid).ok_or_else(|| {
+            invalid("pivotTableReference r:id does not resolve in workbook relationships")
+        })?;
+        if relation.is_external()
+            || relation.target_query().is_some()
+            || relation.target_fragment().is_some()
+            || !matches!(relation.reltype(), rt::PIVOT_TABLE | rt::STRICT_PIVOT_TABLE)
+        {
+            return Err(invalid(
+                "pivotTableReference relationship is not an internal PivotTable relationship",
+            ));
+        }
+        let uri = relation.target_partname()?;
+        let canonical_uri = relationship_index
+            .canonical_part(&uri)?
+            .ok_or_else(|| invalid("pivotTableReference target is not a package Part"))?;
+        if !targets.insert(canonical_uri.clone()) {
+            return Err(invalid(
+                "pivotTableReferences contains a duplicate PivotTable target",
+            ));
+        }
+        let part = package.get_part(canonical_uri)?;
+        if part.content_type() != ct::SML_PIVOT_TABLE {
+            return Err(invalid(
+                "pivotTableReference targets the wrong content type",
+            ));
+        }
+        if part.blob().len() > MAX_PART_BYTES
+            || part.blob().len() > caller_part_limit(package.read_limits())
+        {
+            return Err(invalid("PivotTable Part exceeds the caller's Part limit"));
+        }
+        let table = parse_table(package, part, relationship_index)?;
+        refs.push(Reference {
+            table_uri: canonical_uri.clone(),
+            name: table.name.clone(),
+            cache_id: table.cache_id,
+            table,
+        });
+    }
+    if refs.is_empty() || refs.len() > MAX_REFERENCE_COUNT {
+        return Err(invalid(
+            "pivotTableReferences collection cardinality is invalid",
+        ));
+    }
+    let owner_range = ext.start.start..ext.end;
+    let owner_source = workbook.blob();
+    let root_context = owner_source
+        .get(root.start.clone())
+        .ok_or_else(|| invalid("workbook root context range is invalid"))?;
+    if root_context.len() > MAX_FRAGMENT_BYTES {
+        return Err(invalid("workbook root context exceeds limit"));
+    }
+    let mut context_copy = Vec::new();
+    context_copy
+        .try_reserve_exact(
+            root_context
+                .len()
+                .saturating_add(root.ns.len())
+                .saturating_add(2),
+        )
+        .map_err(|source| Error::Allocation {
+            resource: "workbook root context",
+            source,
+        })?;
+    context_copy.extend_from_slice(&root.ns);
+    context_copy.push(0);
+    context_copy.push(u8::from(root.mce_context));
+    context_copy.extend_from_slice(root_context);
+    let owner_bytes = owner_source
+        .get(owner_range)
+        .ok_or_else(|| invalid("workbook pivotTableReferences owner range is invalid"))?;
+    if owner_bytes.len() > MAX_FRAGMENT_BYTES {
+        return Err(invalid(
+            "workbook pivotTableReferences owner fragment exceeds limit",
+        ));
+    }
+    let mut owner_copy = Vec::new();
+    owner_copy
+        .try_reserve_exact(owner_bytes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "workbook pivotTableReferences owner source",
+            source,
+        })?;
+    owner_copy.extend_from_slice(owner_bytes);
+    Ok(WorkbookReferences {
+        refs,
+        owner: Arc::new(owner_copy),
+        context: Arc::new(context_copy),
+    })
+}
+
+fn direct_exts<'a>(
+    scan: &'a XmlScan,
+    owner: &XmlElement,
+    uri: &str,
+) -> Result<Vec<&'a XmlElement>> {
+    let mut result = Vec::new();
+    for ext in scan.elements.iter().filter(|ext| {
+        ext.parent_index
+            .and_then(|ext_list_index| scan.elements.get(ext_list_index))
+            .is_some_and(|ext_list| {
+                ext_list.parent_index == Some(owner.index)
+                    && ext_list.ns == owner.ns
+                    && ext_list.local == b"extLst"
+                    && ext.ns == owner.ns
+                    && ext.local == b"ext"
+                    && ext
+                        .attrs
+                        .iter()
+                        .find(|attr| attr.ns.is_empty() && attr.local == b"uri")
+                        .is_some_and(|attr| attr.value == uri)
+            })
+    }) {
+        result.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "PivotTable extension owner index",
+            source,
+        })?;
+        result.push(ext);
+    }
+    Ok(result)
+}
+
+fn is_owned_payload(scan: &XmlScan, root: &XmlElement, candidate: &XmlElement, uri: &str) -> bool {
+    let mut current = candidate.parent_index;
+    let mut through_mce = false;
+    while let Some(index) = current {
+        let Some(parent) = scan.elements.get(index) else {
+            return false;
+        };
+        if parent.local == b"ext" && parent.ns == root.ns {
+            let Some(ext_list) = parent.parent_index.and_then(|at| scan.elements.get(at)) else {
+                return false;
+            };
+            return ext_list.parent_index == Some(root.index)
+                && ext_list.ns == root.ns
+                && ext_list.local == b"extLst"
+                && parent
+                    .attrs
+                    .iter()
+                    .find(|attr| attr.ns.is_empty() && attr.local == b"uri")
+                    .is_some_and(|attr| attr.value == uri)
+                && (through_mce || candidate.parent_index == Some(parent.index));
+        }
+        if parent.ns != MCE_NS {
+            return false;
+        }
+        through_mce = true;
+        current = parent.parent_index;
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests;
+
+fn required_rel_id(element: &XmlElement, owner: &str) -> Result<String> {
+    let mut value = None;
+    for attr in &element.attrs {
+        if (attr.ns == REL_NS || attr.ns == STRICT_REL_NS) && attr.local == b"id" {
+            if value.is_some() {
+                return Err(invalid(format!(
+                    "{owner} has multiple strict/transitional r:id attributes"
+                )));
+            }
+            value = Some(attr.value.clone());
+        }
+    }
+    value
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid(format!("{owner} requires r:id")))
+}
+
+fn parse_table(
+    package: &OpcPackage,
+    part: &dyn Part,
+    relationship_index: &RelationshipIndex<'_>,
+) -> Result<TableInfo> {
+    let scan = scan_xml(part.blob(), "pivotTableDefinition", package.read_limits())?;
+    let meta = scan_table_metadata_from_scan(&scan)?;
+    let mut matching_cache = part.rels().iter().filter(|relation| {
+        matches!(
+            relation.reltype(),
+            rt::PIVOT_CACHE_DEFINITION | rt::STRICT_PIVOT_CACHE_DEFINITION
+        )
+    });
+    let relation = matching_cache
+        .next()
+        .ok_or_else(|| invalid("PivotTable is missing its cache-definition relationship"))?;
+    if matching_cache.next().is_some()
+        || relation.is_external()
+        || relation.target_query().is_some()
+        || relation.target_fragment().is_some()
+    {
+        return Err(invalid(
+            "PivotTable cache-definition relationship is ambiguous",
+        ));
+    }
+    let cache_uri = relation.target_partname()?;
+    let canonical_cache_uri = relationship_index
+        .canonical_part(&cache_uri)?
+        .ok_or_else(|| invalid("PivotTable cache target is not a package Part"))?;
+    let cache_part = package.get_part(canonical_cache_uri)?;
+    if cache_part.content_type() != ct::SML_PIVOT_CACHE_DEFINITION {
+        return Err(invalid(
+            "PivotTable cache relationship targets the wrong content type",
+        ));
+    }
+    let payload = parse_payload(&scan)?;
+    Ok(TableInfo {
+        name: meta.name,
+        cache_id: meta.cache_id,
+        cache_uri: canonical_cache_uri.clone(),
+        source: SourcePart::capture(relationship_index, part)?,
+        owner: meta.owner,
+        payload,
+    })
+}
+
+struct TableMeta {
+    name: String,
+    cache_id: u32,
+    owner: Range<usize>,
+}
+
+fn scan_table_metadata(bytes: &[u8], limits: ReadLimits) -> Result<TableMeta> {
+    let scan = scan_xml(bytes, "pivotTableDefinition", limits)?;
+    scan_table_metadata_from_scan(&scan)
+}
+
+fn scan_table_metadata_from_scan(scan: &XmlScan) -> Result<TableMeta> {
+    let root = scan
+        .elements
+        .iter()
+        .find(|element| element.parent_index.is_none())
+        .ok_or_else(|| invalid("PivotTable Part has no root"))?;
+    if root.ns != CORE_NS && root.ns != STRICT_CORE_NS || root.local != b"pivotTableDefinition" {
+        return Err(invalid("PivotTable Part has an invalid root"));
+    }
+    let name = root
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"name")
+        .map(|attr| decode_spreadsheet_text(&attr.value))
+        .transpose()?
+        .ok_or_else(|| invalid("PivotTable definition requires name"))?;
+    if name.is_empty() {
+        return Err(invalid("PivotTable name cannot be empty"));
+    }
+    let cache_id = root
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"cacheId")
+        .map(|attr| parse_u32(&attr.value, "PivotTable cacheId"))
+        .transpose()?
+        .ok_or_else(|| invalid("PivotTable definition requires cacheId"))?;
+    if let Some(enable_edit) = root
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"enableEdit")
+    {
+        if parse_bool(&enable_edit.value, "PivotTable enableEdit")? {
+            return Err(invalid("Non-Worksheet PivotTable enableEdit must be false"));
+        }
+    }
+    let locations = scan.elements.iter().filter(|element| {
+        element.parent_index == Some(root.index)
+            && element.ns == root.ns
+            && element.local == b"location"
+    });
+    let mut locations = locations;
+    let location = locations
+        .next()
+        .ok_or_else(|| invalid("Non-Worksheet PivotTable requires location"))?;
+    if locations.next().is_some() {
+        return Err(invalid(
+            "PivotTable definition has multiple location elements",
+        ));
+    }
+    let location_ref = location
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"ref")
+        .map(|attr| attr.value.as_str())
+        .ok_or_else(|| invalid("Non-Worksheet PivotTable requires location@ref"))?;
+    if !location_ref.starts_with("A1") {
+        return Err(invalid(
+            "Non-Worksheet PivotTable location@ref must begin with A1",
+        ));
+    }
+    for child in scan
+        .elements
+        .iter()
+        .filter(|element| element.parent_index == Some(root.index))
+    {
+        if child.ns == root.ns
+            && (child.local == b"pivotEdits"
+                || child.local == b"pivotChanges"
+                || child.local == b"conditionalFormats")
+        {
+            return Err(invalid(
+                "PivotTable is not eligible for pivotTableReferences",
+            ));
+        }
+    }
+    Ok(TableMeta {
+        name,
+        cache_id,
+        owner: root.start.start..root.end,
+    })
+}
+
+fn validate_cache_closure(
+    cache_part: &dyn Part,
+    expected_cache_id: u32,
+    connections: Option<&ConnectionCatalog>,
+    limits: ReadLimits,
+) -> Result<()> {
+    let scan = scan_xml(cache_part.blob(), "pivotCacheDefinition", limits)?;
+    let root = scan
+        .elements
+        .iter()
+        .find(|element| element.parent_index.is_none())
+        .ok_or_else(|| invalid("PivotCache Part has no root"))?;
+    if root.ns != CORE_NS && root.ns != STRICT_CORE_NS || root.local != b"pivotCacheDefinition" {
+        return Err(invalid("PivotCache Part has an invalid root"));
+    }
+    if root
+        .attrs
+        .iter()
+        .find(|attr| {
+            attr.ns.is_empty() && (attr.local == b"pivotCacheId" || attr.local == b"cacheId")
+        })
+        .is_some()
+    {
+        return Err(invalid("core pivotCacheDefinition cannot carry a cache ID"));
+    }
+    let definition_exts = direct_exts(&scan, root, PIVOT_CACHE_DEFINITION_URI)?;
+    if definition_exts.len() > 1 {
+        return Err(invalid("duplicate pivotCacheDefinition extension"));
+    }
+    if let Some(definition_ext) = definition_exts.first().copied() {
+        if definition_ext
+            .end
+            .saturating_sub(definition_ext.start.start)
+            > MAX_FRAGMENT_BYTES
+        {
+            return Err(invalid("pivotCacheDefinition owner fragment exceeds limit"));
+        }
+        let definitions = scan.elements.iter().filter(|element| {
+            element.parent_index == Some(definition_ext.index)
+                && element.ns == X14_NS
+                && element.local == b"pivotCacheDefinition"
+        });
+        let mut definitions = definitions;
+        let definition = definitions
+            .next()
+            .ok_or_else(|| invalid("pivotCacheDefinition extension has no payload"))?;
+        if definitions.next().is_some() {
+            return Err(invalid("duplicate pivotCacheDefinition extension payload"));
+        }
+        let mut cache_id = None;
+        for attr in &definition.attrs {
+            if attr.ns.is_empty() && attr.local == b"pivotCacheId" {
+                if cache_id.is_some() {
+                    return Err(invalid(
+                        "pivotCacheDefinition extension has duplicate pivotCacheId",
+                    ));
+                }
+                cache_id = Some(parse_u32(&attr.value, "pivotCacheDefinition pivotCacheId")?);
+            }
+        }
+        if let Some(cache_id) = cache_id {
+            if cache_id != expected_cache_id {
+                return Err(invalid(
+                    "pivotCacheDefinition pivotCacheId does not match the semantic workbook cache ID",
+                ));
+            }
+        }
+    }
+    let sources = scan.elements.iter().filter(|element| {
+        element.parent_index == Some(root.index)
+            && element.ns == root.ns
+            && element.local == b"cacheSource"
+    });
+    let mut sources = sources;
+    let source = sources
+        .next()
+        .ok_or_else(|| invalid("PivotCache has no cacheSource"))?;
+    if sources.next().is_some() {
+        return Err(invalid("PivotCache has multiple cacheSource elements"));
+    }
+    let source_type = source
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"type")
+        .map(|attr| attr.value.as_str());
+    if source_type != Some("external") {
+        return Err(invalid(
+            "pivotTableServerFormats requires cacheSource type=external",
+        ));
+    }
+    validate_external_source_connection(&scan, root, source, connections)?;
+    let owner_exts = direct_exts(&scan, root, PIVOT_CACHE_ID_VERSION_URI)?;
+    if owner_exts.len() > 1 {
+        return Err(invalid("duplicate pivotCacheIdVersion extension"));
+    }
+    let Some(version_ext) = owner_exts.first().copied() else {
+        return Err(invalid(
+            "external PivotCache is missing pivotCacheIdVersion extension",
+        ));
+    };
+    if version_ext.end.saturating_sub(version_ext.start.start) > MAX_FRAGMENT_BYTES {
+        return Err(invalid("pivotCacheIdVersion owner fragment exceeds limit"));
+    }
+    let versions = scan.elements.iter().filter(|element| {
+        element.parent_index == Some(version_ext.index)
+            && element.ns == EXT_NS
+            && element.local == b"pivotCacheIdVersion"
+    });
+    let mut versions = versions;
+    let version = versions
+        .next()
+        .ok_or_else(|| invalid("pivotCacheIdVersion extension has no payload"))?;
+    if versions.next().is_some() {
+        return Err(invalid("duplicate pivotCacheIdVersion payload"));
+    }
+    for attr in [
+        b"cacheIdSupportedVersion".as_slice(),
+        b"cacheIdCreatedVersion".as_slice(),
+    ] {
+        let value = version
+            .attrs
+            .iter()
+            .find(|candidate| candidate.ns.is_empty() && candidate.local == attr)
+            .map(|candidate| candidate.value.as_str())
+            .ok_or_else(|| invalid("pivotCacheIdVersion is missing a required attribute"))?;
+        let parsed = parse_u32(value, "pivotCacheIdVersion attribute")?;
+        if parsed > u8::MAX as u32 {
+            return Err(invalid(
+                "pivotCacheIdVersion attribute exceeds unsignedByte",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_external_source_connection(
+    scan: &XmlScan,
+    root: &XmlElement,
+    source: &XmlElement,
+    connections: Option<&ConnectionCatalog>,
+) -> Result<()> {
+    let connection_id = source
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"connectionId")
+        .map(|attr| parse_u32(&attr.value, "cacheSource connectionId"))
+        .transpose()?;
+    if let Some(connection_id) = connection_id {
+        if !connections.is_some_and(|connections| connections.by_id.contains_key(&connection_id)) {
+            return Err(invalid(
+                "cacheSource connectionId does not resolve to a workbook connection",
+            ));
+        }
+    }
+    let ext_lists = scan.elements.iter().filter(|element| {
+        element.parent_index == Some(source.index)
+            && element.ns == root.ns
+            && element.local == b"extLst"
+    });
+    let mut f057_ext = None;
+    let mut ext_list_count = 0usize;
+    for ext_list in ext_lists {
+        ext_list_count += 1;
+        if ext_list_count > 1 {
+            return Err(invalid("cacheSource has multiple extLst elements"));
+        }
+        for ext in scan.elements.iter().filter(|element| {
+            element.parent_index == Some(ext_list.index)
+                && element.ns == root.ns
+                && element.local == b"ext"
+        }) {
+            let uri = ext
+                .attrs
+                .iter()
+                .find(|attr| attr.ns.is_empty() && attr.local == b"uri")
+                .map(|attr| attr.value.as_str());
+            if uri == Some(CACHE_SOURCE_URI) {
+                if f057_ext.replace(ext).is_some() {
+                    return Err(invalid("cacheSource has duplicate F057 extensions"));
+                }
+            }
+        }
+    }
+    let Some(ext) = f057_ext else {
+        return Ok(());
+    };
+    if ext.end.saturating_sub(ext.start.start) > MAX_FRAGMENT_BYTES {
+        return Err(invalid("cacheSource owner fragment exceeds limit"));
+    }
+    let source_connections = scan.elements.iter().filter(|element| {
+        element.parent_index == Some(ext.index)
+            && element.ns == X14_NS
+            && element.local == b"sourceConnection"
+    });
+    let mut source_connections = source_connections;
+    let source_connection = source_connections
+        .next()
+        .ok_or_else(|| invalid("F057 extension has no sourceConnection"))?;
+    if source_connections.next().is_some() {
+        return Err(invalid(
+            "F057 extension has multiple sourceConnection elements",
+        ));
+    }
+    let name = source_connection
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"name")
+        .map(|attr| decode_spreadsheet_text(&attr.value))
+        .transpose()?
+        .ok_or_else(|| invalid("sourceConnection requires name"))?;
+    if name.is_empty() {
+        return Err(invalid("sourceConnection name cannot be empty"));
+    }
+    if name.encode_utf16().count() >= 65_536 {
+        return Err(invalid("sourceConnection name exceeds its text limit"));
+    }
+    let resolved_id = connections
+        .and_then(|connections| connections.by_name.get(&name).copied())
+        .ok_or_else(|| {
+            invalid("sourceConnection name does not resolve to a workbook connection")
+        })?;
+    if let Some(connection_id) = connection_id
+        && connection_id != resolved_id
+    {
+        return Err(invalid(
+            "cacheSource connectionId disagrees with sourceConnection name",
+        ));
+    }
+    Ok(())
+}
+
+fn worksheet_pivot_names(
+    package: &OpcPackage,
+    catalog: &raw::Catalog,
+    relationship_index: &RelationshipIndex<'_>,
+) -> Result<Vec<String>> {
+    let workbook = package.main_document_part()?;
+    let mut names = Vec::new();
+    let mut table_targets = HashSet::<PackURI>::new();
+    for sheet in &catalog.sheets {
+        let Some(relation) = workbook.rels().get(&sheet.relationship_id) else {
+            continue;
+        };
+        if !matches!(relation.reltype(), rt::WORKSHEET | rt::STRICT_WORKSHEET)
+            || relation.is_external()
+        {
+            continue;
+        }
+        let uri = relation.target_partname()?;
+        let canonical_uri = relationship_index
+            .canonical_part(&uri)?
+            .ok_or_else(|| invalid("worksheet target is not a package Part"))?;
+        let worksheet = package.get_part(canonical_uri)?;
+        for relation in worksheet.rels().iter().filter(|relation| {
+            matches!(relation.reltype(), rt::PIVOT_TABLE | rt::STRICT_PIVOT_TABLE)
+        }) {
+            if relation.is_external()
+                || relation.target_query().is_some()
+                || relation.target_fragment().is_some()
+            {
+                return Err(invalid(
+                    "worksheet PivotTable relationship cannot be external",
+                ));
+            }
+            let table_uri = relation.target_partname()?;
+            let canonical_table_uri = relationship_index
+                .canonical_part(&table_uri)?
+                .ok_or_else(|| invalid("worksheet PivotTable target is not a package Part"))?;
+            if !admit_worksheet_table_target(&mut table_targets, canonical_table_uri)? {
+                continue;
+            }
+            let table = package.get_part(canonical_table_uri)?;
+            if table.content_type() != ct::SML_PIVOT_TABLE {
+                return Err(invalid(
+                    "worksheet PivotTable relationship targets the wrong content type",
+                ));
+            }
+            if table.blob().len() > MAX_PART_BYTES
+                || table.blob().len() > caller_part_limit(package.read_limits())
+            {
+                return Err(invalid(
+                    "worksheet PivotTable Part exceeds the caller's Part limit",
+                ));
+            }
+            names.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "worksheet PivotTable name index",
+                source,
+            })?;
+            names.push(scan_table_metadata(table.blob(), package.read_limits())?.name);
+        }
+    }
+    Ok(names)
+}
+
+fn admit_worksheet_table_target(
+    table_targets: &mut HashSet<PackURI>,
+    canonical_uri: &PackURI,
+) -> Result<bool> {
+    if table_targets.contains(canonical_uri) {
+        // A worksheet may expose the same physical PivotTable through more
+        // than one relationship ID.  The workbook-name check needs one
+        // physical target; the relationship index retains every edge for
+        // closure and readset validation.
+        return Ok(false);
+    }
+    table_targets
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "worksheet PivotTable target cache",
+            source,
+        })?;
+    table_targets.insert(canonical_uri.clone());
+    Ok(true)
+}
+
+fn parse_payload(scan: &XmlScan) -> Result<PayloadInfo> {
+    let mut payloads = Vec::new();
+    let root = scan
+        .elements
+        .iter()
+        .find(|element| element.parent_index.is_none())
+        .ok_or_else(|| invalid("PivotTable Part has no root"))?;
+    for element in &scan.elements {
+        if element.ns != EXT_NS || element.local != b"pivotTableServerFormats" {
+            continue;
+        }
+        if !is_owned_payload(scan, root, element, PIVOT_TABLE_SERVER_FORMATS_URI) {
+            continue;
+        }
+        if element.end.saturating_sub(element.start.start) > MAX_FRAGMENT_BYTES {
+            return Err(invalid(
+                "pivotTableServerFormats owner fragment exceeds limit",
+            ));
+        }
+        payloads
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format payloads",
+                source,
+            })?;
+        payloads.push(element);
+    }
+    if payloads.len() != 1 {
+        return Err(invalid(if payloads.is_empty() {
+            "PivotTable has no pivotTableServerFormats payload"
+        } else {
+            "PivotTable has duplicate pivotTableServerFormats payloads"
+        }));
+    }
+    let payload = payloads[0];
+    let count = payload
+        .attrs
+        .iter()
+        .find(|attr| attr.ns.is_empty() && attr.local == b"count")
+        .map(|attr| parse_u32(&attr.value, "pivotTableServerFormats count"))
+        .transpose()?
+        .ok_or_else(|| invalid("pivotTableServerFormats requires count"))?;
+    if count == 0 || count as usize > MAX_SERVER_FORMATS {
+        return Err(invalid(
+            "pivotTableServerFormats count is outside its bounded domain",
+        ));
+    }
+    let mut entries = Vec::new();
+    for element in scan
+        .elements
+        .iter()
+        .filter(|candidate| candidate.parent_index == Some(payload.index))
+    {
+        if element.ns != EXT_NS || element.local != b"serverFormat" {
+            return Err(invalid(
+                "pivotTableServerFormats contains an unexpected child",
+            ));
+        }
+        if entries.len() >= MAX_SERVER_FORMATS || entries.len() >= count as usize {
+            return Err(invalid("pivotTableServerFormats child count exceeds count"));
+        }
+        validate_server_format_leaf(element)?;
+        let culture = parse_optional_xstring(element, b"culture")?;
+        let format = parse_optional_xstring(element, b"format")?;
+        entries.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "PivotTable server-format values",
+            source,
+        })?;
+        entries.push(ParsedEntry {
+            value: ServerFormat { culture, format },
+            source: EntrySource {
+                culture: attr_source(element, b"culture")?,
+                format: attr_source(element, b"format")?,
+                start_tag: element.start.clone(),
+            },
+        });
+    }
+    if entries.is_empty() || entries.len() != count as usize {
+        return Err(invalid(
+            "pivotTableServerFormats count does not equal child count",
+        ));
+    }
+    let mut diagnostic = false;
+    for element in &scan.elements {
+        if element.ns != EXT_NS || element.local != b"x" {
+            continue;
+        }
+        let Some(cell) = element
+            .parent_index
+            .and_then(|index| scan.elements.get(index))
+        else {
+            continue;
+        };
+        if cell.ns != EXT_NS || cell.local != b"c" {
+            continue;
+        }
+        let Some(row) = cell.parent_index.and_then(|index| scan.elements.get(index)) else {
+            continue;
+        };
+        if row.ns != EXT_NS || row.local != b"pivotRow" {
+            continue;
+        }
+        let Some(data) = row.parent_index.and_then(|index| scan.elements.get(index)) else {
+            continue;
+        };
+        if data.ns != EXT_NS
+            || data.local != b"pivotTableData"
+            || !is_owned_payload(scan, root, data, PIVOT_TABLE_DATA_URI)
+        {
+            continue;
+        }
+        if let Some(attr) = element
+            .attrs
+            .iter()
+            .find(|attr| attr.ns.is_empty() && attr.local == b"in")
+        {
+            let index = parse_u32(&attr.value, "pivotValueCellExtra in")? as usize;
+            if index > entries.len() {
+                return Err(invalid(
+                    "pivotValueCellExtra@in exceeds server-format count",
+                ));
+            }
+            if index == entries.len() {
+                diagnostic = true;
+            }
+        }
+    }
+    Ok(PayloadInfo {
+        entries,
+        owner: payload.start.start..payload.end,
+        diagnostic_index_boundary: diagnostic,
+        mce_ambiguous: payload.mce_context,
+    })
+}
+
+fn validate_server_format_leaf(element: &XmlElement) -> Result<()> {
+    if element.has_element_child {
+        return Err(invalid("serverFormat cannot contain child elements"));
+    }
+    if element.has_cdata {
+        return Err(invalid("serverFormat cannot contain CDATA"));
+    }
+    if element.has_text {
+        return Err(invalid("serverFormat cannot contain text"));
+    }
+    for attribute in &element.attrs {
+        if !attribute.ns.is_empty()
+            || (attribute.local.as_slice() != b"culture" && attribute.local.as_slice() != b"format")
+        {
+            return Err(invalid(
+                "serverFormat has an attribute outside its CT_ServerFormat contract",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_optional_xstring(element: &XmlElement, name: &[u8]) -> Result<Option<String>> {
+    let mut found = None;
+    for attr in &element.attrs {
+        if attr.ns.is_empty() && attr.local == name {
+            if found.is_some() {
+                return Err(invalid("serverFormat has a duplicate optional attribute"));
+            }
+            found = Some(attr);
+        }
+    }
+    found
+        .map(|attr| decode_spreadsheet_text(&attr.value))
+        .transpose()
+}
+
+fn attr_source(element: &XmlElement, name: &[u8]) -> Result<Option<AttributeSource>> {
+    let mut found = None;
+    for attr in &element.attrs {
+        if attr.ns.is_empty() && attr.local == name {
+            if found.is_some() {
+                return Err(invalid("serverFormat has a duplicate optional attribute"));
+            }
+            found = Some(attr);
+        }
+    }
+    Ok(found.map(|attr| AttributeSource {
+        value: attr.value_range.clone(),
+        whole: attr.whole_range.clone(),
+    }))
+}
+
+fn parse_u32(value: &str, owner: &str) -> Result<u32> {
+    let value = value.trim_matches(|character| matches!(character, ' ' | '\t' | '\r' | '\n'));
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(invalid(format!("{owner} is not an unsignedInt")));
+    }
+    value
+        .parse::<u32>()
+        .map_err(|_| invalid(format!("{owner} is not an unsignedInt")))
+}
+
+fn parse_bool(value: &str, owner: &str) -> Result<bool> {
+    match value.trim() {
+        "true" | "1" => Ok(true),
+        "false" | "0" => Ok(false),
+        _ => Err(invalid(format!("{owner} is not an XML Schema boolean"))),
+    }
+}
+
+fn decode_spreadsheet_text(value: &str) -> Result<String> {
+    raw::strings::decode_spreadsheet_text(value)
+}
+
+#[derive(Debug)]
+struct XmlScan {
+    elements: Vec<XmlElement>,
+}
+
+#[derive(Debug)]
+struct XmlElement {
+    index: usize,
+    parent_index: Option<usize>,
+    ns: Vec<u8>,
+    local: Vec<u8>,
+    start: Range<usize>,
+    end: usize,
+    attrs: Vec<XmlAttribute>,
+    mce_context: bool,
+    has_element_child: bool,
+    has_cdata: bool,
+    has_text: bool,
+}
+
+#[derive(Debug)]
+struct XmlAttribute {
+    ns: Vec<u8>,
+    local: Vec<u8>,
+    value: String,
+    value_range: Range<usize>,
+    whole_range: Range<usize>,
+}
+
+#[derive(Debug)]
+struct OpenElement {
+    index: usize,
+    ns: Vec<u8>,
+    mce_context: bool,
+}
+
+fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Result<XmlScan> {
+    let limits = XmlScanLimits::from_read_limits(read_limits);
+    if bytes.is_empty() || bytes.len() > limits.part_bytes {
+        return Err(invalid("PivotTable XML exceeds its Part limit"));
+    }
+    validate_xml_characters(bytes)?;
+    let mut reader = NsReader::from_reader(bytes);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(limits.namespace_declarations);
+    let mut elements = Vec::<XmlElement>::new();
+    let mut stack = Vec::<OpenElement>::new();
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut nodes = 0usize;
+    let mut events = 0usize;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("PivotTable XML event count overflows"))?;
+        if events > limits.events {
+            return Err(invalid("PivotTable XML event count exceeds caller limit"));
+        }
+        let before = reader.buffer_position() as usize;
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(error.to_string()))?;
+        let after = reader.buffer_position() as usize;
+        if !matches!(event, Event::Eof) {
+            nodes = nodes
+                .checked_add(1)
+                .ok_or_else(|| invalid("PivotTable XML node count overflow"))?;
+            if nodes > MAX_NODES {
+                return Err(invalid("PivotTable XML node count exceeds limit"));
+            }
+        }
+        let resolver = reader.resolver().clone();
+        let is_start = matches!(&event, Event::Start(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let (ns, local) = resolved_name(&resolver, element.name(), limits)?;
+                if !root_seen {
+                    root_seen = true;
+                    if local.as_slice() != expected_root.as_bytes() {
+                        return Err(invalid(format!(
+                            "PivotTable XML root must be {expected_root}"
+                        )));
+                    }
+                } else if root_closed || stack.is_empty() {
+                    return Err(invalid("PivotTable XML has multiple roots"));
+                }
+                if stack.len() >= MAX_DEPTH {
+                    return Err(invalid("PivotTable XML depth exceeds limit"));
+                }
+                if stack.len() >= limits.depth {
+                    return Err(invalid("PivotTable XML depth exceeds caller limit"));
+                }
+                let parent = stack.last();
+                let index = elements.len();
+                let start = event_start_range(bytes, before, after, &element)?;
+                let element_end = start.end;
+                let attrs =
+                    parse_attrs(bytes, &element, &resolver, reader.decoder(), &start, limits)?;
+                if let Some(parent) = parent {
+                    if let Some(parent_element) = elements.get_mut(parent.index) {
+                        parent_element.has_element_child = true;
+                    }
+                }
+                let mce_context = parent.map_or(ns.as_slice() == MCE_NS, |parent| {
+                    parent.mce_context || parent.ns.as_slice() == MCE_NS || ns.as_slice() == MCE_NS
+                });
+                let info = XmlElement {
+                    index,
+                    parent_index: parent.map(|parent| parent.index),
+                    ns: ns.clone(),
+                    local: local.clone(),
+                    start,
+                    end: element_end,
+                    attrs,
+                    mce_context,
+                    has_element_child: false,
+                    has_cdata: false,
+                    has_text: false,
+                };
+                elements
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "PivotTable XML element index",
+                        source,
+                    })?;
+                elements.push(info);
+                if is_start {
+                    stack.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "PivotTable XML element stack",
+                        source,
+                    })?;
+                    stack.push(OpenElement {
+                        index,
+                        ns,
+                        mce_context,
+                    });
+                } else if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::End(_) => {
+                let Some(open) = stack.pop() else {
+                    return Err(invalid("PivotTable XML has an unmatched end"));
+                };
+                let end = event_end_position(bytes, before, after);
+                if let Some(element) = elements.get_mut(open.index) {
+                    element.end = end;
+                }
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::Eof => break,
+            Event::PI(_) | Event::DocType(_) => {
+                // PIs are preserved source material; DTDs/entities are not
+                // accepted by the bounded OOXML reader.
+                if matches!(event, Event::DocType(_)) {
+                    return Err(invalid("PivotTable XML DTD is not supported"));
+                }
+            },
+            Event::GeneralRef(_) => {
+                return Err(invalid(
+                    "PivotTable XML entity references are not supported",
+                ));
+            },
+            Event::Text(_) => {
+                if let Some(open) = stack.last()
+                    && let Some(element) = elements.get_mut(open.index)
+                {
+                    element.has_text = true;
+                }
+            },
+            Event::CData(_) => {
+                if let Some(open) = stack.last()
+                    && let Some(element) = elements.get_mut(open.index)
+                {
+                    element.has_cdata = true;
+                }
+            },
+            Event::Comment(_) | Event::Decl(_) => {},
+        }
+    }
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(invalid("PivotTable XML is unterminated"));
+    }
+    Ok(XmlScan { elements })
+}
+
+fn event_end_position(bytes: &[u8], before: usize, after: usize) -> usize {
+    if after <= bytes.len() && after >= before {
+        if let Some(offset) = bytes[before..after].iter().position(|byte| *byte == b'>') {
+            return before.saturating_add(offset).saturating_add(1);
+        }
+        return after;
+    }
+    bytes.len()
+}
+
+fn resolved_name(
+    resolver: &quick_xml::name::NamespaceResolver,
+    name: quick_xml::name::QName<'_>,
+    limits: XmlScanLimits,
+) -> Result<(Vec<u8>, Vec<u8>)> {
+    let (resolved, local_name) = resolver.resolve_element(name);
+    if local_name.as_ref().len() > limits.name_bytes {
+        return Err(invalid("PivotTable XML local name exceeds caller limit"));
+    }
+    let ns = match resolved {
+        ResolveResult::Bound(value) => {
+            if value.as_ref().len() > limits.namespace_bytes {
+                return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+            }
+            value.as_ref().to_vec()
+        },
+        ResolveResult::Unbound => Vec::new(),
+        ResolveResult::Unknown(prefix) => {
+            if prefix.len() > limits.name_bytes {
+                return Err(invalid(
+                    "PivotTable XML namespace prefix exceeds caller limit",
+                ));
+            }
+            return Err(invalid("unbound XML namespace prefix"));
+        },
+    };
+    Ok((ns, local_name.as_ref().to_vec()))
+}
+
+#[allow(
+    deprecated,
+    reason = "ST_Xstring attributes retain XML whitespace semantics"
+)]
+fn parse_attrs(
+    bytes: &[u8],
+    element: &BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    start: &Range<usize>,
+    limits: XmlScanLimits,
+) -> Result<Vec<XmlAttribute>> {
+    let mut attrs = Vec::new();
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        let key_bytes = attribute.key.as_ref();
+        if key_bytes.len() > limits.name_bytes {
+            return Err(invalid(
+                "PivotTable XML qualified attribute name exceeds caller limit",
+            ));
+        }
+        let raw_attribute_bytes = key_bytes
+            .len()
+            .checked_add(attribute.value.len())
+            .ok_or_else(|| invalid("PivotTable XML attribute length overflows"))?;
+        if raw_attribute_bytes > MAX_ATTRIBUTE_TEXT_BYTES
+            || raw_attribute_bytes > limits.attribute_bytes
+        {
+            return Err(invalid("PivotTable attribute exceeds its text limit"));
+        }
+        if let Some(prefix) = attribute.key.as_namespace_binding() {
+            let prefix = match prefix {
+                quick_xml::name::PrefixDeclaration::Default => &[][..],
+                quick_xml::name::PrefixDeclaration::Named(prefix) => prefix,
+            };
+            if prefix.len() > limits.name_bytes {
+                return Err(invalid(
+                    "PivotTable XML namespace prefix exceeds caller limit",
+                ));
+            }
+            if attribute.value.len() > limits.namespace_bytes {
+                return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+            }
+            continue;
+        }
+        if attrs.len() >= MAX_NAMESPACE_DECLARATIONS {
+            return Err(invalid("PivotTable XML attribute count exceeds limit"));
+        }
+        let (resolved, local_name) = resolver.resolve_attribute(attribute.key);
+        if local_name.as_ref().len() > limits.name_bytes {
+            return Err(invalid(
+                "PivotTable XML attribute local name exceeds caller limit",
+            ));
+        }
+        let local_name = local_name.as_ref().to_vec();
+        let ns = match resolved {
+            ResolveResult::Bound(value) => {
+                if value.as_ref().len() > limits.namespace_bytes {
+                    return Err(invalid(
+                        "PivotTable XML attribute namespace exceeds caller limit",
+                    ));
+                }
+                value.as_ref().to_vec()
+            },
+            ResolveResult::Unbound => Vec::new(),
+            ResolveResult::Unknown(prefix) => {
+                if prefix.len() > limits.name_bytes {
+                    return Err(invalid(
+                        "PivotTable XML attribute namespace prefix exceeds caller limit",
+                    ));
+                }
+                return Err(invalid("unbound XML attribute prefix"));
+            },
+        };
+        let value = attribute
+            .decode_and_unescape_value(decoder)
+            .map_err(|error| invalid(error.to_string()))?
+            .into_owned();
+        validate_xml_characters(value.as_bytes())?;
+        if value.len() > MAX_ATTRIBUTE_TEXT_BYTES || value.len() > limits.attribute_bytes {
+            return Err(invalid("PivotTable attribute exceeds its text limit"));
+        }
+        let value_range = value_span(bytes, attribute.value.as_ref())?;
+        let key_start = ptr_offset(bytes, attribute.key.0.as_ptr())?;
+        let value_end = value_range.end;
+        if key_start < start.start || value_end > start.end {
+            return Err(invalid(
+                "PivotTable attribute source range is outside its start tag",
+            ));
+        }
+        let mut whole_start = key_start;
+        while whole_start > start.start
+            && matches!(bytes[whole_start - 1], b' ' | b'\t' | b'\r' | b'\n')
+        {
+            whole_start -= 1;
+        }
+        attrs.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "PivotTable XML attributes",
+            source,
+        })?;
+        attrs.push(XmlAttribute {
+            ns,
+            local: local_name,
+            value,
+            value_range,
+            whole_range: whole_start..value_end.saturating_add(1),
+        });
+    }
+    Ok(attrs)
+}
+
+fn ptr_offset(bytes: &[u8], ptr: *const u8) -> Result<usize> {
+    let start = bytes.as_ptr() as usize;
+    let ptr = ptr as usize;
+    ptr.checked_sub(start)
+        .filter(|offset| *offset <= bytes.len())
+        .ok_or_else(|| invalid("PivotTable XML source pointer is not backed by the Part"))
+}
+
+fn event_start_range(
+    bytes: &[u8],
+    before: usize,
+    after: usize,
+    element: &BytesStart<'_>,
+) -> Result<Range<usize>> {
+    let raw = element.as_ref();
+    for extra in 0..=2 {
+        let Some(start) = after.checked_sub(raw.len().saturating_add(extra)) else {
+            continue;
+        };
+        let Some(end) = start.checked_add(raw.len()) else {
+            continue;
+        };
+        if end <= bytes.len() && bytes.get(start..end) == Some(raw) {
+            let candidate_end = if bytes.get(end) == Some(&b'>') {
+                end + 1
+            } else if bytes.get(end..end.saturating_add(2)) == Some(b"/>") {
+                end + 2
+            } else {
+                end
+            };
+            if start >= before.saturating_sub(2) && candidate_end <= after.saturating_add(1) {
+                return Ok(start..candidate_end);
+            }
+        }
+    }
+    // `NsReader`'s buffer position is after the closing `>`; fall back to the
+    // nearest `<` in the event window while still checking the raw token.
+    let lower = before.saturating_sub(raw.len().saturating_add(3));
+    for start in (lower..after.min(bytes.len())).rev() {
+        if bytes.get(start) == Some(&b'<')
+            && bytes.get(start..start.saturating_add(raw.len())) == Some(raw)
+        {
+            let end = start
+                + raw.len()
+                + if bytes.get(start + raw.len()) == Some(&b'>') {
+                    1
+                } else if bytes.get(start + raw.len()..start + raw.len() + 2) == Some(b"/>") {
+                    2
+                } else {
+                    0
+                };
+            return Ok(start..end);
+        }
+    }
+    Err(invalid("PivotTable XML event has no source range"))
+}
