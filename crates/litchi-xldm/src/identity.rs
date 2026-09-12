@@ -14,7 +14,9 @@
 //! implemented remain explicit refusals; the typed table XML-name operation
 //! below is the first supported descriptor edit.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, TryReserveError};
+use std::error::Error as StdError;
+use std::fmt;
 
 use super::generated::{
     SystemGeneratedKind, SystemGeneratedModel, parse_system_generated_file,
@@ -33,6 +35,215 @@ const MAX_IDENTITY_ITEMS: usize = 500_000;
 /// parsers; this separate budget prevents a large number of individually
 /// valid names from making the projection clone an unbounded graph.
 const MAX_IDENTITY_BYTES: usize = 64 * 1024 * 1024;
+
+/// Failure classes exposed by the bounded XLDM table-rename seam.
+///
+/// The ordinary identity APIs retain their historical [`OlapError`] return
+/// type.  The caller-limited rename has this small diagnostic vocabulary so a
+/// format host can preserve its own invalid-format, quota, allocation, and
+/// unsupported-feature error contracts without parsing display strings.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Xldm140RenameErrorKind {
+    /// The source, identity closure, XML, or requested operation is invalid.
+    InvalidSource,
+    /// A hard XLDM or caller-supplied bound was exceeded.
+    LimitExceeded,
+    /// A bounded vector or output buffer could not be reserved.
+    Allocation,
+    /// The source profile or requested operation is outside this owner.
+    Unsupported,
+}
+
+/// Typed diagnostic returned by the caller-limited XLDM table rename.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Xldm140RenameError {
+    kind: Xldm140RenameErrorKind,
+    message: String,
+    limit_bounds: Option<(usize, usize)>,
+    allocation_resource: Option<String>,
+    allocation_source: Option<TryReserveError>,
+}
+
+impl Xldm140RenameError {
+    /// Return the stable failure class for host error mapping.
+    #[must_use]
+    pub const fn kind(&self) -> Xldm140RenameErrorKind {
+        self.kind
+    }
+
+    /// Return the exact observed and maximum values for a bounded failure.
+    ///
+    /// Some structural overflow checks have no representable observed value;
+    /// those retain `None` while preserving their historical display text.
+    #[must_use]
+    pub const fn limit_bounds(&self) -> Option<(usize, usize)> {
+        self.limit_bounds
+    }
+
+    /// Return the observed value for a bounded failure, when available.
+    #[must_use]
+    pub const fn limit_actual(&self) -> Option<usize> {
+        match self.limit_bounds {
+            Some(bounds) => Some(bounds.0),
+            None => None,
+        }
+    }
+
+    /// Return the configured maximum for a bounded failure, when available.
+    #[must_use]
+    pub const fn limit_maximum(&self) -> Option<usize> {
+        match self.limit_bounds {
+            Some(bounds) => Some(bounds.1),
+            None => None,
+        }
+    }
+
+    /// Return the neutral resource label for a bounded allocation failure.
+    ///
+    /// The original reservation source, when available, is exposed separately
+    /// through [`Self::allocation_source`].
+    #[must_use]
+    pub fn allocation_resource(&self) -> Option<&str> {
+        self.allocation_resource.as_deref()
+    }
+
+    /// Return the original bounded reservation failure when the rename path
+    /// received one from `try_reserve`.  Proof diagnostics that only carry a
+    /// neutral detail string intentionally return `None`.
+    #[must_use]
+    pub fn allocation_source(&self) -> Option<&TryReserveError> {
+        self.allocation_source.as_ref()
+    }
+
+    fn invalid(message: impl Into<String>) -> Self {
+        Self {
+            kind: Xldm140RenameErrorKind::InvalidSource,
+            message: message.into(),
+            limit_bounds: None,
+            allocation_resource: None,
+            allocation_source: None,
+        }
+    }
+
+    fn limit(message: impl Into<String>) -> Self {
+        Self::limit_with_bounds(message, None)
+    }
+
+    fn limit_with_bounds(message: impl Into<String>, bounds: Option<(usize, usize)>) -> Self {
+        Self {
+            kind: Xldm140RenameErrorKind::LimitExceeded,
+            message: message.into(),
+            limit_bounds: bounds,
+            allocation_resource: None,
+            allocation_source: None,
+        }
+    }
+
+    fn unsupported(message: impl Into<String>) -> Self {
+        Self {
+            kind: Xldm140RenameErrorKind::Unsupported,
+            message: message.into(),
+            limit_bounds: None,
+            allocation_resource: None,
+            allocation_source: None,
+        }
+    }
+
+    fn allocation(resource: impl Into<String>, error: TryReserveError) -> Self {
+        let resource = resource.into();
+        Self {
+            kind: Xldm140RenameErrorKind::Allocation,
+            message: format!("could not reserve XLDM rename {resource}: {error}"),
+            limit_bounds: None,
+            allocation_resource: Some(resource),
+            allocation_source: Some(error),
+        }
+    }
+
+    fn allocation_detail(resource: impl Into<String>, detail: impl fmt::Display) -> Self {
+        let resource = resource.into();
+        Self {
+            kind: Xldm140RenameErrorKind::Allocation,
+            message: format!("could not reserve XLDM rename {resource}: {detail}"),
+            limit_bounds: None,
+            allocation_resource: Some(resource),
+            allocation_source: None,
+        }
+    }
+
+    fn from_codec(error: crate::error::Error) -> Self {
+        match error {
+            crate::error::Error::Invalid(message) | crate::error::Error::Xml(message) => {
+                Self::invalid(message)
+            },
+            crate::error::Error::Unsupported { feature } => Self {
+                kind: Xldm140RenameErrorKind::Unsupported,
+                message: format!("unsupported XLDM rename operation: {feature}"),
+                limit_bounds: None,
+                allocation_resource: None,
+                allocation_source: None,
+            },
+            crate::error::Error::Allocation { resource, source } => {
+                Self::allocation(resource, source)
+            },
+        }
+    }
+
+    fn from_variable_rewrite(error: super::codec::VariableRewriteError) -> Self {
+        match error {
+            super::codec::VariableRewriteError::Codec(error) => Self::from_codec(error),
+            super::codec::VariableRewriteError::CallerLimit { actual, maximum } => {
+                Self::limit_with_bounds(
+                    format!(
+                        "rewritten storage caller output bytes {actual} exceed limit {maximum}"
+                    ),
+                    Some((actual, maximum)),
+                )
+            },
+        }
+    }
+
+    fn from_olap_proof(error: super::olapproof::OlapProofError) -> Self {
+        match error {
+            super::olapproof::OlapProofError::UnsupportedProfile => Self {
+                kind: Xldm140RenameErrorKind::Unsupported,
+                message: error.to_string(),
+                limit_bounds: None,
+                allocation_resource: None,
+                allocation_source: None,
+            },
+            super::olapproof::OlapProofError::LimitExceeded {
+                resource: _,
+                actual,
+                maximum,
+            } => Self::limit_with_bounds(error.to_string(), Some((actual, maximum))),
+            super::olapproof::OlapProofError::Allocation { resource, detail } => {
+                Self::allocation_detail(resource, detail)
+            },
+            super::olapproof::OlapProofError::Invalid { .. }
+            | super::olapproof::OlapProofError::Unproven { .. } => Self::invalid(error.to_string()),
+        }
+    }
+
+    fn into_olap_error(self) -> OlapError {
+        OlapError::new(self.message)
+    }
+}
+
+impl fmt::Display for Xldm140RenameError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl StdError for Xldm140RenameError {}
+
+impl From<OlapError> for Xldm140RenameError {
+    fn from(error: OlapError) -> Self {
+        Self::invalid(error.to_string())
+    }
+}
 
 /// One canonical table-local column identity.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -926,20 +1137,39 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
         table_id: &str,
         new_name: &str,
     ) -> Result<Xldm140Patch<'storage>, OlapError> {
+        self.rename_table_name_with_relationships_with_limit(
+            table_id,
+            new_name,
+            super::model::MAX_STORAGE_BYTES,
+        )
+        .map_err(Xldm140RenameError::into_olap_error)
+    }
+
+    /// Rename a table XML name and its proven relationship endpoints under an
+    /// exact caller output cap. The outer allocation and directory plan is
+    /// computed from encoded lengths before changed metadata payloads or the
+    /// rewritten storage buffer are materialized. Exact semantic no-ops keep
+    /// borrowing the original source even when the caller cap is zero.
+    pub fn rename_table_name_with_relationships_with_limit(
+        &self,
+        table_id: &str,
+        new_name: &str,
+        max_output_bytes: usize,
+    ) -> Result<Xldm140Patch<'storage>, Xldm140RenameError> {
         if new_name.is_empty() || !new_name.chars().all(valid_xml10_char) {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::invalid(
                 "XLDM table XML name is empty or contains an XML 1.0-forbidden character",
             ));
         }
         if new_name.len() > super::model::MAX_PATH_BYTES {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::limit_with_bounds(
                 "XLDM table XML name exceeds the bounded path-text limit",
+                Some((new_name.len(), super::model::MAX_PATH_BYTES)),
             ));
         }
-        let table = self
-            .projection
-            .table(table_id)
-            .ok_or_else(|| OlapError::new(format!("unknown XLDM table identity {table_id}")))?;
+        let table = self.projection.table(table_id).ok_or_else(|| {
+            Xldm140RenameError::invalid(format!("unknown XLDM table identity {table_id}"))
+        })?;
         if table.xml_name == new_name {
             return Ok(Xldm140Patch {
                 before: self.storage.source_bytes(),
@@ -947,7 +1177,7 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             });
         }
         if !self.is_complete() {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::unsupported(
                 "cannot structurally rename a table in an XLDM closure containing unknown members",
             ));
         }
@@ -959,7 +1189,7 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             .count()
             != 1
         {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::invalid(
                 "table XML rename is ambiguous because the source XML name is shared",
             ));
         }
@@ -969,24 +1199,25 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             .iter()
             .any(|candidate| candidate.xml_name == new_name)
         {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::invalid(
                 "table XML rename would collide with another table XML name",
             ));
         }
-        let metadata = self
-            .metadata
-            .ok_or_else(|| OlapError::new("table rename lacks the source metadata model"))?;
-        let source_olap = super::olap::inspect(self.storage, metadata)
-            .map_err(|error| OlapError::new(format!("source OLAP model is invalid: {error}")))?;
+        let metadata = self.metadata.ok_or_else(|| {
+            Xldm140RenameError::invalid("table rename lacks the source metadata model")
+        })?;
+        let source_olap = super::olap::inspect(self.storage, metadata).map_err(|error| {
+            Xldm140RenameError::invalid(format!("source OLAP model is invalid: {error}"))
+        })?;
         let source_olap_proof = super::olapproof::prove_xldm140_olap(
             self.storage,
             metadata,
             &source_olap,
             super::olapproof::OlapProofLimits::default(),
         )
-        .map_err(|error| OlapError::new(format!("source OLAP closure is unproven: {error}")))?;
+        .map_err(Xldm140RenameError::from_olap_proof)?;
         if !source_olap_proof.is_complete() {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::unsupported(
                 "table XML rename requires a complete OLAP/file-group proof",
             ));
         }
@@ -998,6 +1229,10 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
         // buffer is grown so allocation failure/refusal is deterministic.
         let mut rewrite_count = 0usize;
         let mut rewrite_output_bytes = 0usize;
+        let mut payload_lengths = Vec::new();
+        payload_lengths
+            .try_reserve_exact(metadata.files.len())
+            .map_err(|error| Xldm140RenameError::allocation("payload lengths", error))?;
         for file in &metadata.files {
             let relationship_root_owned = relationship_metadata_owned_by(file, table_id)?;
             let rewrites_root = file.storage_path == table.metadata_path || relationship_root_owned;
@@ -1020,32 +1255,44 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
                         .checked_add(relationship_len)
                         .and_then(|value| value.checked_sub(file.bytes.len()))
                         .ok_or_else(|| {
-                            OlapError::new("table rename output-byte budget overflow")
+                            Xldm140RenameError::limit("table rename output-byte budget overflow")
                         })?;
                     changed = true;
                 }
             }
             if changed {
-                rewrite_count = rewrite_count
-                    .checked_add(1)
-                    .ok_or_else(|| OlapError::new("table rename member count overflow"))?;
-                rewrite_output_bytes = rewrite_output_bytes
-                    .checked_add(output_len)
-                    .ok_or_else(|| OlapError::new("table rename output-byte budget overflow"))?;
+                rewrite_count = rewrite_count.checked_add(1).ok_or_else(|| {
+                    Xldm140RenameError::limit("table rename member count overflow")
+                })?;
+                rewrite_output_bytes =
+                    rewrite_output_bytes
+                        .checked_add(output_len)
+                        .ok_or_else(|| {
+                            Xldm140RenameError::limit("table rename output-byte budget overflow")
+                        })?;
+                payload_lengths.push(super::codec::VariablePayloadLength {
+                    storage_path: file.storage_path,
+                    payload_len: output_len,
+                });
             }
         }
         if rewrite_output_bytes > super::model::MAX_STORAGE_BYTES {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::limit_with_bounds(
                 "table rename output-byte budget exceeds the XLDM storage limit",
+                Some((rewrite_output_bytes, super::model::MAX_STORAGE_BYTES)),
             ));
         }
+        super::codec::preflight_variable_size_payloads(
+            self.storage,
+            &payload_lengths,
+            max_output_bytes,
+        )
+        .map_err(Xldm140RenameError::from_variable_rewrite)?;
 
         let mut owned_payloads: Vec<(&str, Vec<u8>)> = Vec::new();
         owned_payloads
             .try_reserve_exact(rewrite_count)
-            .map_err(|error| {
-                OlapError::new(format!("cannot reserve table rename payloads: {error}"))
-            })?;
+            .map_err(|error| Xldm140RenameError::allocation("payloads", error))?;
         for file in &metadata.files {
             let is_target_table = file.storage_path == table.metadata_path;
             let is_relationship_file = relationship_metadata_owned_by(file, table_id)?;
@@ -1078,10 +1325,10 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             }
             if changed {
                 let payload = payload.ok_or_else(|| {
-                    OlapError::new("table rename planner lost a rewritten payload")
+                    Xldm140RenameError::invalid("table rename planner lost a rewritten payload")
                 })?;
                 super::metadata::parse_file(file.storage_path, &payload).map_err(|error| {
-                    OlapError::new(format!(
+                    Xldm140RenameError::invalid(format!(
                         "rewritten relationship metadata {} is invalid: {error}",
                         file.storage_path
                     ))
@@ -1090,16 +1337,14 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             }
         }
         if owned_payloads.is_empty() {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::invalid(
                 "table XML rename found no source metadata member to rewrite",
             ));
         }
         let mut replacements = Vec::new();
         replacements
             .try_reserve_exact(owned_payloads.len())
-            .map_err(|error| {
-                OlapError::new(format!("cannot reserve table rename replacements: {error}"))
-            })?;
+            .map_err(|error| Xldm140RenameError::allocation("replacements", error))?;
         for (storage_path, payload) in &owned_payloads {
             replacements.push(Xldm140FileReplacement {
                 storage_path,
@@ -1107,32 +1352,36 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             });
         }
 
-        let candidate_bytes =
-            super::codec::rewrite_variable_size_payloads(self.storage, &replacements).map_err(
-                |error| {
-                    OlapError::new(format!(
-                        "XLDM structural table rename outer rewrite failed: {error}"
-                    ))
-                },
-            )?;
+        let candidate_bytes = super::codec::rewrite_variable_size_payloads_with_limit(
+            self.storage,
+            &replacements,
+            max_output_bytes,
+        )
+        .map_err(Xldm140RenameError::from_codec)?;
         let candidate = super::codec::inspect(&candidate_bytes).map_err(|error| {
-            OlapError::new(format!(
+            Xldm140RenameError::invalid(format!(
                 "XLDM structural table rename produced invalid storage: {error}"
             ))
         })?;
         let metadata_after = super::metadata::inspect(&candidate).map_err(|error| {
-            OlapError::new(format!("renamed table metadata is invalid: {error}"))
+            Xldm140RenameError::invalid(format!("renamed table metadata is invalid: {error}"))
         })?;
-        let native_after =
-            super::native::inspect(&candidate, &metadata_after.native_parse_options()).map_err(
-                |error| OlapError::new(format!("renamed native closure is invalid: {error}")),
-            )?;
+        let native_after = super::native::inspect(
+            &candidate,
+            &metadata_after.native_parse_options(),
+        )
+        .map_err(|error| {
+            Xldm140RenameError::invalid(format!("renamed native closure is invalid: {error}"))
+        })?;
         let generated_after =
             super::generated::inspect_system_generated(&candidate).map_err(|error| {
-                OlapError::new(format!("renamed generated closure is invalid: {error}"))
+                Xldm140RenameError::invalid(format!(
+                    "renamed generated closure is invalid: {error}"
+                ))
             })?;
-        let olap_after = super::olap::inspect(&candidate, &metadata_after)
-            .map_err(|error| OlapError::new(format!("renamed OLAP closure is invalid: {error}")))?;
+        let olap_after = super::olap::inspect(&candidate, &metadata_after).map_err(|error| {
+            Xldm140RenameError::invalid(format!("renamed OLAP closure is invalid: {error}"))
+        })?;
         let candidate_closure = prove_xldm140_closure(
             &candidate,
             &metadata_after,
@@ -1150,7 +1399,7 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
                 new_name,
             )
         {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::invalid(
                 "XLDM structural table rename changed an admitted identity or dependency closure",
             ));
         }
@@ -1160,7 +1409,7 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             &olap_after,
             super::olapproof::OlapProofLimits::default(),
         )
-        .map_err(|error| OlapError::new(format!("rewritten OLAP closure is unproven: {error}")))?;
+        .map_err(Xldm140RenameError::from_olap_proof)?;
         if !candidate_olap_proof.is_complete()
             || !same_olap_proof_except_table_name(
                 &source_olap_proof,
@@ -1170,7 +1419,7 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
                 new_name,
             )
         {
-            return Err(OlapError::new(
+            return Err(Xldm140RenameError::invalid(
                 "XLDM structural table rename changed the proven OLAP dependency closure",
             ));
         }
@@ -1552,10 +1801,7 @@ fn replace_table_name_attribute_variable(
     new_name: &str,
 ) -> Result<Vec<u8>, OlapError> {
     let output_len = table_name_replacement_output_len(source, expected_name, new_name)?;
-    let root_start = source
-        .windows(b"<XMObject".len())
-        .position(|window| window == b"<XMObject")
-        .ok_or_else(|| OlapError::new("table metadata has no XMObject root"))?;
+    let root_start = find_xmobject_root_start(source)?;
     let root_end = find_start_tag_end(source, root_start)?;
     let (value_start, value_end, quote) = find_name_attribute(source, root_start, root_end)?;
     let encoded_old = std::str::from_utf8(&source[value_start..value_end])
@@ -1592,10 +1838,7 @@ fn table_name_replacement_output_len(
             "XLDM table XML name exceeds the bounded path-text limit",
         ));
     }
-    let root_start = source
-        .windows(b"<XMObject".len())
-        .position(|window| window == b"<XMObject")
-        .ok_or_else(|| OlapError::new("table metadata has no XMObject root"))?;
+    let root_start = find_xmobject_root_start(source)?;
     let root_end = find_start_tag_end(source, root_start)?;
     let (value_start, value_end, quote) = find_name_attribute(source, root_start, root_end)?;
     let encoded_old = std::str::from_utf8(&source[value_start..value_end])
@@ -1716,62 +1959,181 @@ fn relationship_replacement_output_len(
     Ok((output_len, matches))
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RelationshipXmlFrame {
+    Other,
+    Object,
+    Relationships,
+    RelationshipObject,
+    RelationshipProperties,
+    PrimaryTable,
+}
+
+struct RelationshipPrimaryTableValue {
+    content_start: usize,
+}
+
+fn relationship_xml_frame(
+    start: &quick_xml::events::BytesStart<'_>,
+    parent: Option<RelationshipXmlFrame>,
+) -> Result<RelationshipXmlFrame, OlapError> {
+    let name = start.name();
+    let name = name.as_ref();
+    if name == b"PrimaryTable"
+        && matches!(
+            parent,
+            Some(
+                RelationshipXmlFrame::Relationships
+                    | RelationshipXmlFrame::RelationshipObject
+                    | RelationshipXmlFrame::RelationshipProperties
+                    | RelationshipXmlFrame::Object
+            )
+        )
+    {
+        return Ok(RelationshipXmlFrame::PrimaryTable);
+    }
+    if name == b"XMRelationship" {
+        return Ok(RelationshipXmlFrame::RelationshipObject);
+    }
+    if name == b"XMObject" {
+        let mut is_relationship = false;
+        for attribute in start.attributes() {
+            let attribute = attribute.map_err(|error| {
+                OlapError::new(format!("relationship XML attribute is invalid: {error}"))
+            })?;
+            if attribute.key.as_ref() == b"class" {
+                // The recognized metadata class is an ASCII token.  An
+                // escaped spelling is opaque rather than another admitted
+                // relationship owner, so it must not broaden the rewrite
+                // scope.
+                is_relationship = attribute.value.as_ref() == b"XMRelationship";
+            }
+        }
+        return Ok(if is_relationship {
+            RelationshipXmlFrame::RelationshipObject
+        } else {
+            RelationshipXmlFrame::Object
+        });
+    }
+    if name == b"Relationships" && parent == Some(RelationshipXmlFrame::Object) {
+        return Ok(RelationshipXmlFrame::Relationships);
+    }
+    if name == b"Properties" && parent == Some(RelationshipXmlFrame::RelationshipObject) {
+        return Ok(RelationshipXmlFrame::RelationshipProperties);
+    }
+    Ok(RelationshipXmlFrame::Other)
+}
+
+fn relationship_xml_text_range(source: &[u8], start: usize, end: usize) -> (usize, usize) {
+    let mut value_start = start;
+    while value_start < end && source[value_start].is_ascii_whitespace() {
+        value_start += 1;
+    }
+    let mut value_end = end;
+    while value_end > value_start && source[value_end - 1].is_ascii_whitespace() {
+        value_end -= 1;
+    }
+    (value_start, value_end)
+}
+
 fn scan_relationship_primary_table(
     source: &[u8],
     expected_name: &str,
     mut on_match: impl FnMut(usize, usize),
 ) -> Result<(), OlapError> {
-    let mut cursor = 0usize;
-    while let Some(relative) = source[cursor..]
-        .windows(b"<PrimaryTable".len())
-        .position(|window| window == b"<PrimaryTable")
-    {
-        let start = cursor + relative;
-        let after_name = start + b"<PrimaryTable".len();
-        if source
-            .get(after_name)
-            .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'>')
-        {
-            cursor = after_name;
-            continue;
-        }
-        let tag_end = find_start_tag_end(source, start)?;
-        let close = b"</PrimaryTable>";
-        let content_start = tag_end + 1;
-        let Some(relative_close) = source[content_start..]
-            .windows(close.len())
-            .position(|window| window == close)
-        else {
-            return Err(OlapError::new("PrimaryTable element is unclosed"));
+    let mut reader = quick_xml::reader::Reader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().enable_all_checks(true);
+    let mut frames = Vec::new();
+    frames
+        .try_reserve(source.len().min(super::model::MAX_XML_DEPTH))
+        .map_err(|error| {
+            OlapError::new(format!("cannot reserve relationship XML stack: {error}"))
+        })?;
+    let mut candidate = None;
+    let mut event_start = usize::from(source.starts_with(b"\xEF\xBB\xBF")) * 3;
+    loop {
+        let event = match reader.read_event() {
+            Ok(event) => event,
+            Err(error) => {
+                if candidate.is_some() {
+                    return Err(OlapError::new("PrimaryTable element is unclosed"));
+                }
+                return Err(OlapError::new(format!(
+                    "relationship XML is not well-formed: {error}"
+                )));
+            },
         };
-        let content_end = content_start + relative_close;
-        if source[content_start..content_end].contains(&b'<') {
-            return Err(OlapError::new("PrimaryTable element is not scalar"));
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_| OlapError::new("relationship XML position exceeds host size"))?;
+        if event_end > source.len() || event_start > event_end {
+            return Err(OlapError::new("relationship XML event range is invalid"));
         }
-        let content = &source[content_start..content_end];
-        let Some(left) = content.iter().position(|byte| !byte.is_ascii_whitespace()) else {
-            cursor = content_end + close.len();
-            continue;
-        };
-        let right = content
-            .iter()
-            .rposition(|byte| !byte.is_ascii_whitespace())
-            .map_or(left, |index| index + 1);
-        let value_start = content_start + left;
-        let value_end = content_start + right;
-        if value_start < value_end {
-            let lexical =
-                std::str::from_utf8(&source[value_start..value_end]).map_err(|error| {
-                    OlapError::new(format!("PrimaryTable value is not UTF-8: {error}"))
-                })?;
-            let decoded = quick_xml::escape::unescape(lexical).map_err(|error| {
-                OlapError::new(format!("PrimaryTable value is not XML: {error}"))
-            })?;
-            if decoded == expected_name {
-                on_match(value_start, value_end);
-            }
+        match event {
+            quick_xml::events::Event::Start(start) => {
+                if candidate.is_some() {
+                    return Err(OlapError::new("PrimaryTable element is not scalar"));
+                }
+                let frame = relationship_xml_frame(&start, frames.last().copied())?;
+                if frame == RelationshipXmlFrame::PrimaryTable {
+                    candidate = Some(RelationshipPrimaryTableValue {
+                        content_start: event_end,
+                    });
+                }
+                frames.push(frame);
+            },
+            quick_xml::events::Event::Empty(empty) => {
+                if candidate.is_some() {
+                    return Err(OlapError::new("PrimaryTable element is not scalar"));
+                }
+                let frame = relationship_xml_frame(&empty, frames.last().copied())?;
+                if frame == RelationshipXmlFrame::PrimaryTable {
+                    // An empty scalar has no endpoint value.
+                }
+            },
+            quick_xml::events::Event::End(end) => {
+                let frame = frames
+                    .pop()
+                    .ok_or_else(|| OlapError::new("relationship XML has an unmatched end"))?;
+                if frame == RelationshipXmlFrame::PrimaryTable {
+                    let value = candidate
+                        .take()
+                        .ok_or_else(|| OlapError::new("PrimaryTable scalar state is invalid"))?;
+                    let (value_start, value_end) =
+                        relationship_xml_text_range(source, value.content_start, event_start);
+                    if value_start < value_end {
+                        let lexical = std::str::from_utf8(&source[value_start..value_end])
+                            .map_err(|error| {
+                                OlapError::new(format!("PrimaryTable value is not UTF-8: {error}"))
+                            })?;
+                        let decoded = quick_xml::escape::unescape(lexical).map_err(|error| {
+                            OlapError::new(format!("PrimaryTable value is not XML: {error}"))
+                        })?;
+                        if decoded == expected_name {
+                            on_match(value_start, value_end);
+                        }
+                    }
+                }
+                let _ = end;
+            },
+            quick_xml::events::Event::Text(_) | quick_xml::events::Event::GeneralRef(_) => {},
+            quick_xml::events::Event::CData(_)
+            | quick_xml::events::Event::Comment(_)
+            | quick_xml::events::Event::PI(_)
+            | quick_xml::events::Event::DocType(_) => {
+                if candidate.is_some() {
+                    return Err(OlapError::new("PrimaryTable element is not scalar"));
+                }
+            },
+            quick_xml::events::Event::Decl(_) => {},
+            quick_xml::events::Event::Eof => {
+                if candidate.is_some() || !frames.is_empty() {
+                    return Err(OlapError::new("PrimaryTable element is unclosed"));
+                }
+                break;
+            },
         }
-        cursor = content_end + close.len();
+        event_start = event_end;
     }
     Ok(())
 }
@@ -1826,6 +2188,55 @@ fn find_start_tag_end(source: &[u8], start: usize) -> Result<usize, OlapError> {
     Err(OlapError::new(
         "table metadata XMObject start tag is unclosed",
     ))
+}
+
+/// Locate the actual first element rather than a byte lookalike in a prolog
+/// comment, processing instruction, or CDATA payload.  The root grammar for
+/// table metadata admits an unprefixed `XMObject` element; any other first
+/// element is refused before its attributes are inspected.
+fn find_xmobject_root_start(source: &[u8]) -> Result<usize, OlapError> {
+    let mut reader = quick_xml::reader::Reader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().enable_all_checks(true);
+    let mut event_start = usize::from(source.starts_with(b"\xEF\xBB\xBF")) * 3;
+    loop {
+        let event = reader.read_event().map_err(|error| {
+            OlapError::new(format!("table metadata XML is not well-formed: {error}"))
+        })?;
+        let event_end = usize::try_from(reader.buffer_position())
+            .map_err(|_| OlapError::new("table metadata XML position exceeds host size"))?;
+        if event_end > source.len() || event_start > event_end {
+            return Err(OlapError::new("table metadata XML event range is invalid"));
+        }
+        match event {
+            quick_xml::events::Event::Start(start) => {
+                if start.name().as_ref() == b"XMObject" {
+                    return Ok(event_start);
+                }
+                return Err(OlapError::new("table metadata has a non-XMObject root"));
+            },
+            quick_xml::events::Event::Empty(empty) => {
+                if empty.name().as_ref() == b"XMObject" {
+                    return Ok(event_start);
+                }
+                return Err(OlapError::new("table metadata has a non-XMObject root"));
+            },
+            quick_xml::events::Event::End(_) => {
+                return Err(OlapError::new("table metadata has an unmatched end"));
+            },
+            quick_xml::events::Event::Eof => {
+                return Err(OlapError::new("table metadata has no XMObject root"));
+            },
+            quick_xml::events::Event::Text(_)
+            | quick_xml::events::Event::GeneralRef(_)
+            | quick_xml::events::Event::CData(_)
+            | quick_xml::events::Event::Comment(_)
+            | quick_xml::events::Event::PI(_)
+            | quick_xml::events::Event::DocType(_)
+            | quick_xml::events::Event::Decl(_) => {},
+        }
+        event_start = event_end;
+    }
 }
 
 fn find_name_attribute(
@@ -2178,19 +2589,14 @@ pub fn validate_xldm140_identity_closure(
             )));
         }
     }
-    let mut expected_relationships = HashSet::new();
-    expected_relationships
-        .try_reserve(projection.relationships.len())
-        .map_err(|error| {
-            OlapError::new(format!("cannot reserve Xldm140 relationship keys: {error}"))
-        })?;
-    for relationship in &projection.relationships {
-        expected_relationships.insert(relationship.expected_index_key.as_str());
-    }
     for relationship in &projection.relationships {
         let mut indexes = generated.files.iter().filter(|file| {
             file.kind == SystemGeneratedKind::RelationshipIndex
-                && file.object_key == relationship.expected_index_key
+                && relationship_generated_object_key_matches(
+                    &file.object_key,
+                    &relationship.metadata_path,
+                    &relationship.expected_index_key,
+                )
         });
         let Some(index) = indexes.next() else {
             return Err(OlapError::new(format!(
@@ -2216,13 +2622,26 @@ pub fn validate_xldm140_identity_closure(
         }
     }
     for file in &generated.files {
-        if file.kind == SystemGeneratedKind::RelationshipIndex
-            && !expected_relationships.contains(file.object_key.as_str())
-        {
-            return Err(OlapError::new(format!(
-                "generated relationship index {} is absent from metadata identity closure",
-                file.storage_path
-            )));
+        if file.kind == SystemGeneratedKind::RelationshipIndex {
+            let mut owners = projection.relationships.iter().filter(|relationship| {
+                relationship_generated_object_key_matches(
+                    &file.object_key,
+                    &relationship.metadata_path,
+                    &relationship.expected_index_key,
+                )
+            });
+            let Some(_) = owners.next() else {
+                return Err(OlapError::new(format!(
+                    "generated relationship index {} is absent from metadata identity closure",
+                    file.storage_path
+                )));
+            };
+            if owners.next().is_some() {
+                return Err(OlapError::new(format!(
+                    "generated relationship index {} has ambiguous metadata ownership",
+                    file.storage_path
+                )));
+            }
         }
     }
     Ok(())
@@ -3422,6 +3841,40 @@ fn relationship_index_path_matches(path: &str, containing_table: &str, expected_
         && suffix == format!("{expected_key}.INDEX.0")
 }
 
+/// Match a generated relationship index to its qualified metadata owner.
+///
+/// `SystemGeneratedFile::object_key` is qualified for files discovered from
+/// storage (the parser retains the generated member's parent and ordinal),
+/// while a few older callers construct typed models with the legacy bare
+/// `R$...` identity.  The qualified form is required to retain the containing
+/// dimension ownership; the bare form remains accepted only for that legacy
+/// representation and is still checked against the physical index path by
+/// the closure validator.
+fn relationship_generated_object_key_matches(
+    object_key: &str,
+    metadata_path: &str,
+    expected_key: &str,
+) -> bool {
+    let Some((object_parent, object_name)) = object_key.rsplit_once('/') else {
+        return object_key == expected_key;
+    };
+    let Some((metadata_parent, _)) = metadata_path.rsplit_once('/') else {
+        return false;
+    };
+    if object_parent != metadata_parent {
+        return false;
+    }
+    if object_name == expected_key {
+        return true;
+    }
+    let Some((ordinal, identity)) = object_name.split_once('.') else {
+        return false;
+    };
+    !ordinal.is_empty()
+        && ordinal.bytes().all(|byte| byte.is_ascii_digit())
+        && identity == expected_key
+}
+
 fn qualify_storage_name(metadata_path: &str, name: &str) -> String {
     if name.contains('/') {
         name.to_owned()
@@ -3910,6 +4363,69 @@ mod tests {
             patch.inverse().apply(changed.as_ref()).unwrap(),
             source.as_slice()
         );
+    }
+
+    #[test]
+    fn relationship_rename_with_limit_accepts_exact_output_and_refuses_one_under() {
+        let source = build_identity_storage(&complete_distinct_id_storage_entries());
+        let storage = crate::inspect(&source).expect("canonical XLDM fixture should inspect");
+        let metadata = crate::metadata::inspect(&storage).expect("table metadata should inspect");
+        let native = crate::native::inspect(&storage, &metadata.native_parse_options())
+            .expect("native closure should inspect");
+        let generated = crate::generated::inspect_system_generated(&storage)
+            .expect("generated closure should inspect");
+        let olap = crate::olap::inspect(&storage, &metadata).expect("OLAP should inspect");
+        let closure = prove_xldm140_closure(&storage, &metadata, &olap, &native, &generated)
+            .expect("fixture should form a complete closure");
+
+        let grown = closure
+            .rename_table_name_with_relationships_with_limit(
+                "T1",
+                "A&B<escaped-name>",
+                super::super::model::MAX_STORAGE_BYTES,
+            )
+            .expect("escaped growth should be admitted");
+        assert!(
+            grown
+                .after()
+                .windows(b"A&amp;B&lt;escaped-name>".len())
+                .any(|window| window == b"A&amp;B&lt;escaped-name>")
+        );
+        let exact = grown.after().len();
+        assert!(exact > 0);
+        let repeated = closure
+            .rename_table_name_with_relationships_with_limit("T1", "A&B<escaped-name>", exact)
+            .expect("the exact final output cap should be accepted");
+        assert_eq!(repeated.after(), grown.after());
+        let under = closure
+            .rename_table_name_with_relationships_with_limit("T1", "A&B<escaped-name>", exact - 1)
+            .expect_err("one byte below the final size must report a caller limit");
+        assert_eq!(under.kind(), Xldm140RenameErrorKind::LimitExceeded);
+        assert_eq!(under.limit_bounds(), Some((exact, exact - 1)));
+        assert_eq!(
+            closure
+                .rename_table_name_with_relationships_with_limit("T1", "", exact)
+                .expect_err("an empty table name is an invalid operation")
+                .kind(),
+            Xldm140RenameErrorKind::InvalidSource
+        );
+        assert_eq!(grown.inverse().apply(grown.after()).unwrap(), source);
+
+        let shrunk = closure
+            .rename_table_name_with_relationships_with_limit(
+                "T1",
+                "T",
+                super::super::model::MAX_STORAGE_BYTES,
+            )
+            .expect("a shorter XML name should be admitted");
+        assert_ne!(shrunk.after(), source.as_slice());
+        assert_eq!(shrunk.inverse().apply(shrunk.after()).unwrap(), source);
+
+        let no_op = closure
+            .rename_table_name_with_relationships_with_limit("T1", "OldName", 0)
+            .expect("an exact no-op should not require an output allocation");
+        assert!(no_op.is_noop());
+        assert!(std::ptr::eq(no_op.after().as_ptr(), source.as_ptr()));
     }
 
     #[test]
@@ -4601,6 +5117,44 @@ mod tests {
     }
 
     #[test]
+    fn generated_relationship_index_key_retains_qualified_owner() {
+        let metadata_path = "Model.1.db/T1.0.dim/R$T1$RelA.1.tbl.xml";
+        let expected = "R$T1$RelA";
+        assert!(relationship_generated_object_key_matches(
+            "Model.1.db/T1.0.dim/1.R$T1$RelA",
+            metadata_path,
+            expected,
+        ));
+        assert!(relationship_generated_object_key_matches(
+            "Model.1.db/T1.0.dim/R$T1$RelA",
+            metadata_path,
+            expected,
+        ));
+        // Hand-built typed models from the pre-qualified API remain accepted;
+        // the physical path validator still binds this legacy form to T1.
+        assert!(relationship_generated_object_key_matches(
+            expected,
+            metadata_path,
+            expected,
+        ));
+        assert!(!relationship_generated_object_key_matches(
+            "Model.1.db/T2.0.dim/1.R$T1$RelA",
+            metadata_path,
+            expected,
+        ));
+        assert!(!relationship_generated_object_key_matches(
+            "Model.1.db/T1.0.dim/x.R$T1$RelA",
+            metadata_path,
+            expected,
+        ));
+        assert!(!relationship_generated_object_key_matches(
+            "Model.1.db/T1.0.dim/1.R$T1$RelB",
+            metadata_path,
+            expected,
+        ));
+    }
+
+    #[test]
     fn closure_member_index_merges_shared_native_generated_paths() {
         let mut paths = HashMap::new();
         paths.insert("native-and-generated", 0);
@@ -5094,6 +5648,27 @@ mod tests {
     }
 
     #[test]
+    fn table_name_replacement_ignores_pre_root_xml_lookalikes() {
+        for prefix in [
+            b"<!-- <XMObject name=\"Old\"> -->".as_slice(),
+            b"<?vendor <XMObject name=\"Old\"> ?>".as_slice(),
+            b"<![CDATA[<XMObject name=\"Old\">]]>".as_slice(),
+        ] {
+            let mut source = prefix.to_vec();
+            source.extend_from_slice(
+                br#"<XMObject class="XMSimpleTable" name="Old"><Properties/></XMObject>"#,
+            );
+            let changed = replace_table_name_attribute_variable(&source, "Old", "New")
+                .expect("the actual XMObject root should be selected");
+            let mut expected = prefix.to_vec();
+            expected.extend_from_slice(
+                br#"<XMObject class="XMSimpleTable" name="New"><Properties/></XMObject>"#,
+            );
+            assert_eq!(changed, expected);
+        }
+    }
+
+    #[test]
     fn variable_table_and_relationship_replacements_preserve_unknown_markup() {
         let table = br#"<XMObject class="XMSimpleTable" name="Old"><Unknown a="1"/></XMObject>"#;
         let changed = replace_table_name_attribute_variable(table, "Old", "Longer&Name")
@@ -5113,6 +5688,25 @@ mod tests {
     }
 
     #[test]
+    fn relationship_replacement_ignores_opaque_same_name_markup() {
+        let relationships = br#"<XMObject><Relationships><PrimaryTable>Old</PrimaryTable><Extension><PrimaryTable>Old</PrimaryTable><![CDATA[<PrimaryTable>Old</PrimaryTable>]]><!-- <PrimaryTable>Old</PrimaryTable> --></Extension></Relationships></XMObject>"#;
+        let changed = replace_relationship_primary_table(relationships, "Old", "New")
+            .expect("opaque relationship descendants must not become rewrite candidates");
+        assert_eq!(
+            changed,
+            br#"<XMObject><Relationships><PrimaryTable>New</PrimaryTable><Extension><PrimaryTable>Old</PrimaryTable><![CDATA[<PrimaryTable>Old</PrimaryTable>]]><!-- <PrimaryTable>Old</PrimaryTable> --></Extension></Relationships></XMObject>"#
+        );
+
+        let canonical = br#"<XMObject><Collections><Collection><Name>Relationships</Name><XMObject class="XMRelationship"><Properties><PrimaryTable>Old</PrimaryTable></Properties></XMObject></Collection></Collections></XMObject>"#;
+        let changed = replace_relationship_primary_table(canonical, "Old", "New")
+            .expect("canonical XMRelationship ownership should be admitted");
+        assert_eq!(
+            changed,
+            br#"<XMObject><Collections><Collection><Name>Relationships</Name><XMObject class="XMRelationship"><Properties><PrimaryTable>New</PrimaryTable></Properties></XMObject></Collection></Collections></XMObject>"#
+        );
+    }
+
+    #[test]
     fn relationship_replacement_validates_all_scalar_spans_before_output_allocation() {
         let malformed = br#"<XMObject><PrimaryTable><Nested/></PrimaryTable></XMObject>"#;
         let error = replace_relationship_primary_table(malformed, "Old", "New").unwrap_err();
@@ -5121,6 +5715,24 @@ mod tests {
         let unclosed = br#"<XMObject><PrimaryTable>Old</XMObject>"#;
         let error = replace_relationship_primary_table(unclosed, "Old", "New").unwrap_err();
         assert!(error.to_string().contains("unclosed"));
+    }
+
+    #[test]
+    fn relationship_rename_preserves_comment_lookalikes() {
+        for comment in [
+            "<!-- <PrimaryTable>Old</PrimaryTable> -->",
+            "<!-- <PrimaryTable>Old -->",
+        ] {
+            let source = format!(
+                "<XMObject><Relationships>{comment}<PrimaryTable>Old</PrimaryTable></Relationships></XMObject>"
+            );
+            let expected = format!(
+                "<XMObject><Relationships>{comment}<PrimaryTable>New</PrimaryTable></Relationships></XMObject>"
+            );
+            let actual = replace_relationship_primary_table(source.as_bytes(), "Old", "New")
+                .expect("comment text must not affect relationship matching");
+            assert_eq!(std::str::from_utf8(&actual).unwrap(), expected);
+        }
     }
 
     #[test]
