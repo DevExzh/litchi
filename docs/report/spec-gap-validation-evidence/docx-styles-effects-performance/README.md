@@ -23,7 +23,7 @@ active worktree, choose two absent external paths, then run:
 git worktree add --detach /tmp/litchi-docx-styles-effects-smoke <scaffold-commit>
 DOCX_STYLES_EFFECTS_RESULTS=/var/tmp/litchi-docx-styles-effects-results-unique \
 DOCX_STYLES_EFFECTS_TARGET_DIR=/var/tmp/litchi-docx-styles-effects-target-unique \
-bash docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/run_smoke.sh
+bash /tmp/litchi-docx-styles-effects-smoke/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/run_smoke.sh
 ```
 
 Raw JSON receipts, `/usr/bin/time -v` RSS sidecars, build/source provenance,
@@ -32,3 +32,12 @@ results directory. The current scaffold runs one
 fresh process, zero warmups, and one correctness sample per lane. Full timing,
 scaling, and speedup claims remain gated until this smoke is independently
 reviewed and a measurement harness is approved.
+
+The first frozen-source run executed all 43 lanes, but only 42 passed the
+fail-closed verifier. Existing-owner replacement in `cap_total_part_bytes`
+grew aggregate part bytes from 110,027 to 110,151. With a 110,150-byte limit,
+publication correctly returned a `ReadLimit` for `TotalPartBytes`, while transaction
+commit had incorrectly succeeded. The receipt records
+`commit_stage_checked=false`; this is a production preflight defect, not an
+approved smoke result. The production fix and an independent commit-time
+regression are required before a fresh source pin and rerun.
