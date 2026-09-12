@@ -1,0 +1,8 @@
+{
+  "observed_utc": "2026-09-12T15:29:30.187392+00:00",
+  "scope": "Bounded 4096-byte temporary write probe following observed vgdb failure; exact created path removed in finally.",
+  "status": "failed",
+  "errno": 122,
+  "error": "[Errno 122] Disk quota exceeded",
+  "removed_path": "/tmp/litchi-goal-0532-probe-5as2lpk6"
+}

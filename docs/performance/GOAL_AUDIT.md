@@ -1,5 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0532: OLE2 attribution advances the goal; completion remains open
+
+[0532](changes/0532-cfb-claim-success-path-attribution.md) completes a fresh
+current-head CFB/OLE2 ownership and reconciliation attribution baseline. It
+binds 24,000 native samples, 720 allocation samples, eight profiles with 40
+timed and six setup dumps, and mechanism evidence for the per-sector
+`claim_sector` success path. No runtime optimization or speedup is adopted.
+The next bounded measurement is private cold error helpers plus ordinary
+`claim_sector` inlining, preserving all checked bounds, error precedence,
+fallible operations, collect-then-claim order and physical reconciliation.
+Five fresh quality checks pass with 1,957 test executions; exact-source 0531
+reuse remains separately bound at eight gates and 4,757 executions. The
+OLE2/OOXML optimization goal remains incomplete, ODF stays deferred and iWork
+is excluded; cleanup and evidence sealing are complete.
+
 ## 0531: final OOXML MCE candidate rejected; OLE2 remains next
 
 [0531](changes/0531-ooxml-mce-namespace-search.md) makes progress by completing

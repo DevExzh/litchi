@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## 0532: CFB claim-sector success path is the next bounded lead
+
+[0532](changes/0532-cfb-claim-success-path-attribution.md) attributes the
+current CFB/OLE2 constructor without changing production. `claim_sector` is
+17.8164–17.8209% of exclusive XLS-owned constructor Ir and 18.9505% for
+few-large CFB, with one raw call per physical sector and 15 self Ir per call;
+the six emitted variants are each 363 bytes with a 112-byte stack reservation.
+Tiny and many-small CFB claim shares are only 0.1836% and 0.3282%, where
+stream validation is the larger adjacent owner. The next measurement is a
+private cold-error-helper plus ordinary-inline experiment, with all checked
+bounds, error order, fallibility, collect-then-claim sequencing and physical
+reconciliation retained. Static code is not a speedup claim; fresh ABBA native
+evidence is required, and the proposed 3% primary p50 rule in both repeats is
+not yet frozen. Do not revive the rejected 0524 visited-bit fusion, 0279
+freshness-session proposal or 0531 OOXML MCE binary. OLE2/OOXML stays ahead of
+deferred ODF, and iWork is excluded.
+
 ## 0531: final MCE binary fails native admission
 
 [0531](changes/0531-ooxml-mce-namespace-search.md) rejects the exact

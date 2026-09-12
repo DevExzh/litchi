@@ -1,5 +1,20 @@
 # Performance optimization ADR-compliance matrix
 
+## 0532: bind current-head CFB attribution without adopting a candidate
+
+[0532](changes/0532-cfb-claim-success-path-attribution.md) records a fresh
+current-head OLE2 baseline at revision `70e04d90181847ffe24c2ec8b8d5e1cd3b47981f`.
+The native/allocation analysis passes with 24,000/720 samples and no same-build
+variation above 5%; eight constructor profiles contain 40 timed dumps and six
+setup dumps. Mechanism evidence finds 15 self Ir per `claim_sector` call, six
+363-byte variants with 112-byte stack reservations, and exclusive claim shares
+of 17.8164–17.8209% for XLS and 18.9505% for CFB few-large; no speedup or
+production change is adopted. The next measurement may test private cold error
+helpers plus an ordinary inline hint while preserving checked bounds, error
+order, fallibility, collect-then-claim sequencing and physical reconciliation.
+Five fresh quality checks account for 1,957 test executions; exact-source 0531
+reuse supplies eight prior gates and 4,757 executions. Cleanup and evidence sealing are complete. OLE2/OOXML remains active, ODF is deferred, and iWork is excluded.
+
 ## 0531: reject the final OOXML MCE binary
 
 [0531](changes/0531-ooxml-mce-namespace-search.md) restores the production

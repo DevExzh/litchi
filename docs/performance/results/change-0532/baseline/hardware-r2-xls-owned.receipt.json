@@ -1,0 +1,50 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x",
+    ",",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/hardware-r2-xls-owned.csv",
+    "-e",
+    "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "--",
+    "/tmp/litchi-goal-0532/normal",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--warmup",
+    "0",
+    "--samples",
+    "1000",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/hardware-r2-xls-owned.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/hardware-r2-xls-owned.catalog.json"
+  ],
+  "start_utc": "2026-09-12T15:28:27.441501+00:00",
+  "end_utc": "2026-09-12T15:28:28.406728+00:00",
+  "seconds": 0.9652471060107928,
+  "exit_code": 0,
+  "binary_sha256": "ad0e47d21c12359440259dc466baa0048168a9f936137bdcb9d51fe9797d921d",
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "script_sha256": "b85672a757e7ea1e2aa747b76812d93c319dbee90b930c8c57db835024b8a712",
+  "plan_sha256": "cd9055e39a760143746d02f4a7a21f556f7c4cf9c45d91978283a51be4a49811",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "hardware-r2-xls-owned.catalog.json": "f77792e2218b59c9e3c17d1f3daf1404428d155ab42a81f7f518963ed40934d5",
+    "hardware-r2-xls-owned.csv": "47e698078809ab4d218802c76fbdbb3ab7bad6d15928c98b57140b4c248b098f",
+    "hardware-r2-xls-owned.host.json": "149da6faa50084b3fb48e8773e570f44b62b60be681fa071a553cc934a5b2857",
+    "hardware-r2-xls-owned.json": "39ea8af8fd619148a4eb42ae2aa52f5feda20dc01356820e72c6632f8d798d5d",
+    "hardware-r2-xls-owned.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hardware-r2-xls-owned.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

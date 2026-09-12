@@ -1,0 +1,28 @@
+{
+  "command": [
+    "objdump",
+    "-d",
+    "--disassemble=_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h6ed39d904937106fE",
+    "/tmp/litchi-goal-0532/normal"
+  ],
+  "start_utc": "2026-09-12T15:25:48.034799+00:00",
+  "end_utc": "2026-09-12T15:25:48.233394+00:00",
+  "seconds": 0.19861151800432708,
+  "exit_code": 0,
+  "binary_sha256": "ad0e47d21c12359440259dc466baa0048168a9f936137bdcb9d51fe9797d921d",
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "script_sha256": "b85672a757e7ea1e2aa747b76812d93c319dbee90b930c8c57db835024b8a712",
+  "plan_sha256": "cd9055e39a760143746d02f4a7a21f556f7c4cf9c45d91978283a51be4a49811",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "assembly-validate_physical_sector_layout-4.host.json": "e77274af3396d3cc42b90bac115844a8726102e691fa4545a0f577413f5d14ff",
+    "assembly-validate_physical_sector_layout-4.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "assembly-validate_physical_sector_layout-4.stdout": "98b2f4ffcdb68e4c0e3dad7bfc07b6bb37959623b3002bc324b4e08173fcafce"
+  }
+}

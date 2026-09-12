@@ -1,5 +1,21 @@
 # Performance program phase report
 
+## 0532: current-head CFB ownership and reconciliation attribution
+
+[0532](changes/0532-cfb-claim-success-path-attribution.md) completes the
+current-head OLE2 attribution batch after the rejected 0531 OOXML binary. The
+fresh baseline retains 24,000 native and 720 allocation samples; eight
+constructor profiles contain 40 timed dumps and six setup dumps. The generated
+code evidence records one `claim_sector` call per physical sector, 15 self Ir
+per call, and six 363-byte variants with 112-byte stack reservations. Exclusive
+claim shares are 17.8164–17.8209% for XLS, 18.9505% for CFB few-large, 0.1836%
+for tiny and 0.3282% for many-small. Adjacent physical reconciliation and
+stream-validation shares remain separately accounted. No runtime speedup or
+production change is retained. The next concrete measurement is cold error
+helpers plus ordinary `claim_sector` inlining, preserving all checks and error
+order. Five fresh quality checks pass with 1,957 test executions; exact-source
+0531 reuse supplies eight prior gates and 4,757 executions. Cleanup and evidence sealing are complete; OLE2/OOXML remains active, ODF deferred and iWork excluded.
+
 ## 0531: reject the final OOXML MCE namespace-search candidate
 
 [0531](changes/0531-ooxml-mce-namespace-search.md) completes a fresh native

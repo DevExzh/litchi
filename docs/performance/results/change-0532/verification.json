@@ -1,0 +1,228 @@
+{
+  "components": {
+    "all": {
+      "result": {
+        "analysis": {
+          "allocation_samples": 720,
+          "captures": {
+            "jobs": {
+              "alloc": 4,
+              "hardware": 2,
+              "native": 4,
+              "profile": 8
+            },
+            "profile_retry": {
+              "failed_receipt_sha256": "c9ada7b08e7823d6b0582470bb4ef8feb28532e8efe1f98b846e3427ca04753c",
+              "frozen_sha256": "8b77c5d4fab684a190203922b8420f1e61cebf78772cb4ee34bce483a4c84253",
+              "retry_argument": "--vgdb=no",
+              "retry_plan_sha256": "42d56ae5fab705fa12ed26895361e67a09d14e2a76a176f0f6a9ab62ee5d17cb",
+              "status": "pass"
+            },
+            "receipts": 18,
+            "status": "pass"
+          },
+          "native_samples": 24000,
+          "path": "analysis.json",
+          "rows": 48,
+          "same_build_variations": 0,
+          "sha256": "78e977337ac75724548cc4ebbc213d30759a559badc4d608f51b8a0ea7f9a2cf",
+          "status": "pass"
+        },
+        "assembly": {
+          "disassemblies": 30,
+          "index_sha256": "43e77b7c6662db2284c2e3e4a1f3c5ab0d29e0d578e67a903a6e48566f36f544",
+          "intervals": 31,
+          "plan_sha256": "dc9f0feb3e0c6ad2913ec409f133829947df9df376135b7c0cb49d0821112952",
+          "status": "pass",
+          "symbols": 1,
+          "symbols_receipt": "e4a23e2b6d86adce0f00a781dc008d3f1726632f921d9330a3f70c84b154346c"
+        },
+        "builds": {
+          "alloc": {
+            "bytes": 60000176,
+            "identity_sha256": "b2e7a621529d4bce86b481736d9e756466fd5ebb8554651d2beaae591c91fe44",
+            "kind": "alloc",
+            "path": "/tmp/litchi-goal-0532/alloc",
+            "sha256": "23bc4f4228f4f9d5041da1867f4da3f3d21fffd11880145d409b064bc93dc3fe"
+          },
+          "normal": {
+            "bytes": 60132032,
+            "identity_sha256": "f1fc0f28699497fe8318d8f361b57589198137a08600953f81b3b00c25e642a9",
+            "kind": "normal",
+            "path": "/tmp/litchi-goal-0532/normal",
+            "sha256": "ad0e47d21c12359440259dc466baa0048168a9f936137bdcb9d51fe9797d921d"
+          }
+        },
+        "captures": {
+          "jobs": {
+            "alloc": 4,
+            "hardware": 2,
+            "native": 4,
+            "profile": 8
+          },
+          "profile_retry": {
+            "failed_receipt_sha256": "c9ada7b08e7823d6b0582470bb4ef8feb28532e8efe1f98b846e3427ca04753c",
+            "frozen_sha256": "8b77c5d4fab684a190203922b8420f1e61cebf78772cb4ee34bce483a4c84253",
+            "retry_argument": "--vgdb=no",
+            "retry_plan_sha256": "42d56ae5fab705fa12ed26895361e67a09d14e2a76a176f0f6a9ab62ee5d17cb",
+            "status": "pass"
+          },
+          "receipts": 18,
+          "status": "pass"
+        },
+        "cleanup": {
+          "owned_paths_absent": true,
+          "path": "cleanup.json",
+          "python_cache_absent": true,
+          "sha256": "1cfb22c851d808605bd7f9a0886f364f131e2df6f1b67fab5cbc1e855852a5c4",
+          "status": "pass"
+        },
+        "hardware": {
+          "captures": 2,
+          "path": "hardware-analysis.json",
+          "sha256": "367382fc4c4e4cab6fe466c61ba9eb56e5b3adc6e2b0e1b083e897cef3981a23",
+          "status": "pass",
+          "statuses": [
+            "measured",
+            "measured"
+          ]
+        },
+        "mechanism": {
+          "assembly_variants": 6,
+          "path": "mechanism-analysis.json",
+          "performance_claim": "none",
+          "profile_rows": 8,
+          "sha256": "f2a7c5f237bde80b6db11ee6986eada4cabcae50ee8d73f97177ddad5a530b54",
+          "status": "pass"
+        },
+        "profile": {
+          "path": "profile-analysis.json",
+          "profiles": 8,
+          "setup_dumps": 6,
+          "sha256": "7b2c87f5b0dd8783e7b06d74aa2f411c448b74f837ea09f3146b9ee195e2e1fa",
+          "status": "pass",
+          "timed_constructor_dumps": 40
+        },
+        "quality": {
+          "checks": 5,
+          "executed_tests": 1957,
+          "path": "quality-summary.json",
+          "reuse": {
+            "path": "quality-reuse.json",
+            "prior_replay": {
+              "quality": {
+                "checks": 8,
+                "executed_tests": 4757,
+                "path": "restored-quality-summary.json",
+                "sha256": "5f3447aa59b29d1f615301ce1ecc760b8487c8af3f4825d5789bc1749395e55c",
+                "stage": "restored"
+              },
+              "seal": {
+                "entries": 998,
+                "path": "SHA256SUMS",
+                "sha256": "f178a86d44ceeacc4c1fc9ab1c23fb9d25f018146959b38cba80a07997389168"
+              }
+            },
+            "prior_tests": 4757,
+            "sha256": "b681eed016c73ac0571491e3ffec9d6c0f018fee4df38c86c164c3ea676b8a4b",
+            "status": "pass"
+          },
+          "sha256": "36418843acb841fa2293bde062da53debef1af071b9817e5decbc5083ad0c17c",
+          "status": "pass"
+        },
+        "receipt_inventory": {
+          "receipt_names_sha256": "bb15d084758affd8536f3a9a7b9a944cfe905d2a517f0e41c6f9967fff0be7da",
+          "status": "pass",
+          "successful_receipts": 56
+        },
+        "source": {
+          "adr_entries": 30,
+          "manifest_entries": 8585,
+          "manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+          "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "revision": "70e04d90181847ffe24c2ec8b8d5e1cd3b47981f",
+          "status": "pass"
+        },
+        "status": "pass",
+        "timeline": {
+          "first": "build-normal",
+          "last": "check-owner-rustdoc",
+          "order": [
+            "build-normal",
+            "symbols",
+            "assembly-claim_sector-0",
+            "assembly-claim_sector-1",
+            "assembly-claim_sector-2",
+            "assembly-claim_sector-3",
+            "assembly-claim_sector-4",
+            "assembly-claim_sector-5",
+            "assembly-validate_stream_allocations-0",
+            "assembly-validate_stream_allocations-1",
+            "assembly-validate_stream_allocations-2",
+            "assembly-validate_stream_allocations-3",
+            "assembly-validate_stream_allocations-4",
+            "assembly-validate_stream_allocations-5",
+            "assembly-validate_stream_allocations-6",
+            "assembly-validate_stream_allocations-7",
+            "assembly-validate_stream_allocations-8",
+            "assembly-validate_stream_allocations-9",
+            "assembly-validate_stream_allocations-10",
+            "assembly-validate_stream_allocations-11",
+            "assembly-validate_physical_sector_layout-0",
+            "assembly-validate_physical_sector_layout-1",
+            "assembly-validate_physical_sector_layout-2",
+            "assembly-validate_physical_sector_layout-3",
+            "assembly-validate_physical_sector_layout-4",
+            "assembly-validate_physical_sector_layout-5",
+            "assembly-validate_physical_sector_layout-6",
+            "assembly-validate_physical_sector_layout-7",
+            "assembly-validate_physical_sector_layout-8",
+            "assembly-validate_physical_sector_layout-9",
+            "assembly-validate_physical_sector_layout-10",
+            "assembly-validate_physical_sector_layout-11",
+            "native-r1-xls",
+            "native-r1-cfb",
+            "native-r2-cfb",
+            "native-r2-xls",
+            "failed-profile-initial/profile-r1-xls-owned",
+            "profile-r1-xls-owned",
+            "profile-r1-cfb-tiny",
+            "profile-r1-cfb-many-small",
+            "profile-r1-cfb-few-large",
+            "profile-r2-xls-owned",
+            "profile-r2-cfb-tiny",
+            "profile-r2-cfb-many-small",
+            "profile-r2-cfb-few-large",
+            "hardware-r1-xls-owned",
+            "hardware-r2-xls-owned",
+            "build-alloc",
+            "alloc-r1-xls",
+            "alloc-r1-cfb",
+            "alloc-r2-xls",
+            "alloc-r2-cfb",
+            "check-cfb-tests",
+            "check-cfb-no-default-tests",
+            "check-xls-tests",
+            "check-owner-clippy",
+            "check-owner-rustdoc"
+          ],
+          "retained_failed_attempts": 1,
+          "serial_intervals": 57,
+          "status": "pass",
+          "successful_receipts": 56
+        },
+        "variation": {
+          "path": "variation-review.json",
+          "sha256": "f12c8058fb2348d488ba1e9f19bf5dc942ec903c5851147662c64e005062e9d6",
+          "status": "pass",
+          "variations": 0
+        }
+      },
+      "status": "pass"
+    }
+  },
+  "performance_claim": "none; baseline attribution and diagnostics only",
+  "schema": "litchi-0532-measurement-verification-v1",
+  "scope": "all",
+  "status": "pass"
+}

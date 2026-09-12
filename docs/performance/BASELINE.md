@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0532: current CFB claim-sector attribution baseline
+
+[0532](changes/0532-cfb-claim-success-path-attribution.md) binds the unchanged
+current head to 24,000 native samples and 720 separate allocation samples.
+CFB p50 baselines for repeats 1/2 are 2.410/2.400 µs (tiny),
+140.751/140.670 µs (many-small), and 91.441/90.980 µs (few-large); the
+owned-source XLS one-cell row is 129.775/131.910 µs. The 40 timed constructor
+dumps across eight profile children show one claim call per physical sector and
+15 self Ir per call. `claim_sector` has six recorded variants, each 363 bytes
+with a 112-byte stack reservation. Its exclusive share is 17.8164–17.8209%
+for XLS and 18.9505% for CFB few-large, while tiny and many-small are only
+0.1836% and 0.3282%; adjacent physical and stream-validation shares remain
+separate. This is attribution only: no speedup, allocator reduction or
+production change is claimed. Five fresh checks pass with 1,957 test
+executions, and exact-source 0531 quality reuse contributes 4,757 prior
+executions. Cleanup and evidence sealing are complete.
+
 ## 0531: final MCE candidate fails the native gate
 
 [0531](changes/0531-ooxml-mce-namespace-search.md) retains the final native

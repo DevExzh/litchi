@@ -1,0 +1,82 @@
+{
+  "status": "frozen-before-quality",
+  "commands": [
+    [
+      "cfb-tests",
+      [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ]
+    ],
+    [
+      "cfb-no-default-tests",
+      [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "--no-default-features",
+        "--",
+        "--test-threads=2"
+      ]
+    ],
+    [
+      "xls-tests",
+      [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xls",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ]
+    ],
+    [
+      "owner-clippy",
+      [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "-p",
+        "litchi-xls",
+        "--all-features",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ]
+    ],
+    [
+      "owner-rustdoc",
+      [
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "-p",
+        "litchi-xls",
+        "--all-features",
+        "--no-deps"
+      ]
+    ]
+  ],
+  "script_sha256": "632df05fb4676f668b0e8b6acf4ac81eb5d1058f85e7ac0a2829b7c35205ba48",
+  "amended_utc": "2026-09-12T15:29:58.502498+00:00",
+  "initial_plan_sha256": "9d38210bf2211eb54451dee7fbc20921a3d17f4f00453d90feb7f92ff8b30fea",
+  "initial_script_sha256": "cba7a3f58a4f4b846c1863ddc08712e55564a9f74db9e2fd072ac1f680018e81",
+  "temporary_storage_probe_sha256": "9c0b4ca699be0af067fc5f81f812d91e3d6bac938b9bdf5a57ec88678ab17324",
+  "temporary_directory": "/home/zhuhe/litchi-goal-0532-target/tmp",
+  "amendment": "Before any quality child, route test/compiler temporary files to owned disk storage after an independent 4096-byte /tmp write confirmed EDQUOT. Same five quality commands and source; all temporary data remains in the owned cleanup tree."
+}
