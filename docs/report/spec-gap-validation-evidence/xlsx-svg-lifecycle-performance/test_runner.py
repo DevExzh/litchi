@@ -2,9 +2,38 @@
 
 import os
 from pathlib import Path
+import re
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
+
+
+class RunnerInputTests(unittest.TestCase):
+    def test_declared_manifest_extras_exist_in_committed_checkout(self):
+        here = Path(__file__).resolve().parent
+        root = here.parents[3]
+        script = (here / "run_profile.sh").read_text()
+        variables = {"ROOT": root, "HERE": here}
+        for name, relative in re.findall(r'^([A-Z_]+)="\$HERE/([^"\n]+)"$', script, re.M):
+            variables[name] = here / relative
+        arguments = re.findall(r'--extra "([^"\n]+)"', script)
+        self.assertTrue(arguments, "runner has no declared manifest inputs")
+        paths = set()
+        for argument in arguments:
+            parsed = re.fullmatch(r'\$([A-Z_]+)(/.*)?', argument)
+            self.assertIsNotNone(parsed, f"unhandled input expression: {argument}")
+            variable, suffix = parsed.groups()
+            self.assertIn(variable, variables, f"unresolved input variable: {argument}")
+            path = variables[variable] / (suffix or "").lstrip("/")
+            paths.add(path.relative_to(root).as_posix())
+        for path in sorted(paths):
+            with self.subTest(path=path):
+                run = subprocess.run(
+                    ["git", "--no-replace-objects", "-C", str(root),
+                     "cat-file", "-e", f"HEAD:{path}"],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(run.returncode, 0, f"input absent from Git HEAD: {path}")
 
 
 @unittest.skipUnless(Path("/usr/bin/time").is_file(), "runner requires GNU time")
