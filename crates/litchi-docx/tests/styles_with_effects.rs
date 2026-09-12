@@ -1516,6 +1516,190 @@ fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_own
     Ok(())
 }
 
+fn assert_replacement_honors_total_part_bytes_cap(
+    source: &[u8],
+    owner: Owner,
+) -> FixtureResult<()> {
+    let source_metrics = package_metrics(source)?;
+    let mut generous = Package::from_reader(Cursor::new(source.to_vec())).map_err(|error| {
+        FixtureError(format!(
+            "open generous {owner:?} replacement source: {error}"
+        ))
+    })?;
+    let base = generous
+        .styles_with_effects(owner)
+        .map_err(|error| FixtureError(format!("load generous {owner:?} replacement: {error}")))?;
+    let replacement = changed_resource(&base);
+    assert!(
+        replacement.xml_bytes().len()
+            > base
+                .resource()
+                .expect("existing owner replacement resource")
+                .xml_bytes()
+                .len(),
+        "replacement must grow the selected {owner:?} part"
+    );
+    let mut edit = base.edit();
+    edit.replace_resource(Some(replacement.clone()))
+        .map_err(|error| FixtureError(format!("stage generous {owner:?} replacement: {error}")))?;
+    let commit = edit
+        .commit()
+        .map_err(|error| FixtureError(format!("commit generous {owner:?} replacement: {error}")))?;
+    let published = generous
+        .apply_styles_with_effects_commit(owner, commit)
+        .map_err(|error| {
+            FixtureError(format!("publish generous {owner:?} replacement: {error}"))
+        })?;
+    assert_eq!(
+        published
+            .resource()
+            .expect("published replacement resource")
+            .xml_bytes(),
+        replacement.xml_bytes()
+    );
+    let projected = package_bytes(&mut generous);
+    let projected_metrics = package_metrics(&projected)?;
+    assert!(projected_metrics.total_part_bytes > source_metrics.total_part_bytes);
+    let exact_total = projected_metrics.total_part_bytes;
+    let one_under = exact_total
+        .checked_sub(1)
+        .ok_or_else(|| FixtureError("replacement total-part metric underflow".into()))?;
+    assert!(
+        one_under > source_metrics.total_part_bytes,
+        "one-under replacement cap must still admit the source package"
+    );
+
+    let exact_limits = ReadLimits::builder()
+        .max_total_part_bytes(exact_total)
+        .map_err(|error| FixtureError(format!("set exact {owner:?} total-part cap: {error:?}")))?
+        .build()
+        .map_err(|error| {
+            FixtureError(format!("build exact {owner:?} total-part cap: {error:?}"))
+        })?;
+    let mut exact = Package::from_reader_with_limits(Cursor::new(source.to_vec()), exact_limits)
+        .map_err(|error| {
+            FixtureError(format!("open exact {owner:?} replacement source: {error}"))
+        })?;
+    assert_eq!(package_bytes(&mut exact), source);
+    let exact_base = exact.styles_with_effects(owner).map_err(|error| {
+        FixtureError(format!("load exact {owner:?} replacement source: {error}"))
+    })?;
+    let mut exact_edit = exact_base.edit();
+    exact_edit
+        .replace_resource(Some(replacement.clone()))
+        .map_err(|error| FixtureError(format!("stage exact {owner:?} replacement: {error}")))?;
+    let exact_commit = exact_edit
+        .commit()
+        .map_err(|error| FixtureError(format!("commit exact {owner:?} replacement: {error}")))?;
+    let exact_published = exact
+        .apply_styles_with_effects_commit(owner, exact_commit)
+        .map_err(|error| FixtureError(format!("publish exact {owner:?} replacement: {error}")))?;
+    assert_eq!(
+        exact_published
+            .resource()
+            .expect("exact published replacement resource")
+            .xml_bytes(),
+        replacement.xml_bytes()
+    );
+    let exact_output = package_bytes(&mut exact);
+    assert_eq!(
+        package_metrics(&exact_output)?.total_part_bytes,
+        exact_total,
+        "exact {owner:?} cap changed the final part-byte metric"
+    );
+    let reopened = Package::from_reader_with_limits(Cursor::new(exact_output), exact_limits)
+        .map_err(|error| FixtureError(format!("reopen exact {owner:?} replacement: {error}")))?;
+    assert_eq!(
+        reopened
+            .styles_with_effects(owner)
+            .map_err(|error| FixtureError(format!("read reopened exact {owner:?}: {error}")))?
+            .resource()
+            .expect("reopened exact replacement resource")
+            .xml_bytes(),
+        replacement.xml_bytes()
+    );
+
+    let one_under_limits = ReadLimits::builder()
+        .max_total_part_bytes(one_under)
+        .map_err(|error| {
+            FixtureError(format!("set one-under {owner:?} total-part cap: {error:?}"))
+        })?
+        .build()
+        .map_err(|error| {
+            FixtureError(format!(
+                "build one-under {owner:?} total-part cap: {error:?}"
+            ))
+        })?;
+    let mut limited =
+        Package::from_reader_with_limits(Cursor::new(source.to_vec()), one_under_limits).map_err(
+            |error| {
+                FixtureError(format!(
+                    "open one-under {owner:?} replacement source: {error}"
+                ))
+            },
+        )?;
+    let baseline = package_bytes(&mut limited);
+    assert_eq!(baseline, source);
+    let limited_base = limited.styles_with_effects(owner).map_err(|error| {
+        FixtureError(format!(
+            "load one-under {owner:?} replacement source: {error}"
+        ))
+    })?;
+    let mut limited_edit = limited_base.edit();
+    limited_edit
+        .replace_resource(Some(replacement))
+        .map_err(|error| FixtureError(format!("stage one-under {owner:?} replacement: {error}")))?;
+    let commit_error = limited_edit
+        .commit()
+        .expect_err("one-under replacement must fail at transaction commit");
+    assert!(
+        matches!(
+            commit_error,
+            litchi_docx::Error::Opc(litchi_opc::OpcError::ReadLimit {
+                resource: litchi_opc::ReadResource::TotalPartBytes,
+                actual,
+                maximum,
+            }) if actual == exact_total && maximum == one_under
+        ),
+        "one-under {owner:?} replacement returned the wrong commit error: {commit_error}"
+    );
+    assert_eq!(
+        package_bytes(&mut limited),
+        baseline,
+        "one-under {owner:?} commit changed package output"
+    );
+    let reopened_baseline =
+        Package::from_reader_with_limits(Cursor::new(baseline), one_under_limits).map_err(
+            |error| FixtureError(format!("reopen one-under {owner:?} baseline: {error}")),
+        )?;
+    assert_eq!(
+        reopened_baseline
+            .styles_with_effects(owner)
+            .map_err(|error| {
+                FixtureError(format!(
+                    "read reopened one-under {owner:?} baseline: {error}"
+                ))
+            })?
+            .resource()
+            .expect("reopened one-under source resource")
+            .xml_bytes(),
+        base.resource()
+            .expect("generous source resource")
+            .xml_bytes()
+    );
+    Ok(())
+}
+
+#[test]
+fn existing_owner_replacement_honors_exact_and_one_under_total_part_bytes_caps() -> FixtureResult<()>
+{
+    let source = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
+    for owner in [Owner::MainDocument, Owner::Glossary] {
+        assert_replacement_honors_total_part_bytes_cap(&source, owner)?;
+    }
+    Ok(())
+}
+
 #[test]
 fn absent_owner_inverse_rejects_candidate_with_different_relationship_id() -> FixtureResult<()> {
     let native = fixture_bytes("poi/test-data/document/Bug54849.docx")?;

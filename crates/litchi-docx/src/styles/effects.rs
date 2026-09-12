@@ -865,6 +865,40 @@ impl PartialEq for GraphToken {
 impl Eq for GraphToken {}
 
 impl GraphToken {
+    fn replaced(&self, old_part_len: usize, new_part_len: usize) -> Result<Self> {
+        // A replacement keeps the owner edge, target part, content-type
+        // manifest, and relationship members unchanged.  Still project the
+        // selected part's byte delta against the package aggregate before a
+        // replacement commit can expose a graph token.  Planning a no-op
+        // content-types edit supplies the retained manifest metrics without
+        // materializing a new XML buffer.
+        let content_type_plan = self.content_types.plan_edit(&[], &[], self.limits)?;
+        let aggregate = project_aggregate_metrics(
+            self.aggregate,
+            self.limits,
+            AggregateEdit {
+                part_delta: 0,
+                graph_node_delta: 0,
+                removed_part_len: Some(old_part_len),
+                added_part_len: Some(new_part_len),
+                removed_relationship_parts: 0,
+                added_relationship_parts: 0,
+                removed_relationships: 0,
+                added_relationships: 0,
+                removed_relationship_events: 0,
+                added_relationship_events: 0,
+                removed_relationship_bytes: 0,
+                added_relationship_bytes: 0,
+                content_type_len: content_type_plan.final_len(),
+                content_type_mappings: content_type_plan.mapping_count(),
+                content_type_events: content_type_plan.event_count(),
+            },
+        )?;
+        let mut replaced = self.clone();
+        replaced.aggregate = aggregate;
+        Ok(replaced)
+    }
+
     fn added(&self, new_part_len: usize) -> Result<Self> {
         let (Some(source), Some(target), Some(relationship_id), Some(relationships)) = (
             self.source.as_deref(),
@@ -1138,7 +1172,15 @@ fn graph_after_transaction(base: &Snapshot, next: Option<&Resource>) -> Result<O
                     .map_or(0, |resource| resource.xml.len()),
             )
             .map(Some),
-        (true, true) | (false, false) => Ok(Some(graph.clone())),
+        (true, true) => graph
+            .replaced(
+                base.resource
+                    .as_ref()
+                    .map_or(0, |resource| resource.xml.len()),
+                next.map_or(0, |resource| resource.xml.len()),
+            )
+            .map(Some),
+        (false, false) => Ok(Some(graph.clone())),
         (false, true) => graph
             .added(next.map_or(0, |resource| resource.xml.len()))
             .map(Some),
