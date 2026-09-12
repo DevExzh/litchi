@@ -2414,6 +2414,54 @@ mod row_reuse_tests {
     }
 
     #[test]
+    fn valid_formula_value_provenance_forces_omission_and_matches_complete_parse() {
+        let worksheet = format!(
+            r#"<p:worksheet xmlns:p="{SML}"><p:dimension ref="A1:B2"/><p:sheetData><p:row r="1"><p:c r="A1"><p:v>1</p:v></p:c><!--keep-between-cells--><p:c r="B1"><p:f>SUM(A1)</p:f><p:v>2</p:v></p:c></p:row><p:row r="2"><c xmlns="{SML}" r="A2"><v>3</v></c></p:row></p:sheetData></p:worksheet>"#
+        );
+        let source =
+            Snapshot::load(&fixture_package(&worksheet), "Sheet1").expect("valid formula source");
+        let actions = actions_for_sets(&[("A1", 42)]);
+        let proof = rewrite_value_only_with_provenance(source.source_xml(), "Sheet1", actions)
+            .expect("source-backed provenance rewrite");
+        assert!(
+            !proof.omitted.is_empty(),
+            "the valid source-backed case must take the reuse path"
+        );
+        let b1 = proof
+            .omitted
+            .iter()
+            .find(|span| span.row == 0 && span.first_column == 1 && span.last_column == 1)
+            .expect("unchanged B1 must be omitted");
+        assert_eq!(
+            &proof.bytes[b1.start..b1.end],
+            b"<p:c r=\"B1\"><p:f>SUM(A1)</p:f><p:v>2</p:v></p:c>"
+        );
+        assert!(
+            proof
+                .bytes
+                .windows(b"r=\"A1\"".len())
+                .any(|window| window == b"r=\"A1\""),
+            "changed A1 must have an explicit address"
+        );
+
+        let ordinary = rewrite(
+            source.source_xml(),
+            "Sheet1",
+            actions_for_sets(&[("A1", 42)]),
+        )
+        .expect("ordinary rewrite");
+        assert_eq!(
+            proof.bytes, ordinary,
+            "ordinary and provenance bytes differ"
+        );
+
+        let expected = full_store(&proof.bytes);
+        let candidate =
+            Snapshot::from_rewritten_value_source(&source, proof).expect("valid proof readback");
+        assert_store_matches(&candidate.cells, &expected);
+    }
+
+    #[test]
     fn merge_omitted_cells_handles_same_row_gaps_and_a_lower_next_row_column() {
         let source_xml = format!(
             r#"<worksheet xmlns="{SML}"><dimension ref="A1:E2"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c r="C1"><v>3</v></c><c r="D1"><v>4</v></c><c r="E1"><v>5</v></c></row><row r="2"><c r="A2"><v>6</v></c></row></sheetData></worksheet>"#

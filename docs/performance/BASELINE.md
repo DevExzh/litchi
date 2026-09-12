@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0527: row-primary-arena pilot rejected
+
+[0527](changes/0527-xlsx-row-primary-arena-pilot.md) Fresh ABBA evidence covers 2,440 native durations and 40 allocation samples. Candidate total p50 reductions were 1.8214–3.5854%, commit p50 reductions 5.7713–8.0431%, and allocation-call reductions 18.9078–19.8814%. Dense repeat 2 missed the frozen 2% total median/mean gates. Production is restored; conditional profile/hardware/eager lanes are unmeasured.
+
 ## 0526: retained-profile scanner investigation
 
 [0526](changes/0526-xlsx-primary-span-layout-audit.md) Revalidated the accepted 0525 evidence seal and current source before decomposing the remaining XLSX scanner cost. This is a retained-profile audit, not a fresh native or allocator baseline. The row-owned primary-span draft must receive a new matched baseline/candidate campaign before any production retention or speedup claim.

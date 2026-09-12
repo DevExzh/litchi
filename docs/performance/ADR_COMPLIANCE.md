@@ -1,5 +1,9 @@
 # Performance optimization ADR-compliance matrix
 
+## 0527: rejected private-layout candidate, compatible tests retained
+
+[0527](changes/0527-xlsx-row-primary-arena-pilot.md) The candidate preserved all spans, both checked writer paths, complete XML validation, independent readback and existing source/execution/resource fences. It passed 1,294 candidate tests but failed a performance gate. Runtime source is restored to baseline; four compatible preservation/error regression tests remain. All accepted ADR/index bindings remain recorded.
+
 ## 0526: private scanner storage audit
 
 [0526](changes/0526-xlsx-primary-span-layout-audit.md) All 30 accepted ADR/index hashes are unchanged. The unapplied row-span draft preserves full XML validation, independent actual-output readback, source/execution fences, resource limits and arbitrary primary-span ordering. It changes no public contract. Source/design review does not establish runtime correctness or performance; those gates remain required before adoption.

@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "scope": "All seven pre-cleanup components passed; cleanup verified separately. Final sealed replay is required after generating SHA256SUMS.",
+  "observed_utc": "2026-09-12T11:20:38.069413+00:00",
+  "precleanup_report_sha256": "c07e1384a8c8d57325495610ce82fe227f5cc43e561358e9a5a736eeb366d8c3",
+  "cleanup_sha256": "c4d5a412b05fa58ac35c934af6603b5bd5ece5c3f85ce50ffb4fb71bfc653f3b",
+  "components": {
+    "source": "pass",
+    "builds": "pass",
+    "captures": "pass",
+    "analysis": "pass",
+    "flags": "pass",
+    "quality": "pass",
+    "decision": "pass"
+  },
+  "owned_test_temp_paths_absent": true,
+  "performance_claim": "none",
+  "overall_goal_complete": false
+}

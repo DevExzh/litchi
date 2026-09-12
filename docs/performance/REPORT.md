@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0527: preserve a failed pilot without a production speedup claim
+
+[0527](changes/0527-xlsx-row-primary-arena-pilot.md) The XLSX row-primary-arena candidate was rejected by the frozen dense repeat-2 total-time gates despite lower commit medians and allocation calls. All 47 matched adverse and 71 same-build drift flags are retained. Four baseline-compatible regression tests remain, with restored-source quality and evidence replay recorded separately. No profile/hardware/eager claim is made.
+
 ## 0526: primary-span representation investigated
 
 [0526](changes/0526-xlsx-primary-span-layout-audit.md) The scanner stores per-cell payload-span vectors that are boxed at cell close. The reviewed draft moves identical spans into row-owned storage and keeps per-cell ranges, covering ordinary and provenance writers. This is a measured-hotspot investigation and unapplied draft, with no new speedup, allocation or RSS claim. A fresh pilot must demonstrate practical end-to-end benefit before production retention.

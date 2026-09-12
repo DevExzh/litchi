@@ -1,0 +1,225 @@
+diff --git a/crates/litchi-xlsx/src/cell_values/snapshot.rs b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+index 323b4da58..6addfbf99 100644
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -2413,6 +2413,54 @@ mod row_reuse_tests {
+         );
+     }
+ 
++    #[test]
++    fn valid_formula_value_provenance_forces_omission_and_matches_complete_parse() {
++        let worksheet = format!(
++            r#"<p:worksheet xmlns:p="{SML}"><p:dimension ref="A1:B2"/><p:sheetData><p:row r="1"><p:c r="A1"><p:v>1</p:v></p:c><!--keep-between-cells--><p:c r="B1"><p:f>SUM(A1)</p:f><p:v>2</p:v></p:c></p:row><p:row r="2"><c xmlns="{SML}" r="A2"><v>3</v></c></p:row></p:sheetData></p:worksheet>"#
++        );
++        let source =
++            Snapshot::load(&fixture_package(&worksheet), "Sheet1").expect("valid formula source");
++        let actions = actions_for_sets(&[("A1", 42)]);
++        let proof = rewrite_value_only_with_provenance(source.source_xml(), "Sheet1", actions)
++            .expect("source-backed provenance rewrite");
++        assert!(
++            !proof.omitted.is_empty(),
++            "the valid source-backed case must take the reuse path"
++        );
++        let b1 = proof
++            .omitted
++            .iter()
++            .find(|span| span.row == 0 && span.first_column == 1 && span.last_column == 1)
++            .expect("unchanged B1 must be omitted");
++        assert_eq!(
++            &proof.bytes[b1.start..b1.end],
++            b"<p:c r=\"B1\"><p:f>SUM(A1)</p:f><p:v>2</p:v></p:c>"
++        );
++        assert!(
++            proof
++                .bytes
++                .windows(b"r=\"A1\"".len())
++                .any(|window| window == b"r=\"A1\""),
++            "changed A1 must have an explicit address"
++        );
++
++        let ordinary = rewrite(
++            source.source_xml(),
++            "Sheet1",
++            actions_for_sets(&[("A1", 42)]),
++        )
++        .expect("ordinary rewrite");
++        assert_eq!(
++            proof.bytes, ordinary,
++            "ordinary and provenance bytes differ"
++        );
++
++        let expected = full_store(&proof.bytes);
++        let candidate =
++            Snapshot::from_rewritten_value_source(&source, proof).expect("valid proof readback");
++        assert_store_matches(&candidate.cells, &expected);
++    }
++
+     #[test]
+     fn merge_omitted_cells_handles_same_row_gaps_and_a_lower_next_row_column() {
+         let source_xml = format!(
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
+index a1dfb0853..e4bcaf635 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
+@@ -450,6 +450,38 @@ fn snapshot_scan_reports_cell_address_errors_before_compact_tag_errors() {
+     );
+ }
+ 
++#[test]
++fn snapshot_scan_preserves_malformed_error_order_after_prior_primary_spans() {
++    let cases: &[&[u8]] = &[
++        br#"<c r="A1" future="&missing;"/>"#,
++        br#"<c r="A1" future="one" future="two"/>"#,
++        br#"<c r="not-a-cell" future="&missing;"/>"#,
++        b"<c r=\"\xff\" future=\"&missing;\"/>",
++        b"<c r=\"A1\" future=\"\xff\"/>",
++    ];
++
++    for cell in cases {
++        let expected = legacy_cell_pipeline_error(cell);
++        let mut source = format!(
++            r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1"><c r="A1"><v>prior-number</v><!--prior-sentinel--><f>prior-formula</f><is><t>prior-text</t></is></c>"#
++        )
++        .into_bytes();
++        source.extend_from_slice(cell);
++        source.extend_from_slice(b"</row></sheetData></worksheet>");
++        let error = scan(&source).expect_err("malformed cell should be rejected");
++        assert_eq!(
++            format!("{error:?}"),
++            expected.0,
++            "typed error changed after prior primary spans for {cell:?}"
++        );
++        assert_eq!(
++            error.to_string(),
++            expected.1,
++            "display error changed after prior primary spans for {cell:?}"
++        );
++    }
++}
++
+ fn assert_tag_results_match(xml: &[u8]) {
+     let (old_element, old_decoder) = start_element(xml);
+     let old_result = owned_tag(&old_element, old_decoder);
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs
+index d59dbc0ab..7438347b7 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/tests.rs
+@@ -6,7 +6,8 @@ use litchi_sheet::{Cell as Address, Column, Rect, Row};
+ 
+ use super::{
+     Action, ColumnAction, DefaultsAction, DescentEffect, HeightEffect, MergePlan, OptionalEffect,
+-    Plan, RowAction, StyleEffect, WidthEffect, rewrite, rewrite_merges,
++    Plan, RowAction, StyleEffect, ValueOnlyRewrite, WidthEffect, rewrite, rewrite_merges,
++    rewrite_value_only_with_provenance,
+ };
+ use crate::cell::{Cell, Value};
+ use crate::column::Width;
+@@ -27,6 +28,28 @@ fn exact_slice<'a>(content: &'a [u8], needle: &[u8]) -> &'a [u8] {
+     &content[start..start + needle.len()]
+ }
+ 
++fn raw_multi_primary_source() -> Vec<u8> {
++    let s = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
++    format!(
++        r#"<x:worksheet xmlns:x="{s}" xmlns:u="urn:future"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>old-number</x:v><!--between-primary-spans--><x:f>SUM(B1)</x:f><x:extLst><u:opaque marker="keep"/></x:extLst><x:is><x:t>old-text</x:t></x:is></x:c><x:c r="B1"><x:v>untouched-row-one</x:v></x:c></x:row><x:row r="3"><x:c r="A3"><x:v>untouched-row-three</x:v></x:c></x:row></x:sheetData></x:worksheet>"#
++    )
++    .into_bytes()
++}
++
++fn omitted_for<'a, 'source>(
++    proof: &'a ValueOnlyRewrite<'source>,
++    row: u32,
++    first: u32,
++    last: u32,
++) -> &'a [u8] {
++    let span = proof
++        .omitted
++        .iter()
++        .find(|span| span.row == row && span.first_column == first && span.last_column == last)
++        .expect("expected exact omitted address range");
++    &proof.bytes[span.start..span.end]
++}
++
+ #[test]
+ fn no_op_and_redundant_merge_plans_preserve_source_bytes() {
+     let source = format!(
+@@ -167,6 +190,79 @@ fn untouched_xml_fragments_remain_byte_exact() {
+     );
+ }
+ 
++#[test]
++fn ordinary_and_provenance_writers_match_for_nonsemantic_multi_primary_bytes() {
++    let source = raw_multi_primary_source();
++    let provenance = rewrite_value_only_with_provenance(
++        &source,
++        "Data",
++        BTreeMap::from([(
++            Address::from_a1("A1").expect("A1"),
++            Action::set("replacement".into()),
++        )]),
++    )
++    .expect("raw provenance rewrite");
++    let ordinary = rewrite(
++        &source,
++        "Data",
++        BTreeMap::from([(
++            Address::from_a1("A1").expect("A1"),
++            Action::set("replacement".into()),
++        )]),
++    )
++    .expect("ordinary rewrite");
++
++    assert_eq!(
++        provenance.bytes, ordinary,
++        "writers must emit identical bytes"
++    );
++    assert!(
++        !provenance.omitted.is_empty(),
++        "the arbitrary-span proof must take the provenance path"
++    );
++    assert_eq!(
++        omitted_for(&provenance, 0, 1, 1),
++        b"<x:c r=\"B1\"><x:v>untouched-row-one</x:v></x:c>"
++    );
++    assert_eq!(
++        omitted_for(&provenance, 2, 0, 0),
++        b"<x:c r=\"A3\"><x:v>untouched-row-three</x:v></x:c>"
++    );
++
++    let output = std::str::from_utf8(&provenance.bytes).expect("UTF-8 output");
++    assert_eq!(output.matches("r=\"A1\"").count(), 1);
++    assert!(output.contains("<!--between-primary-spans-->"));
++    assert!(output.contains("<x:extLst><u:opaque marker=\"keep\"/></x:extLst>"));
++    assert!(output.contains("<x:is><x:t xml:space=\"preserve\">replacement</x:t></x:is>"));
++    assert!(!output.contains("<x:v>old-number</x:v>"));
++    assert!(!output.contains("<x:f>SUM(B1)</x:f>"));
++    assert!(!output.contains("<x:t>old-text</x:t>"));
++}
++
++#[test]
++fn style_only_multi_primary_and_empty_owner_rewrite_is_lossless() {
++    let source = format!(
++        r#"<x:worksheet xmlns:x="{S}" xmlns:u="urn:future"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>first</x:v><!--style-only-sentinel--><x:v>second</x:v><x:extLst><u:opaque marker="keep"/></x:extLst><x:is><x:t>third</x:t></x:is></x:c><x:c r="B1"/></x:row><x:row r="2"/></x:sheetData></x:worksheet>"#
++    )
++    .into_bytes();
++    let edited = rewrite(
++        &source,
++        "Data",
++        BTreeMap::from([
++            (Address::from_a1("A1").expect("A1"), Action::style(7)),
++            (Address::from_a1("B1").expect("B1"), Action::style(8)),
++        ]),
++    )
++    .expect("style-only rewrite");
++    let output = std::str::from_utf8(&edited).expect("UTF-8 output");
++
++    assert!(output.contains(
++        r#"<x:c r="A1" s="7"><x:v>first</x:v><!--style-only-sentinel--><x:v>second</x:v><x:extLst><u:opaque marker="keep"/></x:extLst><x:is><x:t>third</x:t></x:is></x:c>"#
++    ));
++    assert!(output.contains(r#"<x:c r="B1" s="8"/>"#));
++    assert!(output.contains(r#"<x:row r="2"/>"#));
++}
++
+ #[test]
+ fn minimally_rewrites_set_clear_remove_and_new_rows() {
+     let xml = format!(

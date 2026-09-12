@@ -1,0 +1,118 @@
+{
+  "revision": "b6e0b05e6c01ce6205d4dc32a4c4cf37a2c7afda",
+  "created_utc": "2026-09-12T10:45:20.786508+00:00",
+  "hypothesis": "Replace per-cell primary span vectors and shrink-to-box storage with row-owned spans and cell ranges; retain identical scan events, spans, validation and both writer paths.",
+  "harness_enabler": null,
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "staged sets and MultiSourceEdit::commit; no publication/reopen/oracles"
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "scope": "Separate zero-before/dump-after/toggle exact-name; fourth call only, preceding3lifecyclecalls retained"
+  },
+  "cpu": 2,
+  "admission": "Require at least 2% p50 improvement in primary total and at least 5% p50 improvement in primary commit, plus at least 2% mean improvement in primary total in both repeats of both shapes. Require at least 8% allocation-call reduction in both allocator repeats/shapes. If these pilot gates pass, require at least 3% commit Ir reduction in both shapes/repeats, full quality and eager guards before retention. Flag every >5% adverse timing, mean, RSS or incremental allocation peak and all >5% absolute same-build drift. Reject if any pilot gate fails; no profiler/hardware speedup claim then. Preserve all captured evidence. No cold/range/native-producer/scaling claim.",
+  "owned_paths": [
+    "/tmp/litchi-goal-0527",
+    "/home/zhuhe/litchi-goal-0527-target"
+  ],
+  "native_order": [
+    "baseline native-r1 before candidate application",
+    "candidate native-r1",
+    "candidate native-r2",
+    "retained baseline native-r2 under candidate source checkout"
+  ],
+  "retained_baseline_custody": "Retained baseline binary and build manifest remain hash-bound; candidate checkout source is independently bound during final A2 and differs only in the frozen candidate file inventory.",
+  "status": "frozen-before-build-and-capture",
+  "resource_scope": "Existing limits/fences unchanged. Row span growth window and allocation topology change; all retained span data remains live with Layout until drop.",
+  "hardware": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 100,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole fresh child including corpus/setup/publication/oracles; diagnostic only, not isolated commit counters."
+  },
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/"
+  ],
+  "candidate_source_binding": "Exact source file inventory and SHA256 values captured independently for each stage; candidate diff must be nonempty and entirely within candidate_source_roots. Harness source is identical. Review exact production/test patch before application.",
+  "gates": {
+    "total_p50_reduction_percent": 2.0,
+    "commit_p50_reduction_percent": 5.0,
+    "total_mean_reduction_percent": 2.0,
+    "allocation_calls_reduction_percent": 8.0,
+    "commit_ir_reduction_percent": 3.0,
+    "require_every_shape_repeat": true
+  },
+  "conditional_lanes": {
+    "profile": "Required for retention only after pilot gates pass; preserved baseline binaries may run under candidate checkout.",
+    "hardware": "Diagnostic only after pilot gates pass.",
+    "eager": "Required before retention; no primary gain claim."
+  },
+  "draft_patch_sha256": "28269e6051f9ee9453ccfd590a0f89269c400529d973a84f0ac908eb6730c5e9"
+}

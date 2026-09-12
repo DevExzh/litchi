@@ -1,0 +1,39 @@
+{
+  "command": [
+    "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0527-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "cargo",
+    "test",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--lib",
+    "xlsx_noncompact_cell_reference_guard"
+  ],
+  "start_utc": "2026-09-12T11:08:10.344302+00:00",
+  "end_utc": "2026-09-12T11:10:15.954336+00:00",
+  "seconds": 125.61003500300285,
+  "exit_code": 0,
+  "binary_sha256": null,
+  "source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+  "working_source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+  "script_sha256": "a979104998d7157e2b9e86720d3fe8349abfd52d0ea2afbb3af50da6c2aa9886",
+  "plan_sha256": "9762d905e3a197edd173d4c50ad508124a8a3577afcec25e5f179801c8781950",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0527-target/test-tmp"
+  },
+  "artifacts": {
+    "check-harness-noncompact-test.stderr": "977d1d0641087c1e1c5f923826e38b5c7b6fd71710a1162fd2f01f63aeb0f59d",
+    "check-harness-noncompact-test.stdout": "cf6ead994f241190524e98bd340ea5166e97cb138b3c526caeebfb48aa5f3448"
+  }
+}

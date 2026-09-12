@@ -1,0 +1,92 @@
+{
+  "status": "pass",
+  "stage": "final",
+  "checks": [
+    {
+      "name": "check-fmt.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "483b92e94b4faeb5c1c93e3f7230b1d52eab14d7d0e94b93a49430a13cb10672",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "276a6a933d85a72502ea95f1c968c5c77fffbcdbb31f307842788478e2f5c0a0",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xlsx-tests.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "54bc7cfcd1c69532bded902d26961e8000fd9fe904e5d1844344a79e3234d346",
+      "exit_code": 0,
+      "executed_tests": 1292
+    },
+    {
+      "name": "check-harness-noncompact-test.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "e09e3f0b59ec08e20457455d07d6a4f352ec31d2dbd4e824c6a9105165ac5467",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-harness-test.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "65cf2692c03e31a8fa82dd98722fc9472ab91d3e418d146ab312d264c7e48b65",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-harness-existing-metrics-tests.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "6ddfb889907140f84b21a89a7fb0b52b969342de4015e9e784606db10e69a540",
+      "exit_code": 0,
+      "executed_tests": 3
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "8850f655ccb7872bfc8de2c4d778c223716394acf8ce0739d31c96b5170a3f6c",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-clippy.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "e74206f3f14fda1ddb6770d6ec12d78bcd1ee8b92f32267f415effe36312064b",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "ac2a1989b3ea27603554000c7882da667c87c53a866dc7fb1fa8d0b21eb5af1a",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-rustdoc.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "7a1d89e45c1294e0948b2802a5cecf3d3020b5f13ac7dce31d36e1875e4f756d",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-boundaries.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "3b3ad869d83963587694503a3b14310933eaeb1ad9a721e1af8cf3f12a1982d9",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "stage": "final",
+      "receipt_sha256": "7fb506ffd28c8e965fcac09aef47ac3e848d9d1190bfbbb0fca0ad6d8e13dc2e",
+      "exit_code": 0,
+      "executed_tests": 0
+    }
+  ],
+  "executed_tests": 1297,
+  "source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f"
+}

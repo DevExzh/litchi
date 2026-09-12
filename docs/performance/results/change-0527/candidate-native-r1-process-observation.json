@@ -1,0 +1,12 @@
+{
+  "utc": "2026-09-12T11:02:47.171231+00:00",
+  "processes": [
+    {
+      "pid": 2164779,
+      "name": "candidate-norma",
+      "cwd": "/home/zhuhe/code/litchi",
+      "affinity": "2"
+    }
+  ],
+  "scope": "Point observation only"
+}

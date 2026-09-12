@@ -6,7 +6,8 @@ use litchi_sheet::{Cell as Address, Column, Rect, Row};
 
 use super::{
     Action, ColumnAction, DefaultsAction, DescentEffect, HeightEffect, MergePlan, OptionalEffect,
-    Plan, RowAction, StyleEffect, WidthEffect, rewrite, rewrite_merges,
+    Plan, RowAction, StyleEffect, ValueOnlyRewrite, WidthEffect, rewrite, rewrite_merges,
+    rewrite_value_only_with_provenance,
 };
 use crate::cell::{Cell, Value};
 use crate::column::Width;
@@ -25,6 +26,28 @@ fn exact_slice<'a>(content: &'a [u8], needle: &[u8]) -> &'a [u8] {
         .position(|window| window == needle)
         .expect("expected byte slice");
     &content[start..start + needle.len()]
+}
+
+fn raw_multi_primary_source() -> Vec<u8> {
+    let s = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    format!(
+        r#"<x:worksheet xmlns:x="{s}" xmlns:u="urn:future"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>old-number</x:v><!--between-primary-spans--><x:f>SUM(B1)</x:f><x:extLst><u:opaque marker="keep"/></x:extLst><x:is><x:t>old-text</x:t></x:is></x:c><x:c r="B1"><x:v>untouched-row-one</x:v></x:c></x:row><x:row r="3"><x:c r="A3"><x:v>untouched-row-three</x:v></x:c></x:row></x:sheetData></x:worksheet>"#
+    )
+    .into_bytes()
+}
+
+fn omitted_for<'a, 'source>(
+    proof: &'a ValueOnlyRewrite<'source>,
+    row: u32,
+    first: u32,
+    last: u32,
+) -> &'a [u8] {
+    let span = proof
+        .omitted
+        .iter()
+        .find(|span| span.row == row && span.first_column == first && span.last_column == last)
+        .expect("expected exact omitted address range");
+    &proof.bytes[span.start..span.end]
 }
 
 #[test]
@@ -165,6 +188,79 @@ fn untouched_xml_fragments_remain_byte_exact() {
         exact_slice(&merge_source, untouched_merge),
         exact_slice(&merged, untouched_merge)
     );
+}
+
+#[test]
+fn ordinary_and_provenance_writers_match_for_nonsemantic_multi_primary_bytes() {
+    let source = raw_multi_primary_source();
+    let provenance = rewrite_value_only_with_provenance(
+        &source,
+        "Data",
+        BTreeMap::from([(
+            Address::from_a1("A1").expect("A1"),
+            Action::set("replacement".into()),
+        )]),
+    )
+    .expect("raw provenance rewrite");
+    let ordinary = rewrite(
+        &source,
+        "Data",
+        BTreeMap::from([(
+            Address::from_a1("A1").expect("A1"),
+            Action::set("replacement".into()),
+        )]),
+    )
+    .expect("ordinary rewrite");
+
+    assert_eq!(
+        provenance.bytes, ordinary,
+        "writers must emit identical bytes"
+    );
+    assert!(
+        !provenance.omitted.is_empty(),
+        "the arbitrary-span proof must take the provenance path"
+    );
+    assert_eq!(
+        omitted_for(&provenance, 0, 1, 1),
+        b"<x:c r=\"B1\"><x:v>untouched-row-one</x:v></x:c>"
+    );
+    assert_eq!(
+        omitted_for(&provenance, 2, 0, 0),
+        b"<x:c r=\"A3\"><x:v>untouched-row-three</x:v></x:c>"
+    );
+
+    let output = std::str::from_utf8(&provenance.bytes).expect("UTF-8 output");
+    assert_eq!(output.matches("r=\"A1\"").count(), 1);
+    assert!(output.contains("<!--between-primary-spans-->"));
+    assert!(output.contains("<x:extLst><u:opaque marker=\"keep\"/></x:extLst>"));
+    assert!(output.contains("<x:is><x:t xml:space=\"preserve\">replacement</x:t></x:is>"));
+    assert!(!output.contains("<x:v>old-number</x:v>"));
+    assert!(!output.contains("<x:f>SUM(B1)</x:f>"));
+    assert!(!output.contains("<x:t>old-text</x:t>"));
+}
+
+#[test]
+fn style_only_multi_primary_and_empty_owner_rewrite_is_lossless() {
+    let source = format!(
+        r#"<x:worksheet xmlns:x="{S}" xmlns:u="urn:future"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>first</x:v><!--style-only-sentinel--><x:v>second</x:v><x:extLst><u:opaque marker="keep"/></x:extLst><x:is><x:t>third</x:t></x:is></x:c><x:c r="B1"/></x:row><x:row r="2"/></x:sheetData></x:worksheet>"#
+    )
+    .into_bytes();
+    let edited = rewrite(
+        &source,
+        "Data",
+        BTreeMap::from([
+            (Address::from_a1("A1").expect("A1"), Action::style(7)),
+            (Address::from_a1("B1").expect("B1"), Action::style(8)),
+        ]),
+    )
+    .expect("style-only rewrite");
+    let output = std::str::from_utf8(&edited).expect("UTF-8 output");
+
+    assert!(output.contains(
+        r#"<x:c r="A1" s="7"><x:v>first</x:v><!--style-only-sentinel--><x:v>second</x:v><x:extLst><u:opaque marker="keep"/></x:extLst><x:is><x:t>third</x:t></x:is></x:c>"#
+    ));
+    assert!(output.contains(r#"<x:c r="B1" s="8"/>"#));
+    assert!(output.contains(r#"<x:row r="2"/>"#));
 }
 
 #[test]

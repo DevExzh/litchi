@@ -1,0 +1,8 @@
+
+running 3 tests
+test xlsx_commit_metrics_tests::xlsx_commit_metrics_align_warmups_and_report_normal_allocator_status ... ok
+test xlsx_commit_metrics_tests::xlsx_commit_save_operation_propagates_a_short_counting_sink ... ok
+test xlsx_commit_metrics_tests::xlsx_commit_save_operation_returns_exact_output_and_semantic_commit ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 487 filtered out; finished in 0.26s
+

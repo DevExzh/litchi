@@ -1,0 +1,28 @@
+{
+  "schema": "litchi_0527_pilot_decision_v1",
+  "disposition": "rejected_and_reverted",
+  "pilot_gates_passed": false,
+  "production_change_retained": false,
+  "final_source": "final",
+  "final_source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+  "plan_sha256": "9762d905e3a197edd173d4c50ad508124a8a3577afcec25e5f179801c8781950",
+  "comparison_sha256": "1c973a52ef5785a5f5e2264b2429ea8267119ee14b29513c2f9c9440d9f67eab",
+  "adverse_review_sha256": "78975587e89608e17d23c9864c359ad20c49564da383b2a56b95631621e30498",
+  "quality_summary_sha256": "4d59ac3cc990f020dab9219b3a206140551284679f45a120ef50f37bcc670fb3",
+  "conditional_lanes": {
+    "profile": {
+      "status": "unmeasured",
+      "reason": "Pilot gate failed; this conditional lane was not admitted and is unmeasured."
+    },
+    "hardware": {
+      "status": "unmeasured",
+      "reason": "Pilot gate failed; this conditional lane was not admitted and is unmeasured."
+    },
+    "eager": {
+      "status": "unmeasured",
+      "reason": "Pilot gate failed; this conditional lane was not admitted and is unmeasured."
+    }
+  },
+  "observed_utc": "2026-09-12T11:19:14.813589+00:00",
+  "review": "Reject and restore the production arena candidate: dense-sparse repeat 2 total p50 reduction 1.8214108302% and mean reduction 1.8105018625% miss their frozen 2% gates. All commit p50 and allocation-call gates pass but do not override total failure. Preserve every capture, 47 matched adverse flags and 71 same-build drift flags, with individual reviews. Conditional profile/hardware/eager lanes remain unmeasured after pilot failure. Final source restores all three production files exactly and retains four baseline-compatible tests in three test files. All twelve final quality checks pass. No production speedup is retained or claimed. OLE2/OOXML remains the active priority, ODF deferred, iWork excluded, and the overall goal stays active."
+}
