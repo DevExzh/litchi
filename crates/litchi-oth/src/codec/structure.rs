@@ -2078,8 +2078,9 @@ fn change_kind(node: &Node) -> crate::change::Kind {
 
 fn collect_indexes(node: &Node, output: &mut BodyStructures, tracked_scope: bool) -> Result<()> {
     if node.namespace == Ns::Text && index_kind(&node.local).is_some() {
-        let source_node = elements(node)
-            .find(|child| child.namespace == Ns::Text && child.local.ends_with("-source"));
+        let source_name = index_source_name(&node.local);
+        let source_node =
+            elements(node).find(|child| child.namespace == Ns::Text && child.local == source_name);
         let name = required_attr(node, Ns::Text, b"name", "text:name")?;
         let Some(source_node) = source_node else {
             return invalid("OTH index requires its matching source element");
@@ -2236,6 +2237,19 @@ fn project_index_source(
     Ok(Some(crate::index::IndexSource::projected(
         scope, relative, options,
     )))
+}
+
+fn index_source_name(index_name: &str) -> &str {
+    match index_name {
+        "table-of-content" => "table-of-content-source",
+        "illustration-index" => "illustration-index-source",
+        "table-index" => "table-index-source",
+        "object-index" => "object-index-source",
+        "user-index" => "user-index-source",
+        "alphabetical-index" => "alphabetical-index-source",
+        "bibliography" | "bibliography-index" => "bibliography-source",
+        _ => "",
+    }
 }
 
 fn index_kind(local: &str) -> Option<crate::index::Kind> {
