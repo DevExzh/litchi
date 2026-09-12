@@ -43,7 +43,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-mod content_types_plan;
+pub(crate) mod content_types_plan;
 mod read_session;
 mod relationships_plan;
 pub use read_session::PartReadSession;
@@ -421,7 +421,7 @@ impl SourceRelationshipTarget {
     }
 }
 
-fn escaped_xml_attribute_len(value: &str) -> Result<usize> {
+pub(crate) fn escaped_xml_attribute_len(value: &str) -> Result<usize> {
     value.chars().try_fold(0usize, |length, character| {
         let encoded = match character {
             '&' => 5,
@@ -7706,9 +7706,9 @@ impl SourceBackedPackage {
         {
             None
         } else {
-            Some(content_types_plan::ContentTypesPlan::plan(
+            Some(content_types_plan::ContentTypesPlan::plan_owned(
                 &content_types_xml,
-                &required_content_type_overrides,
+                required_content_type_overrides,
                 &removed_content_type_overrides,
                 self.limits,
                 self.cache.context(),

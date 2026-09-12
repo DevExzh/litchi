@@ -2,9 +2,307 @@
 
 use super::super::{OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadLimits};
 use crate::Result;
+use crate::content_type::validate_content_type;
 use crate::error::OpcError;
+use crate::limits::ReadResource;
+use crate::source_backed::content_types_plan::collapse_xml_token;
+use crate::source_backed::escaped_xml_attribute_len;
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
+use std::sync::Arc as SharedArc;
+
+/// One borrowed content-type override to add to a source manifest.
+///
+/// The part name and MIME value are validated during planning.  The final
+/// manifest is not allocated until [`ContentTypesEditPlan::materialize`] is
+/// called.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ContentTypeEdit<'a> {
+    /// Canonical OPC part name receiving the explicit override.
+    pub part_name: &'a PackURI,
+    /// MIME value written to the `ContentType` attribute.
+    pub content_type: &'a str,
+}
+
+/// A source-bound content-types edit admission.
+///
+/// Planning retains the source allocation and small lexical ranges while
+/// computing exact final bytes and mapping count.  It does not build a
+/// replacement XML buffer.  Callers should compare these metrics with their
+/// aggregate package limits before consuming the plan with `materialize`.
+#[derive(Debug)]
+pub struct ContentTypesEditPlan<'source> {
+    source: &'source super::OwnedContentTypes,
+    inner: crate::source_backed::content_types_plan::ContentTypesPlan<'source>,
+}
+
+impl<'source> ContentTypesEditPlan<'source> {
+    /// Exact final `[Content_Types].xml` byte length.
+    #[must_use]
+    pub const fn final_len(&self) -> usize {
+        self.inner.final_len()
+    }
+
+    /// Exact final number of `Default` and `Override` mappings.
+    #[must_use]
+    pub const fn mapping_count(&self) -> usize {
+        self.inner.mapping_count()
+    }
+
+    /// Exact final quick-xml event count, including `Event::Eof`.
+    #[must_use]
+    pub const fn event_count(&self) -> usize {
+        self.inner.event_count()
+    }
+
+    /// Whether this plan is an exact source-preserving no-op.
+    #[must_use]
+    pub const fn is_noop(&self) -> bool {
+        self.inner.is_noop()
+    }
+
+    /// Materialize one validated replacement XML buffer after caller limits
+    /// have admitted the exact plan metrics.
+    pub fn materialize(self, limits: ReadLimits) -> Result<super::OwnedContentTypes> {
+        let source = self.source;
+        limits.check(
+            ReadResource::ContentTypesBytes,
+            self.inner.final_len() as u64,
+            limits.max_content_types_bytes() as u64,
+        )?;
+        limits.check(
+            ReadResource::PartBytes,
+            self.inner.final_len() as u64,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            ReadResource::ArchiveEntryBytes,
+            self.inner.final_len() as u64,
+            limits.max_archive_entry_bytes(),
+        )?;
+        limits.check(
+            ReadResource::XmlEvents,
+            self.inner.event_count() as u64,
+            limits.max_xml_events() as u64,
+        )?;
+        limits.check(
+            ReadResource::ContentTypeMappings,
+            self.inner.mapping_count() as u64,
+            limits.max_content_type_mappings() as u64,
+        )?;
+        if self.inner.is_noop() {
+            return Ok(source.clone());
+        }
+        let bytes = self.inner.materialize_public(limits)?;
+        let binding = SharedArc::new(crate::content_type::ContentTypeMap::from_xml(
+            &bytes, limits,
+        )?);
+        let xml = OwnedXmlPart::capture_with_limits(
+            source.xml.name.clone(),
+            source.xml.content_type.clone(),
+            SharedArc::new(bytes),
+            limits,
+        )?;
+        Ok(super::OwnedContentTypes { xml, binding })
+    }
+
+    /// The source token used by this plan.  This is useful for exact no-op
+    /// decisions without exposing its internal XML splice ranges.
+    #[must_use]
+    pub fn source(&self) -> &'source super::OwnedContentTypes {
+        self.source
+    }
+}
+
+impl super::OwnedContentTypes {
+    /// Plan source-preserving additions and exact `<Override>` removals.
+    ///
+    /// Existing unrelated defaults, overrides, comments, processing
+    /// instructions, namespace aliases, and lexical ordering remain in the
+    /// source.  The returned plan computes exact final bytes without
+    /// allocating candidate XML.
+    pub fn plan_edit<'source>(
+        &'source self,
+        additions: &[ContentTypeEdit<'_>],
+        removals: &[PackURI],
+        limits: ReadLimits,
+    ) -> Result<ContentTypesEditPlan<'source>> {
+        self.plan_edit_with_defaults(additions, removals, &[], limits)
+    }
+
+    /// Plan source-preserving overrides plus selected `<Default>` mapping
+    /// removals.  Default selectors use XML token-normalized, ASCII
+    /// case-insensitive extension matching, while the original lexical bytes
+    /// of every retained mapping remain untouched.
+    pub fn plan_edit_with_defaults<'source>(
+        &'source self,
+        additions: &[ContentTypeEdit<'_>],
+        removals: &[PackURI],
+        default_removals: &[&str],
+        limits: ReadLimits,
+    ) -> Result<ContentTypesEditPlan<'source>> {
+        limits.check(
+            ReadResource::ContentTypesBytes,
+            self.xml.bytes().len() as u64,
+            limits.max_content_types_bytes() as u64,
+        )?;
+        limits.check(
+            ReadResource::PartBytes,
+            self.xml.bytes().len() as u64,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            ReadResource::ArchiveEntryBytes,
+            self.xml.bytes().len() as u64,
+            limits.max_archive_entry_bytes(),
+        )?;
+        preflight_content_type_edit_inputs(additions, removals, default_removals, limits)?;
+        for addition in additions {
+            if self.binding.override_for(addition.part_name).is_some()
+                && !removals
+                    .iter()
+                    .any(|removal| removal.is_equivalent_to(addition.part_name))
+            {
+                return Err(OpcError::InvalidContentTypesManifest(
+                    "content-types override already exists for the part".to_owned(),
+                ));
+            }
+        }
+        let mut owned_additions = Vec::new();
+        owned_additions
+            .try_reserve_exact(additions.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC content-types edit additions",
+                source,
+            })?;
+        for addition in additions {
+            owned_additions.push((
+                clone_pack_uri_bounded(addition.part_name, "OPC content-types edit part names")?,
+                clone_string_bounded(addition.content_type, "OPC content-types edit MIME values")?,
+            ));
+        }
+        let mut owned_defaults = Vec::new();
+        owned_defaults
+            .try_reserve_exact(default_removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC content-types default removal selectors",
+                source,
+            })?;
+        for value in default_removals {
+            owned_defaults.push(collapse_xml_token(value)?);
+        }
+        let inner = crate::source_backed::content_types_plan::ContentTypesPlan::plan_public_owned(
+            self.xml.bytes(),
+            owned_additions,
+            removals,
+            owned_defaults,
+            limits,
+        )?;
+        Ok(ContentTypesEditPlan {
+            source: self,
+            inner,
+        })
+    }
+}
+
+fn clone_string_bounded(value: &str, resource: &'static str) -> Result<String> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|source| OpcError::Allocation { resource, source })?;
+    owned.push_str(value);
+    Ok(owned)
+}
+
+fn clone_pack_uri_bounded(value: &PackURI, resource: &'static str) -> Result<PackURI> {
+    let text = clone_string_bounded(value.as_str(), resource)?;
+    PackURI::new(text).map_err(OpcError::InvalidPackUri)
+}
+
+/// Bound operation selectors before copying any caller-owned strings into a
+/// source-backed plan.  The source scanner performs the exact escaped-output
+/// admission later; this pass bounds the raw input retained by the plan and
+/// applies the same per-attribute ceilings as content-type parsing.
+fn preflight_content_type_edit_inputs(
+    additions: &[ContentTypeEdit<'_>],
+    removals: &[PackURI],
+    default_removals: &[&str],
+    limits: ReadLimits,
+) -> Result<()> {
+    if additions.len() > limits.max_content_type_mappings() {
+        return Err(OpcError::ReadLimit {
+            resource: ReadResource::ContentTypeMappings,
+            actual: additions.len() as u64,
+            maximum: limits.max_content_type_mappings() as u64,
+        });
+    }
+    let removal_count = removals
+        .len()
+        .checked_add(default_removals.len())
+        .ok_or_else(|| OpcError::InvalidContentTypesManifest("selector count overflows".into()))?;
+    if removal_count > limits.max_content_type_mappings() {
+        return Err(OpcError::ReadLimit {
+            resource: ReadResource::ContentTypeMappings,
+            actual: removal_count as u64,
+            maximum: limits.max_content_type_mappings() as u64,
+        });
+    }
+
+    let mut raw_bytes = 0usize;
+    for addition in additions {
+        let escaped_part_len = escaped_xml_attribute_len(addition.part_name.as_str())?;
+        let escaped_content_type_len = escaped_xml_attribute_len(addition.content_type)?;
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            escaped_part_len as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            escaped_content_type_len as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        validate_content_type(addition.content_type).map_err(|reason| {
+            OpcError::InvalidContentType {
+                value: addition.content_type.to_owned(),
+                reason,
+            }
+        })?;
+        raw_bytes = raw_bytes
+            .checked_add(escaped_part_len)
+            .and_then(|total| total.checked_add(escaped_content_type_len))
+            .ok_or_else(|| {
+                OpcError::InvalidContentTypesManifest("selector bytes overflow".into())
+            })?;
+    }
+    for part in removals {
+        let length = part.as_str().len();
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            length as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        raw_bytes = raw_bytes.checked_add(length).ok_or_else(|| {
+            OpcError::InvalidContentTypesManifest("selector bytes overflow".into())
+        })?;
+    }
+    for extension in default_removals {
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            extension.len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        raw_bytes = raw_bytes.checked_add(extension.len()).ok_or_else(|| {
+            OpcError::InvalidContentTypesManifest("selector bytes overflow".into())
+        })?;
+    }
+    limits.check(
+        ReadResource::ContentTypesBytes,
+        raw_bytes as u64,
+        limits.max_content_types_bytes() as u64,
+    )?;
+    Ok(())
+}
 
 /// Remove `<Override>` elements for the supplied part names and their
 /// relationship members. The source XML is edited through validated structural
@@ -376,24 +674,8 @@ pub(crate) fn with_part_overrides(
     OwnedXmlPart::capture(
         source.name.clone(),
         source.content_type.clone(),
-        std::sync::Arc::new(bytes),
+        SharedArc::new(bytes),
     )
-}
-
-fn escaped_xml_attribute_len(value: &str) -> Result<usize> {
-    value.bytes().try_fold(0usize, |length, byte| {
-        let encoded = match byte {
-            b'&' => 5,
-            b'<' | b'>' => 4,
-            b'"' | b'\'' => 6,
-            _ => 1,
-        };
-        length.checked_add(encoded).ok_or_else(|| {
-            OpcError::InvalidContentTypesManifest(
-                "escaped content-type attribute length overflows".into(),
-            )
-        })
-    })
 }
 
 fn append_override_bytes(
@@ -518,6 +800,187 @@ mod tests {
         assert!(output.contains("<!-- retain -->"));
         assert!(output.contains("PartName=\"/word/ink/ink1.xml\""));
         assert!(output.contains("ContentType=\"application/inkml+xml\""));
+    }
+
+    #[test]
+    fn borrowed_content_types_plan_reports_exact_mixed_output_and_removes_default() {
+        let source_bytes = br#"<?xml version='1.0'?><Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>
+<!-- keep --> <Default Extension='xml' ContentType='application/xml'/>
+<Default Extension='svg' ContentType='image/svg+xml'/>
+<Override PartName='/custom/drop.bin' ContentType='application/octet-stream'/>
+</Types>"#;
+        let name = PackURI::new("/[Content_Types].xml").unwrap();
+        let xml = OwnedXmlPart::capture(
+            name,
+            "application/xml".to_owned(),
+            SharedArc::new(source_bytes.to_vec()),
+        )
+        .unwrap();
+        let binding = SharedArc::new(
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+                .unwrap(),
+        );
+        let token = super::super::OwnedContentTypes { xml, binding };
+        let added = PackURI::new("/custom/new.bin").unwrap();
+        let dropped = PackURI::new("/custom/drop.bin").unwrap();
+        let edits = [ContentTypeEdit {
+            part_name: &added,
+            content_type: "application/octet-stream",
+        }];
+        let plan = token
+            .plan_edit_with_defaults(&edits, &[dropped], &["svg"], ReadLimits::default())
+            .unwrap();
+        assert_eq!(plan.mapping_count(), 2);
+        let exact = plan.final_len().max(token.bytes().len());
+        let limits = ReadLimits::builder()
+            .max_content_types_bytes(exact)
+            .unwrap()
+            .max_part_bytes(exact as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let after = token
+            .plan_edit_with_defaults(
+                &edits,
+                &[PackURI::new("/custom/drop.bin").unwrap()],
+                &["SVG"],
+                limits,
+            )
+            .unwrap()
+            .materialize(limits)
+            .unwrap();
+        let text = std::str::from_utf8(after.bytes()).unwrap();
+        assert!(text.contains("<!-- keep -->"));
+        assert!(text.contains("/custom/new.bin"));
+        assert!(!text.contains("Extension='svg'"));
+        assert!(!text.contains("/custom/drop.bin"));
+    }
+
+    #[test]
+    fn borrowed_content_types_plan_rejects_retained_override_duplicate_but_allows_selected_replacement()
+     {
+        let source_bytes = br#"<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'><Override PartName='/custom/existing.bin' ContentType='application/old'/></Types>"#;
+        let name = PackURI::new("/[Content_Types].xml").unwrap();
+        let xml = OwnedXmlPart::capture(
+            name,
+            "application/xml".to_owned(),
+            SharedArc::new(source_bytes.to_vec()),
+        )
+        .unwrap();
+        let binding = SharedArc::new(
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+                .unwrap(),
+        );
+        let token = super::super::OwnedContentTypes { xml, binding };
+        let existing = PackURI::new("/custom/existing.bin").unwrap();
+        let edit = [ContentTypeEdit {
+            part_name: &existing,
+            content_type: "application/new",
+        }];
+        assert!(token.plan_edit(&edit, &[], ReadLimits::default()).is_err());
+        let after = token
+            .plan_edit(
+                &edit,
+                std::slice::from_ref(&existing),
+                ReadLimits::default(),
+            )
+            .unwrap()
+            .materialize(ReadLimits::default())
+            .unwrap();
+        let text = std::str::from_utf8(after.bytes()).unwrap();
+        assert!(text.contains("ContentType=\"application/new\""));
+        assert!(!text.contains("application/old"));
+    }
+
+    #[test]
+    fn default_removal_selector_collapses_xml_token_whitespace_but_preserves_nbsp() {
+        let source_bytes = br#"<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'><Default Extension='svg' ContentType='image/svg+xml'/></Types>"#;
+        let name = PackURI::new("/[Content_Types].xml").unwrap();
+        let xml = OwnedXmlPart::capture(
+            name,
+            "application/xml".to_owned(),
+            SharedArc::new(source_bytes.to_vec()),
+        )
+        .unwrap();
+        let binding = SharedArc::new(
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+                .unwrap(),
+        );
+        let token = super::super::OwnedContentTypes { xml, binding };
+        let spaced = [" \tSVG\r\n"];
+        let after = token
+            .plan_edit_with_defaults(&[], &[], &spaced, ReadLimits::default())
+            .unwrap()
+            .materialize(ReadLimits::default())
+            .unwrap();
+        assert!(
+            !std::str::from_utf8(after.bytes())
+                .unwrap()
+                .contains("Extension='svg'")
+        );
+
+        let nbsp = ["\u{00a0}svg"];
+        assert!(
+            token
+                .plan_edit_with_defaults(&[], &[], &nbsp, ReadLimits::default())
+                .is_err()
+        );
+        let duplicate = [" svg ", "SVG\n"];
+        assert!(
+            token
+                .plan_edit_with_defaults(&[], &[], &duplicate, ReadLimits::default())
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn borrowed_content_types_plan_expands_prefixed_empty_root_and_rejects_one_under() {
+        let source_bytes = br#"<ct:Types xmlns:ct='http://schemas.openxmlformats.org/package/2006/content-types'/>"#;
+        let name = PackURI::new("/[Content_Types].xml").unwrap();
+        let xml = OwnedXmlPart::capture(
+            name,
+            "application/xml".to_owned(),
+            SharedArc::new(source_bytes.to_vec()),
+        )
+        .unwrap();
+        let binding = SharedArc::new(
+            crate::content_type::ContentTypeMap::from_xml(source_bytes, ReadLimits::default())
+                .unwrap(),
+        );
+        let token = super::super::OwnedContentTypes { xml, binding };
+        let added = PackURI::new("/new.bin").unwrap();
+        let edits = [ContentTypeEdit {
+            part_name: &added,
+            content_type: "application/octet-stream",
+        }];
+        let plan = token.plan_edit(&edits, &[], ReadLimits::default()).unwrap();
+        assert_eq!(plan.event_count(), 4);
+        let exact = plan.final_len().max(token.bytes().len());
+        let limits = ReadLimits::builder()
+            .max_content_types_bytes(exact)
+            .unwrap()
+            .max_part_bytes(exact as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let after = token
+            .plan_edit(&edits, &[], limits)
+            .unwrap()
+            .materialize(limits)
+            .unwrap();
+        assert!(
+            std::str::from_utf8(after.bytes())
+                .unwrap()
+                .contains("</ct:Types>")
+        );
+        let under = ReadLimits::builder()
+            .max_content_types_bytes(exact - 1)
+            .unwrap()
+            .max_part_bytes((exact - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(token.plan_edit(&edits, &[], under).is_err());
     }
 
     #[test]

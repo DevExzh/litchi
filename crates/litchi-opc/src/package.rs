@@ -23,7 +23,10 @@ use std::sync::Arc;
 
 mod content_types;
 mod relationships;
-pub use relationships::OwnedRelationships;
+pub use content_types::{ContentTypeEdit, ContentTypesEditPlan};
+pub use relationships::{
+    CanonicalRelationshipsPlan, OwnedRelationships, RelationshipEdit, RelationshipsEditPlan,
+};
 
 /// Options for saving an OPC package.
 #[derive(Debug, Clone, Default)]

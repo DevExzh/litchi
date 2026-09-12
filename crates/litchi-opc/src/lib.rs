@@ -64,7 +64,10 @@ pub use error::{OpcError, Result};
 pub use execution::OpenSession;
 pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
 pub use members::{NonPartMember, NonPartReason};
-pub use package::{FontEmbedding, OpcPackage, OwnedContentTypes, OwnedRelationships, SaveOptions};
+pub use package::{
+    CanonicalRelationshipsPlan, ContentTypeEdit, ContentTypesEditPlan, FontEmbedding, OpcPackage,
+    OwnedContentTypes, OwnedRelationships, RelationshipEdit, RelationshipsEditPlan, SaveOptions,
+};
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
 pub use pkgreader::{

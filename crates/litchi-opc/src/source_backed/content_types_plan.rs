@@ -31,14 +31,14 @@ pub(crate) type ContentTypeOverride = (PackURI, String);
 
 /// A source-preserving content-types edit plan.
 ///
-/// The source bytes and staged overrides are borrowed for the lifetime of the
-/// plan. The transaction retains ownership of the staged values while the
-/// final XML remains unallocated until materialize.
+/// The source bytes are borrowed for the lifetime of the plan. Staged
+/// overrides are retained in bounded owned storage while the final XML
+/// remains unallocated until materialize.
 #[derive(Debug)]
 pub(crate) struct ContentTypesPlan<'source> {
     source: &'source [u8],
     removals: Vec<Range<usize>>,
-    additions: &'source [ContentTypeOverride],
+    additions: Vec<ContentTypeOverride>,
     insertion_offset: Option<usize>,
     /// Prefix QName bytes from the source Types name, including the colon when
     /// the root is prefixed. Reused for generated Override elements and an
@@ -50,12 +50,38 @@ pub(crate) struct ContentTypesPlan<'source> {
     empty_root_end: Option<usize>,
     final_len: usize,
     mapping_count: usize,
+    event_count: usize,
     /// Charges temporary indexes and retained ranges for the complete plan
     /// lifetime, including the materialization phase.
     planning_memory_reservation: Option<Arc<Reservation>>,
 }
 
 impl<'source> ContentTypesPlan<'source> {
+    /// Package-level entry point for callers that have already performed
+    /// their bounded input preflight. Taking ownership here avoids copying
+    /// staged selectors a second time before the source scan.
+    pub(crate) fn plan_public_owned(
+        source: &'source [u8],
+        additions: Vec<ContentTypeOverride>,
+        removals: &[PackURI],
+        default_removals: Vec<String>,
+        limits: ReadLimits,
+    ) -> Result<Self> {
+        Self::plan_with_defaults_owned(
+            source,
+            additions,
+            removals,
+            default_removals,
+            limits,
+            None,
+            None,
+        )
+    }
+
+    pub(crate) fn materialize_public(self, limits: ReadLimits) -> Result<Vec<u8>> {
+        self.materialize(limits, None, None).map(|(bytes, _)| bytes)
+    }
+
     /// Scan and validate a source manifest and compute the exact candidate
     /// length and mapping count without constructing candidate XML.
     ///
@@ -63,10 +89,87 @@ impl<'source> ContentTypesPlan<'source> {
     /// `ContentTypeMap::from_xml`. This scanner repeats the root namespace,
     /// direct-child, event-count, depth, and text/DTD checks needed to make
     /// source ranges safe without allocating a second source map.
-    pub(crate) fn plan(
+    pub(super) fn plan(
         source: &'source [u8],
-        additions: &'source [ContentTypeOverride],
+        additions: &[ContentTypeOverride],
         removals: &[PackURI],
+        limits: ReadLimits,
+        context: Option<&ExecutionContext>,
+        reservation_failures: Option<&DiagnosticCounter>,
+    ) -> Result<Self> {
+        Self::plan_with_defaults(
+            source,
+            additions,
+            removals,
+            &[],
+            limits,
+            context,
+            reservation_failures,
+        )
+    }
+
+    /// Source-backed topology entry point for staged additions that are
+    /// already owned by the caller.  This preserves the single bounded copy
+    /// performed by the topology planner while the borrowed compatibility
+    /// wrapper remains useful to focused tests and legacy callers.
+    pub(super) fn plan_owned(
+        source: &'source [u8],
+        additions: Vec<ContentTypeOverride>,
+        removals: &[PackURI],
+        limits: ReadLimits,
+        context: Option<&ExecutionContext>,
+        reservation_failures: Option<&DiagnosticCounter>,
+    ) -> Result<Self> {
+        Self::plan_with_defaults_owned(
+            source,
+            additions,
+            removals,
+            Vec::new(),
+            limits,
+            context,
+            reservation_failures,
+        )
+    }
+
+    /// Scan a source manifest with both explicit `<Override>` removals and
+    /// `<Default Extension="...">` removals.  The final XML writer is shared
+    /// with the ordinary topology planner; this extra selector family only
+    /// changes which direct mapping ranges are removed during the scan.
+    pub(super) fn plan_with_defaults(
+        source: &'source [u8],
+        additions: &[ContentTypeOverride],
+        removals: &[PackURI],
+        default_removals: &[String],
+        limits: ReadLimits,
+        context: Option<&ExecutionContext>,
+        reservation_failures: Option<&DiagnosticCounter>,
+    ) -> Result<Self> {
+        let mut normalized_defaults = Vec::new();
+        normalized_defaults
+            .try_reserve_exact(default_removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC content-types default selectors",
+                source,
+            })?;
+        for value in default_removals {
+            normalized_defaults.push(collapse_xml_token(value)?);
+        }
+        Self::plan_with_defaults_owned(
+            source,
+            additions.to_vec(),
+            removals,
+            normalized_defaults,
+            limits,
+            context,
+            reservation_failures,
+        )
+    }
+
+    fn plan_with_defaults_owned(
+        source: &'source [u8],
+        additions: Vec<ContentTypeOverride>,
+        removals: &[PackURI],
+        default_removals: Vec<String>,
         limits: ReadLimits,
         context: Option<&ExecutionContext>,
         reservation_failures: Option<&DiagnosticCounter>,
@@ -90,10 +193,19 @@ impl<'source> ContentTypesPlan<'source> {
                 maximum: limits.max_content_type_mappings() as u64,
             });
         }
-        if removals.len() > limits.max_content_type_mappings() {
+        let removal_selector_count =
+            removals
+                .len()
+                .checked_add(default_removals.len())
+                .ok_or(OpcError::ReadLimit {
+                    resource: ReadResource::ContentTypeMappings,
+                    actual: u64::MAX,
+                    maximum: limits.max_content_type_mappings() as u64,
+                })?;
+        if removal_selector_count > limits.max_content_type_mappings() {
             return Err(OpcError::ReadLimit {
                 resource: ReadResource::ContentTypeMappings,
-                actual: removals.len() as u64,
+                actual: removal_selector_count as u64,
                 maximum: limits.max_content_type_mappings() as u64,
             });
         }
@@ -101,7 +213,7 @@ impl<'source> ContentTypesPlan<'source> {
         // Validate staged MIME values without cloning on the success path.
         // An error owns a copy only so the diagnostic retains the rejected
         // value.
-        for (_, content_type) in additions {
+        for (_, content_type) in &additions {
             if let Err(reason) = validate_content_type(content_type) {
                 return Err(OpcError::InvalidContentType {
                     value: content_type.clone(),
@@ -112,7 +224,7 @@ impl<'source> ContentTypesPlan<'source> {
 
         let planning_memory_reservation = reserve_memory(
             context,
-            planning_memory_bound(additions.len(), removals.len())?,
+            planning_memory_bound(additions.len(), removal_selector_count)?,
             reservation_failures,
             "source-backed OPC content-types planning metadata",
         )?;
@@ -120,7 +232,7 @@ impl<'source> ContentTypesPlan<'source> {
         // The caller normally supplies already canonicalized additions, but
         // reject equivalent selectors here before the plan records any edit.
         // Sorting indexes avoids allocating folded copies of every PartName.
-        let addition_order = sorted_override_indexes(additions)?;
+        let addition_order = sorted_override_indexes(&additions)?;
         if addition_order.windows(2).any(|window| {
             additions[window[0]]
                 .0
@@ -139,6 +251,14 @@ impl<'source> ContentTypesPlan<'source> {
                 "content-type removal selectors contain duplicate part names".into(),
             ));
         }
+        let default_order = sorted_default_indexes(&default_removals)?;
+        if default_order.windows(2).any(|window| {
+            default_removals[window[0]].eq_ignore_ascii_case(default_removals[window[1]].as_str())
+        }) {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-type default selectors contain duplicate extensions".into(),
+            ));
+        }
         let mut matched_removals = Vec::new();
         matched_removals
             .try_reserve_exact(removals.len())
@@ -147,6 +267,14 @@ impl<'source> ContentTypesPlan<'source> {
                 source,
             })?;
         matched_removals.resize(removals.len(), false);
+        let mut matched_defaults = Vec::new();
+        matched_defaults
+            .try_reserve_exact(default_removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC content-types default matches",
+                source,
+            })?;
+        matched_defaults.resize(default_removals.len(), false);
 
         let mut reader = NsReader::from_reader(source);
         reader.config_mut().trim_text(false);
@@ -162,7 +290,7 @@ impl<'source> ContentTypesPlan<'source> {
         let mut mapping_count = 0usize;
         let mut removals_ranges = Vec::new();
         removals_ranges
-            .try_reserve_exact(removals.len())
+            .try_reserve_exact(removal_selector_count)
             .map_err(|source| OpcError::Allocation {
                 resource: "source-backed OPC content-types removal spans",
                 source,
@@ -221,9 +349,12 @@ impl<'source> ContentTypesPlan<'source> {
                     Event::Start(element) if depth == 1 => {
                         ensure_direct_mapping(element, in_content_types_namespace)?;
                         mapping_count = checked_mapping_count(mapping_count, limits)?;
-                        if !removals.is_empty() && element.local_name().as_ref() == b"Override" {
+                        if (!removals.is_empty() && element.local_name().as_ref() == b"Override")
+                            || (!default_removals.is_empty()
+                                && element.local_name().as_ref() == b"Default")
+                        {
                             return Err(invalid_structure(
-                                "non-empty content-type Overrides are unsupported for topology removal",
+                                "non-empty content-type mappings are unsupported for removal",
                             ));
                         }
                         depth = next_depth(depth, limits)?;
@@ -245,6 +376,23 @@ impl<'source> ContentTypesPlan<'source> {
                             }
                             matched_removals[index] = true;
                             matched_removal = Some(index);
+                        } else if element.local_name().as_ref() == b"Default"
+                            && !default_removals.is_empty()
+                        {
+                            let extension = default_extension(element, decoder)?;
+                            let Some(index) =
+                                find_default(&default_removals, &default_order, &extension)
+                            else {
+                                continue;
+                            };
+                            if matched_defaults[index] {
+                                return Err(OpcError::InvalidContentTypesManifest(format!(
+                                    "duplicate content-type Default for extension '{}'",
+                                    default_removals[index]
+                                )));
+                            }
+                            matched_defaults[index] = true;
+                            matched_removal = Some(removals.len() + index);
                         }
                     },
                     Event::Start(_) | Event::Empty(_) => {
@@ -327,6 +475,12 @@ impl<'source> ContentTypesPlan<'source> {
                 removals[index]
             )));
         }
+        if let Some(index) = matched_defaults.iter().position(|matched| !matched) {
+            return Err(OpcError::InvalidContentTypesManifest(format!(
+                "content-type Default for extension '{}' was not found lexically",
+                default_removals[index]
+            )));
+        }
 
         if !additions.is_empty() {
             if !root_is_empty && root_close_start.is_none() {
@@ -382,18 +536,35 @@ impl<'source> ContentTypesPlan<'source> {
             limits.max_content_types_bytes() as u64,
         )?;
         limits.check(
+            ReadResource::PartBytes,
+            final_len as u64,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
             ReadResource::ArchiveEntryBytes,
             final_len as u64,
             limits.max_archive_entry_bytes(),
         )?;
         let mapping_count = mapping_count
-            .checked_sub(removals.len())
+            .checked_sub(removal_selector_count)
             .and_then(|value| value.checked_add(additions.len()))
             .ok_or_else(|| overlay_unavailable("content-type mapping count underflows"))?;
         limits.check(
             ReadResource::ContentTypeMappings,
             mapping_count as u64,
             limits.max_content_type_mappings() as u64,
+        )?;
+        let event_count = event_count
+            .checked_sub(removal_selector_count)
+            .and_then(|value| value.checked_add(additions.len()))
+            .and_then(|value| {
+                value.checked_add(usize::from(root_is_empty && !additions.is_empty()))
+            })
+            .ok_or_else(|| overlay_unavailable("content-type XML event count underflows"))?;
+        limits.check(
+            ReadResource::XmlEvents,
+            event_count as u64,
+            limits.max_xml_events() as u64,
         )?;
 
         let insertion_offset = if additions.is_empty() || root_is_empty {
@@ -414,6 +585,7 @@ impl<'source> ContentTypesPlan<'source> {
             empty_root_end,
             final_len,
             mapping_count,
+            event_count,
             planning_memory_reservation,
         })
     }
@@ -430,10 +602,22 @@ impl<'source> ContentTypesPlan<'source> {
         self.mapping_count
     }
 
+    /// Whether this plan retains every source byte and mapping unchanged.
+    #[must_use]
+    pub(crate) const fn is_noop(&self) -> bool {
+        self.additions.is_empty() && self.removals.is_empty()
+    }
+
+    /// Exact final quick-xml event count, including `Event::Eof`.
+    #[must_use]
+    pub(crate) const fn event_count(&self) -> usize {
+        self.event_count
+    }
+
     /// Materialize one final output allocation after caller aggregate limits
     /// have been admitted. The reservation covers the output vector and the
     /// typed readback map, including decoded strings and hash tables.
-    pub(crate) fn materialize(
+    pub(super) fn materialize(
         self,
         limits: ReadLimits,
         context: Option<&ExecutionContext>,
@@ -449,6 +633,7 @@ impl<'source> ContentTypesPlan<'source> {
             empty_root_end,
             final_len,
             mapping_count,
+            event_count,
             planning_memory_reservation,
         } = self;
         // Keep planning metadata charged until all ranges have been consumed.
@@ -464,6 +649,11 @@ impl<'source> ContentTypesPlan<'source> {
             ReadResource::ArchiveEntryBytes,
             final_len as u64,
             limits.max_archive_entry_bytes(),
+        )?;
+        limits.check(
+            ReadResource::XmlEvents,
+            event_count as u64,
+            limits.max_xml_events() as u64,
         )?;
         let reservation = reserve_memory(
             context,
@@ -494,7 +684,7 @@ impl<'source> ContentTypesPlan<'source> {
                 }
                 output.extend_from_slice(&source[..slash]);
                 output.push(b'>');
-                append_overrides(&mut output, additions, prefix, context)?;
+                append_overrides(&mut output, &additions, prefix, context)?;
                 output.extend_from_slice(b"</");
                 output.extend_from_slice(prefix);
                 output.extend_from_slice(b"Types>");
@@ -507,7 +697,7 @@ impl<'source> ContentTypesPlan<'source> {
                         insertion_offset.filter(|offset| !inserted && *offset <= range.start)
                     {
                         output.extend_from_slice(&source[cursor..offset]);
-                        append_overrides(&mut output, additions, prefix, context)?;
+                        append_overrides(&mut output, &additions, prefix, context)?;
                         cursor = offset;
                         inserted = true;
                     }
@@ -516,7 +706,7 @@ impl<'source> ContentTypesPlan<'source> {
                 }
                 if let Some(offset) = insertion_offset.filter(|_| !inserted) {
                     output.extend_from_slice(&source[cursor..offset]);
-                    append_overrides(&mut output, additions, prefix, context)?;
+                    append_overrides(&mut output, &additions, prefix, context)?;
                     cursor = offset;
                 }
                 output.extend_from_slice(&source[cursor..]);
@@ -586,6 +776,53 @@ fn override_part_name(
             "content-type Override is missing PartName".to_string(),
         )
     })
+}
+
+fn default_extension(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+) -> Result<String> {
+    for attribute in element.attributes() {
+        let attribute =
+            attribute.map_err(|error| OpcError::InvalidContentTypesManifest(error.to_string()))?;
+        if attribute.key.as_ref() == b"Extension" {
+            let value = attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| OpcError::InvalidContentTypesManifest(error.to_string()))?;
+            return collapse_xml_token(value.as_ref());
+        }
+    }
+    Err(OpcError::InvalidContentTypesManifest(
+        "content-type Default is missing Extension".to_owned(),
+    ))
+}
+
+/// Apply the XML Schema `xsd:token` whitespace rule: XML whitespace bytes
+/// are collapsed to one U+0020 between non-whitespace characters, while
+/// other Unicode whitespace such as NBSP remains lexical content.
+pub(crate) fn collapse_xml_token(value: &str) -> Result<String> {
+    let mut collapsed = String::new();
+    collapsed
+        .try_reserve_exact(value.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC XML token normalization",
+            source,
+        })?;
+    let mut pending_space = false;
+    for character in value.chars() {
+        if matches!(character, ' ' | '\t' | '\r' | '\n') {
+            if !collapsed.is_empty() {
+                pending_space = true;
+            }
+            continue;
+        }
+        if pending_space {
+            collapsed.push(' ');
+            pending_space = false;
+        }
+        collapsed.push(character);
+    }
+    Ok(collapsed)
 }
 
 fn ensure_direct_mapping(
@@ -782,11 +1019,33 @@ fn sorted_override_indexes(values: &[ContentTypeOverride]) -> Result<Vec<usize>>
     Ok(indexes)
 }
 
+fn sorted_default_indexes(values: &[String]) -> Result<Vec<usize>> {
+    let mut indexes = Vec::new();
+    indexes
+        .try_reserve_exact(values.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC content-types default order",
+            source,
+        })?;
+    indexes.extend(0..values.len());
+    indexes.sort_unstable_by(|left, right| {
+        cmp_ascii_case_insensitive(&values[*left], &values[*right])
+    });
+    Ok(indexes)
+}
+
 fn find_pack_uri(values: &[PackURI], order: &[usize], candidate: &PackURI) -> Option<usize> {
     order
         .binary_search_by(|index| {
             cmp_ascii_case_insensitive(values[*index].as_str(), candidate.as_str())
         })
+        .ok()
+        .map(|position| order[position])
+}
+
+fn find_default(values: &[String], order: &[usize], candidate: &str) -> Option<usize> {
+    order
+        .binary_search_by(|index| cmp_ascii_case_insensitive(&values[*index], candidate))
         .ok()
         .map(|position| order[position])
 }
