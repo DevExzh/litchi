@@ -16,7 +16,8 @@ The adapter uses deterministic synthetic packages adapted from
 `crates/litchi-xlsx/tests/drawing_svg_lifecycle.rs`, plus the retained native
 LibreOffice fixture. It exercises all three anchor forms, shared and distinct
 targets, inventory counts, namespace pressure, strict-host and incoming-edge
-lifecycle cases, captured-owner clone cases, and refusal lanes. The exploratory
+lifecycle cases, captured-owner clone cases, same-picture attach/detach,
+two-worksheet attach/detach, and refusal lanes. The exploratory
 root-namespace lane requires raw-source and shared-context projections for all
 32 owners. It must
 still satisfy every semantic and refusal gate in `requirements.md` before
@@ -24,7 +25,7 @@ setting `XLSX_SVG_PROFILE_API_WIRED=1`. The three dedicated multi-picture
 attach lanes and six exploratory detach lanes stage 16, 64, and 256 edits on
 one drawing and validate one composed commit/reopen per count. They are
 bounded cost lanes for the current per-intent rescan behavior, without a
-scaling claim. The 65-lane acceptance matrix adds exact in-memory inverse and
+scaling claim. The 69-lane acceptance matrix adds exact in-memory inverse and
 replay-refusal checks for every anchor/size pair and a composite mixed-cap
 atomic-refusal lane. The adapter repeats OPC reachability, SVG leaf, content
 type, fallback, and selected-owner checks after each changed publication;
@@ -56,9 +57,12 @@ Validation performed on the gated adapter scaffold:
 - standalone harness dependency resolution is locked and offline;
 - the adapter is written against the current callable API;
 - the release adapter compiles against an isolated candidate overlay;
-- one-sample semantic smoke checks pass for all 65 acceptance and 7 exploratory lanes (not retained as performance evidence);
+- one-sample semantic smoke checks pass for all 69 acceptance and 7 exploratory lanes (not retained as performance evidence);
 - raw receipts carry both FNV-1a and SHA-256 corpus identities;
 - shell and Python syntax checks pass;
+- the approved source pin is `ac288a303264f9ea0bb4081baa44031bee5b79a7`, and
+  the committed-input guard rejects source files that are untracked or differ
+  from that Git tree;
 - the runner refuses an unfrozen run before creating a target;
 - the runner refuses the semantic-review gate after the freeze flag alone; and
 - an explicit repository `target` path is rejected by the safety guard.
@@ -71,18 +75,22 @@ detach receipts passed allocator, semantic, and exact-output checks. The full
 runner remains gated until the callable lifecycle API and semantic checks are
 frozen; no production files were written by this profiler.
 
-The current root review adds nine adversarial Python verifier tests. They
+The current root review has eleven adversarial Python verifier tests. They
 reject missing/nonempty stderr, missing/failed/duplicate exit-status records,
 changed or malformed executable digests, incorrect process identities, and
 input-size drift despite matching claimed hashes, and native receipts that
-disagree with the documented producer fixture. A copied-runner execution test
-also proves that cleanup preserves historical exploratory and unrelated
-evidence, and removes its owned target on build failure. Namespace tests reject
-missing, malformed, inconsistent, or changing first-refused binding counts.
-All nine pass. Shell syntax
-and three early refusal gates (unfrozen, unwired, insufficient process count)
-also pass without creating a Cargo target. These checks are verifier evidence,
-not lifecycle performance measurements or production acceptance.
+disagree with the documented producer fixture. The separate seven-test runner
+suite proves missing or reused external output refusal, checkout/target/symlink
+separation, symlinked-checkout resolution, and owned-target cleanup while
+retaining failed-run diagnostics. Namespace tests reject missing, malformed,
+inconsistent, or changing first-refused binding counts. Caller-limit tests
+reject missing, floating-point, boolean, nonpositive, and cross-process-drift
+ceiling values. A separate five-test source-snapshot suite exercises real
+temporary Git trees, including untracked, assume-unchanged, and tampered
+path-source inputs. All 23 Python tests pass. Shell syntax and three early
+refusal gates (unfrozen, unwired, insufficient process count) also pass without
+creating a Cargo target. These checks are verifier evidence, not lifecycle
+performance measurements or production acceptance.
 
 The refusal-path review is now corrected. The Rust adapter emits a distinct
 typed refusal only after classifying the public API error and confirming exact
@@ -90,15 +98,22 @@ source-byte preservation. Unexpected acceptance, source mutation, setup
 failure, and unrelated API errors remain hard failures. Five adapter unit tests
 cover those negative cases, exact opaque-fragment checks, registry counts, and
 a validated external-edge refusal; the retained candidate build and one-sample
-semantic smoke pass all 65 acceptance and 7 exploratory lanes. The native lane
+semantic smoke pass all 69 acceptance and 7 exploratory lanes. The native lane
 also asserts the documented producer SHA-256 before emitting a receipt. These
 checks are scaffold validation, not lifecycle performance measurements or
 production acceptance.
 
 The targeted coverage follow-up is now implemented in the owned scaffold, with
-measurement gates still closed. The registry is 65 acceptance lanes plus 7
-exploratory lanes (72 total). The isolated candidate build and one-sample
-semantic smoke pass all 72 lanes, including strict attach/final-detach,
-incoming-edge retention, exact opaque-fragment checks, derived namespace
-refusal, captured-owner clone, and directly constructed shared-final fixtures.
-This is readiness evidence only; it contains no timing or performance claim.
+measurement gates still closed. The registry is 69 acceptance lanes plus 7
+exploratory lanes (76 total). The isolated candidate build and one-sample
+semantic smoke pass all 76 lanes, including strict attach/final-detach,
+same-picture and two-worksheet attach/detach, incoming-edge retention, exact
+opaque-fragment checks, derived namespace refusal, captured-owner clone, and
+directly constructed shared-final fixtures.
+The same-picture and multisheet lanes also require byte-stable reopen after
+attach and restore, all-anchor geometry equality, and opaque-fragment checks
+after attach. Composite caller-limit receipts retain each requested ceiling;
+the verifier checks the complete ordered set and cross-process agreement. The
+source guard binds all 15 files from `ac288a303` plus the reviewed OPC/source
+prerequisites and contextual `svg_blip.rs` blob. This is readiness evidence
+only; it contains no timing or performance claim.

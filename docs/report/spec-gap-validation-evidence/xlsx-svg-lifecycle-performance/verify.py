@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 from summarize import LANES, rows
@@ -23,6 +25,20 @@ REFUSAL_LANES = {
 # The synthetic namespace fixture declares these seven root bindings before
 # adding the generated declarations; keep aligned with its Rust constructor.
 FIXED_ROOT_NAMESPACE_BINDINGS = 7
+
+CALLER_LIMIT_KINDS = {
+    "limit_small": "svg_input_bytes",
+    "limit_large": "svg_input_bytes",
+    "mixed_caps_rejection": "composite_read_limits",
+}
+COMPOSITE_LIMIT_NAMES = (
+    "parts",
+    "total_part_bytes",
+    "total_relationships",
+    "relationship_xml_bytes",
+    "relationship_xml_events",
+    "content_type_mappings",
+)
 
 
 def require(condition: bool, message: str) -> None:
@@ -43,16 +59,70 @@ def resolve(root: Path, shown: str) -> Path:
     return path if path.is_absolute() else root / path
 
 
+def committed_blob_sha256(root: Path, commit: str, shown: str) -> str:
+    try:
+        committed = subprocess.check_output(
+            [
+                "git",
+                "--no-replace-objects",
+                "-C",
+                str(root),
+                "cat-file",
+                "blob",
+                f"{commit}:{shown}",
+            ]
+        )
+    except subprocess.CalledProcessError as error:
+        raise AssertionError(f"cannot read committed source input blob: {shown}") from error
+    return hashlib.sha256(committed).hexdigest()
+
+
+def verify_git_snapshot(paths: list[Path], root: Path, commit: str) -> None:
+    """Ensure local manifest inputs still equal the captured commit tree."""
+
+    relative: list[str] = []
+    for path in sorted({path.resolve() for path in paths}, key=str):
+        require(path.is_file(), f"retained Git input missing: {path}")
+        try:
+            relative.append(path.relative_to(root.resolve()).as_posix())
+        except ValueError as error:
+            raise AssertionError(f"non-Git local input has no committed identity: {path}") from error
+    current = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+    ).strip()
+    require(current == commit, f"Git snapshot commit changed: {commit} -> {current}")
+    changed: list[str] = []
+    for shown in relative:
+        tracked = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", shown],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        require(tracked.returncode == 0, f"local Git input is not tracked: {shown}")
+        if sha256(root / shown) != committed_blob_sha256(root, commit, shown):
+            changed.append(shown)
+    require(
+        not changed,
+        "local Git inputs differ from committed snapshot: " + ", ".join(sorted(changed)),
+    )
+
+
 def verify_manifest(path: Path, root: Path) -> int:
     lines = path.read_text().splitlines()
     require(
-        lines and lines[0] == "format=xlsx-svg-lifecycle-profile-build-source-v1",
+        lines and lines[0] == "format=xlsx-svg-lifecycle-profile-build-source-v2",
         "manifest format changed",
     )
-    packages: dict[tuple[str, str, str], tuple[int, str]] = {}
+    git_commit: str | None = None
+    packages: dict[tuple[str, str, str], tuple[str, int, str]] = {}
     files: dict[tuple[str, str, str], list[tuple[str, str]]] = {}
     extras: list[tuple[str, str]] = []
     for line in lines[1:]:
+        if line.startswith("git_commit="):
+            require(git_commit is None, "duplicate Git commit line")
+            git_commit = line.split("=", 1)[1]
+            continue
         if line.startswith("metadata_sha256="):
             continue
         parts = line.split("\t")
@@ -60,7 +130,7 @@ def verify_manifest(path: Path, root: Path) -> int:
             require(len(parts) == 7, f"malformed package line: {line}")
             key = (parts[0][len("package=") :], parts[1], parts[3])
             require(key not in packages, f"duplicate package line: {key}")
-            packages[key] = (int(parts[5]), parts[6])
+            packages[key] = (parts[2], int(parts[5]), parts[6])
         elif line.startswith("file="):
             require(len(parts) == 5, f"malformed file line: {line}")
             key = (parts[0][len("file=") :], parts[1], parts[2])
@@ -72,7 +142,8 @@ def verify_manifest(path: Path, root: Path) -> int:
             raise AssertionError(f"unknown manifest line: {line}")
     require(set(packages) == set(files), "package/file manifest sets differ")
     checked = 0
-    for key, (expected_count, expected_tree) in packages.items():
+    local_inputs: list[Path] = []
+    for key, (source, expected_count, expected_tree) in packages.items():
         entries = files[key]
         require(len(entries) == expected_count, f"package file count changed: {key}")
         tree_payload = "\n".join(f"{shown}\t{digest}" for shown, digest in entries)
@@ -84,12 +155,17 @@ def verify_manifest(path: Path, root: Path) -> int:
             current = resolve(root, shown)
             require(current.is_file(), f"retained manifest path missing: {shown}")
             require(sha256(current) == expected, f"retained manifest hash changed: {shown}")
+            if source == "path":
+                local_inputs.append(current)
             checked += 1
     for shown, expected in extras:
         current = resolve(root, shown)
         require(current.is_file(), f"retained extra path missing: {shown}")
         require(sha256(current) == expected, f"retained extra hash changed: {shown}")
+        local_inputs.append(current)
         checked += 1
+    require(git_commit is not None and git_commit, "manifest Git commit missing")
+    verify_git_snapshot(local_inputs, root, git_commit)
     require(checked >= 8, f"too few retained manifest inputs checked: {checked}")
     return checked
 
@@ -136,6 +212,40 @@ def verify_namespace_boundary(value: dict[str, object], lane: str, path: Path) -
     return generated, active, limit
 
 
+def verify_caller_limits(
+    value: dict[str, object], lane: str, path: Path
+) -> tuple[str, object] | None:
+    profile = value.get("caller_limits")
+    expected = CALLER_LIMIT_KINDS.get(lane)
+    if expected is None:
+        require(profile is None, f"unexpected caller-limit profile: {path}")
+        return None
+    require(isinstance(profile, dict), f"caller-limit profile missing: {path}")
+    require(profile.get("kind") == expected, f"caller-limit kind mismatch: {path}")
+    if expected == "svg_input_bytes":
+        maximum = profile.get("max")
+        require(
+            type(maximum) is int and maximum == 32 * 1024 * 1024,
+            f"input ceiling mismatch: {path}",
+        )
+        return expected, maximum
+    else:
+        dimensions = profile.get("dimensions")
+        require(dimensions is None, f"legacy composite dimensions leaked: {path}")
+        ceilings = profile.get("ceilings")
+        require(isinstance(ceilings, list), f"composite caller ceilings missing: {path}")
+        require(len(ceilings) == len(COMPOSITE_LIMIT_NAMES), f"composite caller ceiling count changed: {path}")
+        parsed: list[tuple[str, int]] = []
+        for index, item in enumerate(ceilings):
+            require(isinstance(item, dict), f"composite caller ceiling {index} malformed: {path}")
+            name = item.get("name")
+            ceiling = item.get("value")
+            require(name == COMPOSITE_LIMIT_NAMES[index], f"composite caller ceiling name changed: {path}")
+            require(type(ceiling) is int and ceiling > 0, f"composite caller ceiling value malformed: {path}")
+            parsed.append((name, ceiling))
+        return expected, tuple(parsed)
+
+
 def verify_lanes(results: Path) -> None:
     for lane in LANES:
         paths = sorted(results.glob(f"{lane}-p*.json"))
@@ -148,12 +258,14 @@ def verify_lanes(results: Path) -> None:
         input_sha256s = set()
         input_sizes = set()
         namespace_boundaries = set()
+        caller_limit_profiles: set[tuple[str, object] | None] = set()
         for path in paths:
             verify_process_output(path)
             value = json.loads(path.read_text())
             require(value["schema"] == "xlsx-svg-lifecycle-profile-v1", f"schema mismatch: {path}")
             require(value["lane"] == lane, f"lane mismatch: {path}")
             namespace_boundaries.add(verify_namespace_boundary(value, lane, path))
+            caller_limit_profiles.add(verify_caller_limits(value, lane, path))
             require(int(value["warmup"]) >= 2, f"warm-up count below minimum: {path}")
             require(
                 int(value["sample_count"]) == len(value["samples"]) >= 20,
@@ -174,6 +286,7 @@ def verify_lanes(results: Path) -> None:
         require(len(input_sha256s) == 1, f"fixture SHA-256 changed across processes for {lane}")
         require(len(input_sizes) == 1, f"fixture size changed across processes for {lane}")
         require(len(namespace_boundaries) == 1, f"namespace boundary changed across processes for {lane}")
+        require(len(caller_limit_profiles) == 1, f"caller-limit profile changed across processes for {lane}")
 
 
 def verify_process_output(path: Path) -> None:
@@ -260,7 +373,14 @@ def verify_report(path: Path, recomputed: list[dict[str, object]]) -> None:
 def main() -> None:
     here = Path(__file__).resolve().parent
     root = next(path for path in here.parents if (path / "crates").is_dir())
-    results = here / "results"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=root)
+    parser.add_argument("--results", type=Path, default=here / "results")
+    parser.add_argument("--report", type=Path, default=here / "report.md")
+    parser.add_argument("--output", type=Path, default=here / "verification.json")
+    args = parser.parse_args()
+    root = args.root.resolve()
+    results = args.results.resolve()
     before = results / "source-manifest-before.txt"
     after = results / "source-manifest-after.txt"
     require(before.read_bytes() == after.read_bytes(), "source manifest changed during profile")
@@ -271,7 +391,7 @@ def main() -> None:
     verify_native_identity(results, json.loads((here / "corpus-manifest.json").read_text()), root)
     warmup, samples = run_shape(results)
     recomputed = rows(results)
-    verify_report(here / "report.md", recomputed)
+    verify_report(args.report, recomputed)
     result = {
         "passed": True,
         "lanes": len(LANES),
@@ -285,7 +405,7 @@ def main() -> None:
         "expected_refusals": sorted(REFUSAL_LANES),
         "report_recomputed_from_samples": True,
     }
-    (here / "verification.json").write_text(json.dumps(result, indent=2) + "\n")
+    args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
 
 

@@ -6,7 +6,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
+
+
+FORMAT = "xlsx-svg-lifecycle-profile-build-source-v2"
 
 
 def sha256(path: Path) -> str:
@@ -25,9 +29,74 @@ def display(path: Path, root: Path) -> str:
         return str(path)
 
 
-def require_file(path: Path) -> None:
-    if not path.resolve().is_file():
+def require_file(path: Path) -> Path:
+    path = path.resolve()
+    if not path.is_file():
         raise SystemExit(f"source manifest input is missing: {path}")
+    return path
+
+
+def committed_blob_sha256(root: Path, commit: str, shown: str) -> str:
+    try:
+        committed = subprocess.check_output(
+            [
+                "git",
+                "--no-replace-objects",
+                "-C",
+                str(root),
+                "cat-file",
+                "blob",
+                f"{commit}:{shown}",
+            ]
+        )
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"cannot read committed source input blob: {shown}") from error
+    return hashlib.sha256(committed).hexdigest()
+
+
+def verify_git_inputs(paths: list[Path], root: Path, commit: str) -> None:
+    """Bind every local input to a committed Git blob before profiling."""
+
+    root = root.resolve()
+    relative: list[str] = []
+    for path in sorted({path.resolve() for path in paths}, key=str):
+        require_file(path)
+        try:
+            relative.append(path.relative_to(root).as_posix())
+        except ValueError as error:
+            raise SystemExit(
+                f"non-Git local input has no committed source identity: {path}"
+            ) from error
+    current = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+    ).strip()
+    if current != commit:
+        raise SystemExit(f"source input Git head changed during manifest capture: {commit} -> {current}")
+    missing: list[str] = []
+    for shown in relative:
+        tracked = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", shown],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if tracked.returncode != 0:
+            missing.append(shown)
+    if missing:
+        raise SystemExit(
+            "local build inputs are not tracked in the committed checkout: "
+            + ", ".join(sorted(missing))
+        )
+    changed = [
+        shown
+        for shown in relative
+        if sha256(root / shown) != committed_blob_sha256(root, commit, shown)
+    ]
+    if changed:
+        raise SystemExit(
+            "local build inputs differ from committed Git blobs: "
+            + ", ".join(sorted(changed))
+        )
 
 
 def main() -> None:
@@ -35,6 +104,7 @@ def main() -> None:
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--git-commit", required=True)
     parser.add_argument("--extra", type=Path, action="append", default=[])
     args = parser.parse_args()
 
@@ -66,11 +136,16 @@ def main() -> None:
             )
         )
 
-    for extra in args.extra:
-        require_file(extra)
+    local_inputs: list[Path] = []
+    for package in packages:
+        if package[3] is None:
+            local_inputs.extend(package[4])
+    local_inputs.extend(require_file(extra) for extra in args.extra)
+    verify_git_inputs(local_inputs, root, args.git_commit)
 
     lines = [
-        "format=xlsx-svg-lifecycle-profile-build-source-v1",
+        f"format={FORMAT}",
+        f"git_commit={args.git_commit}",
         f"metadata_sha256={sha256(metadata_path)}",
     ]
     for name, version, manifest, source, package_files in sorted(

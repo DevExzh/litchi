@@ -7,9 +7,11 @@ and the public selector / attach / detach API are frozen.
 
 ## Scope and evidence boundary
 
-The input is an OPC XLSX package with one ordinary worksheet drawing part. The
-profile admits direct `xdr:pic` owners beneath `twoCellAnchor`, `oneCellAnchor`,
-or `absoluteAnchor`. Every picture has an existing internal PNG fallback.
+Most inputs are OPC XLSX packages with one ordinary worksheet drawing part. The
+`multisheet_attach_detach` input is the deliberate two-worksheet exception,
+with one independent drawing part per worksheet. The profile admits direct
+`xdr:pic` owners beneath `twoCellAnchor`, `oneCellAnchor`, or
+`absoluteAnchor`. Every picture has an existing internal PNG fallback.
 Attach adds one embedded internal SVG owner; detach removes only the selected
 SVG owner and removes a media leaf only after package-wide incoming-edge
 reachability proves it is unreferenced. The selector is semantic and
@@ -64,6 +66,8 @@ the corresponding source XML element. The `{size}` values are `small` and
 | `strict_detach_end_to_end_shared_final_two_cell` | strict worksheet/drawing dialect | detach final owner, preserve strict host relationships, publish, reopen, and verify SVG cleanup |
 | `incoming_edge_shared_final_two_cell` | one selected owner plus a separate incoming SVG relationship | remove the selected drawing-to-SVG relationship while a package-wide incoming edge retains the SVG leaf |
 | `detach_end_to_end_distinct_{anchor}_{size}` | all 3 anchor forms × 2 payload sizes | detach a distinct target and reopen the changed closure |
+| `same_picture_attach_detach_{anchor}` | all 3 anchor forms, small payload | attach one selected picture and publish; reopen, detach that same semantic picture and publish again; restore source drawing/content-types and close the graph |
+| `multisheet_attach_detach` | Sheet1/two-cell picture and Sheet2/one-cell picture in one package | attach one owner on each worksheet in one public transaction, reopen, detach the same owners in a second transaction, and verify independent drawings/media and final graph cleanup |
 | `noop_detach_{anchor}` | all 3 anchor forms | exact no-op path; source bytes and package snapshot must be shared |
 | `limit_{small,large}` | caller output/edit budget just below required staging | refusal before oversized temporary output allocation or publication |
 | `mixed_caps_rejection` | shared attached fixture under each retained aggregate cap | run bounded detach+attach attempts at exact part, byte, relationship, relationship-XML, relationship-event, and content-type ceilings; require atomic refusal and unchanged source for every cap |
@@ -73,12 +77,12 @@ the corresponding source XML element. The `{size}` values are `small` and
 | `malformed_unknown_uri` | unknown extension URI or foreign SVG namespace | inert preservation, no inferred resource, and exact detach no-op |
 | `multi_picture_same_drawing_{16,64,256}` | 16, 64, and 256 attach intents in one ordinary drawing transaction | composed attach, commit, publish, reopen, and all-owner checks; exposes per-intent rescan and cumulative staging cost without a scaling claim |
 
-The freeze-gated acceptance set has 65 lanes. The adapter also accepts six
+The freeze-gated acceptance set has 69 lanes. The adapter also accepts six
 exploratory-only lanes,
 `multi_picture_same_drawing_detach_{shared,distinct}_{16,64,256}`. Each lane
 detaches every direct picture in one transaction and checks the final raster
 fallback, SVG reachability cleanup, commit, and reopen. They remain outside
-the freeze-gated 65-lane acceptance set and carry no scaling claim.
+the freeze-gated 69-lane acceptance set and carry no scaling claim.
 
 The adapter also accepts the exploratory-only
 `inventory_shared_root_namespace_32` lane. It inventories 32 direct pictures
@@ -112,9 +116,11 @@ construction, and expected-result derivation are outside an isolated operation
 timer. Payload bytes are opaque; the host
 must not parse or render the SVG during this profile.
 
-Each synthetic package contains only the parts needed for the lane: workbook,
-worksheet, worksheet relationship, one drawing, drawing relationships, a PNG
-fallback, optional SVG leaves, and content types. Anchor geometry must remain
+Each single-worksheet synthetic package contains only the parts needed for the
+lane: workbook, worksheet, worksheet relationship, one drawing, drawing
+relationships, a PNG fallback, optional SVG leaves, and content types. The
+multisheet fixture adds a second worksheet, worksheet relationship, drawing,
+and PNG fallback with the same bounded shape. Anchor geometry must remain
 observable in the source-backed readback:
 
 - two-cell fixtures retain validated `from`, `to`, and `editAs`;
@@ -161,6 +167,7 @@ Every process receipt has schema
 ```text
 lane, input_bytes, input_hash_fnv1a64, input_sha256, warmup, sample_count,
 namespace_generated_bindings, namespace_active_bindings, namespace_active_limit,
+caller_limits,
 expected_success, samples[]
 ```
 
@@ -182,6 +189,18 @@ write_call_count, write_call_bytes,
 hardware_counters: {cycles, instructions, ipc, branches,
                     branch_misses, l1d_misses, llc_misses, page_faults}
 ```
+
+The top-level receipt also records the caller-limit profile used by a lane:
+`caller_limits` is either `null` for the default source-backed package, an
+object with the borrowed-input ceiling for `limit_{small,large}`, or an object
+whose `ceilings` array records each actual requested `ReadLimits` value for
+`mixed_caps_rejection`. The composite names are `parts`, aggregate part
+bytes, relationships, relationship XML bytes/events, and content-type
+mappings; the verifier requires the complete ordered set and positive integer
+values, and requires those values to agree across fresh processes. A future
+range-source adapter must add the exact request-size list to
+`range_request_bytes`; a null field means that the public source abstraction
+did not expose that metric and must not be interpreted as zero.
 
 `stage_ns` is optional for an operation that cannot expose a stage boundary,
 but absent stages must be documented as unavailable rather than inferred from
@@ -242,14 +261,16 @@ report. One noisy run is not evidence of a speedup or regression.
 6. run every lane in fresh processes under `/usr/bin/time -v`;
 7. retain raw receipts and commands, but remove a target it created itself;
 8. run `summarize.py` and `verify.py` only after all receipts are present; and
-9. fail if the source manifest, package input hash, allocator equations,
+9. require `XLSX_SVG_PROFILE_RESULTS` to name a fresh nonexistent directory
+   outside the checkout and disjoint from the Cargo target; and
+10. fail if the source manifest, package input hash, allocator equations,
    semantic readback, output exactness, or expected refusal class changes.
 
-The runner and verifier never delete the repository's main target or any
-fixture outside this directory's private temporary area. A future sealed run
-must record CPU model, core count, memory, storage, OS, Rust/Cargo versions,
-compiler flags, allocator, and relevant environment settings in
-`results/build-provenance.txt`.
+The runner and verifier never delete the repository's main target, historical
+evidence, or a pre-existing output directory. A future sealed run must record
+CPU model, core count, memory, storage, OS, Rust/Cargo versions, compiler
+flags, allocator, and relevant environment settings in
+`$XLSX_SVG_PROFILE_RESULTS/build-provenance.txt`.
 
 The default runner measures fresh processes and warm-up samples. If a future
 adapter adds file-cache or thread-count lanes, it must identify cold versus
@@ -280,8 +301,16 @@ Before any receipt is considered valid, the adapter must assert:
 - exact no-op publication shares source bytes;
 - inverse restoration returns exact accepted source bytes and graph topology;
 - stale source and replay are refused atomically; and
+- same-picture and multisheet attach/detach candidates reopen byte-stably,
+  preserve every selected and unselected anchor geometry, and retain exact
+  opaque fragments after attach and restore;
+- composite caller-limit receipts enumerate the complete ordered set of actual
+  requested ceilings, and those values agree across fresh processes; and
 - candidate reopen finds no dangling relationship, duplicate content-type
   override, or orphaned media owner.
 
 The profile does not run until those checks are implemented in the production
 owner's focused test suite and the adapter can call the resulting public API.
+The native producer lane remains read/capture only; it never contributes to
+authoring or Office-acceptance claims. A source pin and clean committed-input
+guard are also required before any timing receipt is sealed.

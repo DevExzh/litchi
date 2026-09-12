@@ -83,6 +83,10 @@ pub const LANES: &[&str] = &[
     "detach_end_to_end_distinct_one_cell_large",
     "detach_end_to_end_distinct_absolute_small",
     "detach_end_to_end_distinct_absolute_large",
+    "same_picture_attach_detach_two_cell",
+    "same_picture_attach_detach_one_cell",
+    "same_picture_attach_detach_absolute",
+    "multisheet_attach_detach",
     "noop_detach_two_cell",
     "noop_detach_one_cell",
     "noop_detach_absolute",
@@ -125,8 +129,11 @@ const SVG_NS: &str = "http://schemas.microsoft.com/office/drawing/2016/SVG/main"
 const SVG_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const SHEET: &str = "/xl/worksheets/sheet1.xml";
+const SHEET2: &str = "/xl/worksheets/sheet2.xml";
 const DRAWING: &str = "/xl/drawings/drawing1.xml";
+const DRAWING2: &str = "/xl/drawings/drawing2.xml";
 const RASTER: &str = "/xl/media/image1.png";
+const RASTER2: &str = "/xl/media/image3.png";
 const OTHER: &str = "/xl/opaque-owner.xml";
 const SMALL_PAYLOAD: usize = 512;
 const LARGE_PAYLOAD: usize = 65_536;
@@ -196,6 +203,7 @@ pub struct Fixture {
     pub package: Arc<[u8]>,
     pub payload: Arc<[u8]>,
     pub picture_count: usize,
+    pub drawing_count: usize,
     pub input_bytes: u64,
     pub input_hash: u64,
     pub input_sha256: String,
@@ -208,6 +216,15 @@ pub struct Fixture {
     pub namespace_generated_bindings: Option<usize>,
     pub namespace_active_bindings: Option<usize>,
     pub namespace_active_limit: Option<usize>,
+    pub multisheet: bool,
+    pub caller_limit_profile: Option<&'static str>,
+    pub caller_limit_ceilings: Option<Vec<CallerLimitCeiling>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CallerLimitCeiling {
+    pub name: &'static str,
+    pub value: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -273,6 +290,7 @@ pub fn fixture_for_lane(lane: &str) -> Result<Fixture> {
     }
     let mut spec = FixtureSpec::default();
     let picture = picture_index(lane);
+    let multisheet = lane == "multisheet_attach_detach";
     if lane.starts_with("strict_") {
         spec.strict = true;
     }
@@ -409,6 +427,8 @@ pub fn fixture_for_lane(lane: &str) -> Result<Fixture> {
         if lane == "namespace_limit_refusal" {
             let (package, generated, active, limit) = derive_namespace_limit_fixture(&payload)?;
             (package, Some(generated), Some(active), Some(limit))
+        } else if multisheet {
+            (package_bytes_multisheet(spec, &payload)?, None, None, None)
         } else {
             (package_bytes(spec, &payload)?, None, None, None)
         };
@@ -426,6 +446,18 @@ pub fn fixture_for_lane(lane: &str) -> Result<Fixture> {
             | "malformed_linked_owner"
             | "mixed_caps_rejection"
     );
+    let caller_limit_profile = if lane.starts_with("limit_") {
+        Some("svg_input_bytes")
+    } else if lane == "mixed_caps_rejection" {
+        Some("composite_read_limits")
+    } else {
+        None
+    };
+    let caller_limit_ceilings = if lane == "mixed_caps_rejection" {
+        Some(composite_caller_limit_ceilings(&package, payload.len())?)
+    } else {
+        None
+    };
     Ok(Fixture {
         input_bytes: u64::try_from(identity.len())?,
         input_hash: support::fnv1a64(&identity),
@@ -433,6 +465,7 @@ pub fn fixture_for_lane(lane: &str) -> Result<Fixture> {
         package: Arc::from(package.into_boxed_slice()),
         payload: Arc::from(payload.into_boxed_slice()),
         picture_count: spec.picture_count,
+        drawing_count: if multisheet { 2 } else { 1 },
         expected_success,
         picture,
         strict: spec.strict,
@@ -442,6 +475,9 @@ pub fn fixture_for_lane(lane: &str) -> Result<Fixture> {
         namespace_generated_bindings,
         namespace_active_bindings,
         namespace_active_limit,
+        multisheet,
+        caller_limit_profile,
+        caller_limit_ceilings,
     })
 }
 
@@ -478,6 +514,7 @@ fn native_fixture() -> Result<Fixture> {
         package: Arc::from(bytes.into_boxed_slice()),
         payload: Arc::from(Vec::<u8>::new().into_boxed_slice()),
         picture_count: 2,
+        drawing_count: 1,
         expected_success: true,
         picture: 0,
         strict: false,
@@ -487,6 +524,9 @@ fn native_fixture() -> Result<Fixture> {
         namespace_generated_bindings: None,
         namespace_active_bindings: None,
         namespace_active_limit: None,
+        multisheet: false,
+        caller_limit_profile: None,
+        caller_limit_ceilings: None,
     })
 }
 
@@ -826,6 +866,80 @@ fn package_bytes(spec: FixtureSpec, payload: &[u8]) -> Result<Vec<u8>> {
                 TargetMode::Internal,
             )?;
     }
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+/// Build the smallest package that exercises public worksheet selection across
+/// two independent drawings.  Each drawing keeps the same three-anchor,
+/// three-picture shape as the single-sheet fixtures; the lifecycle operation
+/// selects different semantic pictures on each worksheet so relationship and
+/// media ownership cannot be accidentally treated as one global drawing.
+fn package_bytes_multisheet(spec: FixtureSpec, payload: &[u8]) -> Result<Vec<u8>> {
+    let mut package = OpcPackage::from_bytes(&package_bytes(spec, payload)?)?;
+    let sheet2_xml =
+        String::from_utf8(worksheet_xml(spec.strict))?.replace("rIdDrawing", "rIdDrawing2");
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new(SHEET2)?,
+        ct::SML_WORKSHEET.to_owned(),
+        sheet2_xml.as_bytes().to_vec(),
+    )))?;
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new(DRAWING2)?,
+        ct::OFC_DRAWING.to_owned(),
+        drawing_xml(spec),
+    )))?;
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new(RASTER2)?,
+        ct::PNG.to_owned(),
+        raster_bytes(spec.raster_size),
+    )))?;
+
+    package
+        .get_part_mut(&PackURI::new(SHEET2)?)?
+        .rels_mut()
+        .try_add_relationship(
+            if spec.strict {
+                rt::STRICT_DRAWING
+            } else {
+                rt::DRAWING
+            }
+            .to_owned(),
+            "../drawings/drawing2.xml".to_owned(),
+            "rIdDrawing2".to_owned(),
+            TargetMode::Internal,
+        )?;
+    package
+        .get_part_mut(&PackURI::new(DRAWING2)?)?
+        .rels_mut()
+        .try_add_relationship(
+            if spec.strict {
+                rt::STRICT_IMAGE
+            } else {
+                rt::IMAGE
+            }
+            .to_owned(),
+            "../media/image3.png".to_owned(),
+            "rIdRaster".to_owned(),
+            TargetMode::Internal,
+        )?;
+
+    let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+    let workbook = package.get_part_mut(&workbook_uri)?;
+    let workbook_xml = String::from_utf8(workbook.blob().to_vec())?;
+    workbook.set_blob(
+        workbook_xml
+            .replace(
+                "</sheets>",
+                r#"<sheet name="Sheet2" sheetId="2" r:id="rId3"/></sheets>"#,
+            )
+            .into_bytes(),
+    );
+    workbook.rels_mut().try_add_relationship(
+        rt::WORKSHEET.to_owned(),
+        "worksheets/sheet2.xml".to_owned(),
+        "rId3".to_owned(),
+        TargetMode::Internal,
+    )?;
     Ok(PackageWriter::to_bytes(&package)?)
 }
 
@@ -1239,6 +1353,12 @@ fn execute_lane(lane: &str, fixture: &Fixture) -> Result<LaneExecution> {
     if lane == "malformed_unknown_uri" {
         return execute_detach(lane, fixture).map(LaneExecution::Success);
     }
+    if lane.starts_with("same_picture_attach_detach") {
+        return execute_same_picture_attach_detach(fixture).map(LaneExecution::Success);
+    }
+    if lane == "multisheet_attach_detach" {
+        return execute_multisheet_attach_detach(fixture).map(LaneExecution::Success);
+    }
     if lane == "mixed_caps_rejection" {
         return execute_mixed_caps(fixture);
     }
@@ -1599,6 +1719,164 @@ fn execute_detach(lane: &str, fixture: &Fixture) -> Result<Execution> {
     })
 }
 
+/// Exercise the public attach and detach verbs on the same semantic picture.
+/// The operations use separate committed transactions so the lane observes
+/// both publication boundaries and verifies that the second publication
+/// restores the accepted source members and graph closure.
+fn execute_same_picture_attach_detach(fixture: &Fixture) -> Result<Execution> {
+    let original_drawing = drawing_part(&fixture.package)?;
+    let original_content_types = content_types_member(&fixture.package)?;
+    let original_source = SourceDrawing::scan(&original_drawing)?;
+    let original_anchor = original_source.picture(fixture.picture)?.anchor().clone();
+
+    let workbook = Workbook::from_bytes(fixture.package.to_vec())?;
+    let mut attach_edit = workbook.edit()?;
+    attach_edit
+        .sheet("Sheet1")?
+        .ok_or("Sheet1 is missing")?
+        .attach_svg(
+            PictureSelector::new(0, fixture.picture),
+            SvgInput::borrowed(fixture.payload.as_ref()),
+        )?;
+    let attached = attach_edit.commit()?.into_workbook().to_plain_bytes()?;
+    let attached_drawing = drawing_part(&attached)?;
+    let attached_source = SourceDrawing::scan(&attached_drawing)?;
+    let attached_picture = attached_source.picture(fixture.picture)?;
+    let attached_reopened = Workbook::from_bytes(attached.clone())?.to_plain_bytes()?;
+    if attached_reopened != attached
+        || !attached_picture.is_direct_embedded_svg()
+        || attached_picture.anchor() != &original_anchor
+        || !source_anchors_match(&original_source, &attached_source)
+        || validate_graph_closure(&attached, 1).is_err()
+        || validate_picture_closure(&attached, fixture.picture, true).is_err()
+        || validate_opaque_fragments(&attached, fixture).is_err()
+        || !svg_payload_matches(&attached, &fixture.payload)
+    {
+        return Err("same-picture attach publication failed semantic checks".into());
+    }
+
+    let attached_workbook = Workbook::from_bytes(attached)?;
+    let mut detach_edit = attached_workbook.edit()?;
+    detach_edit
+        .sheet("Sheet1")?
+        .ok_or("Sheet1 is missing after attach")?
+        .detach_svg(PictureSelector::new(0, fixture.picture))?;
+    let restored = detach_edit.commit()?.into_workbook().to_plain_bytes()?;
+    let restored_drawing = drawing_part(&restored)?;
+    let restored_source = SourceDrawing::scan(&restored_drawing)?;
+    let restored_picture = restored_source.picture(fixture.picture)?;
+    let restored_reopened = Workbook::from_bytes(restored.clone())?.to_plain_bytes()?;
+    let semantic_ok = !restored_picture.is_direct_embedded_svg()
+        && restored_reopened == restored
+        && restored_picture.anchor() == &original_anchor
+        && source_anchors_match(&original_source, &restored_source)
+        && drawing_part(&restored)? == original_drawing
+        && content_types_member(&restored)? == original_content_types
+        && svg_parts(&restored).is_empty()
+        && validate_graph_closure(&restored, 0).is_ok()
+        && validate_picture_closure(&restored, fixture.picture, false).is_ok()
+        && validate_opaque_fragments(&restored, fixture).is_ok();
+    Ok(Execution {
+        output: Some(restored),
+        semantic_ok,
+        output_exact: semantic_ok,
+    })
+}
+
+/// Attach on two worksheets in one public transaction, then detach the same
+/// semantic owners in a second transaction.  The selected picture ordinals
+/// deliberately differ so the lane exercises worksheet selection and drawing
+/// selection independently: Sheet1/two-cell and Sheet2/one-cell.
+fn execute_multisheet_attach_detach(fixture: &Fixture) -> Result<Execution> {
+    if !fixture.multisheet || fixture.drawing_count != 2 {
+        return Err("multisheet fixture did not contain two drawing owners".into());
+    }
+    let original_drawing1 = drawing_part(&fixture.package)?;
+    let original_drawing2 = drawing_part_at(&fixture.package, DRAWING2)?;
+    let original_content_types = content_types_member(&fixture.package)?;
+    let source1 = SourceDrawing::scan(&original_drawing1)?;
+    let source2 = SourceDrawing::scan(&original_drawing2)?;
+    if source1.pictures().len() != fixture.picture_count
+        || source2.pictures().len() != fixture.picture_count
+        || anchor_kind(source1.picture(0)?.anchor()) != "two_cell"
+        || anchor_kind(source2.picture(1)?.anchor()) != "one_cell"
+    {
+        return Err("multisheet fixture did not expose the expected anchor projections".into());
+    }
+
+    let workbook = Workbook::from_bytes(fixture.package.to_vec())?;
+    let mut attach_edit = workbook.edit()?;
+    attach_edit
+        .sheet("Sheet1")?
+        .ok_or("Sheet1 is missing")?
+        .attach_svg(
+            PictureSelector::new(0, 0),
+            SvgInput::borrowed(fixture.payload.as_ref()),
+        )?;
+    attach_edit
+        .sheet("Sheet2")?
+        .ok_or("Sheet2 is missing")?
+        .attach_svg(
+            PictureSelector::new(0, 1),
+            SvgInput::borrowed(fixture.payload.as_ref()),
+        )?;
+    let attached = attach_edit.commit()?.into_workbook().to_plain_bytes()?;
+    let attached_drawing1 = drawing_part(&attached)?;
+    let attached_drawing2 = drawing_part_at(&attached, DRAWING2)?;
+    let attached_source1 = SourceDrawing::scan(&attached_drawing1)?;
+    let attached_source2 = SourceDrawing::scan(&attached_drawing2)?;
+    let attached_reopened = Workbook::from_bytes(attached.clone())?.to_plain_bytes()?;
+    let attached_ok = attached_source1.picture(0)?.is_direct_embedded_svg()
+        && !attached_source1.picture(1)?.is_direct_embedded_svg()
+        && attached_source2.picture(1)?.is_direct_embedded_svg()
+        && !attached_source2.picture(0)?.is_direct_embedded_svg()
+        && attached_source1.picture(0)?.anchor() == source1.picture(0)?.anchor()
+        && attached_source2.picture(1)?.anchor() == source2.picture(1)?.anchor()
+        && source_anchors_match(&source1, &attached_source1)
+        && source_anchors_match(&source2, &attached_source2)
+        && attached_reopened == attached
+        && svg_parts(&attached).len() == 2
+        && svg_parts(&attached)
+            .iter()
+            .all(|part| part.as_slice() == fixture.payload.as_ref())
+        && validate_graph_closure(&attached, 2).is_ok()
+        && validate_picture_closure_at(&attached, DRAWING, 0, true).is_ok()
+        && validate_picture_closure_at(&attached, DRAWING2, 1, true).is_ok()
+        && validate_picture_closure_at(&attached, DRAWING, 1, false).is_ok()
+        && validate_picture_closure_at(&attached, DRAWING2, 0, false).is_ok()
+        && validate_opaque_fragments(&attached, fixture).is_ok();
+    if !attached_ok {
+        return Err("multisheet attach publication failed semantic checks".into());
+    }
+
+    let attached_workbook = Workbook::from_bytes(attached)?;
+    let mut detach_edit = attached_workbook.edit()?;
+    detach_edit
+        .sheet("Sheet1")?
+        .ok_or("Sheet1 is missing after attach")?
+        .detach_svg(PictureSelector::new(0, 0))?;
+    detach_edit
+        .sheet("Sheet2")?
+        .ok_or("Sheet2 is missing after attach")?
+        .detach_svg(PictureSelector::new(0, 1))?;
+    let restored = detach_edit.commit()?.into_workbook().to_plain_bytes()?;
+    let restored_reopened = Workbook::from_bytes(restored.clone())?.to_plain_bytes()?;
+    let restored_ok = drawing_part(&restored)? == original_drawing1
+        && drawing_part_at(&restored, DRAWING2)? == original_drawing2
+        && restored_reopened == restored
+        && content_types_member(&restored)? == original_content_types
+        && svg_parts(&restored).is_empty()
+        && validate_graph_closure(&restored, 0).is_ok()
+        && validate_picture_closure_at(&restored, DRAWING, 0, false).is_ok()
+        && validate_picture_closure_at(&restored, DRAWING2, 1, false).is_ok()
+        && validate_opaque_fragments(&restored, fixture).is_ok();
+    Ok(Execution {
+        output: Some(restored),
+        semantic_ok: restored_ok,
+        output_exact: restored_ok,
+    })
+}
+
 fn execute_expected_refusal(fixture: &Fixture, kind: RefusalKind) -> Result<LaneExecution> {
     validate_malformed_owner_state(fixture, kind)?;
 
@@ -1645,8 +1923,11 @@ fn execute_expected_refusal(fixture: &Fixture, kind: RefusalKind) -> Result<Lane
     }))
 }
 
-fn execute_mixed_caps(fixture: &Fixture) -> Result<LaneExecution> {
-    let package = OpcPackage::from_bytes(fixture.package.as_ref())?;
+fn composite_caller_limit_ceilings(
+    bytes: &[u8],
+    payload_len: usize,
+) -> Result<Vec<CallerLimitCeiling>> {
+    let package = OpcPackage::from_bytes(bytes)?;
     let part_count = package.part_count();
     let part_bytes = package
         .iter_parts()
@@ -1659,7 +1940,7 @@ fn execute_mixed_caps(fixture: &Fixture) -> Result<LaneExecution> {
             .map(|part| part.rels().len())
             .try_fold(0usize, usize::checked_add)
             .ok_or("relationship count overflow")?;
-    let physical = PhysPkgReader::new(fixture.package.as_ref())?;
+    let physical = PhysPkgReader::new(bytes)?;
     let member_names = physical.member_names()?;
     let relationship_members = member_names
         .iter()
@@ -1701,24 +1982,71 @@ fn execute_mixed_caps(fixture: &Fixture) -> Result<LaneExecution> {
     let content_types = String::from_utf8(physical.read_member("[Content_Types].xml")?)?;
     let content_type_mappings =
         content_types.matches("<Default ").count() + content_types.matches("<Override ").count();
-    let limits = [
-        ReadLimits::builder().max_parts(part_count)?.build()?,
-        ReadLimits::builder()
-            .max_total_part_bytes(u64::try_from(part_bytes + fixture.payload.len())?)?
-            .build()?,
-        ReadLimits::builder()
-            .max_total_relationships(relationship_count)?
-            .build()?,
-        ReadLimits::builder()
-            .max_total_relationship_xml_bytes(relationship_xml_bytes)?
-            .build()?,
-        ReadLimits::builder()
-            .max_total_relationship_xml_events(relationship_xml_events)?
-            .build()?,
-        ReadLimits::builder()
-            .max_content_type_mappings(content_type_mappings)?
-            .build()?,
-    ];
+    Ok(vec![
+        CallerLimitCeiling {
+            name: "parts",
+            value: u64::try_from(part_count)?,
+        },
+        CallerLimitCeiling {
+            name: "total_part_bytes",
+            value: u64::try_from(
+                part_bytes
+                    .checked_add(payload_len)
+                    .ok_or("total part byte ceiling overflow")?,
+            )?,
+        },
+        CallerLimitCeiling {
+            name: "total_relationships",
+            value: u64::try_from(relationship_count)?,
+        },
+        CallerLimitCeiling {
+            name: "relationship_xml_bytes",
+            value: u64::try_from(relationship_xml_bytes)?,
+        },
+        CallerLimitCeiling {
+            name: "relationship_xml_events",
+            value: u64::try_from(relationship_xml_events)?,
+        },
+        CallerLimitCeiling {
+            name: "content_type_mappings",
+            value: u64::try_from(content_type_mappings)?,
+        },
+    ])
+}
+
+fn read_limits_for_ceiling(ceiling: CallerLimitCeiling) -> Result<ReadLimits> {
+    let value_as_usize = || -> Result<usize> {
+        usize::try_from(ceiling.value)
+            .map_err(|_| format!("caller limit {} does not fit usize", ceiling.name).into())
+    };
+    let limits = match ceiling.name {
+        "parts" => ReadLimits::builder().max_parts(value_as_usize()?)?,
+        "total_part_bytes" => ReadLimits::builder().max_total_part_bytes(ceiling.value)?,
+        "total_relationships" => ReadLimits::builder().max_total_relationships(value_as_usize()?)?,
+        "relationship_xml_bytes" => {
+            ReadLimits::builder().max_total_relationship_xml_bytes(value_as_usize()?)?
+        },
+        "relationship_xml_events" => {
+            ReadLimits::builder().max_total_relationship_xml_events(value_as_usize()?)?
+        },
+        "content_type_mappings" => {
+            ReadLimits::builder().max_content_type_mappings(value_as_usize()?)?
+        },
+        other => return Err(format!("unknown composite caller limit: {other}").into()),
+    };
+    Ok(limits.build()?)
+}
+
+fn execute_mixed_caps(fixture: &Fixture) -> Result<LaneExecution> {
+    let ceilings = fixture
+        .caller_limit_ceilings
+        .as_ref()
+        .ok_or("mixed cap lane did not record requested ceilings")?;
+    let limits = ceilings
+        .iter()
+        .copied()
+        .map(read_limits_for_ceiling)
+        .collect::<Result<Vec<_>>>()?;
     let mut validated_refusal = None;
     for limit in limits {
         let workbook = Workbook::from_bytes_with_limits(fixture.package.to_vec(), limit)?;
@@ -1841,10 +2169,27 @@ fn execute_multi_picture_detach(fixture: &Fixture) -> Result<Execution> {
 }
 
 fn drawing_part(bytes: &[u8]) -> Result<Vec<u8>> {
+    drawing_part_at(bytes, DRAWING)
+}
+
+fn drawing_part_at(bytes: &[u8], name: &str) -> Result<Vec<u8>> {
     Ok(OpcPackage::from_bytes(bytes)?
-        .get_part(&PackURI::new(DRAWING)?)?
+        .get_part(&PackURI::new(name)?)?
         .blob()
         .to_vec())
+}
+
+fn content_types_member(bytes: &[u8]) -> Result<Vec<u8>> {
+    Ok(PhysPkgReader::new(bytes)?.read_member("[Content_Types].xml")?)
+}
+
+fn source_anchors_match(original: &SourceDrawing, candidate: &SourceDrawing) -> bool {
+    original.pictures().len() == candidate.pictures().len()
+        && original
+            .pictures()
+            .iter()
+            .zip(candidate.pictures())
+            .all(|(before, after)| before.anchor() == after.anchor())
 }
 
 fn fragment_count(haystack: &[u8], needle: &[u8]) -> usize {
@@ -1866,6 +2211,10 @@ fn validate_opaque_fragments(bytes: &[u8], fixture: &Fixture) -> Result<()> {
         return Ok(());
     }
     let drawing = drawing_part(bytes)?;
+    let expected_occurrences = fixture
+        .picture_count
+        .checked_mul(fixture.drawing_count)
+        .ok_or("opaque-fragment occurrence count overflow")?;
     if fixture.opaque_extension {
         let count = fragment_count(&drawing, opaque_extension_fragment());
         if count != fixture.picture_count {
@@ -1885,6 +2234,29 @@ fn validate_opaque_fragments(bytes: &[u8], fixture: &Fixture) -> Result<()> {
                 fixture.picture_count
             )
             .into());
+        }
+    }
+    if fixture.drawing_count > 1 {
+        let second = drawing_part_at(bytes, DRAWING2)?;
+        if fixture.opaque_extension {
+            let count = fragment_count(&second, opaque_extension_fragment());
+            if count != expected_occurrences.saturating_sub(fixture.picture_count) {
+                return Err(format!(
+                    "multisheet opaque extension count changed: expected {}, found {count}",
+                    expected_occurrences.saturating_sub(fixture.picture_count)
+                )
+                .into());
+            }
+        }
+        if fixture.opaque_descendants {
+            let count = fragment_count(&second, namespace_descendants().as_bytes());
+            if count != expected_occurrences.saturating_sub(fixture.picture_count) {
+                return Err(format!(
+                    "multisheet opaque descendant count changed: expected {}, found {count}",
+                    expected_occurrences.saturating_sub(fixture.picture_count)
+                )
+                .into());
+            }
         }
     }
     Ok(())
@@ -1965,10 +2337,11 @@ fn validate_selected_drawing_svg_edge_removed(bytes: &[u8]) -> Result<()> {
     let drawing = package.get_part(&PackURI::new(DRAWING)?)?;
     let retained = drawing.rels().iter().any(|relationship| {
         relationship.r_id() == "rIdSvg"
-            || (!relationship.is_external()
-                && relationship
-                    .target_partname()
-                    .is_ok_and(|target| target.as_str().ends_with(".svg")))
+            || relationship
+                .target_ref()
+                .split(['?', '#'])
+                .next()
+                .is_some_and(|target| target.to_ascii_lowercase().ends_with(".svg"))
     });
     if retained {
         Err("selected drawing SVG relationship was not removed".into())
@@ -2069,14 +2442,23 @@ fn validate_graph_closure(bytes: &[u8], expected_svg_parts: usize) -> Result<()>
 }
 
 fn validate_picture_closure(bytes: &[u8], picture: usize, expected_attached: bool) -> Result<()> {
-    let drawing = drawing_part(bytes)?;
+    validate_picture_closure_at(bytes, DRAWING, picture, expected_attached)
+}
+
+fn validate_picture_closure_at(
+    bytes: &[u8],
+    drawing_name: &str,
+    picture: usize,
+    expected_attached: bool,
+) -> Result<()> {
+    let drawing = drawing_part_at(bytes, drawing_name)?;
     let source = SourceDrawing::scan(&drawing)?;
     let selected = source.picture(picture)?;
     if selected.anchor_range().start >= selected.anchor_range().end {
         return Err("selected anchor range is not ordered".into());
     }
     let package = OpcPackage::from_bytes(bytes)?;
-    let drawing_part = package.get_part(&PackURI::new(DRAWING)?)?;
+    let drawing_part = package.get_part(&PackURI::new(drawing_name)?)?;
     let raster = drawing_part
         .rels()
         .get(selected.raster_relationship_id())
@@ -2271,9 +2653,33 @@ fn receipt_json(lane: &str, fixture: &Fixture, warmup: usize, samples: &[String]
     let namespace_active_limit = fixture
         .namespace_active_limit
         .map_or_else(|| String::from("null"), |value| value.to_string());
+    let caller_limits = match fixture.caller_limit_profile {
+        None => String::from("null"),
+        Some("svg_input_bytes") => {
+            format!(r#"{{"kind":"svg_input_bytes","max":{SVG_INPUT_LIMIT}}}"#)
+        },
+        Some("composite_read_limits") => {
+            let ceilings = fixture
+                .caller_limit_ceilings
+                .as_ref()
+                .expect("mixed cap fixture records caller-limit ceilings");
+            let ceilings_json = ceilings
+                .iter()
+                .map(|ceiling| {
+                    format!(r#"{{"name":"{}","value":{}}}"#, ceiling.name, ceiling.value)
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!(r#"{{"kind":"composite_read_limits","ceilings":[{ceilings_json}]}}"#)
+        },
+        Some(other) => format!(
+            r#"{{"kind":"unknown","name":"{}"}}"#,
+            support::json_escape(other)
+        ),
+    };
     write!(
         output,
-        "{{\n  \"schema\":\"xlsx-svg-lifecycle-profile-v1\",\n  \"lane\":\"{}\",\n  \"input_bytes\":{},\n  \"input_hash_fnv1a64\":{},\n  \"input_sha256\":\"{}\",\n  \"namespace_generated_bindings\":{},\n  \"namespace_active_bindings\":{},\n  \"namespace_active_limit\":{},\n  \"warmup\":{},\n  \"sample_count\":{},\n  \"expected_success\":{},\n  \"samples\":[\n",
+        "{{\n  \"schema\":\"xlsx-svg-lifecycle-profile-v1\",\n  \"lane\":\"{}\",\n  \"input_bytes\":{},\n  \"input_hash_fnv1a64\":{},\n  \"input_sha256\":\"{}\",\n  \"namespace_generated_bindings\":{},\n  \"namespace_active_bindings\":{},\n  \"namespace_active_limit\":{},\n  \"caller_limits\":{},\n  \"warmup\":{},\n  \"sample_count\":{},\n  \"expected_success\":{},\n  \"samples\":[\n",
         support::json_escape(lane),
         fixture.input_bytes,
         fixture.input_hash,
@@ -2281,6 +2687,7 @@ fn receipt_json(lane: &str, fixture: &Fixture, warmup: usize, samples: &[String]
         namespace_generated_bindings,
         namespace_active_bindings,
         namespace_active_limit,
+        caller_limits,
         warmup,
         samples.len(),
         fixture.expected_success,
@@ -2352,7 +2759,7 @@ mod tests {
 
     #[test]
     fn coverage_registry_counts_new_acceptance_and_exploratory_lanes() {
-        assert_eq!(LANES.len(), 65);
+        assert_eq!(LANES.len(), 69);
         assert_eq!(EXPLORATORY_LANES.len(), 7);
         assert_eq!(FIXED_ROOT_NAMESPACE_BINDINGS, 7);
         for lane in [
@@ -2377,8 +2784,8 @@ mod tests {
             .rels_mut()
             .try_add_relationship(
                 rt::IMAGE.to_owned(),
-                "https://example.invalid/renamed-resource".to_owned(),
-                "rIdSvg".to_owned(),
+                "https://example.invalid/renamed-resource.svg".to_owned(),
+                "rIdSvgExternal".to_owned(),
                 TargetMode::External,
             )
             .unwrap();

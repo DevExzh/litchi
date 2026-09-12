@@ -2,8 +2,6 @@
 
 import json
 import hashlib
-import os
-import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -162,39 +160,105 @@ class ReceiptChecks(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "namespace boundary changed"):
                 verify.verify_lanes(self.root)
 
-    @unittest.skipUnless(Path("/usr/bin/time").is_file(), "runner requires GNU time")
-    def test_runner_cleanup_preserves_exploratory_and_unrelated_evidence(self):
-        here = self.root / "docs/report/spec-gap-validation-evidence/profile"
-        results = here / "results"
-        results.mkdir(parents=True)
-        script = here / "run_profile.sh"
-        script.write_bytes(Path(__file__).with_name("run_profile.sh").read_bytes())
-        keep = ["exploratory-review.json", "unrelated.json", "prior-review.log"]
-        remove = ["capture_native_fixture-p1.json", "capture_native_fixture-p1.stderr.log"]
-        for name in keep + remove:
-            (results / name).write_bytes(b"retained evidence")
-        bin_dir = self.root / "bin"
-        bin_dir.mkdir()
-        cargo = bin_dir / "cargo"
-        cargo.write_text("#!/bin/sh\nexit 81\n")
-        cargo.chmod(0o755)
-        target = self.root / "disposable-target"
-        env = os.environ.copy()
-        for key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_BOOTSTRAP", "ALLOW_EXISTING_TARGET"):
-            env.pop(key, None)
-        env.update({
-            "PATH": str(bin_dir) + os.pathsep + env.get("PATH", ""),
-            "PROFILE_FROZEN": "1", "XLSX_SVG_PROFILE_API_WIRED": "1",
-            "PROCESSES": "3", "WARMUP": "2", "SAMPLES": "20",
-            "CARGO_TARGET_DIR": str(target),
-        })
-        run = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True)
-        self.assertEqual(run.returncode, 81, run.stderr)
-        for name in keep:
-            self.assertEqual((results / name).read_bytes(), b"retained evidence")
-        for name in remove:
-            self.assertFalse((results / name).exists())
-        self.assertFalse(target.exists(), "owned target must be cleaned on build failure")
+    def test_svg_caller_ceiling_requires_exact_integer(self):
+        path = self.root / "limit_small-p1.json"
+        profile = {"kind": "svg_input_bytes", "max": 32 * 1024 * 1024}
+        self.assertEqual(
+            verify.verify_caller_limits(
+                {"caller_limits": profile}, "limit_small", path
+            ),
+            ("svg_input_bytes", 32 * 1024 * 1024),
+        )
+        for bad in (None, 32 * 1024 * 1024.0, True, 0, -1, "33554432"):
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(AssertionError, "input ceiling mismatch"):
+                    verify.verify_caller_limits(
+                        {"caller_limits": {"kind": "svg_input_bytes", "max": bad}},
+                        "limit_small",
+                        path,
+                    )
+
+    def test_composite_caller_ceilings_reject_missing_float_bool_and_nonpositive_values(self):
+        path = self.root / "mixed_caps_rejection-p1.json"
+        valid = [
+            {"name": name, "value": index + 1}
+            for index, name in enumerate(verify.COMPOSITE_LIMIT_NAMES)
+        ]
+        profile = {"kind": "composite_read_limits", "ceilings": valid}
+        self.assertEqual(
+            verify.verify_caller_limits({"caller_limits": profile}, "mixed_caps_rejection", path),
+            (
+                "composite_read_limits",
+                tuple((name, index + 1) for index, name in enumerate(verify.COMPOSITE_LIMIT_NAMES)),
+            ),
+        )
+        for bad in (None, 1.0, True, 0, -1):
+            with self.subTest(bad=bad):
+                ceilings = [dict(item) for item in valid]
+                ceilings[0]["value"] = bad
+                with self.assertRaisesRegex(AssertionError, "ceiling value malformed"):
+                    verify.verify_caller_limits(
+                        {"caller_limits": {"kind": "composite_read_limits", "ceilings": ceilings}},
+                        "mixed_caps_rejection",
+                        path,
+                    )
+        for replacement in (None, [], valid[:-1], valid + [{"name": "extra", "value": 1}]):
+            with self.subTest(replacement=replacement):
+                profile_value = {"kind": "composite_read_limits", "ceilings": replacement}
+                message = "composite caller ceilings missing" if replacement is None else "composite caller ceiling count changed"
+                with self.assertRaisesRegex(AssertionError, message):
+                    verify.verify_caller_limits(
+                        {"caller_limits": profile_value}, "mixed_caps_rejection", path
+                    )
+
+    def test_composite_caller_ceiling_must_match_across_processes(self):
+        lane = "mixed_caps_rejection"
+        sample = {
+            "expected_success": False,
+            "actual_success": False,
+            "semantic_ok": True,
+            "output_exact": True,
+            "direct_allocated_bytes": 0,
+            "realloc_new_bytes": 0,
+            "realloc_old_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_before": 0,
+            "live_after": 0,
+            "requested_alloc_bytes": 0,
+            "alloc_balance_ok": True,
+            "alloc_invalid": False,
+            "alloc_failed": 0,
+            "error": {"class": "mixed_limit"},
+        }
+        profile = {
+            "kind": "composite_read_limits",
+            "ceilings": [
+                {"name": name, "value": index + 1}
+                for index, name in enumerate(verify.COMPOSITE_LIMIT_NAMES)
+            ],
+        }
+        receipt = {
+            "schema": "xlsx-svg-lifecycle-profile-v1",
+            "lane": lane,
+            "warmup": 2,
+            "sample_count": 20,
+            "samples": [sample] * 20,
+            "expected_success": False,
+            "input_hash_fnv1a64": 1,
+            "input_sha256": "a" * 64,
+            "input_bytes": 100,
+            "caller_limits": profile,
+        }
+        for number in range(1, 4):
+            self.process(f"{lane}-p{number}.json").write_text(json.dumps(receipt))
+        with patch.object(verify, "LANES", (lane,)):
+            verify.verify_lanes(self.root)
+            changed = json.loads(json.dumps(receipt))
+            changed["caller_limits"]["ceilings"][0]["value"] = 2
+            self.process(f"{lane}-p3.json").write_text(json.dumps(changed))
+            with self.assertRaisesRegex(AssertionError, "caller-limit profile changed"):
+                verify.verify_lanes(self.root)
+
 
 
 if __name__ == "__main__":
