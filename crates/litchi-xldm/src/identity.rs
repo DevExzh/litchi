@@ -61,6 +61,10 @@ pub struct Xldm140RenameError {
     kind: Xldm140RenameErrorKind,
     message: String,
     limit_bounds: Option<(usize, usize)>,
+    /// The owner-specific quota label when the failure came from a nested
+    /// proof.  Caller/output limits are deliberately left unset so hosts can
+    /// apply their format-level fallback label.
+    limit_resource: Option<&'static str>,
     allocation_resource: Option<String>,
     allocation_source: Option<TryReserveError>,
 }
@@ -99,6 +103,14 @@ impl Xldm140RenameError {
         }
     }
 
+    /// Return the owner-specific resource label for a bounded failure, when
+    /// the failure originated in a nested proof with one.  Caller-supplied
+    /// output limits intentionally return `None`; the host owns that label.
+    #[must_use]
+    pub const fn limit_resource(&self) -> Option<&'static str> {
+        self.limit_resource
+    }
+
     /// Return the neutral resource label for a bounded allocation failure.
     ///
     /// The original reservation source, when available, is exposed separately
@@ -121,6 +133,7 @@ impl Xldm140RenameError {
             kind: Xldm140RenameErrorKind::InvalidSource,
             message: message.into(),
             limit_bounds: None,
+            limit_resource: None,
             allocation_resource: None,
             allocation_source: None,
         }
@@ -131,10 +144,19 @@ impl Xldm140RenameError {
     }
 
     fn limit_with_bounds(message: impl Into<String>, bounds: Option<(usize, usize)>) -> Self {
+        Self::limit_with_resource(message, bounds, None)
+    }
+
+    fn limit_with_resource(
+        message: impl Into<String>,
+        bounds: Option<(usize, usize)>,
+        resource: Option<&'static str>,
+    ) -> Self {
         Self {
             kind: Xldm140RenameErrorKind::LimitExceeded,
             message: message.into(),
             limit_bounds: bounds,
+            limit_resource: resource,
             allocation_resource: None,
             allocation_source: None,
         }
@@ -145,6 +167,7 @@ impl Xldm140RenameError {
             kind: Xldm140RenameErrorKind::Unsupported,
             message: message.into(),
             limit_bounds: None,
+            limit_resource: None,
             allocation_resource: None,
             allocation_source: None,
         }
@@ -156,6 +179,7 @@ impl Xldm140RenameError {
             kind: Xldm140RenameErrorKind::Allocation,
             message: format!("could not reserve XLDM rename {resource}: {error}"),
             limit_bounds: None,
+            limit_resource: None,
             allocation_resource: Some(resource),
             allocation_source: Some(error),
         }
@@ -167,6 +191,7 @@ impl Xldm140RenameError {
             kind: Xldm140RenameErrorKind::Allocation,
             message: format!("could not reserve XLDM rename {resource}: {detail}"),
             limit_bounds: None,
+            limit_resource: None,
             allocation_resource: Some(resource),
             allocation_source: None,
         }
@@ -181,6 +206,7 @@ impl Xldm140RenameError {
                 kind: Xldm140RenameErrorKind::Unsupported,
                 message: format!("unsupported XLDM rename operation: {feature}"),
                 limit_bounds: None,
+                limit_resource: None,
                 allocation_resource: None,
                 allocation_source: None,
             },
@@ -210,14 +236,19 @@ impl Xldm140RenameError {
                 kind: Xldm140RenameErrorKind::Unsupported,
                 message: error.to_string(),
                 limit_bounds: None,
+                limit_resource: None,
                 allocation_resource: None,
                 allocation_source: None,
             },
             super::olapproof::OlapProofError::LimitExceeded {
-                resource: _,
+                resource,
                 actual,
                 maximum,
-            } => Self::limit_with_bounds(error.to_string(), Some((actual, maximum))),
+            } => Self::limit_with_resource(
+                error.to_string(),
+                Some((actual, maximum)),
+                Some(resource),
+            ),
             super::olapproof::OlapProofError::Allocation { resource, detail } => {
                 Self::allocation_detail(resource, detail)
             },
@@ -3899,6 +3930,19 @@ mod tests {
         OlapDefinition, OlapElement, OlapFile, OlapFileKind, OlapParentReference, TabularExtension,
     };
     use crate::{FileGroup, FileKind, GeneratedPath, LoggedFile};
+
+    #[test]
+    fn rename_error_preserves_nested_proof_limit_resource() {
+        let error = Xldm140RenameError::from_olap_proof(crate::OlapProofError::LimitExceeded {
+            resource: "graph work",
+            actual: 17,
+            maximum: 16,
+        });
+
+        assert_eq!(error.kind(), Xldm140RenameErrorKind::LimitExceeded);
+        assert_eq!(error.limit_bounds(), Some((17, 16)));
+        assert_eq!(error.limit_resource(), Some("graph work"));
+    }
 
     fn object(
         class: &str,

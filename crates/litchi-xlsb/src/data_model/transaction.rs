@@ -778,7 +778,7 @@ fn map_xldm_rename_error(context: &str, error: Xldm140RenameError) -> Error {
                 return invalid(message);
             };
             Error::LimitExceeded {
-                resource: "Data Model payload bytes",
+                resource: error.limit_resource().unwrap_or("Data Model payload bytes"),
                 actual,
                 maximum,
             }
