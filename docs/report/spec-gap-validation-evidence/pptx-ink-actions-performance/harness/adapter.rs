@@ -926,6 +926,13 @@ fn prepare(
     read_limits: ReadLimits,
 ) -> Result<Prepared> {
     let operation = operation_for(lane)?;
+    // These values are retained in `Prepared` through the operation and named
+    // drop phase. Clone them before the retained-baseline snapshot so their
+    // setup allocations are charged to the retained prepared set. The apply
+    // working package is intentionally constructed after that snapshot and
+    // released in `drop`.
+    let prepared_lane = lane.clone();
+    let prepared_recipe = recipe.clone();
     let (_, baseline_facts) = build_opc(recipe)?;
     let source_snapshot = if matches!(
         operation,
@@ -984,8 +991,8 @@ fn prepare(
         None
     };
     Ok(Prepared {
-        lane: lane.clone(),
-        recipe: recipe.clone(),
+        lane: prepared_lane,
+        recipe: prepared_recipe,
         package,
         operation_package,
         retained_baseline_live_bytes,
@@ -2506,4 +2513,33 @@ fn read_limits_json(limits: ReadLimits) -> Value {
         "max_xml_attribute_bytes": limits.max_xml_attribute_bytes(),
         "max_relationship_target_bytes": limits.max_relationship_target_bytes(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_prepared_metadata_is_charged_before_baseline_snapshot() {
+        let manifest = manifest();
+        let lane = manifest
+            .lanes
+            .iter()
+            .find(|lane| lane.id == "package_read_tiny_shared")
+            .expect("representative lane is present");
+        let recipe = manifest
+            .recipes
+            .iter()
+            .find(|recipe| recipe.id == lane.recipe)
+            .expect("representative recipe is present");
+        let limits = owner_limits_for(recipe, lane).expect("representative limits are valid");
+        let (prepared, _setup) =
+            prepare_with_phase(lane, recipe, limits, ReadLimits::default()).expect("setup");
+
+        assert_eq!(
+            AllocSnapshot::now().live_bytes(),
+            prepared.retained_baseline_live_bytes,
+            "retained Prepared metadata must be included before the baseline snapshot",
+        );
+    }
 }
