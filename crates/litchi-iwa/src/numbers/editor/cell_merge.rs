@@ -3,11 +3,15 @@
 use prost::Message;
 
 use super::*;
+use crate::numbers::editor::selectors;
 use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
 use litchi_numbers::table::merge::{self, Deletion as MergeDeletion, Region};
 use litchi_numbers_wire::table_merges::{self, ReadLimits};
 
 mod formula;
+mod reader;
+
+pub(crate) use reader::regions_in_editor;
 mod wire;
 
 #[cfg(test)]
@@ -533,6 +537,22 @@ mod tests {
         let mut reopened = NumbersEditor::from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert!(reopened.unmerge_cells(table_id, second).unwrap());
         assert_eq!(reopened.to_bytes().unwrap(), baseline);
+    }
+
+    #[test]
+    fn native_table_merge_read_matches_compatibility_projection() {
+        let editor = NumbersEditor::from_bytes(include_bytes!(
+            "../../../../../test-data/iwork/numbers/table-merges-native.numbers"
+        ))
+        .expect("native Numbers merge fixture");
+        let table_id = super::super::table_models(editor.package())
+            .expect("native Numbers table models")[0]
+            .object_id;
+
+        let focused = regions_in_editor(&editor, table_id).expect("focused merge read");
+        let compatibility =
+            regions_in_package(editor.package(), table_id).expect("compatibility merge read");
+        assert_eq!(focused, compatibility);
     }
 
     #[test]

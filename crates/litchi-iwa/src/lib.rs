@@ -249,6 +249,9 @@ pub enum Error {
     PagesSemantic(#[from] litchi_pages::Error),
 
     #[error(transparent)]
+    NumbersTableMerges(#[from] litchi_numbers::TableMergesError),
+
+    #[error(transparent)]
     TextHyperlink(#[from] litchi_iwa_text::hyperlink::Error),
 
     #[error(transparent)]

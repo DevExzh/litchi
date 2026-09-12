@@ -46348,6 +46348,15 @@ def audit_iwa_numbers_model_storage_source_topology(
 
     if attached_role_function is not None:
         body, offset = attached_role_function
+        role_bodies = [(body, offset)]
+        shared_role_name = "validate_attached_table_info_role"
+        if re.search(rf"\b{shared_role_name}\s*\(", body):
+            shared_role = require_functions(model_path, (shared_role_name,)).get(
+                shared_role_name
+            )
+            if shared_role is not None:
+                role_bodies.append(shared_role)
+                body += "\n" + shared_role[0]
         role_markers = (
             (
                 "TABLE_INFO_MESSAGE_TYPES",
@@ -46386,15 +46395,16 @@ def audit_iwa_numbers_model_storage_source_topology(
                 "ambiguous table-info/table-model roles: "
                 f"{IWA_NUMBERS_MODEL_SOURCE}"
             )
-        for match in re.finditer(
-            r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?TableInfoArchive\s*::\s*decode\s*\(",
-            body,
-        ):
-            violations.append(
-                "legacy iwa Numbers attached-table role resolver performs a "
-                "generated TableInfo decode: "
-                f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, offset, match)}"
-            )
+        for role_body, role_offset in role_bodies:
+            for match in re.finditer(
+                r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?TableInfoArchive\s*::\s*decode\s*\(",
+                role_body,
+            ):
+                violations.append(
+                    "legacy iwa Numbers attached-table role resolver performs a "
+                    "generated TableInfo decode: "
+                    f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, role_offset, match)}"
+                )
 
     for name, function in attached_functions.items():
         body, offset = function
@@ -69815,6 +69825,7 @@ NUMBERS_TABLE_MERGE_READER_ALLOWED_METHODS = frozenset(
         "from_shared_bytes",
         "from_shared_bytes_with_options",
         "table_merges",
+        "__from_shared_catalog",
     }
 )
 NUMBERS_TABLE_MERGE_READER_FUNCTION_NAME = re.compile(
@@ -69890,7 +69901,7 @@ IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
     },
 )
 IWA_TABLE_MERGE_HOST_LEGACY_READ = re.compile(
-    r"\btable_cell_merges_in_package\s*\("
+    r"\b(?:table_cell_merges_in_package|regions_in_package)\s*\("
 )
 IWA_TABLE_MERGE_HOST_FOCUSED_CALL = re.compile(
     r"\b(?P<method>body_table_merges|slide_table_merges)\s*\("
@@ -71468,6 +71479,31 @@ def audit_numbers_table_merge_reader_source_topology(
                     "Numbers table-merge reader shared ingress must accept "
                     f"Arc<[u8]> ({name}): {relative_reader}:{line_number}"
                 )
+        elif name == "__from_shared_catalog":
+            if re.search(r"\bArc[ \t]*<[ \t]*ComponentCatalog[ \t]*>", declaration) is None:
+                violations.append(
+                    "Numbers table-merge reader internal ingress must accept "
+                    f"Arc<ComponentCatalog>: {relative_reader}:{line_number}"
+                )
+            if re.search(r"\bReadOptions\b", declaration) is None:
+                violations.append(
+                    "Numbers table-merge reader internal ingress must retain "
+                    f"ReadOptions: {relative_reader}:{line_number}"
+                )
+            for method in re.finditer(r"\bpub\s+fn\s+__from_shared_catalog\b", code):
+                if code.count("\n", 0, method.start()) + 1 != line_number:
+                    continue
+                attributes = _rust_attribute_block_before(production_source, method.start())
+                if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(attributes) is None:
+                    violations.append(
+                        "Numbers table-merge reader internal ingress must be "
+                        f"feature-gated: {relative_reader}:{line_number}"
+                    )
+                if IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is None:
+                    violations.append(
+                        "Numbers table-merge reader internal ingress must be "
+                        f"doc(hidden): {relative_reader}:{line_number}"
+                    )
         elif name == "table_merges":
             if not re.search(r"\bSheetSelector\b", declaration):
                 violations.append(
@@ -71655,7 +71691,66 @@ def audit_iwa_table_merge_host_read_delegation_source_topology(
                     f"{relative_path}:{line_number}"
                 )
 
+    violations.extend(_audit_numbers_cached_merge_handoff(root))
     return sorted(set(violations))
+
+
+def _audit_numbers_cached_merge_handoff(root: Path) -> list[str]:
+    owner_path = Path("crates/litchi-iwa/src/numbers/editor/semantic/table.rs")
+    reader_path = Path("crates/litchi-iwa/src/numbers/editor/cell_merge/reader.rs")
+    selectors_path = Path("crates/litchi-iwa/src/numbers/editor/selectors.rs")
+    if not (root / owner_path).is_file():
+        return []
+    owner = (root / owner_path).read_text(encoding="utf-8")
+    methods = _rust_public_method_bodies(owner, "table_cell_merges", type_name="NumbersEditor")
+    if not methods:
+        return []
+    violations: list[str] = []
+    for _declaration, body, line in methods:
+        code = _mask_rust_non_code(body)
+        if re.search(r"\bcell_merge\s*::\s*regions_in_editor\s*\(", code) is None:
+            violations.append(f"Numbers host merge read must use its cached selector handoff: {owner_path}:{line}")
+        if IWA_TABLE_MERGE_HOST_LEGACY_READ.search(code):
+            violations.append(f"Numbers host merge read bypasses its cached selector handoff: {owner_path}:{line}")
+    if not (root / reader_path).is_file():
+        violations.append(f"Numbers cached merge handoff owner is missing: {reader_path}")
+        return violations
+    reader = _mask_rust_cfg_test_items((root / reader_path).read_text(encoding="utf-8"))
+    code = _mask_rust_non_code(reader)
+    for forbidden in (r"\bfrom_(?:shared_)?bytes(?:_with_options)?\s*\(", r"\bto_bytes\s*\(", r"\.\s*archive\s*\(", r"\btable_models\s*\(", r"\blet\s+Ok\s*\(", r"\.\s*(?:ok|unwrap_or|or_else)\s*\("):
+        if re.search(forbidden, code):
+            violations.append(f"Numbers cached merge handoff reparses, copies, or swallows ingress failures: {reader_path}")
+    cached = _rust_named_function_body(reader, "cached_reader")
+    if cached is None:
+        violations.append(f"Numbers cached merge handoff has no cache reader: {reader_path}")
+    else:
+        body = _mask_rust_non_code(cached[0])
+        for required in ("parsed_archive", "__from_shared_archives", "__from_shared_catalog"):
+            if re.search(rf"\b{required}\s*\(", body) is None:
+                violations.append(f"Numbers cached merge handoff must use {required}: {reader_path}")
+    entry = _rust_named_function_body(reader, "regions_in_editor")
+    if entry is None:
+        violations.append(f"Numbers cached merge handoff entry is missing: {reader_path}")
+    else:
+        body = _mask_rust_non_code(entry[0])
+        for required in ("focused_merge_table_indices", "cached_reader", "table_merges"):
+            if re.search(rf"\b{required}\s*\(", body) is None:
+                violations.append(f"Numbers cached merge handoff must use {required}: {reader_path}")
+        for selector in ("SheetSelector", "TableSelector"):
+            if re.search(rf"\b{selector}\s*::\s*index\s*\(", body) is None:
+                violations.append(f"Numbers cached merge handoff must forward {selector}::index: {reader_path}")
+        admitted = re.search(r"\blet\s+reader\s*=\s*cached_reader\b", body)
+        if admitted is None or IWA_TABLE_MERGE_HOST_LEGACY_READ.search(body[admitted.end():]):
+            violations.append(f"Numbers admitted merge errors must remain terminal: {reader_path}")
+    if not (root / selectors_path).is_file():
+        violations.append(f"Numbers cached merge selector owner is missing: {selectors_path}")
+    else:
+        selectors = (root / selectors_path).read_text(encoding="utf-8")
+        selected = _rust_named_function_body(selectors, "focused_merge_table_indices")
+        body = _mask_rust_non_code(selected[0]) if selected else ""
+        if "strict_attached_table_info_model_identifier" not in body or re.search(r"\b(?:table_models|find_table_owner|focused_table_location|numbers_sheet)\s*\(", body):
+            violations.append(f"Numbers cached merge selectors must avoid complete model decoding: {selectors_path}")
+    return violations
 
 
 def audit_iwa_common_table_read_source_topology(root: Path = ROOT) -> list[str]:

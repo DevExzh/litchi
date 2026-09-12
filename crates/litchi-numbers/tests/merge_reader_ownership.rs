@@ -88,3 +88,78 @@ fn bounded_path_ingress_retains_an_independent_immutable_source() {
         vec![Region::new(10, 1, 2, 2).unwrap()]
     );
 }
+
+#[cfg(feature = "internal-iwork-source")]
+#[test]
+fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() {
+    use litchi_iwa_archive::{ComponentCatalog, Limits};
+    use litchi_numbers::{
+        PackageReadOptions, PackageSemanticLimits, TableMergesError, TableMergesLimitKind,
+    };
+
+    let records = ComponentCatalog::from_bytes(NATIVE)
+        .unwrap()
+        .into_iter()
+        .map(|component| {
+            let (name, archive) = component.into_parts();
+            (name, Arc::new(archive))
+        })
+        .collect::<Vec<_>>();
+    let lifetimes = records
+        .iter()
+        .map(|(_, archive)| Arc::downgrade(archive))
+        .collect::<Vec<_>>();
+    let catalog = Arc::new(
+        ComponentCatalog::__from_shared_archives(
+            records
+                .iter()
+                .map(|(name, archive)| (name.as_str(), Arc::clone(archive))),
+            Limits::default(),
+        )
+        .unwrap(),
+    );
+    let object_count: usize = records
+        .iter()
+        .map(|(_, archive)| archive.objects.len())
+        .sum();
+    let defaults = PackageSemanticLimits::default();
+    let limited = PackageSemanticLimits::new(
+        object_count - 1,
+        defaults.max_sheets(),
+        defaults.max_tables(),
+        defaults.max_references(),
+    )
+    .unwrap();
+    assert!(matches!(
+        MergeReader::__from_shared_catalog(
+            Arc::clone(&catalog),
+            PackageReadOptions::new(Limits::default(), limited),
+        ),
+        Err(TableMergesError::LimitExceeded {
+            kind: TableMergesLimitKind::PayloadObjects,
+            observed,
+            maximum,
+        }) if observed == object_count as u64 && maximum == (object_count - 1) as u64
+    ));
+    let reader =
+        MergeReader::__from_shared_catalog(Arc::clone(&catalog), PackageReadOptions::default())
+            .unwrap();
+    let clone = reader.clone();
+    for (name, archive) in &records {
+        assert!(std::ptr::eq(
+            catalog.get(name).unwrap().archive(),
+            Arc::as_ptr(archive),
+        ));
+        assert_eq!(Arc::strong_count(archive), 2);
+    }
+    drop(records);
+    drop(catalog);
+    drop(reader);
+    assert!(lifetimes.iter().all(|record| record.upgrade().is_some()));
+    assert_eq!(
+        clone.table_merges("Sheet 1", "shared-model").unwrap(),
+        vec![Region::new(10, 1, 2, 2).unwrap()]
+    );
+    drop(clone);
+    assert!(lifetimes.iter().all(|record| record.upgrade().is_none()));
+}

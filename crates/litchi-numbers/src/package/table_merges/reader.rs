@@ -5,6 +5,8 @@
 
 use std::{fmt, path::Path, sync::Arc};
 
+#[cfg(feature = "internal-iwork-source")]
+use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::numbers_names_codec;
 
@@ -170,6 +172,28 @@ impl MergeReader {
     /// Returns the same typed failures as [`Self::from_bytes`].
     pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, TableMergesError> {
         Self::from_shared_bytes_with_options(bytes, ReadOptions::default())
+    }
+
+    /// Build a reader from an already parsed component catalog.
+    ///
+    /// This migration-only ingress retains the archive allocations owned by
+    /// the caller's cache. It performs the same Numbers application and
+    /// object-index validation as byte ingress, but does not reopen the ZIP or
+    /// decode any IWA component a second time.
+    /// The originating catalog retains responsibility for physical ingress
+    /// validation; these options govern Numbers indexing and query budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error for foreign application data, invalid indexing,
+    /// or an exceeded Numbers resource limit.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_shared_catalog(
+        catalog: Arc<ComponentCatalog>,
+        options: ReadOptions,
+    ) -> Result<Self, TableMergesError> {
+        Self::from_components_with_options(Components::from_catalog(catalog), options)
     }
 
     fn from_components_with_options(

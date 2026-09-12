@@ -3447,7 +3447,6 @@ pub(super) fn attached_table_info_model_identifier(
         return Ok(None);
     }
 
-    let object_id = object.archive_info.identifier.unwrap_or_default();
     let Ok(table_info_id) = super::table_info_projection::model_reference_for_type(
         message.type_,
         message.data.as_slice(),
@@ -3455,8 +3454,31 @@ pub(super) fn attached_table_info_model_identifier(
     .map(std::num::NonZeroU64::get) else {
         return Ok(None);
     };
+    validate_attached_table_info_role(object, message, table_info_id).map(Some)
+}
+
+/// Strict rooted-read admission: malformed and over-budget table-info payloads
+/// remain errors instead of being classified as absent compatibility candidates.
+pub(super) fn strict_attached_table_info_model_identifier(
+    object: &ArchiveObject,
+    message: &RawMessage,
+) -> Result<Option<u64>> {
+    if !TABLE_INFO_MESSAGE_TYPES.contains(&message.type_) {
+        return Ok(None);
+    }
+    let model_id =
+        super::table_info_projection::model_reference_for_type(message.type_, &message.data)?.get();
+    validate_attached_table_info_role(object, message, model_id).map(Some)
+}
+
+fn validate_attached_table_info_role(
+    object: &ArchiveObject,
+    message: &RawMessage,
+    table_info_id: u64,
+) -> Result<u64> {
+    let object_id = object.archive_info.identifier.unwrap_or_default();
     if message.type_ != TABLE_INFO_MESSAGE_TYPES[0] {
-        return Ok(Some(table_info_id));
+        return Ok(table_info_id);
     }
 
     // Run the existing bounded model projection only after this message has
@@ -3472,7 +3494,7 @@ pub(super) fn attached_table_info_model_identifier(
             "iWork object {object_id} has an ambiguous type-6000 table-info/table-model role"
         )));
     }
-    Ok(Some(table_info_id))
+    Ok(table_info_id)
 }
 
 pub(super) fn attached_table_descriptor(
@@ -5877,5 +5899,29 @@ mod tests {
         .unwrap();
 
         assert!(find_table_model_message(&object).is_err());
+    }
+}
+
+#[cfg(test)]
+mod strict_merge_info_tests {
+    use super::*;
+
+    #[test]
+    fn rooted_merge_admission_keeps_malformed_table_info_as_an_error() {
+        let message = RawMessage {
+            type_: 6_000,
+            data: vec![0],
+        };
+        let object = ArchiveObject::new(42, vec![message.clone()]).unwrap();
+        assert!(
+            attached_table_info_model_identifier(&object, &message)
+                .unwrap()
+                .is_none(),
+            "the historical candidate probe retains its compatibility contract"
+        );
+        assert!(
+            strict_attached_table_info_model_identifier(&object, &message).is_err(),
+            "a malformed rooted table-info must not become an absent candidate"
+        );
     }
 }

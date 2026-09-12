@@ -567,6 +567,130 @@ pub(super) fn focused_table_location(
     ))
 }
 
+/// Resolve a legacy table identifier to the selector positions understood by
+/// the focused merge reader.
+///
+/// Merge metadata does not need the complete generated table model (or any
+/// cell/tile projection). The host therefore derives the table position from
+/// the rooted sheet drawable order and the bounded table-info ownership edge.
+/// The returned positions follow the same table-info filtering used by the
+/// focused Numbers reader, while all native identifiers remain private to this
+/// adapter.
+pub(super) fn focused_merge_table_indices(
+    editor: &NumbersEditor,
+    native_id: u64,
+) -> Result<Option<(usize, usize)>> {
+    let package = editor.package();
+    let locations = super::object_locations(package)?;
+    let Some(model_archive) = locations.get(&native_id) else {
+        return Ok(None);
+    };
+    let canonical_model = package.with_parsed_archive(model_archive, |archive| {
+        Ok(archive
+            .object(native_id)
+            .is_some_and(|object| object.messages.iter().any(|message| message.type_ == 6_001)))
+    })?;
+    // The host also admits historical model type aliases. Only canonical
+    // models enter the focused rooted reader; the compatibility projection
+    // validates a legacy candidate before returning its geometry.
+    if !canonical_model {
+        return Ok(None);
+    }
+    let document = super::numbers_document(package)?;
+    let limits = litchi_numbers::PackageSemanticLimits::default();
+    let check = |kind, observed: usize, maximum: usize| -> Result<()> {
+        if observed > maximum {
+            return Err(litchi_numbers::TableMergesError::LimitExceeded {
+                kind,
+                observed: observed as u64,
+                maximum: maximum as u64,
+            }
+            .into());
+        }
+        Ok(())
+    };
+    check(
+        litchi_numbers::TableMergesLimitKind::Sheets,
+        document.sheets.len(),
+        limits.max_sheets(),
+    )?;
+    let mut seen_sheets = HashSet::new();
+    let mut references = 0usize;
+    let mut tables = 0usize;
+    let mut selected = None;
+    for (sheet_position, sheet_reference) in document.sheets.iter().enumerate() {
+        seen_sheets.try_reserve(1).map_err(|_| {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Numbers merge sheet membership",
+                amount: 1,
+            })
+        })?;
+        if !seen_sheets.insert(sheet_reference.identifier) {
+            return Err(Error::InvalidFormat(
+                "Numbers document repeats a sheet reference".to_owned(),
+            ));
+        }
+        let sheet_archive = locations.get(&sheet_reference.identifier).ok_or_else(|| {
+            Error::InvalidFormat("Numbers merge sheet is missing from the object index".to_owned())
+        })?;
+        let sheet = package.with_parsed_archive(sheet_archive, |archive| {
+            let object = archive.object(sheet_reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat("Numbers merge sheet is missing from its archive".to_owned())
+            })?;
+            super::model::decode_sheet(object).map(|(_, sheet)| sheet)
+        })?;
+        references = references.saturating_add(sheet.drawable_infos.len());
+        check(
+            litchi_numbers::TableMergesLimitKind::PayloadReferences,
+            references,
+            limits.max_references(),
+        )?;
+        let mut table_position = 0usize;
+        for drawable in &sheet.drawable_infos {
+            let Some(archive_name) = locations.get(&drawable.identifier) else {
+                continue;
+            };
+            let model_id = package.with_parsed_archive(archive_name, |archive| {
+                let object = archive.object(drawable.identifier).ok_or_else(|| {
+                    Error::InvalidFormat("Numbers drawable missing from indexed archive".to_owned())
+                })?;
+                let mut model = None;
+                for message in &object.messages {
+                    if let Some(identifier) =
+                        super::model::strict_attached_table_info_model_identifier(object, message)?
+                        && model.replace(identifier).is_some()
+                    {
+                        return Err(Error::InvalidFormat(
+                            "Numbers drawable has multiple table-info payloads".to_owned(),
+                        ));
+                    }
+                }
+                Ok(model)
+            })?;
+            if let Some(identifier) = model_id {
+                tables = tables.saturating_add(1);
+                check(
+                    litchi_numbers::TableMergesLimitKind::Tables,
+                    tables,
+                    limits.max_tables(),
+                )?;
+                if identifier == native_id
+                    && selected.replace((sheet_position, table_position)).is_some()
+                {
+                    return Err(Error::InvalidFormat(
+                        "Numbers table has multiple rooted owning drawables".to_owned(),
+                    ));
+                }
+                table_position = table_position.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("Numbers table position overflow".to_owned())
+                })?;
+            }
+        }
+    }
+    // Detached table-info/model pairs remain explicit compatibility scope.
+    Ok(selected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

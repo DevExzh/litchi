@@ -12053,3 +12053,82 @@ The existing nine private merge-budget regressions also pass after adapting
 their fixtures to the shared component/index interface. Boundary regression
 coverage verifies the new ingress allowance and rejects same-named byte-return
 constructors, public reader state, raw IDs, and generated-message imports.
+
+### 2026-09-12: cached merge-reader handoff native source receipt
+
+Computer Use opened a disposable copy of
+`test-data/iwork/numbers/table-merges-native.numbers` in Numbers, entered
+`Shared archive verified` in the existing B11:C12 merged cell, saved, closed,
+and reopened the exact saved path. The reopened sheet retained the marker and
+the visible two-row, two-column merged rectangle in table `shared-model` on
+`Sheet 1`. Numbers' accessibility span count is inconsistent, so the native
+geometry observation comes from the rendered grid rather than that count.
+The saved source contains 139,276 bytes with SHA-256
+`a217b397702404c4d4390fae7b687ab68156c8e0bf4d70ab0166f7b1f428aaaa`.
+The checked-in fixture was not modified. This receipt proves native source
+save/reopen only; programmatic handoff parity is recorded separately below.
+
+The host `NumbersEditor::table_cell_merges` now uses a private cached-source
+handoff for canonical rooted models. The host maps its compatibility identifier
+to checked sheet/table positions using bounded borrowed table-info projection,
+without decoding the full table model. Source-built packages, historical model
+type aliases, and detached models remain explicit pre-admission compatibility
+cases. Selector errors are not swallowed; after a canonical rooted selection,
+focused source, allocation, and resource failures are terminal. A transparent
+host error variant retains the focused resource kind and observed/maximum
+values, including when the host's cache error cloning path copies the error.
+
+`ComponentCatalog::__from_shared_archives`, gated by `internal-iwork-source`,
+retains immutable parsed `Arc<Archive>` records. It validates canonical names,
+duplicate component authorities, entry/name/metadata ceilings, exact encoded
+IWA sizes, archive profiles, and aggregate object/IWA-byte budgets before
+publishing the catalog. Original package ingress still owns ZIP provenance and
+compressed-source validation. The focused reader's hidden, feature-gated
+catalog constructor performs Numbers application/index validation and retains
+query options. Supported format APIs still expose selectors and geometry,
+without archive objects or native IDs.
+
+The handoff borrows original payload allocations instead of reconstructing a
+ZIP or cloning archives. It pins component owners for the query duration; this
+is not a package-wide RSS, latency, throughput, or allocation-count claim. The
+low-level `Component::archive` accessor now dispatches over owned/shared storage
+and is no longer a `const fn`; ordinary borrowing remains unchanged. Consuming
+`Component::into_parts` unwraps a unique shared record or clones when another
+owner remains, preserving its owned-return contract.
+
+Focused checks pass six archive handoff tests, four Numbers reader ownership
+and limit tests, and 21 existing host merge tests covering Numbers/Pages/Keynote
+CRUD, axis transformations, and formula-anchor preservation. Boundary
+regressions reject ZIP reparsing, archive cloning, missing selector forwarding,
+post-admission legacy fallback, and exposing the internal catalog constructor
+without its feature gate or hidden documentation. The topology remains 64
+packages, 241 internal dependency declarations, and 11 migration debts; this
+read handoff does not close the monolith deletion gate.
+
+The exact native saved source above also passed programmatic parity:
+`MergeReader`, full `Package`, and the host returned `Region(10, 1, 2, 2)`
+without changing its bytes. Four host handoff regressions and the existing four
+native merge tests pass. The handoff regressions include a malformed selected
+root edge that the former compatibility reader accepted: the revised path
+returns typed `NumbersTableMerges(TableMergesError::InvalidSource)` instead of
+falling back. Selector traversal carries finite sheet, table, and reference
+ceilings before its loops. Focused all-feature library lint and 19 merge
+boundary regressions pass; full normal commit hooks remain the publication
+gate for this batch.
+
+The final admission audit also removed repeated whole-archive sheet lookup: a
+single object-location index now drives borrowed sheet decoding. Duplicate root
+sheet references are rejected. Merge admission uses a strict table-info
+projection that propagates malformed payload and budget errors; the historical
+permissive helper retains its compatibility behavior. Both helpers share the
+same ambiguity validator, and architecture regressions follow that helper to
+reject missing probes, missing ambiguity checks, and generated decoding. A
+malformed table-info unit regression distinguishes strict refusal from the
+legacy probe. The final four-test host harness also passes against the exact
+Numbers-saved source recorded above.
+
+An additional all-targets Clippy probe reports existing test-only style
+violations in chart arrangement, image adjustment, chart fixture, and merge
+budget assertion code. The configured `cargo lint` release policy remains
+production-library lint plus separate workspace test execution; this batch
+does not claim an all-targets Clippy pass.

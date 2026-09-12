@@ -47397,6 +47397,31 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
+    def test_iwa_numbers_shared_attached_role_preserves_strict_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_model_storage_scaffold(root)
+            path = root / boundaries.IWA_NUMBERS_MODEL_SOURCE
+            source = path.read_text(encoding="utf-8").replace(
+                "fn attached_table_info_model_identifier(message: &RawMessage) {",
+                "fn attached_table_info_model_identifier(message: &RawMessage) {\n"
+                "    validate_attached_table_info_role(message);\n}\n"
+                "fn validate_attached_table_info_role(message: &RawMessage) {",
+            )
+            path.write_text(source, encoding="utf-8")
+            audit = boundaries.audit_iwa_numbers_model_storage_source_topology
+            self.assertEqual(audit(root), [])
+            for original, replacement in (
+                ("probe_candidate(", "unchecked_candidate("),
+                ("match (table_info_id, is_table_model)", "match unchecked_role"),
+                ("fn validate_attached_table_info_role(", "fn removed_role("),
+                ("let _ = TABLE_INFO_MESSAGE_TYPES;",
+                 "let _ = TABLE_INFO_MESSAGE_TYPES; TableInfoArchive::decode(bytes);"),
+            ):
+                with self.subTest(original=original):
+                    path.write_text(source.replace(original, replacement), encoding="utf-8")
+                    self.assertTrue(audit(root))
+
     def test_iwa_numbers_model_storage_boundary_is_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
@@ -48018,6 +48043,58 @@ fn rewrite_movie_title_operation(
                         violations,
                     )
 
+    def test_numbers_cached_merge_handoff_rejects_reparse_and_fallback(self) -> None:
+        reader_path = Path("crates/litchi-iwa/src/numbers/editor/cell_merge/reader.rs")
+        paths = (
+            reader_path,
+            Path("crates/litchi-iwa/src/numbers/editor/semantic/table.rs"),
+            Path("crates/litchi-iwa/src/numbers/editor/selectors.rs"),
+        )
+        original = (boundaries.ROOT / reader_path).read_text(encoding="utf-8")
+        for source, expected in (
+            (original.replace("__from_shared_catalog", "from_shared_bytes_with_options", 1), "reparses"),
+            (original.replace("package.parsed_archive(name)", "package.archive(name)", 1), "copies"),
+            (original.replace("let reader = cached_reader(editor.package())?;", "let reader = cached_reader(editor.package())?;\nreturn super::regions_in_package(editor.package(), table_id);", 1), "must remain terminal"),
+            (original.replace("SheetSelector::index(sheet)", "sheet", 1), "SheetSelector::index"),
+            (original.replace("focused_merge_table_indices(editor, table_id)?", "focused_merge_table_indices(editor, table_id).unwrap_or(None)", 1), "swallows"),
+        ):
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for path in paths:
+                    target = root / path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text((boundaries.ROOT / path).read_text(encoding="utf-8"), encoding="utf-8")
+                self.assertNotEqual(source, original)
+                (root / reader_path).write_text(source, encoding="utf-8")
+                violations = boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(root)
+                self.assertTrue(any(expected in item for item in violations), violations)
+
+    def test_host_table_merge_read_rejects_direct_private_wire_route(self) -> None:
+        for delegation in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS:
+            with self.subTest(format=delegation["format_name"]):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    path = root / delegation["source"]
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(
+                        f"impl {delegation['impl_type']} {{\n"
+                        f"pub fn {delegation['method']}(&self, model_id: u64) "
+                        "-> Result<Vec<Region>> {\n"
+                        "cell_merge::regions_in_package(self.package(), model_id)\n"
+                        "}\n}\n",
+                        encoding="utf-8",
+                    )
+                    violations = (
+                        boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(root)
+                    )
+                    self.assertTrue(
+                        any(
+                            "must not call the monolith Numbers table-merge reader" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
     def test_keynote_table_merge_read_allows_only_typed_unsupported_fallback(self) -> None:
         delegation = next(
             item
@@ -48323,6 +48400,28 @@ impl KeynoteEditor {
             self.assertEqual(
                 boundaries.audit_numbers_table_merge_reader_source_topology(root), []
             )
+
+    def test_numbers_table_merge_reader_internal_ingress_stays_hidden_and_bounded(self) -> None:
+        for removed, expected in (
+            ('#[cfg(feature = "internal-iwork-source")]', "feature-gated"),
+            ('#[doc(hidden)]', "doc(hidden)"),
+            ('Arc<ComponentCatalog>', "Arc<ComponentCatalog>"),
+            ('options: ReadOptions', "ReadOptions"),
+        ):
+            with self.subTest(removed=removed), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_numbers_table_merge_reader_fixture(root)
+                reader = root / boundaries.NUMBERS_TABLE_MERGE_READER_SOURCE
+                source = reader.read_text(encoding="utf-8")
+                marker = source.index("    pub fn __from_shared_catalog")
+                start = source.rfind("    #[cfg", 0, marker)
+                end = source.index("    fn from_components_with_options", marker)
+                seam = source[start:end]
+                self.assertIn(removed, seam)
+                source = source[:start] + seam.replace(removed, "", 1) + source[end:]
+                reader.write_text(source, encoding="utf-8")
+                violations = boundaries.audit_numbers_table_merge_reader_source_topology(root)
+                self.assertTrue(any(expected in item for item in violations), violations)
 
     def test_numbers_table_merge_reader_boundary_rejects_raw_byte_methods_and_aliases(
         self,
