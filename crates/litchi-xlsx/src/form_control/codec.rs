@@ -12,17 +12,21 @@ use std::ops::Deref;
 use std::ops::Range;
 use std::sync::Arc;
 
+use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
+use crate::source_payload::SourcePayload;
+
 use super::model::{
     Checked, DropStyle, EditValidation, FormControlFormula, Item, ItemList, KnownOrUnknown,
-    LexicalAttribute, NamespaceBinding, ObjectType, OpaqueAttribute, OpaqueXml, Properties,
-    ScalarField, ScalarValue, SelectionType, TextHAlign, TextVAlign, is_xml_10_char,
-    validate_multi_selection, validate_xml_text,
+    LexicalAttribute, NamespaceBinding, ObjectType, OpaqueAttribute, OpaqueXml,
+    PROPERTIES_STORAGE_BYTES, Properties, RETAINED_LEASE_STORAGE_BYTES, SHARED_VEC_STORAGE_BYTES,
+    ScalarField, ScalarValue, SelectionType, SharedOption, SharedVec, TextHAlign, TextVAlign,
+    is_xml_10_char, validate_multi_selection, validate_xml_text,
 };
 use super::{FORM_CONTROL_NAMESPACE, Limits, Result, allocation, invalid, limit};
 
@@ -30,6 +34,7 @@ const ROOT: &[u8] = b"formControlPr";
 const ITEM_LIST: &[u8] = b"itemLst";
 const ITEM: &[u8] = b"item";
 const EXT_LIST: &[u8] = b"extLst";
+const ARC_HEADER_BYTES: usize = 2 * size_of::<usize>();
 
 /// Parse one complete control-properties XML part.
 pub fn parse(xml: &[u8]) -> Result<Properties> {
@@ -38,7 +43,40 @@ pub fn parse(xml: &[u8]) -> Result<Properties> {
 
 /// Parse one complete control-properties XML part under a caller policy.
 pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Properties> {
-    let inspected = inspect_with_limits_owned(xml, *limits, true)?;
+    let source = owned_source(xml, *limits)?;
+    let inspected = inspect_with_limits_owned(xml, *limits, Some(source), None)?;
+    Ok(inspected.properties)
+}
+
+/// Parse one source-backed control-properties part while retaining the
+/// caller-provided payload handle.
+///
+/// The source payload may be a managed OPC [`litchi_opc::PartData`] handle.  Parsing only
+/// borrows its bytes and stores clones of that handle in the properties model
+/// and any retained opaque ranges; it never calls `into_arc()` and therefore
+/// does not detach a managed reservation.
+#[allow(dead_code, reason = "called by the source-backed form-control owner")]
+pub(crate) fn parse_source_with_limits(
+    source: SourcePayload,
+    limits: &Limits,
+) -> Result<Properties> {
+    parse_source_with_limits_and_context(source, limits, None)
+}
+
+/// Parse one source-backed part while charging parser-owned semantic memory to
+/// the caller's execution context. The source payload itself is assumed to be
+/// already budgeted by its owner (as it is for managed OPC `PartData`), so the
+/// retained lease covers only parser allocations and is attached to the
+/// returned model for its full clone-shared lifetime. One unit of cumulative
+/// `Work` is also consumed for each XML event when a context is supplied.
+#[allow(dead_code, reason = "called by the source-backed form-control owner")]
+pub(crate) fn parse_source_with_limits_and_context(
+    source: SourcePayload,
+    limits: &Limits,
+    context: Option<&ExecutionContext>,
+) -> Result<Properties> {
+    let xml = source.as_bytes();
+    let inspected = inspect_with_limits_owned(xml, *limits, Some(source.clone()), context)?;
     Ok(inspected.properties)
 }
 
@@ -49,7 +87,7 @@ pub fn inspect(xml: &[u8]) -> Result<SourceView<'_>> {
 
 /// Inspect a source part under a caller policy.
 pub fn inspect_with_limits(xml: &[u8], limits: Limits) -> Result<SourceView<'_>> {
-    let inspected = inspect_with_limits_owned(xml, limits, false)?;
+    let inspected = inspect_with_limits_owned(xml, limits, None, None)?;
     Ok(SourceView {
         source: xml,
         properties: inspected.properties,
@@ -1283,7 +1321,7 @@ struct ItemLayout {
     opaque: bool,
 }
 
-fn inspect_with_limits_owned(xml: &[u8], limits: Limits, retain_source: bool) -> Result<Inspected> {
+fn owned_source(xml: &[u8], limits: Limits) -> Result<SourcePayload> {
     if xml.len() > limits.max_part_bytes() {
         return Err(limit(
             "source part bytes",
@@ -1291,28 +1329,59 @@ fn inspect_with_limits_owned(xml: &[u8], limits: Limits, retain_source: bool) ->
             limits.max_part_bytes(),
         ));
     }
-    validate_xml_source_characters(xml)?;
-    if retain_source && xml.len() > limits.max_retained_bytes() {
+    if xml.len() > limits.max_retained_bytes() {
         return Err(limit(
             "retained source bytes",
             xml.len(),
             limits.max_retained_bytes(),
         ));
     }
-    let mut retained = RetainedBudget::new(limits.max_retained_bytes());
-    if retain_source {
-        retained.charge(xml.len(), "retained source bytes")?;
+    let mut source_bytes = Vec::new();
+    source_bytes
+        .try_reserve_exact(xml.len())
+        .map_err(|source| allocation("form-control source bytes", source))?;
+    source_bytes.extend_from_slice(xml);
+    Ok(SourcePayload::Owned(Arc::new(source_bytes)))
+}
+
+fn inspect_with_limits_owned(
+    xml: &[u8],
+    limits: Limits,
+    source: Option<SourcePayload>,
+    context: Option<&ExecutionContext>,
+) -> Result<Inspected> {
+    if xml.len() > limits.max_part_bytes() {
+        return Err(limit(
+            "source part bytes",
+            xml.len(),
+            limits.max_part_bytes(),
+        ));
     }
-    let source = if retain_source {
-        let mut source_bytes = Vec::new();
-        source_bytes
-            .try_reserve_exact(xml.len())
-            .map_err(|source| allocation("form-control source bytes", source))?;
-        source_bytes.extend_from_slice(xml);
-        Some(Arc::<[u8]>::from(source_bytes))
-    } else {
-        None
-    };
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    validate_xml_source_characters(xml)?;
+    if source
+        .as_ref()
+        .is_some_and(|source| source.len() != xml.len())
+    {
+        return Err(invalid("form-control source payload length mismatch"));
+    }
+    if source.is_some() && xml.len() > limits.max_retained_bytes() {
+        return Err(limit(
+            "retained source bytes",
+            xml.len(),
+            limits.max_retained_bytes(),
+        ));
+    }
+    let mut retained = RetainedBudget::new(limits.max_retained_bytes(), context.cloned());
+    if source.is_some() {
+        // The source payload is already owned by the caller's source cache or
+        // by the standalone `Owned` copy. It contributes to the leaf's local
+        // retained cap, but managed source bytes must not be charged a second
+        // time to the shared execution budget.
+        retained.charge_source(xml.len(), "retained source bytes")?;
+    }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -1341,15 +1410,24 @@ fn inspect_with_limits_owned(xml: &[u8], limits: Limits, retain_source: bool) ->
     // Attribute/entity decoding is transient parser scratch.  It is bounded
     // separately from the retained model budget and from the candidate
     // output ceiling; a temporary URI decode must not consume output quota.
-    let mut scratch = ScratchBudget::new(limits.max_opaque_bytes());
+    let mut scratch = ScratchBudget::new(limits.max_opaque_bytes(), context.cloned());
     let mut open_item = None::<OpenItem>;
     let mut open_item_list = false;
     let mut open_opaque = None::<OpenOpaque>;
     let mut child_rank = 0u8;
     let mut item_child_rank = 0u8;
+    retained.charge(PROPERTIES_STORAGE_BYTES, "form-control properties backing")?;
+    retained.charge(
+        2usize
+            .checked_mul(SHARED_VEC_STORAGE_BYTES)
+            .ok_or_else(|| invalid("form-control shared vector storage overflow"))?,
+        "form-control shared vector handles",
+    )?;
     let mut properties = Properties::new();
 
     loop {
+        retained.check_execution()?;
+        retained.charge_work(1)?;
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid("form-control XML event count overflow"))?;
@@ -1514,7 +1592,10 @@ fn inspect_with_limits_owned(xml: &[u8], limits: Limits, retain_source: bool) ->
                         &mut root_namespaces,
                         &mut opaque_bytes,
                     )?;
-                    namespace_context = Some(Arc::from(std::mem::take(&mut root_namespaces)));
+                    namespace_context = Some(finish_root_namespace_context(
+                        &mut root_namespaces,
+                        &mut retained,
+                    )?);
                     depth = 1;
                     check_depth(depth, limits)?;
                 } else if depth == 1 {
@@ -1725,7 +1806,10 @@ fn inspect_with_limits_owned(xml: &[u8], limits: Limits, retain_source: bool) ->
                         &mut root_namespaces,
                         &mut opaque_bytes,
                     )?;
-                    namespace_context = Some(Arc::from(std::mem::take(&mut root_namespaces)));
+                    namespace_context = Some(finish_root_namespace_context(
+                        &mut root_namespaces,
+                        &mut retained,
+                    )?);
                 } else if depth == 1 {
                     if root_child_insertion.is_none() {
                         root_child_insertion = Some(start);
@@ -2055,7 +2139,7 @@ fn inspect_with_limits_owned(xml: &[u8], limits: Limits, retain_source: bool) ->
     if let Some(layout) = item_list.as_mut() {
         layout.extension = layout.extension.take().or(item_list_extension_span);
     }
-    properties.item_list = item_list.as_ref().map(|_| {
+    let parsed_item_list = item_list.as_ref().map(|_| {
         ItemList::from_parts_with_namespace(
             item_values,
             item_list_extension,
@@ -2065,19 +2149,36 @@ fn inspect_with_limits_owned(xml: &[u8], limits: Limits, retain_source: bool) ->
             item_list_unknown_attributes,
         )
     });
-    properties.root_extension_list = root_extension;
+    replace_shared_option(
+        &mut properties.item_list,
+        parsed_item_list,
+        &mut retained,
+        "form-control item-list backing",
+    )?;
+    replace_shared_option(
+        &mut properties.root_extension_list,
+        root_extension,
+        &mut retained,
+        "form-control opaque root backing",
+    )?;
     let namespace_context =
         namespace_context.ok_or_else(|| invalid("form-control namespace context missing"))?;
-    if retain_source {
+    replace_shared_vec(
+        &mut properties.lexical_attributes,
+        lexical_attributes,
+        &mut retained,
+        "form-control lexical attribute backing",
+    )?;
+    if source.is_some() {
         properties.mark_source(
             source.ok_or_else(|| invalid("form-control source ownership missing"))?,
             namespace_context,
-            lexical_attributes,
         );
     } else {
-        properties.mark_metadata(namespace_context, lexical_attributes);
+        properties.mark_metadata(namespace_context);
     }
     properties.validate_parse_with_limits(limits)?;
+    properties.mark_retained_lease(retained.finish_lease()?);
     let root_open = root_open.ok_or_else(|| invalid("form-control root source span missing"))?;
     if root_child_insertion.is_none() {
         root_child_insertion = root_close_opening.or_else(|| Some(root_open.end.saturating_sub(1)));
@@ -2127,7 +2228,7 @@ fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
 }
 
 struct RetainedRange {
-    source: Arc<[u8]>,
+    source: SourcePayload,
     range: Range<usize>,
 }
 
@@ -2138,10 +2239,19 @@ struct SourceElement<'a> {
     end: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
 struct RetainedBudget {
     used: usize,
     maximum: usize,
+    temporary_used: usize,
+    namespace_temporary_used: usize,
+    lease: Option<RetainedLeaseBuilder>,
+}
+
+struct RetainedLeaseBuilder {
+    context: ExecutionContext,
+    reservation: Option<Reservation>,
+    temporary: Option<Reservation>,
+    namespace_temporary: Option<Reservation>,
 }
 
 fn reserve_retained_slots<T>(
@@ -2150,45 +2260,419 @@ fn reserve_retained_slots<T>(
     retained: &mut RetainedBudget,
     resource: &'static str,
 ) -> Result<()> {
+    retained.reserve_vec_growth(values, additional, resource)
+}
+
+fn reserve_namespace_slots<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    retained: &mut RetainedBudget,
+    resource: &'static str,
+) -> Result<()> {
     let required = values
         .len()
         .checked_add(additional)
-        .ok_or_else(|| invalid("form-control retained slot count overflow"))?;
-    if required <= values.capacity() {
+        .ok_or_else(|| invalid("form-control namespace binding count overflow"))?;
+    let old_capacity = values.capacity();
+    if required <= old_capacity {
         return Ok(());
     }
-    let doubled = values
-        .capacity()
+    let doubled = old_capacity
         .max(1)
         .checked_mul(2)
-        .ok_or_else(|| invalid("form-control retained slot capacity overflow"))?;
+        .ok_or_else(|| invalid("form-control namespace binding capacity overflow"))?;
     let target = required.max(doubled);
-    let additional_capacity = target
-        .checked_sub(values.capacity())
-        .ok_or_else(|| invalid("form-control retained slot capacity underflow"))?;
-    let bytes = additional_capacity
+    let target_bytes = target
         .checked_mul(size_of::<T>())
-        .ok_or_else(|| invalid("form-control retained slot storage overflow"))?;
-    retained.charge(bytes, resource)?;
-    values
-        .try_reserve_exact(additional_capacity)
-        .map_err(|source| allocation(resource, source))
+        .ok_or_else(|| invalid("form-control namespace binding storage overflow"))?;
+    retained.check_peak(target_bytes, resource)?;
+    retained.reserve_namespace_temporary(target_bytes, resource)?;
+    if let Err(source) = values.try_reserve_exact(target - old_capacity) {
+        retained.release_namespace_temporary();
+        return Err(allocation(resource, source));
+    }
+    let actual_bytes = values
+        .capacity()
+        .checked_mul(size_of::<T>())
+        .ok_or_else(|| invalid("form-control namespace binding storage overflow"))?;
+    if values.capacity() < required {
+        retained.release_namespace_temporary();
+        return Err(invalid(
+            "form-control namespace binding capacity below request",
+        ));
+    }
+    if actual_bytes > target_bytes {
+        let extra = actual_bytes
+            .checked_sub(target_bytes)
+            .ok_or_else(|| invalid("form-control namespace binding storage underflow"))?;
+        retained.check_peak(extra, resource)?;
+        if let Err(error) = retained.reserve_namespace_temporary(extra, resource) {
+            retained.release_namespace_temporary();
+            return Err(error);
+        }
+    }
+    // The Vec's spare capacity is temporary: the final root context is an
+    // Arc slice and retains exactly its length.  Rebuild the temporary lease
+    // from the allocator's actual capacity before the next growth.
+    retained.release_namespace_temporary();
+    retained.reserve_namespace_temporary(actual_bytes, resource)
+}
+
+/// Reserve a fresh parser-temporary vector and keep its actual allocation in
+/// the temporary peak ledger.  The caller must release the temporary ledger
+/// after dropping the vector, then charge only the final retained allocation.
+fn reserve_temporary_slots<T>(
+    values: &mut Vec<T>,
+    required: usize,
+    retained: &mut RetainedBudget,
+    resource: &'static str,
+) -> Result<usize> {
+    let old_capacity = values.capacity();
+    if required <= old_capacity {
+        return old_capacity
+            .checked_mul(size_of::<T>())
+            .ok_or_else(|| invalid("form-control temporary slot storage overflow"));
+    }
+    let target_bytes = required
+        .checked_mul(size_of::<T>())
+        .ok_or_else(|| invalid("form-control temporary slot storage overflow"))?;
+    retained.check_peak(target_bytes, resource)?;
+    retained.reserve_temporary(target_bytes)?;
+    if let Err(source) = values.try_reserve_exact(required - old_capacity) {
+        retained.release_temporary();
+        return Err(allocation(resource, source));
+    }
+    let actual_capacity = values.capacity();
+    if actual_capacity < required {
+        retained.release_temporary();
+        return Err(invalid(
+            "form-control temporary vector capacity below request",
+        ));
+    }
+    let actual_bytes = actual_capacity
+        .checked_mul(size_of::<T>())
+        .ok_or_else(|| invalid("form-control temporary slot storage overflow"))?;
+    if actual_bytes > target_bytes {
+        let extra = actual_bytes
+            .checked_sub(target_bytes)
+            .ok_or_else(|| invalid("form-control temporary slot storage underflow"))?;
+        retained.check_peak(extra, resource)?;
+        if let Err(error) = retained.reserve_temporary(extra) {
+            retained.release_temporary();
+            return Err(error);
+        }
+    }
+    Ok(actual_bytes)
 }
 
 impl RetainedBudget {
-    const fn new(maximum: usize) -> Self {
-        Self { used: 0, maximum }
+    fn new(maximum: usize, context: Option<ExecutionContext>) -> Self {
+        Self {
+            used: 0,
+            maximum,
+            temporary_used: 0,
+            namespace_temporary_used: 0,
+            lease: context.map(|context| RetainedLeaseBuilder {
+                context,
+                reservation: None,
+                temporary: None,
+                namespace_temporary: None,
+            }),
+        }
     }
 
     fn charge(&mut self, amount: usize, resource: &'static str) -> Result<()> {
-        self.used = self
+        self.charge_inner(amount, resource, true)
+    }
+
+    fn charge_source(&mut self, amount: usize, resource: &'static str) -> Result<()> {
+        self.charge_inner(amount, resource, false)
+    }
+
+    fn reserve_vec_growth<T>(
+        &mut self,
+        values: &mut Vec<T>,
+        additional: usize,
+        resource: &'static str,
+    ) -> Result<()> {
+        let required = values
+            .len()
+            .checked_add(additional)
+            .ok_or_else(|| invalid("form-control retained slot count overflow"))?;
+        let old_capacity = values.capacity();
+        if required <= old_capacity {
+            return Ok(());
+        }
+        let doubled = old_capacity
+            .max(1)
+            .checked_mul(2)
+            .ok_or_else(|| invalid("form-control retained slot capacity overflow"))?;
+        let target = required.max(doubled);
+        let old_bytes = old_capacity
+            .checked_mul(size_of::<T>())
+            .ok_or_else(|| invalid("form-control retained slot storage overflow"))?;
+        let target_bytes = target
+            .checked_mul(size_of::<T>())
+            .ok_or_else(|| invalid("form-control retained slot storage overflow"))?;
+
+        // The old allocation is already part of `used`. Reserve the complete
+        // requested new allocation separately so the shared execution budget
+        // and local retained cap see the old+new reallocation peak.
+        self.check_peak(target_bytes, resource)?;
+        self.reserve_temporary(target_bytes)?;
+        if let Err(source) = values.try_reserve_exact(target - old_capacity) {
+            self.release_temporary();
+            return Err(allocation(resource, source));
+        }
+        let actual_capacity = values.capacity();
+        if actual_capacity < required {
+            self.release_temporary();
+            return Err(invalid(
+                "form-control retained vector capacity below request",
+            ));
+        }
+        let actual_bytes = actual_capacity
+            .checked_mul(size_of::<T>())
+            .ok_or_else(|| invalid("form-control retained slot storage overflow"))?;
+        if actual_bytes > target_bytes {
+            let extra = actual_bytes
+                .checked_sub(target_bytes)
+                .ok_or_else(|| invalid("form-control retained slot storage underflow"))?;
+            self.check_peak(actual_bytes, resource)?;
+            self.reserve_temporary(extra)?;
+        }
+        self.release_temporary();
+
+        // `try_reserve_exact` has released the old allocation before it
+        // returns. Retain only the actual final capacity in the live ledger;
+        // reconciling against `capacity()` avoids trusting the requested
+        // target when an allocator grows beyond it.
+        let additional_bytes = actual_bytes
+            .checked_sub(old_bytes)
+            .ok_or_else(|| invalid("form-control retained slot storage underflow"))?;
+        self.charge(additional_bytes, resource)
+    }
+
+    fn check_peak(&self, additional: usize, resource: &'static str) -> Result<()> {
+        let peak = self
+            .used
+            .checked_add(self.temporary_used)
+            .ok_or_else(|| invalid("form-control retained allocation length overflow"))?
+            .checked_add(self.namespace_temporary_used)
+            .ok_or_else(|| invalid("form-control retained allocation length overflow"))?
+            .checked_add(additional)
+            .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
+        if peak > self.maximum {
+            return Err(limit(resource, peak, self.maximum));
+        }
+        Ok(())
+    }
+
+    fn reserve_temporary(&mut self, amount: usize) -> Result<()> {
+        let temporary_used = self
+            .temporary_used
+            .checked_add(amount)
+            .ok_or_else(|| invalid("form-control temporary allocation length overflow"))?;
+        let peak = self
+            .used
+            .checked_add(temporary_used)
+            .and_then(|value| value.checked_add(self.namespace_temporary_used))
+            .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
+        if peak > self.maximum {
+            return Err(limit(
+                "form-control temporary retained allocation",
+                peak,
+                self.maximum,
+            ));
+        }
+        if let Some(lease) = self.lease.as_mut() {
+            lease.reserve_temporary(amount)?;
+        }
+        self.temporary_used = temporary_used;
+        Ok(())
+    }
+
+    fn release_temporary(&mut self) {
+        self.temporary_used = 0;
+        if let Some(lease) = self.lease.as_mut() {
+            lease.release_temporary();
+        }
+    }
+
+    fn reserve_namespace_temporary(&mut self, amount: usize, resource: &'static str) -> Result<()> {
+        let namespace_temporary_used = self
+            .namespace_temporary_used
+            .checked_add(amount)
+            .ok_or_else(|| invalid("form-control namespace temporary storage overflow"))?;
+        let peak = self
+            .used
+            .checked_add(self.temporary_used)
+            .and_then(|value| value.checked_add(namespace_temporary_used))
+            .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
+        if peak > self.maximum {
+            return Err(limit(resource, peak, self.maximum));
+        }
+        if let Some(lease) = self.lease.as_mut() {
+            lease.reserve_namespace_temporary(amount)?;
+        }
+        self.namespace_temporary_used = namespace_temporary_used;
+        Ok(())
+    }
+
+    fn release_namespace_temporary(&mut self) {
+        self.namespace_temporary_used = 0;
+        if let Some(lease) = self.lease.as_mut() {
+            lease.release_namespace_temporary();
+        }
+    }
+
+    fn charge_inner(
+        &mut self,
+        amount: usize,
+        resource: &'static str,
+        charge_execution: bool,
+    ) -> Result<()> {
+        let used = self
             .used
             .checked_add(amount)
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
-        if self.used > self.maximum {
-            return Err(limit(resource, self.used, self.maximum));
+        let peak = used
+            .checked_add(self.temporary_used)
+            .and_then(|value| value.checked_add(self.namespace_temporary_used))
+            .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
+        if peak > self.maximum {
+            return Err(limit(resource, peak, self.maximum));
+        }
+        if charge_execution {
+            if let Some(lease) = self.lease.as_mut() {
+                lease.reserve(amount)?;
+            }
+        }
+        self.used = used;
+        Ok(())
+    }
+
+    fn check_execution(&self) -> Result<()> {
+        self.lease
+            .as_ref()
+            .map_or(Ok(()), RetainedLeaseBuilder::check)
+    }
+
+    fn charge_work(&self, amount: usize) -> Result<()> {
+        let Some(lease) = self.lease.as_ref() else {
+            return Ok(());
+        };
+        let amount = u64::try_from(amount)
+            .map_err(|_| invalid("form-control execution work charge overflow"))?;
+        lease
+            .context
+            .consume(Resource::Work, amount)
+            .map_err(map_execution_error)
+    }
+
+    fn finish_lease(mut self) -> Result<Option<Arc<Reservation>>> {
+        let has_reservation = self
+            .lease
+            .as_ref()
+            .is_some_and(|lease| lease.reservation.is_some());
+        if !has_reservation {
+            return Ok(None);
+        }
+        // `Arc::new` allocates an Arc header in addition to the reservation;
+        // reserve that retained storage before publishing the lease handle.
+        self.charge(
+            RETAINED_LEASE_STORAGE_BYTES,
+            "form-control retained execution lease",
+        )?;
+        let reservation = self
+            .lease
+            .as_mut()
+            .and_then(|lease| lease.reservation.take())
+            .ok_or_else(|| invalid("form-control retained execution lease disappeared"))?;
+        Ok(Some(Arc::new(reservation)))
+    }
+}
+
+impl RetainedLeaseBuilder {
+    fn reserve(&mut self, amount: usize) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
+        let amount = u64::try_from(amount)
+            .map_err(|_| invalid("form-control execution memory charge overflow"))?;
+        let reservation = self
+            .context
+            .reserve(Resource::Memory, amount)
+            .map_err(map_execution_error)?;
+        if let Some(existing) = self.reservation.as_mut() {
+            if let Err(other) = existing.try_merge(reservation) {
+                drop(other);
+                return Err(invalid(
+                    "form-control execution memory reservations used different budget chains",
+                ));
+            }
+        } else {
+            self.reservation = Some(reservation);
         }
         Ok(())
+    }
+
+    fn reserve_temporary(&mut self, amount: usize) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
+        let amount = u64::try_from(amount)
+            .map_err(|_| invalid("form-control execution temporary memory charge overflow"))?;
+        let reservation = self
+            .context
+            .reserve(Resource::Memory, amount)
+            .map_err(map_execution_error)?;
+        if let Some(existing) = self.temporary.as_mut() {
+            if let Err(other) = existing.try_merge(reservation) {
+                drop(other);
+                return Err(invalid(
+                    "form-control temporary reservations used different budget chains",
+                ));
+            }
+        } else {
+            self.temporary = Some(reservation);
+        }
+        Ok(())
+    }
+
+    fn release_temporary(&mut self) {
+        drop(self.temporary.take());
+    }
+
+    fn reserve_namespace_temporary(&mut self, amount: usize) -> Result<()> {
+        if amount == 0 {
+            return Ok(());
+        }
+        let amount = u64::try_from(amount)
+            .map_err(|_| invalid("form-control namespace temporary memory charge overflow"))?;
+        let reservation = self
+            .context
+            .reserve(Resource::Memory, amount)
+            .map_err(map_execution_error)?;
+        if let Some(existing) = self.namespace_temporary.as_mut() {
+            if let Err(other) = existing.try_merge(reservation) {
+                drop(other);
+                return Err(invalid(
+                    "form-control namespace temporary reservations used different budget chains",
+                ));
+            }
+        } else {
+            self.namespace_temporary = Some(reservation);
+        }
+        Ok(())
+    }
+
+    fn release_namespace_temporary(&mut self) {
+        drop(self.namespace_temporary.take());
+    }
+
+    fn check(&self) -> Result<()> {
+        self.context.check().map_err(map_execution_error)
     }
 }
 
@@ -2197,15 +2681,21 @@ impl RetainedBudget {
 /// This is deliberately independent of `Limits::max_output_bytes`: output is
 /// the size of the final candidate, while this counter bounds a temporary
 /// decoded attribute value which is released before the next event.
-#[derive(Clone, Copy, Debug)]
 struct ScratchBudget {
     used: usize,
     maximum: usize,
+    context: Option<ExecutionContext>,
+    reservation: Option<Reservation>,
 }
 
 impl ScratchBudget {
-    const fn new(maximum: usize) -> Self {
-        Self { used: 0, maximum }
+    fn new(maximum: usize, context: Option<ExecutionContext>) -> Self {
+        Self {
+            used: 0,
+            maximum,
+            context,
+            reservation: None,
+        }
     }
 
     fn charge(&mut self, amount: usize, resource: &'static str) -> Result<()> {
@@ -2216,16 +2706,72 @@ impl ScratchBudget {
         if self.used > self.maximum {
             return Err(limit(resource, self.used, self.maximum));
         }
+        if let Some(context) = self.context.as_ref() {
+            if self.reservation.is_some() {
+                return Err(invalid(
+                    "form-control scratch allocations overlap unexpectedly",
+                ));
+            }
+            let amount = u64::try_from(amount)
+                .map_err(|_| invalid("form-control scratch memory charge overflow"))?;
+            self.reservation = Some(
+                context
+                    .reserve(Resource::Memory, amount)
+                    .map_err(map_execution_error)?,
+            );
+        }
         Ok(())
     }
 
     fn release(&mut self, amount: usize) {
         self.used = self.used.saturating_sub(amount);
+        drop(self.reservation.take());
     }
 }
 
+fn map_execution_error(error: ExecutionError) -> super::FormControlError {
+    error.into()
+}
+
+fn replace_shared_option<T>(
+    slot: &mut SharedOption<T>,
+    value: Option<T>,
+    retained: &mut RetainedBudget,
+    resource: &'static str,
+) -> Result<()> {
+    if value.is_some() {
+        retained.charge(
+            ARC_HEADER_BYTES
+                .checked_add(size_of::<T>())
+                .ok_or_else(|| invalid("form-control shared option storage overflow"))?,
+            resource,
+        )?;
+    }
+    slot.replace(value);
+    Ok(())
+}
+
+fn replace_shared_vec<T>(
+    slot: &mut SharedVec<T>,
+    value: Vec<T>,
+    retained: &mut RetainedBudget,
+    resource: &'static str,
+) -> Result<()> {
+    // Parsing starts with unique empty vector handles.  Replacing one of
+    // those handles can move the completed Vec into the existing Arc without
+    // allocating another Arc header, so the retained ledger must charge only
+    // when a shared caller forces a new backing handle.  This keeps the
+    // boundary charge equal to the live model while still precharging the
+    // fallback allocation before publishing it.
+    if !slot.is_unique() {
+        retained.charge(SHARED_VEC_STORAGE_BYTES, resource)?;
+    }
+    slot.replace(value);
+    Ok(())
+}
+
 fn source_for_range(
-    source: &Option<Arc<[u8]>>,
+    source: &Option<SourcePayload>,
     xml: &[u8],
     range: Range<usize>,
     limits: Limits,
@@ -2241,7 +2787,7 @@ fn source_for_range(
     }
     if let Some(source) = source {
         return Ok(Some(RetainedRange {
-            source: Arc::clone(source),
+            source: source.clone(),
             range,
         }));
     }
@@ -2351,6 +2897,23 @@ fn element_prefix(name: QName<'_>, retained: &mut RetainedBudget) -> Result<Opti
         .transpose()
 }
 
+fn finish_root_namespace_context(
+    namespaces: &mut Vec<NamespaceBinding>,
+    retained: &mut RetainedBudget,
+) -> Result<Arc<[NamespaceBinding]>> {
+    let storage = namespaces
+        .len()
+        .checked_mul(size_of::<NamespaceBinding>())
+        .ok_or_else(|| invalid("form-control namespace binding storage overflow"))?;
+    // Keep the parsing Vec reservation live while the exact-length Arc slice
+    // is charged and published.  `Arc::from(Vec)` may allocate a new slice
+    // before the source Vec is dropped, so this is a real old-plus-new peak.
+    retained.charge(storage, "form-control namespace binding storage")?;
+    let context = Arc::from(std::mem::take(namespaces));
+    retained.release_namespace_temporary();
+    Ok(context)
+}
+
 fn parse_root_attributes(
     element: &BytesStart<'_>,
     resolver: &NamespaceResolver,
@@ -2394,20 +2957,7 @@ fn parse_root_attributes(
                     limits.max_opaque_bytes(),
                 ));
             }
-            if namespaces.is_empty() {
-                // The first root binding still owns a real vector slot.  Its
-                // storage is charged before reservation just like every
-                // later capacity growth.
-                retained.charge(
-                    size_of::<NamespaceBinding>(),
-                    "form-control namespace bindings",
-                )?;
-                namespaces
-                    .try_reserve_exact(1)
-                    .map_err(|source| allocation("form-control namespace bindings", source))?;
-            } else {
-                reserve_retained_slots(namespaces, 1, retained, "form-control namespace bindings")?;
-            }
+            reserve_namespace_slots(namespaces, 1, retained, "form-control namespace bindings")?;
             namespaces.push(NamespaceBinding::new(
                 String::from_utf8(prefix.to_vec())
                     .map_err(|error| invalid(format!("invalid namespace prefix: {error}")))?,
@@ -2452,13 +3002,14 @@ fn parse_root_attributes(
                 "form-control unknown attribute",
             )?;
             reserve_retained_slots(
-                &mut properties.unknown_attributes,
+                properties.unknown_attributes.as_mut_vec(),
                 1,
                 retained,
                 "form-control unknown attributes",
             )?;
             properties
                 .unknown_attributes
+                .as_mut_vec()
                 .push(OpaqueAttribute::from_lexical(
                     key,
                     &source.source[token.clone()],
@@ -2493,7 +3044,7 @@ fn parse_root_attributes(
                     limits.max_opaque_bytes(),
                 ));
             }
-            assign_parsed_scalar(properties, field, decoded.as_ref())?;
+            assign_parsed_scalar(properties, field, decoded.as_ref(), retained)?;
             reserve_retained_slots(
                 lexical,
                 1,
@@ -2800,13 +3351,16 @@ fn namespace_context_for_element(
     let mut attributes_binding = element.attributes();
     let attributes = attributes_binding.with_checks(true);
     let mut additions = Vec::<NamespaceBinding>::new();
-    let addition_storage = declaration_count
-        .checked_mul(size_of::<NamespaceBinding>())
-        .ok_or_else(|| invalid("form-control namespace binding storage overflow"))?;
-    retained.charge(addition_storage, "form-control namespace binding storage")?;
-    additions
-        .try_reserve_exact(declaration_count)
-        .map_err(|source| allocation("form-control namespace bindings", source))?;
+    let _addition_storage = if declaration_count == 0 {
+        0
+    } else {
+        reserve_temporary_slots(
+            &mut additions,
+            declaration_count,
+            retained,
+            "form-control namespace binding storage",
+        )?
+    };
     for attribute in attributes {
         let attribute = attribute
             .map_err(|error| invalid(format!("form-control namespace attribute error: {error}")))?;
@@ -2843,23 +3397,35 @@ fn namespace_context_for_element(
         .len()
         .checked_add(additions.len())
         .ok_or_else(|| invalid("form-control namespace binding count overflow"))?;
-    let merged_storage = capacity
-        .checked_mul(size_of::<NamespaceBinding>())
-        .ok_or_else(|| invalid("form-control namespace binding storage overflow"))?;
-    retained.charge(merged_storage, "form-control namespace binding storage")?;
     let mut merged = Vec::new();
-    merged
-        .try_reserve_exact(capacity)
-        .map_err(|source| allocation("form-control namespace bindings", source))?;
+    let _merged_peak_storage = reserve_temporary_slots(
+        &mut merged,
+        capacity,
+        retained,
+        "form-control namespace binding storage",
+    )?;
     merged.extend(base.iter().cloned());
     merged.extend(additions);
-    Ok(Arc::from(merged))
+    let final_storage = capacity
+        .checked_mul(size_of::<NamespaceBinding>())
+        .ok_or_else(|| invalid("form-control namespace binding storage overflow"))?;
+    let final_storage = final_storage
+        .checked_add(ARC_HEADER_BYTES)
+        .ok_or_else(|| invalid("form-control namespace Arc storage overflow"))?;
+    // Keep both the temporary Vec capacity and the final Arc slice charge
+    // live until Arc publication has completed; the source Vec is still live
+    // during that conversion on allocators that cannot reuse its buffer.
+    retained.charge(final_storage, "form-control namespace binding storage")?;
+    let context = Arc::from(merged);
+    retained.release_temporary();
+    Ok(context)
 }
 
 fn assign_parsed_scalar(
     properties: &mut Properties,
     field: ScalarField,
     value: &str,
+    retained: &mut RetainedBudget,
 ) -> Result<()> {
     let value = match field {
         ScalarField::ObjectType => {
@@ -2867,7 +3433,12 @@ fn assign_parsed_scalar(
             match ObjectType::parse_token(collapsed.as_ref()) {
                 Some(value) => ScalarValue::ObjectType(value),
                 None => {
-                    properties.object_type = Some(KnownOrUnknown::Unknown(collapsed.into_owned()));
+                    replace_shared_option(
+                        &mut properties.object_type,
+                        Some(KnownOrUnknown::Unknown(collapsed.into_owned())),
+                        retained,
+                        "form-control object-type backing",
+                    )?;
                     return Ok(());
                 },
             }
@@ -2877,7 +3448,12 @@ fn assign_parsed_scalar(
             match Checked::parse_token(collapsed.as_ref()) {
                 Some(value) => ScalarValue::Checked(value),
                 None => {
-                    properties.checked = Some(KnownOrUnknown::Unknown(collapsed.into_owned()));
+                    replace_shared_option(
+                        &mut properties.checked,
+                        Some(KnownOrUnknown::Unknown(collapsed.into_owned())),
+                        retained,
+                        "form-control checked backing",
+                    )?;
                     return Ok(());
                 },
             }
@@ -2887,7 +3463,12 @@ fn assign_parsed_scalar(
             match DropStyle::parse_token(collapsed.as_ref()) {
                 Some(value) => ScalarValue::DropStyle(value),
                 None => {
-                    properties.drop_style = Some(KnownOrUnknown::Unknown(collapsed.into_owned()));
+                    replace_shared_option(
+                        &mut properties.drop_style,
+                        Some(KnownOrUnknown::Unknown(collapsed.into_owned())),
+                        retained,
+                        "form-control drop-style backing",
+                    )?;
                     return Ok(());
                 },
             }
@@ -2897,7 +3478,12 @@ fn assign_parsed_scalar(
             match SelectionType::parse_token(collapsed.as_ref()) {
                 Some(value) => ScalarValue::SelectionType(value),
                 None => {
-                    properties.seltype = Some(KnownOrUnknown::Unknown(collapsed.into_owned()));
+                    replace_shared_option(
+                        &mut properties.seltype,
+                        Some(KnownOrUnknown::Unknown(collapsed.into_owned())),
+                        retained,
+                        "form-control selection-type backing",
+                    )?;
                     return Ok(());
                 },
             }
@@ -2907,7 +3493,12 @@ fn assign_parsed_scalar(
             match EditValidation::parse_token(collapsed.as_ref()) {
                 Some(value) => ScalarValue::EditValidation(value),
                 None => {
-                    properties.edit_val = Some(KnownOrUnknown::Unknown(collapsed.into_owned()));
+                    replace_shared_option(
+                        &mut properties.edit_val,
+                        Some(KnownOrUnknown::Unknown(collapsed.into_owned())),
+                        retained,
+                        "form-control edit-validation backing",
+                    )?;
                     return Ok(());
                 },
             }
@@ -2915,14 +3506,24 @@ fn assign_parsed_scalar(
         ScalarField::TextHAlign => match TextHAlign::parse_token(value) {
             Some(value) => ScalarValue::TextHAlign(value),
             None => {
-                properties.text_h_align = Some(KnownOrUnknown::Unknown(value.to_owned()));
+                replace_shared_option(
+                    &mut properties.text_h_align,
+                    Some(KnownOrUnknown::Unknown(value.to_owned())),
+                    retained,
+                    "form-control horizontal-alignment backing",
+                )?;
                 return Ok(());
             },
         },
         ScalarField::TextVAlign => match TextVAlign::parse_token(value) {
             Some(value) => ScalarValue::TextVAlign(value),
             None => {
-                properties.text_v_align = Some(KnownOrUnknown::Unknown(value.to_owned()));
+                replace_shared_option(
+                    &mut properties.text_v_align,
+                    Some(KnownOrUnknown::Unknown(value.to_owned())),
+                    retained,
+                    "form-control vertical-alignment backing",
+                )?;
                 return Ok(());
             },
         },
@@ -2935,10 +3536,30 @@ fn assign_parsed_scalar(
                 formula.mark_source_only();
             }
             match field {
-                ScalarField::FmlaGroup => properties.fmla_group = Some(formula),
-                ScalarField::FmlaLink => properties.fmla_link = Some(formula),
-                ScalarField::FmlaRange => properties.fmla_range = Some(formula),
-                ScalarField::FmlaTxbx => properties.fmla_txbx = Some(formula),
+                ScalarField::FmlaGroup => replace_shared_option(
+                    &mut properties.fmla_group,
+                    Some(formula),
+                    retained,
+                    "form-control group-formula backing",
+                )?,
+                ScalarField::FmlaLink => replace_shared_option(
+                    &mut properties.fmla_link,
+                    Some(formula),
+                    retained,
+                    "form-control link-formula backing",
+                )?,
+                ScalarField::FmlaRange => replace_shared_option(
+                    &mut properties.fmla_range,
+                    Some(formula),
+                    retained,
+                    "form-control range-formula backing",
+                )?,
+                ScalarField::FmlaTxbx => replace_shared_option(
+                    &mut properties.fmla_txbx,
+                    Some(formula),
+                    retained,
+                    "form-control textbox-formula backing",
+                )?,
                 _ => unreachable!("formula field branch is exhaustive"),
             }
             return Ok(());
@@ -2964,7 +3585,7 @@ fn assign_parsed_scalar(
         | ScalarField::Val
         | ScalarField::WidthMin => ScalarValue::Unsigned(parse_unsigned(field.wire_name(), value)?),
     };
-    set_model_scalar(properties, field, Some(value))
+    set_model_scalar(properties, field, Some(value), retained)
 }
 
 fn scalar_retains_string(field: ScalarField) -> bool {
@@ -3118,74 +3739,121 @@ fn set_model_scalar(
     properties: &mut Properties,
     field: ScalarField,
     value: Option<ScalarValue>,
+    retained: &mut RetainedBudget,
 ) -> Result<()> {
     let value_ref = value.as_ref();
     validate_scalar_value(field, value_ref)?;
     properties.mark_changed();
     match field {
-        ScalarField::ObjectType => {
-            properties.object_type = value.and_then(|value| match value {
+        ScalarField::ObjectType => replace_shared_option(
+            &mut properties.object_type,
+            value.and_then(|value| match value {
                 ScalarValue::ObjectType(value) => Some(KnownOrUnknown::Known(value)),
                 _ => None,
-            })
-        },
-        ScalarField::Checked => {
-            properties.checked = value.and_then(|value| match value {
+            }),
+            retained,
+            "form-control object-type backing",
+        )?,
+        ScalarField::Checked => replace_shared_option(
+            &mut properties.checked,
+            value.and_then(|value| match value {
                 ScalarValue::Checked(value) => Some(KnownOrUnknown::Known(value)),
                 _ => None,
-            })
-        },
+            }),
+            retained,
+            "form-control checked backing",
+        )?,
         ScalarField::Colored => properties.colored = value.and_then(bool_value),
         ScalarField::DropLines => properties.drop_lines = value.and_then(unsigned_value),
-        ScalarField::DropStyle => {
-            properties.drop_style = value.and_then(|value| match value {
+        ScalarField::DropStyle => replace_shared_option(
+            &mut properties.drop_style,
+            value.and_then(|value| match value {
                 ScalarValue::DropStyle(value) => Some(KnownOrUnknown::Known(value)),
                 _ => None,
-            })
-        },
+            }),
+            retained,
+            "form-control drop-style backing",
+        )?,
         ScalarField::Dx => properties.dx = value.and_then(unsigned_value),
         ScalarField::FirstButton => properties.first_button = value.and_then(bool_value),
-        ScalarField::FmlaGroup => properties.fmla_group = value.and_then(formula_value),
-        ScalarField::FmlaLink => properties.fmla_link = value.and_then(formula_value),
-        ScalarField::FmlaRange => properties.fmla_range = value.and_then(formula_value),
-        ScalarField::FmlaTxbx => properties.fmla_txbx = value.and_then(formula_value),
+        ScalarField::FmlaGroup => replace_shared_option(
+            &mut properties.fmla_group,
+            value.and_then(formula_value),
+            retained,
+            "form-control group-formula backing",
+        )?,
+        ScalarField::FmlaLink => replace_shared_option(
+            &mut properties.fmla_link,
+            value.and_then(formula_value),
+            retained,
+            "form-control link-formula backing",
+        )?,
+        ScalarField::FmlaRange => replace_shared_option(
+            &mut properties.fmla_range,
+            value.and_then(formula_value),
+            retained,
+            "form-control range-formula backing",
+        )?,
+        ScalarField::FmlaTxbx => replace_shared_option(
+            &mut properties.fmla_txbx,
+            value.and_then(formula_value),
+            retained,
+            "form-control textbox-formula backing",
+        )?,
         ScalarField::Horiz => properties.horiz = value.and_then(bool_value),
         ScalarField::Inc => properties.inc = value.and_then(unsigned_value),
         ScalarField::JustLastX => properties.just_last_x = value.and_then(bool_value),
         ScalarField::LockText => properties.lock_text = value.and_then(bool_value),
         ScalarField::Max => properties.max = value.and_then(unsigned_value),
         ScalarField::Min => properties.min = value.and_then(unsigned_value),
-        ScalarField::MultiSel => properties.multi_sel = value.and_then(string_value),
+        ScalarField::MultiSel => replace_shared_option(
+            &mut properties.multi_sel,
+            value.and_then(string_value),
+            retained,
+            "form-control multi-selection backing",
+        )?,
         ScalarField::NoThreeD => properties.no_three_d = value.and_then(bool_value),
         ScalarField::NoThreeD2 => properties.no_three_d2 = value.and_then(bool_value),
         ScalarField::Page => properties.page = value.and_then(unsigned_value),
         ScalarField::Sel => properties.sel = value.and_then(unsigned_value),
-        ScalarField::SelType => {
-            properties.seltype = value.and_then(|value| match value {
+        ScalarField::SelType => replace_shared_option(
+            &mut properties.seltype,
+            value.and_then(|value| match value {
                 ScalarValue::SelectionType(value) => Some(KnownOrUnknown::Known(value)),
                 _ => None,
-            })
-        },
-        ScalarField::TextHAlign => {
-            properties.text_h_align = value.and_then(|value| match value {
+            }),
+            retained,
+            "form-control selection-type backing",
+        )?,
+        ScalarField::TextHAlign => replace_shared_option(
+            &mut properties.text_h_align,
+            value.and_then(|value| match value {
                 ScalarValue::TextHAlign(value) => Some(KnownOrUnknown::Known(value)),
                 _ => None,
-            })
-        },
-        ScalarField::TextVAlign => {
-            properties.text_v_align = value.and_then(|value| match value {
+            }),
+            retained,
+            "form-control horizontal-alignment backing",
+        )?,
+        ScalarField::TextVAlign => replace_shared_option(
+            &mut properties.text_v_align,
+            value.and_then(|value| match value {
                 ScalarValue::TextVAlign(value) => Some(KnownOrUnknown::Known(value)),
                 _ => None,
-            })
-        },
+            }),
+            retained,
+            "form-control vertical-alignment backing",
+        )?,
         ScalarField::Val => properties.val = value.and_then(unsigned_value),
         ScalarField::WidthMin => properties.width_min = value.and_then(unsigned_value),
-        ScalarField::EditVal => {
-            properties.edit_val = value.and_then(|value| match value {
+        ScalarField::EditVal => replace_shared_option(
+            &mut properties.edit_val,
+            value.and_then(|value| match value {
                 ScalarValue::EditValidation(value) => Some(KnownOrUnknown::Known(value)),
                 _ => None,
-            })
-        },
+            }),
+            retained,
+            "form-control edit-validation backing",
+        )?,
         ScalarField::MultiLine => properties.multi_line = value.and_then(bool_value),
         ScalarField::VerticalBar => properties.vertical_bar = value.and_then(bool_value),
         ScalarField::PasswordEdit => properties.password_edit = value.and_then(bool_value),
@@ -4904,6 +5572,16 @@ fn escaped_length(value: &str, limits: Limits, resource: &'static str) -> Result
 
 #[cfg(test)]
 mod tests {
+    use std::num::{NonZeroU64, NonZeroUsize};
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource,
+        Limits as CoreLimits,
+    };
+    use litchi_opc::{OpcError, PackURI, ReadLimits, SourceBackedPackage};
+
     use super::*;
     use crate::form_control::{
         Checked, FormControlFormula, KnownOrUnknown, Limits, ObjectType, Properties, ScalarField,
@@ -4911,6 +5589,153 @@ mod tests {
     };
 
     const NS: &str = FORM_CONTROL_NAMESPACE;
+
+    fn managed_test_context() -> ExecutionContext {
+        let budget = Budget::root(
+            "form-control-source-payload-test",
+            CoreLimits::new(
+                64 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let (_cancel_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("one worker"),
+            NonZeroUsize::new(1).expect("one operation"),
+            NonZeroU64::new(64 * 1024 * 1024).expect("in-flight cap"),
+            0,
+        )
+        .expect("execution limits");
+        ExecutionContext::new(budget, cancellation, execution_limits)
+    }
+
+    fn semantic_test_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "form-control-semantic-budget-test",
+            CoreLimits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancel_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("one worker"),
+            NonZeroUsize::new(1).expect("one operation"),
+            NonZeroU64::new(memory.max(1)).expect("in-flight cap"),
+            0,
+        )
+        .expect("execution limits");
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        (budget, cancel_source, context)
+    }
+
+    #[test]
+    fn source_parse_context_charges_one_clone_shared_semantic_lease() {
+        let xml =
+            format!("<formControlPr xmlns=\"{NS}\" objectType=\"Button\" fmlaLink=\"#REF!\"/>")
+                .into_bytes();
+        let source = SourcePayload::Owned(Arc::new(xml.clone()));
+        let (budget, _cancel_source, context) = semantic_test_context(64 * 1024);
+        let properties =
+            parse_source_with_limits_and_context(source, &Limits::default(), Some(&context))
+                .expect("budgeted source parse");
+        let charged = budget.used(Resource::Memory);
+        assert!(charged > 0, "semantic parser allocations were not charged");
+        assert!(properties.retained_lease.is_some());
+        assert!(
+            charged
+                >= u64::try_from(PROPERTIES_STORAGE_BYTES + RETAINED_LEASE_STORAGE_BYTES)
+                    .expect("test storage bound")
+        );
+
+        let cloned = properties.clone();
+        drop(properties);
+        assert_eq!(budget.used(Resource::Memory), charged);
+        drop(cloned);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(
+            write(parse(&xml).expect("standalone parse")).expect("standalone write"),
+            xml
+        );
+    }
+
+    #[test]
+    fn source_parse_context_refuses_metadata_before_model_construction() {
+        let xml =
+            format!("<formControlPr xmlns=\"{NS}\" objectType=\"Button\" fmlaLink=\"#REF!\"/>");
+        let source = SourcePayload::Owned(Arc::new(xml.into_bytes()));
+        let (_budget, _cancel_source, context) = semantic_test_context(1);
+        let error =
+            parse_source_with_limits_and_context(source, &Limits::default(), Some(&context))
+                .expect_err("one-byte semantic budget must refuse parser metadata");
+        assert!(matches!(
+            error,
+            super::super::FormControlError::Execution(
+                ExecutionError::ResourceLimit(limit)
+            ) if limit.resource == Resource::Memory
+        ));
+    }
+
+    #[test]
+    fn source_parse_context_checks_cancellation_at_event_boundaries() {
+        let xml = format!("<formControlPr xmlns=\"{NS}\"/>").into_bytes();
+        let source = SourcePayload::Owned(Arc::new(xml));
+        let (_budget, cancel_source, context) = semantic_test_context(64 * 1024);
+        cancel_source.cancel();
+        let error =
+            parse_source_with_limits_and_context(source, &Limits::default(), Some(&context))
+                .expect_err("cancelled source parse");
+        assert!(matches!(
+            error,
+            super::super::FormControlError::Execution(ExecutionError::Cancelled)
+        ));
+    }
+
+    #[test]
+    fn managed_source_payload_keeps_reservation_and_exact_bytes_after_owner_drop() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
+            ReadLimits::default(),
+            managed_test_context(),
+        )
+        .expect("managed fixture package");
+        let context = package
+            .execution_context()
+            .expect("managed package execution context");
+        let (properties, expected) = {
+            let part = package
+                .part(&PackURI::new("/xl/ctrlProps/ctrlProp1.xml").expect("part URI"))
+                .expect("control properties part");
+            let data = part.data().expect("managed part data");
+            let expected = data.as_bytes().to_vec();
+            assert!(matches!(
+                data.into_arc(),
+                Err(OpcError::ManagedPartDataArcEscape)
+            ));
+
+            let properties = parse_source_with_limits_and_context(
+                SourcePayload::Managed(data.clone()),
+                &Limits::default(),
+                Some(&context),
+            )
+            .expect("managed source parse");
+            assert!(std::ptr::eq::<[u8]>(
+                properties.source_bytes().expect("retained source"),
+                data.as_bytes()
+            ));
+            (properties, expected)
+        };
+        drop(context);
+        drop(package);
+        assert_eq!(properties.source_bytes(), Some(expected.as_slice()));
+        assert_eq!(
+            write(&properties).expect("exact managed source write"),
+            expected
+        );
+    }
 
     #[test]
     fn native_fragment_is_exact_noop_and_exposes_defaults() {
@@ -4922,7 +5747,7 @@ mod tests {
             properties.object_type(),
             Some(&KnownOrUnknown::Known(ObjectType::CheckBox))
         );
-        assert_eq!(properties.effective_colored(), false);
+        assert!(!properties.effective_colored());
         assert_eq!(properties.effective_drop_lines(), 8);
         assert_eq!(
             properties.fmla_link().map(FormControlFormula::as_str),
@@ -4931,6 +5756,77 @@ mod tests {
         assert_eq!(
             write(&properties).expect("exact no-op write"),
             xml.as_bytes()
+        );
+    }
+
+    #[test]
+    fn source_payload_parse_shares_owned_allocation_and_survives_clone() {
+        let xml = format!(
+            "<x14:formControlPr xmlns:x14=\"{NS}\" xmlns:future=\"urn:future\"><x14:extLst><future:ext/></x14:extLst></x14:formControlPr>"
+        )
+        .into_bytes();
+        let source = SourcePayload::Owned(Arc::new(xml.clone()));
+        let properties =
+            parse_source_with_limits(source.clone(), &Limits::default()).expect("source parse");
+
+        let retained = properties.source_bytes().expect("retained source bytes");
+        assert!(std::ptr::eq::<[u8]>(retained, source.as_bytes()));
+        let extension = properties
+            .root_extension_list()
+            .expect("retained root extension");
+        let extension_start = xml
+            .windows(extension.xml().len())
+            .position(|window| window == extension.xml())
+            .expect("extension source range");
+        let retained_extension =
+            &retained[extension_start..extension_start + extension.xml().len()];
+        assert!(std::ptr::eq::<[u8]>(retained_extension, extension.xml()));
+        assert_eq!(write(&properties).expect("exact source write"), xml);
+
+        let cloned = properties.clone();
+        drop(properties);
+        assert_eq!(cloned.source_bytes(), Some(xml.as_slice()));
+        assert_eq!(write(&cloned).expect("clone source write"), xml);
+    }
+
+    #[test]
+    fn retained_vector_growth_accounts_actual_capacity_and_reallocation_peak() {
+        let mut values = Vec::<u8>::new();
+        let mut retained = RetainedBudget::new(64, None);
+        reserve_retained_slots(&mut values, 2, &mut retained, "test retained slots")
+            .expect("initial retained allocation");
+        values.resize(values.capacity(), 0);
+        let old_capacity = values.capacity();
+        let target = old_capacity
+            .max(1)
+            .checked_mul(2)
+            .expect("test capacity multiplication");
+        let old_used = retained.used;
+
+        retained.maximum = old_used + target - 1;
+        assert!(matches!(
+            reserve_retained_slots(&mut values, 1, &mut retained, "test retained slots"),
+            Err(super::super::FormControlError::Limit { .. })
+        ));
+        assert_eq!(values.capacity(), old_capacity);
+        assert_eq!(retained.used, old_used);
+
+        retained.maximum = usize::MAX;
+        reserve_retained_slots(&mut values, 1, &mut retained, "test retained slots")
+            .expect("reallocation after peak allowance");
+        assert!(values.capacity() > old_capacity);
+        assert_eq!(retained.used, values.capacity());
+    }
+
+    #[test]
+    fn standalone_parse_still_detaches_input_source() {
+        let xml = format!("<formControlPr xmlns=\"{NS}\" objectType=\"Button\"/>").into_bytes();
+        let properties = parse(&xml).expect("standalone parse");
+        let retained = properties.source_bytes().expect("retained source bytes");
+        assert!(!std::ptr::eq::<[u8]>(retained, xml.as_slice()));
+        assert_eq!(
+            write(&properties).expect("exact detached source write"),
+            xml
         );
     }
 
@@ -5138,7 +6034,7 @@ mod tests {
             source.as_bytes()
         );
 
-        let detached = (&*source_properties).clone();
+        let detached = (*source_properties).clone();
         assert!(write(&detached).is_err());
     }
 
@@ -5218,7 +6114,7 @@ mod tests {
         let xml = format!(
             r#"<formControlPr xmlns="{NS}" objectType="Drop"><itemLst extra="{value}"><item val="one"/></itemLst></formControlPr>"#
         );
-        let properties = parse(&xml.as_bytes()).expect("parse itemLst attribute");
+        let properties = parse(xml.as_bytes()).expect("parse itemLst attribute");
         let attributes = properties.item_list().unwrap().unknown_attributes();
         assert_eq!(attributes.len(), 1);
         assert_eq!(
@@ -5265,6 +6161,178 @@ mod tests {
             write(view.properties()).expect("borrowed exact write"),
             xml.as_bytes()
         );
+    }
+
+    #[test]
+    fn namespace_context_capacity_is_exact_at_parse_and_write_boundaries() {
+        let xml = format!(
+            r#"<x14:formControlPr xmlns:x14="{NS}" xmlns:root="urn:root" objectType="Drop"><x14:itemLst xmlns:item="urn:item"><x14:item val="one"/></x14:itemLst></x14:formControlPr>"#
+        );
+        let mut parse_low = 0usize;
+        let mut parse_high = Limits::default().max_retained_bytes();
+        while parse_low < parse_high {
+            let middle = parse_low + (parse_high - parse_low) / 2;
+            if parse_with_limits(
+                xml.as_bytes(),
+                &Limits::new().with_max_retained_bytes(middle),
+            )
+            .is_ok()
+            {
+                parse_high = middle;
+            } else {
+                parse_low = middle.saturating_add(1);
+            }
+        }
+        let parse_required = parse_low;
+        parse_with_limits(
+            xml.as_bytes(),
+            &Limits::new().with_max_retained_bytes(parse_required),
+        )
+        .expect("parse exact namespace retained boundary");
+        assert!(
+            parse_required == 0
+                || parse_with_limits(
+                    xml.as_bytes(),
+                    &Limits::new().with_max_retained_bytes(parse_required - 1),
+                )
+                .is_err()
+        );
+
+        let mut dirty = parse(xml.as_bytes()).expect("parse namespace context");
+        dirty.set_just_last_x(Some(true));
+        let mut write_low = 0usize;
+        let mut write_high = Limits::default().max_retained_bytes();
+        while write_low < write_high {
+            let middle = write_low + (write_high - write_low) / 2;
+            if write_with_limits(&dirty, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
+                write_high = middle;
+            } else {
+                write_low = middle.saturating_add(1);
+            }
+        }
+        let write_required = write_low;
+        write_with_limits(
+            &dirty,
+            &Limits::new().with_max_retained_bytes(write_required),
+        )
+        .expect("write exact namespace retained boundary");
+        assert!(
+            write_required == 0
+                || write_with_limits(
+                    &dirty,
+                    &Limits::new().with_max_retained_bytes(write_required - 1),
+                )
+                .is_err()
+        );
+        // Parsing briefly owns both the inherited-context additions and the
+        // merged context.  The writer sees only the final Arc-backed model,
+        // so its retained boundary can be lower while each boundary remains
+        // exact and independently enforced.
+        assert!(parse_required >= write_required);
+    }
+
+    #[test]
+    fn distinct_namespace_context_charges_one_arc_header_at_boundary() {
+        let root: Arc<[NamespaceBinding]> = Arc::from(vec![NamespaceBinding::new(
+            "root".to_owned(),
+            "urn:root".to_owned(),
+        )]);
+        let child: Arc<[NamespaceBinding]> = Arc::from(root.iter().cloned().collect::<Vec<_>>());
+
+        let mut root_context = Properties::new();
+        root_context.namespaces = Arc::clone(&root);
+        root_context
+            .item_list
+            .replace(Some(ItemList::from_parts_with_namespace(
+                Vec::new(),
+                None,
+                Arc::clone(&root),
+                Vec::new(),
+            )));
+        let mut child_context = Properties::new();
+        child_context.namespaces = Arc::clone(&root);
+        child_context
+            .item_list
+            .replace(Some(ItemList::from_parts_with_namespace(
+                Vec::new(),
+                None,
+                Arc::clone(&child),
+                Vec::new(),
+            )));
+
+        fn required(properties: &Properties) -> usize {
+            let mut low = 0usize;
+            let mut high = Limits::default().max_retained_bytes();
+            while low < high {
+                let middle = low + (high - low) / 2;
+                if properties
+                    .validate_retained_with_limits(Limits::new().with_max_retained_bytes(middle))
+                    .is_ok()
+                {
+                    high = middle;
+                } else {
+                    low = middle.saturating_add(1);
+                }
+            }
+            low
+        }
+
+        let root_required = required(&root_context);
+        let child_required = required(&child_context);
+        assert_eq!(
+            child_required - root_required,
+            size_of::<NamespaceBinding>() + ARC_HEADER_BYTES,
+            "a distinct child context owns its binding payload and one Arc header"
+        );
+        child_context
+            .validate_retained_with_limits(Limits::new().with_max_retained_bytes(child_required))
+            .expect("child namespace context at exact retained boundary");
+        assert!(child_required > 0);
+        assert!(
+            child_context
+                .validate_retained_with_limits(
+                    Limits::new().with_max_retained_bytes(child_required - 1),
+                )
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn namespace_arc_publication_counts_source_vec_peak() {
+        let mut measured = RetainedBudget::new(usize::MAX, None);
+        let mut measured_namespaces = Vec::new();
+        reserve_namespace_slots(
+            &mut measured_namespaces,
+            2,
+            &mut measured,
+            "test namespace storage",
+        )
+        .expect("reserve namespace source vector");
+        measured_namespaces.push(NamespaceBinding::new(String::new(), String::new()));
+        measured_namespaces.push(NamespaceBinding::new(String::new(), String::new()));
+        measured_namespaces.pop();
+        let temporary_storage = measured.namespace_temporary_used;
+        let final_storage = size_of::<NamespaceBinding>();
+        assert!(temporary_storage > final_storage);
+        let peak = measured.used + temporary_storage + final_storage;
+        drop(measured_namespaces);
+        drop(measured);
+
+        for (maximum, succeeds) in [(peak - 1, false), (peak, true)] {
+            let mut retained = RetainedBudget::new(maximum, None);
+            let mut namespaces = Vec::new();
+            reserve_namespace_slots(&mut namespaces, 2, &mut retained, "test namespace storage")
+                .expect("reserve bounded namespace source vector");
+            namespaces.push(NamespaceBinding::new(String::new(), String::new()));
+            namespaces.push(NamespaceBinding::new(String::new(), String::new()));
+            namespaces.pop();
+            let result = finish_root_namespace_context(&mut namespaces, &mut retained);
+            assert_eq!(result.is_ok(), succeeds);
+            if succeeds {
+                assert_eq!(retained.used, final_storage);
+                assert_eq!(retained.namespace_temporary_used, 0);
+            }
+        }
     }
 
     #[test]

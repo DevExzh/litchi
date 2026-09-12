@@ -2,12 +2,16 @@
 
 use std::fmt;
 use std::mem::size_of;
+use std::ops::Deref;
 use std::sync::Arc;
 
+use litchi_core::Reservation;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
 use quick_xml::name::{NamespaceResolver, ResolveResult};
 use quick_xml::reader::NsReader;
+
+use crate::source_payload::SourcePayload;
 
 use super::{
     MAX_FORMULA_BYTES, MAX_ITEM_VALUE_BYTES, MAX_OPAQUE_BYTES, MAX_RETAINED_BYTES, MAX_XML_DEPTH,
@@ -269,7 +273,7 @@ impl NamespaceBinding {
 /// Exact opaque XML retained for an admitted `extLst` subtree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OpaqueXml {
-    pub(crate) source: Arc<[u8]>,
+    pub(crate) source: SourcePayload,
     pub(crate) range: std::ops::Range<usize>,
     pub(crate) namespaces: Arc<[NamespaceBinding]>,
     pub(crate) diagnostic: bool,
@@ -277,7 +281,7 @@ pub struct OpaqueXml {
 
 impl OpaqueXml {
     pub(crate) fn from_range(
-        source: Arc<[u8]>,
+        source: SourcePayload,
         range: std::ops::Range<usize>,
         namespaces: Arc<[NamespaceBinding]>,
     ) -> Result<Self> {
@@ -293,7 +297,7 @@ impl OpaqueXml {
     }
 
     pub(crate) fn from_range_with_diagnostic(
-        source: Arc<[u8]>,
+        source: SourcePayload,
         range: std::ops::Range<usize>,
         namespaces: Arc<[NamespaceBinding]>,
         diagnostic: bool,
@@ -321,7 +325,7 @@ impl OpaqueXml {
         }
         validate_text_bytes(&xml, "opaque XML")?;
         validate_opaque_fragment(&xml)?;
-        let source: Arc<[u8]> = Arc::from(xml);
+        let source = SourcePayload::Owned(Arc::new(xml));
         let end = source.len();
         Ok(Self {
             source,
@@ -334,7 +338,7 @@ impl OpaqueXml {
     /// Borrow the exact opaque source bytes.
     #[must_use]
     pub fn xml(&self) -> &[u8] {
-        &self.source[self.range.clone()]
+        &self.source.as_bytes()[self.range.clone()]
     }
 
     /// Return namespace bindings captured from the owning root.
@@ -658,49 +662,153 @@ pub enum ScalarValue {
     String(String),
 }
 
+/// A clone-cheap optional value used by the source-backed leaf model.
+///
+/// The value allocation is immutable and replaced as a whole.  This keeps a
+/// cloned `Properties` snapshot from copying an existing string, item list, or
+/// opaque value when a caller edits the clone; only the newly supplied value is
+/// allocated.  The parser mutates its own handles while they are unique.
+#[derive(Clone, Debug)]
+pub(crate) struct SharedOption<T>(Option<Arc<T>>);
+
+impl<T> SharedOption<T> {
+    fn new(value: Option<T>) -> Self {
+        Self(value.map(Arc::new))
+    }
+
+    pub(crate) fn as_ref(&self) -> Option<&T> {
+        self.0.as_deref()
+    }
+
+    pub(crate) fn as_deref(&self) -> Option<&T::Target>
+    where
+        T: Deref,
+    {
+        self.0.as_deref().map(Deref::deref)
+    }
+
+    pub(crate) fn is_some(&self) -> bool {
+        self.0.is_some()
+    }
+
+    pub(crate) fn cloned(&self) -> Option<T>
+    where
+        T: Clone,
+    {
+        self.as_ref().cloned()
+    }
+
+    pub(crate) fn replace(&mut self, value: Option<T>) {
+        self.0 = value.map(Arc::new);
+    }
+}
+
+impl<T: PartialEq> PartialEq<Option<T>> for SharedOption<T> {
+    fn eq(&self, other: &Option<T>) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+
+/// A clone-cheap immutable vector handle used for parser-owned collections.
+#[derive(Clone, Debug)]
+pub(crate) struct SharedVec<T>(Arc<Vec<T>>);
+
+impl<T> SharedVec<T> {
+    fn new(value: Vec<T>) -> Self {
+        Self(Arc::new(value))
+    }
+
+    pub(crate) fn as_slice(&self) -> &[T] {
+        self.0.as_slice()
+    }
+
+    /// Replace the vector contents, reusing the existing unique `Arc` when
+    /// possible.  The parser constructs its `Properties` value privately, so
+    /// its backing handles are unique while it is assembling the model.  A
+    /// shared handle can still be replaced by allocating a fresh backing; the
+    /// caller can inspect `is_unique` first and precharge that allocation.
+    pub(crate) fn replace(&mut self, value: Vec<T>) {
+        if let Some(current) = Arc::get_mut(&mut self.0) {
+            *current = value;
+        } else {
+            self.0 = Arc::new(value);
+        }
+    }
+
+    pub(crate) fn is_unique(&self) -> bool {
+        Arc::strong_count(&self.0) == 1
+    }
+
+    pub(crate) fn as_mut_vec(&mut self) -> &mut Vec<T>
+    where
+        T: Clone,
+    {
+        Arc::make_mut(&mut self.0)
+    }
+}
+
+impl<T> Deref for SharedVec<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// Detached form-control property model.
 #[derive(Clone, Debug)]
 pub struct Properties {
-    pub(crate) object_type: Option<KnownOrUnknown<ObjectType>>,
-    pub(crate) checked: Option<KnownOrUnknown<Checked>>,
+    pub(crate) object_type: SharedOption<KnownOrUnknown<ObjectType>>,
+    pub(crate) checked: SharedOption<KnownOrUnknown<Checked>>,
     pub(crate) colored: Option<bool>,
     pub(crate) drop_lines: Option<u32>,
-    pub(crate) drop_style: Option<KnownOrUnknown<DropStyle>>,
+    pub(crate) drop_style: SharedOption<KnownOrUnknown<DropStyle>>,
     pub(crate) dx: Option<u32>,
     pub(crate) first_button: Option<bool>,
-    pub(crate) fmla_group: Option<FormControlFormula>,
-    pub(crate) fmla_link: Option<FormControlFormula>,
-    pub(crate) fmla_range: Option<FormControlFormula>,
-    pub(crate) fmla_txbx: Option<FormControlFormula>,
+    pub(crate) fmla_group: SharedOption<FormControlFormula>,
+    pub(crate) fmla_link: SharedOption<FormControlFormula>,
+    pub(crate) fmla_range: SharedOption<FormControlFormula>,
+    pub(crate) fmla_txbx: SharedOption<FormControlFormula>,
     pub(crate) horiz: Option<bool>,
     pub(crate) inc: Option<u32>,
     pub(crate) just_last_x: Option<bool>,
     pub(crate) lock_text: Option<bool>,
     pub(crate) max: Option<u32>,
     pub(crate) min: Option<u32>,
-    pub(crate) multi_sel: Option<String>,
+    pub(crate) multi_sel: SharedOption<String>,
     pub(crate) no_three_d: Option<bool>,
     pub(crate) no_three_d2: Option<bool>,
     pub(crate) page: Option<u32>,
     pub(crate) sel: Option<u32>,
-    pub(crate) seltype: Option<KnownOrUnknown<SelectionType>>,
-    pub(crate) text_h_align: Option<KnownOrUnknown<TextHAlign>>,
-    pub(crate) text_v_align: Option<KnownOrUnknown<TextVAlign>>,
+    pub(crate) seltype: SharedOption<KnownOrUnknown<SelectionType>>,
+    pub(crate) text_h_align: SharedOption<KnownOrUnknown<TextHAlign>>,
+    pub(crate) text_v_align: SharedOption<KnownOrUnknown<TextVAlign>>,
     pub(crate) val: Option<u32>,
     pub(crate) width_min: Option<u32>,
-    pub(crate) edit_val: Option<KnownOrUnknown<EditValidation>>,
+    pub(crate) edit_val: SharedOption<KnownOrUnknown<EditValidation>>,
     pub(crate) multi_line: Option<bool>,
     pub(crate) vertical_bar: Option<bool>,
     pub(crate) password_edit: Option<bool>,
-    pub(crate) item_list: Option<ItemList>,
-    pub(crate) root_extension_list: Option<OpaqueXml>,
-    pub(crate) unknown_attributes: Vec<OpaqueAttribute>,
+    pub(crate) item_list: SharedOption<ItemList>,
+    pub(crate) root_extension_list: SharedOption<OpaqueXml>,
+    pub(crate) unknown_attributes: SharedVec<OpaqueAttribute>,
     pub(crate) namespaces: Arc<[NamespaceBinding]>,
-    pub(crate) lexical_attributes: Vec<LexicalAttribute>,
-    pub(crate) source: Option<Arc<[u8]>>,
+    pub(crate) lexical_attributes: SharedVec<LexicalAttribute>,
+    pub(crate) source: Option<SourcePayload>,
+    pub(crate) retained_lease: Option<Arc<Reservation>>,
     pub(crate) source_dirty: bool,
     pub(crate) source_diagnostics: bool,
 }
+
+/// Conservative fixed storage bound for one retained `Properties` value.
+/// The individual shared value/vector allocations are charged when created;
+/// this covers the model's fixed handles and its owner-side `Arc` header.
+pub(crate) const PROPERTIES_STORAGE_BYTES: usize = size_of::<Properties>() + 2 * size_of::<usize>();
+
+const SHARED_ARC_HEADER_BYTES: usize = 2 * size_of::<usize>();
+pub(crate) const SHARED_VEC_STORAGE_BYTES: usize = SHARED_ARC_HEADER_BYTES + size_of::<Vec<()>>();
+pub(crate) const RETAINED_LEASE_STORAGE_BYTES: usize =
+    SHARED_ARC_HEADER_BYTES + size_of::<Reservation>();
 
 /// One recognized attribute's original lexical token.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -767,43 +875,44 @@ impl Properties {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            object_type: None,
-            checked: None,
+            object_type: SharedOption::new(None),
+            checked: SharedOption::new(None),
             colored: None,
             drop_lines: None,
-            drop_style: None,
+            drop_style: SharedOption::new(None),
             dx: None,
             first_button: None,
-            fmla_group: None,
-            fmla_link: None,
-            fmla_range: None,
-            fmla_txbx: None,
+            fmla_group: SharedOption::new(None),
+            fmla_link: SharedOption::new(None),
+            fmla_range: SharedOption::new(None),
+            fmla_txbx: SharedOption::new(None),
             horiz: None,
             inc: None,
             just_last_x: None,
             lock_text: None,
             max: None,
             min: None,
-            multi_sel: None,
+            multi_sel: SharedOption::new(None),
             no_three_d: None,
             no_three_d2: None,
             page: None,
             sel: None,
-            seltype: None,
-            text_h_align: None,
-            text_v_align: None,
+            seltype: SharedOption::new(None),
+            text_h_align: SharedOption::new(None),
+            text_v_align: SharedOption::new(None),
             val: None,
             width_min: None,
-            edit_val: None,
+            edit_val: SharedOption::new(None),
             multi_line: None,
             vertical_bar: None,
             password_edit: None,
-            item_list: None,
-            root_extension_list: None,
-            unknown_attributes: Vec::new(),
+            item_list: SharedOption::new(None),
+            root_extension_list: SharedOption::new(None),
+            unknown_attributes: SharedVec::new(Vec::new()),
             namespaces: Arc::from([]),
-            lexical_attributes: Vec::new(),
+            lexical_attributes: SharedVec::new(Vec::new()),
             source: None,
+            retained_lease: None,
             source_dirty: false,
             source_diagnostics: false,
         }
@@ -812,18 +921,18 @@ impl Properties {
     /// Return the exact source bytes when this model came from a part.
     #[must_use]
     pub fn source_bytes(&self) -> Option<&[u8]> {
-        self.source.as_deref()
+        self.source.as_ref().map(SourcePayload::as_bytes)
     }
 
     /// Return the optional object type, including an unknown source token.
     #[must_use]
-    pub const fn object_type(&self) -> Option<&KnownOrUnknown<ObjectType>> {
+    pub fn object_type(&self) -> Option<&KnownOrUnknown<ObjectType>> {
         self.object_type.as_ref()
     }
 
     /// Return the optional checked state, including an unknown source token.
     #[must_use]
-    pub const fn checked(&self) -> Option<&KnownOrUnknown<Checked>> {
+    pub fn checked(&self) -> Option<&KnownOrUnknown<Checked>> {
         self.checked.as_ref()
     }
 
@@ -853,7 +962,7 @@ impl Properties {
 
     /// Return the optional drop style.
     #[must_use]
-    pub const fn drop_style(&self) -> Option<&KnownOrUnknown<DropStyle>> {
+    pub fn drop_style(&self) -> Option<&KnownOrUnknown<DropStyle>> {
         self.drop_style.as_ref()
     }
 
@@ -883,25 +992,25 @@ impl Properties {
 
     /// Return the formula linking a group box.
     #[must_use]
-    pub const fn fmla_group(&self) -> Option<&FormControlFormula> {
+    pub fn fmla_group(&self) -> Option<&FormControlFormula> {
         self.fmla_group.as_ref()
     }
 
     /// Return the formula linking a control.
     #[must_use]
-    pub const fn fmla_link(&self) -> Option<&FormControlFormula> {
+    pub fn fmla_link(&self) -> Option<&FormControlFormula> {
         self.fmla_link.as_ref()
     }
 
     /// Return the list/drop-down source range formula.
     #[must_use]
-    pub const fn fmla_range(&self) -> Option<&FormControlFormula> {
+    pub fn fmla_range(&self) -> Option<&FormControlFormula> {
         self.fmla_range.as_ref()
     }
 
     /// Return the label/edit-box source formula.
     #[must_use]
-    pub const fn fmla_txbx(&self) -> Option<&FormControlFormula> {
+    pub fn fmla_txbx(&self) -> Option<&FormControlFormula> {
         self.fmla_txbx.as_ref()
     }
 
@@ -1015,7 +1124,7 @@ impl Properties {
 
     /// Return the optional selection type.
     #[must_use]
-    pub const fn seltype(&self) -> Option<&KnownOrUnknown<SelectionType>> {
+    pub fn seltype(&self) -> Option<&KnownOrUnknown<SelectionType>> {
         self.seltype.as_ref()
     }
 
@@ -1023,7 +1132,7 @@ impl Properties {
     #[must_use]
     pub fn effective_seltype(&self) -> KnownOrUnknown<SelectionType> {
         self.seltype
-            .clone()
+            .cloned()
             .unwrap_or(KnownOrUnknown::Known(SelectionType::Single))
     }
 
@@ -1035,7 +1144,7 @@ impl Properties {
 
     /// Return the optional horizontal alignment.
     #[must_use]
-    pub const fn text_h_align(&self) -> Option<&KnownOrUnknown<TextHAlign>> {
+    pub fn text_h_align(&self) -> Option<&KnownOrUnknown<TextHAlign>> {
         self.text_h_align.as_ref()
     }
 
@@ -1043,13 +1152,13 @@ impl Properties {
     #[must_use]
     pub fn effective_text_h_align(&self) -> KnownOrUnknown<TextHAlign> {
         self.text_h_align
-            .clone()
+            .cloned()
             .unwrap_or(KnownOrUnknown::Known(TextHAlign::Left))
     }
 
     /// Return the optional vertical alignment.
     #[must_use]
-    pub const fn text_v_align(&self) -> Option<&KnownOrUnknown<TextVAlign>> {
+    pub fn text_v_align(&self) -> Option<&KnownOrUnknown<TextVAlign>> {
         self.text_v_align.as_ref()
     }
 
@@ -1057,7 +1166,7 @@ impl Properties {
     #[must_use]
     pub fn effective_text_v_align(&self) -> KnownOrUnknown<TextVAlign> {
         self.text_v_align
-            .clone()
+            .cloned()
             .unwrap_or(KnownOrUnknown::Known(TextVAlign::Top))
     }
 
@@ -1081,7 +1190,7 @@ impl Properties {
 
     /// Return the optional edit validation mode.
     #[must_use]
-    pub const fn edit_val(&self) -> Option<&KnownOrUnknown<EditValidation>> {
+    pub fn edit_val(&self) -> Option<&KnownOrUnknown<EditValidation>> {
         self.edit_val.as_ref()
     }
 
@@ -1089,7 +1198,7 @@ impl Properties {
     #[must_use]
     pub fn effective_edit_val(&self) -> KnownOrUnknown<EditValidation> {
         self.edit_val
-            .clone()
+            .cloned()
             .unwrap_or(KnownOrUnknown::Known(EditValidation::Text))
     }
 
@@ -1131,20 +1240,20 @@ impl Properties {
 
     /// Return the optional ordered item list.
     #[must_use]
-    pub const fn item_list(&self) -> Option<&ItemList> {
+    pub fn item_list(&self) -> Option<&ItemList> {
         self.item_list.as_ref()
     }
 
     /// Return the root opaque extension list.
     #[must_use]
-    pub const fn root_extension_list(&self) -> Option<&OpaqueXml> {
+    pub fn root_extension_list(&self) -> Option<&OpaqueXml> {
         self.root_extension_list.as_ref()
     }
 
     /// Return unknown root attributes.
     #[must_use]
     pub fn unknown_attributes(&self) -> &[OpaqueAttribute] {
-        &self.unknown_attributes
+        self.unknown_attributes.as_slice()
     }
 
     /// Return the root namespace context retained for detached writing.
@@ -1156,18 +1265,18 @@ impl Properties {
     /// Set an optional known object type.
     pub fn set_object_type(&mut self, value: Option<ObjectType>) {
         let value = value.map(KnownOrUnknown::Known);
-        if self.object_type != value {
+        if self.object_type.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.object_type = value;
+            self.object_type.replace(value);
         }
     }
 
     /// Set an optional known checked state.
     pub fn set_checked(&mut self, value: Option<Checked>) {
         let value = value.map(KnownOrUnknown::Known);
-        if self.checked != value {
+        if self.checked.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.checked = value;
+            self.checked.replace(value);
         }
     }
 
@@ -1189,9 +1298,9 @@ impl Properties {
 
     pub fn set_drop_style(&mut self, value: Option<DropStyle>) {
         let value = value.map(KnownOrUnknown::Known);
-        if self.drop_style != value {
+        if self.drop_style.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.drop_style = value;
+            self.drop_style.replace(value);
         }
     }
 
@@ -1210,30 +1319,30 @@ impl Properties {
     }
 
     pub fn set_fmla_group(&mut self, value: Option<FormControlFormula>) {
-        if self.fmla_group != value {
+        if self.fmla_group.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.fmla_group = value;
+            self.fmla_group.replace(value);
         }
     }
 
     pub fn set_fmla_link(&mut self, value: Option<FormControlFormula>) {
-        if self.fmla_link != value {
+        if self.fmla_link.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.fmla_link = value;
+            self.fmla_link.replace(value);
         }
     }
 
     pub fn set_fmla_range(&mut self, value: Option<FormControlFormula>) {
-        if self.fmla_range != value {
+        if self.fmla_range.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.fmla_range = value;
+            self.fmla_range.replace(value);
         }
     }
 
     pub fn set_fmla_txbx(&mut self, value: Option<FormControlFormula>) {
-        if self.fmla_txbx != value {
+        if self.fmla_txbx.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.fmla_txbx = value;
+            self.fmla_txbx.replace(value);
         }
     }
 
@@ -1296,9 +1405,9 @@ impl Properties {
             }
             validate_multi_selection(value)?;
         }
-        if self.multi_sel != value {
+        if self.multi_sel.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.multi_sel = value;
+            self.multi_sel.replace(value);
         }
         Ok(())
     }
@@ -1335,25 +1444,25 @@ impl Properties {
 
     pub fn set_seltype(&mut self, value: Option<SelectionType>) {
         let value = value.map(KnownOrUnknown::Known);
-        if self.seltype != value {
+        if self.seltype.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.seltype = value;
+            self.seltype.replace(value);
         }
     }
 
     pub fn set_text_h_align(&mut self, value: Option<TextHAlign>) {
         let value = value.map(KnownOrUnknown::Known);
-        if self.text_h_align != value {
+        if self.text_h_align.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.text_h_align = value;
+            self.text_h_align.replace(value);
         }
     }
 
     pub fn set_text_v_align(&mut self, value: Option<TextVAlign>) {
         let value = value.map(KnownOrUnknown::Known);
-        if self.text_v_align != value {
+        if self.text_v_align.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.text_v_align = value;
+            self.text_v_align.replace(value);
         }
     }
 
@@ -1373,9 +1482,9 @@ impl Properties {
 
     pub fn set_edit_val(&mut self, value: Option<EditValidation>) {
         let value = value.map(KnownOrUnknown::Known);
-        if self.edit_val != value {
+        if self.edit_val.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.edit_val = value;
+            self.edit_val.replace(value);
         }
     }
 
@@ -1405,18 +1514,18 @@ impl Properties {
         if let Some(value) = value.as_ref() {
             check_item_list(value, super::Limits::default())?;
         }
-        if self.item_list != value {
+        if self.item_list.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.item_list = value;
+            self.item_list.replace(value);
         }
         Ok(())
     }
 
     /// Set the root opaque extension list.
     pub fn set_root_extension_list(&mut self, value: Option<OpaqueXml>) {
-        if self.root_extension_list != value {
+        if self.root_extension_list.as_ref() != value.as_ref() {
             self.mark_changed();
-            self.root_extension_list = value;
+            self.root_extension_list.replace(value);
         }
     }
 
@@ -1439,17 +1548,17 @@ impl Properties {
             }),
             ScalarField::Dx => self.dx.map(ScalarValue::Unsigned),
             ScalarField::FirstButton => self.first_button.map(ScalarValue::Boolean),
-            ScalarField::FmlaGroup => self.fmla_group.clone().map(ScalarValue::Formula),
-            ScalarField::FmlaLink => self.fmla_link.clone().map(ScalarValue::Formula),
-            ScalarField::FmlaRange => self.fmla_range.clone().map(ScalarValue::Formula),
-            ScalarField::FmlaTxbx => self.fmla_txbx.clone().map(ScalarValue::Formula),
+            ScalarField::FmlaGroup => self.fmla_group.cloned().map(ScalarValue::Formula),
+            ScalarField::FmlaLink => self.fmla_link.cloned().map(ScalarValue::Formula),
+            ScalarField::FmlaRange => self.fmla_range.cloned().map(ScalarValue::Formula),
+            ScalarField::FmlaTxbx => self.fmla_txbx.cloned().map(ScalarValue::Formula),
             ScalarField::Horiz => self.horiz.map(ScalarValue::Boolean),
             ScalarField::Inc => self.inc.map(ScalarValue::Unsigned),
             ScalarField::JustLastX => self.just_last_x.map(ScalarValue::Boolean),
             ScalarField::LockText => self.lock_text.map(ScalarValue::Boolean),
             ScalarField::Max => self.max.map(ScalarValue::Unsigned),
             ScalarField::Min => self.min.map(ScalarValue::Unsigned),
-            ScalarField::MultiSel => self.multi_sel.clone().map(ScalarValue::String),
+            ScalarField::MultiSel => self.multi_sel.cloned().map(ScalarValue::String),
             ScalarField::NoThreeD => self.no_three_d.map(ScalarValue::Boolean),
             ScalarField::NoThreeD2 => self.no_three_d2.map(ScalarValue::Boolean),
             ScalarField::Page => self.page.map(ScalarValue::Unsigned),
@@ -1480,40 +1589,40 @@ impl Properties {
 
     pub(crate) fn semantic_state(&self) -> SemanticState {
         SemanticState {
-            object_type: self.object_type.clone(),
-            checked: self.checked.clone(),
+            object_type: self.object_type.cloned(),
+            checked: self.checked.cloned(),
             colored: self.colored,
             drop_lines: self.drop_lines,
-            drop_style: self.drop_style.clone(),
+            drop_style: self.drop_style.cloned(),
             dx: self.dx,
             first_button: self.first_button,
-            fmla_group: self.fmla_group.clone(),
-            fmla_link: self.fmla_link.clone(),
-            fmla_range: self.fmla_range.clone(),
-            fmla_txbx: self.fmla_txbx.clone(),
+            fmla_group: self.fmla_group.cloned(),
+            fmla_link: self.fmla_link.cloned(),
+            fmla_range: self.fmla_range.cloned(),
+            fmla_txbx: self.fmla_txbx.cloned(),
             horiz: self.horiz,
             inc: self.inc,
             just_last_x: self.just_last_x,
             lock_text: self.lock_text,
             max: self.max,
             min: self.min,
-            multi_sel: self.multi_sel.clone(),
+            multi_sel: self.multi_sel.cloned(),
             no_three_d: self.no_three_d,
             no_three_d2: self.no_three_d2,
             page: self.page,
             sel: self.sel,
-            seltype: self.seltype.clone(),
-            text_h_align: self.text_h_align.clone(),
-            text_v_align: self.text_v_align.clone(),
+            seltype: self.seltype.cloned(),
+            text_h_align: self.text_h_align.cloned(),
+            text_v_align: self.text_v_align.cloned(),
             val: self.val,
             width_min: self.width_min,
-            edit_val: self.edit_val.clone(),
+            edit_val: self.edit_val.cloned(),
             multi_line: self.multi_line,
             vertical_bar: self.vertical_bar,
             password_edit: self.password_edit,
-            item_list: self.item_list.clone(),
-            root_extension_list: self.root_extension_list.clone(),
-            unknown_attributes: self.unknown_attributes.clone(),
+            item_list: self.item_list.cloned(),
+            root_extension_list: self.root_extension_list.cloned(),
+            unknown_attributes: self.unknown_attributes.as_slice().to_vec(),
         }
     }
 
@@ -1523,26 +1632,23 @@ impl Properties {
 
     pub(crate) fn mark_source(
         &mut self,
-        source: Arc<[u8]>,
+        source: SourcePayload,
         namespaces: Arc<[NamespaceBinding]>,
-        lexical_attributes: Vec<LexicalAttribute>,
     ) {
         self.namespaces = namespaces;
-        self.lexical_attributes = lexical_attributes;
         self.source = Some(source);
         self.source_dirty = false;
         self.source_diagnostics = true;
     }
 
-    pub(crate) fn mark_metadata(
-        &mut self,
-        namespaces: Arc<[NamespaceBinding]>,
-        lexical_attributes: Vec<LexicalAttribute>,
-    ) {
+    pub(crate) fn mark_metadata(&mut self, namespaces: Arc<[NamespaceBinding]>) {
         self.namespaces = namespaces;
-        self.lexical_attributes = lexical_attributes;
         self.source_dirty = false;
         self.source_diagnostics = true;
+    }
+
+    pub(crate) fn mark_retained_lease(&mut self, lease: Option<Arc<Reservation>>) {
+        self.retained_lease = lease;
     }
 
     pub(crate) fn mark_changed(&mut self) {
@@ -1587,7 +1693,7 @@ impl Properties {
             }
         }
         let mut opaque = 0usize;
-        for attribute in &self.unknown_attributes {
+        for attribute in self.unknown_attributes.as_slice() {
             opaque = opaque
                 .checked_add(attribute.lexical.len())
                 .ok_or_else(|| invalid("unknown form-control attribute bytes overflow"))?;
@@ -1659,22 +1765,43 @@ impl Properties {
 
     pub(crate) fn validate_retained_with_limits(&self, limits: super::Limits) -> Result<()> {
         let mut retained = 0usize;
+        add_retained(&mut retained, PROPERTIES_STORAGE_BYTES, limits)?;
+        add_retained(&mut retained, 2 * SHARED_VEC_STORAGE_BYTES, limits)?;
+        add_shared_option_storage(&mut retained, &self.object_type, limits)?;
+        add_shared_option_storage(&mut retained, &self.checked, limits)?;
+        add_shared_option_storage(&mut retained, &self.drop_style, limits)?;
+        add_shared_option_storage(&mut retained, &self.fmla_group, limits)?;
+        add_shared_option_storage(&mut retained, &self.fmla_link, limits)?;
+        add_shared_option_storage(&mut retained, &self.fmla_range, limits)?;
+        add_shared_option_storage(&mut retained, &self.fmla_txbx, limits)?;
+        add_shared_option_storage(&mut retained, &self.multi_sel, limits)?;
+        add_shared_option_storage(&mut retained, &self.seltype, limits)?;
+        add_shared_option_storage(&mut retained, &self.text_h_align, limits)?;
+        add_shared_option_storage(&mut retained, &self.text_v_align, limits)?;
+        add_shared_option_storage(&mut retained, &self.edit_val, limits)?;
+        add_shared_option_storage(&mut retained, &self.item_list, limits)?;
+        add_shared_option_storage(&mut retained, &self.root_extension_list, limits)?;
+        if self.retained_lease.is_some() {
+            add_retained(&mut retained, RETAINED_LEASE_STORAGE_BYTES, limits)?;
+        }
         add_retained(
             &mut retained,
             self.source.as_ref().map_or(0, |source| source.len()),
             limits,
         )?;
-        add_namespace_arc_storage(&mut retained, &self.namespaces, limits)?;
+        // The root namespace Arc header is covered by the fixed Properties
+        // storage charge; distinct child contexts carry their own headers.
+        add_namespace_arc_storage(&mut retained, &self.namespaces, limits, false)?;
         for binding in &*self.namespaces {
             add_retained(&mut retained, binding.prefix.len(), limits)?;
             add_retained(&mut retained, binding.uri.len(), limits)?;
         }
-        for attribute in &self.lexical_attributes {
+        for attribute in self.lexical_attributes.as_slice() {
             add_retained(&mut retained, attribute.name.len(), limits)?;
             add_retained(&mut retained, attribute.raw_value.len(), limits)?;
             add_retained(&mut retained, attribute.decoded_value.len(), limits)?;
         }
-        for attribute in &self.unknown_attributes {
+        for attribute in self.unknown_attributes.as_slice() {
             add_retained(&mut retained, attribute.name.len(), limits)?;
             add_retained(&mut retained, attribute.lexical.len(), limits)?;
         }
@@ -1858,7 +1985,10 @@ impl Properties {
         let checked_mixed = if field == ScalarField::Checked {
             matches!(value, Some(ScalarValue::Checked(Checked::Mixed)))
         } else {
-            matches!(self.checked, Some(KnownOrUnknown::Known(Checked::Mixed)))
+            matches!(
+                self.checked.as_ref(),
+                Some(KnownOrUnknown::Known(Checked::Mixed))
+            )
         };
         if checked_mixed && object_type != ObjectType::CheckBox {
             return Err(invalid("checked=Mixed applies only to CheckBox controls"));
@@ -1875,7 +2005,7 @@ impl Properties {
             )
         } else {
             matches!(
-                self.seltype,
+                self.seltype.as_ref(),
                 Some(KnownOrUnknown::Known(SelectionType::Multi))
             )
         };
@@ -1999,6 +2129,23 @@ fn add_retained(total: &mut usize, amount: usize, limits: super::Limits) -> Resu
     Ok(())
 }
 
+fn add_shared_option_storage<T>(
+    total: &mut usize,
+    value: &SharedOption<T>,
+    limits: super::Limits,
+) -> Result<()> {
+    if value.is_some() {
+        add_retained(
+            total,
+            SHARED_ARC_HEADER_BYTES
+                .checked_add(size_of::<T>())
+                .ok_or_else(|| invalid("form-control shared option storage overflow"))?,
+            limits,
+        )?;
+    }
+    Ok(())
+}
+
 fn add_retained_capacity(
     total: &mut usize,
     capacity: usize,
@@ -2019,13 +2166,21 @@ fn add_namespace_arc_storage(
     total: &mut usize,
     context: &[NamespaceBinding],
     limits: super::Limits,
+    include_header: bool,
 ) -> Result<()> {
     if context.is_empty() {
         return Ok(());
     }
-    let bytes = context
+    let payload = context
         .len()
         .checked_mul(size_of::<NamespaceBinding>())
+        .ok_or_else(|| invalid("form-control namespace Arc storage overflow"))?;
+    let bytes = payload
+        .checked_add(if include_header {
+            SHARED_ARC_HEADER_BYTES
+        } else {
+            0
+        })
         .ok_or_else(|| invalid("form-control namespace Arc storage overflow"))?;
     add_retained(total, bytes, limits)
 }
@@ -2048,7 +2203,7 @@ fn add_namespace_context(
     limits: super::Limits,
 ) -> Result<()> {
     if !context.is_empty() && context.as_ptr() != root.as_ptr() {
-        add_namespace_arc_storage(total, context, limits)?;
+        add_namespace_arc_storage(total, context, limits, true)?;
     }
     for binding in context {
         if root.iter().any(|value| {
@@ -2065,7 +2220,7 @@ fn add_namespace_context(
 fn add_opaque_retained(
     total: &mut usize,
     value: &OpaqueXml,
-    source: Option<&Arc<[u8]>>,
+    source: Option<&SourcePayload>,
     limits: super::Limits,
 ) -> Result<()> {
     if value.byte_len() > limits.max_opaque_bytes() {
@@ -2075,8 +2230,13 @@ fn add_opaque_retained(
             limits.max_opaque_bytes(),
         ));
     }
-    let shares_source =
-        source.is_some_and(|source| std::ptr::eq(Arc::as_ptr(source), Arc::as_ptr(&value.source)));
+    // `OpaqueXml` retains a clone of the same `SourcePayload` as the model.
+    // SourcePayload intentionally keeps managed PartData opaque, so compare
+    // the borrowed slice identity instead of attempting an Arc escape.  The
+    // full source slice is used for both values, making this allocation test
+    // independent of the retained opaque range.
+    let shares_source = source
+        .is_some_and(|source| std::ptr::eq::<[u8]>(source.as_bytes(), value.source.as_bytes()));
     if !shares_source {
         add_retained(total, value.byte_len(), limits)?;
     }
@@ -2790,14 +2950,16 @@ fn validate_applicability(value: &Properties, object_type: ObjectType) -> Result
     if value.item_list.is_some() && !matches!(object_type, ObjectType::List | ObjectType::Drop) {
         return Err(invalid("itemLst applies only to List and Drop controls"));
     }
-    if matches!(value.checked, Some(KnownOrUnknown::Known(Checked::Mixed)))
-        && object_type != ObjectType::CheckBox
+    if matches!(
+        value.checked.as_ref(),
+        Some(KnownOrUnknown::Known(Checked::Mixed))
+    ) && object_type != ObjectType::CheckBox
     {
         return Err(invalid("checked=Mixed applies only to CheckBox controls"));
     }
     if value.multi_sel.is_some()
         && !matches!(
-            value.seltype,
+            value.seltype.as_ref(),
             Some(KnownOrUnknown::Known(SelectionType::Multi))
         )
     {
@@ -2811,4 +2973,61 @@ fn validate_applicability(value: &Properties, object_type: ObjectType) -> Result
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn properties_clone_shares_backing_until_mutation() {
+        let mut original = Properties::new();
+        original.set_colored(Some(true));
+        original.set_object_type(Some(ObjectType::Button));
+        let clone = original.clone();
+        assert!(Arc::ptr_eq(
+            original
+                .object_type
+                .0
+                .as_ref()
+                .expect("original object type"),
+            clone.object_type.0.as_ref().expect("cloned object type")
+        ));
+
+        let mut changed = clone;
+        changed.set_object_type(Some(ObjectType::CheckBox));
+        assert!(!Arc::ptr_eq(
+            original
+                .object_type
+                .0
+                .as_ref()
+                .expect("original object type"),
+            changed.object_type.0.as_ref().expect("changed object type")
+        ));
+        assert_eq!(original.colored(), Some(true));
+        assert_eq!(
+            original.object_type(),
+            Some(&KnownOrUnknown::Known(ObjectType::Button))
+        );
+        assert_eq!(
+            changed.object_type(),
+            Some(&KnownOrUnknown::Known(ObjectType::CheckBox))
+        );
+    }
+
+    #[test]
+    fn shared_vec_replacement_reuses_unique_backing() {
+        let mut values = SharedVec::new(Vec::<u8>::new());
+        let original = Arc::as_ptr(&values.0);
+        values.replace(vec![1, 2, 3]);
+        assert!(std::ptr::eq(original, Arc::as_ptr(&values.0)));
+        assert_eq!(values.as_slice(), &[1, 2, 3]);
+
+        let mut shared = values.clone();
+        let shared_original = Arc::as_ptr(&shared.0);
+        shared.replace(vec![4]);
+        assert!(!std::ptr::eq(shared_original, Arc::as_ptr(&shared.0)));
+        assert_eq!(values.as_slice(), &[1, 2, 3]);
+        assert_eq!(shared.as_slice(), &[4]);
+    }
 }
