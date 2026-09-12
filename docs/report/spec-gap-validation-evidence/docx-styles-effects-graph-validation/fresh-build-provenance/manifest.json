@@ -1,0 +1,70 @@
+{
+  "README.md": {
+    "bytes": 1084,
+    "sha256": "e45a73e3ab03be42e5579c851d26141b070f5d7ccfbf3532c445a52581f73f04"
+  },
+  "binary.sha256.gz": {
+    "bytes": 150,
+    "sha256": "e8b35a24f4976a6a92c584fae5f342a3a6f7374c8503671a95797753b4b7ed57"
+  },
+  "build-provenance.txt.gz": {
+    "bytes": 266,
+    "sha256": "9dd4ef55c00fb17df9c5749e27bc0f997cea44ee3d7a9ad7302744ba48d41444"
+  },
+  "build.log.gz": {
+    "bytes": 1252,
+    "sha256": "802f745b912b52d0d2895c03dcc084cea037f22f808119f78ab5792aeb5fd4e7"
+  },
+  "commands.txt.gz": {
+    "bytes": 229,
+    "sha256": "e29a81c4ead7341bbdd14475c9b6306581aa840e218b3937d5386837ac1b02d9"
+  },
+  "effects-sha-after.txt.gz": {
+    "bytes": 113,
+    "sha256": "c12abc3474efc38f942933913a81a136bcf6277b267914d159371911a1d6e1d9"
+  },
+  "effects-sha-before.txt.gz": {
+    "bytes": 113,
+    "sha256": "c12abc3474efc38f942933913a81a136bcf6277b267914d159371911a1d6e1d9"
+  },
+  "environment.txt.gz": {
+    "bytes": 179,
+    "sha256": "a0e5868194681729dbae60f2575aa5d618a2b2d43b849b0f475493ea8cdbbeaa"
+  },
+  "generated-fixtures.json.gz": {
+    "bytes": 698,
+    "sha256": "84c2ed57763fe862fdb18918854a191e165313934c077640f32e210a67e79c56"
+  },
+  "git-head-after.txt.gz": {
+    "bytes": 60,
+    "sha256": "05ad7acf92a467200187f452e4d3a7e3b55349c4c9c1c512e3be333f07f5f583"
+  },
+  "git-head-before.txt.gz": {
+    "bytes": 60,
+    "sha256": "05ad7acf92a467200187f452e4d3a7e3b55349c4c9c1c512e3be333f07f5f583"
+  },
+  "git-status-after.txt.gz": {
+    "bytes": 21921,
+    "sha256": "f81215168a6965499ce528046015554b08c013faa73b1ecfc35663dceab8320e"
+  },
+  "git-status-before.txt.gz": {
+    "bytes": 21921,
+    "sha256": "f81215168a6965499ce528046015554b08c013faa73b1ecfc35663dceab8320e"
+  },
+  "harness-sha.txt.gz": {
+    "bytes": 348,
+    "sha256": "faa326ad1e468fa0229f6419f2b4803edfbb6ab78bc6925e959fa900e901ae34"
+  },
+  "metadata.json.gz": {
+    "bytes": 53082,
+    "sha256": "542f293eae0f898d52f55c1eccd5ae1d53fe30f6ec7312948bf9cf20b7ecf507"
+  },
+  "replace_main-1m-current-provenance.json.gz": {
+    "bytes": 1446,
+    "sha256": "7c547c0994a4c3a2526b0eb8ad1458500fc0f7ea48cee0b7d29672fbc9650bd3"
+  },
+  "working-tree-source-manifest.tsv.gz": {
+    "bytes": 39691,
+    "sha256": "547bdee2718ef6266670ae9df50021e23b5015116dbc67cd555cfd3ba637bb6a"
+  }
+}
