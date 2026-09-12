@@ -109,6 +109,30 @@ def copy_numbers_table_merge_reader_fixture(root: Path) -> None:
         )
 
 
+def copy_focused_table_merge_reader_fixture(root: Path, format_name: str) -> None:
+    """Copy one format's merge owner and whichever reader layout it uses."""
+
+    if format_name == "Pages":
+        owner = boundaries.PAGES_TABLE_MERGE_SOURCE
+        reader = boundaries.PAGES_TABLE_MERGE_READER_SOURCE
+    elif format_name == "Keynote":
+        owner = boundaries.KEYNOTE_TABLE_MERGE_SOURCE
+        reader = boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE
+    else:
+        raise AssertionError(f"unknown focused merge-reader format: {format_name}")
+
+    paths = [owner]
+    if (boundaries.ROOT / reader).is_file():
+        paths.append(reader)
+    for relative in paths:
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+
 def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
     """Create the complete evidence set needed by the root-reader ratchet."""
 
@@ -8569,7 +8593,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
         self.assertEqual(len(self.policy.packages), 64)
-        self.assertEqual(len(all_policy_edges), 240)
+        self.assertEqual(len(all_policy_edges), 241)
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
@@ -48043,6 +48067,123 @@ fn rewrite_movie_title_operation(
                         violations,
                     )
 
+    def test_suite_cached_merge_readers_keep_selector_and_cache_boundaries(self) -> None:
+        for delegation in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS:
+            label = delegation["format_name"]
+            selectors = ", ".join(f"{name}::index(0)" for name, _ in delegation["selectors"])
+            helper = (
+                "fn regions_in_editor(editor: &Editor) {\n"
+                "let (catalog, limits) = editor.package().shared_component_catalog(map_catalog_error)?;\n"
+                "let reader = MergeReader::__from_shared_catalog(catalog, limits)?;\n"
+                f"reader.{delegation['focused_method']}({selectors})\n}}\n"
+            )
+            with self.subTest(format=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path = root / delegation["reader_source"]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(helper, encoding="utf-8")
+                audit = boundaries._audit_iwa_format_cached_merge_handoff
+                self.assertEqual(audit(root, delegation), [])
+                for before, after in (
+                    ("shared_component_catalog", "to_bytes"),
+                    ("__from_shared_catalog", "from_bytes"),
+                    (selectors, "native_id"),
+                    ("reader.", "let _ = TableModelArchive::decode(bytes); reader."),
+                    ("reader.", "let _ = editor.tables(); reader."),
+                    ("reader.", "let _ = result.or_else(fallback); reader."),
+                    ("reader.", "let _ = focused_body_table_source(editor, native_id); reader."),
+                    ("reader.", "let _ = regions_in_package(package, native_id); reader."),
+                ):
+                    with self.subTest(before=before, after=after):
+                        path.write_text(helper.replace(before, after, 1), encoding="utf-8")
+                        self.assertTrue(audit(root, delegation))
+
+    def test_public_merge_read_delegates_directly_to_private_cached_reader(self) -> None:
+        for delegation in boundaries.IWA_TABLE_MERGE_HOST_READ_DELEGATIONS:
+            label = delegation["format_name"]
+            selectors = ", ".join(
+                f"{name}::index(0)" for name, _ in delegation["selectors"]
+            )
+            signature = (
+                "(self, model_object_id: u64)"
+                if label == "Pages"
+                else "(self, slide_index: usize, model_object_id: u64)"
+            )
+            arguments = (
+                "model_object_id"
+                if label == "Pages"
+                else "slide_index, model_object_id"
+            )
+            host = (
+                f"impl {delegation['impl_type']} {{\n"
+                f"    pub fn {delegation['method']}{signature} -> Result<Vec<Region>> {{\n"
+                f"        reader::regions_in_editor(self, {arguments})\n"
+                "    }\n"
+                "}\n"
+            )
+            cached_reader = (
+                "fn regions_in_editor(editor: &Editor) -> Result<Vec<Region>> {\n"
+                "    let (catalog, limits) = editor.package()"
+                ".shared_component_catalog(map_catalog_error)?;\n"
+                "    let reader = MergeReader::__from_shared_catalog(catalog, limits)?;\n"
+                f"    reader.{delegation['focused_method']}({selectors})\n"
+                "}\n"
+            )
+            with self.subTest(format=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                host_path = root / delegation["source"]
+                host_path.parent.mkdir(parents=True, exist_ok=True)
+                host_path.write_text(host, encoding="utf-8")
+                reader_path = root / delegation["reader_source"]
+                reader_path.parent.mkdir(parents=True, exist_ok=True)
+                reader_path.write_text(cached_reader, encoding="utf-8")
+
+                self.assertEqual(
+                    boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
+                        root
+                    ),
+                    [],
+                )
+
+                indirect_host = host.replace(
+                    f"reader::regions_in_editor(self, {arguments})",
+                    f"{{ let regions = reader::regions_in_editor(self, {arguments})?; "
+                    "Ok(regions) }}",
+                    1,
+                )
+                host_path.write_text(indirect_host, encoding="utf-8")
+                violations = (
+                    boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
+                        root
+                    )
+                )
+                self.assertTrue(
+                    any("must delegate directly to its cached merge reader" in item for item in violations),
+                    violations,
+                )
+
+    def test_iwa_shared_catalog_handoff_retains_cache_and_limits(self) -> None:
+        relative = Path("crates/litchi-iwa/src/package.rs")
+        original = (boundaries.ROOT / relative).read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(original, encoding="utf-8")
+            audit = boundaries._audit_iwa_shared_component_catalog
+            self.assertEqual(audit(root), [])
+            for before, after in (
+                ("records.push((name, self.parsed_archive(name)?))", "records.push((name, self.archive(name)?))"),
+                ("ComponentCatalog::__from_shared_archives(records, limits)", "ComponentCatalog::from_bytes(records, limits)"),
+                ("fn shared_component_catalog(", "fn deleted_catalog("),
+                ("records.try_reserve(1)", "records.reserve(1)"),
+            ):
+                with self.subTest(before=before):
+                    mutated = original.replace(before, after, 1)
+                    self.assertNotEqual(mutated, original)
+                    path.write_text(mutated, encoding="utf-8")
+                    self.assertTrue(audit(root))
+
     def test_numbers_cached_merge_handoff_rejects_reparse_and_fallback(self) -> None:
         reader_path = Path("crates/litchi-iwa/src/numbers/editor/cell_merge/reader.rs")
         paths = (
@@ -48053,7 +48194,7 @@ fn rewrite_movie_title_operation(
         original = (boundaries.ROOT / reader_path).read_text(encoding="utf-8")
         for source, expected in (
             (original.replace("__from_shared_catalog", "from_shared_bytes_with_options", 1), "reparses"),
-            (original.replace("package.parsed_archive(name)", "package.archive(name)", 1), "copies"),
+            (original.replace("package.shared_component_catalog(map_catalog_error)", "package.archive(map_catalog_error)", 1), "copies"),
             (original.replace("let reader = cached_reader(editor.package())?;", "let reader = cached_reader(editor.package())?;\nreturn super::regions_in_package(editor.package(), table_id);", 1), "must remain terminal"),
             (original.replace("SheetSelector::index(sheet)", "sheet", 1), "SheetSelector::index"),
             (original.replace("focused_merge_table_indices(editor, table_id)?", "focused_merge_table_indices(editor, table_id).unwrap_or(None)", 1), "swallows"),
@@ -48108,34 +48249,38 @@ fn rewrite_movie_title_operation(
             source = (boundaries.ROOT / delegation["source"]).read_text(
                 encoding="utf-8"
             )
-            source += """
-impl KeynoteEditor {
-    pub fn slide_table_cell_merges(
-        &self,
-        slide_index: usize,
-        model_object_id: u64,
-    ) -> Result<Vec<Region>> {
-        match focused_table_package(self)?.slide_table_merges(
-            litchi_keynote::SlideSelector::index(slide_index),
-            litchi_keynote::TableSelector::index(table_index),
-        ) {
-            Ok(regions) => Ok(regions),
-            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) =>
-                crate::numbers::editor::table_cell_merges_in_package(
-                    self.package(), model_object_id,
-                ),
-            Err(error) => Err(map_focused_keynote_merges_error(error)),
-        }
-    }
-}
-"""
             source_path.write_text(source, encoding="utf-8")
+
+            reader_path = root / delegation["reader_source"]
+            reader_path.parent.mkdir(parents=True, exist_ok=True)
+            reader_source = (boundaries.ROOT / delegation["reader_source"]).read_text(
+                encoding="utf-8"
+            )
+            reader_path.write_text(reader_source, encoding="utf-8")
 
             self.assertEqual(
                 boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
                     root
                 ),
                 [],
+            )
+
+            unsupported_arm = (
+                "Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) => {"
+            )
+            self.assertIn(unsupported_arm, reader_source)
+            reader_path.write_text(
+                reader_source.replace(unsupported_arm, "Err(error) => {", 1),
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("unreviewed legacy fallback" in item for item in violations),
+                violations,
             )
 
     def test_host_table_merge_read_rejects_catchall_and_pages_fallbacks(self) -> None:
@@ -48321,10 +48466,12 @@ impl KeynoteEditor {
             root = Path(directory)
             paths = (
                 boundaries.PAGES_TABLE_MERGE_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
                 boundaries.PAGES_TABLE_MERGE_PACKAGE_SOURCE,
                 Path("crates/litchi-pages/src/table/mod.rs"),
                 Path("crates/litchi-pages/src/table/merge.rs"),
                 boundaries.KEYNOTE_TABLE_MERGE_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
                 boundaries.KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
                 Path("crates/litchi-keynote/src/slide/table.rs"),
                 Path("crates/litchi-keynote/src/slide/table/merge.rs"),
@@ -48483,6 +48630,186 @@ impl KeynoteEditor {
                 any("exact numbers_names_codec import" in item for item in violations),
                 violations,
             )
+
+    def test_pages_and_keynote_merge_readers_accept_checked_ingress(self) -> None:
+        for format_name, audit in (
+            ("Pages", boundaries.audit_pages_table_merge_reader_source_topology),
+            ("Keynote", boundaries.audit_keynote_table_merge_reader_source_topology),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                self.assertEqual(audit(root), [])
+
+    def test_pages_and_keynote_merge_readers_require_private_shared_ingress(self) -> None:
+        for format_name, audit, reader_relative in (
+            (
+                "Pages",
+                boundaries.audit_pages_table_merge_reader_source_topology,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
+            ),
+            (
+                "Keynote",
+                boundaries.audit_keynote_table_merge_reader_source_topology,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
+            ),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                source_path = root / reader_relative
+                if not source_path.is_file():
+                    source_path = root / (
+                        boundaries.PAGES_TABLE_MERGE_SOURCE
+                        if format_name == "Pages"
+                        else boundaries.KEYNOTE_TABLE_MERGE_SOURCE
+                    )
+                source = source_path.read_text(encoding="utf-8")
+                marker = "    pub fn __from_shared_catalog"
+                start = source.index(marker)
+                attribute_start = source.rfind("    #[cfg", 0, start)
+                attribute_end = source.index(marker, attribute_start)
+                seam = source[attribute_start:attribute_end]
+                for removed, expected in (
+                    (
+                        '#[cfg(feature = "internal-iwork-source")]',
+                        "feature-gated",
+                    ),
+                    ("#[doc(hidden)]", "doc(hidden)"),
+                    ("Arc<ComponentCatalog>", "Arc<ComponentCatalog>"),
+                ):
+                    with self.subTest(removed=removed):
+                        mutated = source[:attribute_start] + seam.replace(removed, "", 1) + source[attribute_end:]
+                        if removed == "Arc<ComponentCatalog>":
+                            catalog_start = source.index("Arc<ComponentCatalog>", start)
+                            mutated = (
+                                source[:catalog_start]
+                                + source[catalog_start:].replace(
+                                    "Arc<ComponentCatalog>",
+                                    "ComponentCatalog",
+                                    1,
+                                )
+                            )
+                        source_path.write_text(mutated, encoding="utf-8")
+                        violations = audit(root)
+                        self.assertTrue(any(expected in item for item in violations), violations)
+
+                if format_name == "Pages":
+                    before, after, expected = "limits: Limits,", "limits: (),", "limits ingress"
+                    method_start = source.index("pub fn open_with_limits")
+                else:
+                    before, after, expected = "options: ReadOptions,", "options: (),", "options ingress"
+                    method_start = source.index("pub fn open_with_options")
+                parameter_start = source.index(before, method_start)
+                mutated = source[:parameter_start] + source[parameter_start:].replace(before, after, 1)
+                source_path.write_text(mutated, encoding="utf-8")
+                violations = audit(root)
+                self.assertTrue(any(expected in item for item in violations), violations)
+
+    def test_pages_and_keynote_merge_readers_reject_public_leaks_and_raw_ids(self) -> None:
+        for format_name, audit, reader_relative in (
+            (
+                "Pages",
+                boundaries.audit_pages_table_merge_reader_source_topology,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
+            ),
+            (
+                "Keynote",
+                boundaries.audit_keynote_table_merge_reader_source_topology,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
+            ),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                source_path = root / reader_relative
+                if not source_path.is_file():
+                    source_path = root / (
+                        boundaries.PAGES_TABLE_MERGE_SOURCE
+                        if format_name == "Pages"
+                        else boundaries.KEYNOTE_TABLE_MERGE_SOURCE
+                    )
+                source = source_path.read_text(encoding="utf-8")
+                source = source.replace("    state:", "    pub state:", 1)
+                source = source.replace("    package: Package,", "    pub package: Package,", 1)
+                source += (
+                    "\nimpl MergeReader {\n"
+                    "    pub fn leaked(&self, table_id: u64, bytes: &[u8]) -> Vec<u8> {\n"
+                    "        let _ = (table_id, bytes);\n"
+                    "        Vec::new()\n"
+                    "    }\n"
+                    "    pub fn leaked_document(&self, document: Document) {}\n"
+                    "    pub fn leaked_catalog(&self) -> Arc<ComponentCatalog> {\n"
+                    "        unreachable!()\n"
+                    "    }\n"
+                    "}\n"
+                    "use litchi_iwa_protos::other;\n"
+                )
+                source_path.write_text(source, encoding="utf-8")
+                violations = audit(root)
+                self.assertTrue(any("public MergeReader field" in item for item in violations), violations)
+                self.assertTrue(any("unsupported public method leaked" in item for item in violations), violations)
+                self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+                self.assertTrue(any("raw bytes from public method leaked" in item for item in violations), violations)
+                self.assertTrue(any("full document model reference" in item for item in violations), violations)
+                self.assertTrue(any("generated/owned protobuf" in item for item in violations), violations)
+                self.assertTrue(any("physical or semantic type" in item for item in violations), violations)
+
+    def test_pages_and_keynote_merge_readers_keep_the_child_private_and_selectors_typed(
+        self,
+    ) -> None:
+        for format_name, audit, owner_relative, reader_relative in (
+            (
+                "Pages",
+                boundaries.audit_pages_table_merge_reader_source_topology,
+                boundaries.PAGES_TABLE_MERGE_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
+            ),
+            (
+                "Keynote",
+                boundaries.audit_keynote_table_merge_reader_source_topology,
+                boundaries.KEYNOTE_TABLE_MERGE_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
+            ),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                owner = root / owner_relative
+                reader = root / reader_relative
+                if reader.is_file():
+                    reader.unlink()
+                    violations = audit(root)
+                    self.assertTrue(any("reader child is missing" in item for item in violations), violations)
+
+                    reader.write_text(
+                        (boundaries.ROOT / reader_relative).read_text(encoding="utf-8"),
+                        encoding="utf-8",
+                    )
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(
+                            "mod reader;", "pub mod reader;", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = audit(root)
+                    self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+                    if format_name == "Pages":
+                        source = reader.read_text(encoding="utf-8").replace(
+                            "Into<BodyTableSelector<'table>>",
+                            "Into<SelectorRemoved>",
+                            1,
+                        )
+                    else:
+                        source = reader.read_text(encoding="utf-8").replace(
+                            "impl Into<crate::SlideSelector<'slide>>",
+                            "impl Into<SelectorRemoved>",
+                            1,
+                        )
+                    reader.write_text(source, encoding="utf-8")
+                    violations = audit(root)
+                    self.assertTrue(any("must use typed" in item for item in violations), violations)
 
     def test_numbers_table_merge_boundary_rejects_public_module_and_preserves_host_reader(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -49567,7 +49894,9 @@ impl KeynoteEditor {
             "audit_iwa_common_table_merge_source_topology",
             "audit_iwa_numbers_wire_table_merges_source_topology",
             "audit_pages_table_merge_source_topology",
+            "audit_pages_table_merge_reader_source_topology",
             "audit_keynote_table_merge_source_topology",
+            "audit_keynote_table_merge_reader_source_topology",
             "audit_numbers_table_merge_source_topology",
             "audit_iwa_table_merge_host_read_delegation_source_topology",
         ):

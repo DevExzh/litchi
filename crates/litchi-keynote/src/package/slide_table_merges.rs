@@ -6,6 +6,10 @@
 //! selection through the borrowed merge scan; it never mutates or reassembles
 //! the source package.
 
+mod reader;
+
+pub use reader::MergeReader;
+
 use std::fmt;
 
 use litchi_core::Position;
@@ -160,6 +164,32 @@ impl Package {
         let mut budget = core::Budget::new(self).map_err(map_core_error)?;
         let target = core::select_table(self, slide.into(), table.into(), &mut budget)
             .map_err(map_core_error)?;
+        self.decode_selected_merges(target, &mut budget)
+    }
+
+    /// Read one table from a checked shared component catalog.
+    ///
+    /// This ingress is intentionally private to the metadata-only reader.  It
+    /// keeps the physical selector above source-preserving, while reusing the
+    /// same target proof and lazy merge codec after component inventory has
+    /// been charged by the dedicated read-only core path.
+    pub(super) fn slide_table_merges_from_components<'slide>(
+        &self,
+        slide: impl Into<SlideSelector<'slide>>,
+        table: impl Into<TableSelector>,
+    ) -> Result<Vec<Region>, SlideTableMergesError> {
+        let mut budget = core::Budget::new(self).map_err(map_core_error)?;
+        let target =
+            core::select_table_from_components(self, slide.into(), table.into(), &mut budget)
+                .map_err(map_core_error)?;
+        self.decode_selected_merges(target, &mut budget)
+    }
+
+    fn decode_selected_merges(
+        &self,
+        target: core::Target,
+        budget: &mut core::Budget,
+    ) -> Result<Vec<Region>, SlideTableMergesError> {
         let source = core::model_payload(self, &target).map_err(map_core_error)?;
         let wire = budget.residual(self).map_err(map_core_error)?;
         // The shared decoder reserves one pair-slice, one index vector, and
@@ -178,7 +208,7 @@ impl Package {
             max_overlap_checks: budget.remaining_work().map_err(map_core_error)?,
         };
         let read = table_merges::read_table_merges(source, limits).map_err(|error| {
-            charge_attempted(&mut budget, &error);
+            charge_attempted(budget, &error);
             map_merge_error(error)
         })?;
 

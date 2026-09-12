@@ -7,6 +7,7 @@
 
 use std::fmt;
 
+use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_core::RawMessage;
 use litchi_numbers_wire::table_merges::{self, ReadLimits};
 use thiserror::Error;
@@ -14,6 +15,10 @@ use thiserror::Error;
 use super::{Package, table_lock};
 use crate::selector::BodyTableSelector;
 use crate::table::merge::Region;
+
+mod reader;
+
+pub use reader::MergeReader;
 
 /// A finite resource governed by one body-table merge read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -118,6 +123,35 @@ pub enum BodyTableMergesError {
     },
 }
 
+fn select_reader_target(
+    targets: Vec<table_lock::BodyTableTarget>,
+    selector: BodyTableSelector<'_>,
+    budget: &mut table_lock::WireBudget,
+) -> Result<table_lock::BodyTableTarget, table_lock::BodyTableLockError> {
+    match selector {
+        BodyTableSelector::Position(position) => {
+            budget.charge_payload_work(position.get().saturating_add(1).min(targets.len()))?;
+            targets
+                .into_iter()
+                .nth(position.get())
+                .ok_or(table_lock::BodyTableLockError::TableNotFound)
+        },
+        BodyTableSelector::Name(name) => {
+            let mut first = None;
+            for target in targets {
+                budget.charge_payload_work(target.table_name.len().saturating_add(name.len()))?;
+                if target.table_name.as_ref() != name {
+                    continue;
+                }
+                if first.replace(target).is_some() {
+                    return Err(table_lock::BodyTableLockError::AmbiguousTableName);
+                }
+            }
+            first.ok_or(table_lock::BodyTableLockError::TableNotFound)
+        },
+    }
+}
+
 impl Package {
     /// Read the validated merged-cell rectangles of one rooted body table.
     ///
@@ -174,10 +208,14 @@ fn model_message<'source>(
     package: &'source Package,
     target: &table_lock::BodyTableTarget,
 ) -> Result<&'source RawMessage, BodyTableMergesError> {
-    let component = package
-        .state
-        .source
-        .components()
+    model_message_from_components(package.state.source.components(), target)
+}
+
+fn model_message_from_components<'source>(
+    components: &'source ComponentCatalog,
+    target: &table_lock::BodyTableTarget,
+) -> Result<&'source RawMessage, BodyTableMergesError> {
+    let component = components
         .get_index(target.model_component_index)
         .ok_or(BodyTableMergesError::InvalidSource)?;
     let object = component
@@ -239,6 +277,10 @@ fn read_limits(budget: &table_lock::WireBudget) -> Result<ReadLimits, BodyTableM
 
 fn map_merge_error(error: table_merges::MergeReadError) -> BodyTableMergesError {
     map_common_error(error.error().clone())
+}
+
+fn map_package_error(error: super::PackageError) -> BodyTableMergesError {
+    map_lock_error(table_lock::map_package_error(error))
 }
 
 fn map_common_error(error: litchi_iwa_common::Error) -> BodyTableMergesError {

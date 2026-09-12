@@ -2,23 +2,23 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::mem::size_of;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::EntryEdit;
+use litchi_iwa_archive::{ComponentCatalog, Limits, SourceCatalog};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
     wire::{WireFieldView, WireView, patch_varint_field, transform_length_delimited_field},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
-use litchi_iwa_protos::table_model_discovery_codec;
+use litchi_iwa_protos::{table_model_discovery_codec, text_storage_codec};
 use thiserror::Error;
 
 use super::{
-    Package, PackageError, RootReferences, decode_body_storage, effective_text_limit,
-    root_references_with_limits,
+    Package, PackageError, RootReferences, decode_body_storage, root_references_with_limits,
 };
 use crate::selector::BodyTableSelector;
 use crate::table::lock::State;
@@ -594,7 +594,37 @@ fn native_body_table_targets_with_budget_mode(
     allow_empty: bool,
 ) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
     let source = physical_source(package)?;
-    let components = source.components();
+    native_body_table_targets_from_components_with_budget_mode(
+        source.components(),
+        source.limits(),
+        budget,
+        allow_empty,
+        Some(package),
+    )
+}
+
+/// Discover rooted Pages body-table targets from an already parsed component
+/// catalog.  The caller owns physical ingress validation; this path performs
+/// only the format-specific ownership proof and selected metadata projection.
+/// It is used by the lazy merge reader so constructing a focused reader does
+/// not require constructing the full semantic [`Document`](crate::Document).
+pub(crate) fn body_table_targets_from_components_with_budget(
+    components: &ComponentCatalog,
+    limits: Limits,
+    budget: &mut WireBudget,
+) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
+    native_body_table_targets_from_components_with_budget_mode(
+        components, limits, budget, false, None,
+    )
+}
+
+fn native_body_table_targets_from_components_with_budget_mode(
+    components: &ComponentCatalog,
+    limits: Limits,
+    budget: &mut WireBudget,
+    allow_empty: bool,
+    package: Option<&Package>,
+) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
     let object_index = index_objects(components, budget)?;
     let root_component_index = components
         .iter()
@@ -625,7 +655,7 @@ fn native_body_table_targets_with_budget_mode(
     budget.charge_payload_work(root_message.data.len())?;
     budget.charge_payload_work(root_message.data.len())?;
     let RootReferences { body, .. } =
-        root_references_with_limits(components, source.limits()).map_err(map_package_error)?;
+        root_references_with_limits(components, limits).map_err(map_package_error)?;
     let root_message_info = root_location
         .object
         .archive_info
@@ -666,9 +696,9 @@ fn native_body_table_targets_with_budget_mode(
     let body_message = unique_text_message(body_location.object, body_identifier, budget)?;
     validate_selected_metadata(body_location.object, body_message.0)?;
     let body_payload = body_message.1.data.as_slice();
-    // The body decoder performs a strict wire pass and a lazy/materializing
-    // pass. Reserve both passes in the shared transaction budget before any
-    // decoder-owned allocation can occur.
+    // The body decoder/projection performs strict and lazy passes. Reserve
+    // both passes in the shared transaction budget before any decoder-owned
+    // allocation can occur.
     budget.charge_payload_work(body_payload.len())?;
     budget.charge_payload_work(body_payload.len())?;
     let body_view = budget.parse(body_payload, 0)?;
@@ -685,14 +715,29 @@ fn native_body_table_targets_with_budget_mode(
             .count();
         budget.charge_payload_items(section_count)?;
     }
-    let (body_storage, _) = decode_body_storage(
-        &body_location.object.messages,
-        body_identifier,
-        super::MAX_SECTIONS,
-        effective_text_limit(source.limits()),
-        source.limits(),
-    )
-    .map_err(map_package_error)?;
+    let body_storage = if package.is_some() {
+        // Keep the package mutation path's strict body-storage validation at
+        // its historical point in the rooted walk.  This preserves failures
+        // for malformed body text even when the table selector later misses.
+        Some(
+            decode_body_storage(
+                &body_location.object.messages,
+                body_identifier,
+                super::MAX_SECTIONS,
+                super::effective_text_limit(limits),
+                limits,
+            )
+            .map_err(map_package_error)?
+            .0,
+        )
+    } else {
+        None
+    };
+    let body_validation = if package.is_none() {
+        Some(validate_body_storage_wire(body_payload, limits, budget)?)
+    } else {
+        None
+    };
     let body_message_info = body_location
         .object
         .archive_info
@@ -785,21 +830,11 @@ fn native_body_table_targets_with_budget_mode(
         .map_err(|_| BodyTableLockError::Allocation {
             amount: entries.len(),
         })?;
-    let mut entry_index = 0;
-    for (character_index, character) in body_storage.text().encode_utf16().enumerate() {
-        budget.charge_payload_work(1)?;
-        if entries
-            .get(entry_index)
-            .is_some_and(|entry| entry.character_index == character_index)
-        {
-            if character != OBJECT_REPLACEMENT_CHARACTER {
-                return Err(BodyTableLockError::InvalidSource);
-            }
-            entry_index += 1;
-        }
-    }
-    if entry_index != entries.len() {
-        return Err(BodyTableLockError::InvalidSource);
+    if let Some(body_storage) = body_storage.as_ref() {
+        validate_body_placeholders_in_text(body_storage.text(), &entries, budget)?;
+    } else {
+        let body_validation = body_validation.ok_or(BodyTableLockError::InvalidSource)?;
+        validate_body_placeholders_from_wire(body_payload, &entries, body_validation, budget)?;
     }
     for entry in entries {
         let Some(attachment_location) = object_index.get(&entry.identifier.get()).copied() else {
@@ -922,7 +957,11 @@ fn native_body_table_targets_with_budget_mode(
         // Reads and semantic no-ops must carry the same rooted ownership
         // proof as changed publication. Payload links alone are not enough
         // when archive-header metadata is missing, aliased, or redirected.
-        validate_selected_ownership(package, &target, budget)?;
+        if let Some(package) = package {
+            validate_selected_ownership(package, &target, budget)?;
+        } else {
+            validate_selected_ownership_in_components(components, &target, budget)?;
+        }
         targets.push(target);
     }
     if targets.is_empty() {
@@ -939,6 +978,164 @@ fn native_body_table_targets_with_budget_mode(
 struct BodyTableEntry {
     character_index: usize,
     identifier: NonZeroU64,
+}
+
+/// Check the character positions used by the package-owned mutation path.
+///
+/// This deliberately keeps the historical full-text traversal.  The mutable
+/// [`Package`] path still uses the semantic storage projection so its strict
+/// section and run validation remains unchanged.
+fn validate_body_placeholders_in_text(
+    text: &str,
+    entries: &[BodyTableEntry],
+    budget: &mut WireBudget,
+) -> Result<(), BodyTableLockError> {
+    let mut entry_index = 0;
+    for (character_index, character) in text.encode_utf16().enumerate() {
+        budget.charge_payload_work(1)?;
+        if entries
+            .get(entry_index)
+            .is_some_and(|entry| entry.character_index == character_index)
+        {
+            if character != OBJECT_REPLACEMENT_CHARACTER {
+                return Err(BodyTableLockError::InvalidSource);
+            }
+            entry_index += 1;
+        }
+    }
+    (entry_index == entries.len())
+        .then_some(())
+        .ok_or(BodyTableLockError::InvalidSource)
+}
+
+/// Validate and inspect only the borrowed field-3 text projection needed by
+/// the metadata-only reader.
+///
+/// The text-wire validator still checks the complete known TSWP storage tree,
+/// canonical framing, UTF-8/UTF-16 lengths, references, and bounded work. Its
+/// result is a compact report; no semantic `String` or run vector is built.
+/// Buffa then exposes borrowed text fragments for the placeholder check. Once
+/// every selected table attachment is proven, trailing text is intentionally
+/// left untouched by this focused pass.
+#[derive(Clone, Copy)]
+struct BodyWireValidation {
+    limits: litchi_iwa_text_wire::RewriteLimits,
+    validation: litchi_iwa_text_wire::StorageValidation,
+}
+
+fn validate_body_storage_wire(
+    payload: &[u8],
+    limits: Limits,
+    budget: &mut WireBudget,
+) -> Result<BodyWireValidation, BodyTableLockError> {
+    let wire_limits = super::storage_rewrite_limits(limits).map_err(|error| match error {
+        super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
+        super::StorageWireLimitsError::Wire(_) => BodyTableLockError::InvalidSource,
+    })?;
+    let validation = litchi_iwa_text_wire::validate_storage_with_limits(payload, wire_limits)
+        .map_err(map_body_storage_wire_error)?;
+    budget.charge_payload_work(validation.validation_work())?;
+    Ok(BodyWireValidation {
+        limits: wire_limits,
+        validation,
+    })
+}
+
+fn validate_body_placeholders_from_wire(
+    payload: &[u8],
+    entries: &[BodyTableEntry],
+    body: BodyWireValidation,
+    budget: &mut WireBudget,
+) -> Result<(), BodyTableLockError> {
+    if entries.is_empty() {
+        return Ok(());
+    }
+    let element_memory = body
+        .validation
+        .fragments()
+        .checked_mul(size_of::<&str>())
+        .ok_or(BodyTableLockError::InvalidSource)?;
+    let recursion_limit = u32::try_from(body.limits.max_nesting()).unwrap_or(u32::MAX);
+    let options = text_storage_codec::DecodeOptions::new(
+        body.limits.max_message_bytes(),
+        0,
+        element_memory,
+        recursion_limit,
+    );
+    let view = text_storage_codec::decode_storage_text(payload, options)
+        .map_err(|_| BodyTableLockError::InvalidSource)?;
+    if view.len() != body.validation.fragments() {
+        return Err(BodyTableLockError::InvalidSource);
+    }
+
+    let mut entry_index = 0;
+    let mut character_index = 0usize;
+    for fragment in view.fragments() {
+        for character in fragment.encode_utf16() {
+            if entry_index == entries.len() {
+                return Ok(());
+            }
+            budget.charge_payload_work(1)?;
+            if entries[entry_index].character_index == character_index {
+                if character != OBJECT_REPLACEMENT_CHARACTER {
+                    return Err(BodyTableLockError::InvalidSource);
+                }
+                entry_index += 1;
+            }
+            character_index = character_index
+                .checked_add(1)
+                .ok_or(BodyTableLockError::InvalidSource)?;
+        }
+    }
+    (entry_index == entries.len())
+        .then_some(())
+        .ok_or(BodyTableLockError::InvalidSource)
+}
+
+#[cfg(test)]
+fn validate_body_placeholders_in_wire(
+    payload: &[u8],
+    entries: &[BodyTableEntry],
+    limits: Limits,
+    budget: &mut WireBudget,
+) -> Result<(), BodyTableLockError> {
+    let body = validate_body_storage_wire(payload, limits, budget)?;
+    validate_body_placeholders_from_wire(payload, entries, body, budget)
+}
+
+fn map_body_storage_wire_error(error: litchi_iwa_text_wire::RewriteError) -> BodyTableLockError {
+    match error {
+        litchi_iwa_text_wire::RewriteError::LimitExceeded {
+            resource,
+            observed,
+            limit,
+        } => BodyTableLockError::LimitExceeded {
+            kind: match resource {
+                "message bytes" => BodyTableLockLimitKind::WireBytes,
+                "fields" => BodyTableLockLimitKind::WireFields,
+                "nesting" => BodyTableLockLimitKind::WireNesting,
+                "text fragments" | "table entries" => BodyTableLockLimitKind::PayloadItems,
+                "text bytes" => BodyTableLockLimitKind::PayloadBytes,
+                "object references" => BodyTableLockLimitKind::PayloadReferences,
+                _ => BodyTableLockLimitKind::WireWork,
+            },
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(limit),
+        },
+        litchi_iwa_text_wire::RewriteError::Allocation { amount, .. } => {
+            BodyTableLockError::Allocation { amount }
+        },
+        litchi_iwa_text_wire::RewriteError::InvalidFormat(_)
+        | litchi_iwa_text_wire::RewriteError::Projection(_)
+        | litchi_iwa_text_wire::RewriteError::InvalidLimit { .. }
+        | litchi_iwa_text_wire::RewriteError::ReversedRange { .. }
+        | litchi_iwa_text_wire::RewriteError::RangeOutOfBounds { .. }
+        | litchi_iwa_text_wire::RewriteError::SurrogateSplit { .. }
+        | litchi_iwa_text_wire::RewriteError::ArithmeticOverflow { .. } => {
+            BodyTableLockError::InvalidSource
+        },
+        _ => BodyTableLockError::InvalidSource,
+    }
 }
 
 fn parse_body_table_entry(
@@ -1262,7 +1459,7 @@ fn decode_table_info(
 }
 
 fn index_objects<'a>(
-    components: &'a litchi_iwa_archive::ComponentCatalog,
+    components: &'a ComponentCatalog,
     budget: &mut WireBudget,
 ) -> Result<HashMap<u64, ObjectLocation<'a>>, BodyTableLockError> {
     let object_count = components.iter().try_fold(0usize, |count, component| {
@@ -1601,8 +1798,15 @@ fn validate_selected_ownership(
     budget: &mut WireBudget,
 ) -> Result<(), BodyTableLockError> {
     let source = physical_source(package)?;
-    let component = source
-        .components()
+    validate_selected_ownership_in_components(source.components(), target, budget)
+}
+
+fn validate_selected_ownership_in_components(
+    components: &ComponentCatalog,
+    target: &BodyTableTarget,
+    budget: &mut WireBudget,
+) -> Result<(), BodyTableLockError> {
+    let component = components
         .get_index(target.component_index)
         .ok_or(BodyTableLockError::InvalidSource)?;
     let object = component
@@ -1638,8 +1842,7 @@ fn validate_selected_ownership(
         false,
         budget,
     )?;
-    let attachment_component = source
-        .components()
+    let attachment_component = components
         .get_index(target.attachment_component_index)
         .ok_or(BodyTableLockError::InvalidSource)?;
     let attachment = attachment_component
@@ -1673,8 +1876,7 @@ fn validate_selected_ownership(
     )? {
         return Err(BodyTableLockError::InvalidSource);
     }
-    let body_component = source
-        .components()
+    let body_component = components
         .get_index(target.body_component_index)
         .ok_or(BodyTableLockError::InvalidSource)?;
     let body = body_component
@@ -1700,8 +1902,7 @@ fn validate_selected_ownership(
     // message metadata must remain the same object reached from TableInfo;
     // otherwise a changed transaction could publish against a redirected
     // archive header after resolving the drawable graph.
-    let model_component = source
-        .components()
+    let model_component = components
         .get_index(target.model_component_index)
         .ok_or(BodyTableLockError::InvalidSource)?;
     let model = model_component
@@ -2144,7 +2345,7 @@ fn physical_source(package: &Package) -> Result<&SourceCatalog, BodyTableLockErr
 
 fn reopen_shared(
     source: Arc<[u8]>,
-    limits: litchi_iwa_archive::Limits,
+    limits: Limits,
     budget: &mut WireBudget,
 ) -> Result<Package, BodyTableLockError> {
     budget.charge_input_source(source.as_ref())?;
@@ -2223,7 +2424,7 @@ fn fingerprint(bytes: &[u8], budget: &mut WireBudget) -> Result<u64, BodyTableLo
 
 pub(crate) struct WireBudget {
     limits: WireLimits,
-    physical_limits: litchi_iwa_archive::Limits,
+    physical_limits: Limits,
     total_bytes: usize,
     total_fields: usize,
     total_work: usize,
@@ -2248,9 +2449,7 @@ pub(crate) struct WireBudget {
 }
 
 impl WireBudget {
-    pub(crate) fn new(
-        physical_limits: litchi_iwa_archive::Limits,
-    ) -> Result<Self, BodyTableLockError> {
+    pub(crate) fn new(physical_limits: Limits) -> Result<Self, BodyTableLockError> {
         let archive = physical_limits
             .effective_archive_limits()
             .map_err(map_archive_error)?;
@@ -2733,6 +2932,33 @@ impl WireBudget {
         Ok(())
     }
 
+    /// Charge the parsed IWA storage retained by a component-only reader.
+    ///
+    /// A shared component catalog has already passed physical ZIP, Snappy, and
+    /// neutral archive limits at its originating ingress.  The focused query
+    /// still needs an operation-local accounting point for the immutable
+    /// archive bytes it can inspect, while object/message/index work is
+    /// charged by the rooted ownership walk itself.
+    pub(crate) fn charge_component_catalog(
+        &mut self,
+        components: &ComponentCatalog,
+    ) -> Result<(), BodyTableLockError> {
+        self.charge_payload_work(components.len())?;
+        for component in components.iter() {
+            let archive_bytes = parsed_archive_source_length(component.archive())?;
+            if archive_bytes > self.physical_limits.max_iwa_stream_bytes() {
+                return Err(BodyTableLockError::LimitExceeded {
+                    kind: BodyTableLockLimitKind::PayloadBytes,
+                    observed: usize_as_u64(archive_bytes),
+                    maximum: usize_as_u64(self.physical_limits.max_iwa_stream_bytes()),
+                });
+            }
+            self.charge_total_payload_bytes(archive_bytes)?;
+            self.charge_payload_work(archive_bytes)?;
+        }
+        Ok(())
+    }
+
     fn charge_archive_inventory(
         &mut self,
         archive_bytes: usize,
@@ -2852,7 +3078,7 @@ impl WireBudget {
     }
 }
 
-fn map_package_error(error: PackageError) -> BodyTableLockError {
+pub(crate) fn map_package_error(error: PackageError) -> BodyTableLockError {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
         PackageError::Allocation { amount } => BodyTableLockError::Allocation { amount },
@@ -2896,7 +3122,7 @@ fn map_package_error(error: PackageError) -> BodyTableLockError {
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyTableLockError {
+pub(crate) fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyTableLockError {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
@@ -3023,6 +3249,8 @@ fn usize_as_u64(value: usize) -> u64 {
 mod tests {
     use super::*;
     use litchi_iwa_core::{FieldInfo, FieldPath};
+    use litchi_iwa_protos::tswp;
+    use prost::Message as _;
 
     fn table_info_payload() -> Vec<u8> {
         let mut reference = Vec::new();
@@ -3046,14 +3274,61 @@ mod tests {
         fields: usize,
         rewrite_work: usize,
     ) -> WireBudget {
-        let mut budget =
-            WireBudget::new(litchi_iwa_archive::Limits::default()).expect("default wire budget");
+        let mut budget = WireBudget::new(Limits::default()).expect("default wire budget");
         budget.limits = WireLimits::default()
             .with_input_bytes(input_bytes)
             .and_then(|limits| limits.with_fields(fields))
             .and_then(|limits| limits.with_rewrite_work(rewrite_work))
             .expect("test wire limits");
         budget
+    }
+
+    #[test]
+    fn borrowed_body_placeholder_scan_stops_before_an_oversized_trailing_run() {
+        let trailing = "x".repeat(32 * 1024);
+        let payload = tswp::StorageArchive {
+            text: vec!["\u{fffc}".to_owned(), trailing],
+            ..tswp::StorageArchive::default()
+        }
+        .encode_to_vec();
+        let rewrite_limits = super::super::storage_rewrite_limits(Limits::default())
+            .unwrap_or_else(|_| panic!("default text-wire limits"));
+        let validation =
+            litchi_iwa_text_wire::validate_storage_with_limits(&payload, rewrite_limits)
+                .expect("oversized trailing run is within the test source ceiling");
+        let exact_work = validation
+            .validation_work()
+            .checked_add(1)
+            .expect("test work fits usize");
+        let mut budget = budget_with_wire_limits(payload.len(), 1_024, exact_work);
+        budget.maximum_payload_work = exact_work;
+        let entry = BodyTableEntry {
+            character_index: 0,
+            identifier: NonZeroU64::new(1).expect("test identifier is non-zero"),
+        };
+
+        validate_body_placeholders_in_wire(&payload, &[entry], Limits::default(), &mut budget)
+            .expect("reader should stop after the selected placeholder");
+        assert_eq!(budget.payload_work, exact_work);
+    }
+
+    #[test]
+    fn borrowed_body_placeholder_scan_rejects_a_non_placeholder_at_the_selected_index() {
+        let payload = tswp::StorageArchive {
+            text: vec!["ordinary text".to_owned()],
+            ..tswp::StorageArchive::default()
+        }
+        .encode_to_vec();
+        let entry = BodyTableEntry {
+            character_index: 0,
+            identifier: NonZeroU64::new(1).expect("test identifier is non-zero"),
+        };
+        let mut budget = budget_with_wire_limits(payload.len(), 1_024, 1_024 * 1_024);
+
+        assert_eq!(
+            validate_body_placeholders_in_wire(&payload, &[entry], Limits::default(), &mut budget,),
+            Err(BodyTableLockError::InvalidSource)
+        );
     }
 
     #[test]
@@ -3197,14 +3472,14 @@ mod tests {
         }
     }
 
-    fn tiny_physical_limits() -> litchi_iwa_archive::Limits {
+    fn tiny_physical_limits() -> Limits {
         let archive = litchi_iwa_core::Limits::default()
             .with_archive_bytes(8)
             .and_then(|limits| limits.with_objects(2))
             .and_then(|limits| limits.with_messages(4))
             .and_then(|limits| limits.with_metadata_items(4))
             .expect("test archive limits");
-        litchi_iwa_archive::Limits::new(16, 2, 8, 16, 8)
+        Limits::new(16, 2, 8, 16, 8)
             .expect("test physical limits")
             .with_archive_limits(archive)
             .expect("test physical profile")
@@ -3303,8 +3578,7 @@ mod tests {
 
     #[test]
     fn source_catalog_charges_multi_member_entry_bytes_aggregate_separately() {
-        let limits =
-            litchi_iwa_archive::Limits::new(512, 4, 8, 16, 64).expect("test physical limits");
+        let limits = Limits::new(512, 4, 8, 16, 64).expect("test physical limits");
         let first = [0_u8; 8];
         let second = [1_u8; 8];
         let source = litchi_iwa_archive::package::to_bytes(

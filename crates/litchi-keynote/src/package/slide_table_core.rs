@@ -35,7 +35,9 @@ use litchi_iwa_protos::{
     table_dimension_codec, table_info_codec, table_model_discovery_codec, table_sort_order_codec,
 };
 
-use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
+use super::{
+    Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticBudget, SemanticLimitKind,
+};
 use crate::{SlideSelector, slide::table::TableSelector};
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -751,6 +753,38 @@ impl Budget {
         Ok(())
     }
 
+    /// Charge the parsed component/object/message inventory when the ZIP
+    /// catalog has already been consumed by a shared read handoff.
+    pub(crate) fn inventory_components(&mut self, package: &Package) -> Result<()> {
+        let components = package.state.source.components();
+        self.components(components.len())?;
+        self.allocations(components.len())?;
+        for component in components.iter() {
+            self.payload_objects(component.archive().objects.len())?;
+            let messages = component
+                .archive()
+                .objects
+                .iter()
+                .map(|object| object.messages.len())
+                .try_fold(0usize, |sum, value| sum.checked_add(value))
+                .ok_or(Error::InvalidSource)?;
+            self.payload_messages(messages)?;
+            let mut component_work = 0usize;
+            for object in &component.archive().objects {
+                component_work = component_work
+                    .checked_add(object.messages.len())
+                    .ok_or(Error::InvalidSource)?;
+                for message in &object.messages {
+                    component_work = component_work
+                        .checked_add(message.data.len())
+                        .ok_or(Error::InvalidSource)?;
+                }
+            }
+            self.work(component_work)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn residual(&self, package: &Package) -> Result<WireLimits> {
         let base = package.wire_limits().map_err(|_| Error::Wire)?;
         let input = self.remaining_input()?;
@@ -1333,7 +1367,41 @@ pub(crate) fn select_table(
     let catalog = physical_catalog(package)?;
     budget.input(package.source_bytes().len())?;
     budget.inventory(package, catalog)?;
-    let slide_position = resolve_slide_position(package, slide_selector, budget)?;
+    select_table_after_inventory(package, slide_selector, table_selector, budget, false)
+}
+
+/// Resolve a read-only table against an already checked component catalog.
+///
+/// The semantic-only package source intentionally remains unsupported by the
+/// ordinary selector above because mutation and source-preserving owners need
+/// ZIP provenance.  The metadata-only merge reader is the sole caller of this
+/// ingress: it retains a checked [`ComponentCatalog`] and uses the same graph,
+/// wire, and ownership proof after charging a component inventory pass.
+pub(crate) fn select_table_from_components(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    table_selector: TableSelector,
+    budget: &mut Budget,
+) -> Result<Target> {
+    if !matches!(&package.state.source, PhysicalSource::Semantic(_)) {
+        return Err(Error::UnsupportedSource);
+    }
+    budget.inventory_components(package)?;
+    select_table_after_inventory(package, slide_selector, table_selector, budget, true)
+}
+
+fn select_table_after_inventory(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    table_selector: TableSelector,
+    budget: &mut Budget,
+    metadata_slide_names: bool,
+) -> Result<Target> {
+    let slide_position = if metadata_slide_names {
+        resolve_slide_position_from_components(package, slide_selector, budget)?
+    } else {
+        resolve_slide_position(package, slide_selector, budget)?
+    };
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(read_error)?
@@ -5611,6 +5679,56 @@ fn resolve_slide_position(
                 .map_err(|_| Error::AmbiguousSelector)?
                 .map(|slide| Position::new(slide.index()))
                 .ok_or(Error::SlideNameNotFound)
+        },
+    }
+}
+
+fn resolve_slide_position_from_components(
+    package: &Package,
+    selector: SlideSelector<'_>,
+    budget: &mut Budget,
+) -> Result<Position> {
+    match selector {
+        SlideSelector::Position(position) => Ok(position),
+        SlideSelector::Name(name) => {
+            if name.is_empty() {
+                return Err(Error::EmptySlideName);
+            }
+            // Name diagnostics retain only the requested selector, while the
+            // candidate names remain borrowed directly from their IWA payload.
+            budget.allocations(name.len().max(1))?;
+            let maximum = package.semantic_limits().max_slides();
+            let mut semantic_budget = SemanticBudget::new(package.semantic_limits());
+            let mut selected = None;
+            for index in 0..maximum {
+                let references_before = semantic_budget.references_charged();
+                let projection = package
+                    .slide_record_at_with_budget(index, &mut semantic_budget)
+                    .map_err(read_error)?;
+                let references = semantic_budget
+                    .references_charged()
+                    .checked_sub(references_before)
+                    .ok_or(Error::InvalidSource)?;
+                budget.references(references)?;
+                budget.work(projection.work)?;
+                let Some(record) = projection.record else {
+                    break;
+                };
+                let (candidate, candidate_work) = package
+                    .slide_name_for_identifier_with_work(record.slide_identifier, index)
+                    .map_err(read_error)?;
+                budget.work(candidate_work)?;
+                let Some(candidate) = candidate else {
+                    continue;
+                };
+                budget.work(candidate.len().checked_add(1).ok_or(Error::InvalidSource)?)?;
+                if candidate == name {
+                    if selected.replace(Position::new(index)).is_some() {
+                        return Err(Error::AmbiguousSelector);
+                    }
+                }
+            }
+            selected.ok_or(Error::SlideNameNotFound)
         },
     }
 }

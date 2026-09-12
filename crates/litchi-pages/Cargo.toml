@@ -10,7 +10,7 @@ rust-version.workspace = true
 
 [features]
 default = []
-internal-iwork-source = []
+internal-iwork-source = ["litchi-iwa-archive/internal-iwork-source"]
 
 [dependencies]
 litchi-core       = { workspace = true }

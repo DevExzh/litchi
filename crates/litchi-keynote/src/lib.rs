@@ -519,6 +519,9 @@ pub use package::{
     SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
 };
 pub use package::{
+    MergeReader, SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath,
+};
+pub use package::{
     SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
     SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
 };
@@ -538,7 +541,6 @@ pub use package::{
     SlideTableCellNumberFormatPath,
 };
 pub use package::{SlideTableCellsError, SlideTableCellsLimitKind, SlideTableCellsPath};
-pub use package::{SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath};
 pub use selector::{
     DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,
 };

@@ -147,7 +147,7 @@ pub use package::{
     BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
     BodyTableLockLimitKind, BodyTableLockPatch,
 };
-pub use package::{BodyTableMergesError, BodyTableMergesLimitKind};
+pub use package::{BodyTableMergesError, BodyTableMergesLimitKind, MergeReader};
 pub use package::{
     BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,
     BodyTableNameLimitKind, BodyTableNamePatch, BodyTableNamePath,

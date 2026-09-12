@@ -232,7 +232,7 @@ pub use slide_table_lock_state::{
     SlideTableLockStatePath,
 };
 pub use slide_table_merges::{
-    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath,
+    MergeReader, SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath,
 };
 pub use slide_table_name::{
     SlideTableNameCommit, SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError,
@@ -577,6 +577,15 @@ struct SlideRecord {
     is_skipped: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SlideRecordRead {
+    record: Option<SlideRecord>,
+    /// Lower-bound wire work consumed by the selected show and node reads.
+    /// The metadata selector folds this into its operation ledger for every
+    /// candidate, including the terminal absent position.
+    work: usize,
+}
+
 /// The descriptor metadata captured around one exact package read.
 ///
 /// A path is not a stable source identity: a caller can replace it while a
@@ -840,6 +849,46 @@ impl Package {
             state: Arc::new(State {
                 source: PhysicalSource::Semantic(components),
                 options: ReadOptions::new(archive, semantic),
+                object_index,
+                total_objects,
+                semantic: OnceCell::new(),
+                #[cfg(test)]
+                semantic_decode_attempts: AtomicUsize::new(0),
+                #[cfg(all(test, feature = "internal-iwork-source"))]
+                source_classification_attempts: 0,
+            }),
+        };
+        package.root_show_identifier()?;
+        Ok(package)
+    }
+
+    /// Build the private package view used by the metadata-only merge reader.
+    ///
+    /// A component catalog is already checked by the coordinator or by the
+    /// archive parser that produced it.  Keeping it in the existing semantic
+    /// source slot lets all object and message routing share one compact index
+    /// without manufacturing a second ZIP catalog.  The merge reader calls a
+    /// dedicated core ingress for this state; ordinary package operations keep
+    /// their existing physical-source requirements.
+    pub(super) fn from_merge_components(
+        components: Arc<ComponentCatalog>,
+        options: ReadOptions,
+    ) -> ReadResult<Self> {
+        match litchi_iwa_detect::component_catalog(&components)? {
+            Some(Format::Keynote) => {},
+            Some(_) => return Err(ReadError::NotKeynote),
+            None => {
+                return Err(ReadError::InvalidFormat(
+                    "package has no recognized iWork application root".to_owned(),
+                ));
+            },
+        }
+        let (object_index, total_objects) =
+            build_object_index(&components, options.semantic().max_objects())?;
+        let package = Self {
+            state: Arc::new(State {
+                source: PhysicalSource::Semantic(components),
+                options,
                 object_index,
                 total_objects,
                 semantic: OnceCell::new(),
@@ -1226,15 +1275,34 @@ impl Package {
     }
 
     fn slide_record_at(&self, index: usize) -> ReadResult<Option<SlideRecord>> {
+        let mut budget = SemanticBudget::new(self.semantic_limits());
+        Ok(self.slide_record_at_with_budget(index, &mut budget)?.record)
+    }
+
+    /// Read one ordered slide record against a caller-owned semantic ledger.
+    ///
+    /// Most package readers select one position and can keep the selected
+    /// record's reference charges local.  Metadata-only selector scans visit
+    /// several positions, however, so they must thread one ledger through the
+    /// whole scan rather than resetting the reference ceiling for every
+    /// candidate.
+    fn slide_record_at_with_budget(
+        &self,
+        index: usize,
+        budget: &mut SemanticBudget,
+    ) -> ReadResult<SlideRecordRead> {
         let show_identifier = self.root_show_identifier()?;
         if show_identifier == 0 {
-            return Ok(None);
+            return Ok(SlideRecordRead {
+                record: None,
+                work: 0,
+            });
         }
         let show_object = self
             .object(show_identifier)
             .ok_or_else(|| ReadError::Decode("Keynote show object is missing".to_owned()))?;
         let payload = unique_payload(&show_object.messages, &[SHOW_MESSAGE_TYPE], "Keynote show")?;
-        let mut budget = SemanticBudget::new(self.semantic_limits());
+        let work = payload.len();
         budget.charge_references(1, SemanticPath::Show)?;
         // This is a selected-local read: the codec validates the outer show
         // and slide-tree framing plus the selected nested reference, but does
@@ -1248,7 +1316,7 @@ impl Package {
             self.semantic_wire_limits()?,
         )?;
         let Some(selected) = selected else {
-            return Ok(None);
+            return Ok(SlideRecordRead { record: None, work });
         };
         // Charge the show -> slide-node edge before resolving the selected
         // object so a reference ceiling cannot be bypassed by a missing node.
@@ -1260,6 +1328,12 @@ impl Package {
             &[SLIDE_NODE_MESSAGE_TYPE],
             "Keynote slide node",
         )?;
+        let work = work
+            .checked_add(node_payload.len())
+            .ok_or(ReadError::Allocation {
+                resource: "Keynote selected slide projection",
+                amount: usize::MAX,
+            })?;
         let (slide_identifier, is_skipped) = decode_slide_node_projection(
             node_payload,
             self.semantic_wire_limits()?,
@@ -1268,11 +1342,43 @@ impl Package {
         // Charge the node -> slide edge after validating its payload so the
         // selected record accounts for both graph edges.
         budget.charge_references(1, SemanticPath::Slide { index })?;
-        Ok(Some(SlideRecord {
-            node_identifier,
-            slide_identifier,
-            is_skipped,
-        }))
+        Ok(SlideRecordRead {
+            record: Some(SlideRecord {
+                node_identifier,
+                slide_identifier,
+                is_skipped,
+            }),
+            work,
+        })
+    }
+
+    /// Borrow one slide's navigator name without constructing semantic slide
+    /// values.  The caller has already resolved the slide node, which keeps
+    /// the no-name and no-slide cases distinct during selector scans.
+    fn slide_name_for_identifier_with_work(
+        &self,
+        slide_identifier: u64,
+        index: usize,
+    ) -> ReadResult<(Option<&str>, usize)> {
+        let slide_object = self.required_object(slide_identifier, "Keynote slide")?;
+        let payload = unique_payload(
+            &slide_object.messages,
+            &[SLIDE_MESSAGE_TYPE],
+            "Keynote slide",
+        )?;
+        let wire_limits = self.semantic_wire_limits()?;
+        let view = WireView::parse_with_limits(payload, wire_limits).map_err(|error| {
+            map_wire_preflight_error(error, "Keynote slide", SemanticPath::Slide { index })
+        })?;
+        let mut name = None;
+        for field in view.fields() {
+            if field.number() == 10 {
+                set_unique_utf8(field, &mut name, "Keynote slide name").map_err(|error| {
+                    map_wire_preflight_error(error, "Keynote slide", SemanticPath::Slide { index })
+                })?;
+            }
+        }
+        Ok((name, payload.len()))
     }
 
     fn parse_slide(
@@ -1731,6 +1837,16 @@ impl SemanticBudget {
             text_fragments: 0,
             text_bytes: 0,
         }
+    }
+
+    /// Number of semantic graph references charged by this bounded read.
+    ///
+    /// Focused metadata selectors use the value to debit their independent
+    /// operation ledger without giving the operation a second semantic
+    /// budget.  Keeping the counter private preserves the package-level
+    /// resource boundary.
+    const fn references_charged(&self) -> usize {
+        self.references
     }
 
     fn charge_references(&mut self, amount: usize, path: SemanticPath) -> ReadResult<()> {
