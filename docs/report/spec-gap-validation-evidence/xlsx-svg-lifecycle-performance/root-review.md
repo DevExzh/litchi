@@ -130,3 +130,20 @@ manifest extra. The manifest now binds the committed ADR 0001 and ADR 0005
 alongside this profile's committed requirements. The local goal remains task
 context; it is not required to build or execute the harness. The new declared
 input test reproduced this missing-file failure before the runner correction.
+
+## Sealed semantic capture at `cd5dc456b`
+
+The [retained bundle](results/clean-cd5dc456b/README.md) contains 69 acceptance
+lanes, three fresh processes each, two warmups and 20 measured samples per
+process. Root and independent review verified all 207 receipts, 4,140 samples,
+empty stderr files, successful GNU time exits, 4,870 manifest inputs, exact
+semantic/readback outcomes, expected typed refusals, and unchanged source and
+binary identities. The 635 raw files were retained byte-for-byte.
+
+This bundle is approved for semantic and scaffold evidence only. Its original
+CPU/memory provenance fields were unavailable because of the runner quoting
+defect; the explicit post-run host supplement does not replace measured
+provenance. Performance and optimization claims require a fresh capture under
+the `e7b80f056` correction and an uncertainty summary. Raw timing data and the
+generated report remain intact for audit, with that limitation stated in the
+bundle README.
