@@ -1,0 +1,15 @@
+{
+  "status": "pass",
+  "source_revision": "67028ab6037ae6eef15af92a0d540285c3c5362c",
+  "source_files": 12,
+  "adr_files": 30,
+  "prior_seal_entries": 550,
+  "draft_patch_sha256": "28269e6051f9ee9453ccfd590a0f89269c400529d973a84f0ac908eb6730c5e9",
+  "draft_applies": true,
+  "candidate_source_replay": true,
+  "profile_analysis_replay": true,
+  "candidate_scratch_absent": true,
+  "python_cache_absent": true,
+  "seal_entries": null,
+  "scope": "Source/ADR/retained seal/draft applicability/cleanup audit; not a Rust build, correctness suite or new performance measurement."
+}

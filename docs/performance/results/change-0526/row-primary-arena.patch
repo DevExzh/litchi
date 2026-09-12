@@ -1,0 +1,251 @@
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
+index 20a1b013e..deba7b492 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
+@@ -1,5 +1,7 @@
+ //! Captured worksheet layout and lossless XML tag model.
+ 
++use std::ops::Range;
++
+ use litchi_sheet::{Cell as Address, Column, Rect};
+ 
+ use crate::raw::worksheet::edit::model::SelectionRange;
+@@ -32,7 +34,9 @@ pub(crate) struct CellSlot {
+     /// one unqualified `r` attribute. The address is parsed separately, so
+     /// the writer can regenerate `r` without retaining an owned tag.
+     pub(crate) tag: Option<Tag>,
+-    pub(crate) primary: Box<[Span]>,
++    /// Half-open indices into the owning [`RowSlot::primary`] arena. The
++    /// referenced `Span` values retain byte offsets into the worksheet source.
++    pub(crate) primary: Range<usize>,
+     pub(crate) mce_payload: bool,
+     pub(crate) empty: bool,
+ }
+@@ -46,6 +50,7 @@ pub(crate) struct RowSlot {
+     pub(crate) tag: Tag,
+     pub(crate) descent_attribute: Option<Box<str>>,
+     pub(crate) cells: Box<[CellSlot]>,
++    pub(crate) primary: Box<[Span]>,
+     pub(crate) empty: bool,
+ }
+ 
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+index 3af9bd8c8..189b081ff 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+@@ -49,9 +49,9 @@ struct Frame {
+ struct PendingCell {
+     address: Address,
+     start: usize,
++    primary_start: usize,
+     tag_end: usize,
+     tag: Option<Tag>,
+-    primary: Vec<Span>,
+     mce_payload: bool,
+     formula_index: Option<usize>,
+ }
+@@ -65,6 +65,7 @@ struct PendingRow {
+     tag: Tag,
+     descent_attribute: Option<Box<str>>,
+     cells: Vec<CellSlot>,
++    primary: Vec<Span>,
+ }
+ 
+ #[derive(Debug)]
+@@ -641,6 +642,7 @@ impl Scanner {
+                 tag: tag(element, decoder)?,
+                 descent_attribute: x14ac::attribute_name(element, resolver)?,
+                 cells: Box::new([]),
++                primary: Box::new([]),
+                 empty: true,
+             };
+             self.pending_sheet_data
+@@ -654,6 +656,12 @@ impl Scanner {
+         {
+             let address = self.cell_address(element, decoder)?;
+             let tag = cell_tag(element, decoder)?;
++            let primary_start = self
++                .row
++                .as_ref()
++                .ok_or_else(|| invalid("empty cell outside row"))?
++                .primary
++                .len();
+             self.row
+                 .as_mut()
+                 .ok_or_else(|| invalid("empty cell outside row"))?
+@@ -664,7 +672,7 @@ impl Scanner {
+                     tag_end: span.end,
+                     close_start: span.end,
+                     tag,
+-                    primary: Box::new([]),
++                    primary: primary_start..primary_start,
+                     mce_payload: false,
+                     empty: true,
+                 });
+@@ -686,9 +694,12 @@ impl Scanner {
+             } else if let Some(cell) = self.cell.as_mut() {
+                 cell.formula_index = None;
+             }
+-            self.cell
++            if self.cell.is_none() {
++                return Err(invalid("empty cell payload outside cell"));
++            }
++            self.row
+                 .as_mut()
+-                .ok_or_else(|| invalid("empty cell payload outside cell"))?
++                .ok_or_else(|| invalid("empty cell payload outside row"))?
+                 .primary
+                 .push(span);
+         } else if self.cell.is_some()
+@@ -827,10 +838,14 @@ impl Scanner {
+                     .cell
+                     .as_mut()
+                     .ok_or_else(|| invalid("cell payload closed outside a cell"))?;
+-                cell.primary.push(Span {
+-                    start: frame.start,
+-                    end,
+-                });
++                self.row
++                    .as_mut()
++                    .ok_or_else(|| invalid("cell payload closed outside a row"))?
++                    .primary
++                    .push(Span {
++                        start: frame.start,
++                        end,
++                    });
+                 cell.formula_index = None;
+             },
+             FrameKind::Cell => {
+@@ -838,23 +853,24 @@ impl Scanner {
+                     .cell
+                     .take()
+                     .ok_or_else(|| invalid("cell close without edit state"))?;
+-                self.row
++                let row = self
++                    .row
+                     .as_mut()
+-                    .ok_or_else(|| invalid("cell closed outside a row"))?
+-                    .cells
+-                    .push(CellSlot {
+-                        address: cell.address,
+-                        span: Span {
+-                            start: cell.start,
+-                            end,
+-                        },
+-                        tag_end: cell.tag_end,
+-                        close_start,
+-                        tag: cell.tag,
+-                        primary: cell.primary.into_boxed_slice(),
+-                        mce_payload: cell.mce_payload,
+-                        empty: false,
+-                    });
++                    .ok_or_else(|| invalid("cell closed outside a row"))?;
++                let primary_end = row.primary.len();
++                row.cells.push(CellSlot {
++                    address: cell.address,
++                    span: Span {
++                        start: cell.start,
++                        end,
++                    },
++                    tag_end: cell.tag_end,
++                    close_start,
++                    tag: cell.tag,
++                    primary: cell.primary_start..primary_end,
++                    mce_payload: cell.mce_payload,
++                    empty: false,
++                });
+             },
+             FrameKind::Row => {
+                 let row = self
+@@ -885,6 +901,7 @@ impl Scanner {
+                         tag: row.tag,
+                         descent_attribute: row.descent_attribute,
+                         cells: row.cells.into_boxed_slice(),
++                        primary: row.primary.into_boxed_slice(),
+                         empty: false,
+                     });
+             },
+@@ -927,6 +944,7 @@ impl Scanner {
+             tag: tag(element, decoder)?,
+             descent_attribute: x14ac::attribute_name(element, resolver)?,
+             cells: Vec::new(),
++            primary: Vec::new(),
+         });
+         Ok(())
+     }
+@@ -958,12 +976,18 @@ impl Scanner {
+     ) -> Result<()> {
+         let address = self.cell_address(element, decoder)?;
+         let tag = cell_tag(element, decoder)?;
++        let primary_start = self
++            .row
++            .as_ref()
++            .ok_or_else(|| invalid("cell outside edit row"))?
++            .primary
++            .len();
+         self.cell = Some(PendingCell {
+             address,
+             start,
++            primary_start,
+             tag_end: end,
+             tag,
+-            primary: Vec::new(),
+             mce_payload: false,
+             formula_index: None,
+         });
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+index c50324062..bb01cf08a 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -224,7 +224,7 @@ fn write_replacement_row(
+                 record_omitted(omitted, recording, first, last, start, cell_start)?;
+             }
+             match action {
+-                Action::Update { .. } => write_cell(output, source, cell, action)?,
++                Action::Update { .. } => write_cell(output, source, cell, &row.primary, action)?,
+                 Action::Remove => {
+                     return Err(invalid("replacement row unexpectedly removes a cell"));
+                 },
+@@ -384,7 +384,7 @@ fn write_row(
+                 .next()
+                 .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+             match action {
+-                Action::Update { .. } => write_cell(output, source, cell, action)?,
++                Action::Update { .. } => write_cell(output, source, cell, &row.primary, action)?,
+                 Action::Remove => {},
+             }
+         } else {
+@@ -486,7 +486,13 @@ fn row_effect_attributes<'a>(
+     }
+ }
+ 
+-fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Action) -> Result<()> {
++fn write_cell(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    cell: &CellSlot,
++    primary: &[Span],
++    action: &Action,
++) -> Result<()> {
+     let Action::Update { payload, style } = action else {
+         return Err(invalid("cannot rewrite a removed cell"));
+     };
+@@ -527,13 +533,10 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
+     }
+     if !cell.empty {
+         if payload.is_some() {
+-            copy_without(
+-                output,
+-                source,
+-                cell.tag_end,
+-                cell.close_start,
+-                &cell.primary,
+-            );
++            let primary = primary.get(cell.primary.clone()).ok_or_else(|| {
++                invalid("worksheet cell primary span range exceeds its owning row")
++            })?;
++            copy_without(output, source, cell.tag_end, cell.close_start, primary);
+         } else {
+             output.extend_from_slice(&source[cell.tag_end..cell.close_start]);
+         }
+

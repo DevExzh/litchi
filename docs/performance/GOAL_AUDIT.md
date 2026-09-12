@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0526: next scanner experiment prepared; full goal remains open
+
+[0526](changes/0526-xlsx-primary-span-layout-audit.md) The previous turn made progress through accepted commit `67028ab60`. This batch revalidates its source/evidence and prepares a concrete scanner-storage experiment with independent cost/design/test reviews. No production optimization is retained here. Fresh before/after measurements and correctness gates are the next action; broader CRUD, provider, cold/range and scaling requirements remain open. OLE2/OOXML continues ahead of deferred ODF; iWork is excluded.
+
 ## 0525: measured OOXML reconstruction progress; full optimization goal remains open
 
 [0525](changes/0525-xlsx-unchanged-cell-readback.md) advances the active
