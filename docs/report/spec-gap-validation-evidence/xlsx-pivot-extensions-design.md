@@ -455,9 +455,11 @@ the implementation has passed its production gate. Its public names are
   `diagnostic_status()` returns `DiagnosticStatus`.
 * `Transaction::new(&mut OpcPackage, impl Into<CacheSelector>, FieldSelector<'_>)`
   returns `Result<Transaction<'_>>`. Its
-  `set_cached_unique_name(index: u32, name: impl Into<String>)` returns
+  `set_cached_unique_name(index: u32, name: impl AsRef<str>)` returns
   `Result<bool>`: the index is the semantic item index, not the vector ordinal,
-  and `false` means the staged value was already equal.
+  and `false` means the staged value was already equal. The setter validates
+  borrowed text against the name and caller limits before allocating its
+  staged copy; `&str` and owned `String` inputs both use this contract.
 * `Transaction::commit()` returns `Result<Commit>`. `Commit::changed()` returns
   `bool`, `snapshot()` returns `&Snapshot`, and `patch()` returns `&Patch`.
   `Patch::inverse()` returns `Patch`; `apply(&mut OpcPackage)` returns
