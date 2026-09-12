@@ -404,7 +404,7 @@ reuse names across data-style families. Use an owner and family in every
 mutation selector:
 
 ```rust
-pub enum DataStyleOwner { ContentAutomatic, CommonStyles }
+pub enum DataStyleOwner { ContentAutomatic, CommonStyles, StylesAutomatic }
 
 pub struct DataStyleSelector<'a> {
     pub owner: DataStyleOwner,
@@ -413,20 +413,33 @@ pub struct DataStyleSelector<'a> {
 }
 ```
 
-`ContentAutomatic` is the only mutable owner in this batch. A
-`CommonStyles` selector is valid for inspection and typed catalog lookup but
-returns a read-only/refused result for every mutation. A selector that omits
+`ContentAutomatic` selects direct `office:automatic-styles` in `content.xml`
+and is the only mutable owner in this batch. `CommonStyles` selects direct
+`office:styles` in `styles.xml`; `StylesAutomatic` selects the separate direct
+`office:automatic-styles` container in that same member. Both styles-member
+owners are valid for inspection and typed catalog lookup and refuse every
+mutation. Their scopes remain distinct even when names coincide. A selector that omits
 owner or family must first resolve to exactly one catalog entry; otherwise it
-returns an ambiguity error instead of picking content or common styles by
-precedence. `DataStyleSelector::automatic(name, family)` and
-`DataStyleSelector::common(name, family)` are the concise constructors.
+returns an ambiguity error instead of selecting an owner or family by
+precedence. `DataStyleSelector::automatic(name, family)`,
+`DataStyleSelector::common(name, family)`, and
+`DataStyleSelector::styles_automatic(name, family)` are the concise constructors.
+The styles-member automatic scope is not an implicit fallback for a reference
+originating in `content.xml`.
 
 A `DataStyleAttributePatch` with `Keep`, `Set`, and `Clear` operations should
 allow metadata edits on number/date/time/currency/percentage/boolean and text
 data-style roots, including a `number:text-style` whose body is otherwise
 opaque. The patch must locate exactly one style in the selected
 `ContentAutomatic` owner and preserve its child/body bytes. It must refuse a
-`CommonStyles` target explicitly, even when the source body is fully typed.
+`CommonStyles` or `StylesAutomatic` target explicitly, even when the source
+body is fully typed. `Set("")` retains a present empty attribute when its
+scalar type permits that value; `Clear` removes the attribute. Setting an
+existing attribute to its successfully decoded semantic value preserves that
+attribute’s exact source spelling, including character references. The whole
+patch is an exact source no-op only when every operation is a semantic no-op.
+Malformed or unsupported lexical values must not be normalized through this
+equality rule.
 
 The existing ordinary integration stays source-checked and atomic:
 
@@ -451,8 +464,10 @@ The existing ordinary integration stays source-checked and atomic:
 `effective_cell_style` should retain its current `data_style` name for source
 compatibility and add a definition accessor that returns the typed data-style
 projection when the selected body is supported. Resolution must search the
-content automatic styles with the current precedence, then common `styles.xml`
-styles, while preserving the latter as a read-only source owner. A style with
+direct `content.xml` automatic styles with the current precedence, then direct
+`office:styles` definitions in `styles.xml`, preserving the latter as a
+read-only source owner. `StylesAutomatic` requires explicit owner selection
+and is excluded from this implicit content-cell fallback. A style with
 an unsupported body can still be opened and preserved, but its body accessor
 and semantic replacement return a typed unsupported result. When a decimal
 default depends on the cell's table-cell style, the accessor returns the
@@ -626,8 +641,9 @@ Document integration tests should exercise:
   their body bytes;
 * reject replacement of a source style containing unsupported maps/properties
   without changing the candidate;
-* preserve and resolve a data style defined in `styles.xml` while keeping that
-  common-style owner read-only, and reject an owner-ambiguous name selector;
+* preserve, explicitly owner-select, and resolve data styles from both direct
+  style containers in `styles.xml`, keep both owners read-only, and reject an
+  owner-ambiguous name selector;
 * reopen `formats.ods` through the packaged ODS path, inspect `yielddisc.fods`
   through `FlatSnapshot` or an explicitly recorded extracted-package fixture,
   classify core and `loext:*` attributes separately, and prove that
@@ -660,9 +676,9 @@ owner. It does not claim the following:
 * semantic `number:text-style` body editing, style-map condition evaluation,
   style:text-properties editing, or arbitrary foreign/extension markup
   rewriting;
-* a public common `styles.xml` graph authoring API or metadata mutation path;
-  those definitions remain source-preserved and resolvable where the typed
-  projection is available;
+* graph authoring or metadata mutation for either read-only `styles.xml`
+  owner (`CommonStyles` or `StylesAutomatic`); those definitions remain
+  source-preserved and explicitly resolvable where typed projection is available;
 * semantic authoring of LibreOffice `loext:*` attributes such as
   `loext:max-numerator-digits`, `loext:min-decimal-places`,
   `loext:exponent-interval`, or `loext:forced-exponent-sign`; they remain
