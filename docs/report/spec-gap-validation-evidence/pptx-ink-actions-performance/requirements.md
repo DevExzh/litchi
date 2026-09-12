@@ -1,12 +1,12 @@
 # PPTX existing InkAction evidence requirements
 
-This is the acceptance contract for a future adapter. It is not a measurement
+This is the acceptance contract for the bounded adapter. It is not a measurement
 result. The initial profile contains exactly 23 recipes and 42 lanes; the
 complete names and recipe mapping are in `corpus-manifest.json`.
 
 ## Public API binding and setup
 
-The adapter must use only the public existing-target routes:
+The adapter uses only the public existing-target routes:
 
 | scope | required call | setup excluded from the timer |
 |---|---|---|
@@ -177,10 +177,9 @@ elapsed_ns, requested_alloc_bytes, peak_live_delta_bytes,
 rss_max_kib, allocation_equation_ok, process_id, warmup
 ```
 
-`generator_sha256` is `null` in this docs-only scaffold because no profile
-generator exists yet; the future adapter must hash any retained generator
-before building. `helper_sha256` must match the committed helper hash in the
-manifest. Unavailable fields are `null`, never measured zero.
+`generator_sha256` is the SHA-256 of the retained bounded OPC generator source
+(`harness/adapter.rs`); `helper_sha256` must match the committed helper hash in
+the manifest. Unavailable fields are `null`, never measured zero.
 
 The later sealed run requires three fresh processes per lane, two warm-ups,
 and twenty measured samples per process: 126 process launches, 252 warm-ups,
@@ -197,8 +196,8 @@ review.
 Before any later build, the implementation must materialize a tracked
 `harness/Cargo.lock` from the isolated harness manifest and record its
 SHA-256. A missing, dirty, or repository-root lockfile substitution fails
-preflight. This docs-only scaffold intentionally has no harness manifest or
-lockfile; materialization belongs to the later reviewed implementation step.
+preflight. The isolated harness manifest and lockfile are materialized in this scaffold;
+the later sealed runner still refuses any root-lockfile substitution.
 
 The matrix preflight must assert 23 unique recipe IDs, 42 unique lane IDs,
 every recipe is referenced by at least one lane, and every lane references an

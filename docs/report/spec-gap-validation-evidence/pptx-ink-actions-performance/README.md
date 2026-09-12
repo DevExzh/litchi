@@ -1,9 +1,11 @@
 # PPTX existing InkAction performance scaffold
 
-This directory is a review-gated scaffold for bounded absolute Litchi host
-observations about the existing-target PowerPoint 2014 `inkAction` owner at
-`cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`. It contains no build, timing
-receipt, native PowerPoint acceptance result, or speedup claim.
+This directory is a review-gated bounded harness scaffold for absolute Litchi
+host observations about the existing-target PowerPoint 2014 `inkAction` owner
+at `cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`. The public adapter, executable
+host probe, matrix preflight, verifier, full-source manifest tool, and
+isolated lockfile are present. No release profile or timing receipt has been
+captured, and there is no native PowerPoint acceptance result or speedup claim.
 
 The initial profile is deliberately finite: exactly 23 recipes and 42 lanes,
 with no Cartesian expansion. [`PLAN.md`](PLAN.md) defines the public
@@ -24,9 +26,9 @@ establish only the named Litchi host behavior; they cannot establish
 PowerPoint acceptance, rendering, playback, recognition, or producer-specific
 path/MIME behavior.
 
-The future adapter must own an isolated `harness/Cargo.lock`; the repository
-root lockfile is not the profile lock. The later implementation must
-materialize and hash `harness/Cargo.lock` before its first build; a missing or
+The adapter owns the isolated `harness/Cargo.lock`; the repository root
+lockfile is not the profile lock. The lockfile is materialized and included in
+the source/provenance closure before any later release profile. A missing or
 root-lockfile substitution fails preflight. The later authorized run requires
 a clean isolated checkout,
 full source/toolchain/host/binary/fixture hashes, three fresh processes, two
@@ -34,4 +36,4 @@ warm-ups, and twenty samples per process: at most 126 process launches, 252
 warm-ups, 2,520 measured calls, and 2,772 operation calls. Until that review
 gate passes,
 [`report.md`](report.md), [`root-review.md`](root-review.md), and
-[`results/`](results/) remain placeholders.
+[`results/`](results/) remain free of timing receipts.
