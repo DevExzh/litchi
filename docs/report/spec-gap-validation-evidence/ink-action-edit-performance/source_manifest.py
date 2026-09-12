@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -25,10 +26,98 @@ def display(path: Path, root: Path) -> str:
         return str(path)
 
 
-def require_file(path: Path) -> None:
+FORMAT = "ink-action-edit-build-source-v2"
+
+
+def require_file(path: Path) -> Path:
     path = path.resolve()
     if not path.is_file():
         raise SystemExit(f"source manifest input is missing: {path}")
+    return path
+
+
+def committed_blob_sha256(root: Path, commit: str, shown: str) -> str:
+    """Hash the committed blob bytes without consulting the Git index."""
+
+    try:
+        committed = subprocess.check_output(
+            [
+                "git",
+                "--no-replace-objects",
+                "-C",
+                str(root),
+                "cat-file",
+                "blob",
+                f"{commit}:{shown}",
+            ]
+        )
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"cannot read committed source input blob: {shown}") from error
+    return hashlib.sha256(committed).hexdigest()
+
+
+def verify_git_inputs(paths: list[Path], root: Path, commit: str) -> None:
+    """Require every local build input to equal its committed Git blob.
+
+    ``git diff`` is deliberately not used here.  Its result can be affected by
+    index flags such as ``assume-unchanged``; the local SHA-256 is compared with
+    bytes read by ``git cat-file`` from the committed tree, so a mutated file
+    is caught even when Git's index metadata says it is clean.
+    """
+
+    root = root.resolve()
+    relative: list[str] = []
+    for path in sorted({path.resolve() for path in paths}, key=str):
+        require_file(path)
+        try:
+            shown = path.relative_to(root).as_posix()
+        except ValueError as error:
+            raise SystemExit(
+                "non-Git local input requires a retained source snapshot: "
+                f"{path}"
+            ) from error
+        relative.append(shown)
+
+    if not relative:
+        return
+    try:
+        current = subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+        ).strip()
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"cannot read committed Git head for source inputs: {root}") from error
+    if current != commit:
+        raise SystemExit(
+            f"source input Git head changed during manifest capture: {commit} -> {current}"
+        )
+
+    missing: list[str] = []
+    for shown in relative:
+        tracked = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", shown],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if tracked.returncode != 0:
+            missing.append(shown)
+    if missing:
+        raise SystemExit(
+            "local build inputs are not tracked in the committed checkout: "
+            + ", ".join(sorted(missing))
+        )
+
+    changed: list[str] = []
+    for shown in relative:
+        committed_blob = committed_blob_sha256(root, commit, shown)
+        working_blob = sha256(root / shown)
+        if working_blob != committed_blob:
+            changed.append(shown)
+    if changed:
+        raise SystemExit(
+            "local build inputs differ from committed Git blobs: "
+            + ", ".join(sorted(set(changed)))
+        )
 
 
 def main() -> None:
@@ -36,6 +125,7 @@ def main() -> None:
     parser.add_argument("--metadata", type=Path, required=True)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--git-commit", required=True)
     parser.add_argument("--extra", type=Path, action="append", default=[])
     args = parser.parse_args()
 
@@ -43,6 +133,7 @@ def main() -> None:
     metadata_path = args.metadata.resolve()
     metadata = json.loads(metadata_path.read_text())
     packages: list[tuple[str, str, Path, str | None, list[Path]]] = []
+    local_inputs: list[Path] = []
 
     for package in metadata["packages"]:
         manifest = Path(package["manifest_path"]).resolve()
@@ -66,12 +157,17 @@ def main() -> None:
                 sorted(set(package_files), key=str),
             )
         )
+        if package.get("source") is None:
+            local_inputs.extend(package_files)
 
     for extra in args.extra:
-        require_file(extra)
+        local_inputs.append(require_file(extra))
+
+    verify_git_inputs(local_inputs, root, args.git_commit)
 
     lines = [
-        "format=ink-action-edit-build-source-v1",
+        f"format={FORMAT}",
+        f"git_commit={args.git_commit}",
         f"metadata_sha256={sha256(metadata_path)}",
     ]
     for name, version, manifest, source, package_files in sorted(

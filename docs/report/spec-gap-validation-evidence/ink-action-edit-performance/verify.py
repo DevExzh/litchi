@@ -17,6 +17,7 @@ from pathlib import Path
 
 
 SCHEMA = "ink-action-edit-profile-v2"
+SOURCE_MANIFEST_FORMAT = "ink-action-edit-build-source-v2"
 EXPECTED_COMMIT = "079cbbcbfc00c8d2412a38586a9688ae7eb0009e"
 SOURCE_HASHES = {
     "crates/litchi-drawingml/src/ink/mod.rs": "a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7",
@@ -99,24 +100,98 @@ def bool_field(value: object, field: str, path: Path) -> bool:
     return bool(value)
 
 
-def verify_source_manifest(path: Path, root: Path) -> int:
+def committed_blob_sha256(root: Path, commit: str, shown: str) -> str:
+    """Hash committed blob bytes without consulting the Git index."""
+
+    try:
+        committed = subprocess.check_output(
+            [
+                "git",
+                "--no-replace-objects",
+                "-C",
+                str(root),
+                "cat-file",
+                "blob",
+                f"{commit}:{shown}",
+            ]
+        )
+    except subprocess.CalledProcessError as error:
+        raise AssertionError(f"cannot read committed Git input blob: {shown}") from error
+    return hashlib.sha256(committed).hexdigest()
+
+
+def verify_git_snapshot(paths: list[Path], root: Path, commit: str) -> None:
+    """Verify local manifest inputs equal their committed Git blobs.
+
+    The comparison reads the working-tree bytes directly.  A Git diff is not
+    sufficient because index flags such as ``assume-unchanged`` can hide a
+    changed tracked file.
+    """
+
+    root = root.resolve()
+    relative: list[str] = []
+    for path in sorted({path.resolve() for path in paths}, key=str):
+        require(path.is_file(), f"retained Git input missing: {path}")
+        try:
+            relative.append(path.relative_to(root).as_posix())
+        except ValueError as error:
+            raise AssertionError(
+                f"non-Git local input has no retained source snapshot: {path}"
+            ) from error
+    if not relative:
+        return
+    current = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+    ).strip()
+    require(current == commit, f"Git snapshot commit changed: {commit} -> {current}")
+
+    missing: list[str] = []
+    for shown in relative:
+        tracked = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", shown],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if tracked.returncode != 0:
+            missing.append(shown)
+    require(not missing, "local Git inputs are not tracked: " + ", ".join(sorted(missing)))
+
+    changed: list[str] = []
+    for shown in relative:
+        committed_blob = committed_blob_sha256(root, commit, shown)
+        working_blob = sha256(root / shown)
+        if working_blob != committed_blob:
+            changed.append(shown)
+    require(
+        not changed,
+        "local Git inputs differ from committed snapshot: " + ", ".join(sorted(set(changed))),
+    )
+
+
+def verify_source_manifest(path: Path, root: Path) -> tuple[int, str]:
     lines = path.read_text().splitlines()
     require(
-        lines and lines[0] == "format=ink-action-edit-build-source-v1",
+        lines and lines[0] == f"format={SOURCE_MANIFEST_FORMAT}",
         "manifest format changed",
     )
-    packages: dict[tuple[str, str, str], tuple[int, str]] = {}
+    git_commit: str | None = None
+    packages: dict[tuple[str, str, str], tuple[str, int, str]] = {}
     files: dict[tuple[str, str, str], list[tuple[str, str]]] = {}
     extras: list[tuple[str, str]] = []
     for line in lines[1:]:
-        if line.startswith("metadata_sha256="):
+        if line.startswith("git_commit="):
+            require(git_commit is None, "duplicate Git commit line")
+            git_commit = line.split("=", 1)[1]
+            continue
+        elif line.startswith("metadata_sha256="):
             continue
         parts = line.split("\t")
         if line.startswith("package="):
             require(len(parts) == 7, f"malformed package line: {line}")
             key = (parts[0][len("package=") :], parts[1], parts[3])
             require(key not in packages, f"duplicate package line: {key}")
-            packages[key] = (int(parts[5]), parts[6])
+            packages[key] = (parts[2], int(parts[5]), parts[6])
         elif line.startswith("file="):
             require(len(parts) == 5, f"malformed file line: {line}")
             key = (parts[0][len("file=") :], parts[1], parts[2])
@@ -126,9 +201,11 @@ def verify_source_manifest(path: Path, root: Path) -> int:
             extras.append((parts[1], parts[2]))
         else:
             raise AssertionError(f"unknown manifest line: {line}")
+    require(git_commit is not None and git_commit, "manifest Git commit missing")
     require(set(packages) == set(files), "package/file manifest sets differ")
     checked = 0
-    for key, (expected_count, expected_tree) in packages.items():
+    local_inputs: list[Path] = []
+    for key, (source, expected_count, expected_tree) in packages.items():
         entries = files[key]
         require(len(entries) == expected_count, f"package file count changed: {key}")
         tree_payload = "\n".join(f"{shown}\t{digest}" for shown, digest in entries)
@@ -140,14 +217,18 @@ def verify_source_manifest(path: Path, root: Path) -> int:
             current = resolve(root, shown)
             require(current.is_file(), f"retained manifest path missing: {shown}")
             require(sha256(current) == expected, f"retained manifest hash changed: {shown}")
+            if source == "path":
+                local_inputs.append(current)
             checked += 1
     for shown, expected in extras:
         current = resolve(root, shown)
         require(current.is_file(), f"retained extra path missing: {shown}")
         require(sha256(current) == expected, f"retained extra hash changed: {shown}")
+        local_inputs.append(current)
         checked += 1
+    verify_git_snapshot(local_inputs, root, git_commit)
     require(checked >= 10, f"too few retained manifest inputs checked: {checked}")
-    return checked
+    return checked, git_commit
 
 
 def quantile(values: list[int], percent: int) -> int:
@@ -472,7 +553,7 @@ def verify_binary_receipts(results: Path) -> str:
     return digest
 
 
-def verify_provenance(results: Path, root: Path) -> tuple[str, int]:
+def verify_provenance(results: Path, root: Path, manifest_commit: str) -> tuple[str, int]:
     provenance = (results / "source-provenance.txt").read_text()
     require(
         f"approved_base_commit={EXPECTED_COMMIT}" in provenance,
@@ -488,6 +569,7 @@ def verify_provenance(results: Path, root: Path) -> tuple[str, int]:
         == subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip(),
         "profile git head changed after capture",
     )
+    require(current_commit == manifest_commit, "profile Git head differs from source manifest snapshot")
     require("git_status_relevant=\n" in provenance, "relevant source tree was dirty during profile")
     source_hashes: dict[str, str] = {}
     for line in provenance.splitlines():
@@ -507,7 +589,7 @@ def verify_provenance(results: Path, root: Path) -> tuple[str, int]:
             f"approved source hash missing or changed: {relative}",
         )
     evidence_dir = root / "docs/report/spec-gap-validation-evidence/ink-action-edit-performance"
-    for test_name in ("test_verify.py", "test_smoke_target.py"):
+    for test_name in ("test_verify.py", "test_smoke_target.py", "test_source_snapshot.py"):
         test_path = evidence_dir / test_name
         require(source_hashes.get(str(test_path)) == sha256(test_path), f"test manifest hash missing or changed: {test_name}")
     return provenance, len(source_hashes)
@@ -597,11 +679,11 @@ def main() -> None:
     after = results / "source-manifest-after.txt"
     require(before.read_bytes() == after.read_bytes(), "source manifest changed during profile")
     manifest_sha = sha256(before)
-    manifest_count = verify_source_manifest(before, root)
+    manifest_count, manifest_commit = verify_source_manifest(before, root)
     provenance = (results / "source-provenance.txt").read_text()
     require(f"source_manifest_before_sha256={manifest_sha}" in provenance, "manifest hash missing")
     require(f"source_manifest_after_sha256={manifest_sha}" in provenance, "post-build manifest hash missing")
-    _, source_count = verify_provenance(results, root)
+    _, source_count = verify_provenance(results, root, manifest_commit)
     verify_host_and_commands(results)
     binary_digest = verify_binary_receipts(results)
     rows = verify_lanes(results)
