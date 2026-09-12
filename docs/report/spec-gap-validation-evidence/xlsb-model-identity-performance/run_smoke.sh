@@ -85,6 +85,8 @@ for extra in \
     "$harness_manifest" \
     "$profile_dir/harness/Cargo.lock" \
     "$profile_dir/harness/build.rs" \
+    "$profile_dir/harness/matrix.rs" \
+    "$profile_dir/harness/scaled_fixture.rs" \
     "$profile_dir/harness/adapter.rs" \
     "$profile_dir/harness/main.rs" \
     "$profile_dir/harness/support.rs"; do
@@ -130,6 +132,30 @@ for lane in "${lanes[@]}"; do
         2>"$result_dir/$lane.stderr.log"
 done
 
+# The correctness matrix uses this exact built binary but has its own receipt
+# and verifier. It intentionally runs outside /usr/bin/time: the 120-point
+# matrix records semantic/byte gates only and makes no timing or allocator
+# claim. Keep the argv, stdout, stderr, and exit status as independent
+# artifacts so a later clean review can reproduce the exact invocation.
+XLSB_PROFILE_MATRIX_BINARY="$binary" python3 - <<'PY' \
+    >"$result_dir/matrix-correctness.argv.json"
+import json
+import os
+
+print(json.dumps({"argv": [os.environ["XLSB_PROFILE_MATRIX_BINARY"], "--matrix-correctness"]}))
+PY
+set +e
+"$binary" --matrix-correctness \
+    >"$result_dir/matrix-correctness.stdout.json" \
+    2>"$result_dir/matrix-correctness.stderr.log"
+matrix_status=$?
+set -e
+printf '%s\n' "$matrix_status" >"$result_dir/matrix-correctness.exit.txt"
+if [[ "$matrix_status" -ne 0 ]]; then
+    echo "correctness matrix failed with exit status $matrix_status" >&2
+    exit "$matrix_status"
+fi
+
 sha256sum "$binary" >"$result_dir/binary-after.sha256"
 cmp -s "$result_dir/binary.sha256" "$result_dir/binary-after.sha256"
 
@@ -156,6 +182,8 @@ for extra in \
     "$harness_manifest" \
     "$profile_dir/harness/Cargo.lock" \
     "$profile_dir/harness/build.rs" \
+    "$profile_dir/harness/matrix.rs" \
+    "$profile_dir/harness/scaled_fixture.rs" \
     "$profile_dir/harness/adapter.rs" \
     "$profile_dir/harness/main.rs" \
     "$profile_dir/harness/support.rs"; do
@@ -180,3 +208,8 @@ python3 "$profile_dir/verify.py" \
     --root "$root_dir" \
     --source-before "$result_dir/source-manifest-before.txt" \
     --source-after "$result_dir/source-manifest-after.txt"
+
+python3 "$profile_dir/verify.py" \
+    --correctness-receipt "$result_dir/matrix-correctness.stdout.json" \
+    --manifest "$profile_dir/corpus-manifest.json" \
+    --root "$root_dir"
