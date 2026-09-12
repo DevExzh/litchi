@@ -32,8 +32,9 @@ pub use error::{Error, Result};
 pub use identity::{
     Xldm140Closure, Xldm140ClosureMember, Xldm140ColumnBinding, Xldm140ColumnIdentity,
     Xldm140FileReplacement, Xldm140IdentityProjection, Xldm140InversePatch, Xldm140MemberSection,
-    Xldm140Patch, Xldm140PatchBytes, Xldm140RelationshipIdentity, Xldm140TableIdentity,
-    Xldm140TimeGroupingBinding, Xldm140TimeGroupingContentType, project_xldm140_identity,
+    Xldm140Patch, Xldm140PatchBytes, Xldm140RelationshipIdentity, Xldm140RenameError,
+    Xldm140RenameErrorKind, Xldm140TableIdentity, Xldm140TimeGroupingBinding,
+    Xldm140TimeGroupingContentType, project_xldm140_identity,
     project_xldm140_identity_with_closure, prove_xldm140_closure,
     validate_xldm140_identity_closure,
 };
