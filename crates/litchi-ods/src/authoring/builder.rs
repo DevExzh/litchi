@@ -2,12 +2,12 @@ use crate::model::database_range::Range as DatabaseRange;
 use crate::model::names::{Definition, Expression, Range};
 use crate::worksheet::{Cell, Sheet};
 use litchi_core::{Error, Result};
+use litchi_odf_common::ResolvedReader;
 use litchi_odf_common::calculation::Settings;
 use litchi_odf_common::core::PackageWriter;
 use quick_xml::{
     events::Event,
     name::{Namespace, ResolveResult},
-    reader::NsReader,
 };
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -405,7 +405,7 @@ impl Builder {
 pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     validate_size(xml)?;
 
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;

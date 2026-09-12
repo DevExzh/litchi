@@ -193,10 +193,21 @@ impl Spreadsheet {
     }
 
     pub(crate) fn from_shared_package(package: Arc<crate::package::Package>) -> Result<Self> {
-        let definitions = package.definitions()?;
-        let sheets = package.sheets()?;
+        // Keep ordinary and source-backed opening on the same namespace-aware
+        // content reader.  Besides avoiding five independent tokenizations,
+        // this admits semantically normalized namespace declarations (for
+        // example an entity-escaped `xmlns:xml` URI) without changing the
+        // source bytes retained by the package.
+        let (settings, outputs) =
+            crate::open_parse::OpenParse::run(package.content_xml())?.finish()?;
+        let definitions = outputs.definitions;
+        let mut sheets = outputs.sheets;
+        // `OpenParse` owns the fused worksheet pass, while table title and
+        // description are deliberately applied in the small metadata pass
+        // shared with the source-backed facade.  Keep this post-pass here so
+        // ordinary and source-backed opens expose the same Sheet metadata.
+        crate::worksheet::codec::apply_table_metadata(package.content_xml(), &mut sheets)?;
         let metadata = package.metadata_snapshot()?;
-        let settings = package.calculation_settings()?;
         Ok(Self {
             package,
             definitions,

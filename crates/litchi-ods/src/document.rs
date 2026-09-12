@@ -36,6 +36,15 @@ pub use crate::advanced::{
     TextProperties, TextStyleNode,
 };
 
+// The extended data-style vocabulary is additive to the established closed
+// style graph.  Re-export the source-qualified names at the document boundary
+// so callers do not have to know which owner module performs the XML scan.
+pub use crate::data_style::{
+    Entry as DataStyleDefinition, Family as DataStyleFamily, Graph as StyleGraphExtension,
+    Op as DataStyleAttributeOp, Owner as DataStyleOwner, Patch as DataStyleAttributePatch,
+    Resolution as DecimalPlacesResolution, Selector as DataStyleSelector,
+};
+
 /// Final position of a worksheet after one checked move.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -343,6 +352,53 @@ impl Snapshot {
     /// Returns an error for a missing/cyclic style or malformed package XML.
     pub fn effective_cell_style(&self, name: &str) -> Result<EffectiveCellStyle> {
         crate::advanced::resolve_package_cell_style(self.source.as_ref(), name)
+    }
+
+    /// Resolve the data-style definition selected by an effective table-cell
+    /// style.  The legacy [`EffectiveCellStyle::data_style`] name remains in
+    /// the projection; this companion accessor resolves that name against the
+    /// content automatic-style owner and then the read-only common-style
+    /// owner.
+    ///
+    /// `None` means that the effective cell style has no data-style reference.
+    /// A name shared by different families is reported as an ambiguity rather
+    /// than being selected by an arbitrary precedence rule.
+    pub fn effective_cell_data_style(&self, name: &str) -> Result<Option<DataStyleDefinition>> {
+        let effective = self.effective_cell_style(name)?;
+        let Some(data_style) = effective.data_style.as_deref() else {
+            return Ok(None);
+        };
+        crate::advanced::resolve_effective_data_style(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+            data_style,
+            self.limits.package_bytes,
+        )
+        .map(Some)
+    }
+
+    /// Resolve one source-qualified data-style definition.
+    ///
+    /// Common styles are available for inspection but remain read-only in
+    /// ordinary edits.  The selector always includes owner and family so a
+    /// reused ODF name cannot silently resolve to the wrong root.
+    pub fn data_style(&self, selector: DataStyleSelector<'_>) -> Result<DataStyleDefinition> {
+        crate::advanced::resolve_data_style(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+            selector,
+            self.limits.package_bytes,
+        )
+    }
+
+    /// Return the bounded source-qualified data-style catalog for one owner.
+    pub fn data_styles(&self, owner: DataStyleOwner) -> Result<Vec<DataStyleDefinition>> {
+        crate::advanced::data_style_catalog(
+            self.package.content_xml(),
+            self.package.styles_xml(),
+            owner,
+            self.limits.package_bytes,
+        )
     }
 
     /// Report whether terminal password encryption can publish this exact snapshot.
@@ -1328,6 +1384,57 @@ impl Edit {
             self.before.limits.package_bytes,
         )?;
         self.stage_spliced("style-graph.replace", "automatic-styles", bytes)
+    }
+
+    /// Add a dependency-checked graph containing the extended ODF number and
+    /// data-style vocabulary.  Definitions are authored in the mutable
+    /// `content.xml` automatic-style owner; common `styles.xml` definitions
+    /// remain read-only.
+    pub fn put_extended_style_graph(&mut self, graph: &StyleGraphExtension) -> Result<()> {
+        let bytes = crate::advanced::put_extended_style_graph(
+            &self.candidate,
+            graph,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("extended-style-graph.put", "automatic-styles", bytes)
+    }
+
+    /// Replace the source-qualified automatic data-style definitions in a
+    /// complete graph.  The selector identifies one graph node and every
+    /// additional node is applied atomically in the same owner.
+    ///
+    /// The selected source body must be semantically compatible with the
+    /// replacement family.  Unsupported source markup is preserved for reads
+    /// but refused for canonical replacement.
+    pub fn replace_extended_style_graph(
+        &mut self,
+        selector: DataStyleSelector<'_>,
+        graph: &StyleGraphExtension,
+    ) -> Result<()> {
+        let bytes = crate::advanced::replace_extended_style_graph(
+            &self.candidate,
+            selector,
+            graph,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("extended-style-graph.replace", selector.name, bytes)
+    }
+
+    /// Patch only common metadata attributes on one source-qualified
+    /// automatic data-style definition.  The selected body and every opaque
+    /// child remain source exact.
+    pub fn patch_data_style(
+        &mut self,
+        selector: DataStyleSelector<'_>,
+        patch: &DataStyleAttributePatch,
+    ) -> Result<()> {
+        let bytes = crate::advanced::patch_data_style(
+            &self.candidate,
+            selector,
+            patch,
+            self.before.limits.package_bytes,
+        )?;
+        self.stage_spliced("data-style.patch", selector.name, bytes)
     }
 
     /// Remove exact automatic-style names when no retained XML node references them.

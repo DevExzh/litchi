@@ -903,7 +903,11 @@ struct OpenTableMetadata {
 /// model, so they get a small bounded pass of their own.  The pass is strict
 /// about the ODF shape and never evaluates or otherwise interprets text.
 pub(crate) fn apply_table_metadata(xml: &str, sheets: &mut [Sheet]) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
+    // Keep metadata admission on the same normalized namespace reader as the
+    // fused worksheet pass.  In particular, escaped namespace declaration
+    // values must resolve semantically while the original source bytes remain
+    // untouched for source-backed publication.
+    let mut reader = litchi_odf_common::core::ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
