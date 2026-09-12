@@ -1,0 +1,14 @@
+[package]
+name = "ods-style-profile"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "ods-style-profile"
+path = "main.rs"
+
+[dependencies]
+litchi-ods = { path = "../../../../../crates/litchi-ods" }
+zip = { version = "8", default-features = false, features = ["deflate"] }
