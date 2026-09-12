@@ -856,6 +856,84 @@ def run_matrix_acceptance_guard() -> None:
         check(not accepts(rejected), f"matrix predicate rejects false {field}")
 
 
+def generator_receipt_preflight_test(corpus: dict[str, object]) -> None:
+    """Check the retained adapter bytes and receipt before any build step."""
+    verifier = verify_module()
+    generator = corpus["retained_opc_generator"]
+    adapter = HERE / str(generator["path"])
+    actual_sha256 = hashlib.sha256(adapter.read_bytes()).hexdigest()
+    actual_git_blob = subprocess.check_output(
+        ["git", "hash-object", str(adapter)],
+        cwd=ROOT,
+        text=True,
+    ).strip()
+    check(actual_sha256 == generator["sha256"], "current adapter SHA-256 matches generator receipt")
+    check(actual_git_blob == generator["git_blob"], "current adapter Git blob matches generator receipt")
+    verifier.verify_corpus(HERE / "corpus-manifest.json")
+    check(True, "generator receipt preflight accepts current adapter")
+
+    def rejected_receipt(payload: dict[str, object], label: str, message: str) -> None:
+        receipt = HERE / f".scaffold-test-generator-{label}.json"
+        receipt.write_text(json.dumps(payload))
+        try:
+            probe = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import importlib.util, pathlib, sys; p=pathlib.Path(sys.argv[1]); s=importlib.util.spec_from_file_location('v', pathlib.Path(sys.argv[2])); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.verify_corpus(p)",
+                    str(receipt),
+                    str(VERIFY),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            check(probe.returncode != 0, f"{label} generator receipt tamper is rejected before build")
+            check(message in probe.stderr, f"{label} generator receipt failure is identified")
+        finally:
+            receipt.unlink(missing_ok=True)
+
+    for field, message in (
+        ("sha256", "retained generator hash changed"),
+        ("git_blob", "retained generator Git blob changed"),
+    ):
+        payload = json.loads(json.dumps(corpus))
+        payload["retained_opc_generator"][field] = "0" * 64
+        rejected_receipt(payload, f"receipt-{field}", message)
+
+    with tempfile.TemporaryDirectory(prefix="pptx-ink-actions-generator-") as raw:
+        isolated_root = Path(raw)
+        (isolated_root / ".git").symlink_to(ROOT / ".git", target_is_directory=True)
+        (isolated_root / "crates").symlink_to(ROOT / "crates", target_is_directory=True)
+        design = isolated_root / SEMANTIC_OWNER_DESIGN_PATH
+        design.parent.mkdir(parents=True)
+        design.symlink_to(ROOT / SEMANTIC_OWNER_DESIGN_PATH)
+        performance = isolated_root / "docs/report/spec-gap-validation-evidence/pptx-ink-actions-performance"
+        harness = performance / "harness"
+        harness.mkdir(parents=True)
+        tampered_adapter = harness / "adapter.rs"
+        tampered_adapter.write_bytes(adapter.read_bytes() + b"\n// preflight adapter tamper\n")
+        (harness / "Cargo.lock").symlink_to(HERE / "harness/Cargo.lock")
+        tampered_corpus = performance / "corpus-manifest.json"
+        tampered_corpus.write_text(json.dumps(corpus))
+        probe = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import importlib.util, pathlib, sys; p=pathlib.Path(sys.argv[1]); s=importlib.util.spec_from_file_location('v', pathlib.Path(sys.argv[2])); module=importlib.util.module_from_spec(s); s.loader.exec_module(module); module.verify_corpus(p)",
+                str(tampered_corpus),
+                str(VERIFY),
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        check(probe.returncode != 0, "tampered adapter is rejected before build")
+        check("retained generator hash changed" in probe.stderr, "tampered adapter hash failure is identified")
+
+
 def owner_extra_runner_wiring_test() -> None:
     """Keep the runner's dual source pins coupled to the real guards."""
     runner = RUNNER.read_text()
@@ -1116,6 +1194,7 @@ def main() -> None:
     source_pin_tamper_tests()
     semantic_owner_design_tamper_test()
     run_matrix_acceptance_guard()
+    generator_receipt_preflight_test(corpus)
     verifier_tamper_tests(corpus)
     print(
         "PPTX InkAction scaffold tests passed (timing-free); "

@@ -555,10 +555,10 @@
     }
   ],
   "retained_opc_generator": {
-    "git_blob": "c8a2d960f7159d91d7cecee8df731361fa9dd018",
+    "git_blob": "66c8897a582765b32e7922c96f5c67958cea2739",
     "kind": "bounded_synthetic_complete_opc_generator",
     "path": "harness/adapter.rs",
-    "sha256": "5b65ba8cffa530068ee96d17534b18de607810d21ae93b7d2fa90b9ff99c53cf"
+    "sha256": "4ed8255db15047260aac1f014a8b5196a3ca4858675d2e82605c0ecdc9b078b7"
   },
   "retained_opc_limits": {
     "policy": "ReadLimits::default() for positive lanes; every field is serialized in a future receipt",
