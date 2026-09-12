@@ -136,7 +136,7 @@ fn scans_direct_pictures_in_all_anchor_forms_and_preserves_ranges() {
     let complete = owner.namespace_complete(&source_bytes, 16 * 1024).unwrap();
     assert!(
         complete
-            .windows(SVG.as_bytes().len())
+            .windows(SVG.len())
             .any(|window| window == SVG.as_bytes())
     );
     assert!(
@@ -288,9 +288,7 @@ fn strict_mixed_namespace_profile_keeps_shared_svg_relationships_typed() {
 #[test]
 fn duplicate_and_mce_owner_branches_are_refused_without_guessing() {
     let duplicate = format!(
-        r#"{}{}"#,
-        format!(r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdOne"/></a:ext>"#),
-        format!(r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdTwo"/></a:ext>"#)
+        r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdOne"/></a:ext><a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdTwo"/></a:ext>"#
     );
     let duplicate_bytes = transitional_drawing(&two_cell(1, &duplicate, ""));
     let duplicate_source = SourceDrawing::scan(&duplicate_bytes).unwrap();

@@ -24,6 +24,11 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         added: _,
         removed,
         cross_workbook_scalar: _,
+        svg_lifecycle: _,
+        svg_preflight: _,
+        svg_projected_owners: _,
+        svg_staged_payload_bytes: _,
+        svg_base_part_bytes: _,
     } = edit;
     let first_position = removed
         .iter()
@@ -218,6 +223,8 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         uri: base.inner.workbook_uri.clone(),
         before: before_workbook,
         after: Arc::new(after_workbook),
+        before_source: None,
+        after_source: None,
     }];
     if final_active_identity != current_active {
         if !removed.contains(&current_active) {
@@ -340,12 +347,16 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
             package_changes: Box::new([]),
             parts: parts.into_boxed_slice(),
             relationships: Box::new([]),
+            content_types: None,
+            svg_parts: Box::new([]),
             graph: graph.into_boxed_slice(),
             web: None,
             style_guard: None,
             source: Some(base),
             target: Some(workbook),
             authority: None,
+            svg_read_guards: Box::new([]),
+            svg_final_guards: Box::new([]),
         },
     })
 }

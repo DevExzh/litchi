@@ -3,17 +3,23 @@
 use super::codec::{ensure_unsigned, same_part, same_relationship, validate_web_integrity};
 use super::{Edit, MergeIntent, SheetActions};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
 use litchi_ooxml_common::web as common_web;
-use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
+use litchi_opc::{
+    OpcPackage, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, PackURI, Part, Relationship,
+    Relationships,
+};
 use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
 
 use super::{Visibility, Workbook};
 use crate::cell::{Cell, SharedStringKey, Stored};
 use crate::column::{Flags as ColumnFlags, Outline, Props as ColumnProps, State as ColumnState};
+use crate::drawing::DrawingAnchor;
 use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
 use crate::layout::{self, Defaults};
 use crate::raw::worksheet::edit::{
@@ -1899,6 +1905,13 @@ pub enum PackageChange {
         anchors: usize,
         added: bool,
     },
+    /// One existing worksheet picture gained or lost its embedded SVG owner.
+    SvgLifecycle {
+        sheet: Box<str>,
+        drawing: usize,
+        picture: usize,
+        attached: bool,
+    },
 }
 
 impl PackageChange {
@@ -1907,7 +1920,9 @@ impl PackageChange {
     pub fn task_panes(&self) -> (Option<&common_web::Panes>, Option<&common_web::Panes>) {
         match self {
             Self::TaskPanes { before, after } => (before.as_ref(), after.as_ref()),
-            Self::DefinedNames { .. } | Self::DrawingTransfer { .. } => (None, None),
+            Self::DefinedNames { .. }
+            | Self::DrawingTransfer { .. }
+            | Self::SvgLifecycle { .. } => (None, None),
         }
     }
 
@@ -1918,7 +1933,9 @@ impl PackageChange {
     ) -> Option<(&[crate::raw::DefinedName], &[crate::raw::DefinedName])> {
         match self {
             Self::DefinedNames { before, after } => Some((before, after)),
-            Self::TaskPanes { .. } | Self::DrawingTransfer { .. } => None,
+            Self::TaskPanes { .. } | Self::DrawingTransfer { .. } | Self::SvgLifecycle { .. } => {
+                None
+            },
         }
     }
 
@@ -1943,6 +1960,17 @@ impl PackageChange {
                 anchors: *anchors,
                 added: !added,
             },
+            Self::SvgLifecycle {
+                sheet,
+                drawing,
+                picture,
+                attached,
+            } => Self::SvgLifecycle {
+                sheet: sheet.clone(),
+                drawing: *drawing,
+                picture: *picture,
+                attached: !attached,
+            },
         }
     }
 }
@@ -1952,6 +1980,8 @@ pub(super) struct PartChange {
     pub(super) uri: PackURI,
     pub(super) before: Arc<Vec<u8>>,
     pub(super) after: Arc<Vec<u8>>,
+    pub(super) before_source: Option<OwnedXmlPart>,
+    pub(super) after_source: Option<OwnedXmlPart>,
 }
 
 /// One source-checked worksheet relationship transition.
@@ -1965,6 +1995,56 @@ pub(super) struct RelationshipChange {
     pub(super) owner: PackURI,
     pub(super) before: Option<Relationship>,
     pub(super) after: Option<Relationship>,
+    pub(super) before_source: Option<OwnedRelationships>,
+    pub(super) after_source: Option<OwnedRelationships>,
+}
+
+/// Source snapshots read by an SVG lifecycle patch before it plans the
+/// drawing dependency closure.
+///
+/// SVG edits inspect worksheet XML and the package relationship graph to
+/// resolve a semantic picture.  Keep those reads as bounded, exact guards so
+/// an in-memory patch cannot be replayed onto a package whose selector
+/// topology changed.  The guard intentionally stores immutable bytes rather
+/// than an owning workbook: durable patches continue to use their complete
+/// package snapshot, while in-memory inverse patches remain valid after a
+/// save/reopen.
+#[derive(Debug, Clone)]
+pub(super) struct SvgReadGuard {
+    pub(super) owner: PackURI,
+    pub(super) before_xml: Option<Arc<Vec<u8>>>,
+    pub(super) after_xml: Option<Arc<Vec<u8>>>,
+    pub(super) before_relationships: OwnedRelationships,
+    pub(super) after_relationships: OwnedRelationships,
+}
+
+impl SvgReadGuard {
+    fn validate(&self, package: &OpcPackage) -> Result<()> {
+        if let Some(expected) = &self.before_xml {
+            let current = package
+                .get_part(&self.owner)
+                .map(|part| part.blob_arc())
+                .map_err(|_| Error::PatchConflict {
+                    part: self.owner.to_string(),
+                })?;
+            if current.as_slice() != expected.as_slice() {
+                return Err(Error::PatchConflict {
+                    part: self.owner.to_string(),
+                });
+            }
+        }
+        let current = package
+            .source_relationships_with_limits(&self.owner, package.read_limits())
+            .map_err(|_| Error::PatchConflict {
+                part: self.owner.to_string(),
+            })?;
+        if current != self.before_relationships {
+            return Err(Error::PatchConflict {
+                part: self.owner.to_string(),
+            });
+        }
+        Ok(())
+    }
 }
 
 impl RelationshipChange {
@@ -1977,6 +2057,15 @@ impl RelationshipChange {
     }
 
     pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        if let Some(expected) = &self.before_source {
+            let current = package
+                .source_relationships_with_limits(expected.owner(), package.read_limits())?;
+            if current != *expected {
+                return Err(Error::PatchConflict {
+                    part: expected.owner().to_string(),
+                });
+            }
+        }
         let current = package
             .get_part(&self.owner)?
             .rels()
@@ -1992,6 +2081,14 @@ impl RelationshipChange {
     }
 
     pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        if let (Some(expected), Some(replacement)) = (&self.before_source, &self.after_source) {
+            package.try_replace_relationships_with_limits(
+                expected,
+                replacement,
+                package.read_limits(),
+            )?;
+            return Ok(());
+        }
         let relationship_id = self.relationship_id()?.to_owned();
         let relationships = package.get_part_mut(&self.owner)?.rels_mut();
         relationships.remove(&relationship_id);
@@ -2069,17 +2166,351 @@ pub struct Patch {
     pub(super) package_changes: Box<[PackageChange]>,
     pub(super) parts: Box<[PartChange]>,
     pub(super) relationships: Box<[RelationshipChange]>,
+    pub(super) content_types: Option<ContentTypesChange>,
+    pub(super) svg_parts: Box<[SvgPartChange]>,
     pub(super) graph: Box<[GraphChange]>,
     pub(super) web: Option<common_web::Patch>,
     pub(super) style_guard: Option<StyleGuard>,
     pub(super) source: Option<Workbook>,
     pub(super) target: Option<Workbook>,
+    pub(super) svg_read_guards: Box<[SvgReadGuard]>,
+    /// Paired source/target semantic readback expectations for every SVG
+    /// selector touched by the transaction.  These are deliberately kept
+    /// private: they are a replay proof, rather than another public selector
+    /// or an Office-native identifier.
+    pub(super) svg_final_guards: Box<[SvgFinalGuard]>,
     // Cross-workbook scalar transfers are stricter than the ordinary
     // byte-checked patch path. Keep their exact immutable lineage pair so a
     // worksheet-only delta cannot be replayed onto a foreign or protected
     // workbook that happens to share changed-part bytes. Durable patches bind
     // complete package bytes through their wire envelope and do not use this.
     pub(super) authority: Option<PatchAuthority>,
+}
+
+/// Exact final semantic state captured for one selected worksheet picture.
+///
+/// The source and target XML/relationship/content-type tokens retain the
+/// package's source lineage, while the bounded source anchor and media
+/// projections are read again through the worksheet seam.  Keeping both snapshots in
+/// one guard lets [`Patch::inverse`] validate the original state after a
+/// durable save/reopen without relying on an in-memory workbook identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SvgFinalState {
+    pub(super) drawing: PackURI,
+    pub(super) worksheet_xml: Arc<Vec<u8>>,
+    pub(super) worksheet_relationships: OwnedRelationships,
+    pub(super) drawing_xml: Arc<Vec<u8>>,
+    pub(super) drawing_relationships: OwnedRelationships,
+    pub(super) content_types: OwnedContentTypes,
+    pub(super) anchor: DrawingAnchor,
+    pub(super) raster_relationship_id: Box<str>,
+    pub(super) raster_relationship_type: Box<str>,
+    pub(super) raster_target_mode: litchi_opc::TargetMode,
+    pub(super) raster_part: PackURI,
+    pub(super) raster_content_type: Box<str>,
+    pub(super) raster_bytes: Arc<Vec<u8>>,
+    pub(super) svg: Option<SvgFinalMedia>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SvgFinalMedia {
+    pub(super) relationship_id: Box<str>,
+    pub(super) relationship_type: Box<str>,
+    pub(super) target_mode: litchi_opc::TargetMode,
+    pub(super) part: PackURI,
+    pub(super) content_type: Box<str>,
+    pub(super) bytes: Arc<Vec<u8>>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct SvgFinalGuard {
+    pub(super) worksheet: PackURI,
+    pub(super) drawing_ordinal: usize,
+    pub(super) picture_ordinal: usize,
+    pub(super) before: SvgFinalState,
+    pub(super) after: SvgFinalState,
+    pub(super) expected_attached: bool,
+}
+
+/// Source-bound `[Content_Types].xml` transition retained for an SVG graph
+/// edit. The OPC token preserves unrelated defaults, comments, and ordering.
+#[derive(Debug, Clone)]
+pub(super) struct ContentTypesChange {
+    pub(super) before: OwnedContentTypes,
+    pub(super) after: OwnedContentTypes,
+}
+
+#[derive(Clone)]
+pub(super) struct SvgPartChange {
+    pub(super) action: GraphAction,
+    pub(super) part: Box<dyn Part + Send + Sync>,
+}
+
+impl fmt::Debug for SvgPartChange {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SvgPartChange")
+            .field("action", &self.action)
+            .field("part", self.part.partname())
+            .finish()
+    }
+}
+
+impl ContentTypesChange {
+    pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        if package.source_content_types_with_limits(package.read_limits())? != self.before {
+            return Err(Error::PatchConflict {
+                part: "[Content_Types].xml".to_owned(),
+            });
+        }
+        Ok(())
+    }
+
+    pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        package.try_replace_content_types_with_limits(
+            self.before.bytes(),
+            &self.after,
+            package.read_limits(),
+        )?;
+        Ok(())
+    }
+}
+
+impl SvgPartChange {
+    pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        match self.action {
+            GraphAction::Add => {
+                if package
+                    .validate_new_part_name(self.part.partname())
+                    .is_err()
+                {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+            GraphAction::Remove => {
+                let current = package.get_part(self.part.partname())?;
+                if current.blob() != self.part.blob()
+                    || current.content_type() != self.part.content_type()
+                    || !relationships_match(current.rels(), self.part.rels())
+                {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+        }
+        Ok(())
+    }
+
+    pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        match self.action {
+            GraphAction::Add => package.try_add_part(self.part.clone())?,
+            GraphAction::Remove => {
+                if !package.remove_part(self.part.partname()) {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+        }
+        Ok(())
+    }
+}
+
+fn relationships_match(left: &Relationships, right: &Relationships) -> bool {
+    left.len() == right.len()
+        && left.iter().all(|relationship| {
+            right.get(relationship.r_id()).is_some_and(|candidate| {
+                candidate.r_id() == relationship.r_id()
+                    && candidate.reltype() == relationship.reltype()
+                    && candidate.target_ref() == relationship.target_ref()
+                    && candidate.target_mode() == relationship.target_mode()
+            })
+        })
+}
+
+/// Verify the final SVG package closure and the retained caller resource
+/// ceilings after every ordinary graph effect has become visible.
+///
+/// This is one post-transition census.  It checks removed-target reachability
+/// while it totals relationship members, relationship XML bytes/events,
+/// relationship edges, and graph targets, so closure validation does not scan
+/// the package once per removed target and resource validation does not repeat
+/// the same relationship walk.
+pub(super) fn validate_svg_final_removals(
+    package: &OpcPackage,
+    changes: &[SvgPartChange],
+) -> Result<()> {
+    let limits = package.read_limits();
+    package.source_content_types_with_limits(limits)?;
+
+    let part_count = package.part_count();
+    if part_count > limits.max_parts() {
+        return Err(invalid(format!(
+            "SVG lifecycle candidate parts exceed {}",
+            limits.max_parts()
+        )));
+    }
+    let mut total_part_bytes = 0u64;
+    for part in package.iter_parts() {
+        if part.blob().len() > usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX) {
+            return Err(invalid(format!(
+                "SVG lifecycle candidate part '{}' exceeds {} bytes",
+                part.partname(),
+                limits.max_part_bytes()
+            )));
+        }
+        total_part_bytes = total_part_bytes
+            .checked_add(part.blob().len() as u64)
+            .ok_or_else(|| invalid("SVG lifecycle candidate part bytes overflow"))?;
+    }
+    if total_part_bytes > limits.max_total_part_bytes() {
+        return Err(invalid(format!(
+            "SVG lifecycle candidate part bytes exceed {}",
+            limits.max_total_part_bytes()
+        )));
+    }
+
+    let mut targets = HashMap::new();
+    targets
+        .try_reserve(changes.len())
+        .map_err(|source| allocation("SVG lifecycle final targets", source))?;
+    for change in changes {
+        if change.action == GraphAction::Remove {
+            targets.insert(
+                change.part.partname().as_str().to_ascii_lowercase(),
+                change.part.partname().clone(),
+            );
+        }
+    }
+
+    let mut relationship_parts = 0usize;
+    let mut relationship_xml_bytes = 0usize;
+    let mut relationship_xml_events = 0usize;
+    let mut relationship_count = 0usize;
+    let mut graph_nodes = HashSet::new();
+    let root = PackURI::new("/").map_err(invalid)?;
+    let mut visit = |owner: &PackURI, relationships: &Relationships| -> Result<()> {
+        let source = package.source_relationships_with_limits(owner, limits)?;
+        if source.member_present() {
+            relationship_parts = relationship_parts
+                .checked_add(1)
+                .ok_or_else(|| invalid("SVG lifecycle relationship part count overflow"))?;
+            relationship_xml_bytes = relationship_xml_bytes
+                .checked_add(source.bytes().len())
+                .ok_or_else(|| invalid("SVG lifecycle relationship XML bytes overflow"))?;
+            relationship_xml_events = relationship_xml_events
+                .checked_add(relationship_xml_event_count(
+                    source.bytes(),
+                    limits.max_xml_events(),
+                )?)
+                .ok_or_else(|| invalid("SVG lifecycle relationship XML events overflow"))?;
+        }
+        relationship_count = relationship_count
+            .checked_add(relationships.len())
+            .ok_or_else(|| invalid("SVG lifecycle relationship count overflow"))?;
+        for relationship in relationships.iter() {
+            if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+                continue;
+            }
+            let referenced = relationship.target_partname()?;
+            let canonical = package
+                .get_part(&referenced)
+                .map(|part| part.partname().clone())
+                .unwrap_or(referenced);
+            let mut canonical_key = String::new();
+            canonical_key
+                .try_reserve_exact(canonical.as_str().len())
+                .map_err(|source| allocation("SVG lifecycle graph node name", source))?;
+            canonical_key.push_str(canonical.as_str());
+            canonical_key.make_ascii_lowercase();
+            if let Some(target) = targets.get(&canonical_key) {
+                return Err(Error::PatchConflict {
+                    part: target.to_string(),
+                });
+            }
+            if !graph_nodes.contains(&canonical_key) {
+                if graph_nodes.len() >= limits.max_relationship_graph_nodes() {
+                    return Err(invalid(format!(
+                        "SVG lifecycle relationship graph nodes exceed {}",
+                        limits.max_relationship_graph_nodes()
+                    )));
+                }
+                graph_nodes
+                    .try_reserve(1)
+                    .map_err(|source| allocation("SVG lifecycle final graph nodes", source))?;
+                graph_nodes.insert(canonical_key);
+            }
+        }
+        Ok(())
+    };
+    visit(&root, package.rels())?;
+    for part in package.iter_parts() {
+        visit(part.partname(), part.rels())?;
+    }
+    if relationship_parts > limits.max_relationship_parts() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship parts exceed {}",
+            limits.max_relationship_parts()
+        )));
+    }
+    if relationship_xml_bytes > limits.max_total_relationship_xml_bytes() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship XML bytes exceed {}",
+            limits.max_total_relationship_xml_bytes()
+        )));
+    }
+    if relationship_xml_events > limits.max_total_relationship_xml_events() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship XML events exceed {}",
+            limits.max_total_relationship_xml_events()
+        )));
+    }
+    if relationship_count > limits.max_total_relationships() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationships exceed {}",
+            limits.max_total_relationships()
+        )));
+    }
+    if graph_nodes.len() > limits.max_relationship_graph_nodes() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship graph nodes exceed {}",
+            limits.max_relationship_graph_nodes()
+        )));
+    }
+    for target in targets.values() {
+        if package.get_part(target).is_ok() {
+            return Err(Error::PatchConflict {
+                part: target.to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn relationship_xml_event_count(bytes: &[u8], maximum: usize) -> Result<usize> {
+    let mut reader = Reader::from_reader(bytes);
+    let mut buffer = Vec::new();
+    let mut count = 0usize;
+    loop {
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("SVG lifecycle relationship XML event count overflow"))?;
+        if count > maximum {
+            return Err(invalid(format!(
+                "SVG lifecycle relationship XML events exceed {maximum}"
+            )));
+        }
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| invalid(error.to_string()))?;
+        if matches!(event, Event::Eof) {
+            return Ok(count);
+        }
+        buffer.clear();
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2147,8 +2578,12 @@ impl Patch {
             && self.package_changes.is_empty()
             && self.parts.is_empty()
             && self.relationships.is_empty()
+            && self.content_types.is_none()
+            && self.svg_parts.is_empty()
             && self.graph.is_empty()
             && self.web.is_none()
+            && self.svg_read_guards.is_empty()
+            && self.svg_final_guards.is_empty()
     }
 
     /// Build the inverse without copying part payloads.
@@ -2177,6 +2612,8 @@ impl Patch {
                     uri: part.uri.clone(),
                     before: Arc::clone(&part.after),
                     after: Arc::clone(&part.before),
+                    before_source: part.after_source.clone(),
+                    after_source: part.before_source.clone(),
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
@@ -2188,6 +2625,28 @@ impl Patch {
                     owner: change.owner.clone(),
                     before: change.after.clone(),
                     after: change.before.clone(),
+                    before_source: change.after_source.clone(),
+                    after_source: change.before_source.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            content_types: self
+                .content_types
+                .as_ref()
+                .map(|change| ContentTypesChange {
+                    before: change.after.clone(),
+                    after: change.before.clone(),
+                }),
+            svg_parts: self
+                .svg_parts
+                .iter()
+                .rev()
+                .map(|change| SvgPartChange {
+                    action: match change.action {
+                        GraphAction::Add => GraphAction::Remove,
+                        GraphAction::Remove => GraphAction::Add,
+                    },
+                    part: change.part.clone(),
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
@@ -2211,6 +2670,33 @@ impl Patch {
             source: self.target.clone(),
             target: self.source.clone(),
             authority: self.authority.as_ref().map(PatchAuthority::inverse),
+            svg_read_guards: self
+                .svg_read_guards
+                .iter()
+                .rev()
+                .map(|guard| SvgReadGuard {
+                    owner: guard.owner.clone(),
+                    before_xml: guard.after_xml.clone(),
+                    after_xml: guard.before_xml.clone(),
+                    before_relationships: guard.after_relationships.clone(),
+                    after_relationships: guard.before_relationships.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            svg_final_guards: self
+                .svg_final_guards
+                .iter()
+                .rev()
+                .map(|guard| SvgFinalGuard {
+                    worksheet: guard.worksheet.clone(),
+                    drawing_ordinal: guard.drawing_ordinal,
+                    picture_ordinal: guard.picture_ordinal,
+                    before: guard.after.clone(),
+                    after: guard.before.clone(),
+                    expected_attached: guard.before.svg.is_some(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
         }
     }
 
@@ -2230,14 +2716,21 @@ impl Patch {
         if let Some(authority) = &self.authority {
             authority.validate(workbook)?;
         }
+        for guard in &self.svg_read_guards {
+            guard.validate(&workbook.inner.package)?;
+        }
         let source = workbook.clone();
         if let Some(guard) = &self.style_guard {
             guard.validate(workbook)?;
         }
         if self.parts.is_empty()
             && self.relationships.is_empty()
+            && self.content_types.is_none()
+            && self.svg_parts.is_empty()
             && self.graph.is_empty()
             && self.web.is_none()
+            && self.svg_read_guards.is_empty()
+            && self.svg_final_guards.is_empty()
         {
             let mut patch = self.clone();
             patch.source = Some(workbook.clone());
@@ -2253,6 +2746,9 @@ impl Patch {
                 patch,
             });
         }
+        if !self.svg_final_guards.is_empty() {
+            super::svg_lifecycle::validate_before_guards(workbook, &self.svg_final_guards)?;
+        }
         let mut package = workbook.inner.package.clone();
         for change in &self.parts {
             let part = package.get_part(&change.uri)?;
@@ -2265,10 +2761,39 @@ impl Patch {
         for change in &self.relationships {
             change.validate(&package)?;
         }
+        if let Some(change) = &self.content_types {
+            change.validate(&package)?;
+        }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Add {
+                change.validate(&package)?;
+            }
+        }
         for change in &self.parts {
-            package
-                .get_part_mut(&change.uri)?
-                .set_blob_shared(Arc::clone(&change.after));
+            if let (Some(expected), Some(replacement)) =
+                (&change.before_source, &change.after_source)
+            {
+                if expected.bytes() != change.before.as_slice()
+                    || replacement.bytes() != change.after.as_slice()
+                {
+                    return Err(Error::PatchConflict {
+                        part: change.uri.to_string(),
+                    });
+                }
+                package.try_replace_owned_xml_part(expected.bytes(), replacement.clone())?;
+            } else {
+                package
+                    .get_part_mut(&change.uri)?
+                    .set_blob_shared(Arc::clone(&change.after));
+            }
+        }
+        if let Some(change) = &self.content_types {
+            change.apply(&mut package)?;
+        }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Add {
+                change.apply(&mut package)?;
+            }
         }
         for change in &self.relationships {
             change.apply(&mut package)?;
@@ -2277,10 +2802,26 @@ impl Patch {
             change.validate(&package)?;
             change.apply(&mut package)?;
         }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Remove {
+                change.validate(&package)?;
+            }
+        }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Remove {
+                change.apply(&mut package)?;
+            }
+        }
         if let Some(web) = &self.web {
             let _ = web.apply(&mut package)?;
         }
+        if !self.svg_final_guards.is_empty() || !self.svg_parts.is_empty() {
+            validate_svg_final_removals(&package, &self.svg_parts)?;
+        }
         let workbook = Workbook::from_package_with_styles(package, Some(workbook))?;
+        if !self.svg_final_guards.is_empty() {
+            super::svg_lifecycle::validate_final_guards(&workbook, &self.svg_final_guards)?;
+        }
         if self.web.is_some()
             || self
                 .changes

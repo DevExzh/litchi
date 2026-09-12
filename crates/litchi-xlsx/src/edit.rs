@@ -5,5 +5,6 @@
 
 pub use crate::workbook::edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Edit, JoinError,
-    JoinFailure, NewSheet, PackageChange, Patch, RowEdit, State, TabEdit, WorksheetEdit,
+    JoinFailure, NewSheet, PackageChange, Patch, PictureSelector, RowEdit, State, SvgInput,
+    TabEdit, WorksheetEdit,
 };
