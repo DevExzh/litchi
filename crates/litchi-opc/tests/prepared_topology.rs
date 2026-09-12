@@ -11,6 +11,7 @@
 //! Parts are deliberately left out of the plan so their payload remains lazy.
 
 use std::io::{self, Write};
+use std::ops::Range;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -51,6 +52,8 @@ struct VersionedSource {
     bytes: Arc<Vec<u8>>,
     revision: AtomicU64,
     reads: AtomicU64,
+    denied_start: AtomicU64,
+    denied_end: AtomicU64,
 }
 
 impl VersionedSource {
@@ -59,6 +62,8 @@ impl VersionedSource {
             bytes: Arc::new(bytes),
             revision: AtomicU64::new(0),
             reads: AtomicU64::new(0),
+            denied_start: AtomicU64::new(0),
+            denied_end: AtomicU64::new(0),
         }
     }
 
@@ -69,6 +74,15 @@ impl VersionedSource {
     fn read_count(&self) -> u64 {
         self.reads.load(Ordering::SeqCst)
     }
+
+    fn deny_reads_in(&self, range: Range<u64>) {
+        self.denied_start.store(range.start, Ordering::SeqCst);
+        self.denied_end.store(range.end, Ordering::SeqCst);
+    }
+
+    fn allow_all_reads(&self) {
+        self.denied_end.store(0, Ordering::SeqCst);
+    }
 }
 
 impl ReadAt for VersionedSource {
@@ -78,6 +92,12 @@ impl ReadAt for VersionedSource {
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
         self.reads.fetch_add(1, Ordering::SeqCst);
+        let read_end = offset.saturating_add(output.len() as u64);
+        let denied_start = self.denied_start.load(Ordering::SeqCst);
+        let denied_end = self.denied_end.load(Ordering::SeqCst);
+        if denied_end != 0 && offset < denied_end && denied_start < read_end {
+            return Err(io::Error::other("test source denied member range"));
+        }
         let offset = usize::try_from(offset)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset exceeds usize"))?;
         if offset >= self.bytes.len() {
@@ -118,6 +138,37 @@ fn source_bytes() -> Vec<u8> {
         .unwrap()
         .relate_to("../custom/untouched.xml", CUSTOM_REL);
     PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn stored_member_data_range(bytes: &[u8], wanted: &str) -> Range<u64> {
+    let mut offset = 0usize;
+    while offset.checked_add(30).is_some_and(|end| end <= bytes.len())
+        && bytes[offset..offset + 4] == [0x50, 0x4b, 0x03, 0x04]
+    {
+        let name_len = u16::from_le_bytes([bytes[offset + 26], bytes[offset + 27]]) as usize;
+        let extra_len = u16::from_le_bytes([bytes[offset + 28], bytes[offset + 29]]) as usize;
+        let data_start = offset
+            .checked_add(30)
+            .and_then(|value| value.checked_add(name_len))
+            .and_then(|value| value.checked_add(extra_len))
+            .expect("test ZIP local-header range must fit usize");
+        let data_len = u32::from_le_bytes([
+            bytes[offset + 18],
+            bytes[offset + 19],
+            bytes[offset + 20],
+            bytes[offset + 21],
+        ]) as usize;
+        let data_end = data_start
+            .checked_add(data_len)
+            .expect("test ZIP member range must fit usize");
+        let name = std::str::from_utf8(&bytes[offset + 30..data_start])
+            .expect("test ZIP member names are UTF-8");
+        if name == wanted {
+            return (data_start as u64)..(data_end as u64);
+        }
+        offset = data_end;
+    }
+    panic!("test ZIP member {wanted:?} is missing");
 }
 
 fn source_bytes_with_large_untouched_part() -> (Vec<u8>, Vec<u8>) {
@@ -945,6 +996,43 @@ fn borrowed_prepared_candidate_keeps_source_usable_and_matches_consuming_publish
         .publish_to_stream(&mut expected)
         .unwrap();
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn replacement_only_candidate_uses_source_content_type_without_manifest_reparse() {
+    let source = source_bytes();
+    let content_types_range = stored_member_data_range(&source, "[Content_Types].xml");
+    let source_handle = Arc::new(VersionedSource::new(source));
+    let package = open(Arc::clone(&source_handle));
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_part(pack(DOCUMENT), b"<after/>".to_vec())
+        .unwrap();
+
+    source_handle.deny_reads_in(content_types_range);
+    let prepared = package.prepare_topology(plan).unwrap();
+    prepared
+        .with_candidate(|candidate| {
+            assert_eq!(
+                candidate.content_type(&pack(DOCUMENT))?.as_str(),
+                ct::WML_DOCUMENT
+            );
+            assert_eq!(
+                candidate.part(&pack(UNTOUCHED))?.content_type().as_str(),
+                "application/xml"
+            );
+            assert_eq!(
+                candidate.part(&pack(DOCUMENT))?.data()?.as_bytes(),
+                b"<after/>"
+            );
+            Ok(())
+        })
+        .unwrap();
+
+    source_handle.allow_all_reads();
+    let mut output = Vec::new();
+    prepared.publish_to_stream(&mut output).unwrap();
+    assert_eq!(zip_member(&output, "word/document.xml"), b"<after/>");
+    assert!(source_handle.read_count() > 0);
 }
 
 #[test]

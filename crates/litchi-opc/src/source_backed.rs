@@ -2584,7 +2584,11 @@ struct PreparedTopologyState {
 struct EffectiveTopologyData {
     package_relationships: Option<Relationships>,
     parts: Vec<PreparedPart>,
-    content_types: ContentTypeMap,
+    // The source catalog already carries the validated content type for every
+    // retained Part.  Keep the parsed manifest only when additions/removals
+    // can change the effective mapping; replacement-only and relationship-only
+    // candidates resolve retained Parts through that source catalog lazily.
+    content_types: Option<ContentTypeMap>,
     added_member_names: Vec<String>,
 }
 
@@ -2903,11 +2907,24 @@ impl<'prepared> EffectiveTopology<'prepared> {
     /// Removed or absent Parts return [`OpcError::PartNotFound`], even when
     /// their extension still has a default content-type mapping.
     pub fn content_type(&self, partname: &PackURI) -> Result<&ContentType> {
-        self.part(partname)?;
-        self.prepared
-            .effective_data()
-            .content_types
-            .lookup(partname)
+        let index = self.part_index(partname)?;
+        let data = self.prepared.effective_data();
+        if let Some(content_types) = data.content_types.as_ref() {
+            return content_types
+                .lookup(partname)
+                .ok_or_else(|| OpcError::ContentTypeNotFound(partname.to_string()));
+        }
+
+        // No manifest rewrite is possible for a replacement-only or
+        // relationship-only plan.  The immutable source catalog (or an added
+        // Part's staged content type) is the already validated effective
+        // mapping, so avoid rereading and reparsing [Content_Types].xml while
+        // preserving the candidate API.
+        let part = &data.parts[index];
+        part.source_index
+            .and_then(|source_index| self.package.parts.get(source_index))
+            .map(|source_part| &source_part.content_type)
+            .or(part.content_type.as_ref())
             .ok_or_else(|| OpcError::ContentTypeNotFound(partname.to_string()))
     }
 
@@ -4117,7 +4134,7 @@ impl<W: Write> Write for Chunked<W> {
 #[derive(Debug)]
 struct CatalogPart {
     partname: PackURI,
-    content_type: String,
+    content_type: ContentType,
     relationships: Relationships,
     entry_id: EntryId,
 }
@@ -4262,7 +4279,7 @@ impl<'package> PartView<'package> {
     /// The content type declared by `[Content_Types].xml`.
     #[must_use]
     pub fn content_type(&self) -> &'package str {
-        &self.package.parts[self.index].content_type
+        self.package.parts[self.index].content_type.as_str()
     }
 
     /// The part's already-validated relationships.
@@ -6162,7 +6179,8 @@ impl SourceBackedPackage {
             parts_by_name.insert(part.partname.clone(), index);
             catalog_parts.push(CatalogPart {
                 partname: part.partname,
-                content_type: part.content_type,
+                content_type: ContentType::new(part.content_type)
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
                 relationships,
                 entry_id,
             });
@@ -6475,7 +6493,7 @@ impl SourceBackedPackage {
             parts_by_name.insert(part.partname.clone(), index);
             catalog_parts.push(CatalogPart {
                 partname: part.partname,
-                content_type: part.content_type,
+                content_type: ContentType::new(part.content_type)?,
                 relationships,
                 entry_id,
             });
@@ -6595,7 +6613,10 @@ impl SourceBackedPackage {
             .parts
             .get(index)
             .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
-        if !xml_minifier::audit::package::is_xml_part(part.partname.as_str(), &part.content_type) {
+        if !xml_minifier::audit::package::is_xml_part(
+            part.partname.as_str(),
+            part.content_type.as_str(),
+        ) {
             return Err(overlay_unavailable(
                 "source XML publication requires an XML-classified Part",
             ));
@@ -6607,7 +6628,7 @@ impl SourceBackedPackage {
             self.source.clone(),
             self.limits,
             &part.partname,
-            &part.content_type,
+            part.content_type.as_str(),
             data,
         )
     }
@@ -6900,8 +6921,10 @@ impl SourceBackedPackage {
         // `C + 2*name + 4096`; reserve the capture `C` plus the
         // payload/fixed portion here. The target-name term is added by
         // `try_add_precompressed_part` once the destination URI is known.
-        let fixed_bytes =
-            AuthorizedPrecompressedPart::fixed_memory_bytes(&part.partname, &part.content_type)?;
+        let fixed_bytes = AuthorizedPrecompressedPart::fixed_memory_bytes(
+            &part.partname,
+            part.content_type.as_str(),
+        )?;
         metadata
             .compressed_size()
             .checked_mul(2)
@@ -6987,7 +7010,7 @@ impl SourceBackedPackage {
             source_lineage: self.source.lineage.clone(),
             source_version: self.source.version,
             source_partname: part.partname.clone(),
-            source_content_type: ContentType::new(part.content_type.clone())?,
+            source_content_type: part.content_type.clone(),
             expected_decoded,
             decoded_payload: data.as_ref().map(|data| data.payload.clone()),
             memory_reservation,
@@ -7146,7 +7169,7 @@ impl SourceBackedPackage {
             let catalog_part = &self.parts[index];
             let part_result = PartFactory::load_shared(
                 catalog_part.partname.clone(),
-                catalog_part.content_type.clone(),
+                catalog_part.content_type.as_str().to_owned(),
                 self.finish_stage(bytes.into_arc())?,
             );
             let mut part = self.finish_stage(part_result)?;
@@ -7607,38 +7630,57 @@ impl SourceBackedPackage {
             }
         }
 
-        // Read and validate the source content-types manifest before any
-        // relationship XML is materialized.  ContentTypesPlan records exact
-        // lexical removal/insertion ranges and final bytes/mappings, so the
-        // aggregate admission below can reject the candidate before output
+        // Read and validate the source content-types manifest only when the
+        // plan can change the effective mapping.  Replacement-only and
+        // relationship-only plans preserve every source mapping, and retained
+        // Part catalog entries provide a validated lazy fallback for candidate
+        // content-type queries.  ContentTypesPlan records exact lexical
+        // removal/insertion ranges and final bytes/mappings, so the aggregate
+        // admission below can reject changed manifests before output
         // allocation.
-        let (content_types_xml, content_types_reservation) = self.read_content_types_xml()?;
-        // Scan once without edits to obtain the exact source mapping count,
-        // then reserve the source map's XML-sized strings and per-entry hash
-        // state before `ContentTypeMap` allocates them. The edit plan below
-        // performs its own lexical range scan and keeps only its small staged
-        // metadata reservation.
-        let source_mapping_plan = content_types_plan::ContentTypesPlan::plan(
-            &content_types_xml,
-            &[],
-            &[],
-            self.limits,
-            self.cache.context(),
-            self.cache.reservation_failure_counter(),
-        )?;
-        let source_mapping_count = source_mapping_plan.mapping_count();
-        drop(source_mapping_plan);
-        let source_content_types_memory_bound = content_types_xml
-            .len()
-            .checked_mul(3)
-            .and_then(|bytes| bytes.checked_add(source_mapping_count.checked_mul(512)?))
-            .and_then(|bytes| bytes.checked_add(4096))
-            .ok_or_else(|| overlay_unavailable("source content-types map bound overflows"))?;
-        let source_content_types_memory = self
-            .reserve_topology_memory(u64::try_from(source_content_types_memory_bound).map_err(
-                |_| overlay_unavailable("source content-types map bound exceeds u64"),
-            )?)?;
-        let source_content_types = ContentTypeMap::from_xml(&content_types_xml, self.limits)?;
+        let (
+            content_types_xml,
+            content_types_reservation,
+            source_content_types_memory,
+            source_content_types,
+        ) = if additions.is_empty() && pending_removals.is_empty() {
+            (None, None, None, None)
+        } else {
+            let (content_types_xml, content_types_reservation) = self.read_content_types_xml()?;
+            // Scan once without edits to obtain the exact source mapping count,
+            // then reserve the source map's XML-sized strings and per-entry
+            // hash state before `ContentTypeMap` allocates them. The edit plan
+            // below performs its own lexical range scan and keeps only its
+            // small staged metadata reservation.
+            let source_mapping_plan = content_types_plan::ContentTypesPlan::plan(
+                &content_types_xml,
+                &[],
+                &[],
+                self.limits,
+                self.cache.context(),
+                self.cache.reservation_failure_counter(),
+            )?;
+            let source_mapping_count = source_mapping_plan.mapping_count();
+            drop(source_mapping_plan);
+            let source_content_types_memory_bound = content_types_xml
+                .len()
+                .checked_mul(3)
+                .and_then(|bytes| bytes.checked_add(source_mapping_count.checked_mul(512)?))
+                .and_then(|bytes| bytes.checked_add(4096))
+                .ok_or_else(|| overlay_unavailable("source content-types map bound overflows"))?;
+            let source_content_types_memory = self.reserve_topology_memory(
+                u64::try_from(source_content_types_memory_bound).map_err(|_| {
+                    overlay_unavailable("source content-types map bound exceeds u64")
+                })?,
+            )?;
+            let source_content_types = ContentTypeMap::from_xml(&content_types_xml, self.limits)?;
+            (
+                Some(content_types_xml),
+                content_types_reservation,
+                source_content_types_memory,
+                Some(source_content_types),
+            )
+        };
         let mut required_content_type_overrides = Vec::new();
         required_content_type_overrides
             .try_reserve_exact(additions.len())
@@ -7650,6 +7692,9 @@ impl SourceBackedPackage {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
+            let source_content_types = source_content_types.as_ref().ok_or_else(|| {
+                overlay_unavailable("content-types catalog is unavailable for a new Part")
+            })?;
             if let Some(existing) = source_content_types.override_for(&addition.partname) {
                 if existing.as_str() != addition.content_type.as_str() {
                     return Err(overlay_unavailable(format!(
@@ -7679,23 +7724,25 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC removed content-type overrides",
                 source,
             })?;
-        for target in &pending_removals {
-            let partname = &self.parts[*target].partname;
-            if source_content_types.override_for(partname).is_some() {
-                removed_content_type_overrides.push(partname.clone());
-            }
-            let relationships_uri = partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
-            if self
-                .source_entry_id_case_insensitive(
-                    relationships_uri.membername(),
-                    &physical_members,
-                )?
-                .is_some()
-                && source_content_types
-                    .override_for(&relationships_uri)
+        if let Some(source_content_types) = source_content_types.as_ref() {
+            for target in &pending_removals {
+                let partname = &self.parts[*target].partname;
+                if source_content_types.override_for(partname).is_some() {
+                    removed_content_type_overrides.push(partname.clone());
+                }
+                let relationships_uri = partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .source_entry_id_case_insensitive(
+                        relationships_uri.membername(),
+                        &physical_members,
+                    )?
                     .is_some()
-            {
-                removed_content_type_overrides.push(relationships_uri);
+                    && source_content_types
+                        .override_for(&relationships_uri)
+                        .is_some()
+                {
+                    removed_content_type_overrides.push(relationships_uri);
+                }
             }
         }
         removed_content_type_overrides
@@ -7707,7 +7754,9 @@ impl SourceBackedPackage {
             None
         } else {
             Some(content_types_plan::ContentTypesPlan::plan_owned(
-                &content_types_xml,
+                content_types_xml.as_deref().ok_or_else(|| {
+                    overlay_unavailable("content-types source is unavailable for overrides")
+                })?,
                 required_content_type_overrides,
                 &removed_content_type_overrides,
                 self.limits,
@@ -7745,19 +7794,21 @@ impl SourceBackedPackage {
         // metadata vectors before the planner starts allocating them; the
         // source/typed relationship clone bound above covers the deep graph
         // storage itself.
-        let preflight_metadata_bound = relationships
-            .len()
-            .checked_mul(256)
-            .and_then(|bytes| bytes.checked_add(4096))
-            .ok_or_else(|| {
-                overlay_unavailable("relationship preflight metadata bound overflows")
-            })?;
-        if let Some(reservation) =
-            self.reserve_topology_memory(u64::try_from(preflight_metadata_bound).map_err(
-                |_| overlay_unavailable("relationship preflight metadata bound exceeds u64"),
-            )?)?
-        {
-            relationship_clone_memory_reservations.push(reservation);
+        if !relationships.is_empty() {
+            let preflight_metadata_bound = relationships
+                .len()
+                .checked_mul(256)
+                .and_then(|bytes| bytes.checked_add(4096))
+                .ok_or_else(|| {
+                    overlay_unavailable("relationship preflight metadata bound overflows")
+                })?;
+            if let Some(reservation) =
+                self.reserve_topology_memory(u64::try_from(preflight_metadata_bound).map_err(
+                    |_| overlay_unavailable("relationship preflight metadata bound exceeds u64"),
+                )?)?
+            {
+                relationship_clone_memory_reservations.push(reservation);
+            }
         }
         let mut reservation_group_start = 0usize;
         while reservation_group_start < relationships.len() {
@@ -8653,7 +8704,7 @@ impl SourceBackedPackage {
                     // not pass through the authored compactness audit.
                 } else if xml_minifier::audit::package::is_xml_part(
                     part.partname.as_str(),
-                    &part.content_type,
+                    part.content_type.as_str(),
                 ) {
                     validate_overlay_xml(part.partname.as_str(), original.as_bytes())?;
                     validate_overlay_xml(part.partname.as_str(), &replacement.replacement)?;
@@ -8751,7 +8802,7 @@ impl SourceBackedPackage {
         // Part bytes remain lazy through `source_index`.
         let effective_content_types = if let Some(replacement) = content_types_replacement.as_ref()
         {
-            ContentTypeMap::from_xml(replacement, self.limits)?
+            Some(ContentTypeMap::from_xml(replacement, self.limits)?)
         } else {
             source_content_types
         };
@@ -9203,7 +9254,7 @@ impl SourceBackedPackage {
         let target_part = &self.parts[target];
         if xml_minifier::audit::package::is_xml_part(
             target_part.partname.as_str(),
-            &target_part.content_type,
+            target_part.content_type.as_str(),
         ) {
             validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
             validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
@@ -9315,7 +9366,7 @@ impl SourceBackedPackage {
         }
         if xml_minifier::audit::package::is_xml_part(
             target_part.partname.as_str(),
-            &target_part.content_type,
+            target_part.content_type.as_str(),
         ) {
             validate_overlay_xml(target_part.partname.as_str(), original_part.as_bytes())?;
             validate_overlay_xml(target_part.partname.as_str(), &replacement)?;
@@ -9535,7 +9586,7 @@ impl SourceBackedPackage {
             let target_part = &self.parts[overlay.target];
             if xml_minifier::audit::package::is_xml_part(
                 target_part.partname.as_str(),
-                &target_part.content_type,
+                target_part.content_type.as_str(),
             ) {
                 validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
                 validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
@@ -9782,7 +9833,7 @@ impl SourceBackedPackage {
             let target_part = &self.parts[overlay.target];
             if xml_minifier::audit::package::is_xml_part(
                 target_part.partname.as_str(),
-                &target_part.content_type,
+                target_part.content_type.as_str(),
             ) {
                 validate_overlay_xml(target_part.partname.as_str(), original.as_bytes())?;
                 validate_overlay_xml(target_part.partname.as_str(), &overlay.replacement)?;
@@ -10625,7 +10676,7 @@ impl SourceBackedPackage {
                 .any(is_signature_relationship_or_target)
             || self.parts.iter().any(|part| {
                 is_signature_path(part.partname.as_str())
-                    || is_signature_content_type(&part.content_type)
+                    || is_signature_content_type(part.content_type.as_str())
                     || part
                         .relationships
                         .iter()
