@@ -36,7 +36,6 @@ const STRICT_RELATIONSHIPS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/
 const SVG_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/drawing/2016/SVG/main";
 const SVG_EXTENSION_URI: &[u8] = b"{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const XMLNS_NAMESPACE: &[u8] = b"http://www.w3.org/2000/xmlns/";
 
@@ -2153,7 +2152,7 @@ impl<'a> Scanner<'a> {
 }
 
 fn classify(namespace: Option<&[u8]>, name: QName<'_>, parent: Option<Kind>) -> Kind {
-    if is_namespace(namespace, MCE, STRICT_MCE) {
+    if namespace.is_some_and(|value| value == MCE) {
         return Kind::Mce;
     }
     if parent.is_none()
