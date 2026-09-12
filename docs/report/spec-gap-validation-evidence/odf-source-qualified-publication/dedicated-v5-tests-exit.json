@@ -1,0 +1,14 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ods",
+    "-p",
+    "litchi-odf-common",
+    "--no-fail-fast"
+  ],
+  "exit_code": 0
+}

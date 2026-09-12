@@ -13,6 +13,7 @@
 //! debug overflow panic or release-mode wraparound.
 
 use memchr::memmem;
+use quick_xml::XmlVersion;
 use quick_xml::events::BytesStart;
 use quick_xml::name::{
     LocalName, Namespace, NamespaceError, Prefix, PrefixDeclaration, QName, ResolveResult,
@@ -249,7 +250,17 @@ impl BindingTracker {
                     ));
                 }
                 count += 1;
-                self.add(prefix, &attribute.value)?;
+                // Namespace names are XML attribute values, so character/entity
+                // references are part of the URI before prefix resolution.  The
+                // quick-xml resolver stores raw bytes; decode here so source
+                // scanners accept legal escaped aliases and apply reserved-URI
+                // checks to the expanded value.  Malformed values are diagnosed
+                // by the caller's complete attribute validation; stopping this
+                // preliminary scan preserves that error path.
+                let Ok(value) = attribute.normalized_value(XmlVersion::Implicit1_0) else {
+                    break;
+                };
+                self.add(prefix, value.as_bytes())?;
             }
         }
         Ok(())
