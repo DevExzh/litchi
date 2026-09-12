@@ -1,0 +1,77 @@
+{
+  "status": "pass",
+  "stage": "candidate",
+  "checks": [
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "6fbcf22ab7681c7fb3a7444039c5b0c44cdb276f601533247a2f873f74969c48",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-cfb-no-default-tests.receipt.json",
+      "receipt_sha256": "0d569a70a81760f42690968850b982da6b35fe279642622158c7d4831cb50e9e",
+      "executed_tests": 308
+    },
+    {
+      "name": "check-cfb-tests.receipt.json",
+      "receipt_sha256": "de753bbccfb7dd49e2ef1e058e951fb24bb932daf3bcd9a607786f51e7c80674",
+      "executed_tests": 308
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "6b7966a3262c1fb8ac50b4f237f579a21e0d3c568ccacb6f249f46684363ce68",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-doc-tests.receipt.json",
+      "receipt_sha256": "7ea238011b25e38c1b4b4bb46e20817a59c57b2bc4f4631abf3f1fc818a1dc50",
+      "executed_tests": 1187
+    },
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "e392c07b8a7246b30549e393072beae7da9e09ff24d90602301e11b0d6e404a7",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "02ffa636ce4ad3509dbb46d3098429c5ecdb665460978672e2f492292cbb973e",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "e1e8cb79782d87134ce301723309c2d9de8d484bd34bdea37369f6f1b7dcd935",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-rustdoc.receipt.json",
+      "receipt_sha256": "0670650a1999f8a1733af8619a58a4d85348d6a45d80e68b33f822d66f724c42",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-clippy.receipt.json",
+      "receipt_sha256": "846fc63047594401dff9274bfb2579f0d014417c2c446b304bf3a967f14e576a",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-rustdoc.receipt.json",
+      "receipt_sha256": "6332287874e2707a8b4002bd9e75176a40797a34934560c970a65cfe1b7433ff",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ppt-tests.receipt.json",
+      "receipt_sha256": "83255dd986f872b2702a154e3f98af6177419cc5dd37cbce2f25b436fceb90ba",
+      "executed_tests": 1230
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "b87dfa4aa2bf76166f24da02fefe0122806da87314c1c20e9a85a36753c6d5c8",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xls-tests.receipt.json",
+      "receipt_sha256": "f3033c5ae4f4ac73392fabfe4d66d5025ab288725df849ea158ddf999339ae09",
+      "executed_tests": 1345
+    }
+  ],
+  "executed_tests": 4378
+}

@@ -1,0 +1,9 @@
+{
+  "created_utc": "2026-09-12T15:49:45.260021+00:00",
+  "files": {
+    "plan.json": "fc146cf05feb8e09c37a700aa611817411eb3eeb72d932480e4f0c53120f9438",
+    "run.py": "09e9153768e5655f718f33d851426f3eecf876d2d55183f37babc58425110b61",
+    "checks.py": "8783bd3f920dd107e6299d140554f29a04a153ecedf49580e6d3b78aea3b37d9",
+    "adr-manifest.json": "8aed97d378425650f3b355a3bd0ec5d2eb8000b9d28ba2a900cd8f35585e541f"
+  }
+}

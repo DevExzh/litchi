@@ -1,0 +1,37 @@
+
+/tmp/litchi-goal-0533/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000028677d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17haf8368dcf0a90783E>:
+ 28677d0:	53                   	push   %rbx
+ 28677d1:	48 89 fb             	mov    %rdi,%rbx
+ 28677d4:	ff 15 d6 9c 85 00    	call   *0x859cd6(%rip)        # 30c14b0 <_DYNAMIC+0x298>
+ 28677da:	bf 18 00 00 00       	mov    $0x18,%edi
+ 28677df:	be 01 00 00 00       	mov    $0x1,%esi
+ 28677e4:	ff 15 ce 9c 85 00    	call   *0x859cce(%rip)        # 30c14b8 <_DYNAMIC+0x2a0>
+ 28677ea:	48 85 c0             	test   %rax,%rax
+ 28677ed:	74 35                	je     2867824 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17haf8368dcf0a90783E+0x54>
+ 28677ef:	0f 10 05 4f 60 bf fd 	movups -0x2409fb1(%rip),%xmm0        # 45d845 <anon.2077b60551287b2eeaef1459249fd50a.7.llvm.18364902712296607230+0x1441>
+ 28677f6:	0f 11 00             	movups %xmm0,(%rax)
+ 28677f9:	48 b9 6f 76 65 72 66 	movabs $0x776f6c667265766f,%rcx
+ 2867800:	6c 6f 77 
+ 2867803:	48 89 48 10          	mov    %rcx,0x10(%rax)
+ 2867807:	48 c7 43 08 18 00 00 	movq   $0x18,0x8(%rbx)
+ 286780e:	00 
+ 286780f:	48 89 43 10          	mov    %rax,0x10(%rbx)
+ 2867813:	48 c7 43 18 18 00 00 	movq   $0x18,0x18(%rbx)
+ 286781a:	00 
+ 286781b:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2867822:	5b                   	pop    %rbx
+ 2867823:	c3                   	ret
+ 2867824:	bf 01 00 00 00       	mov    $0x1,%edi
+ 2867829:	be 18 00 00 00       	mov    $0x18,%esi
+ 286782e:	ff 15 b4 9c 85 00    	call   *0x859cb4(%rip)        # 30c14e8 <_DYNAMIC+0x2d0>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

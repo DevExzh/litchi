@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## 0533: CFB claim-sector formatting leaves the success path
+
+[0533](changes/0533-cfb-claim-cold-error-layout.md) moves three formatted
+`claim_sector` failures to private cold helpers and exposes the checked
+success path to ordinary inlining. XLS owned-source constructor instructions
+fall 18.9967%/19.0280%, and CFB few-large falls 21.4860% in both repeats.
+The old out-of-line claim symbol disappears; its remaining checked work is
+inside callers. The physical-reconciliation pass remains unchanged. Caller
+code grows, and the normal executable grows by 8,240 bytes (0.0137%), so no instruction-cache or
+working-set conclusion follows. Assembly confirms bounds, conflict and role
+stores remain in both stream-validation loops; only error paths call helpers.
+
+The native matrix passes all four primary p50 gates and all four allocator
+vectors are repeat-identical. Four matched adverse max/standard-deviation rows
+and 30 same-build variations are retained after individual review. A fresh
+paired walk of residual physical reconciliation is the next lead. The chain
+collector remains the largest current exclusive owner at about 49.49% of XLS
+constructor Ir; physical reconciliation is about 17.60%. Rejected 0524
+visited-bit fusion is not revived. OLE2/OOXML stays ahead of deferred ODF, and iWork is excluded.
+
 ## 0532: CFB claim-sector success path is the next bounded lead
 
 [0532](changes/0532-cfb-claim-success-path-attribution.md) attributes the

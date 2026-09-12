@@ -1,0 +1,33 @@
+{
+  "status": "pass",
+  "tests": [
+    {
+      "name": "omitted-host-artifact",
+      "status": "pass",
+      "observed_refusal": "omitted-host-artifact artifact inventory differs"
+    },
+    {
+      "name": "forged-raw-vector-hash",
+      "status": "pass",
+      "observed_refusal": "forged-raw-vector-hash artifact custody differs: native-r1-xls.json"
+    },
+    {
+      "name": "unexpected-extra-artifact",
+      "status": "pass",
+      "observed_refusal": "unexpected-extra-artifact artifact inventory differs"
+    },
+    {
+      "name": "overlapping-capture-intervals",
+      "status": "pass",
+      "observed_refusal": "probe receipt intervals overlap"
+    },
+    {
+      "name": "silently-narrowed-primary-gate",
+      "status": "pass",
+      "observed_refusal": "review plan differs"
+    }
+  ],
+  "raw_receipt_sha256": "caf21d8db14a483e707f571645c6b43b7a05d7da5c7d7c2c75b4e6003e136703",
+  "verifier_sha256": "24e68d4126579319f7809173536e6df706f598bed03a63cbcf292b0d7227e00c",
+  "scope": "Five in-memory negative custody probes plus raw-artifact and non-duplicated quality-interval positive controls. No Rust test or benchmark execution."
+}

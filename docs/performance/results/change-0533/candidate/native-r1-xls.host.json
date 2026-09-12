@@ -1,0 +1,11 @@
+{
+  "observed_utc": "2026-09-12T16:18:47.589263+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3170109,
+      "comm": "cargo",
+      "cwd": "/var/tmp/litchi-xlsx-pivot-final-uwchw4qr/worktree"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

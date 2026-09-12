@@ -1,5 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0533: matched CFB sector-claim layout comparison
+
+[0533](changes/0533-cfb-claim-cold-error-layout.md) binds a 24,000-sample
+per-stage native baseline/candidate comparison and a separate 720-sample
+per-stage allocation lane across nine XLS and three CFB scenarios. The four
+primary XLS p50 improvements are 20.5382–24.5798% in each paired repeat;
+CFB `few-large` improves 23.6156%/23.6937%. All 12 scenario rows improve in
+p50, mean, p95 and p99 in both repeats, with no matched peak-RSS change above
+5%. All four allocation vectors—calls, reallocation calls, allocated bytes
+and incremental region peak—are exactly identical. The comparison retains four
+matched over-5% standard-deviation/maximum flags and 30 same-build variations
+with completed individual review. The candidate is accepted; post-cleanup
+verification and evidence sealing are complete.
+
 ## 0532: current CFB claim-sector attribution baseline
 
 [0532](changes/0532-cfb-claim-success-path-attribution.md) binds the unchanged

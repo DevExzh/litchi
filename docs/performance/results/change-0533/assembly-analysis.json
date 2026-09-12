@@ -1,0 +1,1685 @@
+{
+  "status": "pass",
+  "stages": {
+    "baseline": {
+      "binary_sha256": "d39ef567849f8251a43cf8680d92351cdcc8257caf87fe3f3f59418c10c25386",
+      "binary_bytes": 60132200,
+      "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+      "assembly_index_sha256": "c38cb88870454dc604defdbcc3fd204842c0080ad0cf78564deba727ccfc3a85",
+      "owners": {
+        "claim_sector": {
+          "symbol_count": 6,
+          "size_bytes": 2178,
+          "variant_sizes": [
+            363,
+            363,
+            363,
+            363,
+            363,
+            363
+          ],
+          "explicit_claim_call_sites": 0
+        },
+        "claim_sector_index_error": {
+          "symbol_count": 0,
+          "size_bytes": 0,
+          "variant_sizes": [],
+          "explicit_claim_call_sites": 0
+        },
+        "claim_sector_bounds_error": {
+          "symbol_count": 0,
+          "size_bytes": 0,
+          "variant_sizes": [],
+          "explicit_claim_call_sites": 0
+        },
+        "claim_sector_conflict_error": {
+          "symbol_count": 0,
+          "size_bytes": 0,
+          "variant_sizes": [],
+          "explicit_claim_call_sites": 0
+        },
+        "validate_stream_allocations": {
+          "symbol_count": 12,
+          "size_bytes": 25832,
+          "variant_sizes": [
+            2103,
+            2103,
+            2103,
+            2103,
+            2103,
+            2103,
+            2103,
+            2103,
+            2699,
+            2103,
+            2103,
+            2103
+          ],
+          "explicit_claim_call_sites": 24
+        },
+        "validate_physical_sector_layout": {
+          "symbol_count": 12,
+          "size_bytes": 3300,
+          "variant_sizes": [
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275
+          ],
+          "explicit_claim_call_sites": 0
+        },
+        "load_fat": {
+          "symbol_count": 23,
+          "size_bytes": 80175,
+          "variant_sizes": [
+            4709,
+            4704,
+            4704,
+            4709,
+            4704,
+            4704,
+            4704,
+            4704,
+            4500,
+            4704,
+            4704,
+            4704,
+            4709,
+            4500,
+            4704,
+            4704,
+            4704,
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ],
+          "explicit_claim_call_sites": 51
+        }
+      },
+      "rows": [
+        {
+          "name": "assembly-claim_sector-0",
+          "owner": "claim_sector",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E",
+          "address_hex": "0000000002818f10",
+          "size_bytes": 363,
+          "receipt_sha256": "3fd5785b390c4c864460d56946d7e0b1eaf0f28f593d313b77adc9a299dcbcd6",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x70"
+          ]
+        },
+        {
+          "name": "assembly-claim_sector-1",
+          "owner": "claim_sector",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E",
+          "address_hex": "000000000178d7d0",
+          "size_bytes": 363,
+          "receipt_sha256": "c4ff3bc3df1db2ad4d42499e2b51eee0f7062e5659ae0755713e19866debadb6",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x70"
+          ]
+        },
+        {
+          "name": "assembly-claim_sector-2",
+          "owner": "claim_sector",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE",
+          "address_hex": "0000000001f63e60",
+          "size_bytes": 363,
+          "receipt_sha256": "d6a4d31b3a2cde415c4db53e7076cdc1c304fe2509a067503bd4dd28d99d0de2",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x70"
+          ]
+        },
+        {
+          "name": "assembly-claim_sector-3",
+          "owner": "claim_sector",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE",
+          "address_hex": "000000000285b2f0",
+          "size_bytes": 363,
+          "receipt_sha256": "c1d687294460e9565cc10ce81e4eefacd09f7bf2d2e0cdd9c274c4449709e556",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x70"
+          ]
+        },
+        {
+          "name": "assembly-claim_sector-4",
+          "owner": "claim_sector",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E",
+          "address_hex": "0000000002f19bf0",
+          "size_bytes": 363,
+          "receipt_sha256": "715aaebcb5b2420d6f729da2dba76dbde0c98d58cdc44c1fec480c210e72a163",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x70"
+          ]
+        },
+        {
+          "name": "assembly-claim_sector-5",
+          "owner": "claim_sector",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E",
+          "address_hex": "0000000002833c90",
+          "size_bytes": 363,
+          "receipt_sha256": "d45cbc34176a1f929fc45e6cbba1b304d693ce96d016ee7d56db583321721fbb",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x70"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-0",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h144431ac4416e3d3E",
+          "address_hex": "0000000002860000",
+          "size_bytes": 2103,
+          "receipt_sha256": "2f51284779a717056130ff2447181cdb2d14c1aeafcb10f8d28fa0526ae273de",
+          "explicit_claim_call_sites": [
+            "286017d:\te8 6e b1 ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+            "286053f:\te8 ac ad ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-1",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h1ab05b3c9be5c99cE",
+          "address_hex": "0000000002822040",
+          "size_bytes": 2103,
+          "receipt_sha256": "4692dcc85eddd93754e9f9017768fb9b8a29b1fac6e31e350b73d6fcba985bf1",
+          "explicit_claim_call_sites": [
+            "28221bd:\te8 4e 6d ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "282257f:\te8 8c 69 ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-2",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h3954090a9826ae24E",
+          "address_hex": "00000000017995e0",
+          "size_bytes": 2103,
+          "receipt_sha256": "29a1cac7d82e8de0dab9556fdee8aeebce83bb2f48dd73ec85dc9a81bffa76d2",
+          "explicit_claim_call_sites": [
+            "179975d:\te8 6e 40 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "1799b1f:\te8 ac 3c ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-3",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h3ff2b4d8bb76d716E",
+          "address_hex": "0000000001799e20",
+          "size_bytes": 2103,
+          "receipt_sha256": "557cb0179e438e096936d8fe5b84829af5d95ddfa0ad262352ffcae472b3c87e",
+          "explicit_claim_call_sites": [
+            "1799f9d:\te8 2e 38 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "179a35f:\te8 6c 34 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-4",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h4b3dc8aaeece68aeE",
+          "address_hex": "0000000001f6ae30",
+          "size_bytes": 2103,
+          "receipt_sha256": "b0de91f72b92356410e6b0dc8cbe9b393ce534e3c8ac41fd7ff7c3dfce0a5bdd",
+          "explicit_claim_call_sites": [
+            "1f6afad:\te8 ae 8e ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f6b36f:\te8 ec 8a ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-5",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h4d858c2c704bd558E",
+          "address_hex": "0000000002822880",
+          "size_bytes": 2103,
+          "receipt_sha256": "deec3a53d304beda7e6f6e65a194d46c54ee9f1e66cacaccf8f9a63f253369e0",
+          "explicit_claim_call_sites": [
+            "28229fd:\te8 0e 65 ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "2822dbf:\te8 4c 61 ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-6",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h6c1efa366543d03fE",
+          "address_hex": "0000000002836a90",
+          "size_bytes": 2103,
+          "receipt_sha256": "4316da03309caa2728bd6139a3e1e2beaf8ad451b35da63c14405bc8004d9ee8",
+          "explicit_claim_call_sites": [
+            "2836c0d:\te8 7e d0 ff ff       \tcall   2833c90 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E>",
+            "2836fcf:\te8 bc cc ff ff       \tcall   2833c90 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-7",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h7ce6a7c2ce4c22efE",
+          "address_hex": "0000000002860840",
+          "size_bytes": 2103,
+          "receipt_sha256": "317adac45024726744dffb8f22d27a9d5e51d1bdac717ef1dd9359909478e9b1",
+          "explicit_claim_call_sites": [
+            "28609bd:\te8 2e a9 ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+            "2860d7f:\te8 6c a5 ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-8",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h7e841c4fd57f5f86E",
+          "address_hex": "0000000002f22130",
+          "size_bytes": 2699,
+          "receipt_sha256": "5f942c5b96088a310aa0d8ff534dbcebbd6810f4644cd9dc7d68368f96ebadfa",
+          "explicit_claim_call_sites": [
+            "2f222ad:\te8 3e 79 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>",
+            "2f2273f:\te8 ac 74 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x178",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-9",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h880841bd29b913beE",
+          "address_hex": "0000000001f6b670",
+          "size_bytes": 2103,
+          "receipt_sha256": "7492a52db292279e2715731715f8028463daffb5d473c8071a573bdb56bb9474",
+          "explicit_claim_call_sites": [
+            "1f6b7ed:\te8 6e 86 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f6bbaf:\te8 ac 82 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-10",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E",
+          "address_hex": "000000000179a660",
+          "size_bytes": 2103,
+          "receipt_sha256": "8cd1fd81545dd2f5696be192de40aa3315f44db170dd11c7492780042f0911b8",
+          "explicit_claim_call_sites": [
+            "179a7dd:\te8 ee 2f ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "179ab9f:\te8 2c 2c ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-11",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hcfc9b534903ca5e5E",
+          "address_hex": "000000000179aea0",
+          "size_bytes": 2103,
+          "receipt_sha256": "f86cab5296a8674afd93436e2b5cb91d6ff0b1bda5c0e78d86fab8b0f8ff048a",
+          "explicit_claim_call_sites": [
+            "179b01d:\te8 ae 27 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "179b3df:\te8 ec 23 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 2,
+          "stack_reservations_hex": [
+            "0x138",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-0",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h0e69b5034738168dE",
+          "address_hex": "0000000001f6e1a0",
+          "size_bytes": 275,
+          "receipt_sha256": "7bdd8a5171939357919f0728df3f7600cbc55354392dffc9caea046ef381510a",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-1",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE",
+          "address_hex": "000000000179d9d0",
+          "size_bytes": 275,
+          "receipt_sha256": "c8e694b3821afacada8a6f835bc11d9bb4b613dcfc1d973ac5c074ee63770f3d",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-2",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h32d74b246e64e63aE",
+          "address_hex": "00000000028253b0",
+          "size_bytes": 275,
+          "receipt_sha256": "c6cbfadacfd9b41ab68e5c5720837bd623198fb4419fa400b1bfbf1977e9fc01",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-3",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h59934f0ccee77b4cE",
+          "address_hex": "00000000028254d0",
+          "size_bytes": 275,
+          "receipt_sha256": "bcd21a5f9debe23de8af21df92367452e8af5b6cd04b6ababdb89409e02bdc38",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-4",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h6ed39d904937106fE",
+          "address_hex": "0000000001f6e2c0",
+          "size_bytes": 275,
+          "receipt_sha256": "25a7622ffee997a526ce42d521baa85242259d3ad52d61f2e23252f9095f642c",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-5",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h769dd948d65b2434E",
+          "address_hex": "0000000002863370",
+          "size_bytes": 275,
+          "receipt_sha256": "6d6a6a6e0c8e0db834654da0c183cb1c1a491d7e2966f305870a23a59cfeb718",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-6",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h8d40fff814a4a8a7E",
+          "address_hex": "000000000179daf0",
+          "size_bytes": 275,
+          "receipt_sha256": "236643c93e6d0463e201f4e5d8e848d29482c92fc245435efba4183c9b067c4f",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-7",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17ha40b13305c31545cE",
+          "address_hex": "0000000002f233d0",
+          "size_bytes": 275,
+          "receipt_sha256": "c687b120f59c434a8af875166835ee50db7a82cd3fa898379f4049e9dbb2365c",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-8",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb7d2b6532e71dc24E",
+          "address_hex": "0000000002863490",
+          "size_bytes": 275,
+          "receipt_sha256": "dd3f75aa2635442d546174abecda118bb502d5ba60e74f4034b9ffc5ba77e3cb",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-9",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb823506d9d9b26c8E",
+          "address_hex": "000000000179dc10",
+          "size_bytes": 275,
+          "receipt_sha256": "e77ca3ab12d109eb0e018c7ddc29edf1a6a7ceeae90b10f0e0f85ce90a765806",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-10",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E",
+          "address_hex": "000000000179dd30",
+          "size_bytes": 275,
+          "receipt_sha256": "e522ddded0af04647555ed1741224a115e5475e27fa1804039ea39714822aa29",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-11",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hc6d894f09f4e71e8E",
+          "address_hex": "0000000002839750",
+          "size_bytes": 275,
+          "receipt_sha256": "bdc8efbe9136a2d4301a9533172c4424ded59c5b09a7dd0a3e1fa383460fc7d2",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-0",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h0c679fe312ef5c56E",
+          "address_hex": "00000000017a2b90",
+          "size_bytes": 4709,
+          "receipt_sha256": "c13f9a38ce30d07740ab6efa0e0d602f2ba12065695b7c15d400ef2cd7755ce5",
+          "explicit_claim_call_sites": [
+            "17a2d91:\te8 3a aa fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a2f16:\te8 b5 a8 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a3019:\te8 b2 a7 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-1",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h166065feee8a0016E",
+          "address_hex": "00000000017a3e00",
+          "size_bytes": 4704,
+          "receipt_sha256": "24e9b5ff205b0c5887b9a729c65f190f47d107fabe1f22621b80446d65162bd3",
+          "explicit_claim_call_sites": [
+            "17a4001:\te8 ca 97 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a4186:\te8 45 96 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a4289:\te8 42 95 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-2",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h3e7fa66c0e8e1cf5E",
+          "address_hex": "0000000001f71010",
+          "size_bytes": 4704,
+          "receipt_sha256": "cdc5f474e2bca4f60a95a9820b8438b026ecd6f539782bb6ef84624d9dc5e0bb",
+          "explicit_claim_call_sites": [
+            "1f71211:\te8 4a 2c ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f71396:\te8 c5 2a ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f71499:\te8 c2 29 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-3",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h52c3e622347b1d96E",
+          "address_hex": "0000000001f72270",
+          "size_bytes": 4709,
+          "receipt_sha256": "c96ba3a04a14b0cf1a6a694d0c91a9b6975b4fe0f77f0f72c2433a22bdd0b4a5",
+          "explicit_claim_call_sites": [
+            "1f72471:\te8 ea 19 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f725f6:\te8 65 18 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f726f9:\te8 62 17 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-4",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h6228ec25bca8b4b4E",
+          "address_hex": "00000000017a5060",
+          "size_bytes": 4704,
+          "receipt_sha256": "d787245469b03ac2abb7c1a8ea4deaabdfa1992465ec2468c56e69ab04dd50ae",
+          "explicit_claim_call_sites": [
+            "17a5261:\te8 6a 85 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a53e6:\te8 e5 83 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a54e9:\te8 e2 82 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-5",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h647ae3016fe2ea8bE",
+          "address_hex": "00000000028294c0",
+          "size_bytes": 4704,
+          "receipt_sha256": "7cf0946052b59d2e0b8fe36777e661414a69a24e605de5bc7e97bdba159d9f65",
+          "explicit_claim_call_sites": [
+            "28296c1:\te8 4a f8 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "2829846:\te8 c5 f6 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "2829949:\te8 c2 f5 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-6",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h797dc38583de8b44E",
+          "address_hex": "000000000282a720",
+          "size_bytes": 4704,
+          "receipt_sha256": "165fbd66dd83d8eb63064194d0b9d86a6988e559028c8c915917155115d21f06",
+          "explicit_claim_call_sites": [
+            "282a921:\te8 ea e5 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "282aaa6:\te8 65 e4 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "282aba9:\te8 62 e3 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-7",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h8c1846b2bfec3773E",
+          "address_hex": "0000000002865300",
+          "size_bytes": 4704,
+          "receipt_sha256": "dab19b6e697f26601568d158b4f701c0e36223e5e642d34006fc043c2a4d5c38",
+          "explicit_claim_call_sites": [
+            "2865501:\te8 ea 5d ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+            "2865686:\te8 65 5c ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+            "2865789:\te8 62 5b ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-8",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h9c9a3b45f6782f45E",
+          "address_hex": "0000000002f240b0",
+          "size_bytes": 4500,
+          "receipt_sha256": "7d2a4dc8d1de9013cfa4d5a87d63e70ff47c0987745ebdee736b63946b12ace0",
+          "explicit_claim_call_sites": [
+            "2f2427c:\te8 6f 59 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>",
+            "2f2440b:\te8 e0 57 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>",
+            "2f244ec:\te8 ff 56 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-9",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h9e7c06f4878e0380E",
+          "address_hex": "000000000283a740",
+          "size_bytes": 4704,
+          "receipt_sha256": "4b28d4198d7e8f903807fa6958e1333f00f6a2ec9a3ec239b99d19bb8456825c",
+          "explicit_claim_call_sites": [
+            "283a941:\te8 4a 93 ff ff       \tcall   2833c90 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E>",
+            "283aac6:\te8 c5 91 ff ff       \tcall   2833c90 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E>",
+            "283abc9:\te8 c2 90 ff ff       \tcall   2833c90 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-10",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17ha34ece09c545e887E",
+          "address_hex": "00000000017a62c0",
+          "size_bytes": 4704,
+          "receipt_sha256": "e8c6d0d12919827e9fa98c7ec3190a39a85ace8463f601d67dc07879391c073f",
+          "explicit_claim_call_sites": [
+            "17a64c1:\te8 0a 73 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a6646:\te8 85 71 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a6749:\te8 82 70 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-11",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hb0be7ebc713e2603E",
+          "address_hex": "000000000282b980",
+          "size_bytes": 4704,
+          "receipt_sha256": "550934233e92d1ace0404ca19fde49358293a8608884f3d01d31094fb5ea8db2",
+          "explicit_claim_call_sites": [
+            "282bb81:\te8 8a d3 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "282bd06:\te8 05 d2 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "282be09:\te8 02 d1 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-12",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hb2b3dbabfb291dbbE",
+          "address_hex": "0000000002866560",
+          "size_bytes": 4709,
+          "receipt_sha256": "a6c247dd19a92c5af04f6da7dc80742c56da5ac5b005f6f0047eb406761de8e1",
+          "explicit_claim_call_sites": [
+            "2866761:\te8 8a 4b ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+            "28668e6:\te8 05 4a ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+            "28669e9:\te8 02 49 ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-13",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hc5ac15b7141c1f18E",
+          "address_hex": "0000000002f25250",
+          "size_bytes": 4500,
+          "receipt_sha256": "a139efcc097957d180db8f11274c80c6fa1ed0904cd08e8c682e3f37d84f2266",
+          "explicit_claim_call_sites": [
+            "2f2541c:\te8 cf 47 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>",
+            "2f255ab:\te8 40 46 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>",
+            "2f2568c:\te8 5f 45 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-14",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hccb585eaf083f8d7E",
+          "address_hex": "0000000001f734e0",
+          "size_bytes": 4704,
+          "receipt_sha256": "28662202f9edfa1702b904c5d969234460403201e2ad0c66dfa5e01f697a7676",
+          "explicit_claim_call_sites": [
+            "1f736e1:\te8 7a 07 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f73866:\te8 f5 05 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+            "1f73969:\te8 f2 04 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-15",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17he271095f5e92837cE",
+          "address_hex": "000000000282cbe0",
+          "size_bytes": 4704,
+          "receipt_sha256": "d85d3380f65f0b7e65304e1d503e5e2dc8f7108be224ba2b38b97b503c9151db",
+          "explicit_claim_call_sites": [
+            "282cde1:\te8 2a c1 fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "282cf66:\te8 a5 bf fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+            "282d069:\te8 a2 be fe ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-16",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17he278f1943b5a50a5E",
+          "address_hex": "00000000017a7520",
+          "size_bytes": 4704,
+          "receipt_sha256": "e3ecca492b172ea1bd2e6b5006f9b35d810916d00cf5756555cb9987795809b7",
+          "explicit_claim_call_sites": [
+            "17a7721:\te8 aa 60 fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a78a6:\te8 25 5f fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+            "17a79a9:\te8 22 5e fe ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+          ],
+          "claim_call_site_count": 3,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x138"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-17",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h00d5975ea938c78aE",
+          "address_hex": "00000000017a8780",
+          "size_bytes": 100,
+          "receipt_sha256": "b25ad6c47bb14fd6a1f6223462c6c63b0fea201656af51f8435c4ccc676eece0",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-18",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0bd9951df1ae84d4E",
+          "address_hex": "000000000282de40",
+          "size_bytes": 100,
+          "receipt_sha256": "3fc9209b77cabbde9f17b124be3b4a4c19d1a08800171bd49b1509e3463c48b4",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-19",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0cfacb7aa20ae74dE",
+          "address_hex": "0000000001f74740",
+          "size_bytes": 100,
+          "receipt_sha256": "784c99016b78b372aaf8d8fc5a6d20f41c7d6c96ba3b74db0ed189e7c61a8e98",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-20",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0d4d579b3c6cd775E",
+          "address_hex": "0000000002f263f0",
+          "size_bytes": 100,
+          "receipt_sha256": "cc572d5769cc0b7d3c3096946528fa8dc742f69779aac099b98776e3137a8f4f",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-21",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17haf8368dcf0a90783E",
+          "address_hex": "00000000028677d0",
+          "size_bytes": 100,
+          "receipt_sha256": "8a2efe20d499f27add43a603c66ed8e155519d4cf280238f8fccba8a1f116e79",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-22",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17he6864b81a0eb674cE",
+          "address_hex": "000000000283b9a0",
+          "size_bytes": 100,
+          "receipt_sha256": "1ffcccc5b141cfb85ae8c88a241c2f95a5295e404b24b9c59b0c13aec7a86f3a",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        }
+      ]
+    },
+    "candidate": {
+      "binary_sha256": "d7d935fca5066d647f67a2ef1b18e56fff2162b2f0726b5fd22094fd9910b819",
+      "binary_bytes": 60140440,
+      "source_manifest_sha256": "ce5a705508299624c2611d525940ce1502b3b9f20196814cf449e9286f8f11d6",
+      "assembly_index_sha256": "e5ada88b80eb789c77b3398c163af749f977fdef7541ff9c970ed9c900bc9b7f",
+      "owners": {
+        "claim_sector": {
+          "symbol_count": 0,
+          "size_bytes": 0,
+          "variant_sizes": [],
+          "explicit_claim_call_sites": 0
+        },
+        "claim_sector_index_error": {
+          "symbol_count": 0,
+          "size_bytes": 0,
+          "variant_sizes": [],
+          "explicit_claim_call_sites": 0
+        },
+        "claim_sector_bounds_error": {
+          "symbol_count": 1,
+          "size_bytes": 132,
+          "variant_sizes": [
+            132
+          ],
+          "explicit_claim_call_sites": 0
+        },
+        "claim_sector_conflict_error": {
+          "symbol_count": 1,
+          "size_bytes": 171,
+          "variant_sizes": [
+            171
+          ],
+          "explicit_claim_call_sites": 0
+        },
+        "validate_stream_allocations": {
+          "symbol_count": 12,
+          "size_bytes": 28373,
+          "variant_sizes": [
+            2323,
+            2323,
+            2323,
+            2323,
+            2323,
+            2323,
+            2323,
+            2323,
+            2820,
+            2323,
+            2323,
+            2323
+          ],
+          "explicit_claim_call_sites": 0
+        },
+        "validate_physical_sector_layout": {
+          "symbol_count": 12,
+          "size_bytes": 3300,
+          "variant_sizes": [
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275,
+            275
+          ],
+          "explicit_claim_call_sites": 0
+        },
+        "load_fat": {
+          "symbol_count": 23,
+          "size_bytes": 85913,
+          "variant_sizes": [
+            5045,
+            5042,
+            5042,
+            5045,
+            5042,
+            5042,
+            5042,
+            5042,
+            4837,
+            5042,
+            5042,
+            5042,
+            5045,
+            4837,
+            5042,
+            5042,
+            5042,
+            100,
+            100,
+            100,
+            100,
+            100,
+            100
+          ],
+          "explicit_claim_call_sites": 0
+        }
+      },
+      "rows": [
+        {
+          "name": "assembly-validate_stream_allocations-0",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h144431ac4416e3d3E",
+          "address_hex": "00000000028626d0",
+          "size_bytes": 2323,
+          "receipt_sha256": "4c8ebf84988c7a61e30529d6adf075260395e08b442401858e6e870aa7e72e75",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-1",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h1ab05b3c9be5c99cE",
+          "address_hex": "00000000027a14a0",
+          "size_bytes": 2323,
+          "receipt_sha256": "8b2495f5f442d8045a4304c35184d0b763e88e4416bd0bb629ce159fb960a5d4",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-2",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h3954090a9826ae24E",
+          "address_hex": "000000000139e7a0",
+          "size_bytes": 2323,
+          "receipt_sha256": "921e0bf7a8cd7efa4299421271ca6c7f9a86ce00d149527f38612868439792fb",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-3",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h3ff2b4d8bb76d716E",
+          "address_hex": "000000000139f0c0",
+          "size_bytes": 2323,
+          "receipt_sha256": "df81ee4add6491f19bf93ee0c8f5e4c5cf0445d805f67d6caf78612e21c1e522",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-4",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h4b3dc8aaeece68aeE",
+          "address_hex": "0000000001fc46a0",
+          "size_bytes": 2323,
+          "receipt_sha256": "119b42ac4f904ae77abbc3d08b1fce658c7c772d00d841e4a6b488a549a1d3f3",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-5",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h4d858c2c704bd558E",
+          "address_hex": "00000000027a1dc0",
+          "size_bytes": 2323,
+          "receipt_sha256": "f6b28610c7fe289269a8e91ffea4a2909198325373bace917c8293c1352ef4b6",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-6",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h6c1efa366543d03fE",
+          "address_hex": "0000000002839020",
+          "size_bytes": 2323,
+          "receipt_sha256": "420396c79e3d9e91669e2ebbd069b3b3f42e294c1692a1e5e289769d40c0d77b",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-7",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h7ce6a7c2ce4c22efE",
+          "address_hex": "0000000002862ff0",
+          "size_bytes": 2323,
+          "receipt_sha256": "ea6fa8b3e8bd41a53de4aae5ccf3a6b072959660d22af06f8f566b67aa3f0863",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-8",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h7e841c4fd57f5f86E",
+          "address_hex": "0000000002f24c70",
+          "size_bytes": 2820,
+          "receipt_sha256": "30a87d8250936040f03f3112caf93dd20447d442651499a793e51791b5852446",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x178",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-9",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h880841bd29b913beE",
+          "address_hex": "0000000001fc4fc0",
+          "size_bytes": 2323,
+          "receipt_sha256": "f88acdd9beb94f4d0959db33302cb950df0b9ab8963b152facabbb8f1e773522",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-10",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E",
+          "address_hex": "000000000139f9e0",
+          "size_bytes": 2323,
+          "receipt_sha256": "00b6e77312377ab25ca685f58136c1619fd83cf8a5dbda68a1d77160ce6da0ae",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_stream_allocations-11",
+          "owner": "validate_stream_allocations",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hcfc9b534903ca5e5E",
+          "address_hex": "00000000013a0300",
+          "size_bytes": 2323,
+          "receipt_sha256": "0a877f1d3bc93648a6668a78957804c4264ac00c2fe273b68e753b9fcd2d1e4b",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x158",
+            "0x8"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-0",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h0e69b5034738168dE",
+          "address_hex": "0000000001fc7bd0",
+          "size_bytes": 275,
+          "receipt_sha256": "957340b029099cec9835883be5eb1f6b11352cf601bfed009a6639f3bf687ad5",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-1",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h1bce0f347986d39aE",
+          "address_hex": "00000000013a2f10",
+          "size_bytes": 275,
+          "receipt_sha256": "8af33e4eb20d214543afbf6a09ca33c09b34f17f91a193174299cee2a2a3de12",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-2",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h32d74b246e64e63aE",
+          "address_hex": "00000000027a49d0",
+          "size_bytes": 275,
+          "receipt_sha256": "d13df5016c305691ef1b94e49b2f6eca1cb56cac07e97874ad7cac91323e6c4f",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-3",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h59934f0ccee77b4cE",
+          "address_hex": "00000000027a4af0",
+          "size_bytes": 275,
+          "receipt_sha256": "a0dbc75a54058921f8ee208daf269891e0802c5a18114823a8b7d3d85ece98b6",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-4",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h6ed39d904937106fE",
+          "address_hex": "0000000001fc7cf0",
+          "size_bytes": 275,
+          "receipt_sha256": "3fdfe9b7ee4da12e9bf1e7f2cffe3cb576c1237fd4eb17989e535726a88dcc85",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-5",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h769dd948d65b2434E",
+          "address_hex": "0000000002865c00",
+          "size_bytes": 275,
+          "receipt_sha256": "de96c3a2fc4a339eaaa3faf335c61610fe11922df4b74ee577127f75c5a950d7",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-6",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17h8d40fff814a4a8a7E",
+          "address_hex": "00000000013a3030",
+          "size_bytes": 275,
+          "receipt_sha256": "d4235b50e0e4750483d75ccf43d3715f0e70e7142d5ed7083edcc18712d92383",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-7",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17ha40b13305c31545cE",
+          "address_hex": "0000000002f25f90",
+          "size_bytes": 275,
+          "receipt_sha256": "004a95f6ea46dcbe723c57dbd3bba7b65bb1ce6ffdfca3e965dfbfdccf4a5e35",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-8",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb7d2b6532e71dc24E",
+          "address_hex": "0000000002865d20",
+          "size_bytes": 275,
+          "receipt_sha256": "e373abd2747d0a65441866194e786443a32b0bbd06fcfca7b241f9d00ee076fc",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-9",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb823506d9d9b26c8E",
+          "address_hex": "00000000013a3150",
+          "size_bytes": 275,
+          "receipt_sha256": "e91891fcbb69e649d8fe3110ac959bcda4faa65238666f8d9d9632ac7c9d9b3a",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-10",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E",
+          "address_hex": "00000000013a3270",
+          "size_bytes": 275,
+          "receipt_sha256": "5716a32f14265691ed76cf529f8af1917deed02902b264a46206af8b1eb467b3",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-validate_physical_sector_layout-11",
+          "owner": "validate_physical_sector_layout",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hc6d894f09f4e71e8E",
+          "address_hex": "000000000283bdc0",
+          "size_bytes": 275,
+          "receipt_sha256": "7784a3d0657874f770d4631ab77438c9bf7244fa23d4991cc0e86d8933cfc175",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x50"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-0",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h0c679fe312ef5c56E",
+          "address_hex": "00000000013a80d0",
+          "size_bytes": 5045,
+          "receipt_sha256": "dd3bbb642ef31b03a716c2cadb153c2b4518d3e57eccc8f5340aea7c422afc04",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-1",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h166065feee8a0016E",
+          "address_hex": "00000000013a9490",
+          "size_bytes": 5042,
+          "receipt_sha256": "053742adb5d3bd3578ae0b09ecbb5d762307973898a631d3a5710725685dc8ad",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-2",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h3e7fa66c0e8e1cf5E",
+          "address_hex": "0000000001fcaa40",
+          "size_bytes": 5042,
+          "receipt_sha256": "13af3f2f86f1755abf84d956e892498a95b8e640ac84ce2da4a898cd9088cde3",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-3",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h52c3e622347b1d96E",
+          "address_hex": "0000000001fcbe00",
+          "size_bytes": 5045,
+          "receipt_sha256": "1ce8a5cbe12a68afdd085bc020d633074b55484980fab55a33ef67013b945da8",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-4",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h6228ec25bca8b4b4E",
+          "address_hex": "00000000013aa850",
+          "size_bytes": 5042,
+          "receipt_sha256": "ae1ae9cf7ac10e2c9357eba0e719abe6f18057e64abcf231157fa576821888d3",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-5",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h647ae3016fe2ea8bE",
+          "address_hex": "00000000027a8ae0",
+          "size_bytes": 5042,
+          "receipt_sha256": "404afc9692b8ab98e236def54cfdc4080fd7a678ef7eaa93b9ec621afa0ce3d0",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-6",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h797dc38583de8b44E",
+          "address_hex": "00000000027a9ea0",
+          "size_bytes": 5042,
+          "receipt_sha256": "ed6d3843b766dc064e008ecbbdf70e7aa8afb3d07a72f4eaca7f6fcf89d5e8da",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-7",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h8c1846b2bfec3773E",
+          "address_hex": "0000000002867b90",
+          "size_bytes": 5042,
+          "receipt_sha256": "951ad62a365ad65a2949f047fa4b0aa415f2b487d2c0f5aacb018e4ec9759891",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-8",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h9c9a3b45f6782f45E",
+          "address_hex": "0000000002f26c70",
+          "size_bytes": 4837,
+          "receipt_sha256": "75a383f99f8d77de5fe95b555a905431808bff42d7a48810babe1348b5bbea6b",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-9",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17h9e7c06f4878e0380E",
+          "address_hex": "000000000283cdb0",
+          "size_bytes": 5042,
+          "receipt_sha256": "a63f26766ce63bc2afd27f7e21943fe5bf22432994c54d90a6d283a8d1f7cdfc",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-10",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17ha34ece09c545e887E",
+          "address_hex": "00000000013abc10",
+          "size_bytes": 5042,
+          "receipt_sha256": "a439ec66ec66a2a7772ada86e51095547dae699051baf83c9f57be26cabb5395",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-11",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hb0be7ebc713e2603E",
+          "address_hex": "00000000027ab260",
+          "size_bytes": 5042,
+          "receipt_sha256": "50e18c1fc065119bdd277b81fe306fe11c55e3f7f228bbcb0d6071f8d7b59c67",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-12",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hb2b3dbabfb291dbbE",
+          "address_hex": "0000000002868f50",
+          "size_bytes": 5045,
+          "receipt_sha256": "4080f67c16a8c6938b08b24ca4e6fb99e3819ee5d86e007a84ea9f8a82e31216",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-13",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hc5ac15b7141c1f18E",
+          "address_hex": "0000000002f27f60",
+          "size_bytes": 4837,
+          "receipt_sha256": "164be566bd0b8fe5f41030429934965f8dcdc09049fb17462bc8e8d3738279af",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-14",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17hccb585eaf083f8d7E",
+          "address_hex": "0000000001fcd1c0",
+          "size_bytes": 5042,
+          "receipt_sha256": "554cf6f02be643629f4ef24a34b6ca683ce288584a5b5a96bd78d9fc71cbfcd7",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-15",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17he271095f5e92837cE",
+          "address_hex": "00000000027ac620",
+          "size_bytes": 5042,
+          "receipt_sha256": "75471df64c2b114c88a0a1c711b3607273aa91f69c58fdf6c0208f4f560bbe75",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-16",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17he278f1943b5a50a5E",
+          "address_hex": "00000000013acfd0",
+          "size_bytes": 5042,
+          "receipt_sha256": "18fb67321f69cbc3e502205f0a128455f9d34ae3c931a755a68bab15f066f4c5",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x1000",
+            "0x148"
+          ]
+        },
+        {
+          "name": "assembly-load_fat-17",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h00d5975ea938c78aE",
+          "address_hex": "00000000013ae390",
+          "size_bytes": 100,
+          "receipt_sha256": "a9c064b7543878ad2558c27aa0e23dbf8caa8bebcfdccf1effdff4ff304622fb",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-18",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0bd9951df1ae84d4E",
+          "address_hex": "00000000027ad9e0",
+          "size_bytes": 100,
+          "receipt_sha256": "5913c59be905c38787fceb460d0048143624a457cbec2866687ca8f8fdf591cd",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-19",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0cfacb7aa20ae74dE",
+          "address_hex": "0000000001fce580",
+          "size_bytes": 100,
+          "receipt_sha256": "5890e0ab1ed0ac800ddbc4965ba3b12f903372209af8975daff2fe4c493488f8",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-20",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17h0d4d579b3c6cd775E",
+          "address_hex": "0000000002f29250",
+          "size_bytes": 100,
+          "receipt_sha256": "3540f8c05fa1a2cfac0f38716804a47217b7fd212a90f6d9df55dc6e3b3995c7",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-21",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17haf8368dcf0a90783E",
+          "address_hex": "000000000286a310",
+          "size_bytes": 100,
+          "receipt_sha256": "5142e5099a981d6f092b1fafe2758f546257cac96e614e73e1f60de2787b8655",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-load_fat-22",
+          "owner": "load_fat",
+          "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat28_$u7b$$u7b$closure$u7d$$u7d$17he6864b81a0eb674cE",
+          "address_hex": "000000000283e170",
+          "size_bytes": 100,
+          "receipt_sha256": "40f42b5f4d935ff8e74acc584d5fe2a379e7409fb3e4e8c3bd449b07c8750a2a",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": []
+        },
+        {
+          "name": "assembly-claim_sector_bounds_error-0",
+          "owner": "claim_sector_bounds_error",
+          "symbol": "_ZN10litchi_cfb4file25claim_sector_bounds_error17hf92416c4b3b14a7bE",
+          "address_hex": "0000000002f29f30",
+          "size_bytes": 132,
+          "receipt_sha256": "9ff384dc427cdae28d889d11161ee87d39e1e24423d031b8e34ef07e1bf14f2e",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x40"
+          ]
+        },
+        {
+          "name": "assembly-claim_sector_conflict_error-0",
+          "owner": "claim_sector_conflict_error",
+          "symbol": "_ZN10litchi_cfb4file27claim_sector_conflict_error17hf0c046462e69c11eE",
+          "address_hex": "0000000002f2a6a0",
+          "size_bytes": 171,
+          "receipt_sha256": "23d4a20f86b3cf2c2a25e116f325181495c071913b0a6db3616c418b4befb915",
+          "explicit_claim_call_sites": [],
+          "claim_call_site_count": 0,
+          "stack_reservations_hex": [
+            "0x60"
+          ]
+        }
+      ]
+    }
+  },
+  "scope": "Symbol-bounded x86-64 static code and explicit call sites. Symbol absence alone does not prove inlining; native and parent-constructor evidence are separate. No dynamic call count, removable instruction estimate or latency claim from static code."
+}

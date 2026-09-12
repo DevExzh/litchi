@@ -1,5 +1,35 @@
 # Performance program phase report
 
+## 0533: accepted CFB sector-claim candidate; verified and sealed
+
+[0533](changes/0533-cfb-claim-cold-error-layout.md) completes the matched
+CFB/OLE2 cold-error-helper and ordinary-inline experiment from revision
+`0dd079b95982aa1fbef5eddd1ec3743261dcaf20`. The native lane covers 48,000
+matched samples (two paired repeats, 20 warmups and 1,000 samples per case) across nine XLS
+and three CFB scenarios; the separate allocation lane covers 1,440 matched
+samples. All four primary XLS p50 rows improve by 20.5382–24.5798% in both
+repeats, all 12 scenarios improve in p50/mean/p95/p99, and all four allocation
+vectors are exactly unchanged. No matched peak-RSS row exceeds 5%.
+
+The profile lane records eight children, 40 timed constructor dumps and six
+setup dumps per stage (16 children, 80 timed dumps and 12 setup dumps total).
+XLS owned-source constructor Ir falls 18.9967%/19.0280%; generated code shows
+the claim body inlined into callers while checked bounds, conflict and role
+stores remain. The executable grows 0.0137%. Whole-child hardware counters
+show lower cycles/instructions/branches but lower IPC and higher branch-miss
+ratio, so they support no operation-local hardware claim. Four matched adverse
+rows and 30 same-build max/standard-deviation/system-time variations remain
+after individual review; the owned-list candidate repeat-2 maximum is 669,572
+ns versus 151,941 ns baseline, and no uniform tail claim is made. The three
+CFB system-time records repeat one coarse whole-child value across shapes and
+are not independent or operation-local observations.
+
+The quality summary passes 14 checks with 4,378 executed tests. Independent
+adverse review permits adoption; post-cleanup verification and evidence
+sealing are complete. The next OLE2/OOXML investigation is a fresh paired
+walk of residual physical reconciliation; ODF remains deferred and iWork is
+excluded.
+
 ## 0532: current-head CFB ownership and reconciliation attribution
 
 [0532](changes/0532-cfb-claim-success-path-attribution.md) completes the

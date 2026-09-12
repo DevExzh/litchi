@@ -164,6 +164,38 @@ impl PhysicalSectorRole {
     }
 }
 
+#[cold]
+#[inline(never)]
+fn claim_sector_index_error(sector: u32, role: PhysicalSectorRole) -> OleError {
+    OleError::CorruptedFile(format!(
+        "{} sector {sector} does not fit usize",
+        role.label()
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn claim_sector_bounds_error(sector: u32, role: PhysicalSectorRole) -> OleError {
+    OleError::CorruptedFile(format!(
+        "{} sector {sector} is outside the file",
+        role.label()
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn claim_sector_conflict_error(
+    sector: u32,
+    existing: PhysicalSectorRole,
+    role: PhysicalSectorRole,
+) -> OleError {
+    OleError::CorruptedFile(format!(
+        "Sector {sector} is claimed by both {} and {}",
+        existing.label(),
+        role.label()
+    ))
+}
+
 /// Main OLE file parser structure
 ///
 /// This struct represents an OLE2 structured storage file and provides
@@ -1022,27 +1054,16 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(())
     }
 
+    #[inline]
     fn claim_sector(&mut self, sector: u32, role: PhysicalSectorRole) -> Result<(), OleError> {
         let slot = self
             .sector_roles
-            .get_mut(usize::try_from(sector).map_err(|_err| {
-                OleError::CorruptedFile(format!(
-                    "{} sector {sector} does not fit usize",
-                    role.label()
-                ))
-            })?)
-            .ok_or_else(|| {
-                OleError::CorruptedFile(format!(
-                    "{} sector {sector} is outside the file",
-                    role.label()
-                ))
-            })?;
+            .get_mut(
+                usize::try_from(sector).map_err(|_err| claim_sector_index_error(sector, role))?,
+            )
+            .ok_or_else(|| claim_sector_bounds_error(sector, role))?;
         if *slot != PhysicalSectorRole::Unclaimed {
-            return Err(OleError::CorruptedFile(format!(
-                "Sector {sector} is claimed by both {} and {}",
-                slot.label(),
-                role.label()
-            )));
+            return Err(claim_sector_conflict_error(sector, *slot, role));
         }
         *slot = role;
         Ok(())
@@ -3359,6 +3380,82 @@ mod tests {
             dir_name_data: Vec::new(),
             ministream: None,
             sector_roles: Vec::new(),
+        }
+    }
+
+    const CLAIM_ROLES: [(PhysicalSectorRole, &str); 7] = [
+        (PhysicalSectorRole::Unclaimed, "unclaimed"),
+        (PhysicalSectorRole::Fat, "FAT"),
+        (PhysicalSectorRole::Difat, "DIFAT"),
+        (PhysicalSectorRole::Directory, "directory"),
+        (PhysicalSectorRole::MiniFat, "MiniFAT"),
+        (PhysicalSectorRole::MiniStream, "mini stream"),
+        (PhysicalSectorRole::RegularStream, "regular stream"),
+    ];
+
+    fn assert_claim_error(result: Result<(), OleError>, expected: &str) {
+        match result {
+            Err(OleError::CorruptedFile(message)) => assert_eq!(message, expected),
+            other => panic!("expected CorruptedFile({expected:?}), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn claim_sector_repeated_claims_preserve_exact_owner_and_error() {
+        for (first, first_label) in CLAIM_ROLES {
+            for (second, second_label) in CLAIM_ROLES {
+                let mut file = synthetic_fat_file(Vec::new(), Vec::new());
+                file.sector_roles = vec![PhysicalSectorRole::Unclaimed; 2];
+                file.claim_sector(1, first).unwrap();
+                assert_eq!(file.sector_roles, [PhysicalSectorRole::Unclaimed, first]);
+
+                let result = file.claim_sector(1, second);
+                if first == PhysicalSectorRole::Unclaimed {
+                    result.unwrap();
+                    assert_eq!(file.sector_roles, [PhysicalSectorRole::Unclaimed, second]);
+                } else {
+                    assert_claim_error(
+                        result,
+                        &format!("Sector 1 is claimed by both {first_label} and {second_label}"),
+                    );
+                    assert_eq!(file.sector_roles, [PhysicalSectorRole::Unclaimed, first]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+    fn claim_sector_checks_physical_boundaries_without_failure_mutation() {
+        // Every u32 fits usize on these targets. Conversion-error behavior
+        // remains a source-review obligation, not a simulated host test.
+        let cases = [
+            (0, 0, None),
+            (0, u32::MAX, None),
+            (1, 0, Some(0)),
+            (1, 1, None),
+            (3, 0, Some(0)),
+            (3, 2, Some(2)),
+            (3, 3, None),
+            (3, u32::MAX, None),
+        ];
+        for (length, sector, valid_index) in cases {
+            for (role, label) in CLAIM_ROLES {
+                let mut file = synthetic_fat_file(Vec::new(), Vec::new());
+                let mut expected = vec![PhysicalSectorRole::Unclaimed; length];
+                file.sector_roles = expected.clone();
+                let result = file.claim_sector(sector, role);
+                if let Some(index) = valid_index {
+                    result.unwrap();
+                    expected[index] = role;
+                } else {
+                    assert_claim_error(
+                        result,
+                        &format!("{label} sector {sector} is outside the file"),
+                    );
+                }
+                assert_eq!(file.sector_roles, expected, "sector {sector}, role {label}");
+            }
         }
     }
 

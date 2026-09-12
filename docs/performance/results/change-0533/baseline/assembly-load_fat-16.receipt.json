@@ -1,0 +1,30 @@
+{
+  "command": [
+    "objdump",
+    "-d",
+    "--disassemble=_ZN10litchi_cfb4file16OleFile$LT$R$GT$8load_fat17he278f1943b5a50a5E",
+    "/tmp/litchi-goal-0533/baseline/normal"
+  ],
+  "start_utc": "2026-09-12T15:59:23.326291+00:00",
+  "end_utc": "2026-09-12T15:59:23.524207+00:00",
+  "seconds": 0.19792799800052308,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "binary_sha256": "d39ef567849f8251a43cf8680d92351cdcc8257caf87fe3f3f59418c10c25386",
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "script_sha256": "09e9153768e5655f718f33d851426f3eecf876d2d55183f37babc58425110b61",
+  "plan_sha256": "fc146cf05feb8e09c37a700aa611817411eb3eeb72d932480e4f0c53120f9438",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "assembly-load_fat-16.host.json": "ce1cf5d9db29d66d791390b20dc67919938ca2a1d67ed600f5b1dd1ddcca0572",
+    "assembly-load_fat-16.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "assembly-load_fat-16.stdout": "804a37174b16ed50a617c0962c38941f967c8a7a309119b4b7b5459983b195fb"
+  }
+}

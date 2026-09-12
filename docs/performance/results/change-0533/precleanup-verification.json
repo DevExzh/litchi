@@ -1,0 +1,66 @@
+{
+  "status": "pass",
+  "scope": "Full source/build/assembly/capture/native/allocation/profile/hardware/variation/quality/decision replay before cleanup",
+  "verifier_sha256": "8d6a08472e0d022b09c63ad5a4786b68fdcbaa33408f5f6bbf5f40657fdc6d48",
+  "receipt_inventory": {
+    "status": "pass",
+    "stages": {
+      "baseline": 74,
+      "candidate": 84
+    },
+    "successful_receipts": 158,
+    "receipt_names_sha256": "1a112706ea13b10371fef6cfa17c1378e0857d6138310a96f59073e864ba6148"
+  },
+  "timeline": {
+    "status": "pass",
+    "serial_intervals": 158,
+    "first": "baseline/build-normal",
+    "last": "candidate/alloc-r2-cfb",
+    "native_abba": [
+      "baseline/native-r1-xls",
+      "baseline/native-r1-cfb",
+      "candidate/native-r1-xls",
+      "candidate/native-r1-cfb",
+      "candidate/native-r2-cfb",
+      "candidate/native-r2-xls",
+      "baseline/native-r2-cfb",
+      "baseline/native-r2-xls"
+    ]
+  },
+  "decision": {
+    "status": "pass",
+    "analysis": "76d84e9dc952c03684c5172bd060a31087c1d431b71235fb35b93e755e7b0dcf",
+    "profiles": {
+      "baseline": "3f5130542c96d2fc284fa7dacf2cc721eb52f69a93c268334cadcf206a9dae0b",
+      "candidate": "16a26063d1481d8014b0e571d6bd90172058a6f21cc0f0c273586c361f97a325"
+    },
+    "quality": {
+      "status": "pass",
+      "stage": "candidate",
+      "checks": 14,
+      "executed_tests": 4378,
+      "sha256": "3a1da2467c13b4dcec97157064edc8e0b8fc1abcd388f7ac0d2ec9b64b895ba6"
+    },
+    "decision": {
+      "status": "pass",
+      "disposition": "accepted",
+      "final_source": "candidate",
+      "sha256": "22b2b62883b2294caa1e7d1b9cd99d354cc8354565e870776622559e49c39772",
+      "constructor_ir": [
+        {
+          "repeat": 1,
+          "baseline": 13972463,
+          "candidate": 11318150,
+          "change_percent": -18.996743809591766
+        },
+        {
+          "repeat": 2,
+          "baseline": 13975911,
+          "candidate": 11316569,
+          "change_percent": -19.028040461906205
+        }
+      ]
+    }
+  },
+  "verifier_file": "precleanup-verifier.txt"
+}

@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## 0533: accepted CFB error-layout candidate; verified and sealed
+
+[0533](changes/0533-cfb-claim-cold-error-layout.md) measures private cold
+error helpers plus ordinary `claim_sector` inlining against revision
+`0dd079b95982aa1fbef5eddd1ec3743261dcaf20`. The checked conversion, bounds
+lookup, conflict precedence, role mutation, collect-then-claim order and
+physical reconciliation remain intact; no public API, dependency, unsafe
+code, validation policy or resource policy is added. All four primary XLS p50
+rows improve by at least 3% in both repeats, the allocation vectors are
+identical, and 14 quality checks record 4,378 executed tests. The candidate's
+four matched adverse rows and 30 same-build variation records remain explicit
+in the completed review; no stable-tail, operation-local hardware or broad
+provider claim is made. Independent adverse review permits adoption, with
+post-cleanup verification and evidence sealing complete. OLE2/OOXML
+remains active, ODF is deferred and iWork is excluded.
+
 ## 0532: bind current-head CFB attribution without adopting a candidate
 
 [0532](changes/0532-cfb-claim-success-path-attribution.md) records a fresh

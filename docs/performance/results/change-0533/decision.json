@@ -1,0 +1,31 @@
+{
+  "disposition": "accepted",
+  "native_primary_gate": true,
+  "memory_gate": true,
+  "profile_gate": true,
+  "constructor_ir": [
+    {
+      "repeat": 1,
+      "baseline": 13972463,
+      "candidate": 11318150,
+      "change_percent": -18.996743809591766
+    },
+    {
+      "repeat": 2,
+      "baseline": 13975911,
+      "candidate": 11316569,
+      "change_percent": -19.028040461906205
+    }
+  ],
+  "adverse_review_complete": true,
+  "quality_gates": 14,
+  "other_rejection_reason": null,
+  "comparison_sha256": "76d84e9dc952c03684c5172bd060a31087c1d431b71235fb35b93e755e7b0dcf",
+  "profiles_sha256": {
+    "baseline": "3f5130542c96d2fc284fa7dacf2cc721eb52f69a93c268334cadcf206a9dae0b",
+    "candidate": "16a26063d1481d8014b0e571d6bd90172058a6f21cc0f0c273586c361f97a325"
+  },
+  "quality_summary_sha256": "3a1da2467c13b4dcec97157064edc8e0b8fc1abcd388f7ac0d2ec9b64b895ba6",
+  "adverse_review_sha256": "ec175360b4e71c08e4002b7d51ec2151293e3adc6eb5f07afaeb587bb2bd28e9",
+  "scope": "Fixed synthetic in-memory CFB/XLS comparison; OLE2/OOXML active, ODF deferred, iWork excluded"
+}
