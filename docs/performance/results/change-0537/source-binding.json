@@ -1,0 +1,15 @@
+{
+  "crates/litchi-ooxml-common/src/mce/codec.rs": "e5911cdcd94116474b09062af96d639b8f08d80a09a26d90c86a931a7344fa74",
+  "crates/litchi-xlsx/src/cell_values/snapshot.rs": "2f3f839adc91f0da204aefc83ebe2bb605cc02d269346759155b7bda54abc0e9",
+  "crates/litchi-xlsx/src/cell_values/source.rs": "10c9a99892dea1cf5c0dd529f628313126c4908c0fdc6e3694439c1c3889213b",
+  "crates/litchi-xlsx/src/cell_values/validation.rs": "52e7d2d18f59e716c686f1c4c59b5835632fe6981dc6789ef7b06b555d136c0b",
+  "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "69719bc7a0aa0754ab4745f49baba077303ca7909f4e9adbc5243189e85fb9a7",
+  "crates/litchi-xlsx/src/raw/worksheet/mod.rs": "7ed9276c713b8fcf8c84722bc62e58696912a11a1f02360e011059b830cf9b73",
+  "crates/litchi-xlsx/src/raw/worksheet/model.rs": "439d6cc4a645891d51b34f7ed6c55098e853ff8662daba7bec2cdd870fc474f5",
+  "crates/litchi-xlsx/src/raw/worksheet/semantic.rs": "1cd0f76748070b78049033b984eaa3a37ed86fddb9c8d92f9890c467e764cd93",
+  "crates/litchi-xlsx/src/raw/worksheet/validation.rs": "dc79e3e8dbb11943acdf68d0d68259cb4d05ff01616184a700e2f829b5f36bfa",
+  "rust-toolchain.toml": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+  "tools/perf-baseline/Cargo.lock": "13333f511914d8146c60282b5d6385693cf89c0f939fa52b12e4db821c9b8b36",
+  "tools/perf-baseline/Cargo.toml": "a04de024b9cbe9683cdb7307c3d7199daab7171bbdcb6bb8c30b361766857aca",
+  "tools/perf-baseline/src/lib.rs": "bdeeeef53b276cb72d813ff3c7345a302e72e0d8575e13d6757d07875189585f"
+}

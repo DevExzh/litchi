@@ -1,0 +1,8 @@
+{
+  "path": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/events/attributes.rs",
+  "sha256": "c46448f11d7dba312e6ad2177dc31deab2ce51282e9f1e4069d3b35175c18518",
+  "package": "quick-xml",
+  "version": "0.41.0",
+  "signature": "decoded_and_normalized_value(&self, version, decoder) -> XmlResult<Cow<'a, str>>",
+  "ownership": "Borrowed raw input may stay borrowed; owned raw input converted to owned; normalization replacements return owned. PendingCell cell_type must remain owned."
+}

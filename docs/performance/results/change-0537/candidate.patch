@@ -1,0 +1,45 @@
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/codec.rs b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -1,5 +1,6 @@
+ //! Streaming `SpreadsheetML` event codec.
+ 
++use std::borrow::Cow;
+ use std::collections::HashSet;
+ 
+ use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
+@@ -174,7 +175,7 @@
+ // errors still follow coordinate, style, cell-metadata and value-metadata checks.
+ #[derive(Debug)]
+ struct CellAttributeView<'a> {
+-    reference: Option<String>,
++    reference: Option<Cow<'a, str>>,
+     style: Option<Attribute<'a>>,
+     cell_metadata: Option<Attribute<'a>>,
+     value_metadata: Option<Attribute<'a>>,
+@@ -212,13 +213,12 @@
+     Ok(attributes)
+ }
+ 
+-fn decode_cell_attribute(
+-    attribute: Attribute<'_>,
++fn decode_cell_attribute<'a>(
++    attribute: Attribute<'a>,
+     decoder: Decoder,
+-) -> litchi_ooxml_common::xml::Result<String> {
++) -> litchi_ooxml_common::xml::Result<Cow<'a, str>> {
+     attribute
+         .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+-        .map(|value| value.into_owned())
+         .map_err(|error| litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+ }
+ 
+@@ -792,7 +792,7 @@
+             cell_metadata,
+             value_metadata,
+             cell_type: cell_type
+-                .map(|attribute| decode_cell_attribute(attribute, decoder))
++                .map(|attribute| decode_cell_attribute(attribute, decoder).map(Cow::into_owned))
+                 .transpose()?,
+             value: String::new(),
+             value_bytes: 0,
