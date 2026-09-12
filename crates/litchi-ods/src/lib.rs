@@ -56,6 +56,7 @@ pub mod charts;
 pub mod codec;
 pub mod content_validation;
 pub mod data_pilot;
+pub mod data_style;
 pub mod database_range;
 pub mod definitions;
 pub mod document;
