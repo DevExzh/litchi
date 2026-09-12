@@ -57,5 +57,13 @@ integration.
 The transaction and preservation boundary follows [ADR 0003](../../adr/0003-snapshots-edits-and-patches.md),
 the preserve-or-refuse policy follows [ADR 0006](../../adr/0006-validation-security-and-compatibility.md),
 and ODS family ownership follows [ADR 0023](../../adr/0023-odf-family-crate-split.md).
-No performance result is claimed: the separate historical data-style smoke is not
-current speed or memory evidence, and profiler work remains ongoing under [ADR 0005](../../adr/0005-io-memory-and-performance.md).
+Measured evidence now follows [ADR 0005](../../adr/0005-io-memory-and-performance.md).
+Commit `750b8d450` retains the reviewed [source-workflow characterization](ods-data-style-source-performance/README.md).
+Commit `f2daff703` removes a repeated parse during graph insertion preflight;
+its [matched evidence and replay](ods-data-style-graph-preflight-performance/README.md)
+show 11.16% fewer allocation calls and 8.24% fewer requested bytes for graph put
+on the scale-512 synthetic fixture, with unchanged allocator-observed logical
+peak memory. An independent replay matched all deterministic metrics and nine
+fixture hashes. The optimization separately passed 298 library tests, 47
+integration tests and strict library Clippy. These measurements do not establish
+RSS reductions, durable-publication throughput, or a general latency guarantee.

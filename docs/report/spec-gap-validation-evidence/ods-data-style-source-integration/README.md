@@ -10,4 +10,4 @@ Root validation of `combined-validation-source.json`: 2,234 tests passed across 
 
 Independent review approved the scanner. Owner review approved selectors, dependency closure, failed staging, stale/inverse checks, signature policy and facade integration, and the final v9 insertion preflight correction. The scoped owner review is approved. Earlier v7/v8 findings were corrected in this v9 capture; green results from earlier captures are not substituted for current validation.
 
-Performance characterization is separate and pending. Historical smoke measurements do not establish a current speedup or memory claim. The broader audit remains open.
+Performance evidence is separate: the reviewed [source-workflow characterization](../ods-data-style-source-performance/README.md) is committed in `750b8d450`, and the [matched graph-preflight optimization](../ods-data-style-graph-preflight-performance/README.md) in `f2daff703` includes independent replay. Their workload and allocator caveats apply; the broader audit remains open.
