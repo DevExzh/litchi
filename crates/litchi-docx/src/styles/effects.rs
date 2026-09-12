@@ -30,10 +30,19 @@ mod test_trace {
     pub(super) struct Counts {
         pub(super) loads: usize,
         pub(super) candidate_clones: usize,
+        pub(super) projection_builds: usize,
+        pub(super) readbacks: usize,
     }
 
     thread_local! {
-        static COUNTS: Cell<Counts> = const { Cell::new(Counts { loads: 0, candidate_clones: 0 }) };
+        static COUNTS: Cell<Counts> = const {
+            Cell::new(Counts {
+                loads: 0,
+                candidate_clones: 0,
+                projection_builds: 0,
+                readbacks: 0,
+            })
+        };
     }
 
     pub(super) fn reset() {
@@ -56,6 +65,22 @@ mod test_trace {
         COUNTS.with(|counts| {
             let mut value = counts.get();
             value.candidate_clones = value.candidate_clones.saturating_add(1);
+            counts.set(value);
+        });
+    }
+
+    pub(super) fn record_projection_build() {
+        COUNTS.with(|counts| {
+            let mut value = counts.get();
+            value.projection_builds = value.projection_builds.saturating_add(1);
+            counts.set(value);
+        });
+    }
+
+    pub(super) fn record_readback() {
+        COUNTS.with(|counts| {
+            let mut value = counts.get();
+            value.readbacks = value.readbacks.saturating_add(1);
             counts.set(value);
         });
     }
@@ -143,6 +168,9 @@ pub type Projection = StyleDefinitions;
 
 impl StyleDefinitions {
     fn from_xml(xml: &Arc<Vec<u8>>) -> Result<Self> {
+        #[cfg(test)]
+        test_trace::record_projection_build();
+
         // Reuse the established style reader for the typed projection. The
         // temporary part adopts the same Arc allocation; it is not a second
         // source copy and is dropped after the projection is materialized.
@@ -1171,6 +1199,10 @@ impl GraphToken {
             && self.limits == other.limits
     }
 
+    fn same_published_state_with_aggregate(&self, other: &Self) -> bool {
+        self.same_published_state(other) && self.aggregate == other.aggregate
+    }
+
     fn matches_source_precondition(&self, actual: &Self) -> bool {
         if self.target.is_none()
             && self.relationship_id.is_none()
@@ -1485,18 +1517,37 @@ fn apply_projected_patch(
     projected: Snapshot,
     signature_source: Option<&OpcPackage>,
 ) -> Result<Snapshot> {
+    let replacement = is_existing_resource_replacement(patch, &projected);
     publish_resource(
         package,
         owner,
         projected.resource.clone(),
         patch.after_graph.as_ref(),
+        replacement.then_some(patch.before.as_ref()).flatten(),
     )?;
     if let Some(source) = signature_source {
         package.validate_signature_edit_from(source)?;
     }
-    let published = load(package, owner)?;
+    let published = if replacement {
+        readback_existing_resource_replacement(
+            package,
+            owner,
+            projected
+                .resource
+                .as_ref()
+                .ok_or_else(|| invalid("stylesWithEffects replacement lacks a resource"))?,
+            patch
+                .after_graph
+                .as_ref()
+                .ok_or_else(|| invalid("stylesWithEffects replacement lacks graph provenance"))?,
+        )?
+    } else {
+        load(package, owner)?
+    };
     let graph_matches = match (&published.graph, &projected.graph) {
-        (Some(published), Some(projected)) => published.same_published_state(projected),
+        (Some(published), Some(projected)) => {
+            published.same_published_state_with_aggregate(projected)
+        },
         (None, None) => true,
         _ => false,
     };
@@ -1509,6 +1560,80 @@ fn apply_projected_patch(
         return Err(invalid("staged stylesWithEffects graph did not round-trip"));
     }
     Ok(published)
+}
+
+fn is_existing_resource_replacement(patch: &Patch, projected: &Snapshot) -> bool {
+    patch.before.is_some()
+        && projected.resource.is_some()
+        && patch
+            .before_graph
+            .as_ref()
+            .is_some_and(|graph| graph.target.is_some() && graph.relationship_id.is_some())
+        && patch
+            .after_graph
+            .as_ref()
+            .is_some_and(|graph| graph.target.is_some() && graph.relationship_id.is_some())
+}
+
+fn readback_existing_resource_replacement(
+    package: &OpcPackage,
+    owner: Owner,
+    expected_resource: &Resource,
+    desired_graph: &GraphToken,
+) -> Result<Snapshot> {
+    #[cfg(test)]
+    test_trace::record_readback();
+
+    let graph = inspect_graph_with_validated_resource(package, Some((owner, expected_resource)))?;
+    let source = match owner {
+        Owner::MainDocument => graph.main.clone(),
+        Owner::Glossary => graph.glossary.clone().ok_or_else(|| {
+            Error::PartNotFound(
+                "glossary document owner is required before reading stylesWithEffects".to_owned(),
+            )
+        })?,
+    };
+    if expected_resource.conformance != graph.conformance {
+        return Err(invalid(
+            "stylesWithEffects replacement conformance does not match the package",
+        ));
+    }
+    if desired_graph.owner != owner || desired_graph.source.as_deref() != Some(source.as_str()) {
+        return Err(invalid(
+            "stylesWithEffects replacement graph belongs to a different owner source",
+        ));
+    }
+    let binding = graph
+        .binding(owner)
+        .ok_or_else(|| invalid("stylesWithEffects replacement lost its existing owner binding"))?;
+    if desired_graph.target.as_deref() != Some(binding.target.as_str())
+        || desired_graph.relationship_id.as_deref() != Some(binding.relationship_id.as_str())
+    {
+        return Err(invalid(
+            "stylesWithEffects replacement graph target differs from its source",
+        ));
+    }
+    let limits = package.read_limits();
+    let target_relationships = package.source_relationships_with_limits(&binding.target, limits)?;
+    if desired_graph.target_relationships.as_ref() != Some(&target_relationships) {
+        return Err(invalid(
+            "stylesWithEffects replacement graph target metadata differs from its source",
+        ));
+    }
+    let part = package.get_part(&binding.target)?;
+    validate_effects_part_for_package(part, graph.conformance, limits)?;
+    if part.blob() != expected_resource.xml_bytes() {
+        return Err(invalid(
+            "stylesWithEffects replacement source bytes did not round-trip",
+        ));
+    }
+    let graph_token = capture_graph_token(package, &graph, owner)?;
+    Ok(Snapshot::from_package(
+        owner,
+        Some(expected_resource.clone()),
+        graph.conformance,
+        Some(graph_token),
+    ))
 }
 
 /// Apply a committed source patch to one package owner.
@@ -1545,7 +1670,7 @@ pub fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result
     }
 
     let mut candidate = package.clone();
-    publish_resource(&mut candidate, owner, Some(resource), None)?;
+    publish_resource(&mut candidate, owner, Some(resource), None, None)?;
     candidate.validate_signature_edit_from(package)?;
     let published = load(&candidate, owner)?;
     if published.resource().is_none() {
@@ -1562,7 +1687,7 @@ pub fn remove(package: &mut OpcPackage, owner: Owner) -> Result<bool> {
         return Ok(false);
     }
     let mut candidate = package.clone();
-    publish_resource(&mut candidate, owner, None, None)?;
+    publish_resource(&mut candidate, owner, None, None, None)?;
     candidate.validate_signature_edit_from(package)?;
     let published = load(&candidate, owner)?;
     if published.resource().is_some() {
@@ -1577,8 +1702,12 @@ fn publish_resource(
     owner: Owner,
     resource: Option<Resource>,
     desired_graph: Option<&GraphToken>,
+    validated_resource: Option<&Resource>,
 ) -> Result<()> {
-    let graph = inspect_graph(package)?;
+    let graph = inspect_graph_with_validated_resource(
+        package,
+        validated_resource.map(|resource| (owner, resource)),
+    )?;
     let source = match owner {
         Owner::MainDocument => graph.main.clone(),
         Owner::Glossary => graph.glossary.clone().ok_or_else(|| {
@@ -1908,6 +2037,38 @@ fn validate_resource_for_package(
         ));
     }
     validate_xml_with_limits(&resource.xml, Some(conformance), package.read_limits()).map(|_| ())
+}
+
+fn validate_effects_part_for_package(
+    part: &dyn Part,
+    conformance: Conformance,
+    limits: ReadLimits,
+) -> Result<()> {
+    if part.content_type() != CONTENT_TYPE {
+        return Err(Error::ContentType {
+            expected: CONTENT_TYPE.to_owned(),
+            actual: part.content_type().to_owned(),
+        });
+    }
+    validate_xml_with_limits(part.blob(), Some(conformance), limits).map(|_| ())
+}
+
+fn validate_effects_part_for_graph(
+    part: &dyn Part,
+    conformance: Conformance,
+    limits: ReadLimits,
+    validated_resource: Option<&Resource>,
+) -> Result<()> {
+    if let Some(resource) = validated_resource {
+        validate_effects_part_for_package(part, conformance, limits)?;
+        if resource.conformance != conformance || part.blob() != resource.xml_bytes() {
+            return Err(invalid(
+                "stylesWithEffects validated resource does not match its package target",
+            ));
+        }
+        return Ok(());
+    }
+    Resource::from_part(part, conformance, limits).map(|_| ())
 }
 
 fn preflight_package_limits(
@@ -2337,6 +2498,13 @@ fn next_relationship_id(package: &OpcPackage, source: &PackURI) -> Result<String
 }
 
 fn inspect_graph(package: &OpcPackage) -> Result<GraphState> {
+    inspect_graph_with_validated_resource(package, None)
+}
+
+fn inspect_graph_with_validated_resource(
+    package: &OpcPackage,
+    validated: Option<(Owner, &Resource)>,
+) -> Result<GraphState> {
     let conformance = package_conformance(package)?;
     let main_part = package.main_document_part()?;
     if !matches!(
@@ -2457,7 +2625,18 @@ fn inspect_graph(package: &OpcPackage) -> Result<GraphState> {
         };
         validate_exclusive_inbound(package, target, expected)?;
         let part = package.get_part(target)?;
-        let _ = Resource::from_part(part, conformance, package.read_limits())?;
+        let validated_resource = validated.and_then(|(owner, resource)| {
+            bindings[owner.index()]
+                .as_ref()
+                .filter(|binding| same_uri(&binding.target, target))
+                .map(|_| resource)
+        });
+        validate_effects_part_for_graph(
+            part,
+            conformance,
+            package.read_limits(),
+            validated_resource,
+        )?;
     }
 
     Ok(GraphState {
@@ -2914,8 +3093,10 @@ mod tests {
             .expect("apply staged effects patch");
         let counts = test_trace::take();
 
-        assert_eq!(counts.loads, 2);
+        assert_eq!(counts.loads, 1);
         assert_eq!(counts.candidate_clones, 0);
+        assert_eq!(counts.projection_builds, 5);
+        assert_eq!(counts.readbacks, 1);
         assert_eq!(
             applied
                 .resource()
@@ -2937,8 +3118,10 @@ mod tests {
             .expect("apply direct effects patch");
         let counts = test_trace::take();
 
-        assert_eq!(counts.loads, 2);
+        assert_eq!(counts.loads, 1);
         assert_eq!(counts.candidate_clones, 1);
+        assert_eq!(counts.projection_builds, 5);
+        assert_eq!(counts.readbacks, 1);
         assert_eq!(
             applied
                 .resource()

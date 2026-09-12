@@ -857,12 +857,16 @@ fn public_patch_rejects_cross_owner_and_cross_package_snapshots_atomically() -> 
         "cross-owner rejection changed package bytes"
     );
     assert_eq!(
-        archive_member(&package_bytes(&mut package), "word/glossary/stylesWithEffects.xml")?,
+        archive_member(
+            &package_bytes(&mut package),
+            "word/glossary/stylesWithEffects.xml"
+        )?,
         glossary_before,
         "cross-owner rejection changed the independent glossary part"
     );
 
-    let other_source = fixture_bytes("libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx")?;
+    let other_source =
+        fixture_bytes("libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx")?;
     let mut other = Package::from_reader(Cursor::new(other_source.clone()))
         .map_err(|error| FixtureError(format!("open cross-package source: {error}")))?;
     let other_before = package_bytes(&mut other);
@@ -1224,6 +1228,80 @@ fn effects_resource_rejects_malformed_opaque_xml() {
         }
     }
     assert!(accepted.is_empty(), "accepted malformed XML: {accepted:?}");
+}
+
+#[test]
+fn secondary_effects_projection_failures_refuse_public_main_read_and_edit() -> FixtureResult<()> {
+    let source = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
+    let main_xml = archive_member(&source, "word/stylesWithEffects.xml")?;
+    let secondary_cases: [(&str, &[u8]); 2] = [
+        (
+            "unsupported MustUnderstand",
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:u="urn:unsupported" mc:MustUnderstand="u">
+  <w:style w:type="paragraph" w:styleId="secondary"/>
+</w:styles>"#,
+        ),
+        (
+            "duplicate typed numId",
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:style w:type="paragraph" w:styleId="secondary">
+    <w:pPr><w:numPr><w:numId w:val="7"/><w:numId w:val="8"/></w:numPr></w:pPr>
+  </w:style>
+</w:styles>"#,
+        ),
+    ];
+
+    for (label, secondary_xml) in secondary_cases {
+        let synthetic = replace_member(
+            &source,
+            "word/glossary/stylesWithEffects.xml",
+            secondary_xml.to_vec(),
+        )?;
+        assert_eq!(
+            archive_member(&synthetic, "word/stylesWithEffects.xml")?,
+            main_xml,
+            "secondary {label} fixture changed the main effects source"
+        );
+
+        let mut read_package = Package::from_reader(Cursor::new(synthetic.clone()))
+            .map_err(|error| FixtureError(format!("open secondary {label} fixture: {error}")))?;
+        let before_read = package_bytes(&mut read_package);
+        assert!(
+            read_package.styles_with_effects(Owner::Glossary).is_err(),
+            "secondary {label} fixture was accepted by its direct owner"
+        );
+        assert!(
+            read_package
+                .styles_with_effects(Owner::MainDocument)
+                .is_err(),
+            "main read bypassed secondary {label} projection failure"
+        );
+        assert_eq!(
+            package_bytes(&mut read_package),
+            before_read,
+            "main read refusal changed package bytes for secondary {label}"
+        );
+
+        let mut edit_package = Package::from_reader(Cursor::new(synthetic))
+            .map_err(|error| FixtureError(format!("reopen secondary {label} fixture: {error}")))?;
+        let before_edit = package_bytes(&mut edit_package);
+        assert!(
+            edit_package
+                .remove_styles_with_effects(Owner::MainDocument)
+                .is_err(),
+            "main edit bypassed secondary {label} projection failure"
+        );
+        assert_eq!(
+            package_bytes(&mut edit_package),
+            before_edit,
+            "main edit refusal changed package bytes for secondary {label}"
+        );
+    }
+    Ok(())
 }
 
 #[test]
