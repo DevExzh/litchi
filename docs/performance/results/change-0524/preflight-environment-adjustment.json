@@ -1,0 +1,62 @@
+{
+  "initial_exit_code": 101,
+  "initial_source_unchanged": true,
+  "initial_passed": 273,
+  "initial_failed": 5,
+  "reason": "Three explicit E122 QuotaExceeded errors and two filesystem failure-state assertions in shared /tmp; all four new tests passed. Repeat same source with owned disk-backed TMPDIR.",
+  "removed_initial_test_artifacts": [
+    {
+      "path": "/tmp/litchi-cfb-sequential-replace-failure-1370116-1.ole",
+      "files": [
+        {
+          "path": "/tmp/litchi-cfb-sequential-replace-failure-1370116-1.ole",
+          "bytes": 15,
+          "sha256": "8b1623d79d2251015510b2dee1e51b523e87e6a0c60593f979b10e7d346d52be"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/litchi-cfb-owned-overlay-scan-count-1370116-0",
+      "files": [
+        {
+          "path": "/tmp/litchi-cfb-owned-overlay-scan-count-1370116-0/document.ole",
+          "bytes": 15,
+          "sha256": "8b1623d79d2251015510b2dee1e51b523e87e6a0c60593f979b10e7d346d52be"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/litchi-cfb-overlay-scan-count-1370116-0",
+      "files": [
+        {
+          "path": "/tmp/litchi-cfb-overlay-scan-count-1370116-0/document.ole",
+          "bytes": 15,
+          "sha256": "8b1623d79d2251015510b2dee1e51b523e87e6a0c60593f979b10e7d346d52be"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/litchi-cfb-overlay-1370116-0",
+      "files": [
+        {
+          "path": "/tmp/litchi-cfb-overlay-1370116-0/document.ole",
+          "bytes": 15,
+          "sha256": "8b1623d79d2251015510b2dee1e51b523e87e6a0c60593f979b10e7d346d52be"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/litchi-cfb-overlay-late-mutation-1370116-0",
+      "files": [
+        {
+          "path": "/tmp/litchi-cfb-overlay-late-mutation-1370116-0/document.ole",
+          "bytes": 15,
+          "sha256": "8b1623d79d2251015510b2dee1e51b523e87e6a0c60593f979b10e7d346d52be"
+        }
+      ]
+    }
+  ],
+  "initial_test_process_absent": true,
+  "removed_paths_absent": true,
+  "temporary_directory": "/home/zhuhe/litchi-goal-0524-target/test-tmp"
+}

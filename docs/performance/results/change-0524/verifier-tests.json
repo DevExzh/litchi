@@ -1,0 +1,29 @@
+{
+  "schema": "cfb_ole2_numeric_verifier_tests_v1",
+  "status": "pass",
+  "stage": "baseline",
+  "valid_controls_pass": true,
+  "checks": [
+    {
+      "case": "short_native_vector",
+      "rejected": true,
+      "reason": "cfb_open/tiny.elapsed_ns.samples must contain exactly 1000 values"
+    },
+    {
+      "case": "operation_sample_alignment",
+      "rejected": true,
+      "reason": "cfb_open/tiny.operation_metrics.sample_indices is not a complete permutation"
+    },
+    {
+      "case": "source_read_contract",
+      "rejected": true,
+      "reason": "xls_source_backed_open/256-comments-opaque-heavy.source.read_calls changed from the matched logical-read contract"
+    },
+    {
+      "case": "allocation_live_byte_balance",
+      "rejected": true,
+      "reason": "cfb_open/tiny live-byte balance does not reconcile"
+    }
+  ],
+  "scope": "Four in-memory raw semantic mutations; no retained artifact modified"
+}

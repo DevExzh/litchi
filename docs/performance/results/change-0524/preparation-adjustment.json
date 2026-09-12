@@ -1,0 +1,9 @@
+{
+  "scope": "Before candidate preflight/freeze/capture",
+  "rustfmt_check_initial_exit": 1,
+  "changes": [
+    "Wrap one test local binding",
+    "Add configured match-arm commas in collector test"
+  ],
+  "resolution": "Applied repository rustfmt before preflight; stage source.patch records final formatted source"
+}

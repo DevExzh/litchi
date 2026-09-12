@@ -1,0 +1,18 @@
+{
+  "candidate_checks_completed": [
+    "fmt",
+    "harness-fmt"
+  ],
+  "candidate_check_failure": "cfb-tests",
+  "candidate_test_result": {
+    "passed": 277,
+    "failed": 1
+  },
+  "failure": "detected_temp_substitution_is_not_deleted_by_cleanup read replacement path returned NotFound",
+  "mechanism": "Unlink/recreate can reuse native identity, making the old test fail to create a distinct replacement. Filesystem probe observed reuse100/100 for unlink and0/100 while retaining displaced original.",
+  "disposition": "Performance candidate already rejected by native gate. Restore production, retain collector differential and stabilize existing substitution test. Run all14qualitygates on frozen final source; preserve failed candidate receipt.",
+  "final_source_changes": [
+    "crates/litchi-cfb/src/file.rs (collector differential only)",
+    "crates/litchi-cfb/src/writer/sequential.rs (substitution test only)"
+  ]
+}

@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0524: visited-bit experiment closed; broader optimization goal remains open
+
+[0524](changes/0524-cfb-visited-bit-evaluation.md) completes and rejects the
+bounded CFB candidate under matched native admission. It retains an independent
+collector differential and stabilizes an existing filesystem substitution test;
+production is unchanged. The complete evidence includes adverse results and
+both preflight/environment and later filesystem-test failures. This does not
+close provider, producer, cold/range, fuzz, scaling or broad CRUD requirements.
+OLE2/OOXML performance remains first until that goal completes; ODF is deferred
+and iWork excluded.
+
 ## 0523: CFB allocation gap closed; OLE2/OOXML optimization continues
 
 [0523](changes/0523-cfb-open-allocation-attribution.md) adds missing direct-CFB

@@ -1,0 +1,217 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 1da9ad4f2..85fb33500 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -45,6 +45,24 @@ impl CheckedBitSet {
+         self.words.get(word).is_some_and(|value| value & mask != 0)
+     }
+ 
++    #[inline]
++    fn test_and_set(&mut self, bit: usize) -> Result<bool, OleError> {
++        if bit >= self.bit_len {
++            return Err(OleError::CorruptedFile(format!(
++                "bit index {bit} exceeds checked bit-set capacity {}",
++                self.bit_len
++            )));
++        }
++        let word = bit / BITSET_WORD_BITS;
++        let mask = 1u64 << (bit % BITSET_WORD_BITS);
++        let value = self.words.get_mut(word).ok_or_else(|| {
++            OleError::CorruptedFile(format!("bit index {bit} has no backing word"))
++        })?;
++        let was_set = *value & mask != 0;
++        *value |= mask;
++        Ok(was_set)
++    }
++
+     fn insert(&mut self, bit: usize) -> Result<(), OleError> {
+         if bit >= self.bit_len {
+             return Err(OleError::CorruptedFile(format!(
+@@ -2824,12 +2842,11 @@ impl SectorChainScratch {
+                         "Invalid sector index {sector} in {table_name}"
+                     )));
+                 }
+-                if self.visited.contains(slot) {
++                if self.visited.test_and_set(slot)? {
+                     return Err(OleError::CorruptedFile(format!(
+                         "Cycle detected in {table_name} chain at sector {sector}"
+                     )));
+                 }
+-                self.visited.insert(slot)?;
+                 // The fallible exact reservation above covers this loop's
+                 // exactly `expected_count` pushes; keep allocation failure at
+                 // that established boundary.
+@@ -3132,6 +3149,95 @@ mod tests {
+         ));
+     }
+ 
++    #[test]
++    fn checked_bit_set_test_and_set_matches_insert_at_word_boundaries() {
++        for bit_len in [0usize, 1, 63, 64, 65, 127, 128, 129, 130] {
++            let mut expected =
++                CheckedBitSet::try_with_capacity(bit_len, "expected bit set").unwrap();
++            let mut actual = CheckedBitSet::try_with_capacity(bit_len, "actual bit set").unwrap();
++
++            for bit in 0..bit_len {
++                let expected_was_set = expected.contains(bit);
++                expected.insert(bit).unwrap();
++                assert_eq!(
++                    actual.test_and_set(bit).unwrap(),
++                    expected_was_set,
++                    "first visit at bit {bit} with bit length {bit_len}"
++                );
++                assert_eq!(actual.contains(bit), expected.contains(bit));
++            }
++            for bit in (0..bit_len).rev() {
++                let expected_was_set = expected.contains(bit);
++                expected.insert(bit).unwrap();
++                assert_eq!(
++                    actual.test_and_set(bit).unwrap(),
++                    expected_was_set,
++                    "repeat visit at bit {bit} with bit length {bit_len}"
++                );
++                assert_eq!(actual.contains(bit), expected.contains(bit));
++            }
++
++            assert_eq!(actual.words, expected.words);
++            assert_eq!(actual.bit_len, expected.bit_len);
++        }
++    }
++
++    #[test]
++    fn checked_bit_set_test_and_set_preserves_state_on_bounds_error() {
++        let mut expected = CheckedBitSet::try_with_capacity(65, "expected bit set").unwrap();
++        let mut actual = CheckedBitSet::try_with_capacity(65, "actual bit set").unwrap();
++        expected.insert(0).unwrap();
++        actual.test_and_set(0).unwrap();
++        expected.insert(64).unwrap();
++        actual.test_and_set(64).unwrap();
++        let words_before = actual.words.clone();
++        let bit_len_before = actual.bit_len;
++
++        let expected_error = expected
++            .insert(65)
++            .expect_err("the old insertion helper must reject an out-of-range bit")
++            .to_string();
++        let actual_error = actual
++            .test_and_set(65)
++            .expect_err("the fused helper must reject an out-of-range bit")
++            .to_string();
++
++        assert_eq!(actual_error, expected_error);
++        assert_eq!(actual.words, words_before);
++        assert_eq!(actual.bit_len, bit_len_before);
++        assert!(actual.contains(0));
++        assert!(actual.contains(64));
++    }
++
++    #[test]
++    fn checked_bit_set_test_and_set_preserves_state_on_missing_backing_word() {
++        let mut expected = CheckedBitSet::try_with_capacity(65, "expected bit set").unwrap();
++        let mut actual = CheckedBitSet::try_with_capacity(65, "actual bit set").unwrap();
++        expected.insert(0).unwrap();
++        actual.test_and_set(0).unwrap();
++
++        // Deliberately corrupt only the private backing length.  This reaches
++        // the checked word lookup without invoking allocator failure.
++        expected.words.truncate(1);
++        actual.words.truncate(1);
++        let words_before = actual.words.clone();
++        let bit_len_before = actual.bit_len;
++
++        let expected_error = expected
++            .insert(64)
++            .expect_err("the old insertion helper must reject a missing word")
++            .to_string();
++        let actual_error = actual
++            .test_and_set(64)
++            .expect_err("the fused helper must reject a missing word")
++            .to_string();
++
++        assert_eq!(actual_error, expected_error);
++        assert_eq!(actual.words, words_before);
++        assert_eq!(actual.bit_len, bit_len_before);
++        assert!(actual.test_and_set(0).unwrap());
++    }
++
+     #[test]
+     fn reusable_chain_scratch_reuses_buffers_for_different_lengths() {
+         let mut scratch = SectorChainScratch::default();
+@@ -3236,6 +3342,77 @@ mod tests {
+         assert_eq!(scratch.visited.bit_len, 0);
+     }
+ 
++    #[test]
++    fn scratch_differential_matches_owned_chain_helper_and_resets() {
++        let cases = [
++            ("valid", vec![2, 3, 1, ENDOFCHAIN], 0, 4usize),
++            ("empty", vec![], ENDOFCHAIN, 0),
++            ("cycle", vec![1, 0, ENDOFCHAIN], 0, 3),
++            ("invalid-start", vec![ENDOFCHAIN], MAXREGSECT, 1),
++            ("invalid-index", vec![2, ENDOFCHAIN], 0, 2),
++            ("early-end-marker", vec![ENDOFCHAIN, ENDOFCHAIN], 0, 2),
++            ("late-end-marker", vec![1, ENDOFCHAIN], 0, 1),
++            ("invalid-marker", vec![MAXREGSECT, ENDOFCHAIN], 0, 2),
++            ("table-too-short", vec![ENDOFCHAIN], 0, 2),
++            ("empty-non-end", vec![ENDOFCHAIN], 0, 0),
++        ];
++        let mut scratch = SectorChainScratch::default();
++        let mut reusable_layout = None;
++
++        for pass in 0..2 {
++            for (name, allocation_table, start_sector, expected_count) in &cases {
++                let expected = collect_sector_chain_exact(
++                    allocation_table.as_slice(),
++                    *start_sector,
++                    *expected_count,
++                    name,
++                )
++                .map_err(|error| error.to_string());
++                let actual_result = scratch.collect_exact(
++                    allocation_table.as_slice(),
++                    *start_sector,
++                    *expected_count,
++                    name,
++                );
++                let actual = match actual_result {
++                    Ok(()) => Ok(scratch.sectors().to_vec()),
++                    Err(error) => Err(error.to_string()),
++                };
++
++                assert_eq!(actual, expected, "pass {pass}, case {name}");
++                match &expected {
++                    Ok(sectors) => {
++                        assert_eq!(scratch.sectors(), sectors.as_slice());
++                        assert_eq!(scratch.visited.bit_len, allocation_table.len());
++                        if pass == 0 && *name == "valid" {
++                            reusable_layout = Some((
++                                scratch.sectors.as_ptr(),
++                                scratch.sectors.capacity(),
++                                scratch.visited.words.as_ptr(),
++                                scratch.visited.words.len(),
++                            ));
++                        } else if pass == 1 && *name == "valid" {
++                            assert_eq!(
++                                reusable_layout,
++                                Some((
++                                    scratch.sectors.as_ptr(),
++                                    scratch.sectors.capacity(),
++                                    scratch.visited.words.as_ptr(),
++                                    scratch.visited.words.len(),
++                                )),
++                                "successful collections must reuse the retained buffers",
++                            );
++                        }
++                    },
++                    Err(_) => {
++                        assert!(scratch.sectors.is_empty());
++                        assert_eq!(scratch.visited.bit_len, 0);
++                    },
++                }
++            }
++        }
++    }
++
+     #[test]
+     fn malformed_large_declarations_do_not_unwind() {
+         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

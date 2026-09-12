@@ -1,0 +1,41 @@
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -45,6 +45,24 @@ impl CheckedBitSet {
+         self.words.get(word).is_some_and(|value| value & mask != 0)
+     }
+ 
++    #[inline]
++    fn test_and_set(&mut self, bit: usize) -> Result<bool, OleError> {
++        if bit >= self.bit_len {
++            return Err(OleError::CorruptedFile(format!(
++                "bit index {bit} exceeds checked bit-set capacity {}",
++                self.bit_len
++            )));
++        }
++        let word = bit / BITSET_WORD_BITS;
++        let mask = 1u64 << (bit % BITSET_WORD_BITS);
++        let value = self.words.get_mut(word).ok_or_else(|| {
++            OleError::CorruptedFile(format!("bit index {bit} has no backing word"))
++        })?;
++        let was_set = *value & mask != 0;
++        *value |= mask;
++        Ok(was_set)
++    }
++
+     fn insert(&mut self, bit: usize) -> Result<(), OleError> {
+         if bit >= self.bit_len {
+             return Err(OleError::CorruptedFile(format!(
+@@ -2825,11 +2825,10 @@ impl SectorChainScratch {
+                         "Invalid sector index {sector} in {table_name}"
+                     )));
+                 }
+-                if self.visited.contains(slot) {
++                if self.visited.test_and_set(slot)? {
+                     return Err(OleError::CorruptedFile(format!(
+                         "Cycle detected in {table_name} chain at sector {sector}"
+                     )));
+                 }
+-                self.visited.insert(slot)?;
+                 // The fallible exact reservation above covers this loop's
+                 // exactly `expected_count` pushes; keep allocation failure at
+                 // that established boundary.

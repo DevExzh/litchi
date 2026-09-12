@@ -1,0 +1,31 @@
+{
+  "disposition": "rejected",
+  "native_primary_gate": false,
+  "memory_gate": true,
+  "profile_gate": true,
+  "constructor_ir": [
+    {
+      "repeat": 1,
+      "baseline": 13973331,
+      "candidate": 13807165,
+      "change_percent": -1.1891652749083215
+    },
+    {
+      "repeat": 2,
+      "baseline": 13971462,
+      "candidate": 13808665,
+      "change_percent": -1.1652109135035449
+    }
+  ],
+  "adverse_review_complete": true,
+  "quality_gates": 14,
+  "other_rejection_reason": "No primary workflow reaches the frozen >=3% p50 improvement in both repeats.",
+  "comparison_sha256": "793bb0bd37570d529b4be519a77eac6036419ae73519e608d0685d2f9169e486",
+  "profiles_sha256": {
+    "baseline": "7b67b3ea53bd67266143840be6dca7236e974976e43f73d58629cf70c3a25661",
+    "candidate": "654701724c8f906957b7f516f0b8631cc0ed6bd94c0fbeea7bee5f49dcb7f7e0"
+  },
+  "quality_summary_sha256": "9bf17d00120223605da1543d8162715c4318b05997c143f90ad79b8d1e7ae066",
+  "adverse_review_sha256": "584afe664fbda599d6b6aa088550130cbbd72a11e64b68065ec260434b304716",
+  "scope": "Fixed synthetic in-memory CFB/XLS comparison; OLE2/OOXML active, ODF deferred, iWork excluded"
+}

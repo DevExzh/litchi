@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0524: duplicate visited-bit work is too small for adoption
+
+[0524](changes/0524-cfb-visited-bit-evaluation.md) lowers XLS collector self Ir
+about 2.94%, translating to only 1.17–1.19% fewer constructor instructions.
+Native workflow improvement fails the frozen gate, so the production candidate
+is reverted. A 40% owner share is not 40% removable work. Ownership claims,
+cycle/marker checks and physical reconciliation remain mandatory. Next inspect
+larger OOXML reconstruction/rewrite work for a specific removable pass or
+representation; ODF remains deferred behind OLE2/OOXML.
+
 ## 0523: checked CFB chain visitation is the next bounded experiment
 
 [0523](changes/0523-cfb-open-allocation-attribution.md) refreshes OLE2 constructor

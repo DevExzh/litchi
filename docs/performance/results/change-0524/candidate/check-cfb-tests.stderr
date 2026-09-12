@@ -1,0 +1,4 @@
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.80s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0524-target/debug/deps/litchi_cfb-5b8b4235e47a11e8)
+error: test failed, to rerun pass `-p litchi-cfb --lib`
