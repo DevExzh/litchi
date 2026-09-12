@@ -1,0 +1,34 @@
+{
+  "initial-unit/xlsx-unit-receipt.json": {
+    "exit_code": 101,
+    "reason": "Initial candidate snapshot did not compile: normalized_start return lifetime, two unnecessary test qualifications, and expect_err requiring WorksheetOutput Debug. Isolated fixes requested; final epoch must pass."
+  },
+  "second-unit/xlsx-unit-receipt.json": {
+    "exit_code": 101,
+    "reason": "Compiled candidate: 961 tests passed, five new differential tests failed because their fixtures/expectations assumed stricter compaction/web behavior than the unchanged reference owners. Reference-based corrections requested; final epoch must pass."
+  },
+  "second-unit/clippy-receipt.json": {
+    "exit_code": 101,
+    "reason": "Warning-denied production build found write_start now used only by cfg(test) reference compactor. Requested cfg(test) on helper; final epoch must pass."
+  },
+  "third-unit/xlsx-unit-receipt.json": {
+    "exit_code": 101,
+    "reason": "966 tests passed including dense feed eligibility; one new x14ac fixture omitted required defaultRowHeight and failed the exact reference parser. Fixture correction requested; final epoch must pass."
+  },
+  "fourth-unit/xlsx-features-receipt.json": {
+    "exit_code": 101,
+    "reason": "Integration/example linking failed with Disk quota exceeded (os error 122) in the tmpfs target, followed by linker SIGBUS. The owned target cache was moved to disk-backed storage behind the same logical path; settings and source were retained for the retry."
+  },
+  "fourth-unit/xlsx-features-retry-receipt.json": {
+    "exit_code": 101,
+    "reason": "57 tests passed and two managed no-op publication budget tests failed. Both identical typed errors were confirmed on unchanged control production; see baseline-failures.json."
+  },
+  "before/xlsx-source-backed-values-receipt.json": {
+    "exit_code": 101,
+    "reason": "Unchanged control reproduces the same two managed no-op publication memory-budget errors: 57 passed, two failed. These failures were not introduced by the candidate."
+  },
+  "before/xlsx-features-known-receipt.json": {
+    "exit_code": 101,
+    "reason": "Unchanged control with two explicit known cell-test exclusions found two analogous stale-budget failures, each exceeding its limit by 65,536 bytes, in source_backed_row_visibility (15 passed, two failed). The investigation extended to the same copy-scratch test contract."
+  }
+}

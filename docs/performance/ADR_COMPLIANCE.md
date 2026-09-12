@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0516: preserve admission and publication boundaries
+
+The [0516 matrix](results/change-0516/adr-matrix.md) and final semantic/resource
+reviews approve the candidate's scoped correctness proof, but its changed-edit
+latency and allocation results fail performance admission. The production
+candidate is restored and remains available as an exact replayable patch.
+The independent two-file fixture repair preserves byte identity and proves
+that the archive cannot detach within the allowed memory budget; its 64 KiB
+scratch allowance follows the existing OPC owner. All accepted ADRs and the
+index are unchanged. ODF remains deferred behind the full OLE2/OOXML goal.
+
 ## 0515: isolate XLSX changed-output work
 
 [0515](changes/0515-xlsx-output-attribution.md) separates changed-output parsing

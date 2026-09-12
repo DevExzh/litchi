@@ -1,0 +1,201 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "400d3adc97c82b64a33eda1362dfc1b3579a3ae036ad80cf2cbb6dcab361a415",
+  "content_set_sha256": "66889d1124b43cd8ec4580ba0675509d97419df2d10e0d8a6130a3a509076936",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+    "git_worktree_dirty": true,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+      "name": "xlsx-dense-wide",
+      "legacy_v1": {
+        "name": "xlsx-dense-wide",
+        "generator": "litchi-xlsx-synthetic-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-wide",
+        "payload_kind": "deterministic-integer-grid",
+        "compression": "deflate",
+        "entry_count": 131072,
+        "archive_member_count": 7,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 524288,
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "format": "XLSX/OPC/ZIP",
+      "size_class": "unknown",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-xlsx-synthetic-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "address_formula": "column_to_letters(column + 1) + (row + 1)",
+          "archive_member_count": 7,
+          "columns_per_sheet": 256,
+          "compression": "deflate",
+          "entry_bytes": 4,
+          "entry_count": 131072,
+          "family": "xlsx",
+          "legacy_payload_kind": "deterministic-integer-grid",
+          "legacy_shape": "dense-wide",
+          "one_percent_update_count": 1311,
+          "one_percent_update_formula": "ceil(cell_count / 100)",
+          "package_format": "XLSX/OPC/ZIP",
+          "rows_per_sheet": 256,
+          "sheet_count": 2,
+          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
+          "source_functions": [
+            "build_xlsx_corpus",
+            "build_xlsx_workbook",
+            "xlsx_one_percent_updates",
+            "xlsx_value",
+            "xlsx_sheet_name",
+            "xlsx_address",
+            "XlsxShape"
+          ],
+          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 384525,
+        "archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+        "logical_payload_bytes": 524288,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "columns_per_sheet": 256,
+        "entry_bytes": 4,
+        "entry_count": 131072,
+        "rows_per_sheet": 256,
+        "sheet_count": 2
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 384525,
+          "members": 7,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Sheet1!A1",
+          "logical_bytes": 1,
+          "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "xlsx_one_percent_commit_save"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "xlsx_one_percent_commit_save",
+      "corpus_id": "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+      "legacy_name": "xlsx-dense-wide",
+      "legacy_archive_sha256": "5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+      "role": "timed"
+    }
+  ]
+}

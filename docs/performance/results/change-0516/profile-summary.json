@@ -1,0 +1,322 @@
+{
+  "schema": "litchi-0516-profile-metrics-v1",
+  "performance_claim": "none",
+  "scope": "Callgrind raw/inclusive/exclusive selected direct-edge costs and calls; instruction diagnostic only",
+  "profiles": {
+    "before": {
+      "stage": "before",
+      "lane": "profile",
+      "profile_total_ir": 14458444767,
+      "roles": {
+        "runner_to_operation": {
+          "parent": "litchi_perf_baseline::run_xlsx_update_commit_save",
+          "child": "litchi_perf_baseline::xlsx_commit_save_operation",
+          "expected_calls": 3,
+          "total_ir": 14458444767,
+          "selected_costs_ir": {
+            "raw": 14458444767,
+            "inclusive": 14458444767,
+            "exclusive": 14458444767
+          },
+          "selected_calls": {
+            "raw": 3,
+            "inclusive": 3,
+            "exclusive": 3
+          },
+          "records": {
+            "raw": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "inclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "exclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            }
+          }
+        },
+        "operation_to_commit": {
+          "parent": "litchi_perf_baseline::xlsx_commit_save_operation",
+          "child": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+          "expected_calls": 3,
+          "total_ir": 11911869450,
+          "selected_costs_ir": {
+            "raw": 11911869450,
+            "inclusive": 11911869450,
+            "exclusive": 11911869450
+          },
+          "selected_calls": {
+            "raw": 3,
+            "inclusive": 3,
+            "exclusive": 3
+          },
+          "records": {
+            "raw": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "inclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "exclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            }
+          }
+        },
+        "operation_to_writer": {
+          "parent": "litchi_perf_baseline::xlsx_commit_save_operation",
+          "child": "litchi_opc::pkgwriter::PackageWriter::write_to_stream",
+          "expected_calls": 3,
+          "total_ir": 2546574684,
+          "selected_costs_ir": {
+            "raw": 2546574684,
+            "inclusive": 2546574684,
+            "exclusive": 2546574684
+          },
+          "selected_calls": {
+            "raw": 3,
+            "inclusive": 3,
+            "exclusive": 3
+          },
+          "records": {
+            "raw": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "inclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "exclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            }
+          }
+        }
+      },
+      "hashes": {
+        "raw": "402742339c4658e7786431f57d1f573dddb9e62ba503181fda5c971011837c6e",
+        "inclusive": "1c3fa88aa6cb4a568db365b0c46b352d9ce11f4bfdf62baafbb26c782896b02b",
+        "exclusive": "99c27fe9956677779972a85196b042faad3b2cb665d11dc85043fb6395bdb659",
+        "log": "e1a942e71cfda6582e933361625b14d402193ca2383f7fd404b6894a3b7d54aa",
+        "receipt": "79619615f9c6cd050a04a4a50fa0b27bdeb7804588e931aefc1d8efa44bfce36",
+        "annotations": "7541ac30f711ec82c03f72bf244890be46567f6f33307b1364c747a64c437624",
+        "report": "ca71c59853684d346d2c209328adeeffe857fa14d697ec9f43f423072a5f55be",
+        "catalog": "202de89d64fa38a24d3e33719f2c5df223540747f2ffab0f5930964e3c0fe9af",
+        "parser": "465e574da2854bce539f76f6c5c8c0665a1572fe9864339622eaf016e007f381"
+      },
+      "annotation_parsers": {
+        "inclusive": "0516.no-percent-compatible-parser",
+        "exclusive": "0516.no-percent-compatible-parser"
+      },
+      "brk_warning": {
+        "present": true,
+        "count": 1,
+        "log": "before/profile.log"
+      },
+      "scope": "Selected direct Callgrind edges; diagnostic instruction attribution only"
+    },
+    "after": {
+      "stage": "after",
+      "lane": "profile",
+      "profile_total_ir": 14928683870,
+      "roles": {
+        "runner_to_operation": {
+          "parent": "litchi_perf_baseline::run_xlsx_update_commit_save",
+          "child": "litchi_perf_baseline::xlsx_commit_save_operation",
+          "expected_calls": 3,
+          "total_ir": 14928683870,
+          "selected_costs_ir": {
+            "raw": 14928683870,
+            "inclusive": 14928683870,
+            "exclusive": 14928683870
+          },
+          "selected_calls": {
+            "raw": 3,
+            "inclusive": 3,
+            "exclusive": 3
+          },
+          "records": {
+            "raw": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "inclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "exclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            }
+          }
+        },
+        "operation_to_commit": {
+          "parent": "litchi_perf_baseline::xlsx_commit_save_operation",
+          "child": "litchi_xlsx::workbook::edit::semantic::transaction::Edit::commit",
+          "expected_calls": 3,
+          "total_ir": 12382107894,
+          "selected_costs_ir": {
+            "raw": 12382107894,
+            "inclusive": 12382107894,
+            "exclusive": 12382107894
+          },
+          "selected_calls": {
+            "raw": 3,
+            "inclusive": 3,
+            "exclusive": 3
+          },
+          "records": {
+            "raw": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "inclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "exclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            }
+          }
+        },
+        "operation_to_writer": {
+          "parent": "litchi_perf_baseline::xlsx_commit_save_operation",
+          "child": "litchi_opc::pkgwriter::PackageWriter::write_to_stream",
+          "expected_calls": 3,
+          "total_ir": 2546575343,
+          "selected_costs_ir": {
+            "raw": 2546575343,
+            "inclusive": 2546575343,
+            "exclusive": 2546575343
+          },
+          "selected_calls": {
+            "raw": 3,
+            "inclusive": 3,
+            "exclusive": 3
+          },
+          "records": {
+            "raw": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "inclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            },
+            "exclusive": {
+              "record_count": 1,
+              "positive_record_count": 1,
+              "zero_call_ir": 0
+            }
+          }
+        }
+      },
+      "hashes": {
+        "raw": "3186334a81d121ee1de2cf9c1d9ed360c1f7b84f7af7e02d3241a8f1413367e1",
+        "inclusive": "01e03d5582c022d2cc77b3fa4e5dac602171f751c1f7c72a3a70ba55fd0a441d",
+        "exclusive": "4a2a92c2b3f35bbce6e21276e969df970dfb1b46b53f877d65f90616ba68faf3",
+        "log": "5f7798351a0c1b5e9d228cc4a6c271910b61921f6e7ea7252460327c0e02b80d",
+        "receipt": "84a657b2c2ec016a39466d5157ba6409472c33e7ec79e951fa9b0fef589dbf12",
+        "annotations": "dd1048f5228c554843107aaea4c07b713436708aa42d908b0018d5f7a8975b40",
+        "report": "9412faeff025f436b0a6a9e8e1bcef67eee57a63e758787c3b117125f6db7a99",
+        "catalog": "202de89d64fa38a24d3e33719f2c5df223540747f2ffab0f5930964e3c0fe9af",
+        "parser": "465e574da2854bce539f76f6c5c8c0665a1572fe9864339622eaf016e007f381"
+      },
+      "annotation_parsers": {
+        "inclusive": "0516.no-percent-compatible-parser",
+        "exclusive": "0516.no-percent-compatible-parser"
+      },
+      "brk_warning": {
+        "present": true,
+        "count": 1,
+        "log": "after/profile.log"
+      },
+      "scope": "Selected direct Callgrind edges; diagnostic instruction attribution only"
+    }
+  },
+  "comparison": {
+    "status": "compared",
+    "profile_total_ir_after_minus_before_percent": 3.2523491328284138,
+    "roles": {
+      "runner_to_operation": {
+        "after_minus_before_percent": {
+          "raw": 3.2523491328284138,
+          "inclusive": 3.2523491328284138,
+          "exclusive": 3.2523491328284138
+        },
+        "before_selected_costs_ir": {
+          "raw": 14458444767,
+          "inclusive": 14458444767,
+          "exclusive": 14458444767
+        },
+        "after_selected_costs_ir": {
+          "raw": 14928683870,
+          "inclusive": 14928683870,
+          "exclusive": 14928683870
+        }
+      },
+      "operation_to_commit": {
+        "after_minus_before_percent": {
+          "raw": 3.9476460514768386,
+          "inclusive": 3.9476460514768386,
+          "exclusive": 3.9476460514768386
+        },
+        "before_selected_costs_ir": {
+          "raw": 11911869450,
+          "inclusive": 11911869450,
+          "exclusive": 11911869450
+        },
+        "after_selected_costs_ir": {
+          "raw": 12382107894,
+          "inclusive": 12382107894,
+          "exclusive": 12382107894
+        }
+      },
+      "operation_to_writer": {
+        "after_minus_before_percent": {
+          "raw": 2.587789802444007e-05,
+          "inclusive": 2.587789802444007e-05,
+          "exclusive": 2.587789802444007e-05
+        },
+        "before_selected_costs_ir": {
+          "raw": 2546574684,
+          "inclusive": 2546574684,
+          "exclusive": 2546574684
+        },
+        "after_selected_costs_ir": {
+          "raw": 2546575343,
+          "inclusive": 2546575343,
+          "exclusive": 2546575343
+        }
+      }
+    },
+    "scope": "Descriptive after/before Callgrind diagnostic; no speedup claim"
+  },
+  "missing_stages": [],
+  "issues": [],
+  "status": "complete"
+}

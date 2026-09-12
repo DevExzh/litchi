@@ -1,0 +1,29 @@
+{
+  "base_revision": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+  "paths": [
+    "crates/litchi-xlsx/src/raw/compact.rs",
+    "crates/litchi-xlsx/src/raw/compact_output_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs",
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs",
+    "crates/litchi-xlsx/tests/source_backed_row_visibility.rs"
+  ],
+  "candidate_file_sha256": {
+    "crates/litchi-xlsx/src/raw/compact.rs": "0ac488dad6162f79b5d38713a730dbf6c4269f20f323505009366de7008f39d3",
+    "crates/litchi-xlsx/src/raw/compact_output_tests.rs": "f549dc1f814042c28793640872ed55d708afc8bfb67e19e49ba38c3eae86acb6",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "0515166610208cd8b811aaff03ac880ac85f7bce689fd119f5a2fcbe6fa2f71c",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": "da769ff4964042367945bc827a3c3067b718e8714696cf4bc87dc2777d26722b",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "eb98adaf7cd5a8f8d9fe4e40aa13575f2396f07f6909528e1764ffcfc072ede7",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs": "987a3f31a791efce93d3ffc5d340b5e7765591059c781e351d8aa88e1232bb1e",
+    "crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs": "950993b3062ece21d37139a6b141ae4f53afb329ee17ba3a29b371e5a855e947",
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs": "7ae1f26a2965ee0d6ccb67617b288b232de5668dc9bd51b26e0b7e8684faa00a",
+    "crates/litchi-xlsx/tests/source_backed_row_visibility.rs": "2a1b9631a6f4e642bf29e096193ef12feff6c9ae9389f4a1d2a40da574600f32"
+  },
+  "patch_sha256": "9b3cf124904ed5970a376c26a4aabd900c212d34755490f916c60f367c8f9b3f",
+  "source_manifest_sha256": "38007ba3313a420bf1f5823fa8aafb2232d9f3f74bc0874ab416e302263b1df6",
+  "previous_epoch": "fifth-unit",
+  "scope": "Source snapshot, independently bound to every test or capture receipt in this epoch."
+}

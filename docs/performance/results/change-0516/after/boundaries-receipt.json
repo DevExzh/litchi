@@ -1,0 +1,23 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "started_utc": "2026-09-12T00:53:05.002461+00:00",
+  "elapsed_seconds": 255.24380967700563,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "38007ba3313a420bf1f5823fa8aafb2232d9f3f74bc0874ab416e302263b1df6",
+  "log_sha256": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9",
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0516/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0516",
+    "RUSTDOCFLAGS": "-D warnings"
+  }
+}

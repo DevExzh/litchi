@@ -1,0 +1,132 @@
+diff --git a/crates/litchi-xlsx/tests/source_backed_cell_values.rs b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+index 386229a43..84aa2000d 100644
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+@@ -29,6 +29,9 @@ const CALC_CHAIN: &str = "/xl/calcChain.xml";
+ const CALC_CHAIN_CONTENT_TYPE: &str =
+     "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
+ const CALC_CHAIN_REL_ID: &str = "rIdCalculationChain";
++// Exact source publication uses one bounded 64 KiB copy window in addition to
++// the selected Part payloads retained by the managed cache.
++const MANAGED_EXACT_NOOP_SCRATCH_BYTES: u64 = 64 * 1024;
+ static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(1_000);
+ 
+ struct VersionedSource {
+@@ -244,7 +247,7 @@ fn fixture_package(sheet_xml: String, signed: bool) -> OpcPackage {
+         .try_add_part(Box::new(BlobPart::new(
+             PackURI::new(UNUSED).unwrap(),
+             "application/octet-stream".to_owned(),
+-            (0..256 * 1024).map(|value| (value % 251) as u8).collect(),
++            incompressible_payload(256 * 1024),
+         )))
+         .unwrap();
+     package
+@@ -276,6 +279,18 @@ fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
+     PackageWriter::to_bytes(&fixture_package(sheet_xml, signed)).unwrap()
+ }
+ 
++fn incompressible_payload(length: usize) -> Vec<u8> {
++    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
++    let mut payload = Vec::with_capacity(length);
++    for _ in 0..length {
++        state = state
++            .wrapping_mul(6_364_136_223_846_793_005)
++            .wrapping_add(1_442_695_040_888_963_407);
++        payload.push((state >> 24).to_le_bytes()[0]);
++    }
++    payload
++}
++
+ fn replace_sheet_with_cancel_on_blob_arc(
+     package: &mut OpcPackage,
+     cancellation_source: CancellationSource,
+@@ -1314,7 +1329,10 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
+ fn managed_scalar_exact_noop_publishes_without_detaching_source() {
+     let bytes = three_cells();
+     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+-    let (budget, _cancellation_source, context) = managed_context(exact);
++    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&bytes, UNUSED) > available_memory);
++    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
++    let (budget, _cancellation_source, context) = managed_context(available_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(bytes.clone())),
+         litchi_xlsx::ReadLimits::default(),
+@@ -1552,7 +1570,10 @@ fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
+     let exact = part_len(&bytes, MAIN)
+         + part_len(&bytes, SHEET)
+         + part_len(&bytes, "/xl/worksheets/sheet2.xml");
+-    let (budget, _cancellation_source, context) = managed_context(exact);
++    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&bytes, UNUSED) > available_memory);
++    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
++    let (budget, _cancellation_source, context) = managed_context(available_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(bytes.clone())),
+         litchi_xlsx::ReadLimits::default(),
+diff --git a/crates/litchi-xlsx/tests/source_backed_row_visibility.rs b/crates/litchi-xlsx/tests/source_backed_row_visibility.rs
+index aaed4a45c..6a5c653d1 100644
+--- a/crates/litchi-xlsx/tests/source_backed_row_visibility.rs
++++ b/crates/litchi-xlsx/tests/source_backed_row_visibility.rs
+@@ -28,6 +28,9 @@ const UNUSED: &str = "/xl/media/unused.bin";
+ // topology metadata. Keep this allowance explicit and separate from payload
+ // capacity, matching the managed XLSX publication contract.
+ const MANAGED_PUBLICATION_PLANNING_HEADROOM: u64 = 64 * 1024;
++// Exact source publication uses one bounded 64 KiB copy window in addition to
++// the selected Part payloads retained by the managed cache.
++const MANAGED_EXACT_NOOP_SCRATCH_BYTES: u64 = 64 * 1024;
+ static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(20_000);
+ 
+ struct VersionedSource {
+@@ -128,7 +131,7 @@ fn fixture(sheet_xml: String, main_type: &str, signed: bool) -> Vec<u8> {
+         .try_add_part(Box::new(BlobPart::new(
+             PackURI::new(UNUSED).unwrap(),
+             "application/octet-stream".to_owned(),
+-            (0..128 * 1024).map(|value| (value % 251) as u8).collect(),
++            incompressible_payload(128 * 1024),
+         )))
+         .unwrap();
+     package
+@@ -156,6 +159,18 @@ fn fixture(sheet_xml: String, main_type: &str, signed: bool) -> Vec<u8> {
+     PackageWriter::to_bytes(&package).unwrap()
+ }
+ 
++fn incompressible_payload(length: usize) -> Vec<u8> {
++    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
++    let mut payload = Vec::with_capacity(length);
++    for _ in 0..length {
++        state = state
++            .wrapping_mul(6_364_136_223_846_793_005)
++            .wrapping_add(1_442_695_040_888_963_407);
++        payload.push((state >> 24).to_le_bytes()[0]);
++    }
++    payload
++}
++
+ fn ordinary(sheet_xml: String) -> Vec<u8> {
+     fixture(sheet_xml, ct::SML_SHEET_MAIN, false)
+ }
+@@ -631,7 +646,10 @@ fn managed_exact_noop_publication_is_byte_exact_and_releases_budget() {
+     );
+     let bytes = ordinary(xml);
+     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+-    let (budget, _cancellation_source, context) = managed_context(exact);
++    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&bytes, UNUSED) > available_memory);
++    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
++    let (budget, _cancellation_source, context) = managed_context(available_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(bytes.clone())),
+         litchi_xlsx::ReadLimits::default(),
+@@ -783,7 +801,10 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed()
+         format!(r#"<worksheet xmlns="{SML}"><sheetData><row r="1"/></sheetData></worksheet>"#);
+     let signed = fixture(plain.clone(), ct::SML_SHEET_MAIN, true);
+     let signed_exact = part_len(&signed, MAIN) + part_len(&signed, SHEET);
+-    let (budget, _cancellation_source, context) = managed_context(signed_exact);
++    let signed_noop_memory = signed_exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&signed, UNUSED) > signed_noop_memory);
++    assert!(u64::try_from(signed.len()).unwrap() > signed_noop_memory);
++    let (budget, _cancellation_source, context) = managed_context(signed_noop_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(signed.clone())),
+         litchi_xlsx::ReadLimits::default(),

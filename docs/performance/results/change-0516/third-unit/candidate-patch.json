@@ -1,0 +1,25 @@
+{
+  "base_revision": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+  "paths": [
+    "crates/litchi-xlsx/src/raw/compact.rs",
+    "crates/litchi-xlsx/src/raw/compact_output_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs",
+    "crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs"
+  ],
+  "candidate_file_sha256": {
+    "crates/litchi-xlsx/src/raw/compact.rs": "72a3ef67ae288f8c700f03c916e399d8f4631baf03c30ae2c39ee567cf7b22b8",
+    "crates/litchi-xlsx/src/raw/compact_output_tests.rs": "7fdc4efb35ddaca7d36ab8ffde2fd5e4eed2746b160aa75779e32b8005adc952",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": "8c351422c1c792ca867d49f26e58b5f6a8fe78dd708622d750914739b7fc9958",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs": "68b177bd3283b924f34c237a20fa91959c92a4a18e147a66da9960964fc4fd5e",
+    "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs": "3f66444e3f76a7dc885a0da987d35420be6cfde93271e157f7f41003ee20dc1d",
+    "crates/litchi-xlsx/src/workbook/edit/tests/mod.rs": "987a3f31a791efce93d3ffc5d340b5e7765591059c781e351d8aa88e1232bb1e",
+    "crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs": "950993b3062ece21d37139a6b141ae4f53afb329ee17ba3a29b371e5a855e947"
+  },
+  "patch_sha256": "007f7f1cad0ec4171c25c1b50ac5941426ddc987a20efcedd3cdd0cc129e05f5",
+  "source_manifest_sha256": "2bc53ff4c5f8d85db66b2243517c30c03d0a9ec350f523dc89cfdd7705e854e2",
+  "previous_epoch": "second-unit",
+  "scope": "Source snapshot, independently bound to every test or capture receipt in this epoch."
+}

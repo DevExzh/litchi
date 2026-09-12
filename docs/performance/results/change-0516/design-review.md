@@ -1,0 +1,225 @@
+# 0516 emitted-output worksheet parser-feed design review
+
+`performance_claim: none`
+
+`claim_authorized: false`
+
+This is a bounded design review for the OLE2/OOXML priority lane. It does not
+edit production code, run a build, or authorize a performance claim. ODF is
+outside this review and remains deferred. The review was performed against
+`c5abaef129f5ae0000a925b295cf6507b7474e3c`.
+
+## Decision
+
+Proceed to a correctness pilot only after the adjustments below. Retention of
+an output-fusion candidate is blocked until it has a finite speculative-memory
+gate and differential evidence for the exact compacted-byte path. The existing
+transaction remains the reference implementation.
+
+The proposed seam is viable only for an effective worksheet edit whose
+`requires_store_verification` is true. Exact and semantically ineffective
+no-ops must keep the source identity path. Metadata-only worksheet edits must
+not construct the grid parser merely because their output is compacted.
+These boundaries are established by the effective-change filtering and flag in
+[`transaction.rs`](../../../../crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs:1485)
+and the current compact/parse sequence at
+[`transaction.rs`](../../../../crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs:1669).
+
+## Findings
+
+| Finding | Decision | Required treatment |
+| --- | --- | --- |
+| A cheap pre-input exclusion avoids constructing a provisional parser for common MCE or x14ac documents. | Approve | Before compaction output events can feed the parser, conservatively search the rewritten input for the MCE namespace URI, the x14ac namespace URI, and `dyDescent` using the existing `memchr::memmem` facilities and `x14ac::may_contain_descent`. Any hit selects the ordinary exact-byte fallback. False positives are acceptable; false negatives are handled by the dynamic and post-output gates. |
+| A callback over the source `Event` is not an emitted-output proof. | Adjust | The feed must use the writer's normalized qualified name, attributes, escaping/serialization result, and omission decision. The callback in [`compact.rs`](../../../../crates/litchi-xlsx/src/raw/compact.rs:41) currently observes the source event after writing; reusing that event for semantic acceptance is insufficient. |
+| The existing x14ac and MCE owners must remain before worksheet parser events. | Block unless satisfied | The ordinary fast slice initializes `Parser` with an empty `x14ac::Values` only after the pre-input gate proves no extension candidate. If an emitted event resolves to x14ac or MCE, discard the provisional parser before it sees that event and use the exact compacted bytes. An extension map cannot be attached after parser events. |
+| A late fallback can otherwise retain both a provisional store and the compacted output. | Block until bounded | Charge speculative parser state before raw-cell/string growth, and account for compact-buffer capacity. A gate trip is an ineligibility transition, not a new public error; drop all provisional state before the exact fallback. |
+| The current web probe is a proof shortcut, not a replacement for the exact web reader. | Approve with unchanged fallback | Finish the existing `Probe` against the exact compacted bytes. If its proof is ineligible, call `raw::web::read` on those bytes. Grid parsing, style validation, change checks, package reopen, and publication remain in their current order. |
+
+## Eligibility gates
+
+The gates are ordered so that a known fallback document never pays for a
+second parser. They are candidate-local eligibility checks; they must not turn
+a valid document into a new rejection.
+
+1. After effective-change planning and before creating a feed, inspect the
+   rewritten worksheet input. Reject the feed candidate when it contains the
+   MCE namespace URI, the x14ac namespace URI, `dyDescent`, or a conservative
+   MCE control token such as `AlternateContent`. The URI checks may match text
+   or an unused declaration and therefore deliberately only cause fallback.
+   `may_contain_descent` alone is not enough: it finds the local attribute name
+   but does not prove that the attribute is bound to the x14ac namespace.
+
+2. Apply the same current MCE input/output byte limits used by
+   `process_ooxml` before starting the feed. The no-MCE fast path still checks
+   those limits before returning borrowed input. Do not copy the limits into a
+   new, weaker policy. If the rewritten input is already over a limit, skip the
+   feed so the exact parser produces the established limit error first.
+
+3. Compact as today. Compaction remains the first fallible phase and the
+   `Vec` holding the exact output remains authoritative. A parser feed may be
+   started only for `requires_store_verification` effective grid/merge work.
+   Dropped formatting whitespace produces no feed event, exactly as it produces
+   no output byte. End events must be the names regenerated by the writer.
+
+4. For each emitted start or empty element, run a dynamic serialization gate
+   before delivering the normalized event to the parser. It must reject an
+   `attributes_raw()` containing an apostrophe, and reject any raw attribute
+   value that the writer would place into a quoted attribute without escaping
+   safely. It must also reject invalid UTF-8 names/values, unresolved or
+   rebound namespace state that cannot be represented by the normalized event,
+   and any MCE or x14ac expanded name or declaration. A normal apostrophe in
+   element text is not by itself an attribute failure; the check belongs to the
+   emitted start/empty attribute bytes.
+
+5. The gate must treat DTDs, unsupported processing constructs, malformed
+   tails, and any event for which the writer cannot provide an equivalent
+   normalized representation as ineligible. It must not synthesize a typed
+   candidate error. The exact parser then decides whether the result is a grid
+   error or proceeds to web validation.
+
+6. At EOF, require a successful one-root/depth/end-name audit over the exact
+   output, valid UTF-8, no MCE/x14ac event or declaration, and a completed
+   provisional parser state. The audit may be collected while writing, but its
+   final state must be checked against the bytes that will be published. Any
+   failed check drops the provisional state and invokes the exact parser on
+   the unchanged compacted byte slice.
+
+The dynamic gate is intentionally stricter than the XML grammar. The current
+writer rebuilds start tags with `BytesStart` and passes raw attribute values to
+the writer at [`compact.rs`](../../../../crates/litchi-xlsx/src/raw/compact.rs:104),
+so a source attribute using single quotes can become an unsafe double-quoted
+output tag. The existing web probe already records this as ineligible at
+[`web/check.rs`](../../../../crates/litchi-xlsx/src/raw/web/check.rs:88), but
+the parser feed needs the same output-safety boundary rather than relying on
+the source event.
+
+## Speculative resource gate
+
+`written_len` alone is useful but insufficient. It is an exact lower bound on
+the emitted bytes, while the compact `Vec` can have a larger `capacity()` and
+the parser retains raw records, vectors, hash tables, and active text scratch.
+The candidate must maintain a finite gate for the complete provisional state:
+
+```text
+compact output capacity
++ parser stack and namespace/event scratch
++ RawCell/row/merge/column/index capacities
++ active formula, value, and inline text capacity
++ retained raw-cell payloads and their semantic materialization
+```
+
+Before `Parser::start` can create cell state, before `push_text` can reserve a
+formula/value/inline string, and before `finish_cell` can retain a `RawCell`,
+charge the candidate budget. Count cells and aggregate retained text as well
+as bytes; a cell with a valid-sized payload can still make a large vector of
+small cells expensive. Existing `try_reserve` calls are necessary allocator
+failure handling, but they do not provide an aggregate pre-allocation gate.
+
+The gate should use the caller's remaining execution memory budget when one is
+available, with a finite candidate ceiling for the unmanaged commit path. It
+must be a fast-path fallback threshold, not a new format limit. On exhaustion,
+mark the candidate ineligible, drop the parser and every provisional extension
+or semantic allocation, and then call the existing parser on
+`compacted.bytes()`. Do not hold a provisional `Store` while running that
+fallback.
+
+Track the actual writer length after every successful write with checked
+arithmetic. If it exceeds either current MCE byte limit, stop feeding before
+the next parser event and fall back; the exact parser must retain ownership of
+the eventual limit error. Do not assume `output.len() <= input.len()` merely
+because formatting whitespace is removed: normalized names and attributes are
+serialized by a writer, and the contract must survive a future writer change.
+An input-size precheck plus the runtime `written_len` check is the minimum safe
+combination. The gate should also reject before feed construction when the
+initial compact-buffer capacity itself leaves no room under the candidate
+ceiling.
+
+MCE stream limits do not bound the ordinary `Parser`'s retained `Vec<RawCell>`
+and strings. Likewise, the 4,096-cell/1 MiB validated-store handoff in the
+transaction is a publication optimization after parsing, not a bound on
+speculative parser memory. Neither may be cited as the resource gate without a
+separate precharge around the feed.
+
+## Required pipeline and error behavior
+
+The candidate must preserve this observable sequence for an effective grid
+edit:
+
+```text
+compact
+  -> x14ac capture / MCE processing (when applicable)
+  -> output UTF-8 and worksheet parser
+  -> web proof or exact web reader
+  -> style validation
+  -> requested-change checks
+  -> package/workbook reopen and publication
+```
+
+For the ordinary fast slice, x14ac capture is represented by the initialized
+empty map, and MCE processing is represented only after the pre-input and
+output gates have proved the MCE-free case. This is a proof of the no-extension
+case, not permission to move either owner below `Parser`.
+
+Compaction errors must win over all later errors. A parser-feed error or gate
+failure must not be returned as a new diagnostic: discard the provisional
+state and let the exact compacted-byte parser establish the grid result. Grid
+errors must still precede web errors; web finishing must still precede style
+and requested-change verification. The exact output web fallback and final
+OPC/workbook reopen remain mandatory. This follows the current parser setup in
+[`worksheet/mod.rs`](../../../../crates/litchi-xlsx/src/raw/worksheet/mod.rs:28),
+the parser's extension initialization in
+[`codec.rs`](../../../../crates/litchi-xlsx/src/raw/worksheet/codec.rs:265),
+and the transaction checks at
+[`transaction.rs`](../../../../crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs:1673).
+
+If a post-output audit discovers an x14ac value, an MCE branch, or an unsafe
+attribute after some ordinary events have already been fed, the provisional
+store is never accepted. The fallback receives the exact compacted bytes, so
+`x14ac::capture` runs before MCE processing and parser events, preserving
+extension ownership and malformed-input precedence.
+
+## Pilot proof required before retention
+
+The differential harness must compare the reference and candidate for exact
+compacted bytes, parsed worksheet state, x14ac/default and row values, web
+bindings, style checks, requested-change checks, publication/reopen result,
+and both error phase and typed diagnostic text. The matrix must include:
+
+- ordinary MCE-free/x14ac-free worksheets, strict and transitional namespace
+  aliases, namespace rebinding, empty cells, rows, columns, merges, styles,
+  inline strings, CDATA, entities/general references, formulas and shared
+  formulas;
+- attributes with single quotes, apostrophes in double-quoted values, escaped
+  quotes, invalid raw quote/ampersand forms, and output-size boundary cases;
+- MCE `AlternateContent`, ignored/preserved branches, x14ac defaults and row
+  descent, unknown qualified markup, DTDs, malformed tails, and invalid UTF-8;
+- competing compaction/grid/web failures to prove `compact > grid > web`,
+  plus oversized output where the exact parser must retain the existing limit
+  error; and
+- exact no-ops, semantically ineffective edits, metadata-only edits, ordinary
+  changed edits, and fallback-heavy edits to prove that only the intended
+  `requires_store_verification` cases construct a feed.
+
+The pilot must record feed eligibility/fallback counts, exact output hashes,
+operation-local p50/p95/p99, allocation count/bytes and peak live/RSS data
+where available. It must include the previously rejected cold same-value
+no-op cases. No changed-output speedup is authorized until the candidate has a
+net measured benefit with no preservation, error-order, output-byte, or memory
+regression.
+
+## ADR and source review record
+
+All 30 accepted ADR/index files were read and their SHA-256 values matched the
+sealed `docs/performance/results/change-0515/adr-manifest.json` at revision
+`b698732363250547f05d235b8c8c090f2dd17c59`. The applicable constraints are
+ADR 0001/0004 (strict typed layers), ADR 0003 (immutable snapshots, exact
+no-ops and atomic publication), ADR 0005 (caller budgets and measured memory),
+ADR 0006 (preservation and deterministic validation), ADR 0011 (OPC ownership
+and reopen), ADR 0017/0018 (format-owned OOXML behavior), and ADR 0024 (current
+workspace topology). No ADR is amended by this review.
+
+The review also used the complete 0515
+[`output-semantics-review.md`](../change-0515/output-semantics-review.md),
+the unchanged compactor and worksheet parser, and the current transaction
+boundary. The retained 0515 evidence is attribution only; it does not prove
+that event fusion is profitable.

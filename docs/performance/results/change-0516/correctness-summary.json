@@ -1,0 +1,162 @@
+{
+  "captures": [
+    {
+      "path": "after/allocator-r1-report.json",
+      "rows": 12,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "after/allocator-r2-report.json",
+      "rows": 12,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "after/fallback-allocator-r1-report.json",
+      "rows": 6,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "after/fallback-allocator-r2-report.json",
+      "rows": 6,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "after/fallback-pilot-report.json",
+      "rows": 6,
+      "samples_per_row": 20,
+      "warmups_per_row": 2
+    },
+    {
+      "path": "after/fallback-preflight-report.json",
+      "rows": 6,
+      "samples_per_row": 1,
+      "warmups_per_row": 0
+    },
+    {
+      "path": "after/guard-allocator-r1-report.json",
+      "rows": 21,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "after/guard-allocator-r2-report.json",
+      "rows": 21,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "after/guard-pilot-report.json",
+      "rows": 21,
+      "samples_per_row": 20,
+      "warmups_per_row": 2
+    },
+    {
+      "path": "after/guard-preflight-report.json",
+      "rows": 21,
+      "samples_per_row": 1,
+      "warmups_per_row": 0
+    },
+    {
+      "path": "after/pilot-report.json",
+      "rows": 12,
+      "samples_per_row": 20,
+      "warmups_per_row": 2
+    },
+    {
+      "path": "after/preflight-report.json",
+      "rows": 12,
+      "samples_per_row": 1,
+      "warmups_per_row": 0
+    },
+    {
+      "path": "after/profile-report.json",
+      "rows": 1,
+      "samples_per_row": 3,
+      "warmups_per_row": 0
+    },
+    {
+      "path": "before/allocator-r1-report.json",
+      "rows": 12,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "before/allocator-r2-report.json",
+      "rows": 12,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "before/fallback-allocator-r1-report.json",
+      "rows": 6,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "before/fallback-allocator-r2-report.json",
+      "rows": 6,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "before/fallback-pilot-report.json",
+      "rows": 6,
+      "samples_per_row": 20,
+      "warmups_per_row": 2
+    },
+    {
+      "path": "before/fallback-preflight-report.json",
+      "rows": 6,
+      "samples_per_row": 1,
+      "warmups_per_row": 0
+    },
+    {
+      "path": "before/guard-allocator-r1-report.json",
+      "rows": 21,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "before/guard-allocator-r2-report.json",
+      "rows": 21,
+      "samples_per_row": 10,
+      "warmups_per_row": 1
+    },
+    {
+      "path": "before/guard-pilot-report.json",
+      "rows": 21,
+      "samples_per_row": 20,
+      "warmups_per_row": 2
+    },
+    {
+      "path": "before/guard-preflight-report.json",
+      "rows": 21,
+      "samples_per_row": 1,
+      "warmups_per_row": 0
+    },
+    {
+      "path": "before/pilot-report.json",
+      "rows": 12,
+      "samples_per_row": 20,
+      "warmups_per_row": 2
+    },
+    {
+      "path": "before/preflight-report.json",
+      "rows": 12,
+      "samples_per_row": 1,
+      "warmups_per_row": 0
+    },
+    {
+      "path": "before/profile-report.json",
+      "rows": 1,
+      "samples_per_row": 3,
+      "warmups_per_row": 0
+    }
+  ],
+  "corpus_and_output_identity_groups": 18,
+  "scope": "Existing reports only; required lane completeness is a separate final check."
+}

@@ -1,0 +1,97 @@
+   Compiling syn v3.0.5
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling zerovec-derive v0.11.6
+   Compiling zerofrom-derive v0.1.7
+   Compiling zerofrom v0.1.8
+   Compiling yoke-derive v0.8.2
+   Compiling displaydoc v0.2.7
+   Compiling generic-array v0.14.7
+   Compiling yoke v0.8.3
+   Compiling crossbeam-utils v0.8.23
+   Compiling zerovec v0.11.8
+   Compiling hybrid-array v0.4.15
+   Compiling writeable v0.6.4
+   Compiling tinystr v0.8.4
+   Compiling crossbeam-epoch v0.9.21
+   Compiling litemap v0.8.3
+   Compiling smallvec v1.16.1
+   Compiling icu_locale_core v2.3.0
+   Compiling num-traits v0.2.19
+   Compiling potential_utf v0.1.6
+   Compiling zerotrie v0.2.5
+   Compiling crossbeam-deque v0.8.8
+   Compiling icu_normalizer_data v2.3.0
+   Compiling cpufeatures v0.3.1
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling serde_derive v1.0.229
+   Compiling zerocopy v0.8.57
+   Compiling digest v0.11.3
+   Compiling chacha20 v0.10.2
+   Compiling serde v1.0.229
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling thiserror-impl v2.0.20
+   Compiling crc32fast v1.5.1
+   Compiling rustix v1.1.4
+   Compiling chrono v0.4.45
+   Compiling thiserror v2.0.20
+   Compiling digest v0.10.7
+   Compiling rand v0.10.2
+   Compiling icu_properties v2.3.0
+   Compiling icu_normalizer v2.3.0
+   Compiling rayon-core v1.13.0
+   Compiling sha2 v0.11.0
+   Compiling bitflags v2.13.2
+   Compiling either v1.18.0
+   Compiling fast-float2 v0.2.4
+   Compiling zlib-rs v0.6.7
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling flate2 v1.1.10
+   Compiling sha2 v0.10.9
+   Compiling tinyvec v1.13.2
+   Compiling rayon v1.12.0
+   Compiling idna_adapter v1.2.2
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling tempfile v3.27.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling idna v1.1.0
+   Compiling unicode-normalization v0.1.25
+   Compiling caseless v0.2.2
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling url v2.5.8
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi-xlsx-commit-guard v0.1.0 (/home/zhuhe/code/litchi/docs/performance/results/change-0516/guard-probe)
+    Finished `release` profile [optimized] target(s) in 1m 31s
+	Command being timed: "cargo build --release --locked --offline --manifest-path /home/zhuhe/code/litchi/docs/performance/results/change-0516/guard-probe/Cargo.toml --bin litchi-xlsx-commit-guard"
+	User time (seconds): 165.06
+	System time (seconds): 4.66
+	Percent of CPU this job got: 185%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:31.30
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1746716
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 3389629
+	Voluntary context switches: 18704
+	Involuntary context switches: 1003
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 24
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

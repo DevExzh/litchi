@@ -1,0 +1,21 @@
+{
+  "frozen_utc": "2026-09-11T23:35:57.652786+00:00",
+  "reason": "Ensure common x14ac/MCE-bearing producer output takes early fallback rather than paying a discarded Parser pass",
+  "relation": "Adds a fallback guard before any measurement; does not replace unchanged plain0514 guard or modify original plan",
+  "corpus": "Existing public guard two-sheet numeric corpus plus public default-descent metadata per sheet; original deterministic cells/update rules preserved",
+  "scenarios": [
+    "warm-changed-one-cell",
+    "warm-changed-one-percent"
+  ],
+  "shapes": [
+    "tiny",
+    "medium",
+    "dense-wide"
+  ],
+  "preflight": "eachrole1sample0warmup",
+  "pilot": "eachrole20samples2warmups",
+  "allocator": "eachrole10samples1warmup,two repeats",
+  "formal_if_admitted": "sameABBAroles100samples3warmups,6rows; diagnostic guard, no new speedup claim",
+  "oracles": "Default descent metadata survives output/readback; exact untouched data and expected changed values; no hidden Store warming inside clock",
+  "gate": "Same5%latency/RSS review trigger and material incremental-live increase requires rejection or independent documented justification"
+}

@@ -1,0 +1,29 @@
+{
+  "exit_code": 0,
+  "commands": [
+    [
+      "callgrind_annotate",
+      "--auto=no",
+      "--show-percs=no",
+      "--inclusive=yes",
+      "--tree=both",
+      "--threshold=100",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/profile.out"
+    ],
+    [
+      "callgrind_annotate",
+      "--auto=no",
+      "--show-percs=no",
+      "--inclusive=no",
+      "--tree=both",
+      "--threshold=100",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0516/before/profile.out"
+    ]
+  ],
+  "raw_sha256": "402742339c4658e7786431f57d1f573dddb9e62ba503181fda5c971011837c6e",
+  "artifacts": {
+    "profile-inclusive.txt": "1c3fa88aa6cb4a568db365b0c46b352d9ce11f4bfdf62baafbb26c782896b02b",
+    "profile-exclusive.txt": "99c27fe9956677779972a85196b042faad3b2cb665d11dc85043fb6395bdb659"
+  },
+  "note": "Equal-cost function ordering may vary when replayed; compare complete blocks and edges."
+}

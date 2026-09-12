@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0516: reject XLSX emitted-output parser fusion
+
+[0516](changes/0516-xlsx-output-fusion-rejection.md) passes all 1,284 candidate
+all-features tests but fails performance admission: changed-edit pilot p50
+rises 4.46–8.30% across the 12 main rows and 5.82–8.64% across the six warm
+changed-edit guard rows. Dense allocation calls also increase, and scoped
+commit instruction references rise 3.95%. No formal ABBA campaign or speedup
+claim follows. The exact candidate and all adverse evidence are archived;
+production is restored. Two independent no-op fixture fixes remain, with
+1,263 tests passing on unchanged production. OLE2/OOXML work remains active;
+ODF is deferred and iWork excluded.
+
 ## 0515: isolate XLSX changed-output work
 
 [0515](changes/0515-xlsx-output-attribution.md) separates changed-output parsing

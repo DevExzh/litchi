@@ -1,0 +1,68 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling zeroize v1.9.0
+   Compiling zerofrom v0.1.4
+   Compiling cmov v0.5.4
+   Compiling hybrid-array v0.4.14
+   Compiling ctutils v0.4.2
+   Compiling yoke v0.7.4
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling zerovec v0.10.4
+   Compiling digest v0.11.3
+   Compiling tinystr v0.7.6
+   Compiling thiserror v2.0.18
+   Compiling sha2 v0.11.0
+   Compiling icu_locid v1.5.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling icu_provider v1.5.0
+   Compiling block-padding v0.4.2
+   Compiling inout v0.2.2
+   Compiling icu_locid_transform v1.5.0
+   Compiling icu_collections v1.5.0
+   Compiling icu_properties v1.5.1
+   Compiling cipher v0.5.2
+   Compiling encoding_rs v0.8.35
+   Compiling fixedbitset v0.5.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling icu_normalizer v1.5.0
+   Compiling litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+   Compiling idna_adapter v1.2.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling cpubits v0.1.1
+   Compiling aes v0.9.3
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling idna v1.1.0
+   Compiling rc4 v0.2.0
+   Compiling cbc v0.2.1
+   Compiling sha1 v0.11.0
+   Compiling hmac v0.13.0
+   Compiling subtle v2.6.1
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling url v2.5.8
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+rustc-LLVM ERROR: IO failure on output stream: Disk quota exceeded
+error: could not compile `litchi-xlsx` (test "source_backed_sheet_protection")
+
+Caused by:
+  Disk quota exceeded (os error 122)
+
+Caused by:
+  failed to parse process output: `/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name source_backed_sheet_protection --edition=2024 crates/litchi-xlsx/tests/source_backed_sheet_protection.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no '--deny=clippy::all' --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs '--deny=rustdoc::unescaped_backticks' --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints '--deny=rustdoc::redundant_explicit_links' '--deny=rustdoc::private_intra_doc_links' --deny=non_ascii_idents '--allow=clippy::needless_return' '--allow=clippy::manual_saturating_arithmetic' '--allow=clippy::manual_is_multiple_of' '--deny=rustdoc::invalid_rust_codeblocks' '--deny=rustdoc::invalid_html_tags' '--deny=rustdoc::invalid_codeblock_attributes' '--allow=clippy::if_same_then_else' '--allow=clippy::collapsible_match' '--allow=clippy::collapsible_if' '--deny=rustdoc::broken_intra_doc_links' '--deny=rustdoc::bare_urls' --test --cfg 'feature="default"' --cfg 'feature="encryption"' --cfg 'feature="vba-inspection"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("default", "encryption", "vba-inspection"))' -C metadata=6593508e4b0c0779 -C extra-filename=-bf11ca8840c0619e --out-dir /tmp/litchi-goal-0516/target/debug/deps -C strip=debuginfo -L dependency=/tmp/litchi-goal-0516/target/debug/deps --extern base64=/tmp/litchi-goal-0516/target/debug/deps/libbase64-1ea43f4c47235624.rlib --extern bitflags=/tmp/litchi-goal-0516/target/debug/deps/libbitflags-99fb9fb7cf0f7dfa.rlib --extern caseless=/tmp/litchi-goal-0516/target/debug/deps/libcaseless-9efa164587d68ea2.rlib --extern chrono=/tmp/litchi-goal-0516/target/debug/deps/libchrono-eb2b1e46781ed714.rlib --extern itoa=/tmp/litchi-goal-0516/target/debug/deps/libitoa-812a2061b055b717.rlib --extern litchi_core=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_core-6baff5d6cbae2337.rlib --extern litchi_crypto=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_crypto-a4c67c9f4529b8d7.rlib --extern litchi_drawingml=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_drawingml-13349df423e9289e.rlib --extern litchi_ooxml_common=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_ooxml_common-9bd5777ded26480c.rlib --extern litchi_opc=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_opc-90b1ee78bb64523b.rlib --extern litchi_sheet=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_sheet-b5d42297a9ca42a1.rlib --extern litchi_spreadsheet_drawing=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_spreadsheet_drawing-a041946a252cb07e.rlib --extern litchi_vba=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_vba-acc4ea5c2947d0df.rlib --extern litchi_xlsx=/tmp/litchi-goal-0516/target/debug/deps/liblitchi_xlsx-4b0557cd1f812f79.rlib --extern memchr=/tmp/litchi-goal-0516/target/debug/deps/libmemchr-3ccca06e46d831b8.rlib --extern once_cell=/tmp/litchi-goal-0516/target/debug/deps/libonce_cell-5ffae3dc441222fd.rlib --extern quick_xml=/tmp/litchi-goal-0516/target/debug/deps/libquick_xml-9af3bbdcd7fb552b.rlib --extern ryu=/tmp/litchi-goal-0516/target/debug/deps/libryu-92be95c68c281eb6.rlib --extern serde_json=/tmp/litchi-goal-0516/target/debug/deps/libserde_json-3e358f5c67e3f183.rlib --extern smallvec=/tmp/litchi-goal-0516/target/debug/deps/libsmallvec-fe3522392cc7bb62.rlib --extern soapberry_zip=/tmp/litchi-goal-0516/target/debug/deps/libsoapberry_zip-098aab8186dd4efc.rlib --extern tempfile=/tmp/litchi-goal-0516/target/debug/deps/libtempfile-9610aeaee412bcc9.rlib --extern thiserror=/tmp/litchi-goal-0516/target/debug/deps/libthiserror-f66dec6e28af1373.rlib --extern unicode_normalization=/tmp/litchi-goal-0516/target/debug/deps/libunicode_normalization-b7fd2ef71266a58b.rlib` (exit status: 101)
+warning: build failed, waiting for other jobs to finish...
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "/tmp/litchi-goal-0516/target/debug/examples/rustcj2BOSY/symbols.o" "<3 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "/tmp/litchi-goal-0516/target/debug/deps/{liblitchi_xlsx-4b0557cd1f812f79,liblitchi_spreadsheet_drawing-a041946a252cb07e,liblitchi_drawingml-13349df423e9289e,liblitchi_sheet-b5d42297a9ca42a1,liblitchi_ooxml_common-9bd5777ded26480c,liburl-00bdb0d7310e1c25,libidna-d2e777ba8db483dc,libidna_adapter-fe685c1da9e03c90,libicu_normalizer-e8b433d61bbf2e8e,libicu_normalizer_data-63716af90c1efcac,libwrite16-4c163686bf40815e,libutf8_iter-6c02925ddae71c29,libutf16_iter-3653161dbdc29aff,libicu_properties-ff3a46dacc7c7ded,libicu_properties_data-a1f0ad8182e52866,libicu_locid_transform-cb110278c9c72ec5,libicu_locid_transform_data-06e1e4d9ef2d8260,libicu_collections-09207e8e27c72d57,libicu_provider-b920429124c165b4,libicu_locid-4a2a6ca9030afeca,liblitemap-3e6aadfd3d515f3b,libtinystr-7cab567036e58437,libzerovec-d3d0d1ce70eca0c7,libwriteable-148fc0627cc19326,libyoke-35b0e8eb45e16ae2,libzerofrom-490b19037c1007b5,libstable_deref_trait-0251c333f0645124,libform_urlencoded-b67ec8fcfcca7a4b,libpercent_encoding-c833f98a2da08b74,libryu-92be95c68c281eb6,liblitchi_vba-acc4ea5c2947d0df,liblitchi_crypto-a4c67c9f4529b8d7,liblitchi_ole_common-928c6151369e8427,liblitchi_codepage-487ce5a5231abdb5,libencoding_rs-00280fb8e5225275,librc4-535217ed0a970542,liblitchi_cfb-8b391a55904daa83,libsubtle-6e86610ca26538fb,libsha1-3e7d4a68431c2e0f,libhmac-ff733867e13f9f26,libcbc-6959c5ef929bfd8d,libaes-e15ef982b9e1f4bc,libcpubits-cfc8fca3e4140e94,libcipher-04247e15fc28c441,libinout-3f46df5921fae5ee,libblock_padding-b6e3fbbd07844c6e,liblitchi_opc-90b1ee78bb64523b,libatoi_simd-f94c0134bb4133d0,libdebug_unsafe-14d9dbafd2b1581c,libxml_minifier-2afc2dc7f9e8a0c0,libtempfile-9610aeaee412bcc9,libgetrandom-b178711eb1fcd4a5,libfastrand-ff3889cbb311bc08,libonce_cell-5ffae3dc441222fd,librustix-bc65b6123dc12216,libbitflags-99fb9fb7cf0f7dfa,liblinux_raw_sys-8517e7b7a212971c,libsoapberry_zip-098aab8186dd4efc,libcrc32fast-351d100e216bb410,libsha2-8b000a676b1a474e,libcpufeatures-bb94c12fd6ffc57b,libdigest-88eaca98e1de6661,libblock_buffer-8304fa35a49acd61,libcrypto_common-98ecf80631c2c5f5,libgeneric_array-0efb7db37992e866,librayon-3e41326a09c4e465,librayon_core-9a3e2235b4a1b37b,libcrossbeam_deque-4c13cef2ed02d475,libcrossbeam_epoch-9be6bf7d9b981b36,libcrossbeam_utils-5063d49e93c2c9d9,libeither-d50f700705ecd685,libflate2-1f9975e1ba73c090,libzlib_rs-f19eac8a310fb10c,liblitchi_core-6baff5d6cbae2337,libfast_float2-e7abb5f2456b72c7,librand-69ec2492683ab68f,libgetrandom-6ddd59b6c9fcc15e,liblibc-301202c60b35651e,libchacha20-35cc171f8e4804e0,librand_core-4dcca60f438351a2,libsha2-3a76307d850d7112,libcpufeatures-4c6c180409ea1532,libcfg_if-cc3921fbd46ed034,libdigest-6ca73f9b31b43a0f,libctutils-021fd00da09333e3,libcmov-0b0cd91cda43e32f,libconst_oid-b706423236984c85,libcrypto_common-9471dd5c503d307a,libblock_buffer-807f81cc48f56414,libhybrid_array-5a76a0b4b4bb048d,libtypenum-031fbdd68d92c830,libzeroize-e2ad608636290576,libserde_json-3e358f5c67e3f183,libitoa-812a2061b055b717,libzmij-05481eefa13a4611,libbase64-1ea43f4c47235624,libsmallvec-fe3522392cc7bb62,libzerocopy-d715281e5fb25e65,libcaseless-9efa164587d68ea2,libunicode_normalization-b7fd2ef71266a58b,libtinyvec-d605e8392dd7fce7,libtinyvec_macros-b74ad9b6daa1f17a,libchrono-eb2b1e46781ed714,libiana_time_zone-315ee8916aeaae37,libnum_traits-50109b1873dc5d43,libserde-acabc04938b4d21a,libserde_core-1a4d65d02224c82d,libthiserror-f66dec6e28af1373,libquick_xml-9af3bbdcd7fb552b,libmemchr-3ccca06e46d831b8}.rlib" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lc" "-lm" "-lrt" "-lpthread" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/tmp/litchi-goal-0516/target/debug/examples/rustcj2BOSY/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/tmp/litchi-goal-0516/target/debug/examples/edit_cells-8faf3808629ad1a7" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,--strip-debug" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: collect2: fatal error: ld terminated with signal 7 [Bus error], core dumped
+          compilation terminated.
+          
+
+error: could not compile `litchi-xlsx` (example "edit_cells") due to 1 previous error

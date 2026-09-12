@@ -1,0 +1,2144 @@
+diff --git a/crates/litchi-xlsx/src/raw/compact.rs b/crates/litchi-xlsx/src/raw/compact.rs
+index fc2acbf89..63936ff4e 100644
+--- a/crates/litchi-xlsx/src/raw/compact.rs
++++ b/crates/litchi-xlsx/src/raw/compact.rs
+@@ -1,9 +1,15 @@
+ //! Compact publication form for changed SpreadsheetML XML parts.
+ 
++use std::borrow::Cow;
++
++use litchi_ooxml_common::mce::process_ooxml;
+ use quick_xml::Writer;
++use quick_xml::XmlVersion;
+ use quick_xml::events::{BytesEnd, BytesStart, Event};
++use quick_xml::name::{Namespace, ResolveResult};
+ use quick_xml::reader::NsReader;
+ 
++use crate::cell::{Store, Text};
+ use crate::error::{Error, Result, allocation};
+ 
+ /// Re-emit changed XML without declaration/root or inter-element formatting.
+@@ -12,13 +18,48 @@ use crate::error::{Error, Result, allocation};
+ /// retained. Callers must compare with the exact source before invoking this
+ /// function so unchanged producer XML keeps its OPC source provenance.
+ pub(crate) fn changed(input: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+-    changed_observed(input, resource, |_, _| {})
++    changed_observed(input, resource, |_, _| {}, |_, _, _, _| {})
++}
++
++// This is a candidate-local admission ceiling for the unmanaged commit path.
++// It bounds the compact output capacity plus the newly constructed parser and
++// proof state. Existing compactor reader/writer/probe allocations remain the
++// baseline path and are deliberately outside this fallback threshold; this is
++// not a new worksheet or process-memory limit.
++const MAX_SPECULATIVE_BYTES: usize = 128 * 1024 * 1024;
++const MIN_PARSER_BYTES: usize = 64 * 1024;
++
++#[derive(Debug)]
++struct SpeculativeBudget {
++    output_capacity: usize,
++    ceiling: usize,
++}
++
++impl SpeculativeBudget {
++    fn new(initial_output_capacity: usize, ceiling: usize) -> Option<Self> {
++        initial_output_capacity
++            .checked_add(MIN_PARSER_BYTES)
++            .filter(|total| *total <= ceiling)
++            .map(|_| Self {
++                output_capacity: initial_output_capacity,
++                ceiling,
++            })
++    }
++
++    fn allows(&mut self, output_capacity: usize, parser_bytes: usize) -> bool {
++        self.output_capacity = self.output_capacity.max(output_capacity);
++        self.output_capacity
++            .checked_add(parser_bytes)
++            .is_some_and(|total| total <= self.ceiling)
++    }
+ }
+ 
+ /// Keep the proof bound to the exact compacted bytes until web validation runs.
++#[derive(Debug)]
+ pub(crate) struct WorksheetOutput {
+     bytes: Vec<u8>,
+     web: super::web::check::Probe,
++    parser: Option<super::worksheet::EventParser>,
+ }
+ 
+ impl WorksheetOutput {
+@@ -26,6 +67,24 @@ impl WorksheetOutput {
+         &self.bytes
+     }
+ 
++    /// Finish a parser that was fed only after the compactor emitted each
++    /// normalized event. `None` means the exact compacted bytes must go
++    /// through the ordinary worksheet parser instead.
++    pub(crate) fn take_store<'a, F>(&mut self, strings: F) -> Result<Option<Store>>
++    where
++        F: FnOnce() -> Result<Option<&'a [Text]>>,
++    {
++        let Some(parser) = self.parser.take() else {
++            return Ok(None);
++        };
++        // At this point compaction reached EOF and the exact-output gates
++        // proved the normalized event stream. The shared worksheet finalizer
++        // is therefore authoritative, including its package-owned string
++        // callback and any typed semantic error; do not retry it through the
++        // exact parser and invoke the owner twice.
++        parser.finish(strings).map(Some)
++    }
++
+     pub(crate) fn into_bytes_and_web(self) -> Result<(Vec<u8>, crate::web::Bindings)> {
+         let bindings = self.web.finish(&self.bytes)?;
+         Ok((self.bytes, bindings))
+@@ -34,14 +93,196 @@ impl WorksheetOutput {
+ 
+ pub(crate) fn changed_worksheet(input: &[u8], resource: &'static str) -> Result<WorksheetOutput> {
+     let mut web = super::web::check::Probe::default();
+-    let bytes = changed_observed(input, resource, |reader, event| web.observe(reader, event))?;
+-    Ok(WorksheetOutput { bytes, web })
++    let bytes = changed_observed(
++        input,
++        resource,
++        |reader, event| web.observe(reader, event),
++        |_, _, _, _| {},
++    )?;
++    Ok(WorksheetOutput {
++        bytes,
++        web,
++        parser: None,
++    })
++}
++
++/// Compact one effective worksheet output while feeding an ordinary semantic
++/// parser from the writer's normalized events. The parser remains provisional
++/// until the whole output has been emitted and the exact output gates pass.
++pub(crate) fn changed_worksheet_with_store(
++    input: &[u8],
++    resource: &'static str,
++) -> Result<WorksheetOutput> {
++    changed_worksheet_with_store_inner(input, resource, MAX_SPECULATIVE_BYTES)
++}
++
++#[cfg(test)]
++pub(crate) fn changed_worksheet_with_store_with_ceiling(
++    input: &[u8],
++    resource: &'static str,
++    ceiling: usize,
++) -> Result<WorksheetOutput> {
++    changed_worksheet_with_store_inner(input, resource, ceiling)
++}
++
++fn changed_worksheet_with_store_inner(
++    input: &[u8],
++    resource: &'static str,
++    speculative_ceiling: usize,
++) -> Result<WorksheetOutput> {
++    let mut web = super::web::check::Probe::default();
++    let mut budget = SpeculativeBudget::new(input.len(), speculative_ceiling);
++    let mut parser = (budget.is_some() && super::worksheet::output_feed_input_eligible(input))
++        .then(super::worksheet::EventParser::new);
++    let max_output_bytes = litchi_ooxml_common::mce::Limits::default().max_output_bytes;
++    let bytes = changed_observed(
++        input,
++        resource,
++        |reader, event| web.observe(reader, event),
++        |reader, event, written_len, output_capacity| {
++            if parser.is_none() {
++                return;
++            }
++            if written_len > max_output_bytes {
++                parser = None;
++                return;
++            }
++            let feed_eligible = parser.as_mut().is_some_and(|feed| {
++                feed.try_charge_event(event)
++                    && budget.as_mut().is_some_and(|budget| {
++                        budget.allows(output_capacity, feed.speculative_bytes())
++                    })
++            });
++            if !feed_eligible {
++                parser = None;
++                return;
++            }
++            if !emitted_event_is_safe(reader, event) {
++                parser = None;
++                return;
++            }
++            let (namespace, _) = reader.resolver().resolve_event(event.borrow());
++            let feed_fallback = parser.as_mut().is_some_and(|feed| {
++                let error = feed
++                    .consume(&namespace, event, reader.decoder(), reader.resolver())
++                    .is_err();
++                let requires_exact_parser = feed.requires_exact_parser();
++                feed.release_event_scratch();
++                error || requires_exact_parser
++            });
++            if feed_fallback {
++                // A provisional error is never authoritative: continue
++                // compaction to EOF and let the exact output parser decide.
++                // Shared-string cells retain a package callback, and shared
++                // formulas can expand during finalization; both are excluded
++                // before the feed can consume a subsequent event.
++                parser = None;
++            }
++        },
++    )?;
++    let retain_parser = parser.as_ref().is_some_and(|feed| {
++        feed.is_complete()
++            && budget.as_mut().is_some_and(|budget| {
++                budget.allows(bytes.capacity(), feed.final_speculative_bytes())
++            })
++            && output_feed_output_eligible(&bytes)
++    });
++    if !retain_parser {
++        parser = None;
++    }
++    Ok(WorksheetOutput { bytes, web, parser })
++}
++
++fn output_feed_output_eligible(output: &[u8]) -> bool {
++    if !super::worksheet::output_feed_input_eligible(output) {
++        return false;
++    }
++    let Ok(processed) = process_ooxml(output) else {
++        return false;
++    };
++    matches!(&processed, Cow::Borrowed(_)) && std::str::from_utf8(processed.as_ref()).is_ok()
++}
++
++const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
++const X14AC_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
++
++/// Verify that a normalized event can represent the bytes just written by the
++/// compacting writer. This is deliberately conservative: a false result only
++/// selects the exact output parser, while a true result is limited to
++/// MCE/x14ac-free, UTF-8-safe events.
++fn emitted_event_is_safe(reader: &NsReader<&[u8]>, event: &Event<'_>) -> bool {
++    match event {
++        Event::Start(element) | Event::Empty(element) => {
++            if std::str::from_utf8(element.name().as_ref()).is_err()
++                || !resolved_name_is_safe(reader, element.name())
++                || element.attributes_raw().contains(&b'\'')
++            {
++                return false;
++            }
++            for attribute in element.attributes().with_checks(true) {
++                let Ok(attribute) = attribute else {
++                    return false;
++                };
++                if std::str::from_utf8(attribute.key.as_ref()).is_err()
++                    || attribute.value.as_ref().contains(&b'"')
++                    || attribute.value.as_ref().contains(&b'<')
++                {
++                    return false;
++                }
++                let Ok(value) = attribute
++                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
++                else {
++                    return false;
++                };
++                let key = attribute.key.as_ref();
++                if (key == b"xmlns" || key.starts_with(b"xmlns:"))
++                    && (value.as_bytes() == MCE_NAMESPACE || value.as_bytes() == X14AC_NAMESPACE)
++                {
++                    return false;
++                }
++                if key == b"xmlns" || key.starts_with(b"xmlns:") {
++                    // The declaration bytes were copied unchanged by
++                    // `normalized_start`; the reader has already applied
++                    // them to its resolver for this event. Do not resolve an
++                    // xmlns attribute as an ordinary qualified attribute.
++                    continue;
++                }
++                let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
++                if !matches!(namespace, ResolveResult::Unbound)
++                    && !matches!(namespace, ResolveResult::Bound(Namespace(value)) if value != MCE_NAMESPACE && value != X14AC_NAMESPACE)
++                {
++                    return false;
++                }
++            }
++            true
++        },
++        Event::End(element) => {
++            std::str::from_utf8(element.name().as_ref()).is_ok()
++                && resolved_name_is_safe(reader, element.name())
++        },
++        Event::Text(text) => text.decode().is_ok(),
++        Event::CData(text) => text.decode().is_ok(),
++        Event::DocType(_) | Event::PI(_) => false,
++        Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => true,
++        Event::Eof => false,
++    }
++}
++
++fn resolved_name_is_safe(reader: &NsReader<&[u8]>, name: quick_xml::name::QName<'_>) -> bool {
++    match reader.resolver().resolve_element(name).0 {
++        ResolveResult::Unbound => true,
++        ResolveResult::Bound(Namespace(value)) => {
++            value != MCE_NAMESPACE && value != X14AC_NAMESPACE
++        },
++        ResolveResult::Unknown(_) => false,
++    }
+ }
+ 
+ fn changed_observed(
+     input: &[u8],
+     resource: &'static str,
+     mut observe: impl FnMut(&NsReader<&[u8]>, &Event<'_>),
++    mut emit: impl FnMut(&NsReader<&[u8]>, &Event<'_>, usize, usize),
+ ) -> Result<Vec<u8>> {
+     let mut reader = NsReader::from_reader(input);
+     reader.config_mut().trim_text(false);
+@@ -67,18 +308,46 @@ fn changed_observed(
+                 }
+                 let inherited = preserve.last().copied().unwrap_or(false);
+                 preserve.push(explicit.unwrap_or(inherited) || text_bearing(local.as_ref()));
+-                write_start(&mut writer, element, false)?;
++                let normalized = normalized_start(element)?;
++                writer
++                    .write_event(Event::Start(normalized.borrow()))
++                    .map_err(xml_error)?;
++                observe(&reader, &event);
++                emit(
++                    &reader,
++                    &Event::Start(normalized.borrow()),
++                    writer.get_ref().len(),
++                    writer.get_ref().capacity(),
++                );
+             },
+             Event::Empty(element) => {
+-                write_start(&mut writer, element, true)?;
++                let normalized = normalized_start(element)?;
++                writer
++                    .write_event(Event::Empty(normalized.borrow()))
++                    .map_err(xml_error)?;
++                observe(&reader, &event);
++                emit(
++                    &reader,
++                    &Event::Empty(normalized.borrow()),
++                    writer.get_ref().len(),
++                    writer.get_ref().capacity(),
++                );
+             },
+             Event::End(element) => {
+                 let _ = preserve.pop();
+                 let qualified_name = element.name();
+                 let name = std::str::from_utf8(qualified_name.as_ref()).map_err(xml_error)?;
++                let normalized = BytesEnd::new(name);
+                 writer
+-                    .write_event(Event::End(BytesEnd::new(name)))
++                    .write_event(Event::End(normalized.borrow()))
+                     .map_err(xml_error)?;
++                observe(&reader, &event);
++                emit(
++                    &reader,
++                    &Event::End(normalized.borrow()),
++                    writer.get_ref().len(),
++                    writer.get_ref().capacity(),
++                );
+             },
+             Event::Text(text)
+                 if text.as_ref().iter().all(u8::is_ascii_whitespace)
+@@ -93,21 +362,40 @@ fn changed_observed(
+             | Event::Decl(_)
+             | Event::PI(_)
+             | Event::DocType(_)
+-            | Event::GeneralRef(_) => writer.write_event(event.borrow()).map_err(xml_error)?,
++            | Event::GeneralRef(_) => {
++                writer.write_event(event.borrow()).map_err(xml_error)?;
++                observe(&reader, &event);
++                emit(
++                    &reader,
++                    &event,
++                    writer.get_ref().len(),
++                    writer.get_ref().capacity(),
++                );
++            },
+         }
+-        // Discarded formatting is absent from the bytes that web validation sees.
+-        observe(&reader, &event);
+     }
+     Ok(writer.into_inner())
+ }
+ 
+-fn write_start(writer: &mut Writer<Vec<u8>>, element: &BytesStart<'_>, empty: bool) -> Result<()> {
++fn normalized_start<'a>(element: &'a BytesStart<'_>) -> Result<BytesStart<'a>> {
++    // Preserve the source qualified-name bytes and raw namespace declarations
++    // exactly. `BytesStart::new` only supplies the writer's UTF-8 view; each
++    // source attribute is copied into the normalized event below, so the
++    // resolver still observes the same alias/rebinding state that the exact
++    // output reader will see. The output safety gate validates the writer's
++    // double-quoted serialization before this event reaches the feed.
+     let qualified_name = element.name();
+-    let name = std::str::from_utf8(qualified_name.as_ref()).map_err(xml_error)?;
++    let name = std::str::from_utf8(qualified_name.into_inner()).map_err(xml_error)?;
+     let mut normalized = BytesStart::new(name);
+     for attribute in element.attributes().with_checks(true) {
+         normalized.push_attribute(attribute.map_err(xml_error)?);
+     }
++    Ok(normalized)
++}
++
++#[cfg(test)]
++fn write_start(writer: &mut Writer<Vec<u8>>, element: &BytesStart<'_>, empty: bool) -> Result<()> {
++    let normalized = normalized_start(element)?;
+     writer
+         .write_event(if empty {
+             Event::Empty(normalized)
+@@ -617,3 +905,7 @@ mod tests {
+         assert!(compacted.web.is_proven());
+     }
+ }
++
++#[cfg(test)]
++#[path = "compact_output_tests.rs"]
++mod compact_output_tests;
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/codec.rs b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+index b0274614c..dbdb63e65 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -1,6 +1,7 @@
+ //! Streaming `SpreadsheetML` event codec.
+ 
+ use std::collections::HashSet;
++use std::mem::size_of;
+ 
+ use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
+ use litchi_sheet::{COLUMNS, Cell as Address, Column as ColumnIndex, ROWS, Rect, Row as RowIndex};
+@@ -238,7 +239,7 @@ fn parse_cell_u32(
+ }
+ 
+ impl Parser {
+-    fn new(extensions: x14ac::Values) -> Self {
++    pub(super) fn new(extensions: x14ac::Values) -> Self {
+         Self {
+             cells: Vec::new(),
+             rows: Vec::new(),
+@@ -283,104 +284,133 @@ impl Parser {
+             let (namespace, event) = reader.resolver().resolve_event(event);
+             let decoder = reader.decoder();
+             let resolver = reader.resolver();
+-            match event {
+-                Event::Start(element) if stack.is_empty() => {
+-                    if closed_root
+-                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
+-                    {
+-                        return Err(invalid(
+-                            "worksheet XML must have one SpreadsheetML worksheet root",
+-                        ));
+-                    }
+-                    stack.push(Context::Worksheet);
+-                },
+-                Event::Empty(element) if stack.is_empty() => {
+-                    if closed_root
+-                        || !is_spreadsheetml_name(&namespace, element.name(), b"worksheet")
+-                    {
+-                        return Err(invalid(
+-                            "worksheet XML must have one SpreadsheetML worksheet root",
+-                        ));
+-                    }
+-                    closed_root = true;
+-                },
+-                Event::Start(element) => {
+-                    if stack.len() >= MAX_XML_DEPTH {
+-                        return Err(invalid(format!(
+-                            "worksheet XML exceeds {MAX_XML_DEPTH} levels"
+-                        )));
+-                    }
+-                    let parent = current(&stack)?;
+-                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
+-                    stack.push(child);
+-                },
+-                Event::Empty(element) => {
+-                    let parent = current(&stack)?;
+-                    let child = parser.start(parent, &namespace, &element, decoder, resolver)?;
+-                    parser.finish(child)?;
+-                },
+-                Event::Text(value) => {
+-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge))
+-                        && !value
+-                            .decode()
+-                            .map_err(|error| invalid(error.to_string()))?
+-                            .trim()
+-                            .is_empty()
+-                    {
+-                        return Err(invalid("worksheet leaf property cannot contain text"));
+-                    }
+-                    if let Some(target) = text_target(&stack) {
+-                        parser.push_text(
+-                            target,
+-                            &value.decode().map_err(|error| invalid(error.to_string()))?,
+-                        )?;
+-                    }
+-                },
+-                Event::CData(value) => {
+-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
+-                        return Err(invalid("worksheet leaf property cannot contain CDATA"));
+-                    }
+-                    if let Some(target) = text_target(&stack) {
+-                        parser.push_text(
+-                            target,
+-                            &value.decode().map_err(|error| invalid(error.to_string()))?,
+-                        )?;
+-                    }
+-                },
+-                Event::GeneralRef(value) => {
+-                    if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
+-                        return Err(invalid(
+-                            "worksheet leaf property cannot contain character references",
+-                        ));
+-                    }
+-                    if let Some(target) = text_target(&stack) {
+-                        parser.push_text(target, &decode_xml_reference(&value)?)?;
+-                    }
+-                },
+-                Event::End(element) => {
+-                    let ended = stack.pop().ok_or_else(|| {
+-                        invalid("worksheet XML has a closing element outside its root")
+-                    })?;
+-                    parser.finish(ended)?;
+-                    if ended == Context::Worksheet {
+-                        if !is_spreadsheetml_name(&namespace, element.name(), b"worksheet") {
+-                            return Err(invalid(
+-                                "worksheet XML has an invalid root closing element",
+-                            ));
+-                        }
+-                        closed_root = true;
+-                    }
+-                },
+-                Event::Eof if !closed_root || !stack.is_empty() => {
++            if Self::consume_event(
++                &mut parser,
++                &mut stack,
++                &mut closed_root,
++                &namespace,
++                &event,
++                decoder,
++                resolver,
++            )? {
++                break;
++            }
++        }
++
++        Self::finish_store(parser, strings)
++    }
++
++    /// Consume one already namespace-resolved event. This is shared by the
++    /// ordinary reader and the changed-output compactor's normalized event
++    /// feed; neither caller can publish the provisional state until the
++    /// complete event stream has reached EOF.
++    #[inline]
++    pub(super) fn consume_event(
++        &mut self,
++        stack: &mut Vec<Context>,
++        closed_root: &mut bool,
++        namespace: &ResolveResult<'_>,
++        event: &Event<'_>,
++        decoder: Decoder,
++        resolver: &NamespaceResolver,
++    ) -> Result<bool> {
++        match event {
++            Event::Start(element) if stack.is_empty() => {
++                if *closed_root || !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
+                     return Err(invalid(
+-                        "worksheet XML has a missing or unterminated SpreadsheetML worksheet root",
++                        "worksheet XML must have one SpreadsheetML worksheet root",
+                     ));
+-                },
+-                Event::Eof => break,
+-                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
+-            }
++                }
++                stack.push(Context::Worksheet);
++            },
++            Event::Empty(element) if stack.is_empty() => {
++                if *closed_root || !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
++                    return Err(invalid(
++                        "worksheet XML must have one SpreadsheetML worksheet root",
++                    ));
++                }
++                *closed_root = true;
++            },
++            Event::Start(element) => {
++                if stack.len() >= MAX_XML_DEPTH {
++                    return Err(invalid(format!(
++                        "worksheet XML exceeds {MAX_XML_DEPTH} levels"
++                    )));
++                }
++                let parent = current(stack)?;
++                let child = self.start(parent, namespace, element, decoder, resolver)?;
++                stack.push(child);
++            },
++            Event::Empty(element) => {
++                let parent = current(stack)?;
++                let child = self.start(parent, namespace, element, decoder, resolver)?;
++                self.finish(child)?;
++            },
++            Event::Text(value) => {
++                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge))
++                    && !value
++                        .decode()
++                        .map_err(|error| invalid(error.to_string()))?
++                        .trim()
++                        .is_empty()
++                {
++                    return Err(invalid("worksheet leaf property cannot contain text"));
++                }
++                if let Some(target) = text_target(stack) {
++                    self.push_text(
++                        target,
++                        &value.decode().map_err(|error| invalid(error.to_string()))?,
++                    )?;
++                }
++            },
++            Event::CData(value) => {
++                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
++                    return Err(invalid("worksheet leaf property cannot contain CDATA"));
++                }
++                if let Some(target) = text_target(stack) {
++                    self.push_text(
++                        target,
++                        &value.decode().map_err(|error| invalid(error.to_string()))?,
++                    )?;
++                }
++            },
++            Event::GeneralRef(value) => {
++                if matches!(stack.last(), Some(Context::SheetFormat | Context::Merge)) {
++                    return Err(invalid(
++                        "worksheet leaf property cannot contain character references",
++                    ));
++                }
++                if let Some(target) = text_target(stack) {
++                    self.push_text(target, &decode_xml_reference(value)?)?;
++                }
++            },
++            Event::End(element) => {
++                let ended = stack.pop().ok_or_else(|| {
++                    invalid("worksheet XML has a closing element outside its root")
++                })?;
++                self.finish(ended)?;
++                if ended == Context::Worksheet {
++                    if !is_spreadsheetml_name(namespace, element.name(), b"worksheet") {
++                        return Err(invalid("worksheet XML has an invalid root closing element"));
++                    }
++                    *closed_root = true;
++                }
++            },
++            Event::Eof if !*closed_root || !stack.is_empty() => {
++                return Err(invalid(
++                    "worksheet XML has a missing or unterminated SpreadsheetML worksheet root",
++                ));
++            },
++            Event::Eof => return Ok(true),
++            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {},
+         }
++        Ok(false)
++    }
+ 
++    pub(super) fn finish_store<'a, F>(mut parser: Self, strings: F) -> Result<Store>
++    where
++        F: FnOnce() -> Result<Option<&'a [Text]>>,
++    {
+         resolve_shared_formulas(&mut parser.cells)?;
+         let needs_strings = parser
+             .cells
+@@ -1070,3 +1100,271 @@ impl Parser {
+         Ok(())
+     }
+ }
++
++/// Parser state used by the changed-output compactor. The source reader owns
++/// namespace resolution while the compactor owns the normalized events;
++/// keeping the state here makes finalization identical to the ordinary
++/// worksheet parser.
++#[derive(Debug)]
++pub(crate) struct EventParser {
++    parser: Parser,
++    stack: Vec<Context>,
++    closed_root: bool,
++    speculative_bytes: usize,
++    event_scratch_bytes: usize,
++    payload_bytes: usize,
++    cell_count: usize,
++    row_count: usize,
++    merge_count: usize,
++    requires_exact_parser: bool,
++}
++
++impl EventParser {
++    pub(crate) fn new() -> Self {
++        // Vec::try_reserve(1) may choose its small initial growth rather than
++        // exactly one element. Reserve accounting below charges geometric
++        // growth per retained record; these small baselines cover that first
++        // allocation for cells, rows, and merge ranges.
++        let initial_vectors = size_of::<RawCell>()
++            .saturating_mul(2)
++            .saturating_add(size_of::<row::Stored>().saturating_mul(2))
++            .saturating_add(size_of::<Rect>().saturating_mul(2));
++        Self {
++            parser: Parser::new(x14ac::Values::default()),
++            stack: Vec::new(),
++            closed_root: false,
++            speculative_bytes: size_of::<Parser>()
++                .saturating_add(MAX_XML_DEPTH.saturating_mul(size_of::<Context>()))
++                .saturating_add(initial_vectors),
++            event_scratch_bytes: 0,
++            payload_bytes: 0,
++            cell_count: 0,
++            row_count: 0,
++            merge_count: 0,
++            requires_exact_parser: false,
++        }
++    }
++
++    /// Charge the parser state before handing an emitted event to the shared
++    /// consumer. The charge intentionally includes retained payload and
++    /// record overhead, so a budget trip drops the whole provisional parser
++    /// before `Parser::start`, `push_text`, or `finish` can grow state.
++    pub(crate) fn try_charge_event(&mut self, event: &Event<'_>) -> bool {
++        const EVENT_SCRATCH_BYTES: usize = 512;
++        const RETAINED_PAYLOAD_MULTIPLIER: usize = 2;
++        // During the writer-boundary proof, the raw event, decoded value, and
++        // parser/materialization-facing text can coexist. Keep three copies
++        // of the emitted payload available for that short-lived scope.
++        const EVENT_COPY_MULTIPLIER: usize = 3;
++        const CELL_BYTES: usize = size_of::<RawCell>()
++            .saturating_mul(2)
++            .saturating_add(size_of::<PendingCell>());
++        // `Parser::seen_rows` is a HashSet<u32>; this explicit term covers its
++        // bucket/control growth alongside the retained row and pending-row
++        // records. The fixed base covers the first small table allocation;
++        // Vec geometric growth is covered by the factors above.
++        const SEEN_ROW_BYTES: usize = size_of::<u32>().saturating_mul(16);
++        const SEEN_ROW_BASE_BYTES: usize = 1024;
++        const ROW_BYTES: usize = size_of::<row::Stored>()
++            .saturating_mul(2)
++            .saturating_add(size_of::<PendingRow>())
++            .saturating_add(SEEN_ROW_BYTES);
++        const MERGE_BYTES: usize = size_of::<Rect>().saturating_mul(2);
++        const COLUMNS_BYTES: usize = 4 * 1024 * 1024;
++
++        let (payload_bytes, cells, rows, merges, columns) = match event {
++            Event::Start(element) | Event::Empty(element) => {
++                let local = element.local_name();
++                (
++                    element
++                        .name()
++                        .as_ref()
++                        .len()
++                        .saturating_add(element.attributes_raw().len()),
++                    usize::from(local.as_ref() == b"c"),
++                    usize::from(local.as_ref() == b"row"),
++                    usize::from(local.as_ref() == b"mergeCell"),
++                    usize::from(local.as_ref() == b"cols"),
++                )
++            },
++            Event::End(element) => (element.name().as_ref().len(), 0, 0, 0, 0),
++            Event::Text(value) => (value.as_ref().len(), 0, 0, 0, 0),
++            Event::CData(value) => (value.as_ref().len(), 0, 0, 0, 0),
++            Event::GeneralRef(value) => (value.as_ref().len(), 0, 0, 0, 0),
++            Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::DocType(_) => {
++                (0, 0, 0, 0, 0)
++            },
++            Event::Eof => (0, 0, 0, 0, 0),
++        };
++        let retained_payload = payload_bytes.saturating_mul(RETAINED_PAYLOAD_MULTIPLIER);
++        let seen_row_base = if rows != 0 && self.row_count == 0 {
++            SEEN_ROW_BASE_BYTES
++        } else {
++            0
++        };
++        let record_bytes = cells
++            .saturating_mul(CELL_BYTES)
++            .saturating_add(rows.saturating_mul(ROW_BYTES))
++            .saturating_add(seen_row_base)
++            .saturating_add(merges.saturating_mul(MERGE_BYTES))
++            .saturating_add(columns.saturating_mul(COLUMNS_BYTES));
++        let Some(total) = self
++            .speculative_bytes
++            .checked_add(retained_payload)
++            .and_then(|value| value.checked_add(record_bytes))
++        else {
++            return false;
++        };
++        let Some(payload_total) = self.payload_bytes.checked_add(payload_bytes) else {
++            return false;
++        };
++        let Some(cell_total) = self.cell_count.checked_add(cells) else {
++            return false;
++        };
++        let Some(row_total) = self.row_count.checked_add(rows) else {
++            return false;
++        };
++        let Some(merge_total) = self.merge_count.checked_add(merges) else {
++            return false;
++        };
++        let Some(scratch) = payload_bytes
++            .checked_mul(EVENT_COPY_MULTIPLIER)
++            .and_then(|value| value.checked_add(EVENT_SCRATCH_BYTES))
++        else {
++            return false;
++        };
++        self.speculative_bytes = total;
++        self.event_scratch_bytes = scratch;
++        self.payload_bytes = payload_total;
++        self.cell_count = cell_total;
++        self.row_count = row_total;
++        self.merge_count = merge_total;
++        true
++    }
++
++    pub(crate) const fn speculative_bytes(&self) -> usize {
++        self.speculative_bytes
++            .saturating_add(self.event_scratch_bytes)
++    }
++
++    pub(crate) const fn release_event_scratch(&mut self) {
++        self.event_scratch_bytes = 0;
++    }
++
++    /// Include the second set of cell/row vectors and semantic materialized
++    /// values that coexist briefly while the shared finalizer builds `Store`.
++    pub(crate) fn final_speculative_bytes(&self) -> usize {
++        const MATERIALIZED_CELL_BYTES: usize = size_of::<crate::cell::Stored>()
++            .saturating_mul(2)
++            .saturating_add(128);
++        const MATERIALIZED_ROW_BYTES: usize = size_of::<row::Stored>()
++            .saturating_mul(2)
++            .saturating_add(64);
++        const CELL_ROW_INDEX_BYTES: usize = 128;
++        // `Store` grows its cell-row index one entry at a time; this covers
++        // the first allocation and allocator/container metadata when the
++        // worksheet has only a few retained cells.
++        const CELL_ROW_INDEX_BASE_BYTES: usize = 1024;
++        // The retained parser strings can coexist with a decoded value and
++        // its immutable `Text(Arc<str>)` during materialization. The event
++        // charges already retain two payload copies for parser-owned String
++        // capacity; this second pair accounts for those finish-time copies
++        // across the complete worksheet, including text held before its End
++        // event.
++        const FINAL_PAYLOAD_COPY_MULTIPLIER: usize = 2;
++        // `merge::Index::new` retains ranges and builds node/span/index
++        // arrays, recursive partition vectors, and validation's map/heap.
++        // A fixed startup allowance covers small tables and container
++        // metadata; the per-range allowance covers the live arrays and
++        // allocator growth overlap without claiming process-wide memory.
++        const MERGE_INDEX_BASE_BYTES: usize = 64 * 1024;
++        const MERGE_INDEX_BYTES: usize = 1024;
++        let cell_row_index_base = (self.cell_count != 0).then_some(CELL_ROW_INDEX_BASE_BYTES);
++        let merge_index_base = (self.merge_count != 0).then_some(MERGE_INDEX_BASE_BYTES);
++        self.speculative_bytes
++            // The final materialized cell Vec has the same small initial
++            // growth behavior as the raw vectors above.
++            .saturating_add(size_of::<crate::cell::Stored>().saturating_mul(2))
++            .saturating_add(
++                self.parser
++                    .cells
++                    .len()
++                    .saturating_mul(MATERIALIZED_CELL_BYTES),
++            )
++            .saturating_add(
++                self.parser
++                    .rows
++                    .len()
++                    .saturating_mul(MATERIALIZED_ROW_BYTES),
++            )
++            .saturating_add(
++                self.payload_bytes
++                    .saturating_mul(FINAL_PAYLOAD_COPY_MULTIPLIER),
++            )
++            .saturating_add(cell_row_index_base.unwrap_or(0))
++            .saturating_add(self.cell_count.saturating_mul(CELL_ROW_INDEX_BYTES))
++            .saturating_add(merge_index_base.unwrap_or(0))
++            .saturating_add(self.merge_count.saturating_mul(MERGE_INDEX_BYTES))
++    }
++
++    pub(crate) fn consume(
++        &mut self,
++        namespace: &ResolveResult<'_>,
++        event: &Event<'_>,
++        decoder: Decoder,
++        resolver: &NamespaceResolver,
++    ) -> Result<()> {
++        Parser::consume_event(
++            &mut self.parser,
++            &mut self.stack,
++            &mut self.closed_root,
++            namespace,
++            event,
++            decoder,
++            resolver,
++        )?;
++        // Read decoded parser fields after consumption. Looking only for raw
++        // bytes would miss equivalent values such as `t="shar&#x65;d"` or
++        // `t="&#x73;"`. Shared formulas are excluded because their translation
++        // strings can grow during finalization; shared-string cells are
++        // excluded because their Store value depends on the package callback.
++        let shared_formula = self.parser.cell.as_ref().is_some_and(|cell| {
++            matches!(
++                cell.formula_kind.as_ref(),
++                Some(RawFormulaKind::Shared { .. })
++            )
++        });
++        let shared_string = self
++            .parser
++            .cell
++            .as_ref()
++            .is_some_and(|cell| cell.cell_type.as_deref() == Some("s"))
++            || self
++                .parser
++                .cells
++                .last()
++                .is_some_and(|cell| cell.cell_type.as_deref() == Some("s"));
++        self.requires_exact_parser |= shared_formula || shared_string;
++        Ok(())
++    }
++
++    pub(crate) const fn requires_exact_parser(&self) -> bool {
++        self.requires_exact_parser
++    }
++
++    pub(crate) fn is_complete(&self) -> bool {
++        self.closed_root && self.stack.is_empty()
++    }
++
++    pub(crate) fn finish<'a, F>(self, strings: F) -> Result<Store>
++    where
++        F: FnOnce() -> Result<Option<&'a [Text]>>,
++    {
++        if !self.is_complete() {
++            return Err(invalid(
++                "worksheet XML has a missing or unterminated SpreadsheetML worksheet root",
++            ));
++        }
++        Parser::finish_store(self.parser, strings)
++    }
++}
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+index 81fa0a883..7119be1e8 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+@@ -15,11 +15,15 @@ mod x14ac;
+ #[cfg(test)]
+ mod tests;
+ 
++pub(crate) use codec::EventParser;
+ pub(crate) use model::merge_successor;
+ pub(crate) use validation::{
+     optional_bool, optional_u32, parse_a1, parse_one_based_row, required_u32,
+ };
+ 
++const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
++const X14AC_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
++
+ use crate::cell::{Store, Text};
+ use crate::error::{Result, invalid};
+ use crate::layout::Defaults;
+@@ -51,6 +55,22 @@ where
+     parsed
+ }
+ 
++/// Cheap, conservative admission for the compactor's provisional parser.
++///
++/// The feed starts with empty x14ac state and sees writer-normalized start
++/// tags. MCE, extension markers, and control tokens therefore disable it
++/// before any provisional semantic allocation begins; the exact output still
++/// receives the normal x14ac/MCE/UTF-8 checks before a feed can be reused.
++pub(crate) fn output_feed_input_eligible(content: &[u8]) -> bool {
++    let limits = litchi_ooxml_common::mce::Limits::default();
++    content.len() <= limits.max_input_bytes
++        && content.len() <= limits.max_output_bytes
++        && memchr::memmem::find(content, MCE_NAMESPACE).is_none()
++        && memchr::memmem::find(content, X14AC_NAMESPACE).is_none()
++        && !x14ac::may_contain_descent(content)
++        && memchr::memmem::find(content, b"AlternateContent").is_none()
++}
++
+ pub(crate) fn parse_defaults(content: &[u8]) -> Result<Option<Defaults>> {
+     let mut descent = x14ac::capture_defaults(content)?;
+     let processed = process_ooxml(content)?;
+diff --git a/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs b/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+index 7de890fd5..998f3111d 100644
+--- a/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
++++ b/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+@@ -1668,11 +1668,24 @@ impl Edit {
+             }
+             let after =
+                 after.ok_or_else(|| invalid("effective worksheet edit produced no bytes"))?;
+-            let compacted =
+-                raw::compact::changed_worksheet(&after, "compact changed worksheet output")?;
+-            let parsed = requires_store_verification
+-                .then(|| raw::worksheet::parse(compacted.bytes(), || base.inner.shared_strings()))
+-                .transpose()?;
++            let mut compacted = if requires_store_verification {
++                raw::compact::changed_worksheet_with_store(
++                    &after,
++                    "compact changed worksheet output",
++                )?
++            } else {
++                raw::compact::changed_worksheet(&after, "compact changed worksheet output")?
++            };
++            let parsed = if requires_store_verification {
++                match compacted.take_store(|| base.inner.shared_strings())? {
++                    Some(store) => Some(store),
++                    None => Some(raw::worksheet::parse(compacted.bytes(), || {
++                        base.inner.shared_strings()
++                    })?),
++                }
++            } else {
++                None
++            };
+             // Resolve web validation after grid parsing to preserve error order.
+             // Compaction may already prove that an ordinary worksheet has no bindings.
+             let (after, parsed_web) = compacted.into_bytes_and_web()?;
+diff --git a/crates/litchi-xlsx/src/workbook/edit/tests/mod.rs b/crates/litchi-xlsx/src/workbook/edit/tests/mod.rs
+index 44ac373f9..26c5db945 100644
+--- a/crates/litchi-xlsx/src/workbook/edit/tests/mod.rs
++++ b/crates/litchi-xlsx/src/workbook/edit/tests/mod.rs
+@@ -2,6 +2,7 @@
+ 
+ mod cells;
+ mod layout;
++mod output_fusion;
+ mod support;
+ mod tabs;
+ mod transactions;
+diff --git a/crates/litchi-xlsx/tests/source_backed_cell_values.rs b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+index 386229a43..84aa2000d 100644
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+@@ -29,6 +29,9 @@ const CALC_CHAIN: &str = "/xl/calcChain.xml";
+ const CALC_CHAIN_CONTENT_TYPE: &str =
+     "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
+ const CALC_CHAIN_REL_ID: &str = "rIdCalculationChain";
++// Exact source publication uses one bounded 64 KiB copy window in addition to
++// the selected Part payloads retained by the managed cache.
++const MANAGED_EXACT_NOOP_SCRATCH_BYTES: u64 = 64 * 1024;
+ static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(1_000);
+ 
+ struct VersionedSource {
+@@ -244,7 +247,7 @@ fn fixture_package(sheet_xml: String, signed: bool) -> OpcPackage {
+         .try_add_part(Box::new(BlobPart::new(
+             PackURI::new(UNUSED).unwrap(),
+             "application/octet-stream".to_owned(),
+-            (0..256 * 1024).map(|value| (value % 251) as u8).collect(),
++            incompressible_payload(256 * 1024),
+         )))
+         .unwrap();
+     package
+@@ -276,6 +279,18 @@ fn fixture(sheet_xml: String, signed: bool) -> Vec<u8> {
+     PackageWriter::to_bytes(&fixture_package(sheet_xml, signed)).unwrap()
+ }
+ 
++fn incompressible_payload(length: usize) -> Vec<u8> {
++    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
++    let mut payload = Vec::with_capacity(length);
++    for _ in 0..length {
++        state = state
++            .wrapping_mul(6_364_136_223_846_793_005)
++            .wrapping_add(1_442_695_040_888_963_407);
++        payload.push((state >> 24).to_le_bytes()[0]);
++    }
++    payload
++}
++
+ fn replace_sheet_with_cancel_on_blob_arc(
+     package: &mut OpcPackage,
+     cancellation_source: CancellationSource,
+@@ -1314,7 +1329,10 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
+ fn managed_scalar_exact_noop_publishes_without_detaching_source() {
+     let bytes = three_cells();
+     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+-    let (budget, _cancellation_source, context) = managed_context(exact);
++    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&bytes, UNUSED) > available_memory);
++    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
++    let (budget, _cancellation_source, context) = managed_context(available_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(bytes.clone())),
+         litchi_xlsx::ReadLimits::default(),
+@@ -1552,7 +1570,10 @@ fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
+     let exact = part_len(&bytes, MAIN)
+         + part_len(&bytes, SHEET)
+         + part_len(&bytes, "/xl/worksheets/sheet2.xml");
+-    let (budget, _cancellation_source, context) = managed_context(exact);
++    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&bytes, UNUSED) > available_memory);
++    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
++    let (budget, _cancellation_source, context) = managed_context(available_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(bytes.clone())),
+         litchi_xlsx::ReadLimits::default(),
+diff --git a/crates/litchi-xlsx/tests/source_backed_row_visibility.rs b/crates/litchi-xlsx/tests/source_backed_row_visibility.rs
+index aaed4a45c..6a5c653d1 100644
+--- a/crates/litchi-xlsx/tests/source_backed_row_visibility.rs
++++ b/crates/litchi-xlsx/tests/source_backed_row_visibility.rs
+@@ -28,6 +28,9 @@ const UNUSED: &str = "/xl/media/unused.bin";
+ // topology metadata. Keep this allowance explicit and separate from payload
+ // capacity, matching the managed XLSX publication contract.
+ const MANAGED_PUBLICATION_PLANNING_HEADROOM: u64 = 64 * 1024;
++// Exact source publication uses one bounded 64 KiB copy window in addition to
++// the selected Part payloads retained by the managed cache.
++const MANAGED_EXACT_NOOP_SCRATCH_BYTES: u64 = 64 * 1024;
+ static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(20_000);
+ 
+ struct VersionedSource {
+@@ -128,7 +131,7 @@ fn fixture(sheet_xml: String, main_type: &str, signed: bool) -> Vec<u8> {
+         .try_add_part(Box::new(BlobPart::new(
+             PackURI::new(UNUSED).unwrap(),
+             "application/octet-stream".to_owned(),
+-            (0..128 * 1024).map(|value| (value % 251) as u8).collect(),
++            incompressible_payload(128 * 1024),
+         )))
+         .unwrap();
+     package
+@@ -156,6 +159,18 @@ fn fixture(sheet_xml: String, main_type: &str, signed: bool) -> Vec<u8> {
+     PackageWriter::to_bytes(&package).unwrap()
+ }
+ 
++fn incompressible_payload(length: usize) -> Vec<u8> {
++    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
++    let mut payload = Vec::with_capacity(length);
++    for _ in 0..length {
++        state = state
++            .wrapping_mul(6_364_136_223_846_793_005)
++            .wrapping_add(1_442_695_040_888_963_407);
++        payload.push((state >> 24).to_le_bytes()[0]);
++    }
++    payload
++}
++
+ fn ordinary(sheet_xml: String) -> Vec<u8> {
+     fixture(sheet_xml, ct::SML_SHEET_MAIN, false)
+ }
+@@ -631,7 +646,10 @@ fn managed_exact_noop_publication_is_byte_exact_and_releases_budget() {
+     );
+     let bytes = ordinary(xml);
+     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+-    let (budget, _cancellation_source, context) = managed_context(exact);
++    let available_memory = exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&bytes, UNUSED) > available_memory);
++    assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
++    let (budget, _cancellation_source, context) = managed_context(available_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(bytes.clone())),
+         litchi_xlsx::ReadLimits::default(),
+@@ -783,7 +801,10 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed()
+         format!(r#"<worksheet xmlns="{SML}"><sheetData><row r="1"/></sheetData></worksheet>"#);
+     let signed = fixture(plain.clone(), ct::SML_SHEET_MAIN, true);
+     let signed_exact = part_len(&signed, MAIN) + part_len(&signed, SHEET);
+-    let (budget, _cancellation_source, context) = managed_context(signed_exact);
++    let signed_noop_memory = signed_exact + MANAGED_EXACT_NOOP_SCRATCH_BYTES;
++    assert!(part_len(&signed, UNUSED) > signed_noop_memory);
++    assert!(u64::try_from(signed.len()).unwrap() > signed_noop_memory);
++    let (budget, _cancellation_source, context) = managed_context(signed_noop_memory);
+     let editor = SourceBackedEditor::from_read_at_with_execution_context(
+         Arc::new(VersionedSource::new(signed.clone())),
+         litchi_xlsx::ReadLimits::default(),
+diff --git a/crates/litchi-xlsx/src/raw/compact_output_tests.rs b/crates/litchi-xlsx/src/raw/compact_output_tests.rs
+new file mode 100644
+index 000000000..0b046eb8a
+--- /dev/null
++++ b/crates/litchi-xlsx/src/raw/compact_output_tests.rs
+@@ -0,0 +1,789 @@
++//! Differential checks for the emitted SpreadsheetML validation boundary.
++//!
++//! These tests keep the exact compacted byte stream as the authority and
++//! compare any parser-facing result with the existing materialized parser.
++//! They intentionally use bounded fixtures so a parser-feed candidate cannot
++//! pass by matching only a decoded source event stream.
++
++use std::fmt::Write as _;
++use std::mem::discriminant;
++
++use litchi_sheet::Cell as Address;
++
++use super::{changed, changed_worksheet_with_store, changed_worksheet_with_store_with_ceiling};
++use crate::cell::{Cell, Store, Value};
++use crate::error::{Error, Result};
++use crate::formula::Cache;
++use crate::raw::worksheet;
++
++const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
++const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
++const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
++const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
++const X15: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
++const XM: &str = "http://schemas.microsoft.com/office/excel/2006/main";
++const WEB_URI: &str = "{F7C9EE02-42E1-4005-9D12-6889AFFD525C}";
++
++fn address(reference: &str) -> Address {
++    Address::from_a1(reference).expect("valid worksheet address")
++}
++
++fn assert_store_equivalent(expected: &Store, actual: &Store) {
++    assert_eq!(expected.extents(), actual.extents());
++    assert_eq!(expected.entries().len(), actual.entries().len());
++    for (expected, actual) in expected.entries().iter().zip(actual.entries()) {
++        assert_eq!(expected.address, actual.address);
++        assert_eq!(expected.cell, actual.cell);
++        assert_eq!(expected.style, actual.style);
++        assert_eq!(expected.shared_string, actual.shared_string);
++        assert_eq!(expected.inline_rich, actual.inline_rich);
++        assert_eq!(expected.formula_range, actual.formula_range);
++        assert_eq!(expected.shared_formula, actual.shared_formula);
++        assert_eq!(expected.cell_metadata, actual.cell_metadata);
++        assert_eq!(expected.value_metadata, actual.value_metadata);
++    }
++    assert_eq!(expected.row_entries(), actual.row_entries());
++    assert_eq!(expected.column_entries(), actual.column_entries());
++    assert_eq!(expected.defaults(), actual.defaults());
++    assert_eq!(expected.merge_ranges(), actual.merge_ranges());
++}
++
++fn parse_store(content: &[u8]) -> Result<Store> {
++    worksheet::parse(content, || Ok(None))
++}
++
++fn compact_bytes(content: &[u8]) -> Result<Vec<u8>> {
++    changed(content, "emitted worksheet test")
++}
++
++fn output_bytes_store_and_web(
++    content: &[u8],
++) -> Result<(Vec<u8>, Option<Store>, crate::web::Bindings)> {
++    let mut output = changed_worksheet_with_store(content, "emitted worksheet test")?;
++    let store = output.take_store(|| Ok(None))?;
++    let (bytes, bindings) = output.into_bytes_and_web()?;
++    Ok((bytes, store, bindings))
++}
++
++fn rich_worksheet() -> Vec<u8> {
++    format!(
++        r#"<?xml version="1.0" encoding="UTF-8"?>
++<q:worksheet xmlns:q="{SML}" xmlns:strict="{STRICT_SML}" q:future="preserve">
++  <q:dimension ref="A1:D3"/>
++  <q:sheetFormatPr defaultRowHeight="15"/>
++  <q:cols><q:col min="3" max="3" width="12" style="1" customWidth="1"/></q:cols>
++  <q:sheetData>
++    <q:row r="1" ht="20" customHeight="1">
++      <q:c r="A1"><q:f t="shared" ref="A1:B1" si="7">B1+$C$1</q:f><q:v><![CDATA[1]]></q:v></q:c>
++      <q:c r="B1"><q:f t="shared" si="7"/><q:v>&#x32;</q:v></q:c>
++      <q:c r="C1" t="inlineStr"><q:is><q:t xml:space="preserve"> café &amp; tea </q:t></q:is></q:c>
++    </q:row>
++    <q:row r="3"><q:c r="D3" t="b"><q:v>1</q:v></q:c></q:row>
++  </q:sheetData>
++  <q:mergeCells count="1"><q:mergeCell ref="A1:B2"/></q:mergeCells>
++  <strict:future strict:opaque="kept"/>
++</q:worksheet>"#,
++        SML = SML,
++        STRICT_SML = STRICT_SML,
++    )
++    .into_bytes()
++}
++
++fn column_name(mut index: usize) -> String {
++    let mut bytes = [0_u8; 3];
++    let mut start = bytes.len();
++    loop {
++        start -= 1;
++        bytes[start] = b'A' + (index % 26) as u8;
++        if index < 26 {
++            break;
++        }
++        index = index / 26 - 1;
++    }
++    String::from_utf8(bytes[start..].to_vec()).expect("ASCII column name")
++}
++
++fn dense_numeric_worksheet() -> Vec<u8> {
++    let columns = (0..256).map(column_name).collect::<Vec<_>>();
++    let mut input = String::with_capacity(2 * 1024 * 1024);
++    write!(
++        input,
++        r#"<worksheet xmlns="{SML}"><dimension ref="A1:IV256"/><sheetData>"#,
++        SML = SML
++    )
++    .expect("worksheet header");
++    for row in 1..=256 {
++        write!(input, r#"<row r="{row}">"#).expect("row start");
++        for (column, name) in columns.iter().enumerate() {
++            let value = (row - 1) * 256 + column;
++            write!(input, r#"<c r="{name}{row}"><v>{value}</v></c>"#).expect("numeric cell");
++        }
++        input.push_str("</row>");
++    }
++    input.push_str("</sheetData></worksheet>");
++    input.into_bytes()
++}
++
++fn shared_formula_worksheet(formula_type: &str, tail: &str) -> Vec<u8> {
++    format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="{formula_type}" ref="A1:B1" si="11">A2+1</f><v>1</v></c><c r="B1"><f t="{formula_type}" si="11"/><v>2</v></c></row></sheetData>{tail}</worksheet>"#,
++        SML = SML,
++        formula_type = formula_type,
++        tail = tail,
++    )
++    .into_bytes()
++}
++
++#[test]
++fn emitted_compaction_bytes_are_exact_and_parser_state_is_semantically_complete() {
++    let input = rich_worksheet();
++    let expected_bytes = compact_bytes(&input).expect("reference compaction");
++    let (actual_bytes, candidate, bindings) =
++        output_bytes_store_and_web(&input).expect("output validation");
++    assert_eq!(
++        actual_bytes, expected_bytes,
++        "candidate must validate emitted bytes"
++    );
++    assert!(bindings.is_empty(), "fixture has no web extensions");
++
++    let expected = parse_store(&expected_bytes).expect("reference output parse");
++    let actual = parse_store(&actual_bytes).expect("candidate output parse");
++    assert_store_equivalent(&expected, &actual);
++    if let Some(candidate) = candidate {
++        assert_store_equivalent(&expected, &candidate);
++    }
++
++    assert!(matches!(
++        actual.get(address("A1")),
++        Some(Cell::Formula(formula))
++            if formula.text() == "B1+$C$1"
++                && matches!(formula.cached().map(Cache::value), Some(Value::Number(value)) if value.as_str() == "1")
++    ));
++    assert!(matches!(
++        actual.get(address("B1")),
++        Some(Cell::Formula(formula)) if formula.text() == "C1+$C$1"
++    ));
++    assert!(matches!(
++        actual.get(address("C1")),
++        Some(Cell::Value(Value::Text(value))) if value.as_str() == " café & tea "
++    ));
++    assert!(matches!(
++        actual.get(address("D3")),
++        Some(Cell::Value(Value::Bool(true)))
++    ));
++    assert_eq!(actual.row_entries().len(), 2);
++    assert_eq!(actual.column_entries().len(), 1);
++    assert_eq!(
++        actual.merge_ranges(),
++        &[litchi_sheet::Rect::from_a1("A1:B2").unwrap()]
++    );
++}
++
++#[test]
++fn finite_speculative_ceiling_drops_feed_after_initial_events_without_changing_output() {
++    let payload = "x".repeat(40_000);
++    let input = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f>A2+1</f><v><![CDATA[1]]></v></c><c r="B1"><v>&#x32;</v></c><c r="C1" t="inlineStr"><is><t xml:space="preserve"> text </t></is></c></row></sheetData><future xml:space="preserve">{payload}</future></worksheet>"#,
++        SML = SML,
++        payload = payload,
++    );
++    let expected_bytes = compact_bytes(input.as_bytes()).expect("reference compaction");
++    let expected = parse_store(&expected_bytes).expect("reference semantic parse");
++
++    let mut ordinary = changed_worksheet_with_store(input.as_bytes(), "ceiling parity")
++        .expect("default candidate compaction");
++    let ordinary_store = ordinary
++        .take_store(|| Ok(None))
++        .expect("default candidate finalization")
++        .expect("ordinary fixture qualifies under the default ceiling");
++    let (ordinary_bytes, ordinary_bindings) = ordinary
++        .into_bytes_and_web()
++        .expect("default web validation");
++    assert_eq!(ordinary_bytes, expected_bytes);
++    assert!(ordinary_bindings.is_empty());
++    assert_store_equivalent(&expected, &ordinary_store);
++    assert!(matches!(
++        ordinary_store.get(address("A1")),
++        Some(Cell::Formula(formula)) if formula.text() == "A2+1"
++    ));
++    assert!(matches!(
++        ordinary_store.get(address("B1")),
++        Some(Cell::Value(Value::Number(value))) if value.as_str() == "2"
++    ));
++    assert!(matches!(
++        ordinary_store.get(address("C1")),
++        Some(Cell::Value(Value::Text(value))) if value.as_str() == " text "
++    ));
++
++    // The constructor's 64 KiB minimum is satisfied, and the first worksheet
++    // events fit. The 40,000-byte preserved text event charges 80,000 bytes
++    // plus the already-live parser state, so this finite ceiling trips during
++    // the feed and silently selects the exact-output fallback.
++    let ceiling = input.len().saturating_add(80 * 1024);
++    let mut finite =
++        changed_worksheet_with_store_with_ceiling(input.as_bytes(), "ceiling parity", ceiling)
++            .expect("finite-ceiling compaction");
++    assert!(
++        finite
++            .take_store(|| Ok(None))
++            .expect("finite-ceiling fallback selection")
++            .is_none(),
++        "speculative budget exhaustion must drop the provisional feed"
++    );
++    let (finite_bytes, finite_bindings) = finite
++        .into_bytes_and_web()
++        .expect("fallback web validation");
++    assert_eq!(finite_bytes, expected_bytes);
++    assert!(finite_bindings.is_empty());
++    let fallback = parse_store(&finite_bytes).expect("exact-output fallback parse");
++    assert_store_equivalent(&expected, &fallback);
++}
++
++#[test]
++fn dense_256_by_256_numeric_output_retains_default_fed_store() {
++    let input = dense_numeric_worksheet();
++    let expected_bytes = compact_bytes(&input).expect("reference compaction");
++    let expected = parse_store(&expected_bytes).expect("reference dense parse");
++
++    let mut output = changed_worksheet_with_store(&input, "dense output parity")
++        .expect("default dense output compaction");
++    let candidate = output
++        .take_store(|| Ok(None))
++        .expect("dense candidate finalization")
++        .expect("default ceiling must retain the dense Store");
++    let (actual_bytes, bindings) = output.into_bytes_and_web().expect("dense web validation");
++    assert_eq!(
++        bindings,
++        crate::raw::web::read(&actual_bytes).expect("dense reference web")
++    );
++    assert!(bindings.is_empty());
++    assert_eq!(actual_bytes, expected_bytes);
++    assert_store_equivalent(&expected, &candidate);
++}
++
++#[test]
++fn escaped_shared_formula_type_matches_literal_and_budget_fallback() {
++    let payload = "x".repeat(40_000);
++    let tail = format!(r#"<future xml:space="preserve">{payload}</future>"#);
++    let literal = shared_formula_worksheet("shared", &tail);
++    let escaped = shared_formula_worksheet("shar&#x65;d", &tail);
++
++    let literal_bytes = compact_bytes(&literal).expect("literal shared formula compaction");
++    let escaped_bytes = compact_bytes(&escaped).expect("escaped shared formula compaction");
++    let literal_store = parse_store(&literal_bytes).expect("literal shared formula parse");
++    let escaped_store = parse_store(&escaped_bytes).expect("escaped shared formula parse");
++    assert_store_equivalent(&literal_store, &escaped_store);
++    assert!(matches!(
++        escaped_store.get(address("A1")),
++        Some(Cell::Formula(formula)) if formula.text() == "A2+1"
++    ));
++    assert!(matches!(
++        escaped_store.get(address("B1")),
++        Some(Cell::Formula(formula)) if formula.text() == "B2+1"
++    ));
++
++    let mut output = changed_worksheet_with_store(&escaped, "escaped shared formula")
++        .expect("escaped shared formula output");
++    let candidate = output
++        .take_store(|| Ok(None))
++        .expect("escaped shared formula finalization");
++    let (actual_bytes, bindings) = output
++        .into_bytes_and_web()
++        .expect("escaped shared formula web validation");
++    assert_eq!(actual_bytes, escaped_bytes);
++    assert!(bindings.is_empty());
++    let actual_store = parse_store(&actual_bytes).expect("escaped shared formula output parse");
++    assert_store_equivalent(&escaped_store, &actual_store);
++    if let Some(candidate) = candidate {
++        assert_store_equivalent(&escaped_store, &candidate);
++    }
++
++    // The finite ceiling admits the initial parser state and worksheet
++    // records, then drops the provisional feed on the preserved tail. The
++    // exact compacted bytes and reference Store remain authoritative.
++    let ceiling = escaped.len().saturating_add(80 * 1024);
++    let mut finite =
++        changed_worksheet_with_store_with_ceiling(&escaped, "escaped shared formula", ceiling)
++            .expect("finite escaped shared formula output");
++    assert!(
++        finite
++            .take_store(|| Ok(None))
++            .expect("finite escaped shared formula finalization")
++            .is_none(),
++        "budget exhaustion must refuse the provisional escaped-formula feed"
++    );
++    let (finite_bytes, finite_bindings) = finite
++        .into_bytes_and_web()
++        .expect("finite escaped shared formula web validation");
++    assert_eq!(finite_bytes, escaped_bytes);
++    assert!(finite_bindings.is_empty());
++    let fallback = parse_store(&finite_bytes).expect("escaped shared formula fallback parse");
++    assert_store_equivalent(&escaped_store, &fallback);
++}
++
++#[test]
++fn shared_string_owner_error_is_typed_and_called_once() {
++    const OWNER_MESSAGE: &str = "shared-string callback sentinel";
++    let input = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>"#,
++        SML = SML,
++    )
++    .into_bytes();
++    let expected_bytes = compact_bytes(&input).expect("shared-string compaction");
++
++    let mut reference_calls = 0;
++    let expected = worksheet::parse(&expected_bytes, || {
++        reference_calls += 1;
++        Err(Error::Invalid(OWNER_MESSAGE.to_owned()))
++    })
++    .err()
++    .expect("reference parser must request the shared-string owner");
++    assert_eq!(reference_calls, 1);
++
++    let mut output = changed_worksheet_with_store(&input, "shared-string owner error")
++        .expect("shared-string output");
++    let mut callback_calls = 0;
++    let actual = match output.take_store(|| {
++        callback_calls += 1;
++        Err(Error::Invalid(OWNER_MESSAGE.to_owned()))
++    }) {
++        Err(error) => error,
++        Ok(Some(_)) => panic!("a failing shared-string owner cannot produce a Store"),
++        Ok(None) => worksheet::parse(output.bytes(), || {
++            callback_calls += 1;
++            Err(Error::Invalid(OWNER_MESSAGE.to_owned()))
++        })
++        .err()
++        .expect("exact-output fallback must request the shared-string owner"),
++    };
++    assert_eq!(
++        callback_calls, 1,
++        "candidate finalization must call the owner once"
++    );
++    assert_eq!(discriminant(&actual), discriminant(&expected));
++    assert_eq!(actual.to_string(), expected.to_string());
++
++    let (actual_bytes, bindings) = output
++        .into_bytes_and_web()
++        .expect("owner error does not invalidate exact output or web phase");
++    assert_eq!(actual_bytes, expected_bytes);
++    assert!(bindings.is_empty());
++}
++
++#[test]
++fn emitted_compaction_preserves_xml_space_cdata_and_general_reference_semantics() {
++    let input = format!(
++        r#"<worksheet xmlns="{SML}">
++  <sheetData>
++    <row r="1">
++      <c r="A1" t="inlineStr"><is><t xml:space="preserve">  a &amp; b  </t></is></c>
++      <c r="B1"><v><![CDATA[1]]>&#x32;</v></c>
++      <c r="C1"><f>SUM(A1:B1)</f><v>3</v></c>
++    </row>
++  </sheetData>
++  <future xml:space="preserve">  unknown  </future>
++</worksheet>"#,
++        SML = SML,
++    )
++    .into_bytes();
++    let expected_bytes = compact_bytes(&input).expect("reference compaction");
++    let (actual_bytes, candidate, bindings) =
++        output_bytes_store_and_web(&input).expect("output validation");
++    assert_eq!(actual_bytes, expected_bytes);
++    assert!(bindings.is_empty());
++
++    let store = parse_store(&actual_bytes).expect("worksheet output parse");
++    assert!(matches!(
++        store.get(address("A1")),
++        Some(Cell::Value(Value::Text(value))) if value.as_str() == "  a & b  "
++    ));
++    assert!(matches!(
++        store.get(address("B1")),
++        Some(Cell::Value(Value::Number(value))) if value.as_str() == "12"
++    ));
++    assert!(matches!(
++        store.get(address("C1")),
++        Some(Cell::Formula(formula)) if formula.text() == "SUM(A1:B1)"
++    ));
++    let text = std::str::from_utf8(&actual_bytes).expect("compacted XML is UTF-8");
++    assert!(text.contains(r#"<future xml:space="preserve">  unknown  </future>"#));
++    assert!(!text.contains("\n  <sheetData>"));
++    let candidate = candidate.expect("plain output should use emitted parser feed");
++    assert_store_equivalent(&store, &candidate);
++}
++
++#[test]
++fn output_reader_aliases_and_strict_namespace_bindings_match_reference() {
++    let plain = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#,
++        SML = SML,
++    );
++    let aliases = format!(
++        r#"<x:worksheet xmlns:x="{SML}" xmlns:q="{SML}" xmlns="urn:other"><q:sheetData><q:row r="1"><q:c r="A1"><q:v>7</q:v></q:c></q:row></q:sheetData></x:worksheet>"#,
++        SML = SML,
++    );
++    let strict = format!(
++        r#"<worksheet xmlns="{STRICT_SML}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#,
++        STRICT_SML = STRICT_SML,
++    );
++
++    let plain_bytes = compact_bytes(plain.as_bytes()).expect("plain compact");
++    let alias_bytes = compact_bytes(aliases.as_bytes()).expect("alias compact");
++    let strict_bytes = compact_bytes(strict.as_bytes()).expect("strict compact");
++    let plain_store = parse_store(&plain_bytes).expect("plain parse");
++    let alias_store = parse_store(&alias_bytes).expect("alias parse");
++    let strict_store = parse_store(&strict_bytes).expect("strict parse");
++    assert_store_equivalent(&plain_store, &alias_store);
++    assert_store_equivalent(&plain_store, &strict_store);
++    let (plain_output, plain_candidate, _) =
++        output_bytes_store_and_web(plain.as_bytes()).expect("plain output validation");
++    let (alias_output, alias_candidate, _) =
++        output_bytes_store_and_web(aliases.as_bytes()).expect("alias output validation");
++    let (strict_output, strict_candidate, _) =
++        output_bytes_store_and_web(strict.as_bytes()).expect("strict output validation");
++    assert_eq!(plain_output, plain_bytes);
++    assert_eq!(alias_output, alias_bytes);
++    assert_eq!(strict_output, strict_bytes);
++    assert_store_equivalent(
++        &plain_store,
++        &plain_candidate.expect("plain output feed is eligible"),
++    );
++    assert_store_equivalent(
++        &alias_store,
++        &alias_candidate.expect("namespace alias output feed is eligible"),
++    );
++    assert_store_equivalent(
++        &strict_store,
++        &strict_candidate.expect("strict namespace output feed is eligible"),
++    );
++    assert!(matches!(
++        alias_store.get(address("A1")),
++        Some(Cell::Value(Value::Number(value))) if value.as_str() == "7"
++    ));
++}
++
++#[test]
++fn nested_namespace_rebindings_preserve_exact_output_store_and_web_result() {
++    let input = format!(
++        r#"<q:worksheet xmlns:q="{SML}" xmlns:a="urn:outer" q:rootFlag="yes">
++  <q:sheetFormatPr defaultRowHeight="15" a:formatFlag="one"/>
++  <q:sheetData>
++    <q:row r="1" a:rowFlag="yes">
++      <q:c r="A1" a:cellFlag="outer"><q:v>7</q:v></q:c>
++      <holder xmlns="" xmlns:q="urn:rebound" xmlns:a="urn:inner" a:holderFlag="yes">
++        <q:item a:itemFlag="rebound"/>
++        <item a:itemFlag="reset"/>
++      </holder>
++      <q:scope xmlns:q="urn:empty" xmlns:a="urn:empty-attr" a:scopeFlag="empty" q:kind="empty"/>
++      <q:c r="B1"><q:v>8</q:v></q:c>
++    </q:row>
++  </q:sheetData>
++</q:worksheet>"#,
++        SML = SML,
++    )
++    .into_bytes();
++    let expected_bytes = compact_bytes(&input).expect("namespace-scope compaction");
++    let expected = parse_store(&expected_bytes).expect("namespace-scope reference parse");
++    let expected_web = crate::raw::web::read(&expected_bytes).expect("namespace-scope web parse");
++    assert!(expected_web.is_empty());
++
++    let mut output = changed_worksheet_with_store(&input, "namespace-scope output")
++        .expect("namespace-scope output");
++    let candidate = output
++        .take_store(|| Ok(None))
++        .expect("namespace-scope parser finalization")
++        .expect("ordinary namespace rebinding remains feed-eligible");
++    let (actual_bytes, actual_web) = output
++        .into_bytes_and_web()
++        .expect("namespace-scope web validation");
++    assert_eq!(actual_bytes, expected_bytes);
++    assert_eq!(actual_web, expected_web);
++    assert_store_equivalent(&expected, &candidate);
++    assert!(matches!(
++        candidate.get(address("A1")),
++        Some(Cell::Value(Value::Number(value))) if value.as_str() == "7"
++    ));
++    assert!(matches!(
++        candidate.get(address("B1")),
++        Some(Cell::Value(Value::Number(value))) if value.as_str() == "8"
++    ));
++}
++
++#[test]
++fn x14ac_and_mce_output_uses_reference_fallback_and_preserves_typed_values() {
++    let input = format!(
++        r#"<x:worksheet xmlns:x="{SML}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac"><x:sheetFormatPr defaultRowHeight="15" x14ac:dyDescent="0.25"/><x:sheetData><x:row r="2" x14ac:dyDescent="0.35"><x:c r="A2"><x:v>5</x:v></x:c></x:row></x:sheetData></x:worksheet>"#,
++        SML = SML,
++        MC = MC,
++        X14AC = X14AC,
++    );
++    let expected = compact_bytes(input.as_bytes()).expect("reference compaction");
++    let mut output = changed_worksheet_with_store(input.as_bytes(), "x14ac worksheet test")
++        .expect("compaction with extension metadata");
++    assert!(
++        output
++            .take_store(|| Ok(None))
++            .expect("extension fallback probe")
++            .is_none(),
++        "x14ac/MCE output must not publish speculative parser state"
++    );
++    let (actual, bindings) = output
++        .into_bytes_and_web()
++        .expect("fallback web validation");
++    assert_eq!(actual, expected);
++    assert_eq!(
++        bindings,
++        crate::raw::web::read(&actual).expect("reference web result")
++    );
++    assert!(bindings.is_empty(), "fixture has no web bindings");
++    let store = parse_store(&actual).expect("x14ac output parse");
++    assert!(matches!(
++        store.get(address("A2")),
++        Some(Cell::Value(Value::Number(value))) if value.as_str() == "5"
++    ));
++    assert_eq!(store.row_entries().len(), 1);
++    assert_eq!(
++        store
++            .defaults()
++            .and_then(|defaults| defaults.descent().map(|v| v.get())),
++        Some(0.25)
++    );
++}
++
++#[test]
++fn attribute_quote_forms_are_checked_against_emitted_output() {
++    let apostrophe = format!(
++        r#"<worksheet xmlns="{SML}" marker="owner's value"><sheetData/></worksheet>"#,
++        SML = SML,
++    );
++    let double_quote = format!(
++        r#"<worksheet xmlns="{SML}" marker='contains "quotes"'><sheetData/></worksheet>"#,
++        SML = SML,
++    );
++
++    let mut apostrophe_output = changed_worksheet_with_store(apostrophe.as_bytes(), "quote test")
++        .expect("double-quoted apostrophe is valid XML");
++    assert!(
++        apostrophe_output
++            .take_store(|| Ok(None))
++            .expect("apostrophe probe")
++            .is_none()
++    );
++    assert!(!apostrophe_output.web.is_proven());
++    let apostrophe_expected = compact_bytes(apostrophe.as_bytes()).expect("apostrophe compact");
++    let (apostrophe_actual, expected_bindings) = apostrophe_output
++        .into_bytes_and_web()
++        .expect("apostrophe web fallback");
++    assert_eq!(apostrophe_actual, apostrophe_expected);
++    assert_eq!(
++        expected_bindings,
++        crate::raw::web::read(&apostrophe_actual).expect("reference web result")
++    );
++    assert!(expected_bindings.is_empty());
++
++    let mut double_quote_output =
++        changed_worksheet_with_store(double_quote.as_bytes(), "quote test")
++            .expect("source quote form can be read before output validation");
++    assert!(
++        double_quote_output
++            .take_store(|| Ok(None))
++            .expect("double-quote probe")
++            .is_none()
++    );
++    assert!(!double_quote_output.web.is_proven());
++    let double_quote_expected = compact_bytes(double_quote.as_bytes()).expect("quote compact");
++    let (double_quote_actual, double_quote_bindings) = double_quote_output
++        .into_bytes_and_web()
++        .expect("web reader follows its reference owner for unknown root attributes");
++    assert_eq!(double_quote_actual, double_quote_expected);
++    assert_eq!(
++        double_quote_bindings,
++        crate::raw::web::read(&double_quote_actual).expect("reference web result")
++    );
++    assert!(
++        std::str::from_utf8(&double_quote_actual)
++            .expect("compacted bytes")
++            .contains(r#"marker="contains "quotes""#),
++        "writer normalization retains the malformed unescaped double quotes"
++    );
++}
++
++#[test]
++fn malformed_output_tail_wins_over_grid_and_web_errors() {
++    let input = format!(
++        r#"<worksheet xmlns="{SML}" xmlns:x15="{X15}"><sheetData><row r="not-a-row"/></sheetData><extLst><ext uri="{WEB_URI}"><x15:webExtensions/></ext></extLst><tail></wrong></worksheet>"#,
++        SML = SML,
++        X15 = X15,
++        WEB_URI = WEB_URI,
++    );
++    let output = changed_worksheet_with_store(input.as_bytes(), "phase test")
++        .err()
++        .expect("compaction must reject the malformed tail first");
++    assert!(matches!(output, Error::Xml(_)));
++    assert!(output.to_string().contains("malformed"));
++
++    let grid_only = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="not-a-row"/></sheetData></worksheet>"#,
++        SML = SML,
++    );
++    let grid_error = parse_store(&compact_bytes(grid_only.as_bytes()).expect("compact grid input"))
++        .expect_err("invalid row must remain a grid error");
++    assert_eq!(
++        discriminant(&grid_error),
++        discriminant(&Error::Invalid(String::new()))
++    );
++
++    let web_only = format!(
++        r#"<worksheet xmlns="{SML}" xmlns:x15="{X15}"><sheetData/><extLst><ext uri="{WEB_URI}"><x15:webExtensions/></ext></extLst></worksheet>"#,
++        SML = SML,
++        X15 = X15,
++        WEB_URI = WEB_URI,
++    );
++    let web_expected_bytes = compact_bytes(web_only.as_bytes()).expect("web compact");
++    let web_expected_error =
++        crate::raw::web::read(&web_expected_bytes).expect_err("reference web error");
++    let web_output = changed_worksheet_with_store(web_only.as_bytes(), "phase test")
++        .expect("web error belongs after compaction");
++    let web_error = web_output
++        .into_bytes_and_web()
++        .expect_err("web extension fixture is intentionally incomplete");
++    assert_eq!(discriminant(&web_error), discriminant(&web_expected_error));
++    assert_eq!(web_error.to_string(), web_expected_error.to_string());
++}
++
++#[test]
++fn provisional_parser_budget_errors_drop_the_candidate_and_reparse_exact_output() {
++    let value = "7".repeat(32_768);
++    let input = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>{value}</v></c></row></sheetData></worksheet>"#,
++        SML = SML,
++        value = value,
++    );
++    let mut output = changed_worksheet_with_store(input.as_bytes(), "candidate budget test")
++        .expect("compaction remains independent of worksheet payload validation");
++    assert!(
++        output
++            .take_store(|| Ok(None))
++            .expect("provisional parser failure must be discarded")
++            .is_none(),
++        "an owner-boundary payload error cannot publish a partial Store"
++    );
++    let (bytes, bindings) = output
++        .into_bytes_and_web()
++        .expect("web proof still follows compaction");
++    assert!(bindings.is_empty());
++    let exact_error = parse_store(&bytes).expect_err("exact output retains the payload error");
++    assert!(exact_error.to_string().contains("32767"));
++    assert!(matches!(exact_error, Error::Invalid(_)));
++}
++
++#[test]
++fn provisional_grid_errors_fall_back_with_the_reference_typed_error() {
++    let input = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="not-a-row"/></sheetData></worksheet>"#,
++        SML = SML,
++    );
++    let expected_bytes = compact_bytes(input.as_bytes()).expect("reference compaction");
++    let expected = parse_store(&expected_bytes).expect_err("reference grid error");
++
++    let mut output = changed_worksheet_with_store(input.as_bytes(), "grid fallback test")
++        .expect("compaction succeeds before grid validation");
++    assert!(
++        output
++            .take_store(|| Ok(None))
++            .expect("provisional grid error is discarded")
++            .is_none()
++    );
++    let (actual_bytes, bindings) = output.into_bytes_and_web().expect("web remains later");
++    assert!(bindings.is_empty());
++    assert_eq!(actual_bytes, expected_bytes);
++    let actual = parse_store(&actual_bytes).expect_err("exact output grid error");
++    assert_eq!(discriminant(&actual), discriminant(&expected));
++    assert_eq!(actual.to_string(), expected.to_string());
++}
++
++#[test]
++fn parser_limit_is_owned_by_depth_and_payload_checks_without_ordinary_event_cap() {
++    let mut depth = format!(r#"<worksheet xmlns="{SML}">"#, SML = SML);
++    for _ in 0..256 {
++        depth.push_str("<future>");
++    }
++    depth.push_str("<sheetData/>");
++    for _ in 0..256 {
++        depth.push_str("</future>");
++    }
++    depth.push_str("</worksheet>");
++    let depth_error = parse_store(&compact_bytes(depth.as_bytes()).expect("depth compaction"))
++        .expect_err("worksheet depth owner must reject 257 nested levels");
++    assert!(depth_error.to_string().contains("levels"));
++
++    let valid_many_events = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>{}</worksheet>"#,
++        "<future/>".repeat(8_192),
++        SML = SML,
++    );
++    let bytes = compact_bytes(valid_many_events.as_bytes()).expect("many harmless XML events");
++    parse_store(&bytes).expect("ordinary worksheet parser has no invented event cap");
++    let (output, candidate, _) =
++        output_bytes_store_and_web(valid_many_events.as_bytes()).expect("many-event output");
++    assert_eq!(output, bytes);
++    assert!(
++        candidate.is_some(),
++        "harmless events must not exhaust a speculative budget"
++    );
++}
++
++#[test]
++fn invalid_utf8_in_text_is_rejected_by_worksheet_parser_after_compaction() {
++    let mut input = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>"#,
++        SML = SML
++    )
++    .into_bytes();
++    input.push(0xff);
++    input.extend_from_slice(b"</v></c></row></sheetData></worksheet>");
++    let bytes = compact_bytes(&input).expect("compactor preserves text bytes");
++    assert!(
++        bytes.contains(&0xff),
++        "the compacted stream remains byte exact"
++    );
++    let error = parse_store(&bytes).expect_err("worksheet parser owns text UTF-8 decoding");
++    assert!(matches!(error, Error::Invalid(_)));
++}
++
++#[test]
++fn compacted_output_web_probe_matches_full_reader_for_empty_and_nonempty_bindings() {
++    let ordinary = format!(
++        r#"<worksheet xmlns="{SML}"><sheetData/></worksheet>"#,
++        SML = SML,
++    );
++    let ordinary_output =
++        changed_worksheet_with_store(ordinary.as_bytes(), "web parity").expect("ordinary compact");
++    assert!(ordinary_output.web.is_proven());
++    let (ordinary_actual, ordinary_bindings) = ordinary_output
++        .into_bytes_and_web()
++        .expect("empty web result");
++    assert_eq!(
++        ordinary_bindings,
++        crate::raw::web::read(&ordinary_actual).unwrap()
++    );
++
++    let bound = format!(
++        r#"<worksheet xmlns="{SML}" xmlns:x15="{X15}" xmlns:xm="{XM}"><sheetData/><extLst><ext uri="{WEB_URI}"><x15:webExtensions><x15:webExtension appRef="dashboard"><xm:f>Sheet1!A1:B2</xm:f></x15:webExtension></x15:webExtensions></ext></extLst></worksheet>"#,
++        SML = SML,
++        X15 = X15,
++        XM = XM,
++        WEB_URI = WEB_URI,
++    );
++    let bound_output =
++        changed_worksheet_with_store(bound.as_bytes(), "web parity").expect("bound compact");
++    assert!(!bound_output.web.is_proven());
++    let expected = compact_bytes(bound.as_bytes()).expect("bound reference compact");
++    let (actual, actual_bindings) = bound_output.into_bytes_and_web().expect("bound web result");
++    assert_eq!(actual, expected);
++    assert_eq!(actual_bindings, crate::raw::web::read(&actual).unwrap());
++    assert_eq!(
++        actual_bindings.get("dashboard").unwrap().formula(),
++        "Sheet1!A1:B2"
++    );
++}
+diff --git a/crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs b/crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs
+new file mode 100644
+index 000000000..51462a3b7
+--- /dev/null
++++ b/crates/litchi-xlsx/src/workbook/edit/tests/output_fusion.rs
+@@ -0,0 +1,203 @@
++//! Public commit-path checks for the changed worksheet output handoff.
++
++use super::super::*;
++use super::support::{part_text, styled_workbook};
++
++use crate::cell::Value;
++use crate::error::Error;
++
++const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
++const X15: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
++const XM: &str = "http://schemas.microsoft.com/office/excel/2006/main";
++const WEB_URI: &str = "{F7C9EE02-42E1-4005-9D12-6889AFFD525C}";
++
++fn workbook_with_sheet(xml: &[u8]) -> Workbook {
++    let source = Workbook::new().expect("baseline workbook");
++    let mut package = source.inner.package.clone();
++    package
++        .get_part_mut(&source.inner.sheets[0].part_uri)
++        .expect("worksheet part")
++        .set_blob(xml.to_vec());
++    Workbook::from_package(package).expect("worksheet workbook")
++}
++
++fn source_with_unknown_tail() -> Workbook {
++    workbook_with_sheet(
++        format!(
++            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><f>A1*2</f><v>14</v></c></row></sheetData><future marker="source's spelling"/></worksheet>"#,
++            SML = SML,
++        )
++        .as_bytes(),
++    )
++}
++
++fn invalid_style_with_valid_web() -> Workbook {
++    let source = styled_workbook();
++    let mut package = source.inner.package.clone();
++    package
++        .get_part_mut(&source.inner.sheets[0].part_uri)
++        .expect("worksheet part")
++        .set_blob(
++            format!(
++                r#"<worksheet xmlns="{SML}" xmlns:x15="{X15}" xmlns:xm="{XM}"><sheetData><row r="1"><c r="A1" s="99"><v>1</v></c></row></sheetData><extLst><ext uri="{WEB_URI}"><x15:webExtensions><x15:webExtension appRef="dashboard"><xm:f>Sheet1!A1</xm:f></x15:webExtension></x15:webExtensions></ext></extLst></worksheet>"#,
++                SML = SML,
++                X15 = X15,
++                XM = XM,
++                WEB_URI = WEB_URI,
++            )
++            .into_bytes(),
++        );
++    Workbook::from_package(package).expect("invalid-style workbook")
++}
++
++#[test]
++fn ineffective_cell_edit_keeps_source_bytes_and_patch_identity() {
++    let source = source_with_unknown_tail();
++    let source_bytes = source.to_plain_bytes().expect("source bytes");
++    let source_sheet = part_text(&source, "/xl/worksheets/sheet1.xml").to_owned();
++
++    let mut edit = source.edit().expect("edit");
++    edit.sheet("Sheet1")
++        .expect("sheet lookup")
++        .expect("worksheet")
++        .set("A1", 7_i32)
++        .expect("same value");
++    let committed = edit.commit().expect("no-op commit");
++
++    assert!(committed.patch().is_empty());
++    assert_eq!(
++        part_text(committed.workbook(), "/xl/worksheets/sheet1.xml"),
++        source_sheet
++    );
++    assert_eq!(
++        committed.workbook().to_plain_bytes().expect("no-op bytes"),
++        source_bytes
++    );
++}
++
++#[test]
++fn changed_output_reopens_with_values_and_formula_and_round_trips_inverse() {
++    let source = source_with_unknown_tail();
++    let source_bytes = source.to_plain_bytes().expect("source bytes");
++
++    let mut edit = source.edit().expect("edit");
++    edit.sheet("Sheet1")
++        .expect("sheet lookup")
++        .expect("worksheet")
++        .set("A1", 9_i32)
++        .expect("changed value");
++    let committed = edit.commit().expect("changed commit");
++    let sheet = committed
++        .workbook()
++        .sheet("Sheet1")
++        .expect("sheet lookup")
++        .expect("worksheet");
++    assert!(matches!(
++        sheet.cell("A1").expect("A1").stored(),
++        Some(Cell::Value(Value::Number(value))) if value.as_str() == "9"
++    ));
++    assert!(matches!(
++        sheet.cell("B1").expect("B1").stored(),
++        Some(Cell::Formula(formula)) if formula.text() == "A1*2"
++    ));
++    let committed_bytes = committed
++        .workbook()
++        .to_plain_bytes()
++        .expect("committed bytes");
++    assert_ne!(committed_bytes, source_bytes);
++    assert_eq!(
++        source.to_plain_bytes().expect("source remains unchanged"),
++        source_bytes
++    );
++
++    let restored = committed
++        .workbook()
++        .apply(&committed.patch().inverse())
++        .expect("inverse apply");
++    assert_eq!(
++        restored
++            .workbook()
++            .to_plain_bytes()
++            .expect("restored bytes"),
++        source_bytes
++    );
++    let replayed = source.apply(committed.patch()).expect("forward replay");
++    assert_eq!(
++        replayed
++            .workbook()
++            .to_plain_bytes()
++            .expect("replayed bytes"),
++        committed_bytes
++    );
++}
++
++#[test]
++fn web_output_validation_remains_before_style_validation() {
++    let source = invalid_style_with_valid_web();
++    let mut edit = source.edit().expect("edit");
++    edit.sheet("Sheet1")
++        .expect("sheet lookup")
++        .expect("worksheet")
++        .set("A1", 2_i32)
++        .expect("changed value");
++    let error = edit.commit().expect_err("invalid style must be rejected");
++    assert!(matches!(
++        error,
++        Error::Invalid(message) if message.contains("shared style 99")
++    ));
++}
++
++#[test]
++fn exactly_4096_cells_stay_within_the_validated_store_handoff() {
++    let source = Workbook::new().expect("baseline workbook");
++    let mut edit = source.edit().expect("edit");
++    {
++        let mut sheet = edit
++            .sheet("Sheet1")
++            .expect("sheet lookup")
++            .expect("worksheet");
++        for index in 0..4_096_u32 {
++            sheet
++                .set(
++                    (index / 64, index % 64),
++                    i32::try_from(index).expect("bounded cell"),
++                )
++                .expect("cell edit");
++        }
++    }
++    let committed = edit.commit().expect("4096-cell commit");
++    let xml = part_text(committed.workbook(), "/xl/worksheets/sheet1.xml");
++    assert!(
++        xml.len() <= 1_048_576,
++        "fixture must exercise the cell owner"
++    );
++    assert!(
++        committed.workbook().inner.sheets[0].cells.get().is_some(),
++        "the 4096-cell result is eligible for validated Store handoff"
++    );
++}
++
++#[test]
++fn a_4096_cell_output_over_1mib_drops_the_validated_store_handoff() {
++    let source = Workbook::new().expect("baseline workbook");
++    let mut edit = source.edit().expect("edit");
++    {
++        let mut sheet = edit
++            .sheet("Sheet1")
++            .expect("sheet lookup")
++            .expect("worksheet");
++        for index in 0..4_096_u32 {
++            let value = format!("{index:04}:{}", "x".repeat(300));
++            sheet
++                .set((index / 64, index % 64), value)
++                .expect("cell edit");
++        }
++    }
++    let committed = edit.commit().expect("large 4096-cell commit");
++    let xml = part_text(committed.workbook(), "/xl/worksheets/sheet1.xml");
++    assert!(xml.len() > 1_048_576, "fixture must cross the byte owner");
++    assert!(
++        committed.workbook().inner.sheets[0].cells.get().is_none(),
++        "the 1 MiB owner boundary must prevent Store retention"
++    );
++}

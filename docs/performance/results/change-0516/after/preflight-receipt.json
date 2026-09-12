@@ -1,0 +1,38 @@
+{
+  "stage": "after",
+  "command": [
+    "/usr/bin/time",
+    "-v",
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0516/after/litchi-perf-baseline",
+    "--case",
+    "xlsx_one_cell_commit,xlsx_one_percent_commit,xlsx_one_cell_commit_save,xlsx_one_percent_commit_save",
+    "--xlsx-shape",
+    "tiny,medium,dense-wide",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/after/preflight-report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0516/after/preflight-catalog.json"
+  ],
+  "started_utc": "2026-09-12T01:03:08.702201+00:00",
+  "elapsed_seconds": 2.4256856519932626,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "active_source_roles": [
+    "after"
+  ],
+  "source_manifest_sha256": "38007ba3313a420bf1f5823fa8aafb2232d9f3f74bc0874ab416e302263b1df6",
+  "binary_sha256": "7287f108b2fa8b9810d34896b893c9a0b025e8e96aeab39ac7812b2273919e07",
+  "scope": "Existing native commit or commit+save clock; setup, expected output, sink reservation, oracles and returned-result drop excluded",
+  "artifacts": {
+    "preflight-report.json": "1b196704f677b259a5e05b626ea5a0c44f5f2e86e85ddd5bd75488e1e395ec02",
+    "preflight-catalog.json": "2b58a5e6a6c054c0f29b4d95b72381b95c544d6e2b49407f4fa62ae521254ddc",
+    "preflight.log": "3596b833b2ec3de005497061e811267f4411937d57d1472d3d3602fa7ca9523d"
+  }
+}

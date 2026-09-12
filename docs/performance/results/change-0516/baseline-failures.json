@@ -1,0 +1,33 @@
+{
+  "tests": [
+    "managed_scalar_exact_noop_publishes_without_detaching_source",
+    "managed_multi_sheet_exact_noop_publishes_without_detaching_sources"
+  ],
+  "reference_receipt": "before/xlsx-source-backed-values-receipt.json",
+  "candidate_receipt": "fourth-unit/xlsx-features-retry-receipt.json",
+  "same_typed_errors": true,
+  "observed_and_limit": [
+    [
+      "66196",
+      "660"
+    ],
+    [
+      "66535",
+      "999"
+    ]
+  ],
+  "diagnosis": "Four stale fixtures omitted the documented 64 KiB exact-source copy scratch. Corrected fixtures retain the no-detachment proof using incompressible untouched members and archives larger than the total budget.",
+  "additional_tests": [
+    "managed_exact_noop_publication_is_byte_exact_and_releases_budget",
+    "managed_signature_noop_and_changed_protection_contracts_remain_fail_closed"
+  ],
+  "fixed_source_epoch": "baseline-tests",
+  "fixed_suite_receipt": "baseline-tests/xlsx-features-receipt.json",
+  "fixed_suite": {
+    "groups": 59,
+    "passed": 1263,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0
+  }
+}

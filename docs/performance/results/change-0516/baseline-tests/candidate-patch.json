@@ -1,0 +1,15 @@
+{
+  "base_revision": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+  "paths": [
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs",
+    "crates/litchi-xlsx/tests/source_backed_row_visibility.rs"
+  ],
+  "candidate_file_sha256": {
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs": "7ae1f26a2965ee0d6ccb67617b288b232de5668dc9bd51b26e0b7e8684faa00a",
+    "crates/litchi-xlsx/tests/source_backed_row_visibility.rs": "2a1b9631a6f4e642bf29e096193ef12feff6c9ae9389f4a1d2a40da574600f32"
+  },
+  "patch_sha256": "57c870811b9ad33d7146682d76320f909124329cf77605a74828f342509a4079",
+  "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+  "scope": "Independent test-only repair of four stale publication scratch budgets; production unchanged fromcontrol",
+  "retained_test_fix": true
+}

@@ -1,0 +1,1015 @@
+{
+  "schema_version": 1,
+  "probe": "litchi-xlsx-public-commit-fallback-guard-v1",
+  "corpus_variant": {
+    "name": "numeric-two-sheet-public-default-descent-x14ac-v1",
+    "source_generator": "public Workbook/Edit two-sheet numeric generator",
+    "default_height": 15.0,
+    "default_descent": 0.2,
+    "metadata_application": "public WorksheetEdit::defaults().height(15).descent(0.2) before initial commit"
+  },
+  "timer_scope": "Edit::commit only; fresh Workbook open, complete public Store warming, edit preparation, output serialization, source-marker/readback/cell oracles, and Commit/View drop are outside the clock",
+  "allocation": {
+    "binary": "litchi-xlsx-commit-guard",
+    "allocator": "Rust system allocator",
+    "instrumentation": "none",
+    "counter_revision": null
+  },
+  "samples": 20,
+  "warmups": 2,
+  "shapes": [
+    {
+      "corpus_variant": "numeric-two-sheet-public-default-descent-x14ac-v1",
+      "shape": "tiny",
+      "sheet_count": 2,
+      "rows_per_sheet": 8,
+      "columns_per_sheet": 8,
+      "cells": 128,
+      "one_percent_update_count": 2,
+      "corpus_bytes": 3221,
+      "corpus_sha256": "cf6f7d69f9ab031b9ff7426879b4c7e082a38deea4380887989c1d69c4546a7a",
+      "source_markers": {
+        "worksheet_parts_checked": 2,
+        "x14ac_namespace_bindings": 2,
+        "mce_namespace_bindings": 2,
+        "mce_ignorable_attributes": 2,
+        "dy_descent_attributes": 2
+      },
+      "descent_readback": {
+        "expected": 0.2,
+        "sheets_checked": 2,
+        "all_sheets_match": true
+      },
+      "scenarios": [
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            512992,
+            500052,
+            495552,
+            490862,
+            485872,
+            486722,
+            485911,
+            487972,
+            496462,
+            491672,
+            488472,
+            492622,
+            482151,
+            479932,
+            479492,
+            482202,
+            486822,
+            495382,
+            489052,
+            490201
+          ],
+          "stats": {
+            "min_ns": 479492,
+            "p50_ns": 488472,
+            "p95_ns": 500052,
+            "p99_ns": 500052,
+            "max_ns": 512992,
+            "mean_ns": 490019.85
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 2,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            950554,
+            945574,
+            941503,
+            952564,
+            943523,
+            941094,
+            954514,
+            953174,
+            944594,
+            946224,
+            935014,
+            940294,
+            922253,
+            933613,
+            931244,
+            921053,
+            944844,
+            920713,
+            951294,
+            933454
+          ],
+          "stats": {
+            "min_ns": 920713,
+            "p50_ns": 941503,
+            "p95_ns": 953174,
+            "p99_ns": 953174,
+            "max_ns": 954514,
+            "mean_ns": 940354.7
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        }
+      ]
+    },
+    {
+      "corpus_variant": "numeric-two-sheet-public-default-descent-x14ac-v1",
+      "shape": "medium",
+      "sheet_count": 2,
+      "rows_per_sheet": 32,
+      "columns_per_sheet": 32,
+      "cells": 2048,
+      "one_percent_update_count": 21,
+      "corpus_bytes": 8866,
+      "corpus_sha256": "63f7b3db7fddc4908b026f93a1a6182502b077171fe0b8e5cd37c3a112658434",
+      "source_markers": {
+        "worksheet_parts_checked": 2,
+        "x14ac_namespace_bindings": 2,
+        "mce_namespace_bindings": 2,
+        "mce_ignorable_attributes": 2,
+        "dy_descent_attributes": 2
+      },
+      "descent_readback": {
+        "expected": 0.2,
+        "sheets_checked": 2,
+        "all_sheets_match": true
+      },
+      "scenarios": [
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            6300294,
+            6282054,
+            6448605,
+            6292994,
+            6250894,
+            6323074,
+            6322704,
+            6275554,
+            6302434,
+            6429385,
+            6191413,
+            6181714,
+            6208434,
+            6194554,
+            6233564,
+            6220624,
+            6160543,
+            6156433,
+            6191813,
+            6147624
+          ],
+          "stats": {
+            "min_ns": 6147624,
+            "p50_ns": 6233564,
+            "p95_ns": 6429385,
+            "p99_ns": 6429385,
+            "max_ns": 6448605,
+            "mean_ns": 6255735.4
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 21,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            12458478,
+            12433448,
+            12329578,
+            12419067,
+            12488028,
+            12357747,
+            12424748,
+            12500278,
+            12560318,
+            12634429,
+            12537658,
+            12630288,
+            12646419,
+            12666888,
+            12603748,
+            12526968,
+            12566288,
+            12620818,
+            12639069,
+            12665978
+          ],
+          "stats": {
+            "min_ns": 12329578,
+            "p50_ns": 12537658,
+            "p95_ns": 12665978,
+            "p99_ns": 12665978,
+            "max_ns": 12666888,
+            "mean_ns": 12535512.05
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        }
+      ]
+    },
+    {
+      "corpus_variant": "numeric-two-sheet-public-default-descent-x14ac-v1",
+      "shape": "dense-wide",
+      "sheet_count": 2,
+      "rows_per_sheet": 256,
+      "columns_per_sheet": 256,
+      "cells": 131072,
+      "one_percent_update_count": 1311,
+      "corpus_bytes": 384944,
+      "corpus_sha256": "1b0fc05fe0620473eee84d73a1262ee5c6f325637d7d2c70ac3ad83e3893c035",
+      "source_markers": {
+        "worksheet_parts_checked": 2,
+        "x14ac_namespace_bindings": 2,
+        "mce_namespace_bindings": 2,
+        "mce_ignorable_attributes": 2,
+        "dy_descent_attributes": 2
+      },
+      "descent_readback": {
+        "expected": 0.2,
+        "sheets_checked": 2,
+        "all_sheets_match": true
+      },
+      "scenarios": [
+        {
+          "scenario": "warm-changed-one-cell",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            385212084,
+            384423441,
+            387996155,
+            391886381,
+            387911355,
+            384340581,
+            389904363,
+            387643658,
+            384422816,
+            382362868,
+            378076870,
+            381091762,
+            388839123,
+            391152502,
+            389207174,
+            385629540,
+            386293443,
+            382323178,
+            387228827,
+            382310307
+          ],
+          "stats": {
+            "min_ns": 378076870,
+            "p50_ns": 385629540,
+            "p95_ns": 391152502,
+            "p99_ns": 391152502,
+            "max_ns": 391886381,
+            "mean_ns": 385912821.4
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        },
+        {
+          "scenario": "warm-changed-one-percent",
+          "warm_store": true,
+          "changed": true,
+          "update_count": 1311,
+          "warmup_iterations": 2,
+          "sample_count": 20,
+          "sample_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ],
+          "elapsed_ns": [
+            773266519,
+            763367475,
+            757998044,
+            769121127,
+            767379220,
+            770074991,
+            769469688,
+            772767217,
+            777919096,
+            776608191,
+            773232929,
+            769544761,
+            770354356,
+            755633598,
+            792973315,
+            791528038,
+            766020368,
+            777355123,
+            774892158,
+            775941321
+          ],
+          "stats": {
+            "min_ns": 755633598,
+            "p50_ns": 770354356,
+            "p95_ns": 791528038,
+            "p99_ns": 791528038,
+            "max_ns": 792973315,
+            "mean_ns": 772272376.75
+          },
+          "allocation_samples": [
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            },
+            {
+              "status": "unavailable",
+              "scope": "operation_global_system_allocator"
+            }
+          ],
+          "oracle": {
+            "iterations_checked": 22,
+            "patch_empty": false,
+            "source_bytes_equal": null,
+            "output_serialized": true,
+            "untouched_data_equal": true,
+            "changed_readback": true,
+            "first_cell_readback": null,
+            "defaults_descent_readback": true,
+            "source_markers": true
+          }
+        }
+      ]
+    }
+  ]
+}

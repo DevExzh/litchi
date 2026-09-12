@@ -1,14 +1,26 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current priority after 0515: OLE2 and OOXML
+## 0516: reject XLSX emitted-output parser fusion
+
+[0516](changes/0516-xlsx-output-fusion-rejection.md) passes all 1,284 candidate
+all-features tests but fails performance admission: changed-edit pilot p50
+rises 4.46–8.30% across the 12 main rows and 5.82–8.64% across the six warm
+changed-edit guard rows. Dense allocation calls also increase, and scoped
+commit instruction references rise 3.95%. No formal ABBA campaign or speedup
+claim follows. The exact candidate and all adverse evidence are archived;
+production is restored. Two independent no-op fixture fixes remain, with
+1,263 tests passing on unchanged production. OLE2/OOXML work remains active;
+ODF is deferred and iWork excluded.
+
+## Current priority after 0516: OLE2 and OOXML
 
 Per the user's September 11 instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
 deferred until then. This overrides the ordering of older entries below.
-CFB profiling and FAT batching are complete in 0511; the 0514 speculative
-XLSX source-pass fusion is rejected. 0515 isolates the changed-output XLSX costs; its production work and DOCX
-publication attribution remain open. This investigation queue is not a
-completion checklist. The broader requirements and
+CFB profiling and FAT batching are complete in 0511. The 0514 source-pass
+fusion and 0516 emitted-output fusion are rejected. Next, investigate DOCX
+publication CPU with source-bound profiling while retaining the 0499/0500
+review flags. This investigation queue is not a completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
 

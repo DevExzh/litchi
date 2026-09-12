@@ -1,0 +1,32 @@
+{
+  "stage": "before",
+  "kind": "allocator",
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--features",
+    "allocator-metrics"
+  ],
+  "started_utc": "2026-09-11T23:41:40.410974+00:00",
+  "elapsed_seconds": 90.27194465600041,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "2482a2f009ab9213d663a6f8a62607398a72006c13f451a56da8dc78ba80ee5c",
+  "log_sha256": "1aef56f474993594f1e2a09602208e0c67c0dd8ea6711cccee021227f9f6dd4a",
+  "environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0516/target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0516"
+  },
+  "binary_sha256": "9d6f75aced8f21ea39be395f23892e4f5a7da428681f21e6249a5793890eae7a"
+}

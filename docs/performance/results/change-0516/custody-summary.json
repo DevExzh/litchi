@@ -1,0 +1,61 @@
+{
+  "base_revision": "c5abaef129f5ae0000a925b295cf6507b7474e3c",
+  "epochs": [
+    {
+      "epoch": "after",
+      "changed_files": 9,
+      "patch_sha256": "9b3cf124904ed5970a376c26a4aabd900c212d34755490f916c60f367c8f9b3f",
+      "source_manifest_sha256": "38007ba3313a420bf1f5823fa8aafb2232d9f3f74bc0874ab416e302263b1df6",
+      "base_blob_and_patch_replay": true,
+      "temporary_directory_removed": true
+    },
+    {
+      "epoch": "baseline-tests",
+      "changed_files": 2,
+      "patch_sha256": "57c870811b9ad33d7146682d76320f909124329cf77605a74828f342509a4079",
+      "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+      "base_blob_and_patch_replay": true,
+      "temporary_directory_removed": true
+    },
+    {
+      "epoch": "fifth-unit",
+      "changed_files": 9,
+      "patch_sha256": "569692b64af42583a2f291908f5a70ee756fd6ba5681860ba151a06d3075080f",
+      "source_manifest_sha256": "a08915252157449f2aba4c4fc491a0c59d0849aa82df5657a7180bd0d32db3c6",
+      "base_blob_and_patch_replay": true,
+      "temporary_directory_removed": true
+    },
+    {
+      "epoch": "fourth-unit",
+      "changed_files": 7,
+      "patch_sha256": "35c435309cb15ce780f9f25659777dcb3f46ca8d27c8581423f829faf0b8d67f",
+      "source_manifest_sha256": "9127ae1530b3892f4d0f7b4cc7e608b0e678617827bf2b4754b5fca33e04fdc9",
+      "base_blob_and_patch_replay": true,
+      "temporary_directory_removed": true
+    },
+    {
+      "epoch": "initial-unit",
+      "changed_files": 7,
+      "patch_sha256": "731b9966857ccc2d325372336745b0d7a7e263c825e0c0fc6727a4ab566c4e5b",
+      "source_manifest_sha256": "2d67bb1df8aa57d5cb662169cfa57f6d60ef9ab1ca08e0e6728e671fe732024e",
+      "base_blob_and_patch_replay": true,
+      "temporary_directory_removed": true
+    },
+    {
+      "epoch": "second-unit",
+      "changed_files": 7,
+      "patch_sha256": "d0e4d7a759123f89fde87da94d0cc066535cc9ac8438cd2d7ae659ac4b6dd3f7",
+      "source_manifest_sha256": "bc1c4a34a174785a42877822c05463e84dd4183588af9a122cce2b496fe9cb29",
+      "base_blob_and_patch_replay": true,
+      "temporary_directory_removed": true
+    },
+    {
+      "epoch": "third-unit",
+      "changed_files": 7,
+      "patch_sha256": "007f7f1cad0ec4171c25c1b50ac5941426ddc987a20efcedd3cdd0cc129e05f5",
+      "source_manifest_sha256": "2bc53ff4c5f8d85db66b2243517c30c03d0a9ec350f523dc89cfdd7705e854e2",
+      "base_blob_and_patch_replay": true,
+      "temporary_directory_removed": true
+    }
+  ]
+}
