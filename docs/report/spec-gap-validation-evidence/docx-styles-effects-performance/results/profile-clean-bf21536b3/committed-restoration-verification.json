@@ -1,0 +1,14 @@
+{
+  "capture_head": "bf21536b35380005041917e7aee03a39804b2659",
+  "external_restoration_removed": true,
+  "matches_runner_verification": true,
+  "passed": true,
+  "production_source": "8702fd4db8723acceb7deb51bcb40ff66604bf10",
+  "raw_origin": "git show of retention_commit, not working tree or external duplicate",
+  "restored_bytes": 12394251,
+  "restored_files": 307,
+  "retention_commit": "23ca02f01b1963e159b72a0e4bb5ce654dc61b37",
+  "schema": "docx-styles-effects-committed-restoration-v1",
+  "verification_sha256": "dd5802f5b8c52946bf8d04aedb811bb0c8478fb673e6f84dbc416d5b86e99036",
+  "verifier": "frozen capture checkout verify_profile.py"
+}
