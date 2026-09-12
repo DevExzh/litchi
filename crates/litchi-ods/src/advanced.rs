@@ -4515,16 +4515,16 @@ fn admit_style_replacement_source(
 ) -> Result<()> {
     match kind {
         StyleNodeKind::Number => {
-            admit_style_source_events(xml, spans, index)?;
-            admit_number_style_source(xml, spans, index)
+            admit_number_style_source(xml, spans, index)?;
+            admit_style_source_events(xml, spans, index)
         },
         StyleNodeKind::Date
         | StyleNodeKind::Time
         | StyleNodeKind::Currency
         | StyleNodeKind::Percentage
         | StyleNodeKind::Boolean => {
-            admit_style_source_events(xml, spans, index)?;
-            admit_closed_data_style_source(xml, spans, index, kind)
+            admit_closed_data_style_source(xml, spans, index, kind)?;
+            admit_style_source_events(xml, spans, index)
         },
         StyleNodeKind::Text | StyleNodeKind::Cell => Ok(()),
     }
