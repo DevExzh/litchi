@@ -47,6 +47,9 @@ ALLOCATION_NOTE = (
     "requested_alloc_bytes is phase-local; live_after includes objects retained for later phases; "
     "phase values must not be summed or subtracted across unlike retained live sets"
 )
+COMPILER_FLAGS = "RUSTFLAGS=unset CARGO_ENCODED_RUSTFLAGS=unset RUSTC_BOOTSTRAP=unset"
+ALLOCATOR = "CountingAllocator (process-local GlobalAlloc observer)"
+PHASE_SCOPE = ",".join(PHASES)
 PHASE_FIELDS = (
     "elapsed_ns",
     "requested_alloc_bytes",
@@ -215,17 +218,21 @@ def _single_line_value(lines: list[str], prefix: str, path: Path) -> str:
     return value
 
 
-def verify_build_provenance(results: Path) -> tuple[str, str]:
+def verify_build_provenance(results: Path) -> tuple[str, str, str]:
     path = results / "build-provenance.txt"
     require(path.is_file(), f"build provenance missing: {path}")
     lines = path.read_text().splitlines()
-    _single_line_value(lines, "binary=", path)
+    binary = _single_line_value(lines, "binary=", path)
     _single_line_value(lines, "cargo=", path)
     _single_line_value(lines, "target=", path)
-    _single_line_value(lines, "cargo_incremental=", path)
-    _single_line_value(lines, "allocator=", path)
-    _single_line_value(lines, "phase_scope=", path)
-    _single_line_value(lines, "compiler_flags=", path)
+    cargo_incremental = _single_line_value(lines, "cargo_incremental=", path)
+    require(cargo_incremental == "0", f"cargo incremental setting changed: {path}")
+    compiler_flags = _single_line_value(lines, "compiler_flags=", path)
+    require(compiler_flags == COMPILER_FLAGS, f"compiler flags changed: {path}")
+    allocator = _single_line_value(lines, "allocator=", path)
+    require(allocator == ALLOCATOR, f"allocator provenance changed: {path}")
+    phase_scope = _single_line_value(lines, "phase_scope=", path)
+    require(phase_scope == PHASE_SCOPE, f"phase scope changed: {path}")
     git_head = _single_line_value(lines, "git_head=", path)
     source_pin = _single_line_value(lines, "approved_source_pin=", path)
     for prefix in ("os=", "cpu_model=", "core_count=", "memory_total=", "storage=", "environment="):
@@ -234,10 +241,10 @@ def verify_build_provenance(results: Path) -> tuple[str, str]:
     require(any(line.startswith("rustc ") for line in lines), f"rustc version missing: {path}")
     require(COMMIT.fullmatch(git_head), f"Git head malformed: {path}")
     require(COMMIT.fullmatch(source_pin), f"source pin malformed: {path}")
-    return git_head, source_pin
+    return git_head, source_pin, binary
 
 
-def verify_binary_receipts(results: Path) -> None:
+def verify_binary_receipts(results: Path, binary: str) -> None:
     before_path = results / "binary.sha256"
     after_path = results / "binary-after.sha256"
     require(before_path.is_file() and after_path.is_file(), f"binary identity receipts missing: {results}")
@@ -246,6 +253,7 @@ def verify_binary_receipts(results: Path) -> None:
     require(before == after, "binary identity changed")
     fields = before.strip().split(maxsplit=1)
     require(len(fields) == 2 and SHA256.fullmatch(fields[0]) and fields[1], f"binary SHA-256 receipt malformed: {results}")
+    require(fields[1] == binary, f"binary path differs from build provenance: {results}")
     provenance = (results / "build-provenance.txt").read_text().splitlines()
     digest_lines = []
     for line in provenance:
@@ -302,18 +310,24 @@ def verify_source_provenance(results: Path, git_head: str, source_pin: str) -> N
     require(COMMIT.fullmatch(provenance_pin) and provenance_pin == source_pin, f"source provenance pin mismatch: {path}")
 
 
-def verify_commands(results: Path) -> None:
+def verify_commands(results: Path, binary: str) -> None:
     path = results / "commands.txt"
     require(path.is_file(), f"command provenance missing: {path}")
-    lines = [line for line in path.read_text().splitlines() if line]
-    require(len(lines) == len(PICTURE_COUNTS) * len(PROCESSES), f"command count changed: {path}")
+    lines = path.read_text().splitlines()
+    expected_shapes: set[tuple[int, int]] = set()
     for pictures in PICTURE_COUNTS:
         for process in PROCESSES:
-            expected = f"fresh_process={process}"
-            require(
-                sum(f"--pictures {pictures}" in line and expected in line for line in lines) == 1,
-                f"command provenance missing pictures={pictures} process {process}: {path}",
-            )
+            receipt = results / f"phase_{pictures}-p{process}.json"
+            payload = json.loads(receipt.read_text())
+            expected_shapes.add((payload["warmup"], payload["sample_count"]))
+    require(len(expected_shapes) == 1, f"receipt command shape changed across processes: {path}")
+    warmup, samples = expected_shapes.pop()
+    expected = [
+        f"run=/usr/bin/time -v {binary} --pictures {pictures} --warmup {warmup} --samples {samples} (fresh_process={process})"
+        for pictures in PICTURE_COUNTS
+        for process in PROCESSES
+    ]
+    require(lines == expected, f"command flags or process invocation changed: {path}")
 
 
 def verify_results(results: Path, report: Path | None = None) -> dict[str, Any]:
@@ -349,11 +363,11 @@ def verify_results(results: Path, report: Path | None = None) -> dict[str, Any]:
         "source manifest changed",
     )
     require((results / "build.log").is_file(), f"build log missing: {results / 'build.log'}")
-    git_head, source_pin = verify_build_provenance(results)
+    git_head, source_pin, binary = verify_build_provenance(results)
     require(manifest_git_head == git_head, "source manifest Git head differs from build provenance")
-    verify_binary_receipts(results)
+    verify_binary_receipts(results, binary)
     verify_source_provenance(results, git_head, source_pin)
-    verify_commands(results)
+    verify_commands(results, binary)
     before = (results / "source-manifest-before.txt").read_bytes()
     if report is not None:
         require(report.is_file(), f"phase report missing: {report}")

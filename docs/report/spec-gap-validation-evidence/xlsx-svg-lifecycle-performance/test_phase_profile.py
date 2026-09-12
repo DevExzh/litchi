@@ -207,6 +207,41 @@ class PhaseReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "receipt fields changed"):
             phase_verify.verify_results(self.results)
 
+    def test_command_flags_are_rejected_when_changed(self):
+        self.write_bundle()
+        path = self.results / "commands.txt"
+        path.write_text(path.read_text().replace("--warmup 2", "--warmup 1", 1))
+        with self.assertRaisesRegex(ValueError, "command flags or process invocation changed"):
+            phase_verify.verify_results(self.results)
+
+        self.write_bundle()
+        path.write_text(path.read_text().replace("--samples 20", "--samples 19", 1))
+        with self.assertRaisesRegex(ValueError, "command flags or process invocation changed"):
+            phase_verify.verify_results(self.results)
+
+        self.write_bundle()
+        path.write_text(path.read_text().replace("--samples 20", "--samples 20 --unexpected", 1))
+        with self.assertRaisesRegex(ValueError, "command flags or process invocation changed"):
+            phase_verify.verify_results(self.results)
+
+    def test_build_provenance_contract_is_rejected_when_changed(self):
+        mutations = (
+            ("cargo_incremental=", "cargo incremental setting changed"),
+            ("compiler_flags=", "compiler flags changed"),
+            ("allocator=", "allocator provenance changed"),
+            ("phase_scope=", "phase scope changed"),
+        )
+        for prefix, message in mutations:
+            with self.subTest(prefix=prefix):
+                self.write_bundle()
+                path = self.results / "build-provenance.txt"
+                lines = path.read_text().splitlines()
+                index = next(index for index, line in enumerate(lines) if line.startswith(prefix))
+                lines[index] = prefix + "tampered"
+                path.write_text("\n".join(lines) + "\n")
+                with self.assertRaisesRegex(ValueError, message):
+                    phase_verify.verify_results(self.results)
+
 
 if __name__ == "__main__":
     unittest.main()
