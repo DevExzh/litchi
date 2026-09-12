@@ -1,0 +1,19 @@
+base_commit=e1ee2ae97afedbb2a260129f833e7393a414ba75
+approved_base_commit=079cbbcbfc00c8d2412a38586a9688ae7eb0009e
+source_inputs_before_sha256=bc14ccceacdac5847a7c0e8bb2aeba5a1a994767a7f4219ee1d12f92a18887c4
+source_inputs_after_sha256=bc14ccceacdac5847a7c0e8bb2aeba5a1a994767a7f4219ee1d12f92a18887c4
+approved_actions_edit_sha256=b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850
+git_status_relevant=
+source_sha256:
+a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/ink/mod.rs
+4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/ink/actions.rs
+b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/ink/actions_edit.rs
+af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/ink_action_edit.rs
+f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/ink_action_id_boundaries.rs
+harness_sha256:
+efad8e8dfdbf8d115d43e34d73b2757792bf768f45f9bc9918c0136c2748ba1a  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.lock
+3168aa1bf74a0b419299c6317440f9d2cbf54de9ed5882b250a70e8d8b6b175c  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/Cargo.toml
+2b6dbc5ef06d9181e5e8abb42fbd4ee2078619a76f08319e8c111c17bfb93863  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/harness/main.rs
+test_sha256:
+91d46a072b2dce5bb4e4dc2f6bd0e1971fdc9cc82012a1052038214257d3b82f  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_verify.py
+aacbbc7d388d183c8d10064b0a422b0d5f1031be19bf8f8ce53958dc7cf3bead  /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ink-action-edit-performance/test_smoke_target.py
