@@ -17,6 +17,8 @@ fixtures, checks the transitive local Cargo source closure against Git blobs,
 and uses only fresh external results and target directories. The standalone
 `harness/Cargo.lock` is authoritative for this isolated workspace; the
 repository-root ignored lock is not part of the evidence closure.
+The separate `profile-harness/Cargo.lock` is likewise authoritative for the
+gated performance scaffold.
 
 Run the source-capture and replay-verifier regression tests from this directory:
 
@@ -63,3 +65,20 @@ including the existing-owner commit-time cap and opaque-member checks. The
 runner and root verifier replays agree. This closes the correctness-smoke
 gate for that recorded source; a measurement harness and matched runtime
 evidence remain necessary before making performance claims.
+
+The separate performance scaffold passed independent review and uses a
+refusal-by-default runner. It requires a reviewed committed descendant, fresh
+external results and Cargo target paths, and the explicit `PROFILE_FROZEN=1` plus
+`DOCX_STYLES_EFFECTS_PROFILE_API_WIRED=1` gates. Its reviewed invocation is
+`bash run_profile.sh`; it uses three fresh processes, two warmups, and twenty
+samples over the bounded representative success matrix. The current scaffold
+re-verifies the retained clean-46 smoke before building, writes generated
+64 KiB/1 MiB XML and DOCX bytes once to a fresh external manifest, and records
+actual source status, toolchain, target, linker, environment, and process-time
+receipts. A failed build, process, or verifier retains the disposable Cargo
+target; cleanup happens only after a matching post-verification sentinel.
+The generated fixture paths and result/target paths are checked for exact
+hashes and external disjointness during replay. The current scaffold
+does not authorize a timing run; those environment gates are set only for a
+separately authorized clean
+run. It does not produce a before/after or speedup claim.
