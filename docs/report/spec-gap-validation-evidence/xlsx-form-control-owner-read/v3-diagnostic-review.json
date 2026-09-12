@@ -1,0 +1,15 @@
+{
+  "source_sha256": "6f933b8779cd00dcbf68bfdbc26fa9541a5fb4cba96d6ccefed2e84e50c5ddaf",
+  "status": "hold",
+  "verified_fixes": [
+    "duplicate VML attributes",
+    "full unreferenced-part diagnostic detail",
+    "worksheet identity Resource::Objects"
+  ],
+  "remaining": {
+    "reproducer": "30 mirror diagnostics, 1567 detail bytes admitted at projection limit3643;3642 refuses",
+    "accounting": "fixed8 diagnostic slots plus8*max_name_bytes does not cover actual diagnostic collection",
+    "allocation_order": "vml_mirror_diagnostics reserves vector and allocates details before projection reservation; correction must account for construction as well as retention"
+  },
+  "evidence_scope": "Independent reviewer reproducer plus root static inspection; not a new passing gate"
+}

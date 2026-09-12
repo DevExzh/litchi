@@ -1564,7 +1564,7 @@ fn inspect_with_limits_owned(
                 if depth == 0 {
                     if root_seen
                         || root_closed
-                        || namespace != FORM_CONTROL_NAMESPACE.as_bytes()
+                        || !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes())
                         || local != ROOT
                     {
                         return Err(invalid(
@@ -1602,7 +1602,7 @@ fn inspect_with_limits_owned(
                     if root_child_insertion.is_none() {
                         root_child_insertion = Some(start);
                     }
-                    if namespace != FORM_CONTROL_NAMESPACE.as_bytes() {
+                    if !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes()) {
                         return Err(invalid("form-control root child uses a foreign namespace"));
                     }
                     match local {
@@ -1674,7 +1674,7 @@ fn inspect_with_limits_owned(
                         _ => return Err(invalid("unexpected form-control root child")),
                     }
                 } else if open_item_list && depth == 2 {
-                    if namespace != FORM_CONTROL_NAMESPACE.as_bytes() {
+                    if !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes()) {
                         return Err(invalid(
                             "form-control itemLst child uses a foreign namespace",
                         ));
@@ -1776,7 +1776,7 @@ fn inspect_with_limits_owned(
                 if depth == 0 {
                     if root_seen
                         || root_closed
-                        || namespace != FORM_CONTROL_NAMESPACE.as_bytes()
+                        || !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes())
                         || local != ROOT
                     {
                         return Err(invalid(
@@ -1814,7 +1814,7 @@ fn inspect_with_limits_owned(
                     if root_child_insertion.is_none() {
                         root_child_insertion = Some(start);
                     }
-                    if namespace != FORM_CONTROL_NAMESPACE.as_bytes() {
+                    if !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes()) {
                         return Err(invalid("form-control root child uses a foreign namespace"));
                     }
                     match local {
@@ -1905,7 +1905,7 @@ fn inspect_with_limits_owned(
                         _ => return Err(invalid("unexpected form-control root child")),
                     }
                 } else if open_item_list && depth == 2 {
-                    if namespace != FORM_CONTROL_NAMESPACE.as_bytes() {
+                    if !namespace_uri_matches(namespace, FORM_CONTROL_NAMESPACE.as_bytes()) {
                         return Err(invalid(
                             "form-control itemLst child uses a foreign namespace",
                         ));
@@ -2886,6 +2886,84 @@ fn resolve_element<'namespace, 'name>(
     }
 }
 
+/// Compare a namespace URI after XML attribute-value normalization.
+///
+/// `quick_xml::NamespaceResolver` intentionally exposes declaration values in
+/// lexical form, while XML namespace identity expands character/entity
+/// references first.  The admitted SpreadsheetML URI is ASCII, so this
+/// comparator decodes one scalar at a time without allocating a normalized
+/// copy of an attacker-controlled declaration.
+fn namespace_uri_matches(raw: &[u8], wanted: &[u8]) -> bool {
+    if raw == wanted {
+        return true;
+    }
+    let mut raw_index = 0usize;
+    let mut wanted_index = 0usize;
+    while raw_index < raw.len() && wanted_index < wanted.len() {
+        let value = if raw[raw_index] == b'&' {
+            let entity_start = raw_index + 1;
+            let Some(relative_end) = raw[entity_start..].iter().position(|byte| *byte == b';')
+            else {
+                return false;
+            };
+            let entity_end = entity_start + relative_end;
+            let Some(scalar) = namespace_entity_scalar(&raw[entity_start..entity_end]) else {
+                return false;
+            };
+            raw_index = entity_end + 1;
+            scalar
+        } else {
+            let value = raw[raw_index] as u32;
+            raw_index += 1;
+            value
+        };
+        if value > u32::from(u8::MAX) || wanted[wanted_index] != value as u8 {
+            return false;
+        }
+        wanted_index += 1;
+    }
+    raw_index == raw.len() && wanted_index == wanted.len()
+}
+
+fn namespace_entity_scalar(entity: &[u8]) -> Option<u32> {
+    match entity {
+        b"amp" => Some(u32::from(b'&')),
+        b"lt" => Some(u32::from(b'<')),
+        b"gt" => Some(u32::from(b'>')),
+        b"apos" => Some(u32::from(b'\'')),
+        b"quot" => Some(u32::from(b'"')),
+        _ if entity.first() == Some(&b'#') => {
+            let (radix, digits) = match entity.get(1) {
+                Some(b'x' | b'X') => (16, &entity[2..]),
+                Some(_) => (10, &entity[1..]),
+                None => return None,
+            };
+            if digits.is_empty() {
+                return None;
+            }
+            let mut value = 0u32;
+            for digit in digits {
+                let digit = match radix {
+                    16 => match digit {
+                        b'0'..=b'9' => u32::from(*digit - b'0'),
+                        b'a'..=b'f' => u32::from(*digit - b'a' + 10),
+                        b'A'..=b'F' => u32::from(*digit - b'A' + 10),
+                        _ => return None,
+                    },
+                    _ => match digit {
+                        b'0'..=b'9' => u32::from(*digit - b'0'),
+                        _ => return None,
+                    },
+                };
+                value = value.checked_mul(radix)?.checked_add(digit)?;
+            }
+            (value <= 0x10_FFFF && !(0xD800..=0xDFFF).contains(&value) && value != 0)
+                .then_some(value)
+        },
+        _ => None,
+    }
+}
+
 fn element_prefix(name: QName<'_>, retained: &mut RetainedBudget) -> Result<Option<Box<[u8]>>> {
     let (_, prefix) = name.decompose();
     prefix
@@ -3262,7 +3340,7 @@ fn validate_extension_element(
 ) -> Result<bool> {
     let (namespace, local) = resolver.resolve_element(element.name());
     let mut valid = matches!(namespace, ResolveResult::Bound(Namespace(value))
-        if value == b"http://schemas.openxmlformats.org/spreadsheetml/2006/main")
+        if namespace_uri_matches(value, b"http://schemas.openxmlformats.org/spreadsheetml/2006/main"))
         && local.into_inner() == b"ext";
     let mut attributes_binding = element.attributes();
     let attributes = attributes_binding.with_checks(true);

@@ -1,0 +1,1 @@
+{"command": ["cargo", "doc", "--locked", "-p", "litchi-xlsx", "--no-deps", "--offline"], "exit_code": 0}
