@@ -52,8 +52,8 @@ impl Package {
         if current.same_state(&projected) {
             return Ok(current);
         }
-        self.edit_semantic_opc("apply_styles_with_effects_patch", |opc| {
-            effects::apply_patch(opc, owner, patch)
+        self.edit_semantic_opc("apply_styles_with_effects_patch", move |opc| {
+            effects::apply_patch_staged(opc, owner, patch, current)
         })
     }
 
