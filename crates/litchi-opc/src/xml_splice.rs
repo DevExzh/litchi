@@ -1217,7 +1217,7 @@ fn validate_xml_string(value: &str) -> Result<()> {
     }
 }
 
-fn xml10_character(value: char) -> bool {
+pub(crate) fn xml10_character(value: char) -> bool {
     matches!(value, '\u{9}' | '\u{a}' | '\u{d}')
         || ('\u{20}'..='\u{d7ff}').contains(&value)
         || ('\u{e000}'..='\u{fffd}').contains(&value)

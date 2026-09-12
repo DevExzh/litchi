@@ -123,6 +123,12 @@ impl OwnedXmlPart {
         limits: ReadLimits,
     ) -> Result<()> {
         Self::check_capture_member_name(name, limits)?;
+        Self::check_capture_bytes(bytes_len, limits)
+    }
+
+    /// Check the bounded byte ceilings shared by source and canonical XML
+    /// capture before any owned XML buffer is allocated.
+    pub(crate) fn check_capture_bytes(bytes_len: usize, limits: ReadLimits) -> Result<()> {
         limits.check(
             crate::ReadResource::PartBytes,
             bytes_len as u64,
@@ -338,17 +344,31 @@ impl OwnedXmlPart {
         Self::capture_with_limits(name, content_type, bytes, ReadLimits::default())
     }
 
+    /// Admit and validate one source XML publication without retaining an
+    /// [`OwnedXmlPart`].  Source-bound callers use this preflight before an
+    /// operation aggregate authorizes a later capture; it deliberately shares
+    /// the exact raw-event, depth, namespace, and attribute checks performed
+    /// by [`Self::capture_with_limits`].
+    pub(crate) fn preflight_capture_with_limits(
+        name: &PackURI,
+        content_type: &str,
+        bytes: &[u8],
+        limits: ReadLimits,
+    ) -> Result<()> {
+        Self::check_capture_size(name, bytes.len(), limits)?;
+        if !xml_minifier::audit::package::is_xml_part(name.as_str(), content_type) {
+            return Err(invalid_source("owned XML source is not an XML part"));
+        }
+        validate_source_xml(name, bytes, limits, None)
+    }
+
     pub(crate) fn capture_with_limits(
         name: PackURI,
         content_type: String,
         bytes: Arc<Vec<u8>>,
         limits: ReadLimits,
     ) -> Result<Self> {
-        Self::check_capture_size(&name, bytes.len(), limits)?;
-        if !xml_minifier::audit::package::is_xml_part(name.as_str(), &content_type) {
-            return Err(invalid_source("owned XML source is not an XML part"));
-        }
-        validate_source_xml(&name, &bytes, limits, None)?;
+        Self::preflight_capture_with_limits(&name, &content_type, &bytes, limits)?;
         Ok(Self {
             name,
             content_type,
