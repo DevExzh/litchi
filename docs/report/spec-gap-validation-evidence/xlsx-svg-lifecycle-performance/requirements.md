@@ -247,6 +247,17 @@ p50/p95 allocation and peak-live values, and min/max `/usr/bin/time -v` RSS.
 Use confidence intervals or a stated robust uncertainty summary in the final
 report. One noisy run is not evidence of a speedup or regression.
 
+The reproducible `uncertainty.py` postprocessor is one permitted uncertainty
+summary. It consumes only already verified raw receipts and `/usr/bin/time -v`
+sidecars, requires exactly three process identities with the sealed warmup and
+sample minimums, and checks the semantic, allocator, and typed-refusal fields
+before deriving any values. For every lane it reports each process median,
+within-process min/max range, between-process median range, and RSS values.
+It writes derived Markdown and optional JSON files without changing raw
+receipts. With n=3, those ranges are descriptive rather than confidence
+intervals; this summary must not be used to claim a speedup, regression,
+causal effect, or scaling law.
+
 ## Runner and source-integrity requirements
 
 `run_profile.sh` must:
