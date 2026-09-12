@@ -1439,13 +1439,14 @@ impl OpcPackage {
         replacement_relationships: &OwnedRelationships,
         parts: Vec<Box<dyn Part + Send + Sync>>,
     ) -> Result<()> {
-        let current_content_types = self.source_content_types()?;
+        let current_content_types = self.source_content_types_with_limits(self.read_limits)?;
         if current_content_types.bytes() != expected_content_types {
             return Err(OpcError::InvalidContentTypesManifest(
                 "stale content-types source replacement".to_owned(),
             ));
         }
-        let current_relationships = self.source_relationships(expected_relationships.owner())?;
+        let current_relationships = self
+            .source_relationships_with_limits(expected_relationships.owner(), self.read_limits)?;
         if current_relationships != *expected_relationships {
             return Err(OpcError::InvalidRelationship(
                 "stale relationship replacement".to_owned(),
@@ -3073,6 +3074,47 @@ mod tests {
         )));
         let replacement_relationships = absent_source.source_relationships(&owner).unwrap();
         assert!(!replacement_relationships.member_present());
+
+        // The batch must honor the package's admission limits while reading
+        // its preconditions, even when supplied tokens were captured earlier
+        // under more generous limits. Neither refusal may publish the edit.
+        let original_limits = package.read_limits;
+        let source_bytes = crate::PackageWriter::to_bytes(&package).unwrap();
+        for (limits, resource) in [
+            (
+                ReadLimits::builder()
+                    .max_content_types_bytes(content_types.bytes().len() - 1)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+                crate::ReadResource::ContentTypesBytes,
+            ),
+            (
+                ReadLimits::builder()
+                    .max_relationship_xml_bytes(expected_relationships.bytes().len() - 1)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+                crate::ReadResource::RelationshipXmlBytes,
+            ),
+        ] {
+            package.read_limits = limits;
+            assert!(matches!(
+                package.try_add_parts_with_source_tokens(
+                    content_types.bytes(),
+                    &content_types,
+                    &expected_relationships,
+                    &replacement_relationships,
+                    Vec::new(),
+                ),
+                Err(OpcError::ReadLimit { resource: actual, .. }) if actual == resource
+            ));
+            package.read_limits = original_limits;
+            assert_eq!(
+                crate::PackageWriter::to_bytes(&package).unwrap(),
+                source_bytes
+            );
+        }
 
         package
             .try_add_parts_with_source_tokens(
