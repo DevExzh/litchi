@@ -1,0 +1,146 @@
+{
+  "schema": "docx_callgrind_publication_analysis_v1",
+  "selected_function": "litchi_docx::source_backed::Package::publish_document_commit_to_stream",
+  "profile_count": 1,
+  "validation": {
+    "all_profiles_exactly_one_positive_call": true,
+    "all_profiles_publication_total_scoped": true
+  },
+  "profiles": [
+    {
+      "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0517/profile-preflight/p128-k1-owned-batch.callgrind",
+      "sha256": "1aec830a4b1a66be5d01a2c082794df16cd11aa488544899581f35aded40da80",
+      "receipt": "/home/zhuhe/code/litchi/docs/performance/results/change-0517/profile-preflight/p128-k1-owned-batch.json",
+      "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+      "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+      "selected_function": "litchi_docx::source_backed::Package::publish_document_commit_to_stream",
+      "selected_function_id": 1386,
+      "summary_ir": 6662867,
+      "positive_incoming_edges": [
+        {
+          "caller_id": 1672,
+          "caller": "managed_paragraph_batch_perf::run_sample",
+          "calls": 1,
+          "inclusive_ir": 6662867,
+          "line": 5355
+        }
+      ],
+      "selected_call_count": 1,
+      "selected_inclusive_ir": 6662867,
+      "selected_self_ir": 474,
+      "selected_direct_ir": 6662393,
+      "selected_direct_callees": [
+        {
+          "callee_id": 1616,
+          "callee": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 3698223
+        },
+        {
+          "callee_id": 1258,
+          "callee": "litchi_docx::source_backed::Package::main_document_snapshot",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 2954799
+        },
+        {
+          "callee_id": 1246,
+          "callee": "litchi_opc::source_backed::SourceBackedPackage::main_document_part",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 4759
+        },
+        {
+          "callee_id": 1298,
+          "callee": "core::ptr::drop_in_place<litchi_docx::document::transaction::Snapshot>",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 1706
+        },
+        {
+          "callee_id": 1378,
+          "callee": "litchi_docx::document::transaction::Patch::apply",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 1223
+        },
+        {
+          "callee_id": 1400,
+          "callee": "xml_minifier::audit::package::is_xml_part",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 493
+        },
+        {
+          "callee_id": 1034,
+          "callee": "alloc::raw_vec::RawVecInner<A>::try_reserve",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 467
+        },
+        {
+          "callee_id": 712,
+          "callee": "__memcpy_avx_unaligned_erms",
+          "calls": 3,
+          "edge_count": 3,
+          "inclusive_ir": 291
+        },
+        {
+          "callee_id": 1572,
+          "callee": "<litchi_opc::xml_splice::SourceXmlPart as core::clone::Clone>::clone",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 177
+        },
+        {
+          "callee_id": 1366,
+          "callee": "litchi_docx::document::transaction::Snapshot::same_source",
+          "calls": 3,
+          "edge_count": 3,
+          "inclusive_ir": 105
+        },
+        {
+          "callee_id": 1380,
+          "callee": "litchi_opc::packuri::PackURI::is_equivalent_to",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 56
+        },
+        {
+          "callee_id": 1678,
+          "callee": "<managed_paragraph_batch_perf::CountingSource as litchi_core::source::ReadAt>::version",
+          "calls": 4,
+          "edge_count": 4,
+          "inclusive_ir": 56
+        },
+        {
+          "callee_id": 1082,
+          "callee": "__memcmp_avx2_movbe",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 29
+        },
+        {
+          "callee_id": 1388,
+          "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+          "calls": 1,
+          "edge_count": 1,
+          "inclusive_ir": 9
+        }
+      ],
+      "validation": {
+        "exactly_one_positive_call": true,
+        "selected_self_plus_direct_equals_inclusive": true,
+        "publication_total_scoped_to_summary": true,
+        "receipt": {
+          "exit_code_zero": true,
+          "cleanup_verified": true,
+          "samples_one": true,
+          "warmups_zero": true,
+          "repeats_one": true
+        }
+      }
+    }
+  ]
+}

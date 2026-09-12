@@ -1,0 +1,5357 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 3778951
+cmd:  /tmp/litchi-goal-0517/managed-paragraph-candidate --paragraphs 512 --replacements 1 --source owned --mode batch --samples 1 --warmups 0 --repeats 1 --artifact-dir /tmp/litchi-goal-0517/corpora/profile-after-r2-p512-k1-owned-batch --output /home/zhuhe/code/litchi/docs/performance/results/change-0517/profile-after-r2/p512-k1-owned-batch.csv
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 33191391
+desc: Trigger: Program termination
+
+positions: line
+events: Ir
+summary: 17749056
+
+
+ob=(6) /tmp/litchi-goal-0517/managed-paragraph-candidate
+fl=(164) ???
+fn=(882) alloc::raw_vec::RawVecInner<A>::try_allocate_in
+0 27
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(155) ./malloc/./malloc/malloc.c
+cfn=(634) malloc
+calls=1 3283 
+0 242
+0 14
+
+fn=(900) <alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+0 120
+cfn=(902) <alloc::raw_vec::RawVecInner>::finish_grow
+calls=88 0 
+0 511
+0 60
+
+fn=(920) hashbrown::raw::RawTable<T,A>::reserve_rehash
+0 162
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=11 3283 
+0 666
+0 51
+cob=(2)
+cfi=(218) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+cfn=(784) __memset_avx2_unaligned_erms
+calls=11 198 
+0 33
+0 140
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=1 3283 
+0 30
+0 17
+cob=(2)
+cfi=(218)
+cfn=(784)
+calls=1 198 
+0 11
+0 25
+
+fn=(928) soapberry_zip::path::ZipFilePath<()>::from_str
+0 264
+
+fn=(1012) <litchi_opc::source_backed::SourceSnapshot as core::clone::Clone>::clone
+0 96
+
+fn=(1046) soapberry_zip::archive::parse_zip64_extra_values
+0 300
+
+fn=(1090) <soapberry_zip::accounting::CountingReader<R> as std::io::Read>::read
+0 38
+cfn=(1018) <litchi_opc::source_backed::SourceReader as soapberry_zip::reader_at::ReaderAt>::read_at
+calls=18 0 
+0 860
+0 50
+
+fn=(1100) core::ptr::drop_in_place<litchi_opc::error::OpcError>
+0 352
+
+fn=(1170) core::ptr::drop_in_place<quick_xml::events::Event>
+0 16
+
+fn=(1188) litchi_opc::pkgreader::is_xml_id
+0 284054
+
+fn=(1218) litchi_opc::members::PartNameIndex::insert
+0 85
+cfn=(958) core::hash::BuildHasher::hash_one
+calls=14 0 
+0 422
+0 144
+cfn=(1148) <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+calls=24 0 
+0 466
+0 58
+cfn=(958)
+calls=18 0 
+0 334
+0 32
+cfn=(1148)
+calls=19 0 
+0 378
+0 21
+cfn=(1148)
+calls=19 0 
+0 343
+0 24
+cfn=(958)
+calls=14 0 
+0 422
+0 89
+cfn=(1148)
+calls=19 0 
+0 378
+0 45
+cfn=(1148)
+calls=19 0 
+0 343
+0 12
+cfn=(1148)
+calls=24 0 
+0 466
+0 81
+cob=(2)
+cfi=(202) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+cfn=(712) __memcpy_avx_unaligned_erms
+calls=24 255 
+0 58
+0 78
+cfn=(1148)
+calls=24 0 
+0 466
+0 64
+cfn=(902)
+calls=24 0 
+0 833
+0 52
+cfn=(1148)
+calls=19 0 
+0 378
+0 21
+cfn=(1148)
+calls=19 0 
+0 343
+0 51
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=19 3283 
+0 708
+0 21
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=19 255 
+0 33
+0 114
+cfn=(902)
+calls=19 0 
+0 460
+0 1643
+cfn=(876) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=19 0 
+0 577
+0 135
+cfn=(958)
+calls=24 0 
+0 702
+0 102
+cob=(2)
+cfi=(235) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+cfn=(1082) __memcmp_avx2_movbe
+calls=10 73 
+0 38
+0 24
+cob=(2)
+cfi=(155)
+cfn=(746) free
+calls=10 3319 
+0 66
+0 59
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=19 3319 
+0 99
+0 18
+cfn=(958)
+calls=19 0 
+0 637
+0 213
+
+fn=(1246) litchi_opc::source_backed::SourceBackedPackage::main_document_part
+0 38
+cfn=(1678) <managed_paragraph_batch_perf::CountingSource as litchi_core::source::ReadAt>::version
+calls=4 0 
+0 28
+0 80
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=6 73 
+0 58
+0 44
+cfn=(1248) litchi_opc::rel::Relationship::target_partname
+calls=6 0 
+0 7884
+0 34
+cfn=(1250) litchi_opc::source_backed::SourceBackedPackage::part
+calls=6 0 
+0 722
+0 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+0 66
+0 2
+
+fn=(1288) quick_xml::events::Event::into_owned
+0 81510
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=8212 3283 
+0 55352
+0 14350
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=8212 255 
+0 33308
+0 14352
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=6161 3283 
+0 39992
+0 10766
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=6161 255 
+0 27685
+0 56393
+
+fn=(1366) litchi_docx::document::transaction::Snapshot::same_source
+0 135
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=1 73 
+0 3851
+0 38
+cfn=(1380) litchi_opc::packuri::PackURI::is_equivalent_to
+calls=1 0 
+0 56
+0 36
+
+fn=(1438) core::slice::<impl [T]>::binary_search_by
+0 450
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=10 73 
+0 214
+0 256
+
+fn=(1516) litchi_opc::source_backed::PartView::source_xml
+0 23
+cfn=(1678)
+calls=2 0 
+0 14
+0 30
+cfn=(1396) litchi_opc::source_backed::SourceBackedPackage::has_signature_infrastructure
+calls=2 0 
+0 1731
+0 13
+cfn=(1400) xml_minifier::audit::package::is_xml_part
+calls=2 0 
+0 493
+0 9
+cfn=(1262) litchi_opc::source_backed::SourceBackedPackage::read_part_with_observer_and_capture
+calls=2 0 
+0 391
+0 15
+cfn=(1070) litchi_opc::source_backed::SourceSnapshot::ensure_current
+calls=2 0 
+0 50
+0 13
+cfn=(1012)
+calls=2 0 
+0 48
+0 6
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 30
+0 9
+cfn=(1520) litchi_opc::xml_splice::SourceXmlPart::from_source_parts
+calls=2 0 
+0 4731457
+0 1
+
+fn=(1526) litchi_opc::xml_splice::validate_source_qname
+0 116888
+cfn=(830) core::str::converts::from_utf8
+calls=12304 0 
+0 362568
+0 73824
+cfn=(1528) litchi_opc::xml_splice::validate_xml_qname
+calls=12304 0 
+0 1680464
+0 92280
+cfn=(1148)
+calls=12304 0 
+0 602896
+0 73824
+cfn=(1132) memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+calls=12304 0 
+0 252232
+0 61520
+cfn=(1136) quick_xml::name::NamespaceResolver::resolve_prefix
+calls=12304 0 
+0 461400
+0 73824
+
+fn=(1532) litchi_opc::source_backed::SourceSnapshot::ensure_current_public
+0 16
+cfn=(1678)
+calls=2 0 
+0 14
+0 20
+
+fn=(1616) litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream
+0 31
+cfn=(1398) litchi_opc::source_backed::is_signature_member_path
+calls=1 0 
+0 129
+0 25
+cfn=(1678)
+calls=1 0 
+0 14
+0 50
+cfn=(1678)
+calls=1 0 
+0 14
+0 55
+cfn=(1678)
+calls=1 0 
+0 14
+0 24
+cfn=(1396)
+calls=1 0 
+0 1731
+0 11
+cfn=(1618) litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup
+calls=1 0 
+0 9738
+0 24
+cfn=(1622) litchi_opc::source_backed::folded_ascii_name
+calls=1 0 
+0 194
+0 10
+cfn=(1624) hashbrown::map::HashMap<K,V,S,A>::get
+calls=1 0 
+0 297
+0 13
+cfn=(1036) alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+calls=1 0 
+0 109
+0 22
+cfn=(1626) litchi_opc::source_backed::SourceBackedPackage::check_topology_progress
+calls=1 0 
+0 56
+0 7
+cfn=(1252) litchi_opc::source_backed::SourceBackedPackage::part_index
+calls=1 0 
+0 300
+0 12
+cfn=(1262)
+calls=1 0 
+0 391
+0 32
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 30
+0 11
+cfn=(1628) litchi_opc::xml_splice::SourceXmlPart::check_for_replacement
+calls=1 0 
+0 4731560
+0 6
+cfn=(1294) core::ptr::drop_in_place<litchi_opc::source_backed::PartData>
+calls=1 0 
+0 17
+0 6
+cfn=(1572) <litchi_opc::xml_splice::SourceXmlPart as core::clone::Clone>::clone
+calls=1 0 
+0 177
+0 5
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 5
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 14
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 24
+cfn=(1036)
+calls=1 0 
+0 10
+0 10
+cfn=(1632) litchi_opc::source_backed::SourceBackedPackage::validate_overlay_limits
+calls=1 0 
+0 5682
+0 18
+cfn=(1208) litchi_opc::members::PartNameIndex::try_with_capacity
+calls=1 0 
+0 879
+0 61
+cfn=(1626)
+calls=1 0 
+0 56
+0 15
+cfn=(1634) <usize as core::slice::cmp::SliceContains>::slice_contains
+calls=3 0 
+0 30
+0 18
+cfn=(1218)
+calls=3 0 
+0 12136
+0 12
+cfn=(1636) std::thread::local::LocalKey<T>::with
+calls=1 0 
+0 7
+0 43
+cfn=(1634)
+calls=3 0 
+0 30
+0 24
+cfn=(1622)
+calls=3 0 
+0 852
+0 51
+cfn=(1058) hashbrown::map::HashMap<K,V,S,A>::insert
+calls=3 0 
+0 865
+0 17
+cfn=(1434) core::slice::<impl [T]>::sort_unstable_by
+calls=1 0 
+0 3
+0 3
+cfn=(1626)
+calls=1 0 
+0 56
+0 28
+cfn=(1638) <hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+calls=1 0 
+0 20
+0 2
+cfn=(1638)
+calls=1 0 
+0 5
+0 10
+cfn=(1248)
+calls=1 0 
+0 4215
+0 16
+cfn=(1252)
+calls=1 0 
+0 300
+0 5
+cfn=(1640) litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream::{{closure}}
+calls=1 0 
+0 10
+0 6
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 35
+cfn=(1634)
+calls=3 0 
+0 30
+0 54
+cfn=(1638)
+calls=3 0 
+0 15
+0 15
+cfn=(1036)
+calls=1 0 
+0 10
+0 9
+cfn=(1434)
+calls=1 0 
+0 3
+0 7
+cfn=(1158) core::iter::traits::iterator::Iterator::try_fold
+calls=1 0 
+0 12
+0 31
+cfn=(1642) <core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::next
+calls=1 0 
+0 19
+0 15
+cfn=(1642)
+calls=5 0 
+0 81
+0 36
+cfn=(1626)
+calls=1 0 
+0 56
+0 18
+cfn=(1644) litchi_opc::source_backed::is_relationship_member_name
+calls=5 0 
+0 1029
+0 39
+cfn=(1626)
+calls=1 0 
+0 56
+0 32
+cfn=(920)
+calls=1 0 
+0 279
+0 43
+cfn=(1036)
+calls=1 0 
+0 10
+0 9
+cfn=(1434)
+calls=1 0 
+0 3
+0 10
+cfn=(1036)
+calls=1 0 
+0 10
+0 9
+cfn=(1434)
+calls=1 0 
+0 3
+0 4
+cfn=(1626)
+calls=1 0 
+0 56
+0 29
+cfn=(1646) litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits
+calls=1 0 
+0 17085
+0 16
+cfn=(1036)
+calls=1 0 
+0 109
+0 12
+cfn=(1036)
+calls=1 0 
+0 10
+0 33
+cfn=(1036)
+calls=1 0 
+0 109
+0 12
+cfn=(1626)
+calls=1 0 
+0 56
+0 12
+cfn=(1262)
+calls=1 0 
+0 391
+0 49
+cfn=(1572)
+calls=1 0 
+0 177
+0 8
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 4
+cfn=(1294)
+calls=1 0 
+0 17
+0 17
+cfn=(1036)
+calls=1 0 
+0 10
+0 20
+cfn=(1396)
+calls=1 0 
+0 1731
+0 11
+cfn=(1036)
+calls=1 0 
+0 10
+0 17
+cfn=(1036)
+calls=1 0 
+0 109
+0 14
+cfn=(1596) litchi_opc::xml_splice::SourceXmlPart::check_source_state
+calls=1 0 
+0 66
+0 8
+cfn=(1650) litchi_opc::xml_splice::SourceXmlPart::source_snapshot
+calls=1 0 
+0 48
+0 42
+cfn=(1240) <alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 23
+0 4
+cfn=(1264) alloc::boxed::box_new_uninit
+calls=1 0 
+0 37
+0 9
+cfn=(1264)
+calls=1 0 
+0 37
+0 22
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 161
+0 10
+cfn=(1652) litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_omissions_and_appended
+calls=1 0 
+0 1281704
+0 10
+cfn=(1666) <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::find_map
+calls=1 0 
+0 71
+0 3
+cfn=(1484) std::sync::poison::mutex::Mutex<T>::lock
+calls=1 0 
+0 23
+0 4
+cfn=(1266) core::ptr::drop_in_place<std::sync::poison::mutex::MutexGuard<soapberry_zip::office::LazyCacheState>>
+calls=1 0 
+0 13
+0 21
+cfn=(980) alloc::sync::Arc<T,A>::drop_slow
+calls=1 0 
+0 38
+0 4
+cfn=(980)
+calls=1 0 
+0 124
+0 4
+cfn=(832) <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 3
+0 9
+cfn=(1612) core::ptr::drop_in_place<litchi_opc::xml_splice::SourceXmlPart>
+calls=1 0 
+0 71
+0 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cfn=(832)
+calls=1 0 
+0 3
+0 6
+cfn=(832)
+calls=1 0 
+0 31
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 3
+cfn=(832)
+calls=1 0 
+0 3
+0 8
+cfn=(832)
+calls=1 0 
+0 3
+0 6
+cfn=(832)
+calls=1 0 
+0 3
+0 4
+cfn=(1668) core::ptr::drop_in_place<core::option::Option<litchi_opc::content_type::ContentTypeMap>>
+calls=1 0 
+0 18
+0 10
+cfn=(978) <hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 607
+0 2
+cfn=(1670) core::ptr::drop_in_place<litchi_opc::members::PartNameIndex>
+calls=1 0 
+0 1778
+0 6
+cfn=(832)
+calls=1 0 
+0 95
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 175
+0 7
+cfn=(980)
+calls=1 0 
+0 88
+0 2
+cfn=(978)
+calls=1 0 
+0 825
+0 3
+cfn=(832)
+calls=1 0 
+0 3
+0 5
+cfn=(832)
+calls=1 0 
+0 3
+0 5
+cfn=(832)
+calls=1 0 
+0 3
+0 5
+cfn=(832)
+calls=1 0 
+0 253
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 129
+0 1
+
+fn=(1624)
+0 16
+cfn=(958)
+calls=1 0 
+0 214
+0 35
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=1 73 
+0 19
+0 13
+
+fn=(1632)
+0 82
+cfn=(1100)
+calls=3 0 
+0 48
+0 78
+cfn=(1078) soapberry_zip::office::IndexedArchive<R>::metadata
+calls=5 0 
+0 5218
+0 60
+cfn=(1100)
+calls=5 0 
+0 80
+0 56
+cfn=(1100)
+calls=1 0 
+0 16
+0 12
+cfn=(1100)
+calls=1 0 
+0 16
+0 16
+
+fn=(1678)
+0 1854
+cfn=(1008) <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version
+calls=235 0 
+0 1030
+
+fn=(820) managed_paragraph_batch_perf::main
+cfn=(1672) managed_paragraph_batch_perf::run_sample
+calls=1 0 
+0 17749056
+
+fn=(1016) soapberry_zip::reader_at::ReaderAt::read_exact_at
+0 682
+cfn=(1018)
+calls=39 0 
+0 538594
+0 678
+
+fn=(1058)
+0 48
+cfn=(958)
+calls=3 0 
+0 616
+0 201
+
+fn=(1098) alloc::raw_vec::RawVec<T,A>::grow_one
+0 120
+cfn=(876)
+calls=32 0 
+0 3806
+0 147
+cfn=(876)
+calls=22 0 
+0 375
+0 210
+cfn=(876)
+calls=555 0 
+0 2840
+0 144
+cfn=(876)
+calls=30 0 
+0 225
+0 72
+cfn=(876)
+calls=11 0 
+0 225
+0 27
+
+fn=(1110) memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+0 196704
+
+fn=(1116) memchr::arch::x86_64::avx2::memchr::Three::find_raw
+0 123794
+cfn=(1118) memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+calls=32456 0 
+0 234111
+0 24826
+
+fn=(1126) quick_xml::events::attributes::IterState::check_for_duplicates
+0 336
+cfn=(1098)
+calls=30 0 
+0 297
+0 9
+
+fn=(1162) litchi_opc::packuri::PackURI::validate_percent_encoding
+0 993
+
+fn=(1164) core::str::iter::SplitInternal<P>::next
+0 36
+cfn=(1148)
+calls=47 0 
+0 345
+0 42
+
+fn=(1238) soapberry_zip::office::IndexedArchive<R>::entry_id
+0 60
+cfn=(1080) soapberry_zip::office::lookup_member_name
+calls=12 0 
+0 4337
+0 144
+cfn=(958)
+calls=12 0 
+0 1295
+0 216
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=12 73 
+0 114
+0 54
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=12 3319 
+0 198
+0 12
+
+fn=(1286) quick_xml::reader::Reader<R>::read_event_impl
+0 169242
+cfn=(1106) memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+calls=22083 0 
+0 319940
+0 172268
+cfn=(1114) memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+calls=10779 0 
+0 187876
+0 89204
+cfn=(1114)
+calls=10779 0 
+0 187636
+0 24626
+cfn=(1114)
+calls=6 0 
+0 122
+0 16
+cfn=(1114)
+calls=6 0 
+0 200
+0 152842
+cfn=(1168) quick_xml::reader::state::ReaderState::emit_end
+calls=10779 0 
+0 250884
+0 55368
+cfn=(1120) quick_xml::reader::state::ReaderState::emit_start
+calls=10779 0 
+0 325660
+0 24608
+
+fn=(1298) core::ptr::drop_in_place<litchi_docx::document::transaction::Snapshot>
+0 12
+cfn=(980)
+calls=3 0 
+0 714
+0 6
+cfn=(980)
+calls=3 0 
+0 322
+0 6
+cfn=(980)
+calls=4 0 
+0 130
+0 6
+cfn=(980)
+calls=4 0 
+0 158
+0 6
+cfn=(980)
+calls=4 0 
+0 180
+0 8
+cfn=(980)
+calls=3 0 
+0 132
+
+fn=(1308) core::ptr::drop_in_place<litchi_docx::document::transaction::TransactionError>
+0 122213
+
+fn=(1440) soapberry_zip::preserve::PreservationPlan::try_reserve_exact
+0 23
+cfn=(876)
+calls=1 0 
+0 75
+0 11
+
+fn=(1448) soapberry_zip::preserve::PreservationIndex<R>::prepare
+0 103
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=1 73 
+0 19
+0 330
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 17
+cfn=(876)
+calls=1 0 
+0 75
+0 14
+cfn=(876)
+calls=1 0 
+0 75
+0 396
+cfn=(1450) soapberry_zip::preserve::generated_entry
+calls=1 0 
+0 14450
+0 197
+
+fn=(1490) core::ptr::drop_in_place<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>
+0 48
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 165
+0 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 11
+
+fn=(1522) litchi_opc::xml_splice::validate_source_xml
+0 40
+cfn=(830)
+calls=4 0 
+0 25307
+0 156
+cfn=(1510) litchi_core::execution::ExecutionContext::reserve
+calls=4 0 
+0 212
+0 24
+cfn=(1096) <quick_xml::name::NamespaceResolver as core::default::Default>::default
+calls=4 0 
+0 2587
+0 107744
+cfn=(1102) quick_xml::reader::ns_reader::NsReader<R>::read_event_impl
+calls=14356 0 
+0 2470882
+0 165094
+cfn=(1128) quick_xml::name::NamespaceResolver::resolve_event
+calls=14356 0 
+0 1030482
+0 261482
+cfn=(1524) litchi_opc::xml_splice::validate_source_element
+calls=6152 0 
+0 2346718
+0 39968
+cfn=(1312) quick_xml::encoding::Decoder::content
+calls=2048 0 
+0 242598
+0 10240
+cfn=(1530) litchi_opc::xml_splice::validate_xml_string
+calls=2048 0 
+0 482444
+0 42020
+cfn=(1526)
+calls=6152 0 
+0 1924416
+0 303302
+cfn=(1170)
+calls=4 0 
+0 8
+0 22
+cfn=(1172) core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>
+calls=4 0 
+0 684
+0 14
+cfn=(980)
+calls=4 0 
+0 176
+0 6
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=4 3283 
+0 60
+0 28
+
+fn=(1524)
+0 70748
+cfn=(1526)
+calls=6152 0 
+0 1927304
+0 101508
+cfn=(1370) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+calls=6152 0 
+0 167558
+0 9296
+cfn=(830)
+calls=4 0 
+0 194
+0 20
+cfn=(1528)
+calls=4 0 
+0 742
+0 18
+cfn=(1142) quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+calls=4 0 
+0 1332
+0 28
+cfn=(1530)
+calls=4 0 
+0 2422
+0 94
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=4 73 
+0 34
+0 38
+cfn=(1188)
+calls=4 0 
+0 46
+0 84
+cfn=(1370)
+calls=4 0 
+0 108
+0 32
+cfn=(876)
+calls=4 0 
+0 150
+0 6382
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 66
+0 30764
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 66
+0 27684
+
+fn=(1542) core::ptr::drop_in_place<core::option::Option<(litchi_core::budget::Reservation,litchi_core::budget::Reservation,litchi_core::budget::Reservation)>>
+0 128
+
+fn=(1548) litchi_docx::document::transaction::ManagedAdmission::scan
+0 23
+cfn=(1308)
+calls=7 0 
+0 17
+0 14
+cfn=(1308)
+calls=7 0 
+0 17
+0 11
+cfn=(1308)
+calls=7 0 
+0 17
+0 15
+cfn=(1308)
+calls=7 0 
+0 17
+0 5
+cfn=(1510)
+calls=7 0 
+0 106
+0 38
+cfn=(1308)
+calls=7 0 
+0 17
+0 12
+cfn=(1308)
+calls=7 0 
+0 17
+0 5
+cfn=(1510)
+calls=7 0 
+0 106
+0 35
+cfn=(1510)
+calls=7 0 
+0 106
+0 38
+cfn=(1308)
+calls=7 0 
+0 17
+0 55
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=7 255 
+0 30
+0 9
+
+fn=(1552) <alloc::sync::Arc<[T],A> as core::convert::From<alloc::vec::Vec<T,A>>>::from
+0 60
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=9 3283 
+0 342
+0 27
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=9 255 
+0 439
+0 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 151
+0 30
+
+fn=(1618)
+0 74
+cfn=(1678)
+calls=1 0 
+0 14
+0 51
+cfn=(1620) litchi_opc::source_backed::SourceBackedPackage::reserve_topology_memory
+calls=1 0 
+0 195
+0 237
+cfn=(1678)
+calls=1 0 
+0 14
+0 398
+cfn=(902)
+calls=5 0 
+0 434
+0 40
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=5 255 
+0 59
+0 290
+cfn=(1238)
+calls=5 0 
+0 5510
+0 65
+cfn=(958)
+calls=4 0 
+0 873
+0 112
+cfn=(958)
+calls=5 0 
+0 1094
+0 74
+cfn=(1678)
+calls=1 0 
+0 14
+0 43
+cfn=(920)
+calls=1 0 
+0 142
+0 5
+
+fn=(1658) litchi_opc::source_backed::TransferSourceCheckedSink<W>::check_before_write
+0 1184
+cfn=(1678)
+calls=32 0 
+0 448
+0 864
+
+fn=(1662) core::ptr::drop_in_place<litchi_opc::source_backed::Chunked<litchi_opc::source_backed::OutputBudgetedSink<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<&mut alloc::vec::Vec<u8>>>>>>>>
+0 3
+cfn=(1664) core::ptr::drop_in_place<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<litchi_opc::source_backed::TransferSourceCheckedSink<&mut alloc::vec::Vec<u8>>>>>>
+calls=1 0 
+0 57
+0 14
+
+fn=(1430) soapberry_zip::archive::validate_borrowed_wayfinder_metadata
+0 90
+
+fn=(1432) soapberry_zip::archive::resolve_local_entry_size_framing
+0 265
+
+fn=(830)
+0 508829
+
+fn=(832)
+0 22
+cfn=(1612)
+calls=1 0 
+0 71
+0 73
+cfn=(978)
+calls=6 0 
+0 54
+0 21
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+0 459
+0 12
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+0 219
+0 12
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+0 509
+0 18
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=6 3319 
+0 515
+0 24
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 153
+0 7
+cfn=(1612)
+calls=1 0 
+0 71
+0 11
+
+fn=(870) core::fmt::write
+0 201
+cfn=(878) <&T as core::fmt::Display>::fmt
+calls=52 0 
+0 1156
+0 60
+
+fn=(876)
+0 41776
+cob=(2)
+cfi=(155)
+cfn=(704) realloc
+calls=28 3380 
+0 3423
+0 9282
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=3610 3283 
+0 40436
+0 18814
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=82 3283 
+0 798
+0 855
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=28 3283 
+0 1056
+0 1708
+cob=(2)
+cfi=(155)
+cfn=(704)
+calls=613 3380 
+0 8930
+0 312
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=1155 3283 
+0 943
+0 766
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=56 3283 
+0 180
+0 72
+
+fn=(902)
+0 503
+cob=(2)
+cfi=(155)
+cfn=(704)
+calls=49 3380 
+0 123
+0 146
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=746 3283 
+0 2972
+0 488
+
+fn=(926) soapberry_zip::writer::sized_member_path
+0 19
+cfn=(928)
+calls=1 0 
+0 264
+0 10
+
+fn=(936) crc32fast::specialized::pclmulqdq::calculate
+0 6
+cfn=(1092) crc32fast::baseline::update_fast_16
+calls=7 0 
+0 17
+0 13228
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=14 255 
+0 26
+0 66
+
+fn=(948) std::io::Write::write_all
+0 189
+cfn=(1654) <litchi_opc::source_backed::Chunked<W> as std::io::Write>::write
+calls=9 0 
+0 5035
+0 180
+
+fn=(1036)
+0 35374
+cfn=(876)
+calls=3079 0 
+0 109384
+0 17307
+cfn=(876)
+calls=13 0 
+0 1130
+0 143
+
+fn=(1086) soapberry_zip::office::IndexedReadSession<R>::read_entry_with_accounting
+0 33
+cfn=(1016)
+calls=7 0 
+0 465
+0 72
+cfn=(876)
+calls=7 0 
+0 75
+0 125
+cob=(2)
+cfi=(218)
+cfn=(784)
+calls=18 198 
+0 42
+0 8
+cfn=(1088) <soapberry_zip::archive::ZipVerifier<Decompressor,Reader> as std::io::Read>::read
+calls=18 0 
+0 1396
+0 104
+
+fn=(1114)
+0 332721
+cfn=(1116)
+calls=34057 0 
+0 382731
+0 36969
+
+fn=(1124) quick_xml::events::attributes::IterState::next
+0 358186
+cfn=(1126)
+calls=135 0 
+0 642
+0 4994
+
+fn=(1128)
+0 242000
+cfn=(1132)
+calls=15397 0 
+0 252232
+0 104584
+cfn=(1132)
+calls=15397 0 
+0 252232
+0 79988
+cfn=(1136)
+calls=15389 0 
+0 461400
+0 55368
+cfn=(1136)
+calls=15389 0 
+0 461400
+0 151760
+
+fn=(1142)
+0 34
+cfn=(830)
+calls=56 0 
+0 274
+0 1024
+
+fn=(1208)
+0 53
+cfn=(876)
+calls=5 0 
+0 75
+0 14
+cfn=(920)
+calls=5 0 
+0 351
+0 20
+cfn=(920)
+calls=5 0 
+0 363
+0 3
+
+fn=(1312)
+0 15360
+cfn=(830)
+calls=2051 0 
+0 120349
+0 8192
+cfn=(1314) quick_xml::escape::normalize_xml10_eols
+calls=2051 0 
+0 86409
+0 12288
+
+fn=(1314)
+0 15360
+cfn=(1132)
+calls=2051 0 
+0 55689
+0 15360
+
+fn=(1416) soapberry_zip::archive::ZipEntries<R>::next_entry
+0 218
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 26
+0 508
+cfn=(1042) <T as soapberry_zip::reader_at::ReaderAtExt>::read_at_least_at
+calls=2 0 
+0 1194
+0 470
+cfn=(1044) soapberry_zip::archive::ZipFileHeaderRecord::from_parts
+calls=10 0 
+0 1580
+0 510
+
+fn=(1452) soapberry_zip::archive::ZipFileHeaderFixed::write
+0 35
+
+fn=(1466) <litchi_opc::source_backed::ContextCheckedSink<W> as std::io::Write>::write
+0 330
+cfn=(1468) litchi_opc::source_backed::ContextCheckedSink<W>::check_before_write
+calls=30 0 
+0 540
+0 120
+cfn=(1022) litchi_opc::source_backed::SourceSnapshot::ensure_current_io_if_monitored
+calls=30 0 
+0 1650
+0 120
+cfn=(1658)
+calls=30 0 
+0 2340
+0 870
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=30 255 
+0 553546
+0 1710
+cfn=(1678)
+calls=30 0 
+0 420
+0 900
+
+fn=(1470) soapberry_zip::accounting::AccountingWriteKind::add
+0 315
+
+fn=(1474) <litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush
+0 6
+cfn=(1656) litchi_opc::source_backed::OutputBudgetedSink<W>::check_before_write
+calls=2 0 
+0 32
+0 10
+cfn=(1660) <litchi_opc::source_backed::ContextCheckedSink<W> as std::io::Write>::flush
+calls=2 0 
+0 484
+
+fn=(1478) core::ptr::drop_in_place<soapberry_zip::preserve::PreparedEntry>
+0 109
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 42
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 32
+
+fn=(1484)
+0 46
+
+fn=(1492) core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>
+0 10
+cfn=(1482) core::ptr::drop_in_place<litchi_opc::source_backed::SourceSnapshot>
+calls=1 0 
+0 31
+0 2
+cfn=(1482)
+calls=1 0 
+0 31
+0 46
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 89
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 165
+0 15
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 42
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 165
+0 20
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 285
+0 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 18
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 12
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 153
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 153
+0 6
+cfn=(978)
+calls=1 0 
+0 784
+0 4
+cfn=(832)
+calls=1 0 
+0 1842
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 60
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 487
+0 14
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 11
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 153
+0 2
+cfn=(978)
+calls=1 0 
+0 95
+0 2
+cfn=(978)
+calls=1 0 
+0 64
+0 15
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 65
+cfn=(980)
+calls=1 0 
+0 88
+
+fn=(1512) litchi_core::budget::Reservation::commit
+0 3528
+
+fn=(1528)
+0 147696
+cfn=(1148)
+calls=12308 0 
+0 603132
+0 61540
+cfn=(1188)
+calls=12308 0 
+0 141698
+0 49232
+cfn=(1148)
+calls=12308 0 
+0 375594
+0 147696
+cfn=(1188)
+calls=12308 0 
+0 142310
+0 12308
+
+fn=(1530)
+0 484866
+
+fn=(1534) litchi_docx::source_backed::ensure_source_document_xml
+0 23
+cfn=(1510)
+calls=2 0 
+0 106
+0 69
+cfn=(1510)
+calls=2 0 
+0 106
+0 61
+cfn=(1510)
+calls=2 0 
+0 106
+0 180
+cfn=(1096)
+calls=2 0 
+0 1219
+0 33
+cfn=(876)
+calls=2 0 
+0 277
+0 104101
+cfn=(1102)
+calls=7178 0 
+0 1273121
+0 53835
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=7178 3283 
+0 107670
+0 25123
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=7178 255 
+0 107662
+0 43068
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=7178 3283 
+0 107670
+0 200974
+cfn=(1128)
+calls=7178 0 
+0 515241
+0 115869
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=3076 73 
+0 32246
+0 26146
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3076 3319 
+0 50754
+0 58432
+cfn=(1036)
+calls=3076 0 
+0 161676
+0 29222
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=3076 255 
+0 27676
+0 9228
+cfn=(1034) alloc::raw_vec::RawVecInner<A>::try_reserve
+calls=3076 0 
+0 6152
+0 29222
+cfn=(1536) litchi_docx::source_backed::ensure_source_mce_element
+calls=3076 0 
+0 136910
+0 51264
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=7176 3319 
+0 118404
+0 21528
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=7176 3319 
+0 118404
+0 28712
+cfn=(1170)
+calls=2 0 
+0 4
+0 4
+cfn=(1540) core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>
+calls=2 0 
+0 77
+0 5
+cfn=(832)
+calls=2 0 
+0 3
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+0 125
+0 2
+cfn=(1172)
+calls=2 0 
+0 413
+0 2
+cfn=(1542)
+calls=2 0 
+0 128
+0 1
+
+fn=(1544) litchi_docx::document::transaction::Snapshot::from_source_xml
+0 22
+cfn=(1546) litchi_docx::document::transaction::ManagedAdmission::new
+calls=2 0 
+0 476
+0 8
+cfn=(1548)
+calls=2 0 
+0 727
+0 56
+cfn=(1284) litchi_docx::document::transaction::scan_document_with_context
+calls=2 0 
+0 3351263
+0 35
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 30
+0 2
+cfn=(1550) core::ptr::drop_in_place<litchi_docx::document::transaction::ScanAdmission>
+calls=2 0 
+0 128
+0 2
+cfn=(1264)
+calls=2 0 
+0 37
+0 7
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 65
+0 4
+cfn=(898) <alloc::string::String as core::clone::Clone>::clone
+calls=2 0 
+0 71
+0 2
+cfn=(1264)
+calls=2 0 
+0 37
+0 14
+cfn=(1552)
+calls=2 0 
+0 889
+0 4
+cfn=(1552)
+calls=2 0 
+0 84
+0 4
+cfn=(1552)
+calls=2 0 
+0 84
+0 17
+
+fn=(1546)
+0 20
+cfn=(1308)
+calls=3 0 
+0 17
+0 17
+cfn=(1308)
+calls=3 0 
+0 17
+0 10
+cfn=(1308)
+calls=3 0 
+0 17
+0 8
+cfn=(1308)
+calls=3 0 
+0 17
+0 5
+cfn=(1510)
+calls=3 0 
+0 106
+0 36
+cfn=(1510)
+calls=3 0 
+0 106
+0 30
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=3 3283 
+0 30
+0 40
+
+fn=(1638)
+0 40
+
+fn=(1640)
+0 10
+
+fn=(1644)
+0 120
+cfn=(968) core::slice::memchr::memrchr
+calls=10 0 
+0 1056
+0 132
+cfn=(968)
+calls=8 0 
+0 516
+0 234
+
+fn=(1660)
+0 18
+cfn=(1468)
+calls=2 0 
+0 36
+0 8
+cfn=(1022)
+calls=2 0 
+0 110
+0 8
+cfn=(1658)
+calls=2 0 
+0 156
+0 54
+cfn=(1678)
+calls=2 0 
+0 28
+0 66
+
+fn=(596) main
+cfn=(818) std::sys::backtrace::__rust_begin_short_backtrace
+calls=0 0 
+0 17749056
+
+fn=(884) alloc::fmt::format::format_inner
+0 297
+cfn=(870)
+calls=39 0 
+0 1417
+0 39
+
+fn=(930) crc32fast::Hasher::internal_new_specialized
+0 135
+
+fn=(1132)
+0 273286
+cfn=(1134) memchr::arch::x86_64::avx2::memchr::One::find_raw
+calls=62164 0 
+0 539327
+0 63066
+
+fn=(1146) litchi_opc::content_type::validate_content_type
+0 22
+cfn=(1148)
+calls=22 0 
+0 153
+0 28
+cfn=(1148)
+calls=22 0 
+0 181
+0 6
+cfn=(1150) litchi_opc::content_type::is_token
+calls=22 0 
+0 151
+0 7
+cfn=(1150)
+calls=22 0 
+0 892
+0 25
+
+fn=(1252)
+0 68
+cfn=(958)
+calls=8 0 
+0 860
+0 140
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=8 73 
+0 76
+0 56
+
+fn=(1296) core::ptr::drop_in_place<core::option::Option<litchi_core::execution::ExecutionContext>>
+0 22
+
+fn=(1378) litchi_docx::document::transaction::Patch::apply
+0 10
+cfn=(1366)
+calls=1 0 
+0 3976
+0 5
+cfn=(1366)
+calls=1 0 
+0 35
+0 58
+
+fn=(1386) litchi_docx::source_backed::Package::publish_document_commit_to_stream
+0 18
+cfn=(1366)
+calls=1 0 
+0 35
+0 8
+cfn=(1258) litchi_docx::source_backed::Package::main_document_snapshot
+calls=1 0 
+0 11656958
+0 29
+cfn=(1378)
+calls=1 0 
+0 4084
+0 46
+cfn=(1366)
+calls=1 0 
+0 35
+0 5
+cfn=(1366)
+calls=1 0 
+0 35
+0 12
+cfn=(1678)
+calls=1 0 
+0 14
+0 10
+cfn=(1572)
+calls=1 0 
+0 177
+0 6
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 21
+cfn=(1380)
+calls=1 0 
+0 56
+0 8
+cfn=(1400)
+calls=1 0 
+0 493
+0 46
+cfn=(1678)
+calls=1 0 
+0 14
+0 16
+cfn=(1246)
+calls=1 0 
+0 4482
+0 40
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=1 73 
+0 29
+0 25
+cfn=(1678)
+calls=1 0 
+0 14
+0 49
+cfn=(1034)
+calls=1 0 
+0 322
+0 27
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 7
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 161
+0 5
+cfn=(1616)
+calls=1 0 
+0 6079840
+0 59
+cfn=(1678)
+calls=1 0 
+0 14
+0 7
+cfn=(1298)
+calls=1 0 
+0 1680
+0 25
+cfn=(1388) litchi_opc::source_backed::SourceBackedPackage::check_execution
+calls=1 0 
+0 9
+0 5
+
+fn=(1486) litchi_opc::source_backed::finish_source_publication
+0 20
+cfn=(1678)
+calls=1 0 
+0 14
+0 35
+
+fn=(1536)
+0 52297
+cfn=(1124)
+calls=2 0 
+0 29
+0 4614
+cfn=(1124)
+calls=3076 0 
+0 45302
+0 7726
+cfn=(1538) litchi_docx::source_backed::validate_source_attribute_value
+calls=2 0 
+0 334
+0 9
+cfn=(1132)
+calls=2 0 
+0 65
+0 11
+cfn=(1136)
+calls=2 0 
+0 97
+0 13
+cfn=(1132)
+calls=2 0 
+0 65
+0 7
+cfn=(1132)
+calls=2 0 
+0 65
+0 320
+cfn=(830)
+calls=2 0 
+0 137
+0 27
+cfn=(1148)
+calls=2 0 
+0 189
+0 4038
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+0 33
+0 21532
+
+fn=(1572)
+0 204
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 60
+0 192
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=3 255 
+0 30
+0 45
+
+fn=(1628)
+0 23
+cfn=(1678)
+calls=1 0 
+0 14
+0 34
+cfn=(1380)
+calls=1 0 
+0 56
+0 9
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=1 73 
+0 3851
+0 16
+cfn=(1630) litchi_opc::xml_splice::SourceXmlPart::check_for_publication
+calls=1 0 
+0 4727556
+0 1
+
+fn=(1642)
+0 100
+
+fn=(1646)
+0 105
+cfn=(1678)
+calls=1 0 
+0 14
+0 41
+cfn=(1078)
+calls=5 0 
+0 5159
+0 65
+cfn=(1100)
+calls=5 0 
+0 80
+0 15
+cfn=(1644)
+calls=5 0 
+0 1029
+0 21
+cfn=(1100)
+calls=1 0 
+0 16
+0 4
+cfn=(1238)
+calls=1 0 
+0 920
+0 26
+cfn=(1086)
+calls=1 0 
+0 2320
+0 18
+cfn=(1678)
+calls=1 0 
+0 14
+0 17
+cfn=(1648) litchi_opc::source_backed::relationship_xml_event_count
+calls=1 0 
+0 6671
+0 10
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 10
+cfn=(1100)
+calls=1 0 
+0 16
+0 67
+cfn=(1678)
+calls=1 0 
+0 14
+0 64
+cfn=(1100)
+calls=3 0 
+0 48
+0 39
+cfn=(1678)
+calls=1 0 
+0 14
+0 49
+cfn=(1100)
+calls=1 0 
+0 16
+0 14
+cfn=(1100)
+calls=1 0 
+0 16
+0 61
+cfn=(1626)
+calls=1 0 
+0 56
+0 23
+
+fn=(1650)
+0 48
+
+fn=(1654)
+0 390
+cfn=(1656)
+calls=30 0 
+0 480
+0 210
+cfn=(1510)
+calls=30 0 
+0 3180
+0 540
+cfn=(1466)
+calls=30 0 
+0 562546
+0 780
+cfn=(1512)
+calls=30 0 
+0 1680
+0 120
+
+fn=(872) <alloc::string::String as core::fmt::Write>::write_str
+0 102
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=98 255 
+0 81
+0 84
+cfn=(900)
+calls=88 0 
+0 691
+0 18
+
+fn=(878)
+0 30
+cfn=(880) <core::fmt::Formatter>::pad
+calls=52 0 
+0 1126
+
+fn=(942) soapberry_zip::writer::FileHeader::finalize_extra_fields
+0 26
+
+fn=(952) soapberry_zip::accounting::write_all_counted
+0 472
+cfn=(1654)
+calls=21 0 
+0 564891
+0 231
+cfn=(1470)
+calls=21 0 
+0 315
+0 325
+
+fn=(958)
+0 744
+cfn=(960) <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+calls=223 0 
+0 2262
+0 155
+cfn=(960)
+calls=223 0 
+0 1239
+0 2187
+cfn=(960)
+calls=30 0 
+0 68
+0 10
+cfn=(960)
+calls=30 0 
+0 70
+0 234
+cfn=(960)
+calls=24 0 
+0 328
+0 20
+cfn=(960)
+calls=24 0 
+0 140
+0 345
+cfn=(960)
+calls=23 0 
+0 168
+0 357
+cfn=(960)
+calls=9 0 
+0 717
+0 45
+cfn=(960)
+calls=9 0 
+0 353
+0 621
+
+fn=(978)
+0 31
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+0 33
+0 97
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 673
+0 22
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 62
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+0 33
+0 67
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 487
+0 20
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 71
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 153
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 153
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 33
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 181
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 153
+0 21
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 33
+0 24
+
+fn=(1008)
+0 1030
+
+fn=(1042)
+0 60
+cfn=(1018)
+calls=4 0 
+0 1090
+0 44
+
+fn=(1050) soapberry_zip::office::normalize_str_fallibly
+0 256
+cfn=(968)
+calls=94 0 
+0 1626
+0 560
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=206 255 
+0 450
+0 5764
+cfn=(902)
+calls=94 0 
+0 1474
+0 112
+
+fn=(1064) core::slice::sort::shared::smallsort::insertion_sort_shift_left
+0 91
+
+fn=(1134)
+0 539327
+
+fn=(1148)
+0 1121121
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=25024 73 
+0 123490
+0 345910
+
+fn=(1172)
+0 12
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=9 3319 
+0 66
+0 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=9 3319 
+0 378
+0 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=9 3319 
+0 306
+0 10
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=9 3319 
+0 66
+0 12
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=12 3319 
+0 66
+0 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=12 3319 
+0 208
+0 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=12 3319 
+0 306
+0 10
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=12 3319 
+0 66
+
+fn=(1202) litchi_opc::packuri::PackURI::from_rel_ref
+0 747
+cfn=(1148)
+calls=11 0 
+0 438
+0 174
+cfn=(884)
+calls=11 0 
+0 1753
+0 129
+cfn=(1148)
+calls=33 0 
+0 1071
+0 219
+cfn=(1098)
+calls=11 0 
+0 297
+0 27
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=11 3319 
+0 99
+0 39
+cfn=(1154) litchi_opc::packuri::PackURI::new
+calls=11 0 
+0 5619
+0 12
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=11 3319 
+0 99
+0 105
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=11 3283 
+0 230
+0 138
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=22 255 
+0 84
+0 54
+
+fn=(1258)
+0 22
+cfn=(1678)
+calls=2 0 
+0 14
+0 29
+cfn=(1246)
+calls=3 0 
+0 4482
+0 15
+cfn=(1254) litchi_docx::package::model::validate_document_main_content_type
+calls=3 0 
+0 57
+0 34
+cfn=(1678)
+calls=2 0 
+0 14
+0 36
+cfn=(1260) litchi_opc::source_backed::SourceBackedPackage::cache_diagnostics
+calls=2 0 
+0 201
+0 11
+cfn=(1678)
+calls=2 0 
+0 14
+0 29
+cfn=(1516)
+calls=2 0 
+0 4734333
+0 6
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 65
+0 21
+cfn=(1534)
+calls=2 0 
+0 3563258
+0 4
+cfn=(1296)
+calls=2 0 
+0 11
+0 4
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 65
+0 29
+cfn=(1544)
+calls=2 0 
+0 3354068
+0 32
+cfn=(898)
+calls=3 0 
+0 71
+0 21
+cfn=(1296)
+calls=3 0 
+0 11
+0 1
+
+fn=(1420) soapberry_zip::preserve::read_vec
+0 85
+cfn=(1016)
+calls=1 0 
+0 26
+0 25
+cfn=(1016)
+calls=5 0 
+0 2710
+0 118
+cfn=(876)
+calls=5 0 
+0 375
+0 70
+cob=(2)
+cfi=(218)
+cfn=(784)
+calls=5 198 
+0 67
+0 35
+
+fn=(1454) soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout
+0 108
+cfn=(1456) soapberry_zip::preserve::validate_prepared_local
+calls=5 0 
+0 121
+0 40
+cfn=(1458) soapberry_zip::preserve::PreparedLocal::len
+calls=5 0 
+0 96
+0 81
+cfn=(876)
+calls=1 0 
+0 75
+0 169
+cfn=(1460) soapberry_zip::preserve::PreparedCentral::checked_bytes
+calls=5 0 
+0 99
+0 138
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 32
+cfn=(1462) soapberry_zip::preserve::prepare_zip32_tail
+calls=1 0 
+0 20
+0 11
+cfn=(876)
+calls=1 0 
+0 75
+0 217
+cfn=(1460)
+calls=5 0 
+0 99
+0 212
+
+fn=(1510)
+0 7950
+
+fn=(1622)
+0 160
+cfn=(902)
+calls=4 0 
+0 520
+0 40
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=4 255 
+0 44
+0 282
+
+fn=(1634)
+0 90
+
+fn=(1652)
+0 27
+cfn=(1678)
+calls=1 0 
+0 14
+0 14
+cfn=(1492)
+calls=1 0 
+0 5214
+0 16
+cfn=(876)
+calls=1 0 
+0 286
+0 9
+cob=(2)
+cfi=(218)
+cfn=(784)
+calls=1 198 
+0 65554
+0 14
+cfn=(1414) soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy
+calls=1 0 
+0 19031
+0 9
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 30
+0 9
+cfn=(1678)
+calls=1 0 
+0 14
+0 24
+cfn=(1036)
+calls=1 0 
+0 109
+0 47
+cfn=(1434)
+calls=1 0 
+0 3
+0 6
+cfn=(1158)
+calls=1 0 
+0 21
+0 11
+cfn=(1036)
+calls=1 0 
+0 264
+0 8
+cfn=(1038) alloc::vec::Vec<T,A>::resize
+calls=1 0 
+0 28
+0 10
+cfn=(1036)
+calls=1 0 
+0 10
+0 15
+cfn=(1158)
+calls=1 0 
+0 21
+0 12
+cfn=(1436) <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any
+calls=1 0 
+0 33
+0 11
+cfn=(1036)
+calls=1 0 
+0 10
+0 6
+cfn=(1038)
+calls=1 0 
+0 16
+0 43
+cfn=(1070)
+calls=1 0 
+0 50
+0 18
+cfn=(1438)
+calls=1 0 
+0 74
+0 20
+cfn=(1438)
+calls=4 0 
+0 291
+0 24
+cfn=(1438)
+calls=1 0 
+0 22
+0 20
+cfn=(1438)
+calls=4 0 
+0 88
+0 75
+cfn=(1440)
+calls=1 0 
+0 109
+0 5
+cfn=(1442) soapberry_zip::preserve::PreservationPlan::try_reserve_appended
+calls=1 0 
+0 8
+0 39
+cfn=(1438)
+calls=4 0 
+0 80
+0 95
+cfn=(1070)
+calls=1 0 
+0 50
+0 19
+cfn=(1438)
+calls=1 0 
+0 74
+0 24
+cfn=(1438)
+calls=4 0 
+0 291
+0 19
+cfn=(1444) litchi_opc::source_backed::replacement_member_name
+calls=1 0 
+0 21
+0 20
+cfn=(882)
+calls=1 0 
+0 283
+0 12
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 11
+0 50
+cfn=(1240)
+calls=1 0 
+0 18
+0 3
+cfn=(1070)
+calls=1 0 
+0 50
+0 14
+cfn=(1264)
+calls=1 0 
+0 37
+0 25
+cfn=(1012)
+calls=1 0 
+0 48
+0 88
+cfn=(1446) soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting
+calls=1 0 
+0 1187266
+0 9
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 2
+cfn=(1474)
+calls=1 0 
+0 266
+0 6
+cfn=(1662)
+calls=1 0 
+0 74
+0 5
+cfn=(1484)
+calls=1 0 
+0 23
+0 25
+cfn=(1266)
+calls=1 0 
+0 13
+0 37
+cfn=(1486)
+calls=1 0 
+0 69
+0 12
+cfn=(980)
+calls=1 0 
+0 43
+0 3
+cfn=(1488) core::ptr::drop_in_place<soapberry_zip::preserve::PreservationPlan>
+calls=1 0 
+0 149
+0 8
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 2
+cfn=(1490)
+calls=1 0 
+0 303
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 125
+0 1
+
+fn=(1656)
+0 512
+
+fn=(1422) soapberry_zip::archive::ZipFileHeaderFixed::parse
+0 165
+
+fn=(1424) soapberry_zip::preserve::central_local_header_offset_patch
+0 95
+
+fn=(1428) soapberry_zip::preserve::validate_local_span
+0 190
+cfn=(1430)
+calls=5 0 
+0 90
+0 130
+cfn=(1016)
+calls=5 0 
+0 2685
+0 220
+cfn=(1036)
+calls=5 0 
+0 545
+0 30
+cfn=(1038)
+calls=5 0 
+0 244
+0 55
+cfn=(1016)
+calls=5 0 
+0 2689
+0 105
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=5 73 
+0 101
+0 65
+cfn=(1432)
+calls=5 0 
+0 265
+0 165
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 165
+0 55
+
+fn=(880)
+0 150
+cfn=(872)
+calls=68 0 
+0 976
+
+fn=(940) soapberry_zip::archive::CompressionMethod::as_id
+0 8
+
+fn=(960)
+0 5345
+
+fn=(964) core::str::iter::SplitInternal<P>::next_back
+0 24
+cfn=(966) <core::str::pattern::CharSearcher as core::str::pattern::ReverseSearcher>::next_match_back
+calls=9 0 
+0 462
+0 28
+
+fn=(1020) litchi_opc::source_backed::read_source_at_with_context
+0 1386
+cfn=(1682) <managed_paragraph_batch_perf::CountingSource as litchi_core::source::ReadAt>::read_at
+calls=47 0 
+0 526042
+0 165
+cfn=(1022)
+calls=47 0 
+0 1707
+0 792
+cfn=(1510)
+calls=47 0 
+0 3498
+0 1419
+cfn=(1512)
+calls=47 0 
+0 1848
+0 396
+cfn=(1022)
+calls=61 0 
+0 1707
+0 198
+
+fn=(1024) <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at
+0 363
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=61 255 
+0 524919
+0 132
+
+fn=(1034)
+0 6182
+cfn=(876)
+calls=12 0 
+0 281
+0 11
+
+fn=(1156) <&str as core::str::pattern::Pattern>::is_contained_in
+0 180
+
+fn=(1160) <core::iter::adapters::skip::Skip<I> as core::iter::traits::iterator::Iterator>::try_fold
+0 51
+cfn=(1148)
+calls=47 0 
+0 378
+0 84
+cfn=(1148)
+calls=114 0 
+0 693
+0 87
+
+fn=(1240)
+0 41
+
+fn=(1262)
+0 147
+cfn=(1678)
+calls=4 0 
+0 42
+0 180
+cfn=(958)
+calls=3 0 
+0 441
+0 234
+cfn=(1678)
+calls=3 0 
+0 42
+0 87
+
+fn=(1264)
+0 9
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=3 3283 
+0 90
+0 18
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=6 3283 
+0 60
+0 14
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=5 3283 
+0 60
+0 8
+
+fn=(1294)
+0 34
+
+fn=(1396)
+0 210
+cfn=(1398)
+calls=20 0 
+0 2349
+0 93
+cfn=(1158)
+calls=4 0 
+0 1530
+0 177
+cfn=(1158)
+calls=12 0 
+0 270
+0 123
+cfn=(1076) core::slice::ascii::<impl [u8]>::eq_ignore_ascii_case_chunks
+calls=12 0 
+0 324
+0 117
+
+fn=(1434)
+0 15
+
+fn=(1436)
+0 33
+
+fn=(1538)
+0 334
+
+fn=(1550)
+0 128
+
+fn=(1596)
+0 32
+cfn=(1678)
+calls=7 0 
+0 28
+0 72
+
+fn=(1612)
+0 9
+cfn=(1482)
+calls=3 0 
+0 93
+0 111
+
+fn=(1620)
+0 16
+cfn=(1510)
+calls=1 0 
+0 106
+0 16
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=1 3283 
+0 30
+0 27
+
+fn=(1648)
+0 14
+cfn=(1096)
+calls=1 0 
+0 1465
+0 54
+cfn=(1102)
+calls=4 0 
+0 4774
+0 69
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 170
+0 4
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 14
+
+fn=(1682)
+0 207
+cfn=(1024)
+calls=4 0 
+0 28
+0 256
+cfn=(1024)
+calls=43 0 
+0 525386
+0 165
+
+fn=(564) (below main)
+cob=(2)
+cfi=(165) ./csu/../csu/libc-start.c
+cfn=(566) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 17749056
+
+fn=(874) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+0 660
+cfn=(876)
+calls=1161 0 
+0 8745
+0 297
+
+fn=(898)
+0 39
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=19 3283 
+0 90
+0 21
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=19 255 
+0 33
+0 30
+
+fn=(980)
+0 99
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 33
+0 15
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=12 3319 
+0 453
+0 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 153
+0 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 153
+0 5
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=7 3319 
+0 33
+0 220
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=9 3319 
+0 132
+0 10
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 40
+cfn=(981) alloc::sync::Arc<T,A>::drop_slow'2
+calls=2 0 
+0 319
+0 5
+cfn=(981)
+calls=2 0 
+0 199
+0 23
+cfn=(981)
+calls=2 0 
+0 88
+0 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 33
+0 11
+cfn=(1482)
+calls=1 0 
+0 31
+0 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 9
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+
+fn=(981)
+0 55
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 33
+0 12
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 186
+0 14
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=4 3319 
+0 306
+
+fn=(1060) soapberry_zip::archive::CompressionMethodId::as_method
+0 55
+
+fn=(1070)
+0 64
+cfn=(1678)
+calls=8 0 
+0 56
+0 80
+
+fn=(1088)
+0 24
+cfn=(1090)
+calls=18 0 
+0 948
+0 24
+cfn=(930)
+calls=18 0 
+0 90
+0 30
+cfn=(936)
+calls=18 0 
+0 214
+0 66
+
+fn=(1118)
+0 234111
+
+fn=(1122) quick_xml::name::NamespaceResolver::push
+0 190846
+cfn=(1124)
+calls=15497 0 
+0 182632
+0 31095
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=9 255 
+0 12
+0 158
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=10 255 
+0 64
+0 60
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=10 255 
+0 48
+0 42
+cfn=(874)
+calls=9 0 
+0 355
+0 21
+cfn=(874)
+calls=10 0 
+0 928
+0 92322
+
+fn=(1248)
+0 66
+cfn=(1148)
+calls=7 0 
+0 291
+0 36
+cfn=(1148)
+calls=7 0 
+0 291
+0 33
+cfn=(1202)
+calls=7 0 
+0 11334
+0 48
+
+fn=(1398)
+0 2478
+
+fn=(1414)
+0 45
+cfn=(1016)
+calls=1 0 
+0 537
+0 81
+cfn=(1416)
+calls=1 0 
+0 967
+0 15
+cfn=(1416)
+calls=5 0 
+0 1286
+0 63
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=5 255 
+0 150
+0 125
+cfn=(1418) soapberry_zip::preserve::central_record_span
+calls=5 0 
+0 115
+0 38
+cfn=(1420)
+calls=1 0 
+0 59
+0 18
+cfn=(1036)
+calls=1 0 
+0 109
+0 30
+cfn=(1416)
+calls=1 0 
+0 967
+0 15
+cfn=(1416)
+calls=5 0 
+0 1286
+0 63
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=5 255 
+0 150
+0 115
+cfn=(1418)
+calls=5 0 
+0 115
+0 85
+cfn=(1420)
+calls=5 0 
+0 3452
+0 55
+cfn=(1422)
+calls=5 0 
+0 165
+0 65
+cfn=(1424)
+calls=5 0 
+0 95
+0 90
+cfn=(1060)
+calls=5 0 
+0 55
+0 278
+cfn=(1036)
+calls=1 0 
+0 109
+0 5
+cfn=(1426) alloc::vec::Vec<T,A>::extend_trusted
+calls=1 0 
+0 46
+0 6
+cfn=(1062) core::slice::<impl [T]>::sort_unstable_by_key
+calls=1 0 
+0 103
+0 156
+cfn=(1428)
+calls=5 0 
+0 7799
+0 118
+
+fn=(1458)
+0 96
+
+fn=(1460)
+0 198
+
+fn=(1468)
+0 576
+
+fn=(1482)
+0 217
+
+fn=(1488)
+0 51
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 15
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 4
+cfn=(832)
+calls=1 0 
+0 3
+0 10
+
+fn=(1520)
+0 24
+cfn=(1678)
+calls=2 0 
+0 14
+0 44
+cfn=(1510)
+calls=2 0 
+0 106
+0 4
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=2 3283 
+0 30
+0 19
+cob=(2)
+cfi=(155)
+cfn=(634)
+calls=2 3283 
+0 30
+0 8
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 22
+0 4
+cfn=(1146)
+calls=2 0 
+0 1465
+0 18
+cfn=(1522)
+calls=2 0 
+0 4729365
+0 6
+cfn=(1532)
+calls=2 0 
+0 50
+0 37
+cfn=(898)
+calls=2 0 
+0 71
+0 1
+cfn=(1264)
+calls=2 0 
+0 37
+0 8
+cfn=(1264)
+calls=2 0 
+0 37
+0 26
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=2 255 
+0 30
+0 1
+
+fn=(1540)
+0 6
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+0 33
+0 5
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+0 33
+
+fn=(1626)
+0 128
+cfn=(1678)
+calls=8 0 
+0 112
+0 208
+
+fn=(1630)
+0 15
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=1 73 
+0 29
+0 28
+cfn=(1678)
+calls=1 0 
+0 14
+0 46
+cfn=(1522)
+calls=1 0 
+0 4727349
+0 5
+cfn=(1596)
+calls=1 0 
+0 66
+0 4
+
+fn=(1636)
+0 7
+
+fn=(1668)
+0 18
+
+fn=(1670)
+0 36
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 459
+0 7
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 60
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 537
+0 13
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 181
+0 44
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2 3319 
+0 356
+0 19
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+
+fn=(1290) litchi_docx::document::transaction::checked_range
+0 7680
+
+fn=(1426)
+0 46
+
+fn=(818)
+cfn=(820)
+calls=0 0 
+0 17749056
+
+fn=(966)
+0 152
+cfn=(968)
+calls=18 0 
+0 402
+0 80
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=18 73 
+0 40
+0 88
+
+fn=(968)
+0 3600
+
+fn=(1018)
+0 858
+cfn=(1020)
+calls=61 0 
+0 539158
+0 528
+
+fn=(1022)
+0 1900
+cfn=(1678)
+calls=92 0 
+0 1288
+0 1986
+
+fn=(1038)
+0 110
+cob=(2)
+cfi=(218)
+cfn=(784)
+calls=5 198 
+0 59
+0 119
+
+fn=(1044)
+0 460
+cfn=(1046)
+calls=10 0 
+0 300
+0 820
+
+fn=(1062)
+0 10
+cfn=(1064)
+calls=1 0 
+0 91
+0 2
+
+fn=(1076)
+0 432
+
+fn=(1106)
+0 258552
+cfn=(1108) memchr::arch::x86_64::avx2::memchr::Two::find_raw
+calls=34451 0 
+0 344576
+0 36936
+
+fn=(1108)
+0 123117
+cfn=(1110)
+calls=32834 0 
+0 196704
+0 24755
+
+fn=(1120)
+0 400274
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=16942 255 
+0 110717
+0 135458
+cfn=(1098)
+calls=549 0 
+0 2542
+0 61
+cfn=(874)
+calls=1076 0 
+0 2904
+0 39
+
+fn=(1150)
+0 1043
+
+fn=(1154)
+0 102
+cfn=(1156)
+calls=47 0 
+0 180
+0 705
+cfn=(1158)
+calls=47 0 
+0 777
+0 45
+cfn=(1160)
+calls=47 0 
+0 1293
+0 18
+cfn=(1162)
+calls=47 0 
+0 993
+0 93
+cfn=(1148)
+calls=67 0 
+0 348
+0 147
+cfn=(1158)
+calls=47 0 
+0 465
+0 12
+cfn=(1164)
+calls=47 0 
+0 423
+0 18
+
+fn=(1250)
+0 36
+cfn=(1678)
+calls=4 0 
+0 28
+0 32
+cfn=(1252)
+calls=6 0 
+0 600
+0 26
+
+fn=(1254)
+0 18
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=5 73 
+0 29
+0 10
+
+fn=(1370)
+0 30780
+cfn=(1124)
+calls=6156 0 
+0 90662
+0 46224
+
+fn=(1380)
+0 168
+
+fn=(1418)
+0 230
+
+fn=(1462)
+0 20
+
+fn=(1464) soapberry_zip::preserve::write_prepared_local
+0 277
+cfn=(1016)
+calls=12 0 
+0 530842
+0 96
+cfn=(952)
+calls=12 0 
+0 531818
+0 56
+cfn=(948)
+calls=1 0 
+0 599
+0 64
+cfn=(952)
+calls=1 0 
+0 29428
+
+fn=(1472) soapberry_zip::preserve::PreparedCentral::bytes
+0 70
+
+fn=(1476) core::ptr::drop_in_place<soapberry_zip::preserve::OutputLayout>
+0 6
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 5
+
+fn=(1664)
+0 13
+cfn=(1482)
+calls=1 0 
+0 31
+0 13
+
+fn=(938) soapberry_zip::writer::prepare_sized_member_with_path
+0 251
+cfn=(940)
+calls=1 0 
+0 4
+0 58
+
+fn=(1078)
+0 65
+cfn=(1080)
+calls=21 0 
+0 3330
+0 75
+cfn=(958)
+calls=21 0 
+0 1094
+0 190
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=15 73 
+0 95
+0 140
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=15 3319 
+0 165
+0 70
+cfn=(1080)
+calls=5 0 
+0 3423
+0 70
+cfn=(958)
+calls=5 0 
+0 1059
+0 190
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=5 73 
+0 101
+0 140
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=5 3319 
+0 165
+0 5
+
+fn=(1080)
+0 272
+cfn=(1050)
+calls=42 0 
+0 10242
+0 576
+
+fn=(1092)
+0 17
+
+fn=(1096)
+0 70
+cfn=(1098)
+calls=22 0 
+0 495
+0 50
+cfn=(874)
+calls=22 0 
+0 650
+0 305
+cfn=(874)
+calls=22 0 
+0 2165
+0 35
+cfn=(874)
+calls=22 0 
+0 2700
+0 20
+
+fn=(1102)
+0 146672
+cfn=(1286)
+calls=6 0 
+0 154
+0 15370
+cfn=(1286)
+calls=9231 0 
+0 948096
+0 16408
+cfn=(1286)
+calls=12321 0 
+0 1012242
+0 96388
+cfn=(1122)
+calls=9237 0 
+0 248034
+0 377614
+cfn=(1106)
+calls=12312 0 
+0 320124
+0 221581
+cfn=(1114)
+calls=6161 0 
+0 187936
+0 89240
+cfn=(1114)
+calls=6186 0 
+0 187758
+0 24678
+cfn=(1114)
+calls=68 0 
+0 365
+0 48
+cfn=(1114)
+calls=68 0 
+0 528
+0 111009
+cfn=(1122)
+calls=6161 0 
+0 249150
+0 27701
+cfn=(1122)
+calls=25 0 
+0 1399
+0 112868
+cfn=(1168)
+calls=6161 0 
+0 280351
+0 55400
+cfn=(1120)
+calls=6186 0 
+0 326335
+0 24621
+
+fn=(1136)
+0 701379
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=43066 73 
+0 184579
+0 498339
+
+fn=(1158)
+0 432
+cfn=(1148)
+calls=4 0 
+0 291
+0 36
+cfn=(1148)
+calls=4 0 
+0 291
+0 33
+cfn=(1076)
+calls=4 0 
+0 108
+0 1497
+cfn=(1148)
+calls=47 0 
+0 378
+0 30
+
+fn=(1168)
+0 267660
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=13866 73 
+0 92824
+0 170751
+
+fn=(1260)
+0 201
+
+fn=(1266)
+0 26
+
+fn=(1284)
+0 14
+cfn=(1096)
+calls=4 0 
+0 1219
+0 39527
+cfn=(1102)
+calls=14356 0 
+0 1333293
+0 43068
+cfn=(1288)
+calls=14356 0 
+0 333708
+0 77933
+cfn=(1124)
+calls=4617 0 
+0 45197
+0 64133
+cfn=(1308)
+calls=10767 0 
+0 61013
+0 61013
+cfn=(1308)
+calls=10767 0 
+0 61013
+0 152787
+cfn=(1128)
+calls=4614 0 
+0 250694
+0 8204
+cfn=(1128)
+calls=9742 0 
+0 264547
+0 80996
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=2048 3319 
+0 16896
+0 6152
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=12304 3319 
+0 101508
+0 83032
+cfn=(1290)
+calls=2048 0 
+0 7680
+0 30236
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=6152 73 
+0 26146
+0 21532
+cfn=(1132)
+calls=6152 0 
+0 63058
+0 21577
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=4 73 
+0 17
+0 16910
+cob=(2)
+cfi=(235)
+cfn=(1082)
+calls=4 73 
+0 17
+0 7
+cfn=(1132)
+calls=4 0 
+0 41
+0 72817
+cfn=(1098)
+calls=6 0 
+0 562
+0 18
+cfn=(1098)
+calls=32 0 
+0 3998
+0 31
+cfn=(1170)
+calls=4 0 
+0 4
+0 46
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=3 3319 
+0 175
+0 2
+cfn=(1172)
+calls=4 0 
+0 441
+0 1
+
+fn=(1388)
+0 9
+
+fn=(1400)
+0 46
+cfn=(964)
+calls=9 0 
+0 514
+0 34
+cfn=(966)
+calls=9 0 
+0 300
+0 92
+
+fn=(1442)
+0 8
+
+fn=(1444)
+0 21
+
+fn=(1446)
+0 85
+cfn=(1448)
+calls=1 0 
+0 15709
+0 13
+cfn=(1454)
+calls=1 0 
+0 1626
+0 27
+cob=(2)
+cfi=(218)
+cfn=(784)
+calls=1 198 
+0 65555
+0 19
+cfn=(1464)
+calls=1 0 
+0 30084
+0 24
+cfn=(1464)
+calls=4 0 
+0 1063096
+0 179
+cfn=(1472)
+calls=5 0 
+0 70
+0 77
+cfn=(952)
+calls=4 0 
+0 2484
+0 14
+cfn=(948)
+calls=1 0 
+0 599
+0 52
+cfn=(948)
+calls=5 0 
+0 3010
+0 56
+cfn=(948)
+calls=1 0 
+0 598
+0 37
+cfn=(952)
+calls=4 0 
+0 2484
+0 26
+cfn=(948)
+calls=1 0 
+0 598
+0 10
+cfn=(952)
+calls=1 0 
+0 20
+0 4
+cfn=(1474)
+calls=1 0 
+0 266
+0 6
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 65
+0 2
+cfn=(1476)
+calls=1 0 
+0 44
+0 5
+cfn=(1478)
+calls=1 0 
+0 34
+0 8
+cfn=(1478)
+calls=4 0 
+0 215
+0 19
+cob=(2)
+cfi=(155)
+cfn=(746)
+calls=1 3319 
+0 33
+0 13
+
+fn=(1450)
+0 37
+cfn=(926)
+calls=1 0 
+0 293
+0 14
+cfn=(930)
+calls=1 0 
+0 45
+0 11
+cfn=(938)
+calls=1 0 
+0 313
+0 16
+cfn=(936)
+calls=1 0 
+0 13129
+0 6
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 30
+0 6
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 30
+0 13
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 30
+0 26
+cfn=(876)
+calls=1 0 
+0 75
+0 31
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 11
+0 22
+cfn=(942)
+calls=1 0 
+0 26
+0 19
+cfn=(876)
+calls=1 0 
+0 75
+0 36
+cfn=(940)
+calls=1 0 
+0 4
+0 47
+cfn=(1452)
+calls=1 0 
+0 35
+0 15
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1 255 
+0 11
+0 44
+
+fn=(1456)
+0 121
+
+fn=(1666)
+0 32
+cfn=(1678)
+calls=1 0 
+0 14
+0 25
+
+fn=(1672)
+cfn=(1386)
+calls=1 0 
+0 17749056
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(6)
+cfi=(164)
+cfn=(564)
+calls=0 0 
+0 17749056
+
+ob=(3) ???
+fl=(152) ???
+fn=(710) 0x0000000004a77680
+0 42
+cob=(2)
+cfi=(202)
+cfn=(712)
+calls=1129 255 
+0 605
+
+ob=(2)
+fl=(235)
+fn=(1082)
+73 38551
++7 38551
++1 38551
++3 1549
++1 1549
++1 1549
++4 1549
++1 1549
++2 1549
++1 1549
++3 7
++1 7
++1 7
++3 7
++1 7
++3 7
++1 7
++3 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++3 2
++1 2
++33 8
++10 8
++1 8
++1 8
++3 16
++69 2
++3 2
++2 2
++2 2
++5 2
++1 2
++2 2
++1 2
++2 2
++1 2
++2 2
++1 2
++2 2
++1 2
++1 2
++1 2
++1 2
++1 2
+-17 446
++1 446
++2 446
++1 446
++2 446
++1 446
++2 446
++1 446
++2 446
++1 446
++1 446
++1 446
++1 446
++1 446
++1 448
++2 448
++1 448
++2 2
++2 2
++1 2
++42 2
++1 2
++1 2
++1 2
++1 2
++1 4
++5 5
++1 5
++1 5
++1 5
++1 5
++3 1547
++1 1547
++1 1547
++1 1547
++1 1547
++1 3094
++59 37002
++1 37002
++5 6193
++1 6193
++1 6193
++1 6193
++1 6193
++3 5284
++1 5284
++1 5284
++1 5284
++3 5284
++1 5284
++1 5276
++1 10552
++6 909
++1 909
++2 907
++1 907
++2 907
++1 907
++18 30809
++1 30809
++1 30809
++1 30809
++2 30809
++53 2
++1 2
++1 2
++1 2
++1 2
++4 2
++1 2
++1 2
++1 2
++1 2
++1 2
++2 2
++2 2
++24 907
++1 907
++1 907
++1 907
++1 907
++1 907
++1 907
++1 907
++1 907
++1 907
++2 907
++2 907
+
+fl=(165)
+fn=(566)
+cfi=(167) ./csu/../sysdeps/nptl/libc_start_call_main.h
+cfn=(588) (below main)
+calls=0 30 
+360 17749056
+
+fl=(167)
+fn=(588)
+cob=(6)
+cfi=(164)
+cfn=(596)
+calls=0 0 
+59 17749056
+
+fl=(155)
+fn=(716) _int_free_merge_chunk
+4407 696
++7 435
+-6 87
++9 261
++5 261
++4 174
+-1 174
++1 174
+1895 261
+4433 174
++2 12
++2 12
++1 48
++2 12
+-4 12
++4 12
+cfn=(778) unlink_chunk.isra.0
+calls=1081 1592 
+* 228
++18 174
++6 168
++4 69
++4 168
++9 6
+-1 6
++2 12
++2 18
++7 156
++1 312
++1 78
++2 156
++3 468
++4 78
+-1 78
++2 78
++1 78
++2 234
++1 78
+-61 78
+-1 156
++1 468
+-1 78
+cfn=(718) _int_free_maybe_trim
+calls=2112 +83 
+* 1872
++57 6
+-1 6
++2 6
++1 6
++2 18
++1 6
+-61 6
+-1 12
++1 36
+-1 6
+cfn=(718)
+calls=913 +83 
+* 144
++1 3
+-1 6
++1 18
+-1 3
+cfn=(718)
+calls=15 +83 
+* 102
++70 3
++1 9
++1 6
+-52 15
++1 15
+-1 15
+cfn=(778)
+calls=88 1592 
+* 300
++1 15
+-49 435
+
+fn=(634)
+3283 12432
+1269 24864
++19 12432
+3287 12432
+1288 32673
+3287 15618
++2 23415
++2 15610
++2 74568
+3030 24800
++4 49600
++4 12400
++1 12400
+3294 12400
+-7 9246
++19 32
+cfn=(636) __libc_malloc2
+calls=363 -59 
+* 5599
+-17 9246
+
+fn=(636)
+3247 192
++4 64
++28 160
+-26 96
+cfn=(638) _int_malloc
+calls=363 3790 
+* 4863
++1 160
+fi=(154) ./malloc/./malloc/arena.c
+151 64
+fe=(155)
+
+fn=(718)
+4528 957
++3 174
++2 12
++3 18
++14 957
+
+fn=(704)
+3380 76
++7 76
+-7 342
++11 76
+4837 38
++1 38
+-1 38
++1 38
+-1 76
++2 114
+3425 31
+-22 31
++22 155
++4 62
+1288 186
+3436 62
+fi=(154)
+151 93
+fe=(155)
+3469 62
+4840 38
+3411 76
++2 14
++1 14
++36 7
++51 342
+-30 124
+cfn=(708) _int_realloc
+calls=1221 4559 
+* 9926
+* 31
++1 155
+fi=(154)
+151 93
+fe=(155)
+3472 62
+
+fn=(708)
+4559 124
++11 372
++8 62
++2 31
++1 93
++1 124
++4 62
++14 10
++53 20
+-53 20
++57 10
+-57 10
++57 20
+-2 20
++2 8
++1 4
++16 4
++1 16
+-1 6
++1 108
+-79 62
++12 62
++12 147
+cfn=(638)
+calls=1131 3790 
+* 3714
+* 21
++1 42
++3 21
++6 63
++36 6
+-4 6
++3 6
++5 6
+-4 6
+-1 6
++5 6
+-4 6
++4 6
+-1 6
++1 18
+cfn=(714) _int_free_chunk
+calls=16 4351 
+* 694
+* 6
+-60 14
+-1 28
++5 60
+cfn=(778)
+calls=22 1592 
+* 196
++44 50
+-48 20
++28 21
+fi=(213) ./malloc/../string/bits/string_fortified.h
+29 21
+fe=(155)
+4637 21
+fi=(213)
+29 42
+fe=(155)
+4638 42
+fi=(213)
+29 21
+cob=(3)
+cfi=(152)
+cfn=(710)
+calls=1129 -29 
+* 647
+fe=(155)
+4642 126
+cfn=(714)
+calls=1129 4351 
+* 2541
++2 42
+
+fn=(746)
+3319 12482
++3 24964
++15 24964
+-4 37446
++8 37446
++6 37431
++6 12477
+-3 24954
++3 12477
+-3 12477
++1 24954
++2 37431
+3007 12422
++8 12422
+-12 12422
++4 37266
++1 12422
++7 12422
+3354 12422
++10 165
+-34 60
++40 120
+fi=(154)
+151 180
+fe=(155)
+3374 180
+cfn=(714)
+calls=1899 4351 
+* 7541
+
+fn=(778)
+1592 63
++2 189
+-2 63
++2 126
++3 63
++3 126
+-2 63
++2 126
++3 63
++1 63
++1 153
++2 12
++1 18
++3 12
++14 6
++1 6
++3 126
+
+fn=(638)
+3790 477
++32 106
+1288 311
+3831 92
++16 92
++54 30
++18 43
+-1 43
++12 86
+-11 86
+-1 129
++12 86
+-6 24
++5 24
+-7 24
++2 48
++9 48
++3 48
+-3 4
++3 4
++1 78
+-3 26
++5 26
++1 104
++2 104
+-10 26
++12 52
++1 52
++2 52
++11 90
++29 7
++1 7
++4 14
++31 14
++8 28
++1 2
++1 2
+-1 2
++4 4
+-4 3
++1 3
+-1 3
++4 6
++50 24
++9 12
+-9 48
++1 12
++1 12
++1 12
++1 12
++6 24
+3053 1
+-27 1
++27 1
+-27 1
++4 2
++4 4
++4 1
++1 1
+4113 1
+3831 28
+1288 7
+3850 7
++2 7
+-2 7
++2 14
+-2 40
++2 40
+-2 40
++2 80
++2 10
++1 20
++2 10
++1 10
++1 10
++2 40
++6 30
++1 20
+2919 20
+3872 30
++4 95
++1 30
++2 10
++2 5
++1 5
++1 10
++2 5
+2999 5
++16 5
+3886 5
+3003 10
++4 20
++1 5
++7 5
++32 25
+1888 10
+3893 10
+1888 20
+4340 477
+3901 78
+-52 240
+4105 36
+3930 39
+4111 44
++13 29
+-2 58
++2 12
++3 6
+-3 6
++3 12
++1 4
++3 4
++1 10
++6 4
++5 2
++1 4
+-1 8
++1 2
+cfn=(778)
+calls=9 1592 
+* 62
++3 12
++13 1
++1 2
++3 1
+-8 1
++8 2
++1 1
++1 1
++1 2
+4277 6
++3 24
++2 9
++1 3
+1888 3
+4286 3
+1888 6
+4280 120
++2 45
++1 15
+1888 15
+4286 15
+1888 38
+4286 8
+1888 16
+3994 1
++1 1
+-1 1
++1 2
+2919 2
+3998 3
++4 2
++1 3
+3003 1
+3981 1
+3015 1
+4006 1
+3003 1
++4 4
++1 1
++7 1
+4007 1
++24 12
++52 5
+-51 5
++51 15
+3959 38
++2 19
+-1 38
++27 6
++1 6
++4 12
++31 25
++2 10
++1 15
++1 5
+-1 5
++1 5
+-2 4
++1 6
++1 2
+-1 2
++1 5
++4 12
+4195 27
++1 27
++1 27
+-1 27
++1 27
++1 54
++1 81
++5 164
++16 150
++2 300
+-4 398
++8 49
++3 98
++2 50
++1 25
++1 25
+-2 25
+-27 25
++4 24
++3 20
++97 6
++1 9
++2 6
++3 12
++5 3
+-2 3
++2 6
+-2 3
++7 3
+-8 3
++3 3
++2 3
+-3 3
++1 12
++2 3
+1888 9
+4208 5
++5 20
++1 10
++24 48
++3 48
++2 24
++3 48
+-3 96
++3 24
+cfn=(778)
+calls=174 1592 
+* 492
++3 144
++15 17
++1 34
++3 17
+-9 17
++9 34
++1 17
++1 17
++3 34
++1 16
++1 37
+-23 8
+-1 8
++1 16
+3965 13
++3 13
+-4 26
++3 13
+-1 13
++1 26
++1 26
++1 26
++6 13
++6 13
+-6 91
++2 39
++5 13
+-4 13
++4 26
+cfn=(646) alloc_perturb
+calls=32 1887 
+* 65
++1 13
+
+fn=(646)
+1887 13
++1 39
++2 13
+
+fn=(714)
+4351 348
++8 87
+-3 87
++3 87
+-3 174
++6 174
++6 87
+cfn=(716)
+calls=3040 +39 
+* 9297
++5 174
++27 261
+
+fl=(218)
+fn=(784)
+198 18
++1 36
++5 18
++1 18
++1 8
++1 8
++1 8
++2 4
++1 4
++1 8
++9 1
++1 1
++2 2
++5 4
++1 4
++6 2
++1 2
++12 2
++3 2
++1 2
++12 1
++1 1
++13 1
++1 1
++2 1
++18 1
++1 1
++1 1
++1 1
++3 2
++15 2
++1 2
++1 2
++1 2
++1 2
++1 131073
++5 2
++2 4
++8 10
++9 10
++1 10
++5 3
++1 3
++1 1
++1 1
++1 1
++1 1
++1 1
++3 1
++17 7
++1 7
++1 7
++9 2
++1 2
++5 2
+
+fl=(202)
+fn=(712)
+255 15070
++1 15070
++6 15070
++1 15070
++2 3684
++1 3684
++1 3684
++3 28
++1 28
++1 28
++3 56
++30 11386
++1 11386
++2 10830
++1 10830
++2 10802
++4 10802
++1 10764
++1 10764
++1 10759
++1 10759
++1 10752
++1 10752
++2 10752
++2 10752
+-2 7
++2 12
++6 38
++1 38
++1 38
++1 38
++1 38
++7 556
++1 556
++1 556
++1 556
++2 556
++17 28
++1 28
++1 28
++1 28
++1 28
++7 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 10
++5 3656
++1 3656
++5 3639
++1 3639
++2 3616
++1 3616
++1 3616
++2 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 3611
++1 7222
++4 23
++1 23
++4 23
++2 23
++4 23
++1 23
++11 23
++3 23
++2 23
++2 23
++4 23
++1 23
++9 22
++1 22
++2 22
++2 22
++1 22
++1 22
++3 22
++2 22
++2 22
++2 44
++6 22
++1 22
++1 22
++1 22
++1 22
++1 22
++1 22
++1 22
++1 22
++1 22
++1 22
++1 22
+-11 83
++1 83
++1 83
++1 83
++1 83
++1 83
++1 83
++1 83
++1 83
++1 83
++1 83
++1 83
++2 22
++1 22
++1 22
++1 22
++2 22
++4 44
++13 1
++1 1
++2 1
++1 1
++1 1
++2 1
++2 1
++2 2
++6 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
+-11 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++1 6
++2 1
++1 1
++1 1
++1 1
++2 1
++1 2
++9 17
++7 17
++1 17
++30 17
++1 17
++4 17
++2 17
++3 17
++4 17
++1 17
++4 17
++4 17
++24 17
++2 17
++2 17
++2 17
++3 17
++1 17
++2 1076976
++3 17
++2 17
++2 34
+
+totals: 17749056

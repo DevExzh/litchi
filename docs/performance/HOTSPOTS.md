@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## 0517: remove a duplicate shared OPC source-XML validation pass
+
+[0517](changes/0517-opc-source-xml-validation.md) retains the initial complete
+source/destination/XML proof and replaces the later duplicate scan with a
+source freshness and cancellation check. All 48 same-route DOCX comparisons
+improve lifecycle p50 by 1.87–14.09%; scoped publication instruction counts fall
+about 17.9–21.1%. No adverse lifecycle, publication or whole-child RSS threshold
+is triggered; short open/commit/drop flags remain explicit in the report.
+This measures synthetic DOCX cases, not every OPC caller. The source-snapshot
+construction path remains roughly half to two-thirds of publication CPU and
+is the next measured investigation target. Historical 0499/0500 flags and
+broader coverage/scaling requirements remain open. OLE2/OOXML remain the
+priority; ODF is deferred until that optimization goal is complete.
+
 ## 0516: reject XLSX emitted-output parser fusion
 
 [0516](changes/0516-xlsx-output-fusion-rejection.md) passes all 1,284 candidate
@@ -12,14 +26,15 @@ production is restored. Two independent no-op fixture fixes remain, with
 1,263 tests passing on unchanged production. OLE2/OOXML work remains active;
 ODF is deferred and iWork excluded.
 
-## Current priority after 0516: OLE2 and OOXML
+## Current priority after 0517: OLE2 and OOXML
 
-Per the user's September 11 instruction, prioritize OLE2 and OOXML performance
+Per the user's instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
 deferred until then. This overrides the ordering of older entries below.
 CFB profiling and FAT batching are complete in 0511. The 0514 source-pass
-fusion and 0516 emitted-output fusion are rejected. Next, investigate DOCX
-publication CPU with source-bound profiling while retaining the 0499/0500
+fusion and 0516 emitted-output fusion are rejected. The 0517 DOCX publication
+profile supports removing duplicate OPC XML validation; next investigate the
+remaining current-source snapshot construction while retaining the 0499/0500
 review flags. This investigation queue is not a completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).

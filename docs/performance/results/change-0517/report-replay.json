@@ -1,0 +1,76 @@
+{
+  "reports": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0517/analyze_native.py",
+        "--json",
+        "/tmp/litchi-goal-0517/report-replay/native-analysis.json",
+        "--markdown",
+        "/tmp/litchi-goal-0517/report-replay/native-analysis.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "38bbab57a1881826185d28f81a9a68f52e8b1b4cbbd6bbe2c19fc4d42d50d52b",
+      "output_sha256": {
+        "native-analysis.json": "dc136c1de57e72982bffe3400edf66229599358be04f707301647ce82926f740",
+        "native-analysis.md": "fdba6e7d6b6d29ec8ccd727184e241b204beeb0207b6c6cd0ed5a9a5c975f50f"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0517/analyze_native.py",
+        "--lanes",
+        "after-r1",
+        "after-r2",
+        "--json",
+        "/tmp/litchi-goal-0517/report-replay/candidate-native-analysis.json",
+        "--markdown",
+        "/tmp/litchi-goal-0517/report-replay/candidate-native-analysis.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "38bbab57a1881826185d28f81a9a68f52e8b1b4cbbd6bbe2c19fc4d42d50d52b",
+      "output_sha256": {
+        "candidate-native-analysis.json": "9b32d1f879c2c019d4762a0aee374847142e54636e14e23bc4794937e1805aa1",
+        "candidate-native-analysis.md": "432705dcfe6919be7cc4fe24adb9ddc09285e3a45b7422db2ec698e6def9e2ce"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0517/compare_candidate.py",
+        "--json",
+        "/tmp/litchi-goal-0517/report-replay/candidate-comparison.json",
+        "--markdown",
+        "/tmp/litchi-goal-0517/report-replay/candidate-comparison.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "244a8489bca661913e3954853ecdc457a3f116c35576464ff44b62dde2f4eb34",
+      "output_sha256": {
+        "candidate-comparison.json": "158a4639d647b7ebfd36d971271d4c52a70e40c9132cbadbd8b6fb93ffb835bd",
+        "candidate-comparison.md": "91ebf9b0cbb6ab2ecedf2772aac6ec6029d10031c4ee301a7be99e6107acccd4"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0517/compare_profile_lanes.py",
+        "--json",
+        "/tmp/litchi-goal-0517/report-replay/profile-comparison.json",
+        "--markdown",
+        "/tmp/litchi-goal-0517/report-replay/profile-comparison.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "3a095c85c5082f28d7543006e7a8ba2b3badf8183ad24de3844df6d8188f2afa",
+      "output_sha256": {
+        "profile-comparison.json": "af7884f01eff94951b04e703903e998cddd1e77641eb38bd51dc487259dc1968",
+        "profile-comparison.md": "7942c4f0307537a5881d07e2a16b7ea1dc76fd5bba379e82913c2d88357685cb"
+      }
+    }
+  ],
+  "temporary_replay_removed": true
+}

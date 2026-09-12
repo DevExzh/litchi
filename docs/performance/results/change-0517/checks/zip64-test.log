@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized] target(s) in 0.08s
+     Running tests/external_zip64_source.rs (/home/zhuhe/litchi-goal-0517-target/debug/deps/external_zip64_source-94425982ecf9a6c6)
+
+running 1 test
+test independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

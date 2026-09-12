@@ -1,0 +1,12 @@
+{
+  "base_revision": "201f65094ff0ca6186fbf1e2ffa6b3641290253b",
+  "prior_turn": "progress: 0516 committed test repairs and rejected a slower XLSX candidate with verified cleanup",
+  "priority": "OLE2/OOXML until full optimization goal complete; ODF deferred; iWork excluded",
+  "scope": "Attribute current managed DOCX paragraph publication CPU before choosing an optimization",
+  "stage": "read-only baseline build and symbol discovery; measurement protocol will be frozen before captures",
+  "owned_scratch": [
+    "/tmp/litchi-goal-0517",
+    "/home/zhuhe/litchi-goal-0517-target"
+  ],
+  "started_utc": "2026-09-12T01:29:39.006599+00:00"
+}

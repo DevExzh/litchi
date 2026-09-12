@@ -1,5 +1,19 @@
 # Performance optimization ADR-compliance matrix
 
+## 0517: reuse a proof within one immutable publication call
+
+The [0517 proof matrix](results/change-0517/publication-map.md) and
+[independent review](results/change-0517/semantic-review.md) establish that
+candidate bytes, content type and destination limits cannot change between
+the initial full validation and transfer registration. The latter now rechecks
+source freshness and cancellation without repeating the XML scan. Source
+lineage/original-byte checks, full initial validation, semantic readback,
+preservation, signatures/encryption, bounded sinks and partial-output errors
+remain intact. Reduced work charges reflect eliminated work; limits are not
+raised. No public API, dependency, executor or unsafe-code change is introduced.
+The accepted ADR/index hashes remain unchanged. ODF stays deferred behind the
+full OLE2/OOXML goal.
+
 ## 0516: preserve admission and publication boundaries
 
 The [0516 matrix](results/change-0516/adr-matrix.md) and final semantic/resource

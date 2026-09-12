@@ -17,8 +17,8 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Resource,
 };
 use litchi_opc::{
-    AuthoredXmlFragment, OpcError, PackURI, ReadLimits, SourceBackedPackage, SourceTopologyPlan,
-    authored_xml_requires_source_proof,
+    AuthoredXmlFragment, OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage,
+    SourceTopologyPlan, authored_xml_requires_source_proof,
 };
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -394,11 +394,13 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
         )
         .expect("source addition must stage before destination validation");
     let mut depth_output = Vec::new();
-    assert!(
-        depth_destination
-            .write_topology_to_stream(&mut depth_output, depth_plan)
-            .is_err()
-    );
+    assert!(matches!(
+        depth_destination.write_topology_to_stream(&mut depth_output, depth_plan),
+        Err(OpcError::ReadLimit {
+            resource: ReadResource::XmlDepth,
+            ..
+        })
+    ));
     assert!(depth_output.is_empty());
 
     let event_limits = ReadLimits::builder()
@@ -412,11 +414,13 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
         .try_add_source_xml_part(PackURI::new("/custom/copied.xml").unwrap(), source_xml)
         .expect("source addition must stage before destination validation");
     let mut event_output = Vec::new();
-    assert!(
-        event_destination
-            .write_topology_to_stream(&mut event_output, event_plan)
-            .is_err()
-    );
+    assert!(matches!(
+        event_destination.write_topology_to_stream(&mut event_output, event_plan),
+        Err(OpcError::ReadLimit {
+            resource: ReadResource::XmlEvents,
+            ..
+        })
+    ));
     assert!(event_output.is_empty());
 }
 

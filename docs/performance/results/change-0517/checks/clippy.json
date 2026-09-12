@@ -1,0 +1,32 @@
+{
+  "command": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "-p",
+    "litchi-opc",
+    "-p",
+    "litchi-docx",
+    "--all-features",
+    "--lib",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "started_utc": "2026-09-12T02:06:40.568642+00:00",
+  "elapsed_seconds": 20.283704009998473,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+  "log_sha256": "42fa429d67f8a065baf129b86dd645dca2ca942009ecd9e74be2273f3bbc60aa",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0517-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0517",
+    "RUSTDOCFLAGS": "-D warnings"
+  }
+}
