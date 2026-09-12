@@ -1,0 +1,27 @@
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -1176,17 +1176,18 @@
+     /// markers are inert; rejecting them would refuse files that Word itself
+     /// opens.
+     fn validate_physical_sector_layout(&self) -> Result<(), OleError> {
+-        for (sector, role) in self.sector_roles.iter().enumerate() {
+-            let entry = self.fat.get(sector).copied().ok_or_else(|| {
+-                OleError::CorruptedFile(format!(
+-                    "FAT does not contain an entry for physical sector {sector}"
+-                ))
+-            })?;
++        for (sector, (role, &entry)) in self.sector_roles.iter().zip(&self.fat).enumerate() {
+             if *role == PhysicalSectorRole::Unclaimed && entry != FREESECT {
+                 return Err(OleError::CorruptedFile(format!(
+                     "unclaimed physical sector {sector} has FAT marker 0x{entry:08X}"
+                 )));
+             }
++        }
++        if self.fat.len() < self.sector_roles.len() {
++            let sector = self.fat.len();
++            return Err(OleError::CorruptedFile(format!(
++                "FAT does not contain an entry for physical sector {sector}"
++            )));
+         }
+         Ok(())
+     }

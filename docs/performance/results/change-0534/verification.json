@@ -1,0 +1,524 @@
+{
+  "schema": "litchi-0534-postcleanup-verification-v1",
+  "status": "pass",
+  "scope": "All verifier components replayed after cleanup",
+  "verifier_sha256": "4536a0a7de8450773b159c4ac33e7d3f7ce2d2e99c64fc9735ba151ad9f13104",
+  "source": {
+    "status": "pass",
+    "baseline": {
+      "stage": "baseline",
+      "manifest_sha256": "ce5a705508299624c2611d525940ce1502b3b9f20196814cf449e9286f8f11d6",
+      "manifest_entries": 8585,
+      "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_files": [],
+      "new_files": []
+    },
+    "candidate": {
+      "stage": "candidate",
+      "manifest_sha256": "232a89a94851140ddbe47b9f48387248be900ebbdb81f2c75b826740fa744252",
+      "manifest_entries": 8585,
+      "patch_sha256": "ce5a70b56fe9ad07ce24e6c512a63ef94efa754f0ad8fc85e3f647aaf1c0eeec",
+      "changed_files": [
+        "crates/litchi-cfb/src/file.rs"
+      ],
+      "new_files": []
+    },
+    "final": {
+      "stage": "final",
+      "manifest_sha256": "9d6a53738f299107582b71e5ddab03922b9646771df4d77b639b3fdc7fd6ff75",
+      "manifest_entries": 8585,
+      "patch_sha256": "57272cdf8b494018b855fdce9165deba3463156ac255b6228802d2568f331219",
+      "changed_files": [
+        "crates/litchi-cfb/src/file.rs"
+      ],
+      "new_files": []
+    },
+    "adr": {
+      "status": "pass",
+      "entries": 30,
+      "sha256": "8aed97d378425650f3b355a3bd0ec5d2eb8000b9d28ba2a900cd8f35585e541f"
+    },
+    "selected": "final",
+    "capture_inputs": {
+      "status": "pass",
+      "sha256": "4df14c29de089ff161661b270ce6d71ceb9b345e36b1f1cad485e6508184c7e6",
+      "files": {
+        "capture_baseline.py": "6210076b25298765dc0445cba9ffb898974efa764d297edeba2f891aca49b854",
+        "capture_candidate.py": "c3296952d479d2937c9a19a76a90d20c5d7a17fc258a48012f82d73f24baaf5d",
+        "inspect_assembly.py": "c7beb8cf2b5ad29b179e1ee40ab4315f1da3bc8263b4d545159e29e2e39c4d2f",
+        "candidate.patch": "8d6d393f6dc96aca8fbf89884790ab379047b24f57a8f0a563fd11bea3a96432"
+      }
+    },
+    "patch_composition": {
+      "status": "pass",
+      "source_hashes": {
+        "candidate": "a7dfb85e47de862f80350c335d4badc97df0b9cc68aa9ef1d2b8bd2309588e6f",
+        "final": "72fb5295dfbba5f3ed2192a9c24ecbf7d8aa2759f418b77563a4e2ff1042d03b"
+      },
+      "patch_hashes": {
+        "candidate.patch": "8d6d393f6dc96aca8fbf89884790ab379047b24f57a8f0a563fd11bea3a96432",
+        "tests.patch": "d9af40480d8fa20c631d4cc2a56ee7f7c391c19d63af8517607887ecc3f92dcb"
+      }
+    },
+    "manifests": {
+      "baseline": "ce5a705508299624c2611d525940ce1502b3b9f20196814cf449e9286f8f11d6",
+      "candidate": "232a89a94851140ddbe47b9f48387248be900ebbdb81f2c75b826740fa744252",
+      "final": "9d6a53738f299107582b71e5ddab03922b9646771df4d77b639b3fdc7fd6ff75"
+    }
+  },
+  "builds": {
+    "baseline": {
+      "normal": {
+        "kind": "normal",
+        "path": "/tmp/litchi-goal-0534/baseline/normal",
+        "sha256": "44c80a425a719441e0182d4a7932fcbe6309a84a816a75d75c764e90a0a13e0f",
+        "bytes": 60140440,
+        "identity_sha256": "7d0d77f41fcbecfb12b8291e27fa023a0ecba2f1f73c90b8b636d6ef4ecf2b8d"
+      },
+      "alloc": {
+        "kind": "alloc",
+        "path": "/tmp/litchi-goal-0534/baseline/alloc",
+        "sha256": "2fa58fa30038487e49bac8c6c4ab5892aa9f8f1f5394da3f0e37b52e26737394",
+        "bytes": 60007968,
+        "identity_sha256": "3a072bae361a007f5954c391f41a928610c0a93ca4c20fb0419a816be60fb527"
+      }
+    },
+    "candidate": {
+      "normal": {
+        "kind": "normal",
+        "path": "/tmp/litchi-goal-0534/candidate/normal",
+        "sha256": "4e5e4e1eb6aa5128a0a9c8b6c7dc321b5901cf77e9a9028b0451c0786ba0f71b",
+        "bytes": 60142888,
+        "identity_sha256": "56153b39c1296d55a3fe39975dbb0b3a93ccf5c2f1e9051aae55034bc54b940e"
+      },
+      "alloc": {
+        "kind": "alloc",
+        "path": "/tmp/litchi-goal-0534/candidate/alloc",
+        "sha256": "f4a10a29260ba9fe8c3bb3d7472952d21dfa528f03a5c2e7cee32f5a85e8c897",
+        "bytes": 60012000,
+        "identity_sha256": "e6947fb471de5b8adbfa9d881ec63f6d35cb7fe261ed754fe25f899d17f06eb9"
+      }
+    }
+  },
+  "assembly_analysis": {
+    "status": "pass",
+    "sha256": "f0c7a50da44ffad76a52935a413ed9df0209a18d5ced5f676de9ea5e4414a8eb",
+    "stages": [
+      "baseline",
+      "candidate"
+    ]
+  },
+  "captures": 36,
+  "hardware": {
+    "status": "pass",
+    "hardware": {
+      "baseline": {
+        "status": "pass",
+        "captures": [
+          {
+            "name": "hardware-r1-xls-owned",
+            "exit_code": 0,
+            "receipt_sha256": "8ba34debf6d384f57bae1ae729a27f216a81d73d42a301dcafef5e8371970d7d",
+            "events": {
+              "cycles": {
+                "status": "measured",
+                "value": 3375781874,
+                "event_runtime_ns": 791818597,
+                "running_percent": 100.0
+              },
+              "instructions": {
+                "status": "measured",
+                "value": 5318099663,
+                "event_runtime_ns": 791818597,
+                "running_percent": 100.0
+              },
+              "branches": {
+                "status": "measured",
+                "value": 981813139,
+                "event_runtime_ns": 791818597,
+                "running_percent": 100.0
+              },
+              "branch-misses": {
+                "status": "measured",
+                "value": 2447901,
+                "event_runtime_ns": 791818597,
+                "running_percent": 100.0
+              },
+              "page-faults": {
+                "status": "measured",
+                "value": 66221,
+                "event_runtime_ns": 791818597,
+                "running_percent": 100.0
+              },
+              "context-switches": {
+                "status": "measured",
+                "value": 78,
+                "event_runtime_ns": 791818597,
+                "running_percent": 100.0
+              },
+              "cpu-migrations": {
+                "status": "measured",
+                "value": 0,
+                "event_runtime_ns": 791818597,
+                "running_percent": 100.0
+              }
+            },
+            "identity_equal": true,
+            "group_valid": true,
+            "status": "measured",
+            "ipc": 1.5753682736315326,
+            "branch_miss_percent": 0.24932453058157739
+          },
+          {
+            "name": "hardware-r2-xls-owned",
+            "exit_code": 0,
+            "receipt_sha256": "ad2d270b62d73de3fe43f081e45ac46ef3d50a597747562b9c0ccd2727496346",
+            "events": {
+              "cycles": {
+                "status": "measured",
+                "value": 3431601703,
+                "event_runtime_ns": 770028784,
+                "running_percent": 100.0
+              },
+              "instructions": {
+                "status": "measured",
+                "value": 5314532424,
+                "event_runtime_ns": 770028784,
+                "running_percent": 100.0
+              },
+              "branches": {
+                "status": "measured",
+                "value": 981159019,
+                "event_runtime_ns": 770028784,
+                "running_percent": 100.0
+              },
+              "branch-misses": {
+                "status": "measured",
+                "value": 2407290,
+                "event_runtime_ns": 770028784,
+                "running_percent": 100.0
+              },
+              "page-faults": {
+                "status": "measured",
+                "value": 66210,
+                "event_runtime_ns": 770028784,
+                "running_percent": 100.0
+              },
+              "context-switches": {
+                "status": "measured",
+                "value": 65,
+                "event_runtime_ns": 770028784,
+                "running_percent": 100.0
+              },
+              "cpu-migrations": {
+                "status": "measured",
+                "value": 0,
+                "event_runtime_ns": 770028784,
+                "running_percent": 100.0
+              }
+            },
+            "identity_equal": true,
+            "group_valid": true,
+            "status": "measured",
+            "ipc": 1.5487031666157207,
+            "branch_miss_percent": 0.2453516660789111
+          }
+        ],
+        "scope": "Whole-child diagnostic including setup/copies/queries/oracles/drop/report; no operation-local hardware claim; unavailable or multiplexed groups cannot support claims",
+        "latency_samples_excluded_from_native": 2000,
+        "no_operation_local_hardware_or_speedup_claim": true
+      },
+      "candidate": {
+        "status": "pass",
+        "captures": [
+          {
+            "name": "hardware-r1-xls-owned",
+            "exit_code": 0,
+            "receipt_sha256": "77e2adb2f69328941129d9a600b7f54a7fc7eef591cf0b212cc362c187c641a9",
+            "events": {
+              "cycles": {
+                "status": "measured",
+                "value": 3549227730,
+                "event_runtime_ns": 830363269,
+                "running_percent": 100.0
+              },
+              "instructions": {
+                "status": "measured",
+                "value": 5262217187,
+                "event_runtime_ns": 830363269,
+                "running_percent": 100.0
+              },
+              "branches": {
+                "status": "measured",
+                "value": 950070514,
+                "event_runtime_ns": 830363269,
+                "running_percent": 100.0
+              },
+              "branch-misses": {
+                "status": "measured",
+                "value": 2449535,
+                "event_runtime_ns": 830363269,
+                "running_percent": 100.0
+              },
+              "page-faults": {
+                "status": "measured",
+                "value": 66213,
+                "event_runtime_ns": 830363269,
+                "running_percent": 100.0
+              },
+              "context-switches": {
+                "status": "measured",
+                "value": 71,
+                "event_runtime_ns": 830363269,
+                "running_percent": 100.0
+              },
+              "cpu-migrations": {
+                "status": "measured",
+                "value": 0,
+                "event_runtime_ns": 830363269,
+                "running_percent": 100.0
+              }
+            },
+            "identity_equal": true,
+            "group_valid": true,
+            "status": "measured",
+            "ipc": 1.4826372347203542,
+            "branch_miss_percent": 0.2578266522225739
+          },
+          {
+            "name": "hardware-r2-xls-owned",
+            "exit_code": 0,
+            "receipt_sha256": "b0ba9294c9f8a70115df77213a2c53e51e8d271225bef8f27ad1276d720a9726",
+            "events": {
+              "cycles": {
+                "status": "measured",
+                "value": 3487356956,
+                "event_runtime_ns": 783133667,
+                "running_percent": 100.0
+              },
+              "instructions": {
+                "status": "measured",
+                "value": 5256151649,
+                "event_runtime_ns": 783133667,
+                "running_percent": 100.0
+              },
+              "branches": {
+                "status": "measured",
+                "value": 949182162,
+                "event_runtime_ns": 783133667,
+                "running_percent": 100.0
+              },
+              "branch-misses": {
+                "status": "measured",
+                "value": 2492564,
+                "event_runtime_ns": 783133667,
+                "running_percent": 100.0
+              },
+              "page-faults": {
+                "status": "measured",
+                "value": 66213,
+                "event_runtime_ns": 783133667,
+                "running_percent": 100.0
+              },
+              "context-switches": {
+                "status": "measured",
+                "value": 69,
+                "event_runtime_ns": 783133667,
+                "running_percent": 100.0
+              },
+              "cpu-migrations": {
+                "status": "measured",
+                "value": 0,
+                "event_runtime_ns": 783133667,
+                "running_percent": 100.0
+              }
+            },
+            "identity_equal": true,
+            "group_valid": true,
+            "status": "measured",
+            "ipc": 1.5072020774807087,
+            "branch_miss_percent": 0.2626012265915296
+          }
+        ],
+        "scope": "Whole-child diagnostic including setup/copies/queries/oracles/drop/report; no operation-local hardware claim; unavailable or multiplexed groups cannot support claims",
+        "latency_samples_excluded_from_native": 2000,
+        "no_operation_local_hardware_or_speedup_claim": true
+      }
+    },
+    "sha256": {
+      "baseline": "e78469a198cbb9cfb1905ff56c6282d10aedcc3b8e636a3c9b39dfce80d8d27d",
+      "candidate": "24ecc89293a853b29274d669be5e090ed27976c301567ea92f5dd3f220267299"
+    }
+  },
+  "variation": {
+    "status": "pass",
+    "sha256": "10cabafd5f816cf276add4766c370e12226cf73ad0d9906f64db9348a5260e22",
+    "variations": 67
+  },
+  "quality": {
+    "status": "pass",
+    "stage": "final",
+    "checks": 14,
+    "executed_tests": 4382,
+    "sha256": "816f28d3926d119972dbc45de1ac8960d93cd6bc370eb1333dca802dfe6fb2b7"
+  },
+  "decision": {
+    "status": "pass",
+    "disposition": "rejected",
+    "final_source": "final",
+    "sha256": "bcb7f163fac9f373289cc55d3499b17fb2cebe575f56d0517cdb280f02b7bf3f",
+    "constructor_ir": [
+      {
+        "repeat": 1,
+        "baseline": 11317204,
+        "candidate": 10989365,
+        "change_percent": -2.896819744523471
+      },
+      {
+        "repeat": 2,
+        "baseline": 11319136,
+        "candidate": 10986774,
+        "change_percent": -2.936284182821025
+      }
+    ],
+    "physical_ir": [
+      {
+        "repeat": 1,
+        "group": "xls-owned",
+        "shape": null,
+        "baseline": 1991710,
+        "candidate": 1659795,
+        "change_percent": -16.664825702537012
+      },
+      {
+        "repeat": 1,
+        "group": "cfb-few-large",
+        "shape": "few-large",
+        "baseline": 1981930,
+        "candidate": 1651645,
+        "change_percent": -16.66481661814494
+      },
+      {
+        "repeat": 2,
+        "group": "xls-owned",
+        "shape": null,
+        "baseline": 1991710,
+        "candidate": 1659795,
+        "change_percent": -16.664825702537012
+      },
+      {
+        "repeat": 2,
+        "group": "cfb-few-large",
+        "shape": "few-large",
+        "baseline": 1981930,
+        "candidate": 1651645,
+        "change_percent": -16.66481661814494
+      }
+    ],
+    "physical_profile_gate": true
+  },
+  "receipt_inventory": {
+    "status": "pass",
+    "stages": {
+      "baseline": 45,
+      "candidate": 59,
+      "final": 14
+    },
+    "successful_receipts": 118,
+    "receipt_names_sha256": "cef9bac2d846e14279fe0dea82fdf46e5ac35cfec4046d013cdd2c6dc3a4911a"
+  },
+  "timeline": {
+    "status": "pass",
+    "serial_intervals": 118,
+    "first": "baseline/build-normal",
+    "last": "final/check-claims",
+    "native_abba": [
+      "baseline/native-r1-xls",
+      "baseline/native-r1-cfb",
+      "candidate/native-r1-xls",
+      "candidate/native-r1-cfb",
+      "candidate/native-r2-cfb",
+      "candidate/native-r2-xls",
+      "baseline/native-r2-cfb",
+      "baseline/native-r2-xls"
+    ]
+  },
+  "cleanup": {
+    "status": "pass",
+    "sha256": "b5f87e22a5319045629d58ab44a51c9b5105aae654768e045ece683fde0e9c16",
+    "owned_paths_absent": true,
+    "python_cache_absent": true
+  },
+  "numeric": {
+    "status": "pass",
+    "comparison_sha256": "6dbd00b9107e562d42da9e6fd326814db297b974460333ca5365af5f0766f55a",
+    "analysis_sha256": {
+      "baseline": "36e9a285eb6b9df05dea5ec7f1c69e30f5f189acdcbea21b924b2a0cf9d35901",
+      "candidate": "234a969c10b6692cc5669dca83911d94d5b600cc852e74b5d34017533c416269"
+    },
+    "native_samples": 48000,
+    "allocation_samples": 1440
+  },
+  "profiles": {
+    "status": "pass",
+    "comparison_sha256": "f5fea3f6b8ab2c9d45ed77111bc5b46afd3e0423413c307dad8c9e32af46703d",
+    "sha256": {
+      "baseline": "ca375510ab289c2381ca268ea647e3519e1d7f83484de979f4f842d81f11b217",
+      "candidate": "4aaaaf523e0e57ff14a7afcf8afba0096466a4ba6e1d1a3f8162179fee3b3658"
+    },
+    "constructor_ir": [
+      {
+        "repeat": 1,
+        "baseline": 11317204,
+        "candidate": 10989365,
+        "change_percent": -2.896819744523471
+      },
+      {
+        "repeat": 2,
+        "baseline": 11319136,
+        "candidate": 10986774,
+        "change_percent": -2.936284182821025
+      }
+    ],
+    "profile_gate": true,
+    "physical_ir": [
+      {
+        "repeat": 1,
+        "group": "xls-owned",
+        "shape": null,
+        "baseline": 1991710,
+        "candidate": 1659795,
+        "change_percent": -16.664825702537012
+      },
+      {
+        "repeat": 1,
+        "group": "cfb-few-large",
+        "shape": "few-large",
+        "baseline": 1981930,
+        "candidate": 1651645,
+        "change_percent": -16.66481661814494
+      },
+      {
+        "repeat": 2,
+        "group": "xls-owned",
+        "shape": null,
+        "baseline": 1991710,
+        "candidate": 1659795,
+        "change_percent": -16.664825702537012
+      },
+      {
+        "repeat": 2,
+        "group": "cfb-few-large",
+        "shape": "few-large",
+        "baseline": 1981930,
+        "candidate": 1651645,
+        "change_percent": -16.66481661814494
+      }
+    ],
+    "physical_profile_gate": true,
+    "timed_dumps": 80,
+    "setup_dumps": 12
+  },
+  "seal_policy": "SHA256SUMS includes this verification receipt after regeneration; final seal is revalidated separately to avoid a recursive digest.",
+  "observed_utc": "2026-09-12T17:26:04.048404+00:00"
+}

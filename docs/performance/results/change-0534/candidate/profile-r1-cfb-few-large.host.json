@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-12T17:13:53.954607+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3369013,
+      "comm": "cargo",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    },
+    {
+      "pid": 3369039,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

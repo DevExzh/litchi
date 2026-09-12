@@ -1,0 +1,9 @@
+{
+  "created_utc": "2026-09-12T16:54:49.895108+00:00",
+  "status": "frozen-before-candidate-application",
+  "files": {
+    "tests.patch": "d9af40480d8fa20c631d4cc2a56ee7f7c391c19d63af8517607887ecc3f92dcb",
+    "source-review.md": "6dfdd890858ec2ebc206e7e92e4880e92b05b6016028cac33d2eb8c5fe0afc9c",
+    "test-review.md": "25f9c5c546ea52e242a49ab705ac510f2c461a6950bc4e67ff7ec898b47b536d"
+  }
+}

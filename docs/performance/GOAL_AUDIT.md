@@ -1,5 +1,20 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0534: CFB paired-prefix candidate rejected; full goal remains open
+
+[0534](changes/0534-cfb-physical-paired-prefix-rejected.md) advances the
+active OLE2/OOXML investigation with a complete paired role/FAT
+reconciliation comparison, then rejects the candidate because all eight
+primary XLS p50 rows regress in both repeats. The allocator guard passes and
+the source contract tests remain on the restored baseline, but no runtime
+speedup is retained. The evidence keeps 48,000 native samples, 1,440
+allocation samples, 16 profile children, 80 timed dumps, 12 setup dumps, and
+all 153 review flags. Retained candidate receipts record 14 checks and 4,382
+candidate-stage test executions; restored final source also passed 14 checks
+and 4,382 executions. Cleanup and post-cleanup verification passed; the evidence is sealed. This closes one physical-reconciliation hypothesis
+and does not complete the broader OLE2/OOXML optimization goal. ODF stays
+deferred until the active goal completes, and iWork remains excluded.
+
 ## 0533: CFB candidate clears measured gates; full goal remains open
 
 [0533](changes/0533-cfb-claim-cold-error-layout.md) advances the active

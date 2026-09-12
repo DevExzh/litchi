@@ -1,5 +1,22 @@
 # Performance optimization ADR-compliance matrix
 
+## 0534: reject the CFB physical paired-prefix candidate
+
+[0534](changes/0534-cfb-physical-paired-prefix-rejected.md) restores the
+baseline physical-reconciliation runtime after all eight primary XLS p50
+rows regress by 1.0596–10.6386%; no speedup is retained. The candidate's
+paired role/FAT walk preserved checked marker/error order and padding
+compatibility, and two baseline-compatible private contract tests remain.
+The matched evidence retains 48,000 native samples, 1,440 allocator samples,
+16 profile children, 80 timed dumps, 12 setup dumps, and all 153 review flags
+(86 matched and 67 same-build). The allocator guard passes, but diagnostic
+Callgrind reductions do not override the native admission failure. All 30
+accepted ADR/index bindings remain unchanged; no API, dependency, unsafe-code,
+validation-policy, or resource-policy change is adopted. Retained candidate
+receipts record 14 checks and 4,382 candidate-stage test executions; restored
+final source also passed 14 checks and 4,382 executions. Cleanup and post-cleanup verification passed; the evidence is sealed. OLE2/OOXML remains
+active, ODF is deferred, and iWork is excluded.
+
 ## 0533: accepted CFB error-layout candidate; verified and sealed
 
 [0533](changes/0533-cfb-claim-cold-error-layout.md) measures private cold

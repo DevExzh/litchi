@@ -1,0 +1,1702 @@
+
+running 1028 tests
+test alignment::tests::a_lenient_policy_still_rejects_every_other_alignment_defect ... ok
+test access::tests::constructs_canonical_compressed_and_utf16_records ... ok
+test alignment::tests::parses_every_horizontal_and_vertical_alignment ... ok
+test alignment::tests::parses_flags_indent_and_reading_orders ... ok
+test access::tests::rejects_malformed_envelopes_strings_and_duplicates ... ok
+test alignment::tests::justify_last_line_survives_when_the_file_is_conforming ... ok
+test access::tests::parses_and_round_trips_poi_and_libreoffice_references ... ok
+test alignment::tests::a_lenient_policy_clears_justify_last_line_without_distributed_alignment ... ok
+test alignment::tests::rejects_invalid_enum_and_reserved_values ... ok
+test autofilter12::tests::icon_filter_round_trips_and_rejects_reserved_sets_indices_and_continuations ... ok
+test autofilter::tests::test_parse_autofilter_numeric ... ok
+test autofilter::tests::test_parse_autofilter_rejects_truncated ... ok
+test autofilter12::tests::scalar_criteria_round_trip_and_reject_hostile_lengths ... ok
+test autofilter12::tests::dynamic_date_and_format_filters_round_trip_typed ... ok
+test autofilter::tests::test_parse_autofilterinfo ... ok
+test autofilter::tests::test_parse_autofilter_string_condition ... ok
+test autofilter::tests::test_parse_autofilterinfo_rejects_truncated ... ok
+test autofilter::tests::test_parse_filtermode_rejects_nonempty_body ... ok
+test alignment::tests::parses_rotation_boundaries ... ok
+test autofilter::tests::test_parse_sort_single_key ... ok
+test autofilter::tests::test_parse_filtermode_empty_body ... ok
+test autofilter::tests::test_parse_sort_rejects_truncated ... ok
+test axes_used::tests::axes_used_rejects_malformed_records ... ok
+test axes_used::tests::axes_used_round_trip ... ok
+test axes_used::tests::axis_parent_preserves_unused_bytes ... ok
+test axes_used::tests::axis_parent_rejects_malformed_records ... ok
+test axes_used::tests::axis_parent_round_trip ... ok
+test background_picture::tests::preserves_nonstandard_reserved_value ... ok
+test background_picture::tests::rejects_malformed_records ... ok
+test background_picture::tests::round_trip_both_formats ... ok
+test backup::tests::backup_rejects_bad_length_and_non_boolean ... ok
+test backup::tests::backup_round_trip ... ok
+test book_ext::tests::parses_base_record ... ok
+test book_ext::tests::parses_conditional_extensions ... ok
+test book_ext::tests::rejects_malformed_records ... ok
+test bop_pop::tests::accepts_field_bounds_and_preserves_reserved_bits ... ok
+test bop_pop::tests::reader_rejects_offset_overflow ... ok
+test bop_pop::tests::rejects_every_truncated_payload ... ok
+test bop_pop::tests::rejects_malformed_records ... ok
+test bop_pop::tests::round_trip_all_subtypes_and_splits ... ok
+test bop_pop_custom::tests::empty_secondary_marker ... ok
+test bop_pop_custom::tests::multi_byte_round_trip ... ok
+test bop_pop_custom::tests::reader_rejects_offset_overflow ... ok
+test bop_pop_custom::tests::rejects_every_truncated_payload ... ok
+test bop_pop_custom::tests::rejects_malformed_records ... ok
+test bop_pop_custom::tests::round_trip_and_bit_positions ... ok
+test border_fill::tests::cell_xf_preserves_extension_and_button_bits ... ok
+test border_fill::tests::decodes_diagonal_directions_and_colors ... ok
+test border_fill::tests::decodes_every_border_style ... ok
+test border_fill::tests::decodes_every_fill_pattern ... ok
+test border_fill::tests::rejects_invalid_and_contradictory_encodings ... ok
+test border_fill::tests::resolves_palette_colors ... ok
+test border_fill::tests::style_xf_ignores_must_zero_reserved_bits ... ok
+test calculation::tests::accepts_libreoffice_block_without_calc_mode ... ok
+test calculation::tests::parses_complete_blocks_and_global_future_records ... ok
+test calculation::tests::rejects_duplicate_out_of_order_and_incomplete_blocks ... ok
+test calculation::tests::validates_user_specified_thread_counts ... ok
+test calculation::tests::rejects_malformed_lengths_values_and_reserved_fields ... ok
+test cell::tests::test_cell_clone ... ok
+test cell::tests::test_cell_coordinate_various_positions ... ok
+test cell::tests::test_cell_empty_value ... ok
+test cell::tests::test_cell_debug ... ok
+test cell::tests::test_cell_int_value ... ok
+test cell::tests::test_cell_trait_methods_via_reference ... ok
+test cell::tests::test_cell_with_formula ... ok
+test cell::tests::test_from_record_blank ... ok
+test cell::tests::test_from_record_bool_err_bool ... ok
+test cell::tests::test_formula_uses_internal_sheet_context ... ok
+test cell::tests::test_from_record_bool_err_error ... ok
+test cell::tests::test_from_record_formula_bool ... ok
+test cell::tests::test_from_record_formula_empty ... ok
+test cell::tests::test_from_record_formula_error ... ok
+test cell::tests::test_from_record_formula_number ... ok
+test cell::tests::test_from_record_formula_string ... ok
+test cell::tests::test_from_record_label_sst_invalid_index ... ok
+test cell::tests::test_from_record_label_sst_no_sst ... ok
+test cell::tests::test_from_record_label ... ok
+test cell::tests::test_from_record_label_sst_with_valid_sst ... ok
+test cell::tests::test_from_record_number ... ok
+test cell::tests::test_from_record_rk ... ok
+test cell::tests::test_new_cell ... ok
+test cell::tests::test_unsupported_formula_retains_original_tokens ... ok
+test cell_values::structural::tests::ranges_and_move_size_anchors_shift_and_inverse_exactly ... ok
+test cell_values::structural::tests::selection_coordinates_follow_row_insertion_and_inverse_deletion ... ok
+test cell_values::structural::tests::ext_sst_tail_resource_updates_bucket_and_inverts_exactly ... ok
+test cell_values::structural::tests::interior_mulrk_deletion_splits_and_inverse_merges_exactly ... ok
+test cell_values::tests::references_enforce_the_biff8_grid ... ok
+test cell_values::tests::canonical_formula_resource_matching_refuses_rgb_extra_atomically ... ok
+test cell_values::tests::inventory_carry_refuses_bytes_outside_changed_numeric_field ... ok
+test cell_values::tests::number_commit_shares_untouched_worksheet_inventories ... ok
+test cell_values::tests::rejected_and_noop_edits_are_failure_atomic ... ok
+test cell_values::tests::source_backed_numeric_plan_preserves_protection_refusal_reasons ... ok
+test cell_values::tests::source_backed_numeric_noop_reuses_identity_and_fingerprint ... ok
+test cell_values::tests::bounded_history_undoes_and_redoes_immutable_snapshots ... ok
+test cell_values::tests::formula_cache_transfer_requires_identical_tokens ... ok
+test cell_values::tests::edits_boolean_text_and_formula_cache ... ok
+test cell_values::tests::source_backed_noncanonical_rk_noop_keeps_exact_source_identity ... ok
+test cell_values::tests::dependency_safe_row_insertion_reopens_and_inverts ... ok
+test cell_values::tests::converts_fixed_width_labelsst_and_rk_with_sst_accounting ... ok
+test cell_values::tests::joins_disjoint_work_and_reports_cell_conflicts ... ok
+test cell_values::tests::edits_only_one_number_field_and_round_trips_patch ... ok
+test cell_values::tests::macro_packages_are_refused_by_source_backed_numeric_publication ... ok
+test cell_values::tests::signed_packages_are_refused_before_editing ... ok
+test cell_values::tests::source_backed_numeric_plan_consumes_cached_source_policy_facts ... ok
+test cell_values::tests::sequential_number_commits_reuse_resources_and_reopen_publicly ... ok
+test cell_watch::tests::preserves_reserved_bits_and_field ... ok
+test cell_watch::tests::rejects_malformed_records ... ok
+test cell_watch::tests::round_trip ... ok
+test chart::chart_area::tests::fixed_payload_codec_round_trips_wire_values ... ok
+test chart::chart_area::tests::invalid_origin_and_size_are_rejected_before_bytes_change ... ok
+test chart::chart_area::tests::transaction_is_source_checked_and_reversible ... ok
+test chart::frt::continuation::tests::accepts_empty_continuation_payload ... ok
+test chart::frt::continuation::tests::empty_chain_round_trips ... ok
+test chart::chart_area::tests::patch_changes_only_the_chart_payload_and_preserves_unknown_offsets ... ok
+test cell_values::tests::durable_semantic_patch_round_trips_and_checks_preconditions ... ok
+test cell_values::tests::formula_string_cache_resizes_and_semantically_inverts ... ok
+test chart::frt::continuation::tests::reassembles_continuations_and_round_trips ... ok
+test cell_values::tests::authored_formulas_join_reopen_and_durably_invert ... ok
+test chart::frt::records::tests::fixed_width_reads_reject_truncation_and_offset_overflow ... ok
+test chart::frt::continuation::tests::rejects_truncated_and_oversized_payloads ... ok
+test cell_values::tests::source_backed_numeric_plan_preserves_complete_directory_topology_and_clsids ... ok
+test chart::frt::continuation::tests::parses_single_record_and_round_trips_exactly ... ok
+test chart::frt::records::tests::parses_cat_lab_round_trip ... ok
+test chart::frt::continuation::tests::preserves_reserved_header_bytes ... ok
+test cell_values::tests::source_backed_mulrk_accepts_signed_integer_fields_and_inverse ... ok
+test chart::frt::continuation::tests::rejects_malformed_records ... ok
+test chart::frt::records::tests::parses_chart_frt_info_for_each_writer_version ... ok
+test chart::frt::records::tests::rejects_malformed_cat_lab ... ok
+test chart::frt::records::tests::parses_end_block_round_trip ... ok
+test chart::frt::records::tests::rejects_malformed_chart_frt_info ... ok
+test chart::frt::records::tests::rejects_malformed_end_block ... ok
+test chart::frt::records::tests::rejects_malformed_start_block ... ok
+test chart::frt::records::tests::parses_start_block_round_trip ... ok
+test chart::frt::wrapper::tests::frt_wrapper_rejects_malformed_records ... ok
+test cell_values::tests::source_backed_numeric_refuses_non_numeric_and_structural_operations ... ok
+test chart::frt::wrapper::tests::frt_wrapper_round_trip_with_and_without_padding ... ok
+test cell_values::tests::source_backed_numeric_plan_rejects_stale_and_foreign_change_metadata ... ok
+test chart::chart_area::tests::package_editor_exposes_contextual_area_edit_without_host_resize ... ok
+test chart::frt::wrapper::tests::end_object_round_trip_and_rejects ... ok
+test chart::frt::wrapper::tests::start_object_rejects_malformed_records ... ok
+test chart::tests::chart_tests::formula_and_cache_edits_are_bounded_and_transactional ... ok
+test chart::tests::chart_tests::generated_combo_round_trips_and_refuses_unplaced_opaque_records ... ok
+test chart::tests::chart_tests::chart_data_patch_preserves_unknown_records_and_refuses_graph_changes ... ok
+test chart::tests::chart_tests::group_lines_and_drop_bars_round_trip_without_collapsing_kinds ... ok
+test chart::tests::chart_tests::malformed_nesting_formula_and_axis_are_rejected ... ok
+test chart::tests::chart_tests::referenced_sheet_removal_and_noncontiguous_reorder_are_rejected_atomically ... ok
+test chart::tests::chart_tests::malformed_formula_and_cache_metadata_are_rejected ... ok
+test chart::tests::chart_tests::semantic_validation_checks_reference_cardinality_and_scatter_types ... ok
+test chart::tests::chart_tests::sheet_properties_and_group_numeric_domains_are_strict ... ok
+test chart::tests::chart_tests::semantic_validation_checks_ordered_ai_links_and_cache_identity ... ok
+test cell_values::tests::source_backed_numeric_diagnostics_report_owned_shapes_after_candidate ... ok
+test chart::tests::chart_tests::typed_inventory_reports_data_sources_without_rendering ... ok
+test chart_3d::tests::rejects_malformed_records ... ok
+test chart::tests::chart_tests::typed_formula_and_cache_edits_round_trip ... ok
+test chart_3d::tests::round_trip ... ok
+test chart_layout::tests::crt_layout12_preserves_unused_and_reserved_bits ... ok
+test chart::tests::chart_tests::editor_and_package_share_the_workbook_stream_allocation ... ok
+test chart_layout::tests::crt_layout12_rejects_malformed_records ... ok
+test chart::tests::chart_tests::embedded_formula_edit_is_an_atomic_refusal ... ok
+test chart_layout::tests::crt_layout12_round_trip ... ok
+test chart_layout::tests::crt_layout12a_rejects_malformed_records ... ok
+test chart_layout::tests::crt_layout12a_round_trip ... ok
+test cell_values::tests::source_backed_numeric_plan_handles_noncanonical_noop_and_sink_failure ... ok
+test chart::frt::records::tests::preserves_ignored_header_and_record_bytes ... ok
+test chart::frt::wrapper::tests::start_object_round_trip_all_kinds ... ok
+test chart::tests::chart_tests::embedded_identity_reorder_is_exact_and_removal_is_atomic_refusal ... ok
+test chart_property_stream::tests::text_and_rich_text_streams_round_trip ... ok
+test chart::tests::chart_tests::public_authoring_refuses_atomically_with_typed_error ... ok
+test comments::tests::enforces_record_and_opaque_payload_bounds ... ok
+test comments::tests::assembles_mixed_segmented_unicode_without_splitting_surrogates ... ok
+test chart_3d::tests::accepts_bounds_and_preserves_reserved_bits ... ok
+test chart_layout::tests::layout_modes_rejects_truncated_and_overflowing_reads ... ok
+test comments::tests::links_obj_txo_continues_and_note ... ok
+test chart::tests::chart_tests::axis_line_format_and_blank_cache_round_trip_once ... ok
+test chart_property_stream::tests::rejects_malformed_streams ... ok
+test comments::tests::preserves_opaque_fields_unknown_obj_subrecords_padding_and_record_order ... ok
+test chart_property_stream::tests::shape_props_stream_round_trip ... ok
+test comments::tests::retains_reserved_bits_and_rejects_broken_order_or_bad_last_run ... ok
+test conditional_format::tests::parses_and_collects_legacy_rules ... ok
+test cell_values::tests::source_backed_number_publication_preserves_the_artifact_contract ... ok
+test consolidation::tests::adjacency_reserved_fields_and_ranges_are_strict ... ok
+test conditional_format::tests::rejects_malformed_ranges_formulas_and_sequences ... ok
+test consolidation::tests::malformed_dcon_and_detached_sources_are_rejected ... ok
+test custom_view::tests::checked_field_reads_reject_truncation_and_offset_overflow ... ok
+test custom_view::tests::enum_accessors_cover_every_legal_encoding ... ok
+test custom_view::tests::parses_user_b_view ... ok
+test custom_view::tests::parses_user_s_view_begin ... ok
+test chart::tests::chart_tests::abbreviated_test_fixture_exercises_chart_parser ... ok
+test cell_values::tests::reference_free_formula_shifts_reopen_and_invert_exactly ... ok
+test conditional_format::tests::reads_poi_legacy_conditional_formatting_fixture ... ok
+test cell_values::tests::source_backed_numeric_sink_reports_partial_output ... ok
+test custom_view::tests::parses_user_s_view_begin_chart ... ok
+test custom_view::tests::parses_user_s_view_end ... ok
+test custom_view::tests::rejects_bad_user_s_view_begin ... ok
+test comments::tests::reads_poi_comment_fixtures ... ok
+test custom_view::tests::user_b_view_honors_invalid_tab_id ... ok
+test custom_view::tests::rejects_bad_user_b_view ... ok
+test data_label_ext::tests::contents_rejects_malformed_records ... ok
+test data_label_ext::tests::data_lab_ext_rejects_malformed_records ... ok
+test data_label_ext::tests::contents_round_trip_compressed_and_double_byte ... ok
+test data_label_ext::tests::data_lab_ext_round_trip ... ok
+test data_label_ext::tests::reader_rejects_offset_overflow ... ok
+test data_label_ext::tests::rejects_every_truncated_payload ... ok
+test data_table::tests::one_variable_preserves_undefined_tail ... ok
+test data_table::tests::one_variable_round_trips ... ok
+test data_table::tests::ptg_tbl_tokens_name_the_range_origin ... ok
+test data_table::tests::rejects_malformed_records ... ok
+test cell_values::tests::structural_cell_style_and_sheet_name_round_trip_semantically ... ok
+test data_table::tests::two_variable_with_deleted_input_round_trips ... ok
+test cell_values::tests::structural_join_three_way_and_transfer_are_deterministic ... ok
+test cell_values::tests::source_backed_numeric_plan_refuses_structural_macro_and_signed_inputs ... ok
+test data_validation::tests::enforces_formula_cardinality_and_range_limit ... ok
+test data_validation::tests::ignores_undefined_operator_bits_for_list_validations ... ok
+test data_validation::tests::parses_dval_and_dv_with_raw_formulas ... ok
+test data_validation::tests::rejects_truncated_dval_payloads_without_panicking ... ok
+test defined_names::tests::macro_slots_keep_indices_but_have_no_symbol_or_public_value ... ok
+test defined_names::tests::name_comment_requires_exact_header_and_matching_preceding_name ... ok
+test data_validation::tests::rejects_truncated_dv_fields_without_panicking ... ok
+test defined_names::tests::parses_compressed_unicode_hidden_and_scoped_names ... ok
+test defined_names::tests::rejects_malformed_names_and_scope ... ok
+test defined_names::tests::parses_every_built_in_name ... ok
+test differential_format::tests::fixed_width_reads_reject_offset_overflow_without_panicking ... ok
+test differential_format::tests::malformed_fixed_width_properties_return_errors_without_panicking ... ok
+test conditional_format::tests::reads_poi_future_conditional_formatting_fixture ... ok
+test differential_format::tests::number_format_code_rejects_malformed_wide_strings ... ok
+test differential_format::tests::enforces_resource_caps ... ok
+test differential_format::tests::rejects_hostile_headers_sizes_flags_and_property_relationships ... ok
+test differential_format::tests::number_format_code_matches_producer_wide_string_bytes ... ok
+test data_validation::tests::rejects_reserved_bits_and_malformed_rule_shape ... ok
+test differential_format::tests::xfprop_color_uses_low_flag_bit_and_high_seven_type_bits ... ok
+test differential_format::tests::typed_dxf_round_trips_representative_property_families ... ok
+test drawing_metadata::tests::client_anchor_round_trips_exactly ... ok
+test drawing_metadata::tests::malformed_anchor_flags_and_extent_are_rejected ... ok
+test drawing_metadata::tests::malformed_columns_and_endpoint_order_are_rejected ... ok
+test drawing_metadata::tests::wrong_officeart_record_identity_is_rejected ... ok
+test encryption::tests::binary_rc4_filepass_length_is_exact ... ok
+test encryption::tests::binary_rc4_secret_matches_apache_poi_vector ... ok
+test differential_format::tests::xfprop_color_rejects_clear_valid_flag_and_invalid_type_data ... ok
+test encryption::tests::decrypts_payloads_with_clear_record_exceptions ... ok
+test encryption::tests::binary_rc4_verifier_uses_one_continuous_cipher ... ok
+test encryption::tests::method_one_vectors_match_apache_poi ... ok
+test encryption::tests::validates_cryptoapi_filepass_headers ... ok
+test encryption::tests::validates_filepass_structure_and_password ... ok
+test ent_ex_u2::tests::round_trip ... ok
+test environment::tests::accepts_dual_stream_dsf_value ... ok
+test environment::tests::rejects_bad_lengths_reserved_bits_values_and_order ... ok
+test environment::tests::rejects_refresh_for_non_template ... ok
+test error::tests::test_xls_error_cfb_source ... ok
+test error::tests::test_xls_error_debug ... ok
+test error::tests::test_xls_error_encoding ... ok
+test error::tests::test_xls_error_eof ... ok
+test encryption::tests::binary_rc4_cursor_handles_clear_gaps_and_block_boundaries ... ok
+test error::tests::test_xls_error_from_io ... ok
+test error::tests::test_xls_error_invalid_cell_reference ... ok
+test error::tests::test_xls_error_invalid_format ... ok
+test error::tests::test_xls_error_invalid_data ... ok
+test encryption::tests::opens_apache_poi_xor_encrypted_workbook ... ok
+test error::tests::test_xls_error_invalid_formula ... ok
+test differential_format::tests::oversized_dxf_writes_are_rejected_without_truncating_record_length ... ok
+test error::tests::test_xls_error_invalid_length ... ok
+test error::tests::test_xls_error_invalid_record ... ok
+test error::tests::test_xls_error_io ... ok
+test error::tests::test_xls_error_password_protected ... ok
+test error::tests::test_xls_error_source_io ... ok
+test error::tests::test_xls_error_source_other ... ok
+test error::tests::test_xls_error_unexpected_end_of_stream ... ok
+test error::tests::test_xls_error_unexpected_record_type ... ok
+test error::tests::test_xls_error_unsupported_biff_version ... ok
+test error::tests::test_xls_error_unsupported_feature ... ok
+test error::tests::test_xls_error_worksheet_not_found ... ok
+test error::tests::test_xls_result_type ... ok
+test external_link::tests::extern_names_are_contextual_bounded_and_continue_complete_moper_values ... ok
+test external_link::tests::external_link_snapshot_noop_preserves_exact_stream ... ok
+test cell_values::tests::reference_formula_shifts_are_durable_mergeable_and_history_safe ... ok
+test external_link::tests::external_name_edit_preserves_owned_continue_payload ... ok
+test external_link::tests::malformed_source_framing_and_link_ownership_are_rejected ... ok
+test external_link::tests::malformed_supbook_xct_and_crn_are_rejected ... ok
+test external_link::tests::invalid_edits_are_failure_atomic_and_stale_patches_are_rejected ... ok
+test fbi::tests::accepts_basis_bounds ... ok
+test external_link::tests::xct_cardinality_and_xti_bounds_are_strict ... ok
+test external_link::tests::metadata_edits_are_contextual_and_preserve_unknown_records ... ok
+test fbi::tests::rejects_malformed_records ... ok
+test fbi::tests::round_trip_both_scales ... ok
+test font::tests::accepts_compressed_font_names_from_nonconformant_producers ... ok
+test font::tests::accepts_zero_weight_and_ignores_reserved_producer_bits ... ok
+test font::tests::parses_all_font_attributes_and_unicode_name ... ok
+test font::tests::parses_normative_normal_and_bold_blue_fonts ... ok
+test font::tests::rejects_invalid_name_lengths_and_truncation ... ok
+test font::tests::rejects_invalid_scalar_fields ... ok
+test font::tests::skips_reserved_logical_index_four ... ok
+test cell_values::tests::new_sst_and_xf_resources_round_trip_with_cells ... ok
+test font::tests::validates_required_default_font_prefix ... ok
+test force_full_calculation::tests::preserves_reserved_header_bytes ... ok
+test force_full_calculation::tests::round_trip_both_modes ... ok
+test force_full_calculation::tests::rejects_malformed_records ... ok
+test formula::tests::decodes_surrogate_pairs_without_allocating_a_unit_buffer ... ok
+test formula::tests::malformed_or_add_in_sup_books_remain_lossless_and_unrendered ... ok
+test formula::tests::ordinary_reference_certification_returns_exact_wire_fields ... ok
+test formula::tests::reference_free_certification_rejects_coordinate_tokens ... ok
+test formula::tests::rejects_external_func_var_without_leading_name_x ... ok
+test formula::tests::rejects_external_or_malformed_sheet_context ... ok
+test formula::tests::rejects_invalid_name_x_indices_and_reserved_field ... ok
+test formula::tests::rejects_workbook_dependent_and_malformed_tokens ... ok
+test cell_values::tests::source_backed_rk_and_mulrk_publication_retain_their_families ... ok
+test formula::tests::renders_absolute_area_and_optimized_sum ... ok
+test formula::tests::renders_command_equivalents_as_inert_text_only ... ok
+test formula::tests::renders_complete_biff_builtin_metadata_and_checks_arity ... ok
+test formula::tests::renders_constants_operators_and_references ... ok
+test formula::tests::renders_deleted_internal_3d_references ... ok
+test formula::tests::renders_external_and_internal_name_x_tokens_by_contextual_index ... ok
+test formula::tests::renders_inert_add_in_functions_from_name_x_and_func_var ... ok
+test formula::tests::renders_one_based_internal_name_without_expanding_it ... ok
+test formula::tests::renders_inert_external_workbook_cell_and_sheet_range_references ... ok
+test formula::tests::renders_internal_3d_references_from_workbook_context ... ok
+test formula::tests::renders_shared_relative_references_at_each_origin ... ok
+test formula::tests::renders_unicode_strings_and_variable_functions ... ok
+test formula_errors::tests::constructs_multiple_ranges_and_all_flags ... ok
+test formula_errors::tests::parses_and_round_trips_poi_reference_records ... ok
+test formula_errors::tests::rejects_malformed_headers_lengths_ranges_flags_and_ordering ... ok
+test formula_metadata::array::tests::authored_owner_is_canonical_and_inert ... ok
+test formula_metadata::array::tests::configurable_limits_have_finite_structural_ceilings ... ok
+test formula_metadata::array::tests::compressed_strings_use_actual_expression_size_and_configured_limit ... ok
+test formula_metadata::array::tests::generic_ptg_exp_requires_exact_opcode_and_zero_high_column_byte ... ok
+test formula_metadata::array::tests::enforces_normative_operand_pressure_and_configured_caps ... ok
+test formula_metadata::array::tests::memory_ptg_result_uses_its_classified_value_type ... ok
+test formula_metadata::array::tests::parses_iterates_and_round_trips_source_fields ... ok
+test encryption::tests::cryptoapi_cursor_handles_key_sizes_clear_gaps_and_block_boundaries ... ok
+test formula_metadata::array::tests::rejects_forbidden_unsafe_truncated_and_bounded_inputs ... ok
+test cell_values::tests::source_backed_numeric_plan_validates_without_retaining_target_snapshot ... ok
+test formula_metadata::array::tests::rejects_invalid_xnum_encodings_in_ptg_and_extra_arrays ... ok
+test formula_metadata::array::tests::validates_and_preserves_ordered_ptg_array_extra ... ok
+test formula_metadata::array::tests::rejects_reference_class_root_malformed_attributes_and_orphan_memory ... ok
+test formula_metadata::array::tests::validates_rpn_root_stack_types_and_fixed_function_arity ... ok
+test formula_metadata::shared::tests::owner_checks_range_anchor_participants_and_record_order ... ok
+test formula_metadata::shared::tests::owner_rejects_inconsistent_participants ... ok
+test formula_metadata::shared::tests::parser_rejects_reserved_bytes_empty_count_and_length_mismatches ... ok
+test formula_metadata::shared::tests::parser_round_trips_refu_reserved_count_and_shared_tokens ... ok
+test formula_metadata::tests::metadata_builders_are_cloneable_and_wire_stable ... ok
+test formula_metadata::tests::parses_all_formula_flags_and_application_cache ... ok
+test formula_metadata::tests::rejects_reserved_flags_empty_tokens_and_trailing_payload ... ok
+test cell_values::tests::rich_sst_resource_round_trips_and_semantically_inverts ... ok
+test formula_metadata::tests::retains_valid_ptg_extra_mem_bytes_with_source_identity ... ok
+test formula_metadata::tests::shared_flag_requires_ptg_exp_and_writer_refuses_orphaned_shared_state ... ok
+test formula_metadata::tests::string_cached_values_allow_an_empty_formula_token_stream ... ok
+test formula_metadata::tests::validates_ptg_extra_array_and_rejects_unowned_or_reversed_ranges ... ok
+test formula::tests::rejects_oversized_token_streams_and_operand_stacks ... ok
+test function_group::tests::rejects_truncated_and_overflowing_fixed_width_reads ... ok
+test header_footer_picture::tests::preserves_undefined_and_reserved_bytes ... ok
+test function_group::tests::rejects_invalid_count_strings_and_future_header ... ok
+test function_group::tests::rejects_order_cardinality_and_duplicates ... ok
+test header_footer_picture::tests::rejects_malformed_records ... ok
+test header_footer_picture::tests::round_trip_drawing_and_drawing_group ... ok
+test hyperlinks::tests::accepts_and_retains_nonstandard_hlink_producer_clsid ... ok
+test hyperlinks::tests::links_only_an_immediately_following_matching_tooltip ... ok
+test hyperlinks::tests::parses_url_email_document_file_and_string_monikers ... ok
+test hyperlinks::tests::rejects_bad_flags_range_and_url_tail ... ok
+test hyperlinks::tests::test_hyperlink_target_document ... ok
+test hyperlinks::tests::test_hyperlink_target_file_with_long_name ... ok
+test hyperlinks::tests::test_hyperlink_target_file_without_long_name ... ok
+test hyperlinks::tests::test_hyperlink_target_unc ... ok
+test hyperlinks::tests::test_hyperlink_target_url ... ok
+test hyperlinks::tests::test_parse_hlink_record_invalid_version ... ok
+test hyperlinks::tests::test_parse_hlink_record_too_short ... ok
+test hyperlinks::tests::test_record_type_constant ... ok
+test hyperlinks::tests::test_xls_hyperlink_clone ... ok
+test interface_records::tests::interface_end_round_trip ... ok
+test hyperlinks::tests::test_xls_hyperlink_debug ... ok
+test interface_records::tests::interface_hdr_rejects_bad_length_and_code_page ... ok
+test interface_records::tests::interface_hdr_round_trip ... ok
+test layout::column::tests::accepts_default_formatting_sentinel ... ok
+test layout::column::tests::parses_flags_and_range ... ok
+test layout::column::tests::rejects_malformed_records ... ok
+test layout::row::tests::accepts_unused_format_bits ... ok
+test layout::row::tests::parses_flags_and_conditional_format ... ok
+test layout::row::tests::rejects_malformed_records ... ok
+test layout::tests::collector_enforces_columns_and_sorted_rows ... ok
+test leniency::tests::default_leniency_is_strict ... ok
+test leniency::tests::every_defect_class_maps_to_its_record_type_and_description ... ok
+test leniency::tests::lenient_mode_records_defects_in_discovery_order ... ok
+test leniency::tests::recorded_defects_are_bounded_and_the_excess_is_counted ... ok
+test leniency::tests::strict_mode_rejects_every_defect_and_records_nothing ... ok
+test hyperlinks::tests::reads_poi_hyperlink_fixtures ... ok
+test list_object::tests::cached_disk_header_typed_builder_and_noncanonical_string_round_trip ... ok
+test list_object::tests::cached_disk_header_presence_lengths_and_flags_are_strict ... ok
+test list_object::tests::external_feature12_is_lossless_and_hostile_versions_cardinality_and_feature11_are_rejected ... ok
+test list_object::tests::table_flags_preserve_known_and_future_bits ... ok
+test list_object::tests::feature12_single_cell_xml_source_round_trips ... ok
+test marker_format::tests::preserves_reserved_bits_and_rgb_reserved_bytes ... ok
+test list_object::tests::feature11_web_ignored_flags_round_trip_but_reserved_and_source_bits_fail ... ok
+test list_object::tests::table_feature_flags_are_typed_and_round_trip_through_feature11 ... ok
+test list_object::tests::unsupported_feature12_bytes_are_retained_and_autofilter12_chain_is_strict ... ok
+test marker_format::tests::rejects_malformed_records ... ok
+test marker_format::tests::round_trip_all_marker_kinds ... ok
+test mdx_metadata::tests::mdb_parses_dir_array ... ok
+test mdx_metadata::tests::mdt_info_parses_flags_and_name ... ok
+test mdx_metadata::tests::mdt_info_rejects_truncated_and_mismatched_strings ... ok
+test list_object::tests::feature11_web_lfdt_values_and_defaults_round_trip_strictly ... ok
+test mdx_metadata::tests::mdx_kpi_parses_fixed_body ... ok
+test mdx_metadata::tests::mdx_prop_parses_fixed_body ... ok
+test mdx_metadata::tests::mdx_set_parses_sort_order ... ok
+test mdx_metadata::tests::mdx_str_parses_shared_string ... ok
+test mdx_metadata::tests::mdx_tuple_parses_and_validates_function ... ok
+test mdx_metadata::tests::metadata_collection_validates_cross_record_indexes ... ok
+test mdx_metadata::tests::push_record_rejects_unknown_record_type ... ok
+test mdx_metadata::tests::payloads_round_trip_through_parse ... ok
+test merged_cells::tests::test_parse_multiple_ranges ... ok
+test merged_cells::tests::test_parse_single_range ... ok
+test merged_cells::tests::test_rejects_truncated_records_without_panicking ... ok
+test number_format::tests::a_lenient_policy_still_rejects_trailing_bytes_and_a_bad_format_identifier ... ok
+test number_format::tests::a_lenient_policy_truncates_a_format_string_that_overstates_its_payload ... ok
+test number_format::tests::a_truncated_format_string_drops_a_split_utf16_code_unit ... ok
+test number_format::tests::decodes_cell_apply_polarity_and_style_local_semantics ... ok
+test number_format::tests::decodes_cell_special_flags_and_ignores_style_reserved_overlays ... ok
+test number_format::tests::classifies_numeric_and_formula_caches_without_literal_false_positives ... ok
+test number_format::tests::parses_strict_unicode_format_records ... ok
+test number_format::tests::real_world_tolerance_tests::a_lenient_policy_repairs_an_xfcrc_count_disagreement_only ... ok
+test number_format::tests::real_world_tolerance_tests::defaults_to_the_1900_date_system_when_date1904_is_absent ... ok
+test number_format::tests::real_world_tolerance_tests::honours_an_explicit_1904_date_system ... ok
+test number_format::tests::recognizes_date_formats_without_literal_false_positives ... ok
+test number_format::tests::real_world_tolerance_tests::still_rejects_a_truncated_format_record ... ok
+test number_format::tests::real_world_tolerance_tests::ignores_reserved_option_bits_in_format_record_strings ... ok
+test number_format::tests::rejects_invalid_date_xf_and_crc_shapes ... ok
+test number_format::tests::resolves_effective_components_by_borrowing_parent_or_cell ... ok
+test object_link::tests::preserves_ignored_var_fields_for_other_targets ... ok
+test object_link::tests::rejects_malformed_records ... ok
+test object_link::tests::round_trip_all_targets ... ok
+test list_object::tests::feature11_xml_lfxidt_is_exhaustive_and_preserves_ignored_storage ... ok
+test object_link::tests::series_link_indexes ... ok
+test ole_object::tests::codec::malformed_control_payload_stays_inert_and_lossless ... ok
+test ole_object::tests::codec::ole_obj_round_trip_retains_unknown_and_reserved_bytes ... ok
+test number_format::tests::opens_libreoffice_format_fixtures_with_ordered_xfs ... ok
+test ole_object::tests::package::add_form_control_is_typed_atomic_and_lossless ... ok
+test number_format::tests::opens_poi_date_and_epoch_fixtures ... ok
+test encryption::tests::opens_apache_poi_binary_rc4_workbook ... ok
+test ole_object::tests::package::derives_deduplicated_mbd_and_lnk_targets_from_obj_records ... ok
+test ole_object::tests::package::bounds_workbook_read_before_stream_materialization ... ok
+test ole_object::tests::validation::dropdown_authoring_requires_matching_drop_data ... ok
+test ole_object::tests::package::add_form_control_rejects_duplicate_ids_without_mutation ... ok
+test ole_object::tests::validation::form_control_constructor_authors_typed_checkbox ... ok
+test ole_object::tests::validation::list_validation_rejects_incomplete_typed_arrays ... ok
+test ole_object::tests::validation::list_authoring_synchronizes_items_and_requires_sbs ... ok
+test ole_object::tests::validation::ole_obj_rejects_conflicting_link_and_control_flags ... ok
+test ole_object::tests::validation::scrollbar_validation_rejects_out_of_range_values ... ok
+test page_setup::tests::header_footer_builder_validates_and_serializes ... ok
+test page_setup::tests::ignores_custom_view_page_records ... ok
+test ole_object::tests::transaction::empty_object_metadata_edit_preserves_exact_bytes ... ok
+test page_setup::tests::parses_header_footer_even_and_first_pages ... ok
+test ole_object::tests::transaction::snapshot_and_noop_commit_preserve_exact_cfb_bytes ... ok
+test page_setup::tests::parses_header_footer_without_strings ... ok
+test ole_object::tests::transaction::invalid_control_edit_is_failure_atomic ... ok
+test page_setup::tests::parses_typed_page_setup ... ok
+test page_setup::tests::partial_page_block_uses_tolerant_defaults ... ok
+test page_setup::tests::rejects_malformed_and_duplicate_page_records ... ok
+test page_setup::tests::rejects_malformed_header_footer_records ... ok
+test palette::tests::parses_custom_palette_and_resolves_icv_indices ... ok
+test palette::tests::rejects_duplicate_palette_records ... ok
+test cell_values::tests::source_backed_scaled_rk_rounds_only_exact_decodes ... ok
+test palette::tests::rejects_nonzero_long_rgb_reserved_byte ... ok
+test palette::tests::rejects_wrong_count_and_record_length ... ok
+test palette::tests::supplies_normative_default_palette ... ok
+test phonetic_info::tests::preserves_unused_flag_bits ... ok
+test phonetic_info::tests::round_trips ... ok
+test phonetic_info::tests::rejects_malformed_records ... ok
+test picture_compression::tests::malformed_payloads_and_duplicate_settings_are_rejected ... ok
+test picture_compression::tests::round_trip_preserves_unknown_records_and_extension_tail ... ok
+test ole_object::tests::transaction::valid_control_edit_publishes_typed_patch_and_keeps_unknowns ... ok
+test ole_object::tests::transaction::metadata_edit_rejects_storage_class_transition_atomically ... ok
+test cell_values::tests::source_backed_numeric_owned_plan_preserves_direct_atomic_and_sink_contracts ... ok
+test picture_compression::tests::transaction_applies_atomically_and_checks_the_base ... ok
+test ole_object::tests::transaction::metadata_edit_rejects_stale_identity_and_invalid_flags_atomically ... ok
+test pivot_editor::tests::malformed_bound_sheet_offsets_are_rejected_before_slicing ... ok
+test picture_compression::tests::unbounded_unknown_payload_is_rejected ... ok
+test pivot_olap::tests::hierarchy_round_trips_unicode_and_hidden_levels ... ok
+test pivot_olap::tests::malformed_record_headers_and_reserved_bits_are_rejected ... ok
+test pivot_olap::tests::page_and_field_extensions_round_trip ... ok
+test ole_object::tests::transaction::object_metadata_edit_changes_typed_fields_and_preserves_unknown_payload ... ok
+test pivot_olap::tests::view_header_round_trips_future_bytes ... ok
+test pivot_table::tests::parse_tests::test_parse_sxpi_two_entries ... ok
+test pivot_olap::tests::sequence_package_enforces_order_counts_and_round_trip ... ok
+test pivot_table::tests::parse_tests::test_parse_sxvd_no_name ... ok
+test pivot_table::tests::parse_tests::test_parse_sxvi_data_item ... ok
+test pivot_table::tests::parse_tests::test_parse_sxvs ... ok
+test pivot_table::tests::worksheet_view_record_tests::parses_current_sxview_layout_and_cache_index ... ok
+test pivot_table::tests::worksheet_view_record_tests::preserves_sxaddl_payload_exactly_and_rejects_bad_lengths ... ok
+test pivot_table::tests::worksheet_view_record_tests::rejects_out_of_order_and_duplicate_singletons ... ok
+test ole_object::tests::transaction::metadata_patch_rejects_stale_snapshot_without_mutation ... ok
+test plot_growth::tests::negative_growth_round_trip ... ok
+test page_setup::tests::reads_poi_page_setup_fixtures ... ok
+test plot_growth::tests::rejects_bad_length ... ok
+test print_flags::tests::grid_set_preserves_unused_bits ... ok
+test plot_growth::tests::round_trip_and_fixed_point_decode ... ok
+test print_flags::tests::grid_set_rejects_bad_length ... ok
+test print_flags::tests::grid_set_round_trip ... ok
+test print_flags::tests::print_row_col_rejects_bad_length_and_non_boolean ... ok
+test print_flags::tests::print_row_col_round_trip ... ok
+test printer_driver::tests::empty_devmode_emits_single_record ... ok
+test printer_driver::tests::preserves_reserved_and_handles_empty_devmode ... ok
+test printer_driver::tests::reassembles_continuations_and_round_trips ... ok
+test printer_driver::tests::single_record_round_trip ... ok
+test protection::tests::absent_workbook_records_default_to_unprotected ... ok
+test protection::tests::file_sharing_forms_are_strict ... ok
+test protection::tests::revision_pair_must_be_immediate ... ok
+test protection::tests::strict_boolean_and_lengths ... ok
+test protection::tests::sheet_password_is_nonzero_and_scoped ... ok
+test query_table::tests::foreign_sxaddl_class_ends_sequence ... ok
+test query_table::tests::malformed_records_never_panic ... ok
+test query_table::tests::mismatched_tag_name_is_ignored ... ok
+test query_table::tests::multiple_query_tables_per_sheet ... ok
+test list_object::tests::continue_frt11_rejects_orphans_bad_echoes_and_short_predecessors ... ok
+test query_table::tests::negative_chunk_counts_are_clamped ... ok
+test query_table::tests::odbc_query_with_parameters ... ok
+test query_table::tests::ole_db_query_with_chunked_connection ... ok
+test query_table::tests::pivot_tag_is_handed_back ... ok
+test query_table::tests::pivot_tag_without_query_table_is_ignored ... ok
+test query_table::tests::sort_data_inside_sequence_is_consumed ... ok
+test query_table::tests::sort_data_with_missing_continues_still_completes ... ok
+test query_table::tests::sxaddl_qsi_class_is_consumed ... ok
+test query_table::tests::text_query_sequence ... ok
+test query_table::tests::web_query_with_post_data ... ok
+test real_time_data::tests::compressed_latin1_uses_character_count_not_utf8_byte_count ... ok
+test real_time_data::tests::parses_numeric_boolean_error_and_integer_values ... ok
+test real_time_data::tests::parses_text_topic_with_cells ... ok
+test real_time_data::tests::parses_wide_strings ... ok
+test real_time_data::tests::payload_round_trips ... ok
+test real_time_data::tests::reapplies_shared_prefix_from_previous_topic ... ok
+test real_time_data::tests::payload_round_trips_long_text_variant ... ok
+test real_time_data::tests::rejects_frt_header_rt_mismatch ... ok
+test query_table::tests::text_query_45365_fixture ... ok
+test real_time_data::tests::rejects_invalid_boolean ... ok
+test real_time_data::tests::rejects_mismatched_rtd_string_kind ... ok
+test real_time_data::tests::rejects_overflowing_and_odd_wire_lengths ... ok
+test real_time_data::tests::rejects_prefix_longer_than_previous_topic ... ok
+test real_time_data::tests::rejects_prefix_without_previous_topic ... ok
+test query_table::tests::web_query_57456_fixture ... ok
+test real_time_data::tests::rejects_truncated_payloads ... ok
+test real_time_data::tests::rejects_unknown_oper_kind_and_ragged_cells ... ok
+test real_time_data::tests::segmented_topic_cch_covers_count_prefixes_and_empty_segments ... ok
+test real_time_data::tests::serialize_promotes_long_compressed_segment_to_wide ... ok
+test real_time_data::tests::removing_prefix_owner_is_atomic_and_insertions_are_bounded ... ok
+test real_time_data::tests::stream_framing_bounds_are_checked_before_interpretation ... ok
+test real_time_data::tests::stream_snapshot_noop_is_exact_and_exposes_opaque_records ... ok
+test records::packed_cell_tests::expands_mul_blank_and_rejects_inconsistent_ranges ... ok
+test records::packed_cell_tests::expands_mul_rk_into_individual_numeric_cells ... ok
+test real_time_data::tests::stream_transaction_edits_typed_value_and_preserves_unknown_bytes ... ok
+test records::packed_cell_tests::formula_uses_declared_token_length ... ok
+test real_time_data::tests::stream_transaction_is_failure_atomic_and_rejects_stale_sources ... ok
+test records::shared_string_tests::chained_empty_continuations_return_an_error_instead_of_panicking ... ok
+test records::shared_string_tests::changes_character_width_at_continue_boundaries ... ok
+test records::shared_string_tests::codepage_construction_and_utf16_decoding_are_strict ... ok
+test records::shared_string_tests::ignores_reserved_shared_string_flags ... ok
+test records::shared_string_tests::maps_truncated_shared_frame_errors_at_the_xls_boundary ... ok
+test records::shared_string_tests::parses_phonetic_text_and_mappings ... ok
+test records::shared_string_tests::parses_plain_compressed_and_utf16_strings ... ok
+test records::shared_string_tests::parses_rich_text_after_the_character_data ... ok
+test records::shared_string_tests::reads_formatting_runs_split_across_continue_records ... ok
+test records::shared_string_tests::rejects_invalid_continue_flags_and_truncated_extensions ... ok
+test revision_log::tests::finds_revision_log_stream_case_insensitively_at_root ... ok
+test revision_log::tests::enforces_rrd_rst_etxp_count ... ok
+test revision_log::tests::parses_minimal_stream_without_optional_records ... ok
+test revision_log::tests::rejects_broken_collection_markers ... ok
+test revision_log::tests::parses_full_revision_log_stream ... ok
+test revision_records::tests::chg_cell_parses_flags_and_location ... ok
+test revision_log::tests::rejects_malformed_stream_structure ... ok
+test revision_records::tests::chg_cell_validates_old_value_size_table ... ok
+test revision_records::tests::conflict_and_user_view_validate_rrd_invariants ... ok
+test revision_records::tests::empty_markers_reject_payloads ... ok
+test revision_records::tests::file_lock_parses_fixed_envelope ... ok
+test revision_records::tests::ins_del_validates_revision_kind_and_undo ... ok
+test revision_records::tests::insert_sh_parses_position_and_name ... ok
+test revision_records::tests::move_parses_source_and_destination ... ok
+test revision_records::tests::ref8u_validates_ordering_and_column_cap ... ok
+test revision_records::tests::ren_sheet_parses_old_and_new_names ... ok
+test revision_records::tests::revision_type_round_trips_all_spec_values ... ok
+test revision_records::tests::rrd_head_parses_metadata ... ok
+test revision_records::tests::rrd_header_validates_memory_flags_and_revid ... ok
+test revision_records::tests::rrd_info_enforces_flag_consistency ... ok
+test revision_records::tests::rrd_info_parses_flags_and_guids ... ok
+test records::shared_string_tests::reads_writer_generated_multirecord_sst ... ok
+test revision_records::tests::short_dtr_validates_calendar_ranges ... ok
+test revision_records::tests::usr_excl_parses_both_string_widths ... ok
+test revision_records::tests::rr_tab_id_parses_identifier_array ... ok
+test revision_records::transaction::tests::header_name_edit_supports_unicode_and_exact_noop ... ok
+test revision_records::transaction::tests::invalid_edits_are_failure_atomic ... ok
+test revision_records::transaction::tests::patch_rejects_stale_source_and_supports_inverse ... ok
+test revision_records::transaction::tests::snapshot_noop_preserves_exact_stream_and_fingerprint ... ok
+test revision_records::transaction::tests::revision_flags_edit_is_typed_and_preserves_opaque_bytes ... ok
+test row_block_index::tests::parses_resolves_and_round_trips_poi_simple_reference ... ok
+test scenario::tests::parses_empty_manager_fixture_shape ... ok
+test row_block_index::tests::rejects_malformed_sizes_bounds_offsets_cardinality_and_targets ... ok
+test scenario::tests::rejects_bad_lengths_counts_flags_and_order ... ok
+test scenario::tests::rejects_partial_declared_collection ... ok
+test scl::tests::rejects_malformed_records ... ok
+test scl::tests::round_trip ... ok
+test ser_aux_err_bar::tests::preserves_reserved_byte_and_ignored_fields ... ok
+test ser_aux_err_bar::tests::rejects_malformed_records ... ok
+test ser_aux_err_bar::tests::round_trip_all_enums ... ok
+test ser_aux_trend::tests::numeric_intercept_decodes ... ok
+test ser_aux_trend::tests::rejects_malformed_records ... ok
+test ser_aux_trend::tests::round_trip_all_trendline_kinds ... ok
+test shapes::tests::projects_the_typed_sheet_anchor_from_officeart ... ok
+test shapes::tests::reconstructs_mso_drawing_continue_fragments ... ok
+test shapes::tests::test_count_shapes_empty_data ... ok
+test shapes::tests::test_count_shapes_invalid_data ... ok
+test shapes::tests::test_deeply_nested_groups ... ok
+test shapes::tests::test_extract_shape_text_empty_data ... ok
+test shapes::tests::test_extract_shapes_empty_data ... ok
+test shapes::tests::test_multiple_children ... ok
+test shapes::tests::test_nested_groups ... ok
+test shapes::tests::test_xls_shape_clone ... ok
+test shapes::tests::test_xls_shape_creation ... ok
+test shapes::tests::test_xls_shape_debug ... ok
+test shapes::tests::test_xls_shape_empty_text ... ok
+test shapes::tests::test_xls_shape_group ... ok
+test shapes::tests::test_xls_shape_unicode_text ... ok
+test shapes::tests::test_xls_shape_variants ... ok
+test shared_string_index::tests::constructs_spec_derived_multi_bucket_index ... ok
+test shared_string_index::tests::parses_and_round_trips_simple_poi_reference ... ok
+test shared_string_index::tests::rejects_bad_formula_lengths_pointers_reserved_and_duplicates ... ok
+test sheet_ext::tests::checked_reader_rejects_offset_overflow ... ok
+test sheet_ext::tests::parses_base_record_with_and_without_tab_color ... ok
+test sheet_ext::tests::parses_optional_extension ... ok
+test sheet_ext::tests::rejects_malformed_records ... ok
+test sheet_ext::tests::rejects_truncation_at_every_fixed_width_boundary ... ok
+test sort_data::tests::exact_domains_use_narrow_checked_storage ... ok
+test sort_data::tests::key_edits_reject_ambiguity_and_are_failure_atomic ... ok
+test sort_data::tests::rejects_invalid_ranges_and_condition_count_mismatch_without_unwind ... ok
+test sort_data::tests::rejects_malformed_continuation_fields_and_unicode ... ok
+test sort_data::tests::rejects_negative_and_out_of_domain_signed_rfx_values_without_unwind ... ok
+test sort_data::tests::rejects_truncated_sort_data_and_continuations_without_unwind ... ok
+test sort_data::tests::round_trips_every_sort_on_kind_and_unicode ... ok
+test sort_data::tests::signed_rfx_fields_have_explicit_four_byte_wire_round_trip ... ok
+test sort_data::tests::validates_frt_reserved_bits_and_conditional_ref8_without_rejecting_ignored_fields ... ok
+test sort_data::tests::rejects_oversized_or_empty_custom_lists_before_retention ... ok
+test style_ext::tests::parses_built_in_style_extension ... ok
+test style_ext::tests::parses_custom_style_extension ... ok
+test style_ext::tests::rejects_malformed_records ... ok
+test sxview_link::tests::rejects_invalid_utf16 ... ok
+test sxview_link::tests::rejects_count_length_mismatch ... ok
+test sxview_link::tests::rejects_truncation_and_trailing_garbage ... ok
+test sxview_link::tests::rejects_unsupported_string_flags ... ok
+test sxview_link::tests::rejects_wrong_rt ... ok
+test sxview_link::tests::round_trip_compressed ... ok
+test sxview_link::tests::round_trip_empty_name ... ok
+test sxview_link::tests::round_trip_utf16 ... ok
+test sheet_metadata::tests::reads_hidden_and_very_hidden_poi_sheets ... ok
+test table_styles::tests::collector_enforces_abnf_counts_and_references ... ok
+test table_styles::tests::complete_custom_family_round_trips_all_record_types ... ok
+test table_styles::tests::parses_and_round_trips_poi_reference_header ... ok
+test table_styles::tests::rejects_hostile_headers_lengths_regions_duplicates_and_caps ... ok
+test theme::tests::parses_custom_theme_with_continuations ... ok
+test theme::tests::parses_default_theme_without_contents ... ok
+test theme::tests::rejects_malformed_records ... ok
+test theme::tests::round_trips_across_record_boundaries ... ok
+test sheet_visibility::tests::refuses_hiding_every_worksheet_atomically ... ok
+test sheet_visibility::tests::duplicate_case_folded_names_are_refused_or_reported_ambiguous ... ok
+test toolbar::tests::ambiguous_tbcdata_boundaries_are_rejected ... ok
+test toolbar::tests::empty_toolbar_roundtrips_without_visual_data ... ok
+test toolbar::tests::fixed_header_activex_controls_are_typed_without_executing_them ... ok
+test toolbar::tests::malformed_signatures_counts_and_lengths_are_rejected ... ok
+test toolbar::tests::multiple_toolbars_keep_optional_records_separate ... ok
+test sheet_metadata::tests::catalogs_chart_sheets_without_parsing_them_as_worksheets ... ok
+test toolbar::tests::multiple_variable_controls_use_the_next_tbc_header_boundary ... ok
+test toolbar::tests::parsed_toolbar_can_be_owned_for_workbook_lifetime ... ok
+test toolbar::tests::reserved_set_fields_and_visual_bytes_are_preserved ... ok
+test toolbar::tests::optional_visual_data_is_lossless_and_views_are_bounded ... ok
+test user_routing::tests::cbusr_rejects_bad_length ... ok
+test toolbar::tests::shared_general_and_extra_info_are_decoded_losslessly ... ok
+test user_routing::tests::cbusr_round_trip ... ok
+test user_routing::tests::cusr_rejects_bad_length_and_count ... ok
+test toolbar::tests::variable_tbc_data_and_tbccmd_roundtrip_without_execution ... ok
+test user_routing::tests::cusr_round_trip ... ok
+test user_routing::tests::doc_route_rejects_missing_nul_and_truncation ... ok
+test user_routing::tests::doc_route_rejects_oversized_and_orphaned_strings ... ok
+test user_routing::tests::doc_route_rejects_stage_past_recipients ... ok
+test user_routing::tests::doc_route_rejects_total_over_limit ... ok
+test user_routing::tests::doc_route_rejects_unknown_delivery_option ... ok
+test user_routing::tests::doc_route_requires_save_route_info ... ok
+test user_routing::tests::doc_route_round_trip ... ok
+test user_routing::tests::doc_route_round_trip_empty_strings ... ok
+test user_routing::tests::recip_name_rejects_bad_counts_and_truncation ... ok
+test user_routing::tests::recip_name_round_trip ... ok
+test user_routing::tests::usr_info_rejects_bad_name_counts ... ok
+test sheet_visibility::tests::selector_rules_and_nonworksheet_positions_are_exact ... ok
+test user_routing::tests::usr_info_rejects_rich_and_extended_strings ... ok
+test user_routing::tests::usr_info_rejects_truncation_and_trailing_garbage ... ok
+test user_routing::tests::usr_info_round_trip_compressed ... ok
+test user_routing::tests::usr_info_round_trip_utf16 ... ok
+test uses_elfs::tests::uses_elfs_rejects_bad_length_and_non_boolean ... ok
+test uses_elfs::tests::uses_elfs_round_trip ... ok
+test utils::tests::decode_string_record_completes_within_one_record ... ok
+test utils::tests::decode_string_record_rejects_split_utf16_character ... ok
+test utils::tests::decode_string_record_reports_missing_continuation ... ok
+test utils::tests::decode_string_record_switches_encoding_at_continue_boundary ... ok
+test utils::tests::decodes_all_rk_number_encodings ... ok
+test sheet_visibility::tests::protected_signed_and_encrypted_sources_are_refused ... ok
+test utils::tests::decodes_formula_cached_value_marker_and_types ... ok
+test utils::tests::parses_xl_unicode_string_character_counts ... ok
+test utils::tests::rejects_truncated_xl_unicode_string ... ok
+test utils::tests::test_cell_reference ... ok
+test utils::tests::test_column_index_to_name ... ok
+test utils::tests::test_column_name_to_index ... ok
+test utils::tests::test_parse_cell_reference ... ok
+test vba::tests::no_macros_marker_is_inert ... ok
+test vba::tests::discovers_xls_vba_storage_topology_from_directory_names_only ... ok
+test vba::tests::parses_strict_code_names ... ok
+test vba::tests::rejects_bad_marker_lengths_order_and_scope ... ok
+test vba::tests::unrelated_workbook_records_are_ignored_without_panicking ... ok
+test vba::tests::vba_marker_record_ids_match_the_spec_enumeration ... ok
+test view::tests::binary_field_reads_return_typed_errors_for_truncation_and_overflow ... ok
+test sheet_visibility::tests::deserialization_rejects_unrelated_stream_changes ... ok
+test view::tests::ignores_custom_view_selections_after_window_closes ... ok
+test sheet_visibility::tests::hides_unhides_and_very_hides_exact_fixed_width_owners ... ok
+test view::tests::parses_window_zoom_pane_and_selection ... ok
+test view::tests::rejects_cross_record_view_inconsistencies ... ok
+test cell_values::tests::source_backed_rk_accepts_signed_integer_boundaries_and_noncanonical_source_bytes ... ok
+test view::tests::rejects_malformed_and_out_of_order_view_records ... ok
+test view::tests::validates_active_range_across_contiguous_selection_records ... ok
+test web_pub::tests::parses_chart_publication_with_source_name_and_shape_id ... ok
+test web_pub::tests::parses_named_range_publication ... ok
+test web_pub::tests::parses_range_publication_with_ref8 ... ok
+test web_pub::tests::bounded_conditional_edits_and_invalid_edits_are_atomic ... ok
+test sheet_visibility::tests::source_backed_visibility_reports_partial_sink_and_save_failures ... ok
+test web_pub::tests::parses_workbook_publication ... ok
+test web_pub::tests::rejects_cb_mismatch ... ok
+test web_pub::tests::patch_rejects_stale_source_without_mutating_it ... ok
+test web_pub::tests::rejects_ref_flag_mismatch ... ok
+test web_pub::tests::payload_round_trips ... ok
+test web_pub::tests::rejects_truncated_and_oversized_strings ... ok
+test web_pub::tests::rejects_unknown_type_codes_and_rt_mismatch ... ok
+test web_pub::tests::serialize_rejects_inconsistent_conditional_fields ... ok
+test workbook::codec::tests::cell_record_xf_is_variant_independent ... ok
+test workbook::codec::tests::pivot_cache_paths_are_case_insensitive_and_sorted ... ok
+test workbook::codec::tests::shared_formula_wire_parser_preserves_range_shape ... ok
+test web_pub::tests::snapshot_noop_and_edits_preserve_opaque_wire_bytes ... ok
+test workbook::codec::tests::shared_formula_wire_parser_rejects_empty_tokens ... ok
+test workbook::source::materialization_tests::reserve_failure_is_reported_as_typed_allocation_error ... ok
+test vba::tests::parsed_xls_workbook_discovers_invalid_vba_payloads_as_inert_metadata ... ok
+test workbook::source::tests::limits_are_finite_by_default ... ok
+test workbook::tests::custom_view_closing_record_restores_primary_page_setup_collection ... ok
+test workbook::tests::pivot_cache_stream_paths_are_sorted_without_unchecked_reparsing ... ok
+test workbook::tests::worksheet_enforces_dval_dv_ordering ... ok
+test workbook::tests::worksheet_expands_packed_numeric_and_blank_cells ... ok
+test workbook::tests::worksheet_expands_shared_formula_relative_references ... ok
+test workbook::tests::worksheet_rejects_formula_missing_its_string_record ... ok
+test workbook::package::property_set::tests::no_op_edits_return_the_exact_source_bytes ... ok
+test workbook::tests::worksheet_rejects_formula_companions_without_an_adjacent_formula ... ok
+test workbook::tests::defined_name_tests::parses_names_after_xor_decryption ... ok
+test workbook::tests::worksheet_rejects_array_without_dimensions_and_second_formula_companion ... ok
+test workbook::tests::worksheet_rejects_malformed_optional_validation_records_and_continue ... ok
+test sheet_visibility::tests::deserialization_binds_empty_storages_and_root_metadata ... ok
+test workbook::tests::defined_name_tests::opens_poi_named_input_with_exact_names_and_ranges ... ok
+test vba::tests::parses_real_xls_vba_project_and_inert_module_source ... ok
+test workbook::tests::worksheet_resolves_formula_value_from_following_string_record ... ok
+test workbook::tests::defined_name_tests::lookup_prefers_last_local_name_then_last_global_name ... ok
+test workbook::tests::worksheet_resolves_array_formula_for_every_cell ... ok
+test workbook::tests::worksheet_rejects_orphan_and_incomplete_array_ptg_exp_links ... ok
+test workbook::tests::defined_name_tests::recognizes_poi_print_area ... ok
+test workbook::tests::worksheet_resolves_string_formula_spanning_continue_records ... ok
+test workbook::tests::worksheet_resolves_string_formula_across_intervening_array_record ... ok
+test workbook::package::property_set::tests::signed_and_encrypted_sources_are_refused_before_mutation ... ok
+test workbook_view::tests::rejects_cardinality_and_boundsheet_mismatch ... ok
+test workbook_view::tests::rejects_malformed_rr_tab_ids ... ok
+test writer::biff::cells::tests::array_token_substitution_cannot_reuse_rgb_extra ... ok
+test writer::biff::cells::tests::reemits_rgb_extra_only_for_its_original_cell_and_tokens ... ok
+test writer::biff::cells::tests::shared_token_substitution_cannot_reuse_rgb_extra ... ok
+test workbook_view::tests::rejects_malformed_window_and_order ... ok
+test writer::biff::cells::tests::participating_formula_emits_ptg_exp_without_a_duplicate_shrfmla ... ok
+test writer::biff::cells::tests::writes_formula_record_with_recalculation_and_empty_cache ... ok
+test writer::biff::cells::tests::writes_anchor_formula_then_one_shrfmla_with_ptg_exp_and_refu ... ok
+test writer::biff::conditional_format::tests::test_cfheader_computes_enclosing_range ... ok
+test writer::biff::conditional_format::tests::test_write_cfheader_empty_ranges ... ok
+test writer::biff::conditional_format::tests::test_write_cfheader_invalid_range ... ok
+test writer::biff::conditional_format::tests::test_write_cfheader_multiple_ranges ... ok
+test workbook_view::tests::validates_boundsheet_visibility_and_window2_selection ... ok
+test writer::biff::conditional_format::tests::test_write_cfheader_row_limit_exceeded ... ok
+test worksheet::layout::tests::rejects_duplicates_and_out_of_order_records ... ok
+test writer::biff::cells::tests::array_members_emit_empty_ptg_exp_formulas_and_only_anchor_emits_array ... ok
+test writer::biff::conditional_format::tests::test_write_cfheader_single_range ... ok
+test workbook::package::property_set::tests::typed_edits_preserve_unrelated_streams_and_publish_a_patch ... ok
+test worksheet::layout::tests::rejects_malformed_layout_records ... ok
+test writer::biff::conditional_format::tests::test_write_cfrule_formula_only ... ok
+test writer::biff::conditional_format::tests::test_write_cfheader_zero_rules ... ok
+test writer::biff::conditional_format::tests::test_write_cfrule_formula_sizes ... ok
+test writer::biff::conditional_format::tests::test_write_cfrule_with_pattern ... ok
+test writer::biff::drawing::tests::checked_anchor_serializes_exact_client_anchor_bytes ... ok
+test sheet_visibility::tests::exact_patch_rejects_stale_and_durable_inverse_restores_source ... ok
+test writer::biff::drawing_group::tests::children_use_child_anchors_child_flags_and_sequential_shape_ids ... ok
+test writer::biff::drawing_group::tests::group_header_holds_spgr_rect_group_flags_and_client_anchor ... ok
+test writer::biff::drawing_group::tests::spgr_container_length_spans_every_fragment ... ok
+test writer::biff::pivot::tests::test_encode_xl_string_no_cch_empty ... ok
+test writer::biff::pivot::tests::test_write_sx_stream_id ... ok
+test writer::biff::pivot::tests::test_write_sxdi_empty_name ... ok
+test writer::biff::pivot::tests::test_write_sxex_default ... ok
+test writer::biff::pivot::tests::test_write_sxpi ... ok
+test writer::biff::pivot::tests::test_write_sxvd_no_name ... ok
+test workbook::tests::reads_data_validation_fixtures ... ok
+test writer::biff::pivot::tests::test_write_sxvi_data ... ok
+test writer::biff::pivot::tests::test_write_sxvs ... ok
+test writer::biff::pivot::tests::validation_preserves_biff_index_width_rules ... ok
+test writer::biff::pivot::tests::validation_rejects_shared_index_cardinality_mismatch ... ok
+test writer::biff::tests::complete_record_encoder_preserves_exact_frame_bytes_at_limit ... ok
+test writer::biff::tests::complete_record_encoder_rejects_payload_above_biff_limit_without_output ... ok
+test writer::biff::tests::test_has_multibyte_char ... ok
+test writer::biff::tests::test_unicode_string_size ... ok
+test writer::biff::tests::test_write_backup ... ok
+test writer::biff::tests::test_write_bof ... ok
+test workbook::tests::defined_name_tests::recognizes_deleted_unicode_and_named_formula_fixtures ... ok
+test writer::biff::tests::test_write_bof_worksheet ... ok
+test writer::biff::tests::test_write_book_bool ... ok
+test writer::biff::tests::test_write_boolerr ... ok
+test writer::biff::tests::test_write_boundsheet ... ok
+test writer::biff::tests::test_write_codepage ... ok
+test writer::biff::tests::test_write_colinfo ... ok
+test writer::biff::tests::test_write_country ... ok
+test writer::biff::tests::test_write_date1904 ... ok
+test writer::biff::tests::test_write_def_col_width ... ok
+test writer::biff::tests::test_write_dimensions ... ok
+test writer::biff::tests::test_write_eof ... ok
+test writer::biff::tests::test_write_format_record ... ok
+test writer::biff::tests::test_write_function_groups ... ok
+test writer::biff::tests::test_write_hide_obj ... ok
+test writer::biff::tests::test_write_labelsst ... ok
+test writer::biff::tests::test_write_number ... ok
+test writer::biff::tests::test_write_number_different_values ... ok
+test writer::biff::tests::test_write_precision ... ok
+test writer::biff::tests::test_write_protect ... ok
+test writer::biff::tests::test_write_record_header ... ok
+test writer::biff::tests::test_write_refresh_all ... ok
+test writer::biff::tests::test_write_row ... ok
+test writer::biff::tests::test_write_tab_id ... ok
+test writer::biff::tests::test_write_unicode_string_biff8_ascii ... ok
+test writer::biff::tests::test_write_window1 ... ok
+test writer::biff::tests::test_write_window_protect ... ok
+test writer::biff::worksheet::hyperlink_writer_tests::accepts_maximum_ref8u_bounds ... ok
+test writer::biff::worksheet::hyperlink_writer_tests::rejects_invalid_ref8u_ranges_before_emitting_bytes ... ok
+test writer::biff::worksheet::view_round_trip_tests::rejects_invalid_writer_view_bounds ... ok
+test writer::biff::worksheet::view_round_trip_tests::writes_view_records_that_round_trip_through_reader ... ok
+test writer::core::conditional_format::tests::test_conditional_pattern ... ok
+test writer::core::conditional_format::tests::test_formula_to_biff_payload ... ok
+test writer::core::conditional_format::tests::test_formula_to_biff_payload_invalid ... ok
+test writer::core::conditional_format::tests::test_xls_conditional_format_clone ... ok
+test writer::core::conditional_format::tests::test_xls_conditional_format_color_masking ... ok
+test writer::core::conditional_format::tests::test_xls_conditional_format_no_pattern ... ok
+test writer::core::conditional_format::tests::test_xls_conditional_format_to_biff_pattern ... ok
+test writer::core::conditional_format::tests::test_xls_conditional_format_type_clone ... ok
+test writer::core::conditional_format::tests::test_xls_conditional_pattern_clone ... ok
+test writer::core::data_validation::tests::test_list_to_biff_payload ... ok
+test writer::core::data_validation::tests::test_list_to_biff_payload_empty ... ok
+test writer::core::data_validation::tests::test_list_to_biff_payload_non_ascii ... ok
+test writer::core::data_validation::tests::test_list_to_biff_payload_too_long ... ok
+test writer::core::data_validation::tests::test_whole_to_biff_payload_between ... ok
+test sheet_visibility::tests::batch_accepts_cap_and_refuses_cap_plus_one_without_staging_prefix ... ok
+test writer::core::data_validation::tests::test_whole_to_biff_payload_between_missing_value2 ... ok
+test writer::core::data_validation::tests::test_whole_to_biff_payload_greater_than ... ok
+test writer::core::data_validation::tests::test_xls_data_validation_clone ... ok
+test writer::core::data_validation::tests::test_xls_data_validation_operator_to_biff_code ... ok
+test writer::core::data_validation::tests::test_xls_data_validation_struct ... ok
+test writer::core::shape::tests::anchor_and_group_rect_reject_degenerate_axes ... ok
+test writer::core::shape::tests::point_boundaries_are_checked_without_unwinding ... ok
+test writer::core::shape_group::tests::degenerate_rectangles_are_rejected ... ok
+test writer::core::shape_group::tests::duplicate_requested_ids_inside_one_group_are_rejected ... ok
+test writer::core::shape_group::tests::empty_group_is_rejected ... ok
+test writer::core::shape_group::tests::group_object_count_includes_group_marker ... ok
+test writer::core::shape_group::tests::grouped_line_children_reject_fill_and_text ... ok
+test writer::core::stream::tests::missing_shared_string_mapping_returns_invalid_data ... ok
+test writer::core::stream::tests::shared_string_mapping_must_match_table_entry ... ok
+test writer::core::shape_group::tests::requested_id_validation_does_not_unwind_for_large_groups ... ok
+test writer::core::tests::array_formula_explicit_limits_fail_without_mutation_and_can_retry ... ok
+test writer::core::tests::array_formula_rejects_data_tables_and_cell_limit_without_mutation ... ok
+test writer::core::tests::array_formula_staging_is_atomic_complete_and_protected ... ok
+test writer::core::tests::filter_sort_and_pivot_locations_fail_before_mutation ... ok
+test writer::core::tests::non_finite_cell_numbers_are_rejected_before_mutation ... ok
+test writer::core::tests::data_table_after_array_formula_is_rejected_atomically_and_retryable ... ok
+test writer::core::tests::test_add_multiple_worksheets ... ok
+test writer::core::tests::test_add_worksheet ... ok
+test writer::core::tests::invalid_formula_reference_returns_error_without_unwinding ... ok
+test writer::core::tests::test_add_worksheet_duplicate_name ... ok
+test writer::core::tests::test_add_worksheet_duplicate_name_is_case_insensitive ... ok
+test writer::core::tests::test_add_worksheet_empty_name ... ok
+test writer::core::tests::test_add_worksheet_long_name ... ok
+test writer::core::tests::test_create_writer ... ok
+test writer::core::tests::test_shared_strings_build ... ok
+test writer::core::tests::test_writablecell_creation ... ok
+test writer::core::tests::test_writableworksheet_add_cell ... ok
+test writer::core::tests::test_writableworksheet_add_conditional_format ... ok
+test writer::core::tests::cell_grid_bounds_are_atomic_and_never_unwind ... ok
+test writer::core::tests::test_writableworksheet_add_hyperlink ... ok
+test writer::core::tests::test_writableworksheet_add_data_validation ... ok
+test writer::core::tests::test_writableworksheet_creation ... ok
+test writer::core::tests::test_writableworksheet_freeze_panes ... ok
+test writer::core::tests::test_writableworksheet_merge_cells ... ok
+test writer::core::tests::test_writableworksheet_set_column_width ... ok
+test writer::core::tests::test_write_formula ... ok
+test writer::core::tests::test_write_boolean ... ok
+test writer::core::tests::test_write_multiple_cells ... ok
+test writer::core::tests::test_write_number ... ok
+test writer::core::tests::test_write_string ... ok
+test writer::core::tests::test_xls_defined_name_basic ... ok
+test writer::core::tests::shared_formula_round_trips_with_inert_relative_references ... ok
+test writer::core::tests::test_xls_defined_name_normalizes_reversed_area_corners ... ok
+test writer::core::tests::test_xls_defined_name_to_biff_formula_area ... ok
+test writer::core::tests::test_xls_defined_name_to_biff_formula_single ... ok
+test writer::core::tests::test_xls_writer_default ... ok
+test writer::core::tests::test_xlscellvalue_clone ... ok
+test writer::core::tests::test_write_to_memory ... ok
+test writer::core::tests::test_xlscellvalue_debug ... ok
+test writer::core::tests::test_xlscellvalue_variants ... ok
+test writer::core::shape::tests::text_validation_checks_utf16_boundaries_without_unwinding ... ok
+test writer::core::tests::test_formula_round_trips_through_xls_reader ... ok
+test writer::formatting::tests::test_border_style_default ... ok
+test writer::formatting::tests::test_border_style_variants ... ok
+test writer::formatting::tests::test_borders_custom ... ok
+test writer::formatting::tests::test_builtin_number_format_index ... ok
+test writer::formatting::tests::test_borders_default ... ok
+test writer::formatting::tests::test_cell_style_default ... ok
+test writer::formatting::tests::test_cell_xf_index_for ... ok
+test writer::formatting::tests::test_extended_format_default ... ok
+test writer::formatting::tests::test_fill_default ... ok
+test writer::formatting::tests::test_fill_pattern_variants ... ok
+test writer::formatting::tests::test_fill_solid ... ok
+test writer::formatting::tests::test_font_clone ... ok
+test writer::formatting::tests::test_font_creation ... ok
+test writer::formatting::tests::test_font_default ... ok
+test writer::formatting::tests::test_formatting_manager ... ok
+test writer::formatting::tests::test_formatting_manager_add_format ... ok
+test writer::formatting::tests::test_formatting_manager_default ... ok
+test writer::formatting::tests::test_formatting_manager_default_fonts ... ok
+test writer::formatting::tests::test_formatting_manager_get_font_invalid ... ok
+test writer::formatting::tests::test_formatting_manager_get_format_invalid ... ok
+test writer::formatting::tests::test_formatting_manager_pivot_xfs ... ok
+test writer::formatting::tests::test_formatting_manager_register_cell_style ... ok
+test writer::formatting::tests::test_formatting_manager_register_number_format_builtin ... ok
+test writer::formatting::tests::test_formatting_manager_register_number_format_custom ... ok
+test writer::formatting::tests::test_formatting_manager_register_number_format_text_alias ... ok
+test writer::formatting::tests::test_horizontal_alignment_variants ... ok
+test writer::formatting::tests::test_pivot_xf_indices_default ... ok
+test writer::core::tests::worksheet_location_bounds_are_atomic_and_never_unwind ... ok
+test writer::formatting::tests::test_vertical_alignment_variants ... ok
+test writer::formatting::tests::test_write_font_basic ... ok
+test writer::formatting::tests::test_write_font_bold ... ok
+test writer::formatting::tests::test_write_font_italic ... ok
+test writer::formatting::tests::test_write_xf ... ok
+test writer::formatting::tests::test_write_xf_style ... ok
+test writer::formatting::tests::test_write_xf_with_alignment ... ok
+test merged_cells::tests::reads_poi_merged_cell_fixtures ... ok
+test writer::formatting::tests::written_font_round_trips_through_biff8_reader ... ok
+test writer::formula::tests::checked_reference_and_area_construction_rejects_invalid_bounds ... ok
+test writer::formula::tests::test_encode_all_operators ... ok
+test writer::formula::tests::test_encode_ptg_area ... ok
+test writer::formula::tests::test_encode_ptg_area3d ... ok
+test writer::formula::tests::array_compiler_assigns_operand_classes_and_rejects_external_syntax ... ok
+test writer::formula::tests::test_encode_ptg_bool ... ok
+test writer::formula::tests::test_encode_ptg_func ... ok
+test workbook::tests::worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap ... ok
+test writer::formula::tests::test_encode_ptg_ref ... ok
+test writer::formula::tests::test_encode_ptg_str ... ok
+test writer::formula::tests::test_encode_ptg_str_as_utf16_when_required ... ok
+test writer::formula::tests::test_encode_ptg_tokens ... ok
+test writer::formula::tests::test_encode_ptg_str_does_not_split_surrogate_pair_at_limit ... ok
+test writer::formula::tests::test_parse_cell_ref ... ok
+test writer::formula::tests::test_parse_cell_ref_biff8_edges ... ok
+test writer::formula::tests::test_parse_cell_ref_col_abs ... ok
+test writer::formula::tests::test_parse_cell_ref_invalid ... ok
+test writer::formula::tests::test_parse_cell_ref_row_abs ... ok
+test writer::formula::tests::test_ptg_clone ... ok
+test writer::formula::tests::test_ptg_debug ... ok
+test writer::formula::tests::test_ptg_enum_variants ... ok
+test writer::formula::tests::test_ptg_partial_eq ... ok
+test writer::formula::tests::test_tokenize_cell_range ... ok
+test writer::formula::tests::test_tokenize_comparison_operators ... ok
+test writer::formula::tests::test_tokenize_complex ... ok
+test writer::formula::tests::test_tokenize_concatenation ... ok
+test writer::formula::tests::test_tokenize_division ... ok
+test writer::formula::tests::test_tokenize_empty ... ok
+test writer::formula::tests::test_tokenize_escaped_string_and_booleans ... ok
+test writer::formula::tests::test_tokenize_function ... ok
+test writer::formula::tests::test_tokenize_function_arguments_and_following_operator ... ok
+test writer::formula::tests::test_tokenize_multiplication ... ok
+test writer::formula::tests::test_tokenize_numbers ... ok
+test writer::formula::tests::test_tokenize_parentheses ... ok
+test writer::formula::tests::test_tokenize_power ... ok
+test writer::formula::tests::test_tokenize_precedence ... ok
+test writer::formula::tests::test_tokenize_simple ... ok
+test writer::formula::tests::test_tokenize_string ... ok
+test writer::formula::tests::test_tokenize_subtraction ... ok
+test writer::formula::tests::test_tokenize_unary_percent_and_missing_arguments ... ok
+test writer::formula::tests::test_tokenize_unknown_function_is_rejected ... ok
+test writer::formula::tests::test_tokenize_whitespace ... ok
+test writer::formula::tests::test_tokenizer_default ... ok
+test writer::formula::tests::tokenizer_preserves_invalid_reference_errors_without_unwinding ... ok
+test writer::location::tests::frozen_panes_retain_checked_counts ... ok
+test writer::location::tests::grid_locations_accept_exact_biff8_bounds ... ok
+test writer::location::tests::grid_locations_reject_overflow_without_unwinding ... ok
+test writer::row_blocks::tests::emits_an_empty_dbcell_for_a_sparse_logical_block ... ok
+test writer::row_blocks::tests::generates_exact_single_block_bytes ... ok
+test writer::row_blocks::tests::omits_rgdb_entries_for_rows_without_cells ... ok
+test writer::row_blocks::tests::keeps_array_with_its_anchor_in_checked_row_blocks ... ok
+test writer::row_blocks::tests::regenerates_a_staged_table_into_the_same_checked_layout ... ok
+test writer::row_blocks::tests::rejects_duplicate_and_reordered_formulas_without_allocating_an_owner_registry ... ok
+test writer::row_blocks::tests::rejects_malformed_layouts_before_serializing ... ok
+test writer::row_blocks::tests::rejects_invalid_array_rpn_and_unmatched_rgb_extra ... ok
+test writer::row_blocks::tests::rejects_orphan_ptg_exp_without_any_array_record ... ok
+test writer::row_blocks::tests::rejects_stream_pointer_overflow ... ok
+test writer::row_blocks::tests::rejects_orphan_displaced_duplicate_and_incomplete_arrays ... ok
+test writer::row_blocks::tests::tolerates_ignored_array_reserved_bits_from_preserved_source ... ok
+test writer::row_blocks::tests::splits_at_the_32_row_boundary ... ok
+test writer::view::tests::checked_values_cover_biff8_boundaries ... ok
+test writer::view::tests::display_options_share_one_biff_word ... ok
+test writer::view::tests::frozen_origin_preflight_is_failure_atomic ... ok
+test writer::view::tests::pane_preflight_does_not_unwind_or_mutate_on_error ... ok
+test writer::view::tests::serializes_exact_view_records ... ok
+test xf_ext::tests::parses_color_and_scalar_properties ... ok
+test writer::view::tests::pane_replacement_returns_owned_previous_state ... ok
+test xf_ext::tests::preserves_unknown_and_malformed_extensions ... ok
+test xf_ext::tests::parses_gradient_fill ... ok
+test xf_ext::tests::rejects_malformed_records ... ok
+test xml_map::tests::public_model_can_build_and_write_inert_metadata ... ok
+test xml_map::tests::rejects_duplicate_map_names_and_schema_cycles ... ok
+test xml_map::tests::parses_and_serializes_the_complete_vertical_slice ... ok
+test xml_map::tests::rejects_invalid_booleans_dependencies_bindings_and_unknown_attributes ... ok
+test sheet_visibility::tests::source_backed_visibility_noop_and_cap_plus_one_are_atomic ... ok
+test view::tests::reads_poi_pane_and_zoom_fixtures ... ok
+test xml_map::tests::typed_constructors_enforce_ids_and_xpath_bounds ... ok
+test writer::core::tests::page_break_entry_limits_are_failure_atomic ... ok
+test encryption::tests::opens_apache_poi_cryptoapi_workbook ... ok
+test sheet_visibility::tests::source_backed_visibility_publishes_one_and_bounded_batches ... ok
+test writer::core::tests::test_save_to_file ... ok
+test cell_values::tests::source_backed_real_producer_rk_fixture_reopens_and_inverts ... ok
+
+test result: ok. 1028 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+
+running 37 tests
+test explicit_limits_and_filepass_are_typed ... ok
+test column_beyond_biff8_visible_range_returns_none_without_reading_worksheet ... ok
+test raw_handoff_enforces_input_limit_against_existing_cfb_size ... ok
+test materialize_eager_limit_is_typed_and_independent ... ok
+test execution_variants_honor_pre_and_mid_scan_cancellation ... ok
+test malformed_unselected_cell_after_a_match_is_refused ... ok
+test exact_sst_entry_limit_is_allowed_and_one_over_is_rejected ... ok
+test raw_handoff_rejects_a_stale_retained_source_before_global_reads ... ok
+test shared_cfb_source_arc_preserves_pointer_identity ... ok
+test filepass_header_scan_never_reads_its_payload_or_worksheets ... ok
+test invalid_label_sst_index_is_typed_without_an_sst_read ... ok
+test cached_formula_string_with_multiple_continues_matches_eager_value ... ok
+test oversized_unknown_record_is_refused_before_payload_read ... ok
+test late_codepage_bound_sheet_names_match_eager_workbook ... ok
+test duplicate_cached_formula_keeps_the_latest_value_like_eager_workbook ... ok
+test selected_queries_are_bounded_to_the_selected_owner ... ok
+test selected_scan_limits_are_enforced_incrementally ... ok
+test stale_sources_are_rejected_before_selected_reads ... ok
+test truncated_global_header_is_rejected_without_overread ... ok
+test source_text_sink_matches_legacy_text_and_reports_output_limits ... ok
+test duplicate_scalar_keeps_the_latest_value_like_eager_workbook ... ok
+test out_of_order_late_packed_duplicate_keeps_the_latest_value ... ok
+test scalar_label_blank_and_error_boolerr_match_eager_values ... ok
+test source_text_rejects_malformed_recognized_tail_and_bare_string_without_rows ... ok
+test truncated_tail_is_refused_after_a_matching_cell ... ok
+test workbook_and_book_selection_only_falls_back_for_missing_stream ... ok
+test materialize_eager_returns_typed_semantic_workbook_with_matching_values ... ok
+test split_global_sst_continue_matches_eager_workbook ... ok
+test worksheet_bof_version_and_substream_type_are_deferred_to_selected_access ... ok
+test supported_unknown_payload_is_skipped_without_source_overread ... ok
+test synthetic_supported_cell_families_match_eager_values ... ok
+test opens_without_worksheet_payload_and_matches_eager_selected_cells ... ok
+test raw_handoff_reads_global_headers_then_one_exact_global_range ... ok
+test source_text_honors_valid_dimensions_and_retained_text_limits ... ok
+test source_text_matches_eager_formula_and_out_of_order_packed_duplicate ... ok
+test formula_fixture_matches_eager_cached_values ... ok
+test date_fixture_matches_eager_date_values ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+
+running 28 tests
+test cfb_directory_byte_ceiling_is_blocked_without_validation_errors ... ok
+test xls_directory_byte_limit_builder_rejects_invalid_values ... ok
+test incomplete_streaming_scans_fail_closed_for_encryption ... ok
+test streaming_validation_propagates_read_and_source_change_errors ... ok
+test workbook_byte_ceiling_blocks_before_materialization ... ok
+test finite_input_and_record_ceilings_stop_without_errors ... ok
+test writer_places_filepass_after_optional_writeprotect ... ok
+test all_space_external_path_remains_external_presence ... ok
+test stops_before_ciphertext_after_bounded_filepass ... ok
+test accepts_filepass_only_after_early_writeprotect ... ok
+test malformed_cfb_is_structured_and_downstream_is_blocked ... ok
+test rejects_conflicting_dde_standard_document_flags ... ok
+test external_metadata_is_reported_without_resolving_targets ... ok
+test clear_workbook_reports_only_provable_semantics ... ok
+test protection_is_reported_without_retaining_password_material ... ok
+test rejects_duplicate_external_cache_owners_and_cells ... ok
+test streaming_record_limits_match_biff_boundaries ... ok
+test rejects_filepass_after_codepage_before_ciphertext ... ok
+test preserves_metadata_errors_before_filepass_stop ... ok
+test unsupported_filepass_is_not_reported_as_malformed ... ok
+test rejects_filepass_after_other_global_records ... ok
+test encrypted_workbook_stops_clear_semantic_checks ... ok
+test preserves_incomplete_metadata_before_filepass_stop ... ok
+test rejects_ambiguous_and_non_stream_workbook_entries ... ok
+test reports_filepass_placement_errors_before_stopping_ciphertext ... ok
+test streaming_record_payload_and_truncation_boundaries_match_biff ... ok
+test rejects_hostile_biff_ownership_and_global_ordering ... ok
+test streaming_validation_stops_before_large_ciphertext_tail ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test reads_shrink_to_fit_xf_metadata ... ok
+test retains_default_formatting_alignment ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test hand_authored_two_by_two_array_binds_every_formula_cell ... ok
+test hand_authored_single_cell_array_and_intervening_string_are_publicly_bound ... ok
+test malformed_array_links_are_rejected_through_the_public_reader ... ok
+test public_writer_array_formula_roundtrips_through_the_reader ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test table_autofilter12_scalar_criteria_writer_reader_round_trip_inertly ... ok
+test apache_poi_icon_filter_table_round_trips_through_writer ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test book_ext_round_trips_through_writer_and_reader ... ok
+test workbook_without_book_ext_has_none ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test reads_poi_xor_encrypted_style_xf_reserved_bit ... ok
+test reads_poi_fill_fixture ... ok
+test reads_libreoffice_border_fixture ... ok
+test reads_poi_border_style_fixture ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test writer_rejects_invalid_calculation_bounds ... ok
+test reads_poi_calculation_fixture ... ok
+test automatic_multithreaded_calculation_round_trip ... ok
+test calculation_settings_round_trip ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test real_mulrk_field_edit_remains_packed ... ok
+test real_mulrk_edge_deletion_rebuilds_and_semantically_repacks ... ok
+test real_excel_formula_references_shift_reopen_and_invert ... ok
+test multiple_real_fixtures_rename_and_fully_reopen ... ok
+test real_fixture_number_commit_reopens_and_preserves_other_streams ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 4 tests
+test clean_inventory_replay_and_existing_sheet_reorder_remain_available ... ok
+test public_fresh_and_replacement_authoring_is_typed_and_atomic ... ok
+test bundled_poi_and_libreoffice_chart_fixtures_are_strictly_gated ... ok
+test real_embedded_chart_mutations_are_typed_atomic_refusals ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 11 tests
+test source_backed_commit_preserves_compressed_and_utf16_widths ... ok
+test refuses_protected_signed_encrypted_and_invalid_values ... ok
+test source_backed_commit_handles_short_and_partial_sinks ... ok
+test source_backed_commit_refuses_length_or_encoding_width_changes ... ok
+test refuses_orphan_and_duplicate_comment_txo_or_drawing_boundaries ... ok
+test exact_noop_and_batch_failure_do_not_publish_bytes ... ok
+test updates_poi_fixture_and_reopens ... ok
+test updates_existing_comments_atomically_and_reversibly ... ok
+test refuses_unsupported_lifecycle_and_enforces_batch_bound ... ok
+test source_backed_commit_exact_noop_unknown_stream_and_atomic_save ... ok
+test source_backed_commit_handles_one_and_two_hundred_fifty_six_updates ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 5 tests
+test comment_api_rejects_bounds_duplicates_and_bad_runs ... ok
+test comment_records_follow_client_boundaries_and_note_order ... ok
+test comments_and_pivot_objects_share_one_drawing_and_use_separate_object_ids ... ok
+test comments_round_trip_unicode_runs_visibility_and_guid ... ok
+test long_comment_splits_without_breaking_surrogates ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test grouped_api_rejects_cardinality_and_formula_shape ... ok
+test grouped_ordered_legacy_rules_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test writer_rejects_invalid_names_paths_ranges_and_resources ... ok
+test consolidation_round_trip_preserves_order_and_inert_paths ... ok
+test reads_poi_and_libreoffice_consolidation_directories ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 6 tests
+test strings_formulas_and_unrelated_owners_are_refused_before_staging ... ok
+test signed_cfb_is_refused_before_cross_workbook_transfer ... ok
+test bounds_noop_and_stale_or_foreign_artifacts_are_checked ... ok
+test copies_numbers_and_blanks_in_source_order_and_preserves_foreign_streams ... ok
+test same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic ... ok
+test hostile_duplicate_unknown_and_dependency_records_are_refused_atomically ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 3 tests
+test custom_table_style_configuration_rejects_hostile_relationships ... ok
+test custom_table_styles_round_trip_from_writer_to_reader ... ok
+test replacement_is_atomic_and_clear_restores_unset_bytes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test workbook_without_custom_views_reads_empty ... ok
+test reads_sheet_custom_views ... ok
+test reads_workbook_custom_view ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 3 tests
+test kind_accessors_expose_input_cells ... ok
+test data_table_anchor_validation ... ok
+test data_tables_round_trip_through_writer_and_reader ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test malformed_writer_metadata_is_rejected ... ok
+test validation_surrogate_pair_messages_round_trip ... ok
+test complete_validation_family_round_trips_as_inert_metadata ... ok
+test explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test future_record_writer_enforces_caps_names_and_emitted_category_references ... ok
+test rich_name_and_comment_round_trip_as_inert_metadata ... ok
+test reads_poi_unicode_names_and_formula_extra ... ok
+test poi_name_comment_corpus_round_trips_through_rich_inert_options ... ok
+test exact_future_records_reject_malformed_order_cardinality_names_headers_and_continue ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test writer_rejects_cross_field_and_country_bounds ... ok
+test workbook_environment_round_trip ... ok
+test reads_poi_dual_stream_dsf_value ... ok
+test reads_libreoffice_environment_fixture_without_refreshing_data ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test writer_rejects_external_cache_resource_errors ... ok
+test external_workbook_cache_round_trip_is_inert ... ok
+test reads_poi_and_libreoffice_external_caches ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test generated_external_names_round_trip_as_inert_metadata ... ok
+test reads_poi_external_and_add_in_names ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 8 tests
+test external_substructure_bounds_are_enforced ... ok
+test external_metadata_rejects_duplicate_and_mismatched_ownership ... ok
+test feature11_source_types_reject_mismatched_or_unbounded_metadata ... ok
+test feature11_web_source_round_trips_typed_inert_sync_metadata ... ok
+test feature11_xml_source_round_trips_typed_mapping ... ok
+test feature12_external_metadata_round_trips_inertly ... ok
+test feature12_web_source_round_trips_typed_with_loaded_total_formula ... ok
+test feature12_xml_source_round_trips_typed_with_loaded_total_formula ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test reads_poi_compressed_font_name_fixture ... ok
+test resolves_duprich_format_run_font_indices ... ok
+test resolves_libreoffice_xf_font_references ... ok
+test reads_formatting_fixture_font_table_and_reserved_index_gap ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 18 tests
+test lbs_data_with_continued_items_preserves_tail ... ok
+test list_item_authoring_respects_ms_xls_character_limit ... ok
+test non_control_objects_are_not_form_controls ... ok
+test lbs_data_with_defective_item_preserves_tail_bytes ... ok
+test malformed_subrecords_fall_back_to_unknown ... ok
+test parses_checkbox_data ... ok
+test parses_group_box_data ... ok
+test parses_edit_box_data ... ok
+test parses_radio_button_data ... ok
+test parses_mixed_and_unchecked_states ... ok
+test parses_dropdown_data ... ok
+test parses_list_box_data_with_items_and_selection ... ok
+test parses_scroll_bar_data ... ok
+test preserves_invalid_list_header_as_unknown ... ok
+test vacant_lbs_data_round_trips_empty ... ok
+test preserves_invalid_scroll_bar_ranges_as_unknown ... ok
+test utf16_items_round_trip ... ok
+test editor_enumerates_form_controls_and_preserves_them_on_rewrite ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test row_and_column_shift_refuse_rgb_extra_atomically ... ok
+test formula_cache_and_style_edits_preserve_the_untouched_rgb_extra ... ok
+test source_backed_formula_access_reaches_the_native_ancillary_parser ... ok
+test native_formula_census_retains_all_five_rgb_extra_tails ... ok
+test native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 7 tests
+test array_extra_values_keep_the_existing_strict_scalar_checks ... ok
+test memory_ranges_and_token_boundaries_are_checked_before_retention ... ok
+test nonempty_array_extra_requires_a_value_or_array_typed_token ... ok
+test ordinary_name_and_three_dimensional_references_do_not_require_revision_extras ... ok
+test suffix_support_does_not_redefine_legacy_opaque_token_validation ... ok
+test mixed_extra_structures_follow_token_order_and_consume_the_exact_tail ... ok
+test the_record_limit_includes_both_tokens_and_ancillary_bytes ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test parses_poi_formula_error_shared_feature_fixture ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test writer_rejects_invalid_function_group_resources ... ok
+test custom_function_groups_round_trip_across_record_generations ... ok
+test reads_poi_and_libreoffice_builtin_function_groups ... ok
+test reads_established_producer_compatibility_count_seventeen ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test no_header_footer_record_by_default ... ok
+test even_and_first_pages_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test facade_exposes_signatures_and_standard_property_sets ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test a_defect_free_report_is_the_default_state ... ok
+test a_conforming_workbook_reports_nothing_under_either_policy ... ok
+test strict_open_is_the_default_for_every_tolerable_defect ... ok
+test lenient_open_repairs_an_empty_font_name ... ok
+test lenient_open_repairs_an_xfcrc_count_disagreement ... ok
+test lenient_open_repairs_an_out_of_range_font_family ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 7 tests
+test writer_rejects_table_collisions_ranges_and_style_references_atomically ... ok
+test headerless_internal_feature12_and_table_sort_continuations_round_trip_in_order ... ok
+test writer_custom_list_object_round_trips_through_reader ... ok
+test feature12_total_formula_string_and_aggregation_round_trip_inertly ... ok
+test producer_table_sort_continue_frt12_chain_remains_attached ... ok
+test reads_excel_producer_feature11_and_list12_tables ... ok
+test long_feature11_uses_strict_continue_frt11_chain_and_round_trips ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 3 tests
+test authored_worksheet_mutations_remain_available ... ok
+test xor_authoring_requires_an_explicit_policy ... ok
+test decoded_worksheet_mutations_refuse_without_changing_state ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test opens_link_storage_from_dde_obj_reference ... ok
+test invalid_flags_and_reorder_are_atomic ... ok
+test removes_shared_storage_only_after_last_reference ... ok
+test add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test writer_rejects_invalid_dimensions_and_breaks ... ok
+test page_settings_round_trip_with_breaks_and_continued_pls ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test supplies_default_palette_for_poi_cell_colour_regression_fixture ... ok
+test reads_palette_used_by_poi_colour_fixture ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test worksheet_without_phonetic_info_has_none ... ok
+test phonetic_info_round_trips ... ok
+test long_range_list_round_trips_across_continues ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test invalid_grouping_is_rejected_without_mutating_writer ... ok
+test emits_and_reopens_exact_numeric_date_and_discrete_grouping_records ... ok
+test reads_libreoffice_number_and_date_grouping_fixtures ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test pivot_cache_links_progress_across_two_worksheets ... ok
+test pivot_cache_links_progress_from_same_sheet_to_later_sheet ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test malformed_typed_records_are_rejected_and_invalid_add_is_atomic ... ok
+test typed_cache_items_emit_exact_flags_payloads_and_rows ... ok
+test typed_caches_coexist_with_workbook_global_stream_ids ... ok
+test reads_libreoffice_boolean_and_empty_pivot_caches ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test writer_view_records_reopen_with_identical_layout_and_cache_link ... ok
+test pivot_view_editor_rolls_back_invalid_cache_and_supports_remove_add ... ok
+test pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations ... ok
+test pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops ... ok
+test libreoffice_pivot_views_parse_with_cache_links ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test file_sharing_rejects_long_user_name ... ok
+test protection_records_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test web_query_57456_is_blocked_by_an_unrelated_sst_defect ... ok
+test ordinary_workbook_has_no_query_tables ... ok
+test pivot_table_fixture_yields_no_query_tables ... ok
+test text_query_mr_extra_lines ... ok
+test text_query_45365 ... ok
+test text_query_45365_2 ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 3 tests
+test real_time_data_round_trips_through_writer_and_reader ... ok
+test real_time_data_prefix_compression_round_trips ... ok
+test workbook_without_real_time_data_has_none ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test workbook_without_revision_log_reports_none ... ok
+test malformed_revision_log_surfaces_an_error ... ok
+test workbook_exposes_revision_log_stream ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test parses_poi_simple_and_multirow_indexes ... ok
+test parses_real_sparse_and_rowless_dbcell_blocks ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 1 test
+test generated_worksheet_indexes_regenerate_and_parse ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test writer_rejects_scenario_resource_bounds ... ok
+test scenario_manager_round_trip_keeps_values_inert ... ok
+test reads_poi_empty_scenario_manager_fixture ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+
+running 4 tests
+test automatic_group_ids_skip_ids_requested_by_later_children ... ok
+test grouped_shapes_emit_exact_record_order_and_round_trip ... ok
+test group_object_ids_are_collision_free_across_primitives_and_groups ... ok
+test group_mutations_reject_malformed_input_and_are_atomic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test mixed_pivot_shape_and_comment_ids_are_collision_free_in_one_cluster ... ok
+test primitives_emit_exact_client_record_order_and_parse_after_write ... ok
+test all_safe_primitive_types_use_unique_shape_and_object_ids ... ok
+test shape_mutations_reject_malformed_input_and_are_atomic ... ok
+test long_unicode_shape_text_respects_continue_record_limits ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test parses_poi_simple_shared_string_index ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test worksheet_exposes_rich_shared_string_properties_by_index ... ok
+test worksheet_resolves_properties_for_duplicate_rich_text_cell ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test tab_color_validation_rejects_out_of_palette_indices ... ok
+test workbook_without_tab_color_has_no_sheet_ext ... ok
+test tab_color_round_trips_through_writer_and_reader ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test writer_rejects_invalid_layout_bounds ... ok
+test reads_poi_column_width_fixture_defaults ... ok
+test worksheet_layout_round_trip ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test writer_sort_crud_is_move_first_idempotent_and_failure_atomic ... ok
+test writer_and_parser_support_zero_condition_sort_data ... ok
+test writer_stream_round_trip_preserves_extended_sort_and_record_order ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test workbook_without_style_extensions_has_none ... ok
+test style_extensions_round_trip_through_writer_and_reader ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test default_theme_round_trips ... ok
+test workbook_without_theme_has_none ... ok
+test large_custom_theme_round_trips_across_continuations ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test writer_can_clear_xcb_stream ... ok
+test writer_and_workbook_facades_round_trip_xcb_stream ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 6 tests
+test writer_rejects_invalid_code_names_and_unscoped_sheet_names ... ok
+test configured_project_and_sheet_code_names_can_be_cleared ... ok
+test reads_macro_fixture_without_opening_project_streams ... ok
+test empty_project_metadata_round_trips_as_non_executable ... ok
+test failed_project_build_does_not_replace_existing_configuration ... ok
+test complete_project_with_modules_round_trips_as_inert_source ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test rejects_inverted_selection_ranges ... ok
+test reads_libreoffice_worksheet_view ... ok
+test reads_poi_zoom_panes_and_selections ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test writes_and_reads_typed_view_state ... ok
+test freeze_and_scale_round_trip ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test worksheet_web_pub_rejects_unknown_sheet ... ok
+test worksheet_web_pub_round_trips_through_writer_and_reader ... ok
+test workbook_without_web_pub_has_none ... ok
+test workbook_web_pub_round_trips_through_writer_and_reader ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 7 tests
+test writer_rejects_invalid_window_and_tab_references ... ok
+test writer_rejects_window1_window2_selection_disagreement ... ok
+test reads_poi_simple_workbook_window_and_sheet_ids ... ok
+test workbook_trait_sheet_lookup_is_case_insensitive ... ok
+test workbook_trait_follows_active_window_worksheet ... ok
+test workbook_window_and_sheet_ids_round_trip ... ok
+test reads_poi_zero_based_sheet_identifiers ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test salts_are_nondeterministic_and_configuration_changes_are_atomic ... ok
+test all_profiles_round_trip_and_emit_exact_filepass_families ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+
+running 2 tests
+test out_of_grid_locations_are_rejected_before_writer_mutation ... ok
+test row_and_column_property_apis_round_trip_checked_locations ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test xf_extension_index_is_validated_against_the_xf_table ... ok
+test xf_extensions_round_trip_through_writer_and_reader ... ok
+test workbook_without_xf_extensions_has_none ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test resolves_libreoffice_xf_inheritance ... ok
+test resolves_poi_xf_inheritance ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test crates/litchi-xls/src/writer/core/codec/worksheet.rs - writer::core::codec::worksheet::Writer::add_filter_condition (line 100) ... ignored
+test crates/litchi-xls/src/writer/mod.rs - writer::core (line 22) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.25s; merged doctests compilation took 0.24s

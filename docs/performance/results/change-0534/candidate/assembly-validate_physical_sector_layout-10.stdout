@@ -1,0 +1,69 @@
+
+/tmp/litchi-goal-0534/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000131e100 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E>:
+ 131e100:	53                   	push   %rbx
+ 131e101:	48 83 ec 30          	sub    $0x30,%rsp
+ 131e105:	48 8b 8e a8 00 00 00 	mov    0xa8(%rsi),%rcx
+ 131e10c:	48 8b 46 30          	mov    0x30(%rsi),%rax
+ 131e110:	48 39 c8             	cmp    %rcx,%rax
+ 131e113:	48 89 ca             	mov    %rcx,%rdx
+ 131e116:	48 0f 42 d0          	cmovb  %rax,%rdx
+ 131e11a:	48 85 d2             	test   %rdx,%rdx
+ 131e11d:	74 6a                	je     131e189 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E+0x89>
+ 131e11f:	4c 8b 86 a0 00 00 00 	mov    0xa0(%rsi),%r8
+ 131e126:	48 8b 76 28          	mov    0x28(%rsi),%rsi
+ 131e12a:	45 31 c9             	xor    %r9d,%r9d
+ 131e12d:	eb 09                	jmp    131e138 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E+0x38>
+ 131e12f:	90                   	nop
+ 131e130:	49 ff c1             	inc    %r9
+ 131e133:	4c 39 ca             	cmp    %r9,%rdx
+ 131e136:	74 51                	je     131e189 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E+0x89>
+ 131e138:	4c 89 0c 24          	mov    %r9,(%rsp)
+ 131e13c:	46 8b 14 8e          	mov    (%rsi,%r9,4),%r10d
+ 131e140:	44 89 54 24 0c       	mov    %r10d,0xc(%rsp)
+ 131e145:	41 83 fa ff          	cmp    $0xffffffff,%r10d
+ 131e149:	74 e5                	je     131e130 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E+0x30>
+ 131e14b:	43 80 3c 08 00       	cmpb   $0x0,(%r8,%r9,1)
+ 131e150:	75 de                	jne    131e130 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E+0x30>
+ 131e152:	48 89 e0             	mov    %rsp,%rax
+ 131e155:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 131e15a:	48 8b 05 5f 70 da 01 	mov    0x1da705f(%rip),%rax        # 30c51c0 <_DYNAMIC+0x588>
+ 131e161:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 131e166:	48 8d 44 24 0c       	lea    0xc(%rsp),%rax
+ 131e16b:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+ 131e170:	48 8b 05 29 70 da 01 	mov    0x1da7029(%rip),%rax        # 30c51a0 <_DYNAMIC+0x568>
+ 131e177:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 131e17c:	48 8d 47 08          	lea    0x8(%rdi),%rax
+ 131e180:	48 8d 35 52 f1 e6 fe 	lea    -0x1190eae(%rip),%rsi        # 18d2d9 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x6fd>
+ 131e187:	eb 28                	jmp    131e1b1 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E+0xb1>
+ 131e189:	48 39 c8             	cmp    %rcx,%rax
+ 131e18c:	73 41                	jae    131e1cf <_ZN10litchi_cfb4file16OleFile$LT$R$GT$31validate_physical_sector_layout17hb8c9bd632b8fd603E+0xcf>
+ 131e18e:	48 89 04 24          	mov    %rax,(%rsp)
+ 131e192:	48 89 e0             	mov    %rsp,%rax
+ 131e195:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 131e19a:	48 8b 05 1f 70 da 01 	mov    0x1da701f(%rip),%rax        # 30c51c0 <_DYNAMIC+0x588>
+ 131e1a1:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 131e1a6:	48 8d 47 08          	lea    0x8(%rdi),%rax
+ 131e1aa:	48 8d 35 d4 e5 d9 fe 	lea    -0x1261a2c(%rip),%rsi        # bc785 <anon.0b41a28f0ed59d0af90b06ae5e8e4658.133.llvm.15834523178036243758+0x5c>
+ 131e1b1:	48 8d 54 24 10       	lea    0x10(%rsp),%rdx
+ 131e1b6:	48 89 fb             	mov    %rdi,%rbx
+ 131e1b9:	48 89 c7             	mov    %rax,%rdi
+ 131e1bc:	ff 15 7e 70 da 01    	call   *0x1da707e(%rip)        # 30c5240 <_DYNAMIC+0x608>
+ 131e1c2:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 131e1c9:	48 83 c4 30          	add    $0x30,%rsp
+ 131e1cd:	5b                   	pop    %rbx
+ 131e1ce:	c3                   	ret
+ 131e1cf:	48 c7 07 0b 00 00 00 	movq   $0xb,(%rdi)
+ 131e1d6:	48 83 c4 30          	add    $0x30,%rsp
+ 131e1da:	5b                   	pop    %rbx
+ 131e1db:	c3                   	ret
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

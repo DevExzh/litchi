@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0534: rejected CFB physical role/FAT paired-prefix comparison
+
+[0534](changes/0534-cfb-physical-paired-prefix-rejected.md) retains the
+matched 48,000-sample native and 1,440-sample allocation comparison across
+nine XLS and three CFB scenarios. Every one of the eight primary XLS p50 rows
+is slower in the candidate in both repeats, by 1.0596–10.6386%, so the
+candidate fails the required 3% improvement rule and its runtime is restored.
+The allocator guard passes for calls, allocated bytes, and incremental-region
+peak; those remain separate evidence. The bundle retains 16 profile children, 80 timed
+dumps, 12 setup dumps, and all 153 matched/same-build review flags. The two
+physical-layout contract tests remain on the restored baseline. Retained
+candidate receipts record 14 checks and 4,382 candidate-stage test
+executions; restored final source also passed 14 checks and 4,382 executions.
+Cleanup and post-cleanup verification passed; the evidence is sealed. No speedup is claimed. OLE2/OOXML stays first, ODF is deferred, and
+iWork is excluded.
+
 ## 0533: matched CFB sector-claim layout comparison
 
 [0533](changes/0533-cfb-claim-cold-error-layout.md) binds a 24,000-sample

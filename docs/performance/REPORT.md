@@ -1,5 +1,43 @@
 # Performance program phase report
 
+## 0534: reject the CFB physical role/FAT paired-prefix candidate
+
+[0534](changes/0534-cfb-physical-paired-prefix-rejected.md) completes the
+matched CFB physical-reconciliation experiment and restores its runtime after
+the native admission gate fails. The candidate pairs role/FAT entries through
+their common prefix and checks a short FAT afterward; exact marker/error order,
+extra-FAT padding tolerance, and the two focused contract tests are retained
+on the baseline.
+
+The native lane has 48,000 total samples (24,000 per stage) across nine XLS
+and three CFB scenarios. The required primary p50 changes are all latency
+regressions:
+
+| Primary workflow | Repeat 1 | Repeat 2 |
+| --- | ---: | ---: |
+| `xls_source_backed_open` | +10.6386% | +1.0596% |
+| `xls_source_backed_open_one_cell` | +8.3510% | +2.5009% |
+| `xls_owned_source_open` | +7.1373% | +4.9282% |
+| `xls_owned_source_open_one_cell` | +6.6620% | +6.0609% |
+
+The separate allocator lane has 1,440 total samples and passes its required
+call, allocated-byte, and incremental-region-peak guard. The profile lane
+contains 16 children, 80 timed constructor dumps, and 12 setup dumps. Its
+per-workload physical-reconciliation self-Ir reduction is 16.6648257% in both
+XLS-owned repeats and 16.6648166% in both CFB few-large repeats; XLS-owned
+constructor Ir falls 2.8968%/2.9363%. These Callgrind results are diagnostic
+only and cannot override the native failure. The comparison retains all 153
+review flags (86 matched over-5% flags and 67 same-build variations), with no
+rows discarded or causes inferred.
+
+The final source is baseline plus the two independent physical-layout tests;
+no runtime speedup is retained. Retained candidate receipts record 14 checks
+and 4,382 candidate-stage test executions; restored final source also passed
+14 checks and 4,382 executions. Cleanup and post-cleanup verification passed; the evidence is sealed. This synthetic warm
+in-memory result makes no cold/range, provider, native-producer,
+scaling, broad CRUD, or ODF claim. OLE2/OOXML remains active, ODF is deferred,
+and iWork is excluded.
+
 ## 0533: accepted CFB sector-claim candidate; verified and sealed
 
 [0533](changes/0533-cfb-claim-cold-error-layout.md) completes the matched

@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0534: paired physical reconciliation is rejected end-to-end
+
+[0534](changes/0534-cfb-physical-paired-prefix-rejected.md) tests a paired
+role/FAT common-prefix walk for the private physical-reconciliation loop.
+Per-workload Callgrind diagnostics report 16.6648257% lower physical-
+reconciliation self Ir in both XLS-owned repeats and 16.6648166% lower in
+both CFB few-large repeats; XLS-owned constructor Ir falls 2.8968%/2.9363%.
+All eight primary XLS p50 rows regress by 1.0596–10.6386% in both repeats.
+The native gate therefore rejects the candidate and restores the baseline;
+the diagnostic instruction reductions are not an end-to-end hotspot claim.
+Allocation guard metrics remain without material growth, and all 153 matched
+and same-build flags stay visible. Revisit physical reconciliation only with
+a new measured design that can clear the native rule. OLE2/OOXML remains
+active, ODF is deferred, and iWork is excluded.
+
 ## 0533: CFB claim-sector formatting leaves the success path
 
 [0533](changes/0533-cfb-claim-cold-error-layout.md) moves three formatted

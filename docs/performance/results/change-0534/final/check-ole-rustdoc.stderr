@@ -1,0 +1,13 @@
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+ Documenting litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+ Documenting litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+ Documenting litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+ Documenting litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.60s
+   Generated /home/zhuhe/litchi-goal-0534-target/doc/litchi_cfb/index.html and 3 other files
