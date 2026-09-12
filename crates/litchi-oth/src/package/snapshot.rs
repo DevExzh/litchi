@@ -286,6 +286,10 @@ impl Snapshot {
         Ok(&self.structures()?.changes)
     }
 
+    pub(crate) fn change_tracking(&self) -> Result<Option<&crate::change::ChangeTracking>> {
+        Ok(self.structures()?.change_tracking.as_ref())
+    }
+
     pub(crate) fn frames(&self) -> Result<&[crate::frame::Frame]> {
         Ok(&self.structures()?.frames)
     }

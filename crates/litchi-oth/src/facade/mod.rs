@@ -38,6 +38,11 @@ impl TextBody {
         self.package.changes()
     }
 
+    /// The optional `text:tracked-changes` declaration, independent of marks.
+    pub fn change_tracking(&self) -> Result<Option<&crate::change::ChangeTracking>> {
+        self.package.change_tracking()
+    }
+
     /// Drawing frames and text boxes in source order.
     pub fn frames(&self) -> Result<&[crate::frame::Frame]> {
         self.package.frames()
