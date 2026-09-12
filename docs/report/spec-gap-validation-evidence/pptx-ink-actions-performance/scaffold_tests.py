@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -818,6 +819,43 @@ def semantic_owner_design_tamper_test() -> None:
         shutil.rmtree(temporary)
 
 
+def run_matrix_acceptance_guard() -> None:
+    """Evaluate the live Rust matrix predicate without building or timing it."""
+    adapter = (HERE / "harness/adapter.rs").read_text()
+    matrix_start = adapter.find("pub fn run_matrix()")
+    check(matrix_start >= 0, "matrix helper is present")
+    match = re.search(
+        r"\bif\s+(receipt\.[a-z_]+(?:\s*&&\s*receipt\.[a-z_]+)*)\s*\{",
+        adapter[matrix_start:],
+    )
+    check(match is not None, "matrix helper exposes an acceptance predicate")
+    expression = " ".join(match.group(1).split())
+    fields = tuple(re.findall(r"receipt\.([a-z_]+)", expression))
+    expected_fields = (
+        "semantic_ok",
+        "preservation_ok",
+        "inverse_ok",
+        "baseline_reopenable",
+        "retained_baseline_balance_ok",
+    )
+    check(fields == expected_fields, "matrix predicate covers semantic and preservation invariants")
+
+    translated = re.sub(
+        r"receipt\.([a-z_]+)",
+        lambda item: f"values[{item.group(1)!r}]",
+        expression,
+    ).replace("&&", " and ")
+
+    def accepts(values: dict[str, bool]) -> bool:
+        return bool(eval(translated, {"__builtins__": {}}, {"values": values}))
+
+    all_true = {field: True for field in expected_fields}
+    check(accepts(all_true), "matrix predicate accepts a fully valid receipt")
+    for field in ("baseline_reopenable", "retained_baseline_balance_ok"):
+        rejected = dict(all_true, **{field: False})
+        check(not accepts(rejected), f"matrix predicate rejects false {field}")
+
+
 def owner_extra_runner_wiring_test() -> None:
     """Keep the runner's dual source pins coupled to the real guards."""
     runner = RUNNER.read_text()
@@ -1077,6 +1115,7 @@ def main() -> None:
     owner_extra_runner_wiring_test()
     source_pin_tamper_tests()
     semantic_owner_design_tamper_test()
+    run_matrix_acceptance_guard()
     verifier_tamper_tests(corpus)
     print(
         "PPTX InkAction scaffold tests passed (timing-free); "
