@@ -30,6 +30,16 @@ pub use server_formats::cached_unique_names::{
     WorkbookPatch as CachedUniqueNamesWorkbookPatch,
     WorkbookTransaction as CachedUniqueNamesWorkbookTransaction,
 };
+pub use server_formats::table_data::{
+    Commit as PivotTableDataCommit, Patch as PivotTableDataPatch, PivotCellAddress, PivotCellType,
+    PivotCellValueEdit, PivotRowView, PivotTableDataDiagnostic, PivotTableDataLimits,
+    PivotTableDataView, PivotValueAttributeEdit, PivotValueCellExtraEdit, PivotValueCellExtraView,
+    PivotValueCellView, Snapshot as PivotTableDataSnapshot,
+    Transaction as PivotTableDataTransaction, WorkbookCommit as PivotTableDataWorkbookCommit,
+    WorkbookPatch as PivotTableDataWorkbookPatch, WorkbookTransaction as PivotTableDataEdit,
+    edit as edit_pivot_table_data, edit_with_limits as edit_pivot_table_data_with_limits,
+    load as load_pivot_table_data, load_with_limits as load_pivot_table_data_with_limits,
+};
 pub use server_formats::{
     AttributeEdit as PivotServerFormatAttributeEdit, Commit as PivotServerFormatsCommit,
     Patch as PivotServerFormatsPatch, PivotTableSelector, PivotTableServerFormats, PivotTableView,

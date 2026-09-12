@@ -108,6 +108,8 @@ fn element(index: usize, parent_index: Option<usize>, ns: &[u8], local: &[u8]) -
         has_element_child: false,
         has_cdata: false,
         has_text: false,
+        has_non_whitespace_cdata: false,
+        has_non_whitespace_text: false,
     }
 }
 

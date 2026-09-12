@@ -1370,14 +1370,15 @@ impl Graph {
                 source: SourcePart::capture(&relationship_index, part)?,
             });
         }
-        let connections = load_connections(package, workbook_part, &relationship_index, true)?.map(
-            |(source, catalog)| ConnectionInfo {
-                source,
-                by_id: catalog.by_id,
-                by_name: catalog.by_name,
-                model_ids: catalog.model_ids,
-            },
-        );
+        let connections =
+            load_connections(package, workbook_part, &relationship_index, true, false)?.map(
+                |(source, catalog)| ConnectionInfo {
+                    source,
+                    by_id: catalog.by_id,
+                    by_name: catalog.by_name,
+                    model_ids: catalog.model_ids,
+                },
+            );
         Ok(Self {
             workbook,
             workbook_owner: Arc::new(owner),
@@ -1540,6 +1541,9 @@ fn parse_cache_field<'a>(
     };
     let field = field_elements[field_ordinal];
     let extension = direct_exts(&scan, field, CACHED_UNIQUE_NAMES_URI)?;
+    for candidate in &extension {
+        check_fragment_limit(candidate, "cachedUniqueNames extension")?;
+    }
     if extension.len() > 1 {
         return Err(invalid(
             "cacheField has duplicate cachedUniqueNames extensions",
@@ -1549,11 +1553,6 @@ fn parse_cache_field<'a>(
         .first()
         .copied()
         .ok_or_else(|| invalid("cacheField has no cachedUniqueNames extension"))?;
-    if extension.end.saturating_sub(extension.start.start) > MAX_FRAGMENT_BYTES {
-        return Err(invalid(
-            "cachedUniqueNames extension exceeds its fragment limit",
-        ));
-    }
     let mut payload = None;
     let mut mce_ambiguous = false;
     for candidate in &scan.elements {
@@ -1563,6 +1562,7 @@ fn parse_cache_field<'a>(
         let Some(through_mce) = owned_cache_payload(&scan, candidate, extension)? else {
             continue;
         };
+        check_fragment_limit(candidate, "cachedUniqueNames payload")?;
         if payload.replace(candidate).is_some() {
             return Err(invalid(
                 "cacheField has duplicate cachedUniqueNames payloads",
@@ -1571,6 +1571,11 @@ fn parse_cache_field<'a>(
         mce_ambiguous = through_mce || candidate.mce_context;
     }
     let payload = payload.ok_or_else(|| invalid("cachedUniqueNames extension has no payload"))?;
+    if payload.has_non_whitespace_text || payload.has_non_whitespace_cdata {
+        return Err(invalid(
+            "cachedUniqueNames cannot contain non-whitespace text",
+        ));
+    }
     for child in scan
         .elements
         .iter()
@@ -1644,6 +1649,9 @@ fn parse_cache_field<'a>(
 
 fn validate_cache_id_version(scan: &XmlScan, root: &XmlElement) -> Result<()> {
     let extensions = direct_exts(scan, root, PIVOT_CACHE_ID_VERSION_URI)?;
+    for candidate in &extensions {
+        check_fragment_limit(candidate, "pivotCacheIdVersion owner")?;
+    }
     if extensions.len() > 1 {
         return Err(invalid("duplicate pivotCacheIdVersion extensions"));
     }
@@ -1651,9 +1659,6 @@ fn validate_cache_id_version(scan: &XmlScan, root: &XmlElement) -> Result<()> {
         .first()
         .copied()
         .ok_or_else(|| invalid("external PivotCache is missing pivotCacheIdVersion extension"))?;
-    if extension.end.saturating_sub(extension.start.start) > MAX_FRAGMENT_BYTES {
-        return Err(invalid("pivotCacheIdVersion owner fragment exceeds limit"));
-    }
     let payloads = scan.elements.iter().filter(|element| {
         element.parent_index == Some(extension.index)
             && element.ns.as_ref() == EXT_NS
@@ -1663,7 +1668,9 @@ fn validate_cache_id_version(scan: &XmlScan, root: &XmlElement) -> Result<()> {
     let payload = payloads
         .next()
         .ok_or_else(|| invalid("pivotCacheIdVersion extension has no payload"))?;
-    if payloads.next().is_some() {
+    check_fragment_limit(payload, "pivotCacheIdVersion payload")?;
+    if let Some(duplicate) = payloads.next() {
+        check_fragment_limit(duplicate, "pivotCacheIdVersion payload")?;
         return Err(invalid("duplicate pivotCacheIdVersion payload"));
     }
     if payload.has_element_child || payload.has_text || payload.has_cdata {
@@ -1828,16 +1835,19 @@ fn validate_optional_definition_id(
     expected: PivotCacheId,
 ) -> Result<()> {
     let extensions = direct_exts(scan, root, PIVOT_CACHE_DEFINITION_URI)?;
+    for candidate in &extensions {
+        check_fragment_limit(candidate, "pivotCacheDefinition owner")?;
+    }
     if extensions.len() > 1 {
         return Err(invalid("duplicate pivotCacheDefinition extensions"));
     }
     let Some(extension) = extensions.first().copied() else {
         return Ok(());
     };
-    if extension.end.saturating_sub(extension.start.start) > MAX_FRAGMENT_BYTES {
-        return Err(invalid("pivotCacheDefinition owner fragment exceeds limit"));
-    }
     let payloads = direct_children(scan, extension, X14_NS, b"pivotCacheDefinition")?;
+    for payload in &payloads {
+        check_fragment_limit(payload, "pivotCacheDefinition payload")?;
+    }
     let payload = one_or_none(payloads, "pivotCacheDefinition extension")?
         .ok_or_else(|| invalid("pivotCacheDefinition extension has no payload"))?;
     if let Some(value) = unique_attr(payload, b"pivotCacheId", "pivotCacheDefinition")? {
@@ -1915,13 +1925,14 @@ fn find_f057_source_connection(
             if unique_attr(ext, b"uri", "cacheSource ext")?
                 .is_some_and(|value| xml_token_eq(value, CACHE_SOURCE_URI))
             {
+                check_fragment_limit(ext, "F057 extension")?;
                 if found.is_some() {
                     return Err(invalid("cacheSource has duplicate F057 extensions"));
                 }
-                if ext.end.saturating_sub(ext.start.start) > MAX_FRAGMENT_BYTES {
-                    return Err(invalid("F057 extension exceeds its fragment limit"));
-                }
                 let payloads = direct_children(scan, ext, X14_NS, b"sourceConnection")?;
+                for payload in &payloads {
+                    check_fragment_limit(payload, "F057 sourceConnection payload")?;
+                }
                 let payload = one_or_none(payloads, "sourceConnection")?
                     .ok_or_else(|| invalid("F057 extension has no sourceConnection"))?;
                 if ext.mce_context

@@ -260,11 +260,18 @@ pub use phonetic_properties::{
     PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
 pub use pivot::{
+    PivotCellAddress, PivotCellType, PivotCellValueEdit, PivotRowView,
     PivotServerFormatAttributeEdit, PivotServerFormatsCommit, PivotServerFormatsPatch,
-    PivotServerFormatsSnapshot, PivotServerFormatsTransaction, PivotTableSelector,
+    PivotServerFormatsSnapshot, PivotServerFormatsTransaction, PivotTableDataCommit,
+    PivotTableDataDiagnostic, PivotTableDataEdit, PivotTableDataLimits, PivotTableDataPatch,
+    PivotTableDataSnapshot, PivotTableDataTransaction, PivotTableDataView,
+    PivotTableDataWorkbookCommit, PivotTableDataWorkbookPatch, PivotTableSelector,
     PivotTableServerFormats, PivotTableServerFormatsEdit, PivotTableServerFormatsWorkbookCommit,
-    PivotTableServerFormatsWorkbookPatch, PivotTableView, ServerFormat, ServerFormatEdit,
-    apply_pivot_server_formats_patch, edit_pivot_server_formats, load_pivot_server_formats,
+    PivotTableServerFormatsWorkbookPatch, PivotTableView, PivotValueAttributeEdit,
+    PivotValueCellExtraEdit, PivotValueCellExtraView, PivotValueCellView, ServerFormat,
+    ServerFormatEdit, apply_pivot_server_formats_patch, edit_pivot_server_formats,
+    edit_pivot_table_data, edit_pivot_table_data_with_limits, load_pivot_server_formats,
+    load_pivot_table_data, load_pivot_table_data_with_limits,
 };
 pub use print_options::{PrintOptions, parse_print_options};
 pub use streaming::{
