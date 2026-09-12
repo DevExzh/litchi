@@ -94,6 +94,12 @@ acceptance, or later-production claim.
 
 ## Replay layout
 
+Root restored all 307 raw files from retention commit `23ca02f01`, reran the
+frozen verifier, and obtained the exact original verification receipt. The
+temporary restoration was then removed. See
+[`committed-restoration-verification.json`](committed-restoration-verification.json)
+for the committed-byte replay record.
+
 The verifier requires the captured clean checkout and the recorded external
 results path because `generated-fixtures.json` contains absolute generated
 resource and package paths. The retained repository result directory cannot
