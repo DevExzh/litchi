@@ -1,0 +1,14 @@
+baseline command:
+TMPDIR=/var/tmp ODS_PROFILE_OUTPUT_DIR=/var/tmp/ods-source-profile-base7-out.2zsXKV ODS_PROFILE_REPEATS=7 CARGO_TARGET_DIR=/var/tmp/ods-source-profile-base7-target.oVrbQW cargo run --manifest-path docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/Cargo.toml --locked --offline --release
+
+candidate build command:
+TMPDIR=/var/tmp ODS_PROFILE_OUTPUT_DIR=/var/tmp/ods-source-profile-final-out.tS6TAh ODS_PROFILE_REPEATS=7 CARGO_TARGET_DIR=/var/tmp/ods-source-profile-final-target.NkvPhP cargo run --manifest-path docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness/Cargo.toml --locked --offline --release
+
+candidate receipt command:
+TMPDIR=/var/tmp ODS_PROFILE_OUTPUT_DIR=/var/tmp/ods-source-profile-final2-out.52AQxq ODS_PROFILE_REPEATS=7 /var/tmp/ods-source-profile-final-target.NkvPhP/release/ods-data-style-source-performance
+
+candidate focused test:
+RUSTFLAGS='-Aunused -Aunused-qualifications' cargo test -p litchi-ods --test data_style_vocabulary --offline --no-fail-fast
+
+candidate clippy:
+cargo clippy -p litchi-ods --lib --offline -- -D warnings
