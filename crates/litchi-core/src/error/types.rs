@@ -16,6 +16,12 @@ pub enum Error {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Atomic publication replaced its destination, but a later durability
+    /// synchronization failed. Callers must not retry as though publication
+    /// had not occurred.
+    #[error("publication committed but durability synchronization failed: {0}")]
+    Committed(#[source] std::io::Error),
+
     /// Parse error occurred
     #[error("Parse error: {0}")]
     ParseError(String),
