@@ -28,3 +28,14 @@ envelope and exposes an inert, namespace-aware text-block projection.
 | Encryption and signatures | ❌ | ❌ | ❌ | Explicitly final-scoped out of the OTH semantic API: password opening, cryptographic verification, signing, and changed publication of signed sources are refused. Signature members remain available only through inert inventory under an explicit read policy. |
 | Permanent non-execution boundary | ✅ | N/A | N/A | Links are never followed; scripts, macros, controls, actions, DDE, and embedded code are never executed or activated. `check_security` inventories embedded/external resources, forms, script members, and signatures and enforces a default-deny explicit policy while keeping permitted surfaces inert. A machine-readable contract marks inventory/policy supported and external resolution, execution, password opening, signature verification, and changed signed publication refused. |
 | Limits and evidence | ✅ | ✅ | ✅ | `content.xml` uses 64 MiB and depth-256 input ceilings plus bounded block/link/field/list/attribute projections; each direct-text replacement or boundary edit is capped at 16 MiB projected text and durable envelopes at 512 MiB. A checked-in LibreOffice Writer/Web template package is opened byte-exact, edited, enriched with an inert resource through the public API, and fully reopened; this is not presented as a native changed-save. Source tests cover unknown-inline-preserving nested boundary splices across durable replay/inverse/merge/history/transfer, fresh rich/form/style/metadata/resource/object authoring, resource reference/payload CRUD, dangling-refusal and coordinated removal, outer nested-tree replacement, object-directory closure/collision handling, compact reopen/readback, explicit validation/security capabilities, signed/script policy refusal, and test-only raw malformed/prettified ZIP negatives. |
+
+The metadata projection hardening in `afeb19037` validates expanded XML names,
+reserved namespace bindings, date/dateTime values, and tracked-change declaration
+placement in the direct ODF body prelude. It borrows the source XML, precharges
+temporary and retained storage, shares unknown namespace URI values, and measures
+text and collection sizes before allocation. Hash collection charges are logical
+budget estimates, not exact allocator or RSS bounds. Rich metadata interoperability
+is covered by synthetic fixtures; the native template's empty body does not prove
+that case. The [recorded validation](../../../docs/report/spec-gap-validation-evidence/oth-body-metadata-fidelity-20260912/README.md)
+contains 98 passing tests, strict lint/documentation checks, source hashes, and
+independent review scope; it makes no runtime performance claim.
