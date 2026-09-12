@@ -536,6 +536,58 @@ mod tests {
     }
 
     #[test]
+    fn scratch_numbers_legacy_merge_read_preserves_source_built_compatibility() {
+        let editor = NumbersDocumentBuilder::new()
+            .table_dimensions(4, 5)
+            .build()
+            .unwrap();
+        let table_id = editor.tables().unwrap()[0].object_id;
+        let region = Region::new(1, 1, 2, 2).unwrap();
+
+        // Keep this package source-built so the standalone host read exercises
+        // its compatibility path rather than constructing a focused package.
+        let mut package = editor.into_package();
+        merge_in_package(&mut package, table_id, region).unwrap();
+        let archive_name = super::super::object_locations(&package)
+            .unwrap()
+            .remove(&table_id)
+            .unwrap();
+        package
+            .update_archive(&archive_name, |archive| {
+                let object = archive
+                    .object_mut(table_id)
+                    .expect("Numbers table model object");
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == 6_001)
+                    .expect("canonical Numbers table model payload");
+                let message = object.messages[message_index].clone();
+                object
+                    .replace_message(
+                        message_index,
+                        RawMessage {
+                            type_: 6_000,
+                            data: message.data,
+                        },
+                    )
+                    .map(|_| ())?;
+                Ok(())
+            })
+            .unwrap();
+
+        let editor = NumbersEditor::from_package(package).unwrap();
+        assert!(!editor.package().source_is_exact());
+        let before = editor.to_bytes().unwrap();
+        assert_eq!(
+            regions_in_package(editor.package(), table_id).unwrap(),
+            vec![region]
+        );
+        assert_eq!(editor.table_cell_merges(table_id).unwrap(), vec![region]);
+        assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
     fn scratch_numbers_merged_table_axis_insertions_follow_native_semantics() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_dimensions(5, 6)

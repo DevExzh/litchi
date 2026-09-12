@@ -11903,3 +11903,82 @@ now evaluate `start + (span - 1)`, matching the constructor's checked invariant.
 Maximum-coordinate tests cover endpoints, containment, overlap, insertion,
 deletion, and anchor relocation; malformed native ranges are refused without
 panicking.
+
+
+## 2026-09-12 Merged-cell read validation follow-up
+
+The shared borrowed merge reader now rejects a present `MergeOwnerArchive`
+without its required `owner_id` and a present `FormulaStoreArchive` without
+its required `next_formula_index`, including stores with zero pairs. An absent
+merge owner, an owner without a store, and a valid empty store remain valid
+empty projections. These checks preserve the borrowed Buffa formula path and
+add no generated model materialization or allocation. Malformed and valid-empty
+regressions distinguish presence from absence.
+
+The focused Numbers integration oracle also wraps the native sheet in a
+source-built `FormBasedSheetArchive`. Name and position selection must follow
+its nested drawable declaration and return the same B11:C12 rectangle without
+rewriting the source. This is source-built coverage of the form-sheet branch;
+the native application receipt below covers the ordinary sheet only.
+
+Computer Use opened a disposable copy of the checked-in Numbers merge control
+at `/private/tmp/litchi-numbers-merge-read-20260912.numbers`. The twelve-row,
+three-column table visibly retained B11:C12. A marker, `Merge read verified`,
+was entered in the merged anchor in Numbers, saved, closed, reopened at that
+exact path, verified in accessibility readback, and closed. The final file was
+138,822 bytes with SHA-256
+`1efbcb2f819126459ed3a9ceea807199a2feadf1aca9a7276e04f0bc4254030f`.
+The original fixture was unchanged. The disposable copy is removed after
+verification; this receipt does not claim native acceptance for Litchi merge
+mutations or form-sheet authoring.
+
+The app feature matrices now list the existing focused Pages, Keynote, and
+Numbers merged-cell readers separately from host-owned merge mutations. The
+boundary scan passes with 64 workspace packages, 241 internal dependency
+declarations, and the same eleven migration debts. No monolith deletion gate
+is closed by these validation and documentation changes.
+
+The host's source-built legacy type-6000 merge regression also remains an
+explicit preservation gate. Direct Numbers host delegation is deferred:
+constructing the focused package solely for a merge read would reintroduce
+full semantic cell materialization into the existing bounded borrowed path.
+A source-sharing handoff is still required before that host reader can retire.
+
+The disposable native-resaved workbook also passed the focused/host differential
+readback probe: name and position selectors and the attached host reader return
+B11:C12, and both readers preserve all 138,822 source bytes exactly. The probe
+source was removed after its one passing test. Focused validation passed 16
+shared codec tests, 12 Numbers package merge tests, 20 host cell-merge tests,
+and four native cross-facade regressions.
+
+The normal workspace gate exposed stale root-facade test assumptions outside
+the merge change. Malformed OPC content-type roots now have explicit rejection
+assertions instead of an ODT-fallback expectation. A renamed `.DOCX` input must
+honor its early caller-selected input ceiling; a subsequent default-limit open
+still proves that its ordinary ODT content retains ODT ownership. The managed
+DOCX paragraph-read fixture now supplies a finite 1 MiB memory budget for the
+source, paragraph index, and parser scratch instead of equating compressed ZIP
+size with query memory. Its rich-paragraph refusal and post-drop budget-release
+assertions remain intact. These are test corrections, with no format-routing
+or production resource-policy changes.
+
+Validation also exposed a local build-artifact scalability issue: accumulated
+`target/debug/deps` directory metadata reached about 21 MB with `st_nlink`
+65,535. Read-only process samples showed newly launched tests suspended before
+dyld; macOS signature inspection was spending time enumerating that directory.
+No security settings or provenance attributes were changed. After stopping the
+stale validation processes, `cargo clean` removed 974,663 files, reporting
+188.0 GiB of artifacts, and restored about 150 GiB of free disk space.
+Subsequent validation uses `CARGO_PROFILE_DEV_DEBUG=0`,
+`CARGO_PROFILE_TEST_DEBUG=0`, and `CARGO_INCREMENTAL=0` to reduce artifact fanout.
+These environment overrides change debug symbols and incremental caching;
+workspace features, test assertions, and the normal commit hooks remain enabled.
+
+The complete failure-collecting workspace run then reached all 1,022 targets:
+22,956 tests passed, twelve remained ignored, and four positive XLSX no-op
+publication fixtures omitted the existing 64 KiB OPC streaming window from
+their memory allowances. Those fixtures now add only that transient window;
+edit-only exact ceilings, signature refusals, byte equality, and post-drop
+budget release remain unchanged. Both corrected targets pass independently
+(59 cell-value tests and 17 row-visibility tests). No XLSX production policy
+changed.
