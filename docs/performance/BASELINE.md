@@ -1,5 +1,18 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0521: matched XLSX ownership comparison
+
+[0521](changes/0521-xlsx-borrow-validation-events.md) compares identical
+instrumentation around the old and borrowed XML validation loops. Medium
+primary p50 moves from 27.70–27.97 ms to 25.65–26.19 ms; dense-sparse moves
+from 53.34–53.96 ms to 49.71–49.87 ms. Four primary and ten guard children
+per stage retain 1,400 native samples. Separate allocator children retain
+40 samples, with commit allocation calls falling about 56% and allocated
+bytes 35–43%; incremental region peak is unchanged. Eight scoped profiles
+show 10.35–10.42% fewer commit instructions. All 23 adverse phase metrics and
+52 same-build variations remain explicit. These synthetic in-memory results
+do not establish physical-provider, cold/range, native-producer or scaling gains.
+
 ## 0520: current source-backed XLSX edit/save baseline
 
 [0520](changes/0520-xlsx-source-edit-phase-attribution.md) retains 400 native samples across two fresh children per shape,

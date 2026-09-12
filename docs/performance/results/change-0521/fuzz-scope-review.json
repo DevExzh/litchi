@@ -1,0 +1,21 @@
+{
+  "observed_utc": "2026-09-12T05:01:35.319019+00:00",
+  "commands": [
+    [
+      "rg",
+      "--files",
+      "crates/litchi-xlsx"
+    ],
+    [
+      "rg",
+      "-n",
+      "cell_values",
+      "crates/litchi/fuzz",
+      "--glob",
+      "*.rs"
+    ]
+  ],
+  "xlsx_crate_has_fuzz_directory": false,
+  "facade_cell_values_fuzz_match": false,
+  "scope": "No current dedicated XLSX cell_values fuzz target found in owner/facade. No new fuzz run claimed; focused differential malformed/truncation tests supplement existing crate tests. Broader fuzz coverage remains a goal requirement."
+}

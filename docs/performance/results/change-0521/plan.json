@@ -1,0 +1,68 @@
+{
+  "revision": "672b8468ac5693136cd27df62c541923485eb444",
+  "created_utc": "2026-09-12T04:46:49.816511+00:00",
+  "hypothesis": "Remove owned Event conversion and cloned NamespaceResolver from source-backed scalar XML validation; all validation order, stack/name storage and candidate semantic reparse retained.",
+  "harness_enabler": "Canonical allocation observation around existing commit timer, frozen identically before and after production candidate.",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 100
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "staged sets and MultiSourceEdit::commit; no publication/reopen/oracles"
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "scope": "Separate zero-before/dump-after/toggle exact-name; fourth call only, preceding3lifecyclecalls retained"
+  },
+  "cpu": 2,
+  "admission": "Require useful repeatable primary total improvement and unchanged semantic/output/resource oracles. Flag every >5% adverse latency/mean/peak change by case; retain/review all flags. No inferred cold/range/native producer/scaling claim.",
+  "owned_paths": [
+    "/tmp/litchi-goal-0521",
+    "/home/zhuhe/litchi-goal-0521-target"
+  ]
+}

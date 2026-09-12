@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0521: temporary validator ownership removed
+
+[0521](changes/0521-xlsx-borrow-validation-events.md) removes per-event owned
+conversion and resolver cloning from source-backed scalar-cell validation.
+Commit Ir falls 10.35–10.42%; the validator's inclusive Ir falls about 32%.
+The positive validator-to-owned-event edge disappears. Required candidate
+validation, semantic readback, owned stack names and dialect binding remain.
+Candidate reconstruction and source layout/rewrite still dominate commit;
+these instruction shares do not establish additional removable work.
+Next, inspect their current owner profiles and reject changes that merely
+move validation or resource charges. Planning and publication are alternatives;
+0514/0516 fusion remains rejected. OLE2/OOXML stays ahead of deferred ODF.
+
 ## 0520: source-backed XLSX commit owners
 
 [0520](changes/0520-xlsx-source-edit-phase-attribution.md) confirms commit as about 45% of the current one-percent edit/save

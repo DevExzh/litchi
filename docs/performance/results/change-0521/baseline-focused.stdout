@@ -1,0 +1,30 @@
+
+running 11 tests
+test cell_values::validation::borrow_tests::document_type_declarations_are_refused_with_exact_errors ... ok
+test cell_values::validation::borrow_tests::namespace_failures_have_the_frozen_exact_errors ... ok
+test cell_values::validation::borrow_tests::mismatched_and_unbalanced_closing_tags_have_exact_errors ... ok
+test cell_values::validation::borrow_tests::malformed_and_duplicate_attributes_match_parser_errors ... ok
+test cell_values::validation::borrow_tests::aliases_and_default_namespace_scopes_are_resolved_identically ... ok
+test cell_values::validation::borrow_tests::malformed_and_truncated_inputs_keep_parser_errors_identical ... ok
+test cell_values::validation::borrow_tests::workbook_invalid_inputs_are_checked_against_the_same_owned_loop ... ok
+test cell_values::validation::borrow_tests::empty_namespace_rebinding_restores_scope_for_siblings_and_closing_tags ... FAILED
+test cell_values::validation::borrow_tests::text_cdata_and_general_references_are_checked_in_context ... ok
+test cell_values::validation::borrow_tests::transitional_and_strict_worksheet_and_workbook_inputs_are_accepted ... ok
+test cell_values::validation::borrow_tests::every_truncation_of_namespace_rich_valid_fixture_is_differentially_checked ... ok
+
+failures:
+
+---- cell_values::validation::borrow_tests::empty_namespace_rebinding_restores_scope_for_siblings_and_closing_tags stdout ----
+
+thread 'cell_values::validation::borrow_tests::empty_namespace_rebinding_restores_scope_for_siblings_and_closing_tags' (578937) panicked at crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs:90:5:
+assertion `left == right` failed: frozen error changed for empty namespace rebind followed by foreign sibling (worksheet)
+  left: Some("invalid XLSX structure: value-only XML has a foreign element namespace")
+ right: Some("invalid XLSX structure: value-only edits refuse foreign or markup-compatible element 'c'")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cell_values::validation::borrow_tests::empty_namespace_rebinding_restores_scope_for_siblings_and_closing_tags
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 949 filtered out; finished in 0.02s
+

@@ -1,0 +1,50 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--zero-before=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--dump-after=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0521/baseline/profile-r2-medium.callgrind",
+    "/tmp/litchi-goal-0521/baseline-normal",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0521/baseline/profile-r2-medium.json"
+  ],
+  "start_utc": "2026-09-12T05:01:32.763766+00:00",
+  "end_utc": "2026-09-12T05:02:04.793603+00:00",
+  "seconds": 32.029839955997886,
+  "exit_code": 0,
+  "binary_sha256": "aa009518b79da47448aa71cd655807a4063c3868d97ff6cbd023b6fb0b7bab4b",
+  "source_manifest_sha256": "e21a054732bf171e423c1b8c087ac2111dcb8f17cb9f653b8e9c72224ff90c37",
+  "script_sha256": "ef37fe884ec7d60819f08eb0ff1757e1010b684f514e29fe5d293972e4275812",
+  "plan_sha256": "711754fb64bcfa7a975509bd961befef6a5d2ddad3d36bf4267dbc04364cd171",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "profile-r2-medium.callgrind": "3c44b416a2b6cd9cc72a48ff193a6add8eddb83cc2801f3554376d90b4301796",
+    "profile-r2-medium.callgrind.1": "a53aa87068aa88220e31be2520a861f2350877a6a13a73e5e00143ce3939b9b5",
+    "profile-r2-medium.callgrind.2": "422eb9aa8f7c09b5feafbff0d53adb794ededabe931f41564e75432ae7274aa4",
+    "profile-r2-medium.callgrind.3": "d35c4051f261ca33c0678342e5c0b2d406980c6f84275cb2b6fe2132671213c2",
+    "profile-r2-medium.callgrind.4": "cf37d5cb7973812f0c4ed338179857cd985543f17cb5cf37ee0777c855ca0f9f",
+    "profile-r2-medium.json": "b20214d1d00e5977abd8d6915b7cc8489636113c77c5a0d1aee2c6f2ffb6b61d",
+    "profile-r2-medium.stderr": "789b7a16316d55e806f5a1a5497eafbde14cea5bce04bbee722015c93e194add",
+    "profile-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

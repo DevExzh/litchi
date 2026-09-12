@@ -1,5 +1,21 @@
 # Performance program phase report
 
+## 0521: remove temporary XLSX validation ownership
+
+[0521](changes/0521-xlsx-borrow-validation-events.md) borrows XML events and
+the current namespace resolver while retaining all validation and semantic
+readback. Primary edit/save p50 improves 6.35–7.59%; guard p50 improves
+6.55–9.80%. All matched whole-operation p50/p95/p99/mean statistics improve.
+Commit instructions fall 10.35–10.42%, allocation calls 55.62–55.95%, and
+allocated bytes 34.59–43.08%. Incremental live-byte peaks are unchanged;
+whole-child RSS has no adverse flag over 5%.
+
+The bundle retains 1,400 native samples, 40 separate allocation samples,
+eight isolated profiles, 23 adverse phase metrics and 52 same-build variations.
+Phase-regression causes remain unproven; no publication/reopen/general-tail
+claim follows. Exact output, source and budget identities remain equal.
+OLE2/OOXML remains active, ODF deferred and iWork excluded.
+
 ## 0520: attribute current source-backed XLSX edit/save
 
 [0520](changes/0520-xlsx-source-edit-phase-attribution.md) adds a current 400-sample phase baseline and four isolated commit

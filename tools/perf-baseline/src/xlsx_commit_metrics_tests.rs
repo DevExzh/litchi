@@ -179,7 +179,7 @@ fn xlsx_commit_metrics_align_warmups_and_report_normal_allocator_status() {
                         after_promotion["operation_metrics"]["sink"]["write_status"],
                         "not_applicable"
                     );
-                }
+                },
                 Case::XlsxOneCellCommitSave | Case::XlsxOnePercentCommitSave => {
                     let sink = top_level_sink.expect("save case publishes sink summary");
                     assert!(sink.accepted_bytes > 0);
@@ -193,7 +193,7 @@ fn xlsx_commit_metrics_align_warmups_and_report_normal_allocator_status() {
                         after_promotion["operation_metrics"]["sink"]["accepted_bytes"]["values"],
                         serde_json::to_value(vec![sink.accepted_bytes; sample_count]).unwrap()
                     );
-                }
+                },
                 _ => unreachable!("the test case list contains only XLSX commit cases"),
             }
         }
@@ -246,7 +246,10 @@ fn xlsx_commit_save_operation_propagates_a_short_counting_sink() -> Result<(), B
 
     let error = xlsx_commit_save_operation(edit, &mut sink)
         .expect_err("a short CountingSink must reject the complete save");
-    assert!(!sink.bytes.is_empty(), "save must retain its partial output");
+    assert!(
+        !sink.bytes.is_empty(),
+        "save must retain its partial output"
+    );
     assert!(sink.summary().write_calls > 0);
     assert!(sink.bytes.len() < expected.len());
     assert!(sink.summary().accepted_bytes <= short_limit);

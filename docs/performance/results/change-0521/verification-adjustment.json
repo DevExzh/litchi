@@ -1,0 +1,8 @@
+{
+  "issue": "First post-cleanup verifier run failed because analyze.py required live build binaries that the campaign had intentionally removed.",
+  "analyzer_before_sha256": "30afce217c56de8b5944d66a6e740fba1c66a50c6a443a9bc6751a9ede5df9f8",
+  "analyzer_after_sha256": "322357892b496ef09ca01aa69bb5a8708182a9a771a4541e3b21a6885a7616ad",
+  "comparison_before_sha256": "4e2616765a75a3facd405634b7e610d49d5516993ee9788a331e30617c407454",
+  "resolution": "Existing live binaries remain hash/size checked. Missing binaries require exact planned paths and completed cleanup; all build/source/capture/report hash bindings remain checked. Reports must replay byte-identically.",
+  "production_harness_plan_capture_driver_unchanged": true
+}

@@ -1,5 +1,19 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0521: XLSX ownership optimization accepted; broader goal remains open
+
+[0521](changes/0521-xlsx-borrow-validation-events.md) closes the narrow
+per-event ownership candidate and operation-local allocation attribution task.
+Primary edit/save p50 improves 6.35–7.59%, commit allocation calls about 56%,
+and scoped commit instructions about 10.4%. Incremental peak is unchanged.
+All 23 adverse phase metrics remain explicit. The synthetic source-backed
+matrix is not a coverage-catalog promotion or completion of physical providers,
+cold/range, native producers, fuzz, broader CRUD or scaling requirements.
+The next investigation follows current candidate reconstruction and worksheet
+layout/rewrite owners, preserving validation and readback. OLE2/OOXML remains
+the active priority until its optimization goal completes; ODF is deferred
+and iWork excluded.
+
 ## 0520: current XLSX phase attribution complete; optimization remains open
 
 [0520](changes/0520-xlsx-source-edit-phase-attribution.md) closes the immediate current phase/commit-owner attribution task for

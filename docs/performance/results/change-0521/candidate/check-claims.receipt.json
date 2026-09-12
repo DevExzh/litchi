@@ -1,0 +1,39 @@
+{
+  "command": [
+    "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0521-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "python3",
+    "-B",
+    "tools/check_perf_claims.py",
+    "--registry",
+    "docs/performance/claim-registry-v1.json",
+    "--repo-root",
+    ".",
+    "--evidence-root",
+    ".",
+    "--mode",
+    "strict"
+  ],
+  "start_utc": "2026-09-12T05:28:45.437106+00:00",
+  "end_utc": "2026-09-12T05:29:56.112999+00:00",
+  "seconds": 70.67590214700613,
+  "exit_code": 0,
+  "binary_sha256": null,
+  "source_manifest_sha256": "765fe38ee9ec1ea9293081a3d439f85b8cf836c31b0068157a5f413f0fec6df8",
+  "script_sha256": "ef37fe884ec7d60819f08eb0ff1757e1010b684f514e29fe5d293972e4275812",
+  "plan_sha256": "711754fb64bcfa7a975509bd961befef6a5d2ddad3d36bf4267dbc04364cd171",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "check-claims.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "check-claims.stdout": "821ddfbe62a06679bd1a5b5b0901b025dcc85bea08b4476f97a9267d6eb10cd8"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "status": "pass",
+  "native_samples": 1400,
+  "allocator_samples": 40,
+  "profile_samples": 8,
+  "stage_receipts": {
+    "baseline": 24,
+    "candidate": 35
+  },
+  "serialized_intervals": 59,
+  "source_replay": true,
+  "source_differences": [
+    "crates/litchi-xlsx/src/cell_values/validation.rs"
+  ],
+  "exact_report_replay": true,
+  "exact_annotation_replay": true,
+  "negative_vectors": 4,
+  "owned_paths_absent": true,
+  "seal_entries": null
+}
