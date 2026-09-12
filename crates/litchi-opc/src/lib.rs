@@ -66,7 +66,8 @@ pub use limits::{ReadLimits, ReadLimitsBuilder, ReadResource};
 pub use members::{NonPartMember, NonPartReason};
 pub use package::{
     CanonicalRelationshipsPlan, ContentTypeEdit, ContentTypesEditPlan, FontEmbedding, OpcPackage,
-    OwnedContentTypes, OwnedRelationships, RelationshipEdit, RelationshipsEditPlan, SaveOptions,
+    OwnedContentTypes, OwnedRelationships, RelationshipEdit, RelationshipSourcePlan,
+    RelationshipsEditPlan, SaveOptions,
 };
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};

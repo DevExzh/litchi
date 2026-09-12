@@ -31,6 +31,52 @@ pub struct OwnedRelationships {
     member_present: bool,
 }
 
+/// Output-free metrics for the current relationship collection of one owner.
+///
+/// This is descriptive admission data, not a source token or a materialize
+/// authority. It is bound to the owner's current in-memory relationship
+/// collection and must be recomputed before a later capture if that
+/// collection changes. Callers may use the exact values to precharge an
+/// operation aggregate, then call [`OpcPackage::source_relationships_with_limits`]
+/// to perform the fresh bounded capture and parser checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RelationshipSourcePlan {
+    final_len: usize,
+    event_count: usize,
+    relationship_count: usize,
+    member_present: bool,
+}
+
+impl RelationshipSourcePlan {
+    /// Exact retained or canonical relationship-member byte length.
+    #[must_use]
+    pub const fn final_len(self) -> usize {
+        self.final_len
+    }
+
+    /// Exact relationship-ingress quick-XML event count, including EOF.
+    /// Relationship ingress uses `trim_text(true)`; raw source-publication
+    /// validation applies its separate per-member event ceiling.
+    #[must_use]
+    pub const fn event_count(self) -> usize {
+        self.event_count
+    }
+
+    /// Exact typed relationship-element count in the current graph.
+    #[must_use]
+    pub const fn relationship_count(self) -> usize {
+        self.relationship_count
+    }
+
+    /// Whether this owner publishes a relationship member. An explicit empty
+    /// source member is `true`; an owner with no source member and no edges is
+    /// `false`.
+    #[must_use]
+    pub const fn member_present(self) -> bool {
+        self.member_present
+    }
+}
+
 /// One borrowed relationship edge to add during a source-bound edit plan.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RelationshipEdit<'a> {
@@ -104,19 +150,23 @@ impl Relationships {
     /// Plan a canonical relationship member without source XML or provenance.
     ///
     /// This is the neutral bridge for newly authored graph owners.  It shares
-    /// the canonical serializer, escaping, validation, and limits used by OPC
-    /// package capture, while keeping the final byte buffer deferred until
-    /// [`CanonicalRelationshipsPlan::materialize`].
+    /// the canonical serializer, escaping, validation, and caller `ReadLimits`
+    /// checks used by OPC package capture, while keeping the final byte buffer
+    /// deferred until [`CanonicalRelationshipsPlan::materialize`]. Source-bound
+    /// capture adds its owned XML fixed-size ceiling before materialization.
     pub fn plan_canonical<'source>(
         &'source self,
         limits: ReadLimits,
     ) -> Result<CanonicalRelationshipsPlan<'source>> {
+        // Validate all authored fields before the length pass can lead to a
+        // later canonical XML allocation. The serializer escapes XML syntax,
+        // but it cannot make XML 1.0-forbidden Unicode scalar values valid.
+        validate_canonical_relationship_values(self, limits)?;
         let final_len = crate::source_backed::canonical_relationship_xml_len(self)?;
         let event_count = self
             .len()
             .checked_add(4)
             .ok_or_else(|| invalid("canonical relationship event count overflows"))?;
-        validate_canonical_relationship_values(self, limits)?;
         check_canonical_relationship_plan_limits(self, final_len, event_count, limits)?;
         Ok(CanonicalRelationshipsPlan {
             relationships: self,
@@ -147,6 +197,21 @@ fn validate_canonical_relationship_values(
         {
             return Err(invalid(
                 "relationship Type or Target is not a valid URI reference",
+            ));
+        }
+        if [
+            relationship.r_id(),
+            relationship.reltype(),
+            relationship.target_ref(),
+        ]
+        .into_iter()
+        .any(|value| {
+            value
+                .chars()
+                .any(|character| !crate::xml_splice::xml10_character(character))
+        }) {
+            return Err(invalid(
+                "relationship fields contain a forbidden XML 1.0 character",
             ));
         }
         limits.check(
@@ -1135,6 +1200,114 @@ impl OwnedRelationships {
 }
 
 impl OpcPackage {
+    /// Plan source-bound relationship capture without retaining XML bytes.
+    ///
+    /// The returned metrics describe the owner's current relationship
+    /// collection and its currently bound source XML, when the semantic
+    /// binding still matches.  A changed collection falls back to the
+    /// output-free canonical serializer plan.  The plan is admission data,
+    /// not authority to skip a later capture: callers must precharge the
+    /// operation aggregate and then invoke
+    /// [`OpcPackage::source_relationships_with_limits`] again so the current
+    /// collection is freshly checked and materialized.
+    pub fn plan_source_relationships_with_limits(
+        &self,
+        owner: &PackURI,
+        limits: ReadLimits,
+    ) -> Result<RelationshipSourcePlan> {
+        let (owner_ref, relationships) = if owner.as_str() == "/" {
+            (owner, self.rels())
+        } else {
+            let part = self.get_part(owner)?;
+            (part.partname(), part.rels())
+        };
+        OwnedXmlPart::check_derived_capture_member_name(owner_ref, limits)?;
+        let relationship_uri = owner_ref.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        check_relationship_capture_limits(relationships, limits)?;
+
+        let source = self
+            .source_relationships_xml
+            .get(owner_ref)
+            .filter(|source| source.binding.matches(relationships));
+        let member_present = owner_ref.as_str() == "/"
+            || !relationships.is_empty()
+            || self.source_relationships_member_present(owner_ref);
+        let (final_len, event_count, relationship_count, member_present) =
+            if let Some(source) = source {
+                limits.check(
+                    ReadResource::RelationshipXmlBytes,
+                    source.bytes.len() as u64,
+                    limits.max_relationship_xml_bytes() as u64,
+                )?;
+                limits.check(
+                    ReadResource::TotalRelationshipXmlBytes,
+                    source.bytes.len() as u64,
+                    limits.max_total_relationship_xml_bytes() as u64,
+                )?;
+                limits.check(
+                    ReadResource::PartBytes,
+                    source.bytes.len() as u64,
+                    limits.max_part_bytes(),
+                )?;
+                OwnedXmlPart::preflight_capture_with_limits(
+                    &relationship_uri,
+                    crate::constants::content_type::OPC_RELATIONSHIPS,
+                    source.bytes.as_slice(),
+                    limits,
+                )?;
+                let (event_count, parsed_relationships) =
+                    relationship_xml_metrics(source.bytes.as_slice(), limits)?;
+                if parsed_relationships != relationships.len() {
+                    return Err(invalid(
+                        "relationship source plan disagrees with the in-memory graph",
+                    ));
+                }
+                (
+                    source.bytes.len(),
+                    event_count,
+                    relationships.len(),
+                    member_present,
+                )
+            } else {
+                let canonical = relationships.plan_canonical(limits)?;
+                OwnedXmlPart::check_capture_size(&relationship_uri, canonical.final_len(), limits)?;
+                (
+                    canonical.final_len(),
+                    canonical.event_count(),
+                    canonical.relationship_count(),
+                    member_present,
+                )
+            };
+
+        // `preflight_capture_with_limits` above admits the raw source-publication
+        // profile (including trim_text(false) events, depth, and all source
+        // attributes). The metrics below intentionally use trim_text(true),
+        // matching relationship ingress and the aggregate relationship ledger.
+        // Keep both views: the first protects fresh OwnedXmlPart capture and
+        // this one supplies exact retained relationship aggregate accounting.
+        limits.check(
+            ReadResource::XmlEvents,
+            event_count as u64,
+            limits.max_xml_events() as u64,
+        )?;
+        limits.check(
+            ReadResource::TotalRelationshipXmlBytes,
+            final_len as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            ReadResource::TotalRelationshipXmlEvents,
+            event_count as u64,
+            limits.max_total_relationship_xml_events() as u64,
+        )?;
+        Ok(RelationshipSourcePlan {
+            final_len,
+            event_count,
+            relationship_count,
+            member_present,
+        })
+    }
+
     /// Capture source-bound relationship XML without exposing mutable provenance.
     /// Newly authored or changed collections receive a validated canonical view.
     pub fn source_relationships(&self, owner: &PackURI) -> Result<OwnedRelationships> {
@@ -1182,21 +1355,15 @@ impl OpcPackage {
             OwnedXmlPart::check_capture_size(&relationship_uri, source.bytes.len(), limits)?;
             Arc::clone(&source.bytes)
         } else {
-            let length = crate::source_backed::canonical_relationship_xml_len(relationships)?;
+            let canonical = relationships.plan_canonical(limits)?;
+            let length = canonical.final_len();
             limits.check(
-                ReadResource::RelationshipXmlBytes,
+                ReadResource::TotalRelationshipXmlBytes,
                 length as u64,
-                limits.max_relationship_xml_bytes() as u64,
+                limits.max_total_relationship_xml_bytes() as u64,
             )?;
-            limits.check(
-                ReadResource::PartBytes,
-                length as u64,
-                limits.max_part_bytes(),
-            )?;
-            check_canonical_relationship_attribute_limits(relationships, limits)?;
-            check_canonical_relationship_structure(relationships, length, limits)?;
             OwnedXmlPart::check_capture_size(&relationship_uri, length, limits)?;
-            Arc::new(relationships.try_to_xml_bytes()?)
+            Arc::new(canonical.materialize(limits)?)
         };
         crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
             &bytes, owner_ref, limits,
@@ -1333,6 +1500,97 @@ fn append_relationship_chunks(
     Ok(())
 }
 
+/// Count retained relationship XML events without allocating a parsed graph.
+///
+/// This intentionally uses the same whitespace and end-tag configuration as
+/// OPC relationship ingress.  The source bytes have already passed semantic
+/// ingress validation; the typed element count is retained as a consistency
+/// check against the current relationship collection.
+fn relationship_xml_metrics(bytes: &[u8], limits: ReadLimits) -> Result<(usize, usize)> {
+    let mut reader = NsReader::from_reader(bytes);
+    reader.config_mut().trim_text(true);
+    reader.config_mut().check_end_names = true;
+    let mut events = 0usize;
+    let mut relationships = 0usize;
+    let mut depth = 0usize;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("relationship XML event count overflows"))?;
+        limits.check(
+            ReadResource::XmlEvents,
+            events as u64,
+            limits.max_xml_events() as u64,
+        )?;
+        let decoder = reader.decoder();
+        match reader
+            .read_event()
+            .map_err(|error| invalid(error.to_string()))?
+        {
+            Event::Start(element) => {
+                let next_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("relationship XML depth overflows"))?;
+                limits.check(
+                    ReadResource::XmlDepth,
+                    next_depth as u64,
+                    limits.max_xml_depth() as u64,
+                )?;
+                if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                    check_relationship_attributes(&element, decoder, limits)?;
+                    relationships = relationships
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("relationship count overflows"))?;
+                }
+                depth = next_depth;
+            },
+            Event::Empty(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                    check_relationship_attributes(&element, decoder, limits)?;
+                    relationships = relationships
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("relationship count overflows"))?;
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("relationship XML depth underflows"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok((events, relationships))
+}
+
+/// Recheck the two attribute byte views enforced by relationship ingress.
+/// The raw value is charged before decoding so a hostile entity spelling
+/// cannot force an unbounded temporary before the caller's limit is applied.
+fn check_relationship_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+    limits: ReadLimits,
+) -> Result<()> {
+    for attribute_result in element.attributes() {
+        let attribute = attribute_result.map_err(|error| invalid(error.to_string()))?;
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            attribute.value.as_ref().len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| invalid(error.to_string()))?;
+        limits.check(
+            ReadResource::XmlAttributeBytes,
+            value.len() as u64,
+            limits.max_xml_attribute_bytes() as u64,
+        )?;
+    }
+    Ok(())
+}
+
 fn invalid(message: impl Into<String>) -> OpcError {
     OpcError::InvalidRelationship(message.into())
 }
@@ -1420,6 +1678,267 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn source_relationship_plan_reports_retained_comments_and_exact_caps() {
+        let package = OpcPackage::from_vec(source(XML)).unwrap();
+        let owner = PackURI::new("/").unwrap();
+        let (events, relationships) = relationship_xml_metrics(XML, ReadLimits::default()).unwrap();
+        assert_eq!(events, 10);
+        assert_eq!(relationships, 2);
+        let plan = package
+            .plan_source_relationships_with_limits(&owner, ReadLimits::default())
+            .unwrap();
+        let retained_token = package
+            .source_relationships_with_limits(&owner, ReadLimits::default())
+            .unwrap();
+        assert_eq!(plan.final_len(), XML.len());
+        assert_eq!(retained_token.bytes(), XML);
+        assert_eq!(plan.final_len(), retained_token.bytes().len());
+        assert_eq!(plan.event_count(), events);
+        assert_eq!(plan.relationship_count(), relationships);
+        assert!(plan.member_present());
+        assert!(
+            std::str::from_utf8(XML)
+                .unwrap()
+                .contains("<!-- before -->")
+        );
+        assert!(
+            std::str::from_utf8(XML)
+                .unwrap()
+                .contains("<!-- middle -->")
+        );
+
+        let exact = ReadLimits::builder()
+            .max_relationship_xml_bytes(XML.len())
+            .unwrap()
+            .max_total_relationship_xml_bytes(XML.len())
+            .unwrap()
+            .max_part_bytes(XML.len() as u64)
+            .unwrap()
+            // The source-publication validator retains whitespace text events
+            // (17 total); relationship ingress trims them (10 aggregate
+            // events). Both ceilings must admit this retained member.
+            .max_xml_events(17)
+            .unwrap()
+            .max_total_relationship_xml_events(events)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            package
+                .plan_source_relationships_with_limits(&owner, exact)
+                .unwrap(),
+            plan
+        );
+        assert_eq!(
+            package
+                .source_relationships_with_limits(&owner, exact)
+                .unwrap()
+                .bytes(),
+            XML
+        );
+
+        let bytes_under = ReadLimits::builder()
+            .max_relationship_xml_bytes(XML.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.plan_source_relationships_with_limits(&owner, bytes_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                ..
+            })
+        ));
+        let raw_events_under = ReadLimits::builder()
+            .max_xml_events(16)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.plan_source_relationships_with_limits(&owner, raw_events_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlEvents,
+                ..
+            })
+        ));
+        let aggregate_bytes_under = ReadLimits::builder()
+            .max_total_relationship_xml_bytes(XML.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.plan_source_relationships_with_limits(&owner, aggregate_bytes_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalRelationshipXmlBytes,
+                ..
+            })
+        ));
+        let aggregate_events_under = ReadLimits::builder()
+            .max_total_relationship_xml_events(events - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.plan_source_relationships_with_limits(&owner, aggregate_events_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::TotalRelationshipXmlEvents,
+                ..
+            })
+        ));
+
+        let depth_under = ReadLimits::builder()
+            .max_xml_depth(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            package.plan_source_relationships_with_limits(&owner, depth_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlDepth,
+                ..
+            })
+        ));
+        assert!(matches!(
+            package.source_relationships_with_limits(&owner, depth_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlDepth,
+                ..
+            })
+        ));
+
+        let escaped_target = "&#x61;".repeat(20);
+        let escaped_attribute_xml = format!(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="{escaped_target}" TargetMode="External"/></Relationships>"#
+        );
+        let escaped_attribute_package =
+            OpcPackage::from_vec(source(escaped_attribute_xml.as_bytes())).unwrap();
+        let raw_attribute_under = ReadLimits::builder()
+            .max_xml_attribute_bytes(96)
+            .unwrap()
+            .max_relationship_target_bytes(96)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            escaped_attribute_package
+                .plan_source_relationships_with_limits(&owner, raw_attribute_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlAttributeBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            escaped_attribute_package.source_relationships_with_limits(&owner, raw_attribute_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::XmlAttributeBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn source_relationship_plan_tracks_changed_new_empty_and_mixed_case_owners() {
+        let retained = OpcPackage::from_vec(source(XML)).unwrap();
+        let mixed_case = PackURI::new("/CUSTOM/ITEM.BIN").unwrap();
+        let retained_plan = retained
+            .plan_source_relationships_with_limits(&mixed_case, ReadLimits::default())
+            .unwrap();
+        assert!(retained_plan.member_present());
+        assert_eq!(retained_plan.relationship_count(), 2);
+
+        let mut changed = OpcPackage::from_vec(source(XML)).unwrap();
+        changed
+            .rels_mut()
+            .try_add_relationship(
+                "urn:changed".to_owned(),
+                "custom/item.bin".to_owned(),
+                "rId9".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        let root = PackURI::new("/").unwrap();
+        let changed_plan = changed
+            .plan_source_relationships_with_limits(&root, ReadLimits::default())
+            .unwrap();
+        let changed_token = changed
+            .source_relationships_with_limits(&root, ReadLimits::default())
+            .unwrap();
+        assert!(changed_plan.member_present());
+        assert_eq!(changed_plan.relationship_count(), 3);
+        assert_eq!(changed_plan.final_len(), changed_token.bytes().len());
+        assert_eq!(changed_plan.event_count(), 7);
+        let changed_exact = ReadLimits::builder()
+            .max_relationship_xml_bytes(changed_plan.final_len())
+            .unwrap()
+            .max_total_relationship_xml_bytes(changed_plan.final_len())
+            .unwrap()
+            .max_part_bytes(changed_plan.final_len() as u64)
+            .unwrap()
+            .max_xml_events(changed_plan.event_count())
+            .unwrap()
+            .max_total_relationship_xml_events(changed_plan.event_count())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert_eq!(
+            changed
+                .plan_source_relationships_with_limits(&root, changed_exact)
+                .unwrap(),
+            changed_plan
+        );
+        let changed_under = ReadLimits::builder()
+            .max_relationship_xml_bytes(changed_plan.final_len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            changed.plan_source_relationships_with_limits(&root, changed_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                ..
+            })
+        ));
+
+        let empty_xml =
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#;
+        let explicit_empty = OpcPackage::from_vec(source(empty_xml)).unwrap();
+        let explicit_owner = PackURI::new("/custom/item.bin").unwrap();
+        let explicit_plan = explicit_empty
+            .plan_source_relationships_with_limits(&explicit_owner, ReadLimits::default())
+            .unwrap();
+        assert!(explicit_plan.member_present());
+        assert_eq!(explicit_plan.relationship_count(), 0);
+
+        let mut authored = OpcPackage::new();
+        let absent_owner = PackURI::new("/custom/no-rels.bin").unwrap();
+        authored.add_part(Box::new(BlobPart::new(
+            absent_owner.clone(),
+            "application/octet-stream".into(),
+            vec![],
+        )));
+        let absent_plan = authored
+            .plan_source_relationships_with_limits(&absent_owner, ReadLimits::default())
+            .unwrap();
+        let absent_token = authored
+            .source_relationships_with_limits(&absent_owner, ReadLimits::default())
+            .unwrap();
+        assert!(!absent_plan.member_present());
+        assert!(!absent_token.member_present());
+        assert_eq!(absent_plan.relationship_count(), 0);
+        assert_eq!(absent_plan.final_len(), absent_token.bytes().len());
+
+        let authored_root = authored
+            .plan_source_relationships_with_limits(&root, ReadLimits::default())
+            .unwrap();
+        let authored_root_token = authored
+            .source_relationships_with_limits(&root, ReadLimits::default())
+            .unwrap();
+        assert!(authored_root.member_present());
+        assert_eq!(authored_root.relationship_count(), 0);
+        assert_eq!(authored_root.final_len(), authored_root_token.bytes().len());
     }
 
     #[test]
@@ -2040,6 +2559,50 @@ mod tests {
             authored_token.bytes()
         );
 
+        // Canonical source capture must admit the ZIP-entry ceiling before
+        // asking the serializer for its output buffer. The neutral plan and
+        // the fresh capture must reject the same under-limit profile.
+        let archive_entry_under = ReadLimits::builder()
+            .max_archive_entry_bytes(authored_token.bytes().len() as u64 - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            authored.plan_source_relationships_with_limits(&root, archive_entry_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveEntryBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            authored.source_relationships_with_limits(&root, archive_entry_under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveEntryBytes,
+                ..
+            })
+        ));
+
+        // Authored relationship fields are checked against the shared XML
+        // 1.0 character predicate before canonical length/materialization.
+        let mut invalid_xml = OpcPackage::new();
+        invalid_xml
+            .rels_mut()
+            .try_add_relationship(
+                "urn:test".to_owned(),
+                "target\u{fffe}".to_owned(),
+                "rId1".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        assert!(matches!(
+            invalid_xml.plan_source_relationships_with_limits(&root, ReadLimits::default()),
+            Err(OpcError::InvalidRelationship(_))
+        ));
+        assert!(matches!(
+            invalid_xml.source_relationships_with_limits(&root, ReadLimits::default()),
+            Err(OpcError::InvalidRelationship(_))
+        ));
+
         let event_under = ReadLimits::builder()
             .max_xml_events(4)
             .unwrap()
@@ -2103,6 +2666,52 @@ mod tests {
                 actual: 2,
                 maximum: 1,
             })
+        ));
+    }
+
+    #[test]
+    fn source_canonical_capture_rejects_the_fixed_owned_xml_ceiling_before_materialization() {
+        let target_bytes = (32 * 1024 * 1024) + 1;
+        let output_limit = target_bytes + 4096;
+        let limits = ReadLimits::builder()
+            .max_relationship_xml_bytes(output_limit)
+            .unwrap()
+            .max_total_relationship_xml_bytes(output_limit)
+            .unwrap()
+            .max_part_bytes(output_limit as u64)
+            .unwrap()
+            .max_archive_entry_bytes(output_limit as u64)
+            .unwrap()
+            .max_xml_attribute_bytes(output_limit)
+            .unwrap()
+            .max_relationship_target_bytes(target_bytes)
+            .unwrap()
+            .build()
+            .unwrap();
+        let mut package = OpcPackage::new();
+        package
+            .rels_mut()
+            .try_add_relationship(
+                "urn:test".to_owned(),
+                "x".repeat(target_bytes),
+                "rId1".to_owned(),
+                TargetMode::External,
+            )
+            .unwrap();
+
+        // The neutral plan is output-free and may be admitted by the caller's
+        // raised limits. Do not materialize its deliberately oversized XML.
+        let canonical = package.rels().plan_canonical(limits).unwrap();
+        assert!(canonical.final_len() > 32 * 1024 * 1024);
+
+        let root = PackURI::new("/").unwrap();
+        assert!(matches!(
+            package.plan_source_relationships_with_limits(&root, limits),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
+        ));
+        assert!(matches!(
+            package.source_relationships_with_limits(&root, limits),
+            Err(OpcError::SourceBackedOverlayUnavailable { .. })
         ));
     }
 }

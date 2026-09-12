@@ -25,7 +25,8 @@ mod content_types;
 mod relationships;
 pub use content_types::{ContentTypeEdit, ContentTypesEditPlan};
 pub use relationships::{
-    CanonicalRelationshipsPlan, OwnedRelationships, RelationshipEdit, RelationshipsEditPlan,
+    CanonicalRelationshipsPlan, OwnedRelationships, RelationshipEdit, RelationshipSourcePlan,
+    RelationshipsEditPlan,
 };
 
 /// Options for saving an OPC package.
