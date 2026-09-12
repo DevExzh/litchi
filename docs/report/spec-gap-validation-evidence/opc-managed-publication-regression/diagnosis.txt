@@ -1,0 +1,30 @@
+Owned regression-check receipt (2026-09-12 UTC)
+
+Baseline worktrees and immutable inputs:
+- /var/tmp/litchi-xlsx-baseline-1404fb65b: HEAD 1404fb65bd33ce6fc99f5562279e279509aaf275; clean; Cargo.lock SHA256 ff45c428d2047106e3cc586e879cea7bd5d7556eaebcf6634e00659406d49a9b; 3rdparty -> /home/zhuhe/code/litchi/3rdparty.
+- /var/tmp/litchi-xlsx-pre-57680: HEAD 8fff95972b7409cd9da84b8a6fa4e66b1f8a41b4; clean; same Cargo.lock SHA256 and 3rdparty symlink.
+
+Comparison command:
+CARGO_TARGET_DIR=<isolated> cargo test --locked -p litchi-xlsx --test source_backed_cell_values --all-features --offline
+
+Observed baseline results recorded during diagnosis:
+- 1404fb65b: 57 passed, 2 failed. managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once: observed memory 7042, limit 5494. managed_stream_publication_works_and_inverse_materialization_is_explicit: observed 6391, limit 4800.
+- 8fff959: both named failing tests passed individually.
+
+Regression fix commit:
+- 83e60e8c62d52d46d75e06f3ddda121692775dc3 (source_backed.rs + prepared_topology.rs only).
+- Full OPC all-features offline: 438 unit tests and all integration groups passed; one existing external-corpus test ignored.
+- Focused prepared_topology: 29 passed; prepared_topology_empty_roots: 3 passed.
+
+Owned temporary paths removed after this receipt was written:
+- /var/tmp/litchi-xlsx-baseline-1404fb65b
+- /var/tmp/litchi-xlsx-pre-57680
+- /var/tmp/litchi-xlsx-baseline-target
+- /var/tmp/litchi-xlsx-current-target
+- /var/tmp/litchi-xlsx-debug-target
+- /var/tmp/litchi-xlsx-instrumented-target
+- /var/tmp/litchi-xlsx-pre57680-target
+- /var/tmp/litchi-xlsx-fix-target
+- /var/tmp/litchi-xlsx-fix-target2
+- /var/tmp/litchi-xlsx-fix-final-target
+- /var/tmp/pre_old_topology.txt
