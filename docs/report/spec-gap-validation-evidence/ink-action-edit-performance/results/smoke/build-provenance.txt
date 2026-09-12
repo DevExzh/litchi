@@ -1,0 +1,4 @@
+binary=/var/tmp/litchi-ink-action-edit-smoke-target/release/ink-action-edit-profile
+6847e5d17414dc4ca65e40abcd0e591df77806f95a4dad2519780fb5e84d6e5c  /var/tmp/litchi-ink-action-edit-smoke-target/release/ink-action-edit-profile
+flags=none
+cargo_incremental=0

@@ -1,0 +1,8 @@
+base_commit=e1ee2ae97afedbb2a260129f833e7393a414ba75
+approved_base_commit=079cbbcbfc00c8d2412a38586a9688ae7eb0009e
+source_sha256:
+a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/ink/mod.rs
+4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/ink/actions.rs
+b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/src/ink/actions_edit.rs
+af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/ink_action_edit.rs
+f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06  /home/zhuhe/code/litchi-spec-gaps/crates/litchi-drawingml/tests/ink_action_id_boundaries.rs
