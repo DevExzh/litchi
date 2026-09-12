@@ -1,0 +1,6 @@
+docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-after-5f4dd8954/captured-source.bundle is okay
+The bundle contains this ref:
+5f4dd8954acef1fea9e9d7de01c90b3f3f0c2721 HEAD
+The bundle requires this ref:
+c1003473d1aed4cf3019a8fcbfd95900f9ba31e5 
+The bundle uses this hash algorithm: sha1
