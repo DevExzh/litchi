@@ -1,0 +1,84 @@
+{
+  "base_revision": "201f65094ff0ca6186fbf1e2ffa6b3641290253b",
+  "frozen_utc": "2026-09-12T01:34:09.810007+00:00",
+  "objective": "Locate current managed DOCX publication CPU work and use the evidence to select a compatible optimization; preserve unresolved historical0499/0500flags",
+  "source": "Unchanged production and unchanged managed_paragraph_batch_perf example; SHA matches0500final",
+  "native": {
+    "shapes": [
+      128,
+      512
+    ],
+    "replacements": [
+      1,
+      8,
+      32
+    ],
+    "providers": [
+      "owned",
+      "file"
+    ],
+    "routes": [
+      "repeated",
+      "batch"
+    ],
+    "preflight": {
+      "samples": 1,
+      "warmups": 0,
+      "repeats": 1
+    },
+    "campaigns": [
+      "r1",
+      "r2"
+    ],
+    "samples": 30,
+    "warmups": 3,
+    "repeats": 2,
+    "order": "r1 lexicographic workload/route order; r2 complete reverse order",
+    "cpu": 2,
+    "scope": "Existing lifecycle and phase clocks, including returned Snapshot drop in publication; fresh process per case capture, rows sampled in that process"
+  },
+  "profile": {
+    "preflight": "p128-k1-owned-batch,one sample,zero warmups,one repeat; prove reset/toggle and exactly one positive publication edge before full profiles",
+    "cases": [
+      "p128-k1-owned-repeated",
+      "p128-k1-owned-batch",
+      "p512-k1-owned-repeated",
+      "p512-k1-owned-batch",
+      "p512-k32-owned-repeated",
+      "p512-k32-owned-batch"
+    ],
+    "repeats": 2,
+    "samples": 1,
+    "warmups": 0,
+    "internal_repeats": 1,
+    "collect_atstart": false,
+    "zero_before": "*managed_paragraph_batch_perf::run_sample",
+    "toggle_collect": "*litchi_docx::source_backed::Package::publish_document_commit_to_stream",
+    "scope": "Publication method only after run_sample reset; excludes fixture/preflight, open/edit/commit, caller drop of returned Snapshot and post-output oracles. Raw positive-edge costs/calls and annotations must establish this scope."
+  },
+  "hardware": {
+    "availability": "Fresh instructions probe succeeds; retain separate whole-child perf stat diagnostic on the six profile cases with30samples3warmups2repeats",
+    "events": [
+      "cycles",
+      "instructions",
+      "branches",
+      "branch-misses",
+      "cache-misses",
+      "context-switches",
+      "cpu-migrations",
+      "page-faults"
+    ],
+    "scope": "Whole child including fixture and output verification; not publication-local attribution; elapsed and RSS excluded from native comparison"
+  },
+  "review_thresholds_percent": {
+    "latency": 5,
+    "RSS": 5,
+    "repeat_p50": 5,
+    "repeat_mean": 5,
+    "repeat_p95": 10,
+    "repeat_p99": 15
+  },
+  "claims": "Current API-choice and repeat observations only; no historical causal closure or new production speedup without a later matched candidate campaign",
+  "serial": "No overlapping build, native, hardware or Callgrind captures",
+  "priority": "OLE2/OOXML until full goal complete; ODF deferred; iWork excluded"
+}

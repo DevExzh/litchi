@@ -1,0 +1,1566 @@
+{
+  "bindings": {
+    "baseline": {
+      "binary_sha256": [
+        "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0"
+      ],
+      "candidate_plan_sha256": [
+        null
+      ],
+      "plan_sha256": [
+        "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168"
+      ],
+      "source_manifest_sha256": [
+        "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2"
+      ]
+    },
+    "candidate": {
+      "binary_sha256": [
+        "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255"
+      ],
+      "candidate_plan_sha256": [
+        "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f"
+      ],
+      "plan_sha256": [
+        "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168"
+      ],
+      "source_manifest_sha256": [
+        "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37"
+      ]
+    }
+  },
+  "comparisons": [
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 3697297,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r1/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "8b5eefeca8bf99e283f8e6217fd0c8ff6b4c16f9c890a06ba495cb37c553f8e0",
+        "publication_calls": 1,
+        "publication_direct_ir": 6659938,
+        "publication_inclusive_ir": 6660412,
+        "publication_self_ir": 474,
+        "receipt": "profile-r1/p128-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-batch",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 3697297,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 3579651
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2503886,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r1/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "84714eed27865e7883e7912fa9995a28f5b7938c6f9c877ff902145124aa6fa8",
+        "publication_calls": 1,
+        "publication_direct_ir": 5466608,
+        "publication_inclusive_ir": 5467082,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r1/p128-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-batch",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 2503886,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 2386994
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 3697297,
+          "candidate": 2503886,
+          "delta_ir": -1193411,
+          "delta_pct": -32.27793168901497,
+          "ratio_candidate_over_baseline": 0.6772206831098503
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6660412,
+          "candidate": 5467082,
+          "delta_ir": -1193330,
+          "delta_pct": -17.916759503766432,
+          "ratio_candidate_over_baseline": 0.8208324049623357
+        },
+        "topology_inclusive_ir": {
+          "baseline": 3697297,
+          "candidate": 2503886,
+          "delta_ir": -1193411,
+          "delta_pct": -32.27793168901497,
+          "ratio_candidate_over_baseline": 0.6772206831098503
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 3579651,
+          "candidate": 2386994,
+          "delta_ir": -1192657,
+          "delta_pct": -33.31768935016291,
+          "ratio_candidate_over_baseline": 0.666823106498371
+        }
+      },
+      "mode": "batch",
+      "repeat": "r1",
+      "route": "p128-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 3699308,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r1/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "e684654638c6fe35a65ce51e1f05b3b0236264336371e3286083c818f64db385",
+        "publication_calls": 1,
+        "publication_direct_ir": 6661415,
+        "publication_inclusive_ir": 6661889,
+        "publication_self_ir": 474,
+        "receipt": "profile-r1/p128-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-repeated",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 3699308,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 3581129
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2503148,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r1/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "420449b6cb770bc571b7c3db29b5b2ad9d2001ac152dcd4a3f22d8aefa7325fc",
+        "publication_calls": 1,
+        "publication_direct_ir": 5467507,
+        "publication_inclusive_ir": 5467981,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r1/p128-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-repeated",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 2503148,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 2386603
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 3699308,
+          "candidate": 2503148,
+          "delta_ir": -1196160,
+          "delta_pct": -32.33469611073206,
+          "ratio_candidate_over_baseline": 0.6766530388926794
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6661889,
+          "candidate": 5467981,
+          "delta_ir": -1193908,
+          "delta_pct": -17.92146341675762,
+          "ratio_candidate_over_baseline": 0.8207853658324238
+        },
+        "topology_inclusive_ir": {
+          "baseline": 3699308,
+          "candidate": 2503148,
+          "delta_ir": -1196160,
+          "delta_pct": -32.33469611073206,
+          "ratio_candidate_over_baseline": 0.6766530388926794
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 3581129,
+          "candidate": 2386603,
+          "delta_ir": -1194526,
+          "delta_pct": -33.35612875157528,
+          "ratio_candidate_over_baseline": 0.6664387124842472
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r1",
+      "route": "p128-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10805246,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r1/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "2959acdca4dc66cabbcc5330508a411833245bf19efd9f9a5b21449edfbc9864",
+        "publication_calls": 1,
+        "publication_direct_ir": 22475721,
+        "publication_inclusive_ir": 22476195,
+        "publication_self_ir": 474,
+        "receipt": "profile-r1/p512-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-batch",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10805246,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14181738
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6079188,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r1/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "bdbc99c6469152bae8f845768ae3d50fe783a4c1047a83f1aae30d4c28b7bbff",
+        "publication_calls": 1,
+        "publication_direct_ir": 17748647,
+        "publication_inclusive_ir": 17749121,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r1/p512-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-batch",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6079188,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9455917
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10805246,
+          "candidate": 6079188,
+          "delta_ir": -4726058,
+          "delta_pct": -43.73855070028022,
+          "ratio_candidate_over_baseline": 0.5626144929971978
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22476195,
+          "candidate": 17749121,
+          "delta_ir": -4727074,
+          "delta_pct": -21.03146907205601,
+          "ratio_candidate_over_baseline": 0.7896853092794399
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10805246,
+          "candidate": 6079188,
+          "delta_ir": -4726058,
+          "delta_pct": -43.73855070028022,
+          "ratio_candidate_over_baseline": 0.5626144929971978
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14181738,
+          "candidate": 9455917,
+          "delta_ir": -4725821,
+          "delta_pct": -33.32328519959965,
+          "ratio_candidate_over_baseline": 0.6667671480040035
+        }
+      },
+      "mode": "batch",
+      "repeat": "r1",
+      "route": "p512-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10806300,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r1/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "5492c66152047d1649cc852f8787a111859b0847163f6ad9ce7bae22586d4c50",
+        "publication_calls": 1,
+        "publication_direct_ir": 22472385,
+        "publication_inclusive_ir": 22472859,
+        "publication_self_ir": 474,
+        "receipt": "profile-r1/p512-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-repeated",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10806300,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14183597
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6077118,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r1/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "90278601e3ee6d290788b98029e9f21bd27a7c08d462f80bbe032a511fad4191",
+        "publication_calls": 1,
+        "publication_direct_ir": 17743479,
+        "publication_inclusive_ir": 17743953,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r1/p512-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-repeated",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6077118,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9455739
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10806300,
+          "candidate": 6077118,
+          "delta_ir": -4729182,
+          "delta_pct": -43.76319369256822,
+          "ratio_candidate_over_baseline": 0.5623680630743177
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22472859,
+          "candidate": 17743953,
+          "delta_ir": -4728906,
+          "delta_pct": -21.042743159648715,
+          "ratio_candidate_over_baseline": 0.7895725684035129
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10806300,
+          "candidate": 6077118,
+          "delta_ir": -4729182,
+          "delta_pct": -43.76319369256822,
+          "ratio_candidate_over_baseline": 0.5623680630743177
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14183597,
+          "candidate": 9455739,
+          "delta_ir": -4727858,
+          "delta_pct": -33.333279280284124,
+          "ratio_candidate_over_baseline": 0.6666672071971588
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r1",
+      "route": "p512-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10805168,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r1/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "6b1f5de1e06591ba67536bed9efc35250817cf63c99ce0cf15fc3967d63d3091",
+        "publication_calls": 1,
+        "publication_direct_ir": 22485271,
+        "publication_inclusive_ir": 22485900,
+        "publication_self_ir": 629,
+        "receipt": "profile-r1/p512-k32-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-batch",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10805168,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14186945
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6079334,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r1/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "a33854fe5d7756735b16a6901412003418b6974bfa55603e3f6c0c06c9ad1c03",
+        "publication_calls": 1,
+        "publication_direct_ir": 17749348,
+        "publication_inclusive_ir": 17749977,
+        "publication_self_ir": 629,
+        "receipt": "profile-after-r1/p512-k32-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-batch",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6079334,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9455704
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10805168,
+          "candidate": 6079334,
+          "delta_ir": -4725834,
+          "delta_pct": -43.73679335666044,
+          "ratio_candidate_over_baseline": 0.5626320664333956
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22485900,
+          "candidate": 17749977,
+          "delta_ir": -4735923,
+          "delta_pct": -21.061745360425867,
+          "ratio_candidate_over_baseline": 0.7893825463957413
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10805168,
+          "candidate": 6079334,
+          "delta_ir": -4725834,
+          "delta_pct": -43.73679335666044,
+          "ratio_candidate_over_baseline": 0.5626320664333956
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14186945,
+          "candidate": 9455704,
+          "delta_ir": -4731241,
+          "delta_pct": -33.34925877276609,
+          "ratio_candidate_over_baseline": 0.6665074122723391
+        }
+      },
+      "mode": "batch",
+      "repeat": "r1",
+      "route": "p512-k32-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10803895,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r1/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "aee7fd350cc655f84b196f6d3ed341116d9848eee50e96f0378f582a726a3b19",
+        "publication_calls": 1,
+        "publication_direct_ir": 22478676,
+        "publication_inclusive_ir": 22479305,
+        "publication_self_ir": 629,
+        "receipt": "profile-r1/p512-k32-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-repeated",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10803895,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14180807
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6078607,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r1/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "9811d3c9faaa6d3ef63e46788d7c7a5c22035fb6e568e8077bd5cc23157f17c3",
+        "publication_calls": 1,
+        "publication_direct_ir": 17748778,
+        "publication_inclusive_ir": 17749407,
+        "publication_self_ir": 629,
+        "receipt": "profile-after-r1/p512-k32-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-repeated",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6078607,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9454859
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10803895,
+          "candidate": 6078607,
+          "delta_ir": -4725288,
+          "delta_pct": -43.73689303718705,
+          "ratio_candidate_over_baseline": 0.5626310696281295
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22479305,
+          "candidate": 17749407,
+          "delta_ir": -4729898,
+          "delta_pct": -21.041122045365725,
+          "ratio_candidate_over_baseline": 0.7895887795463428
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10803895,
+          "candidate": 6078607,
+          "delta_ir": -4725288,
+          "delta_pct": -43.73689303718705,
+          "ratio_candidate_over_baseline": 0.5626310696281295
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14180807,
+          "candidate": 9454859,
+          "delta_ir": -4725948,
+          "delta_pct": -33.32636852049393,
+          "ratio_candidate_over_baseline": 0.6667363147950607
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r1",
+      "route": "p512-k32-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 3698264,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r2/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "b208453985ce2273326fd5ff8b2dad7985eda7c4f5f843af52f9cc332fa26ae8",
+        "publication_calls": 1,
+        "publication_direct_ir": 6661233,
+        "publication_inclusive_ir": 6661707,
+        "publication_self_ir": 474,
+        "receipt": "profile-r2/p128-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-batch",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 3698264,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 3579277
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2503468,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r2/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "1de02b777a65a2ddb8dcc2ceea4dad05bd1b63ff79c02a9b84f48303786fea09",
+        "publication_calls": 1,
+        "publication_direct_ir": 5466904,
+        "publication_inclusive_ir": 5467378,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r2/p128-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-batch",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 2503468,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 2386227
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 3698264,
+          "candidate": 2503468,
+          "delta_ir": -1194796,
+          "delta_pct": -32.30694185163634,
+          "ratio_candidate_over_baseline": 0.6769305814836366
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6661707,
+          "candidate": 5467378,
+          "delta_ir": -1194329,
+          "delta_pct": -17.928272738503814,
+          "ratio_candidate_over_baseline": 0.8207172726149619
+        },
+        "topology_inclusive_ir": {
+          "baseline": 3698264,
+          "candidate": 2503468,
+          "delta_ir": -1194796,
+          "delta_pct": -32.30694185163634,
+          "ratio_candidate_over_baseline": 0.6769305814836366
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 3579277,
+          "candidate": 2386227,
+          "delta_ir": -1193050,
+          "delta_pct": -33.33215059912937,
+          "ratio_candidate_over_baseline": 0.6666784940087063
+        }
+      },
+      "mode": "batch",
+      "repeat": "r2",
+      "route": "p128-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 3696395,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r2/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "145b44492c369635f685cbe12ef7bcc1e3103d93d73885d3cc0391bc0b00fd20",
+        "publication_calls": 1,
+        "publication_direct_ir": 6659636,
+        "publication_inclusive_ir": 6660110,
+        "publication_self_ir": 474,
+        "receipt": "profile-r2/p128-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-repeated",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 3696395,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 3579164
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2504078,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r2/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "8d43903bc77916f7686963e1fdc99de0be0e7a80802c2b8bb03aa1222c5db0fc",
+        "publication_calls": 1,
+        "publication_direct_ir": 5466296,
+        "publication_inclusive_ir": 5466770,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r2/p128-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-repeated",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 2504078,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 2386448
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 3696395,
+          "candidate": 2504078,
+          "delta_ir": -1192317,
+          "delta_pct": -32.25621179554674,
+          "ratio_candidate_over_baseline": 0.6774378820445326
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6660110,
+          "candidate": 5466770,
+          "delta_ir": -1193340,
+          "delta_pct": -17.917722079665353,
+          "ratio_candidate_over_baseline": 0.8208227792033465
+        },
+        "topology_inclusive_ir": {
+          "baseline": 3696395,
+          "candidate": 2504078,
+          "delta_ir": -1192317,
+          "delta_pct": -32.25621179554674,
+          "ratio_candidate_over_baseline": 0.6774378820445326
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 3579164,
+          "candidate": 2386448,
+          "delta_ir": -1192716,
+          "delta_pct": -33.32387116097502,
+          "ratio_candidate_over_baseline": 0.6667612883902498
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r2",
+      "route": "p128-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10806228,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r2/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "bb400a54d068e734b9c9edadb4491e50e3609f2378c19840bd360e81b992c145",
+        "publication_calls": 1,
+        "publication_direct_ir": 22472808,
+        "publication_inclusive_ir": 22473282,
+        "publication_self_ir": 474,
+        "receipt": "profile-r2/p512-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-batch",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10806228,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14182475
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6079840,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r2/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "231359109b18235e6454d44de5e23f763ad10eda3ea41251e87941364870ddda",
+        "publication_calls": 1,
+        "publication_direct_ir": 17748582,
+        "publication_inclusive_ir": 17749056,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r2/p512-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-batch",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6079840,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9456714
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10806228,
+          "candidate": 6079840,
+          "delta_ir": -4726388,
+          "delta_pct": -43.73762981865643,
+          "ratio_candidate_over_baseline": 0.5626237018134357
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22473282,
+          "candidate": 17749056,
+          "delta_ir": -4724226,
+          "delta_pct": -21.021522357081622,
+          "ratio_candidate_over_baseline": 0.7897847764291838
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10806228,
+          "candidate": 6079840,
+          "delta_ir": -4726388,
+          "delta_pct": -43.73762981865643,
+          "ratio_candidate_over_baseline": 0.5626237018134357
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14182475,
+          "candidate": 9456714,
+          "delta_ir": -4725761,
+          "delta_pct": -33.321130479694126,
+          "ratio_candidate_over_baseline": 0.6667886952030587
+        }
+      },
+      "mode": "batch",
+      "repeat": "r2",
+      "route": "p512-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10807082,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r2/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "2a774e6e8615d3cff3cbb0df6c2249b3a3df4ffba21ca127a9d2e074e9bd7a8c",
+        "publication_calls": 1,
+        "publication_direct_ir": 22472645,
+        "publication_inclusive_ir": 22473119,
+        "publication_self_ir": 474,
+        "receipt": "profile-r2/p512-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-repeated",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10807082,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14183801
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6081801,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r2/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "e734a1e15efd6fb7148defda73dfaa7492b8aa256781d7a57cfc811b182cbb71",
+        "publication_calls": 1,
+        "publication_direct_ir": 17748691,
+        "publication_inclusive_ir": 17749165,
+        "publication_self_ir": 474,
+        "receipt": "profile-after-r2/p512-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-repeated",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6081801,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9457268
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10807082,
+          "candidate": 6081801,
+          "delta_ir": -4725281,
+          "delta_pct": -43.72393028941577,
+          "ratio_candidate_over_baseline": 0.5627606971058423
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22473119,
+          "candidate": 17749165,
+          "delta_ir": -4723954,
+          "delta_pct": -21.020464493602333,
+          "ratio_candidate_over_baseline": 0.7897953550639767
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10807082,
+          "candidate": 6081801,
+          "delta_ir": -4725281,
+          "delta_pct": -43.72393028941577,
+          "ratio_candidate_over_baseline": 0.5627606971058423
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14183801,
+          "candidate": 9457268,
+          "delta_ir": -4726533,
+          "delta_pct": -33.323458218287186,
+          "ratio_candidate_over_baseline": 0.6667654178171282
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r2",
+      "route": "p512-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10808579,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r2/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "1fa03ceb6b72f0f299e8ab09af60e243720f8f161cb958528130bfb6fad3b5d3",
+        "publication_calls": 1,
+        "publication_direct_ir": 22484217,
+        "publication_inclusive_ir": 22484846,
+        "publication_self_ir": 629,
+        "receipt": "profile-r2/p512-k32-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-batch",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10808579,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14190157
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6081221,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "batch",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r2/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "446787b80b52be887abda5479dc9cb61cf79e5a93fb7caad99572e92a4aefe91",
+        "publication_calls": 1,
+        "publication_direct_ir": 17753758,
+        "publication_inclusive_ir": 17754387,
+        "publication_self_ir": 629,
+        "receipt": "profile-after-r2/p512-k32-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-batch",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6081221,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9457106
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10808579,
+          "candidate": 6081221,
+          "delta_ir": -4727358,
+          "delta_pct": -43.73709069434567,
+          "ratio_candidate_over_baseline": 0.5626290930565433
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22484846,
+          "candidate": 17754387,
+          "delta_ir": -4730459,
+          "delta_pct": -21.0384318398267,
+          "ratio_candidate_over_baseline": 0.789615681601733
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10808579,
+          "candidate": 6081221,
+          "delta_ir": -4727358,
+          "delta_pct": -43.73709069434567,
+          "ratio_candidate_over_baseline": 0.5626290930565433
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14190157,
+          "candidate": 9457106,
+          "delta_ir": -4733051,
+          "delta_pct": -33.3544653522861,
+          "ratio_candidate_over_baseline": 0.666455346477139
+        }
+      },
+      "mode": "batch",
+      "repeat": "r2",
+      "route": "p512-k32-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "f6df2ab3e612dea9cd3cdb9fe17e0c77e8799bea4efb633450ca34526b13c1c0",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 10804312,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-r2/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "da01ce877725c7f6223d6beb38e6dfbfd5de14eb91644f3ca80d27ed74b25d96",
+        "publication_calls": 1,
+        "publication_direct_ir": 22472772,
+        "publication_inclusive_ir": 22473401,
+        "publication_self_ir": 629,
+        "receipt": "profile-r2/p512-k32-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-repeated",
+        "source_manifest_sha256": "a8e8eac4549e0671bd5964cd66a843eb0756d72ce933ac7d84505fb5eca3dec2",
+        "topology_inclusive_ir": 10804312,
+        "variant": "baseline",
+        "xml_validator_inclusive_ir": 14180105
+      },
+      "candidate": {
+        "annotation_checks": {
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "637df10f921f47c7572a25a9900b537ab28a316f85c4ee7010764ff2ecd29255",
+        "candidate_plan_sha256": "e3a16649e115037782080c74bc45843b01e85bdcbd25bf6f53caa5ce5488948f",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6078714,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "mode": "repeated",
+        "plan_sha256": "a67193771a7e48f5e39145cbd293b041c280f654ecfaa95aedd2269a44e9b168",
+        "profile": "profile-after-r2/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "5f2778a2294040d3c60dbebe66d45e2266c718ab66b0ee7e69ac0b6301da1144",
+        "publication_calls": 1,
+        "publication_direct_ir": 17748199,
+        "publication_inclusive_ir": 17748828,
+        "publication_self_ir": 629,
+        "receipt": "profile-after-r2/p512-k32-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-repeated",
+        "source_manifest_sha256": "409fa85fd395fff77c7c133e0d98b150ab82fe7efa9efc3a1935a30e9f238e37",
+        "topology_inclusive_ir": 6078714,
+        "variant": "candidate",
+        "xml_validator_inclusive_ir": 9454163
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 10804312,
+          "candidate": 6078714,
+          "delta_ir": -4725598,
+          "delta_pct": -43.73807420592816,
+          "ratio_candidate_over_baseline": 0.5626192579407184
+        },
+        "publication_inclusive_ir": {
+          "baseline": 22473401,
+          "candidate": 17748828,
+          "delta_ir": -4724573,
+          "delta_pct": -21.02295509255586,
+          "ratio_candidate_over_baseline": 0.7897704490744414
+        },
+        "topology_inclusive_ir": {
+          "baseline": 10804312,
+          "candidate": 6078714,
+          "delta_ir": -4725598,
+          "delta_pct": -43.73807420592816,
+          "ratio_candidate_over_baseline": 0.5626192579407184
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 14180105,
+          "candidate": 9454163,
+          "delta_ir": -4725942,
+          "delta_pct": -33.327976062236495,
+          "ratio_candidate_over_baseline": 0.666720239377635
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r2",
+      "route": "p512-k32-owned-repeated",
+      "same_api": true
+    }
+  ],
+  "functions": {
+    "direct_owner": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+    "publication": "litchi_docx::source_backed::Package::publish_document_commit_to_stream",
+    "topology": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+    "xml_validator": "litchi_opc::xml_splice::validate_source_xml"
+  },
+  "matrix": {
+    "arms": [
+      "p128-k1-owned-batch",
+      "p128-k1-owned-repeated",
+      "p512-k1-owned-batch",
+      "p512-k1-owned-repeated",
+      "p512-k32-owned-batch",
+      "p512-k32-owned-repeated"
+    ],
+    "matched_pairs": 12,
+    "profiles_per_variant": 12,
+    "repeats": [
+      "r1",
+      "r2"
+    ]
+  },
+  "schema": "managed_docx_publication_profile_comparison_v1",
+  "scope": "Callgrind Ir publication-method diagnostic; owned source; one measured sample; zero warmups; one harness repeat; publication excludes caller Snapshot drop; no RSS claim",
+  "validation": {
+    "all_annotation_checks": true,
+    "baseline_exact_one_positive_call": true,
+    "baseline_profile_count": 12,
+    "candidate_exact_one_positive_call": true,
+    "candidate_profile_count": 12,
+    "same_api_for_all_pairs": true
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "base": "201f65094ff0ca6186fbf1e2ffa6b3641290253b",
+  "command": [
+    "git",
+    "apply",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0517/candidate/source.patch"
+  ],
+  "exit_code": 0,
+  "patch_sha256": "96d752bb64735cca79287f4c7b6d31898c78f759895316ed490191ea2574352b",
+  "reproduced_sources": {
+    "crates/litchi-opc/src/source_backed.rs": "444ca5d86b0b8f3498d8460c4f77255479c40c3ac730160dbb88ecc0cc3ad543",
+    "crates/litchi-opc/tests/source_xml_publication.rs": "d750b56695b6f623d5ca443e50b0fa34baace64ad22d276c11f4d2f0e72872ce"
+  },
+  "temporary_replay_removed": true
+}

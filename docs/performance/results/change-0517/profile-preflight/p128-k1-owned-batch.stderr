@@ -1,0 +1,34 @@
+==3684843== Callgrind, a call-graph generating cache profiler
+==3684843== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3684843== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==3684843== Command: /tmp/litchi-goal-0517/managed-paragraph-baseline --paragraphs 128 --replacements 1 --source owned --mode batch --samples 1 --warmups 0 --repeats 1 --artifact-dir /tmp/litchi-goal-0517/corpora/profile-preflight-p128-k1-owned-batch --output /home/zhuhe/code/litchi/docs/performance/results/change-0517/profile-preflight/p128-k1-owned-batch.csv
+==3684843== 
+==3684843== For interactive control, run 'callgrind_control -h'.
+==3684843== 
+==3684843== Events    : Ir
+==3684843== Collected : 6662867
+==3684843== 
+==3684843== I   refs:      6,662,867
+	Command being timed: "taskset -c 2 valgrind --tool=callgrind --collect-atstart=no --zero-before=*managed_paragraph_batch_perf::run_sample --toggle-collect=*litchi_docx::source_backed::Package::publish_document_commit_to_stream --callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0517/profile-preflight/p128-k1-owned-batch.callgrind /tmp/litchi-goal-0517/managed-paragraph-baseline --paragraphs 128 --replacements 1 --source owned --mode batch --samples 1 --warmups 0 --repeats 1 --artifact-dir /tmp/litchi-goal-0517/corpora/profile-preflight-p128-k1-owned-batch --output /home/zhuhe/code/litchi/docs/performance/results/change-0517/profile-preflight/p128-k1-owned-batch.csv"
+	User time (seconds): 0.58
+	System time (seconds): 0.01
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.60
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 44232
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 1
+	Minor (reclaiming a frame) page faults: 14937
+	Voluntary context switches: 2
+	Involuntary context switches: 18
+	Swaps: 0
+	File system inputs: 16
+	File system outputs: 128
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

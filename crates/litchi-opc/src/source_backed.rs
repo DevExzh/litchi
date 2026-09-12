@@ -7719,7 +7719,12 @@ impl SourceBackedPackage {
                 source,
             })?;
         for source_xml in &source_xml_tokens {
-            source_xml.check_for_publication(source_xml.content_type(), self.limits)?;
+            // The complete destination/XML proof ran earlier in this
+            // write_topology_to_stream call while resolving source tokens.
+            // Payload and destination limits are immutable, so this
+            // transfer-boundary fence only needs freshness, context, and
+            // cancellation.
+            source_xml.check_source_state()?;
             source_xml.source.monitor_publication();
             transfer_sources.push(source_xml.source_snapshot());
         }
@@ -7742,7 +7747,10 @@ impl SourceBackedPackage {
                     .compression_method(soapberry_zip::CompressionMethod::Deflate)
                 },
                 TopologyPartPayload::SourceXml(payload) => {
-                    payload.check_for_publication(addition.content_type.as_str(), self.limits)?;
+                    // This payload was fully checked earlier in this
+                    // write_topology_to_stream call before topology planning;
+                    // only the late source/context fence is needed here.
+                    payload.check_source_state()?;
                     payload.source.monitor_publication();
                     source_xml_tokens.push(payload.as_ref().clone());
                     transfer_sources.push(payload.source_snapshot());
@@ -11490,11 +11498,15 @@ mod tests {
             }
         }
 
+        fn arm_after_versions(&self, skip_versions: usize) {
+            self.skip_versions.store(skip_versions, Ordering::SeqCst);
+            self.armed.store(true, Ordering::SeqCst);
+        }
+
         fn arm_after_cache_enter(&self) {
             // The part lookup and `read_part` perform three freshness checks
             // before a hit's post-entry check can run.
-            self.skip_versions.store(3, Ordering::SeqCst);
-            self.armed.store(true, Ordering::SeqCst);
+            self.arm_after_versions(3);
         }
     }
 
@@ -11528,6 +11540,65 @@ mod tests {
                 self.cancellation_source.cancel();
             }
             Ok(SourceVersion::new(43, 0))
+        }
+    }
+
+    struct ChangeOnHitVersionSource {
+        bytes: Vec<u8>,
+        revision: AtomicU64,
+        skip_versions: AtomicUsize,
+        armed: AtomicBool,
+    }
+
+    impl ChangeOnHitVersionSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                revision: AtomicU64::new(0),
+                skip_versions: AtomicUsize::new(0),
+                armed: AtomicBool::new(false),
+            }
+        }
+
+        fn arm_after_versions(&self, skip_versions: usize) {
+            self.skip_versions.store(skip_versions, Ordering::SeqCst);
+            self.armed.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl ReadAt for ChangeOnHitVersionSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            if self.armed.load(Ordering::SeqCst)
+                && self
+                    .skip_versions
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                        remaining.checked_sub(1)
+                    })
+                    .is_err()
+            {
+                self.armed.store(false, Ordering::SeqCst);
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(SourceVersion::new(
+                102,
+                self.revision.load(Ordering::SeqCst),
+            ))
         }
     }
 
@@ -12498,6 +12569,126 @@ mod tests {
                 .unwrap(),
             b"<after/>"
         );
+    }
+
+    #[test]
+    fn topology_source_xml_addition_rechecks_source_version_after_initial_validation() {
+        const SOURCE_XML: &[u8] = b"<source><nested/></source>";
+        let source = Arc::new(ChangeOnHitVersionSource::new(archive_bytes(
+            root_relationships(),
+            SOURCE_XML,
+            false,
+        )));
+        let source_package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let source_xml = source_package
+            .part(&document)
+            .unwrap()
+            .source_xml()
+            .unwrap();
+        // A source XML addition receives two source checks in its initial
+        // publication proof. The next check is the transfer-boundary fence.
+        source.arm_after_versions(2);
+
+        let destination = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"<destination/>", false),
+        )))
+        .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_source_xml_part(PackURI::new("/custom/copied.xml").unwrap(), source_xml)
+            .unwrap();
+        let mut output = Vec::new();
+        let error = destination
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(error, OpcError::SourceChanged { .. }));
+        assert!(output.is_empty());
+        drop(source_package);
+    }
+
+    #[test]
+    fn topology_source_xml_addition_rechecks_cancellation_after_initial_validation() {
+        const SOURCE_XML: &[u8] = b"<source><nested/></source>";
+        let (budget, cancellation_source, context) = managed_context_with_cancellation(64 * 1024);
+        let source = Arc::new(CancelOnHitVersionSource::new(
+            archive_bytes(root_relationships(), SOURCE_XML, false),
+            cancellation_source,
+        ));
+        let source_package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let source_xml = source_package
+            .part(&document)
+            .unwrap()
+            .source_xml()
+            .unwrap();
+        // The source's cancellation is injected by the first version check
+        // after the two checks that complete the initial XML proof.
+        source.arm_after_versions(2);
+
+        let destination = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"<destination/>", false),
+        )))
+        .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_source_xml_part(PackURI::new("/custom/copied.xml").unwrap(), source_xml)
+            .unwrap();
+        let mut output = Vec::new();
+        let error = destination
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap_err();
+        assert!(matches!(error, OpcError::Cancelled));
+        assert!(output.is_empty());
+        drop(source_package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn topology_source_xml_addition_charges_one_xml_validation_pass() {
+        const SOURCE_XML: &[u8] = b"<source><nested/></source>";
+        let (budget, _cancellation_source, context) = managed_context_with_cancellation(64 * 1024);
+        let source_package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                SOURCE_XML,
+                false,
+            ))),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let source_xml = source_package
+            .part(&document)
+            .unwrap()
+            .source_xml()
+            .unwrap();
+        let work_before = budget.used(Resource::Work);
+
+        let destination = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"<destination/>", false),
+        )))
+        .unwrap();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_source_xml_part(PackURI::new("/custom/copied.xml").unwrap(), source_xml)
+            .unwrap();
+        let mut output = Vec::new();
+        destination
+            .write_topology_to_stream(&mut output, plan)
+            .unwrap();
+        assert_eq!(
+            budget.used(Resource::Work) - work_before,
+            SOURCE_XML.len() as u64
+        );
+
+        drop(source_package);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        assert_eq!(budget.used(Resource::Objects), 0);
     }
 
     #[test]

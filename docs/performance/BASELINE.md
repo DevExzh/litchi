@@ -1,5 +1,19 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0517: remove a duplicate shared OPC source-XML validation pass
+
+[0517](changes/0517-opc-source-xml-validation.md) retains the initial complete
+source/destination/XML proof and replaces the later duplicate scan with a
+source freshness and cancellation check. All 48 same-route DOCX comparisons
+improve lifecycle p50 by 1.87–14.09%; scoped publication instruction counts fall
+about 17.9–21.1%. No adverse lifecycle, publication or whole-child RSS threshold
+is triggered; short open/commit/drop flags remain explicit in the report.
+This measures synthetic DOCX cases, not every OPC caller. The source-snapshot
+construction path remains roughly half to two-thirds of publication CPU and
+is the next measured investigation target. Historical 0499/0500 flags and
+broader coverage/scaling requirements remain open. OLE2/OOXML remain the
+priority; ODF is deferred until that optimization goal is complete.
+
 ## 0516: reject XLSX emitted-output parser fusion
 
 [0516](changes/0516-xlsx-output-fusion-rejection.md) passes all 1,284 candidate

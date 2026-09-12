@@ -1,0 +1,10 @@
+{
+  "frozen_utc": "2026-09-12T01:41:28.009211+00:00",
+  "hypothesis": "Source XML candidate is immutable and validated against immutable destination limits early in write_topology_to_stream; replace its second full XML scan with current source state/cancellation check immediately before guarded transfer, retaining every initial source identity, payload, content type, limits and XML validation. Avoid duplicate scan for replacements and additions.",
+  "predicted_mechanism": "Remove one of three publication XML validation passes for changed managed DOCX, about18percent of p128 publication Ir in scoped baseline; not an end-to-end speedup prediction.",
+  "baseline_complete": "24preflights,2x24native66rowchildren,2x6publicationprofiles,6wholechildhardwarechildren",
+  "candidate_captures": "after-r1 lexicographic24cases thenprofile-after-r1 sixcases thenprofile-after-r2 reverse thenafter-r2 reverse24cases; native30samples3warmups2internalrepeats,profile1sample0warmups1repeat; frozen baseline executable retained for later interleaved controls if noise requires",
+  "admission": "Same-route native comparison, individual >5percentlatency/RSS flags retained, two profile repetitions, focusedOPCguards and relevantOOXMLtests, clippy/rustdoc/boundaries. No sourceauthority/readback/error/security/budgetlimit weakening.",
+  "source": "Only write_topology_to_stream duplicate validation plus focused regression tests, pending reviewer proof",
+  "priority": "OLE2/OOXML; ODFdeferred until goal complete; iWorkexcluded"
+}
