@@ -1,4 +1,11 @@
-# XLSX profile scaffold readiness
+# XLSX profile validation and capture history
+
+The current sealed baseline is [the `ab954d91d` capture](results/clean-ab954d91d/README.md).
+It is approved for capture integrity and descriptive measurements, with no
+causal speedup or regression claim. The following readiness notes retain the
+history of earlier scaffolds and provisional evidence.
+
+## Scaffold development history
 
 This handoff contains requirements, runner infrastructure, and an adapter
 wired to the current public XLSX selector / source scanner / attach / detach
@@ -147,3 +154,21 @@ provenance. Performance and optimization claims require a fresh capture under
 the `e7b80f056` correction and an uncertainty summary. Raw timing data and the
 generated report remain intact for audit, with that limitation stated in the
 bundle README.
+
+## Sealed baseline capture at `ab954d91d`
+
+Root and independent review approved the [fresh capture](results/clean-ab954d91d/README.md)
+for reproducible capture integrity and descriptive measurements. Its 69 lanes
+contain 207 fresh processes and 4,140 measured samples, including seven typed
+refusal lanes. Both source manifests agree; all 4,871 inputs and 19 pinned
+production paths passed source checks. The before/after executable digest is
+stable. Host CPU and memory metadata were captured during this run.
+
+The 635 capture files and matching root verification receipt are retained
+byte-for-byte. The uncertainty Markdown and JSON recompute exactly from the
+raw samples and explicitly limit n=3 ranges to descriptive observations.
+The current scaffold suite passes 36 Python tests. The disposable Cargo target
+was cleaned; source and raw evidence remain available for review. This closes
+the earlier capture's missing in-run host provenance and uncertainty evidence
+for the new run only. It does not turn either capture into a comparative
+optimization, native application acceptance, or scaling claim.
