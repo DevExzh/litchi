@@ -562,6 +562,7 @@ pub struct PictureSource<'a> {
     namespace_context: NamespaceContext,
     blip_namespace_context: Option<NamespaceContext>,
     ext_list_namespace_context: Option<NamespaceContext>,
+    opaque_svg_extension: bool,
 }
 
 impl fmt::Debug for PictureSource<'_> {
@@ -591,6 +592,7 @@ impl fmt::Debug for PictureSource<'_> {
                 &self.raster_relationship_dialect,
             )
             .field("svg_owner", &self.svg_owner)
+            .field("opaque_svg_extension", &self.opaque_svg_extension)
             .field("relationship_references", &self.relationship_references)
             .finish()
     }
@@ -619,6 +621,7 @@ impl PartialEq for PictureSource<'_> {
             && self.namespace_context == other.namespace_context
             && self.blip_namespace_context == other.blip_namespace_context
             && self.ext_list_namespace_context == other.ext_list_namespace_context
+            && self.opaque_svg_extension == other.opaque_svg_extension
     }
 }
 
@@ -787,6 +790,15 @@ impl<'a> PictureSource<'a> {
     #[must_use]
     pub fn ext_list_namespace_context(&self) -> Option<&NamespaceContext> {
         self.ext_list_namespace_context.as_ref()
+    }
+
+    /// Whether this picture retains an unknown direct SVG extension alongside
+    /// a recognized owner.  A detach therefore leaves an opaque owner state
+    /// instead of manufacturing an empty `None` state without rescanning the
+    /// source story.
+    #[must_use]
+    pub const fn has_opaque_svg_extension(&self) -> bool {
+        self.opaque_svg_extension
     }
 }
 
@@ -1419,6 +1431,10 @@ impl<'a> Scanner<'a> {
             .try_reserve_exact(self.pictures.len())
             .map_err(|source| allocation("DOCX drawing picture projection", source))?;
         for (picture_ordinal, pending) in self.pictures.into_iter().enumerate() {
+            let opaque_svg_extension = pending
+                .extensions
+                .iter()
+                .any(|extension| !extension.admitted);
             let svg_owner = project_svg_owner(
                 self.source,
                 &pending,
@@ -1447,6 +1463,7 @@ impl<'a> Scanner<'a> {
                 namespace_context: pending.namespace_context,
                 blip_namespace_context: pending.blip_namespace_context,
                 ext_list_namespace_context: pending.ext_list_namespace_context,
+                opaque_svg_extension,
             });
         }
         Ok(SourceDrawing {

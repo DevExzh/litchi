@@ -1683,15 +1683,25 @@ fn batch_source_stale_between_operations_refuses_commit() {
             br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="after-stale"/></svg>"#,
         ),
     );
-    if second_result.is_err() {
-        assert_eq!(
-            edit.projected().story_xml().unwrap(),
-            projected_before_stale.as_slice(),
-            "an immediately rejected stale operation must preserve the prior projection"
-        );
-    }
+    assert!(second_result.is_err());
+    assert_eq!(
+        edit.projected().story_xml().unwrap(),
+        projected_before_stale.as_slice(),
+        "an immediately rejected stale operation must preserve the prior projection"
+    );
     assert!(
         edit.commit().is_err(),
         "a source revision change between staged operations must refuse publication"
     );
+}
+
+#[test]
+fn unchanged_batch_refuses_commit_after_source_revision_changes() {
+    let source_bytes = raster_only_fixture("inline", "stale-no-op-batch");
+    let source = MutableArchiveSource::new(source_bytes.clone());
+    let source_handle = source.clone();
+    let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
+    let edit = package.edit_svg_attachments([0usize]).unwrap();
+    source_handle.replace_and_bump(source_bytes);
+    assert!(edit.commit().is_err());
 }
