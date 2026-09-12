@@ -1,0 +1,7 @@
+{
+  "base": "01c31e6e4d9c09d10bf89bbea9b9d578c0031995",
+  "file": "crates/litchi-xlsx/src/form_control/owner.rs",
+  "sha256": "778c510def4174e196ae277ec92127337f49bb28b8834f9bbcdb4b889b60d5c4",
+  "patch_sha256": "744139737b5817a2393535abe95b2842b4db95b02aebcc2ff06f50f2ecd34bbb",
+  "lock_sha256": "aa945c79965460e74a64063e1c45396eaae7a68e71072730e2bc426cded22f02"
+}
