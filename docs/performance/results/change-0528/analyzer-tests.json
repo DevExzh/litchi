@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0528/analyzer_test.py"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "..\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n",
+  "script_sha256": "db0dfaa0c01f82d7fbd655366d8cce12bdd8243cd24e6194bbca5653a6bd2cbb",
+  "analyzer_sha256": "3b15fe8ca7032402306716312f897d2fe1f4022f089573544c1d42d3f40bc0f7",
+  "observed_utc": "2026-09-12T11:41:13.859565+00:00"
+}

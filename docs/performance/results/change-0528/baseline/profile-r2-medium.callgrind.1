@@ -1,0 +1,2078 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 2260860
+cmd:  /tmp/litchi-goal-0528/baseline-normal --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape medium --json /home/zhuhe/code/litchi/docs/performance/results/change-0528/baseline/profile-r2-medium.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 350368664
+desc: Trigger: --dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+
+positions: line
+events: Ir
+summary: 10399234
+
+
+ob=(3) ???
+fl=(152) ???
+fn=(722) 0x0000000007952680
+0 12
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(203) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+cfn=(724) __memcpy_avx_unaligned_erms
+calls=560 255 
+0 1725496
+
+ob=(7) /home/zhuhe/litchi-goal-0528-target/retained-binaries/baseline-normal
+fl=(165) ???
+fn=(606) main
+cfn=(608) std::rt::lang_start_internal
+calls=0 0 
+0 10399234
+
+fn=(838) std::sys::backtrace::__rust_begin_short_backtrace
+cfn=(840) litchi_perf_baseline::main
+calls=0 0 
+0 10399234
+
+fn=(2314) litchi_opc::source_backed::SourceSnapshot::ensure_current_io_if_monitored
+0 3724
+cfn=(2300) <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version
+calls=196 0 
+0 980
+0 3920
+
+fn=(1728) core::ptr::drop_in_place<litchi_opc::rel::Relationship>
+0 48
+cfn=(844) __rustc::__rust_dealloc
+calls=8 0 
+0 967
+0 36
+cfn=(844)
+calls=8 0 
+0 210
+0 36
+cfn=(844)
+calls=8 0 
+0 1056
+0 36
+cfn=(844)
+calls=8 0 
+0 944
+0 49
+cfn=(844)
+calls=5 0 
+0 950
+0 2
+
+fn=(2524) litchi_opc::source_backed::SourceSnapshot::monitor_publication
+0 3
+
+fn=(2532) core::ptr::drop_in_place<soapberry_zip::office::IndexedArchive<litchi_opc::source_backed::SourceReader>>
+0 11
+cfn=(2526) core::ptr::drop_in_place<litchi_opc::source_backed::SourceSnapshot>
+calls=1 0 
+0 367
+0 122
+cfn=(844)
+calls=1 0 
+0 126
+0 327
+cfn=(844)
+calls=17 0 
+0 710
+0 30
+cfn=(844)
+calls=1 0 
+0 126
+0 160
+cfn=(844)
+calls=17 0 
+0 2029
+0 102
+cfn=(844)
+calls=17 0 
+0 2116
+0 24
+cfn=(844)
+calls=1 0 
+0 126
+0 20
+cfn=(844)
+calls=1 0 
+0 126
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 12
+
+fn=(2536) core::ptr::drop_in_place<litchi_opc::source_backed::CatalogPart>
+0 112
+cfn=(844)
+calls=14 0 
+0 2323
+0 84
+cfn=(844)
+calls=14 0 
+0 1653
+0 84
+cfn=(844)
+calls=14 0 
+0 2306
+0 112
+cfn=(844)
+calls=14 0 
+0 2250
+0 56
+cfn=(1092) <hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop
+calls=14 0 
+0 5106
+
+fn=(830) __rustc::__rust_alloc
+0 47
+cfn=(832) __rustc::__rdl_alloc
+calls=339092 0 
+0 8720
+
+fn=(2286) litchi_perf_baseline::run_xlsx_cell_values_edit_save
+cfn=(2288) litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates
+calls=0 0 
+0 10399234
+
+fn=(1816) std::io::Write::write_all
+0 585
+cfn=(2314)
+calls=65 0 
+0 2860
+0 845
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=65 255 
+0 4225549
+0 755
+cfn=(968) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+calls=8 0 
+0 1731036
+0 406
+
+fn=(2516) litchi_xlsx::cell_values::snapshot::MultiSnapshot::matches_source_backed
+0 14
+cfn=(2382) litchi_opc::source_backed::SourceBackedPackage::check_execution
+calls=1 0 
+0 15
+0 5
+cfn=(2388) litchi_opc::source_backed::SourceBackedPackage::source_version
+calls=1 0 
+0 44
+0 8
+cfn=(2382)
+calls=1 0 
+0 15
+0 98
+
+fn=(832)
+0 423
+cob=(2)
+cfi=(155) ./malloc/./malloc/malloc.c
+cfn=(646) malloc
+calls=339045 3283 
+0 8297
+
+fn=(846) __rustc::__rdl_dealloc
+0 177
+cob=(2)
+cfi=(155)
+cfn=(758) free
+calls=329588 3319 
+0 22509
+
+fn=(880) __rustc::__rust_realloc
+0 7
+cfn=(882) __rustc::__rdl_realloc
+calls=14801 0 
+0 1730103
+
+fn=(608)
+cfn=(836) std::rt::lang_start::{{closure}}
+calls=0 0 
+0 10399234
+
+fn=(2312) litchi_opc::source_backed::read_source_at_with_context
+0 1105
+cfn=(2314)
+calls=113 0 
+0 2860
+0 2405
+cfn=(2316) <litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at
+calls=113 0 
+0 4228444
+0 1170
+cfn=(2314)
+calls=113 0 
+0 2860
+0 520
+
+fn=(2528) litchi_opc::source_backed::finish_source_publication
+0 20
+cfn=(2300)
+calls=1 0 
+0 5
+0 44
+
+fn=(1358) <alloc::boxed::Box<str> as core::clone::Clone>::clone
+0 324
+cfn=(828) __rustc::__rust_no_alloc_shim_is_unstable_v2
+calls=18564 0 
+0 36
+0 108
+cfn=(830)
+calls=18564 0 
+0 6935
+0 252
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=18564 255 
+0 628
+0 216
+
+fn=(2506) litchi_xlsx::cell_values::patch::MultiPatch::is_empty
+0 36
+cfn=(2508) litchi_xlsx::cell_values::snapshot::Snapshot::same_source
+calls=3 0 
+0 21778
+0 18
+cfn=(2508)
+calls=9 0 
+0 69500
+0 78
+
+fn=(2510) <litchi_xlsx::cell_values::snapshot::PartState as core::cmp::PartialEq>::eq
+0 264
+cob=(2)
+cfi=(233) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+cfn=(900) __memcmp_avx2_movbe
+calls=36 73 
+0 456
+0 192
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=36 73 
+0 696
+0 312
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=36 73 
+0 73118
+0 216
+
+fn=(2534) core::ptr::drop_in_place<litchi_core::source::OwnedSource>
+0 4
+cfn=(1735) alloc::sync::Arc<T,A>::drop_slow'2
+calls=1 0 
+0 222
+
+fn=(844)
+0 177
+cfn=(846)
+calls=329588 0 
+0 22686
+
+fn=(1092)
+0 166
+cfn=(844)
+calls=1 0 
+0 35
+0 210
+cfn=(1728)
+calls=8 0 
+0 4334
+0 90
+cfn=(844)
+calls=8 0 
+0 928
+0 44
+cfn=(844)
+calls=4 0 
+0 161
+0 137
+cfn=(844)
+calls=1 0 
+0 35
+
+fn=(2388)
+0 16
+cfn=(2300)
+calls=4 0 
+0 5
+0 23
+
+fn=(2540) core::ptr::drop_in_place<litchi_opc::source_backed::CacheCounters>
+0 38
+
+fn=(836)
+cfn=(838)
+calls=0 0 
+0 10399234
+
+fn=(2300)
+0 995
+
+fn=(2340) litchi_opc::source_backed::SourceSnapshot::ensure_current
+0 16
+cfn=(2300)
+calls=9 0 
+0 5
+0 21
+
+fn=(2504) <alloc::boxed::Box<[T],A> as core::clone::Clone>::clone
+0 16
+cfn=(828)
+calls=1 0 
+0 1
+0 4
+cfn=(830)
+calls=1 0 
+0 311
+0 255
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 120
+0 52
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=4 255 
+0 120
+0 344
+cfn=(1358)
+calls=4 0 
+0 918
+0 56
+cfn=(1020) <alloc::string::String as core::clone::Clone>::clone
+calls=4 0 
+0 896
+0 12
+cfn=(1358)
+calls=4 0 
+0 1037
+0 76
+cfn=(1020)
+calls=4 0 
+0 340
+0 12
+cfn=(1358)
+calls=4 0 
+0 916
+0 76
+cfn=(1358)
+calls=4 0 
+0 916
+0 20
+cfn=(1358)
+calls=4 0 
+0 1198
+0 20
+cfn=(1358)
+calls=4 0 
+0 882
+0 52
+cfn=(1358)
+calls=4 0 
+0 844
+0 20
+cfn=(1358)
+calls=4 0 
+0 916
+0 20
+cfn=(1358)
+calls=4 0 
+0 872
+0 231
+
+fn=(2520) litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication
+0 16
+
+fn=(2542) <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop
+0 32
+
+fn=(882)
+0 154
+cob=(2)
+cfi=(155)
+cfn=(716) realloc
+calls=14801 3380 
+0 1729949
+
+fn=(2508)
+0 120
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=12 73 
+0 168
+0 64
+cfn=(2510)
+calls=12 0 
+0 1392
+0 40
+cfn=(2510)
+calls=12 0 
+0 72302
+0 64
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=12 73 
+0 168
+0 64
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=12 73 
+0 232
+0 64
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=12 73 
+0 152
+0 88
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=12 73 
+0 152
+0 64
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=12 73 
+0 232
+0 64
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=12 73 
+0 152
+0 104
+cfn=(2512) <A as core::slice::cmp::SlicePartialEq<B>>::equal_same_length
+calls=12 0 
+0 976
+0 80
+cfn=(2512)
+calls=12 0 
+0 4080
+0 184
+cfn=(2510)
+calls=12 0 
+0 1560
+0 112
+cfn=(2512)
+calls=12 0 
+0 8360
+0 240
+
+fn=(2512)
+0 408
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=48 73 
+0 608
+0 256
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=48 73 
+0 672
+0 512
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=48 73 
+0 608
+0 256
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=48 73 
+0 928
+0 256
+cfn=(2513) <A as core::slice::cmp::SlicePartialEq<B>>::equal_same_length'2
+calls=48 0 
+0 608
+0 256
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=48 73 
+0 608
+0 256
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=48 73 
+0 928
+0 256
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=48 73 
+0 608
+0 864
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=72 73 
+0 912
+0 384
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=72 73 
+0 1392
+0 384
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=72 73 
+0 912
+0 544
+
+fn=(2513)
+0 608
+
+fn=(2522) litchi_opc::source_backed::write_exact_snapshot
+0 16
+cfn=(2524)
+calls=1 0 
+0 3
+0 3
+cfn=(2340)
+calls=1 0 
+0 42
+0 2
+
+ob=(2)
+fl=(235) ./misc/../sysdeps/unix/sysv/linux/setvmaname.c
+fn=(972) __set_vma_name
+60 8
+-26 10
++36 10
+
+fl=(188) ./malloc/./malloc/morecore.c
+fn=(652) __glibc_morecore
+25 1
++1 2
+-1 2
++4 1
+cfi=(189) ./misc/./misc/sbrk.c
+cfn=(654) sbrk
+calls=56 +8 
+* 37
++1 2
+-3 1
++7 2
+
+fl=(203)
+fn=(724)
+255 190
++1 190
++6 190
++1 190
++2 162
++1 162
++1 162
++38 28
++1 28
++2 16
++1 16
++2 12
++4 12
++16 12
++1 12
++1 12
++1 12
++1 12
++7 12
++1 12
++1 12
++1 12
++2 12
++17 4
++1 4
++1 4
++1 4
++1 4
++7 16
++1 16
++1 16
++1 16
++1 16
++1 16
++1 32
++5 162
++1 162
++5 26
++1 26
++2 24
++1 24
++1 24
++2 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 16
++4 2
++1 2
++4 2
++2 2
++4 2
++1 2
++11 2
++3 2
++2 2
++2 2
++4 2
++1 2
++9 2
++1 2
++2 2
++2 2
++1 2
++1 2
++3 2
++2 2
++2 2
++2 4
++6 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
+-11 18
++1 18
++1 18
++1 18
++1 18
++1 18
++1 18
++1 18
++1 18
++1 18
++1 18
++1 18
++2 2
++1 2
++1 2
++1 2
++2 2
++4 4
++58 133
++7 133
++1 133
++6 2
++3 2
++2 2
++3 2
++1 2
++2 2
++2 131042
++2 2
++2 2
++2 4
++5 136
++1 136
++4 136
++2 136
++3 136
++4 136
++1 136
++4 133
++4 133
++24 131
++2 131
++2 131
++2 131
++3 131
++1 131
++2 9235381
++3 131
++2 131
++2 262
++17 3
++1 3
++1 3
++5 3
++1 3
++1 3
++7 3
++6 3
++2 3
++8 3
++1 3
++2 3
++2 3
++2 3
++2 3
++8 3
++1 3
++1 3
++1 3
++5 3
++1 3
++1 3
++3 3
++2 6
++5 3
++2 6
++1 6
++1 6
++1 6
++2 12
++1 12
++1 3
++2 12
++1 12
++1 3
++1 3
++1 3
+-15 890
++2 1780
++1 1780
++1 1780
++1 1780
++2 3560
++1 3560
++1 890
++2 3560
++1 3560
++1 890
++1 890
++1 890
+-13 55366
++1 55366
++1 55366
++1 55366
++2 110732
++1 110732
++1 27683
++2 110732
++1 110732
++1 27683
++1 27683
++1 27683
++1 893
++1 893
++1 893
++1 893
++1 3
++3 3
++1 3
++5 378
++1 378
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++1 189
++4 3
++1 3
++1 3
++1 3
++2 3
++1 3
++1 3
++1 3
++1 6
+
+fl=(226) ./misc/../sysdeps/unix/sysv/linux/mmap64.c
+fn=(820) mmap
+47 2
++3 4
+-3 12
++6 4
++5 12
++2 8
+-7 10
+
+fl=(155)
+fn=(758)
+3319 177
++3 354
++15 354
+-4 531
++8 531
++6 507
++6 169
+-3 338
++3 169
+-3 169
++1 338
++2 507
+3007 46
++8 46
+-12 46
++4 138
++1 46
++7 46
+3354 46
++10 369
+-34 131
++40 262
+fi=(154) ./malloc/./malloc/arena.c
+151 393
+fe=(155)
+3374 393
+cfn=(726) _int_free_chunk
+calls=57595 4351 
+* 16403
+
+fn=(648) __libc_malloc2
+3247 258
++4 86
++28 215
+-26 129
+cfn=(650) _int_malloc
+calls=66921 3790 
+* 6323
++1 215
+fi=(154)
+151 86
+fe=(155)
+
+fn=(726)
+4351 556
++8 139
+-3 139
++3 139
+-3 278
++6 278
++6 139
+cfn=(728) _int_free_merge_chunk
+calls=58356 +39 
+* 15098
++5 278
++27 417
+
+fn=(716)
+3380 14
++7 14
+-7 63
++11 14
+4837 7
++1 7
+-1 7
++1 7
+-1 14
++2 21
+3425 7
+-22 7
++22 35
++4 14
+1288 42
+3436 14
+fi=(154)
+151 21
+fe=(155)
+3469 14
+4840 7
+3411 14
++90 63
+-30 28
+cfn=(720) _int_realloc
+calls=12459 4559 
+* 1729443
+* 7
++1 35
+fi=(154)
+151 18
+fe=(155)
+3472 12
+
+fn=(646)
+3283 47
+1269 94
++19 47
+3287 47
+1288 129
+3287 70
++2 96
++2 64
++2 264
+3030 8
++4 16
++4 4
++1 4
+3294 4
+-7 24
++19 43
+cfn=(648)
+calls=66920 -59 
+* 7312
+-17 24
+
+fn=(650)
+3790 441
++32 98
+1288 282
+3831 74
++16 74
++54 45
++18 49
+-1 49
++12 98
+-11 98
+-1 147
++12 98
+-6 46
++5 46
+-7 46
++2 92
++9 92
++3 92
+-3 10
++3 10
++1 153
+-3 51
++5 51
++1 204
++2 204
+-10 51
++12 102
++1 102
++2 102
++11 176
++29 15
++1 15
++4 30
++31 30
++8 68
++1 2
++1 2
+-1 2
++4 4
+-4 13
++1 13
+-1 13
++4 26
++5 28
+-2 7
++3 14
++6 12
++3 12
++2 8
++33 8
++9 4
+-9 16
++1 4
++1 4
++1 4
++1 4
++6 8
+-10 24
++9 12
+-9 48
++1 12
++1 12
++1 12
++1 12
++6 24
+3831 48
+1288 12
+3850 12
++2 12
+-2 12
++2 24
+-2 28
++2 28
+-2 28
++2 56
+4340 441
+3901 212
+-52 168
+4105 48
+3930 48
+4111 44
++13 14
+-2 28
++2 18
++3 9
+-3 9
++3 18
++1 12
++3 8
++3 4
+-2 40
++6 8
++2 2
++1 4
++2 2
++1 4
+-1 8
++1 2
+cfn=(790) unlink_chunk.isra.0
+calls=448 1592 
+* 62
+-1 2
++1 4
+-1 8
++1 2
+cfn=(790)
+calls=1022 1592 
+* 62
++3 24
++13 4
++1 8
++3 4
+-8 4
++8 8
++1 4
++1 4
++1 8
+4277 18
++3 72
++2 27
++1 9
+1888 9
+4286 9
+1888 21
+4286 3
+1888 6
+4031 101
++52 8
+-51 8
++51 24
+3959 74
++2 36
+-1 72
++27 1
++1 1
++4 2
++31 5
++2 2
++1 3
++1 1
+-1 1
++1 3
++4 8
++26 9
++3 3
++1 9
+-3 12
++6 3
++7 2
+-1 6
++2 4
++2 2
++1 6
++2 2
++1 4
+-1 1
++1 2
+-47 55
++36 2
+-36 70
+4195 10
++1 10
++1 10
+-1 10
++1 10
++1 20
++1 30
++5 57
++16 45
++2 90
+-4 120
++8 15
++3 30
++2 14
++1 7
++1 7
+-2 7
+-27 7
++4 18
++3 16
+-3 6
++3 8
++97 4
++1 6
++2 4
++3 8
+2324 2
++12 2
+-12 4
++12 2
++1 3
++3 4
++8 7
+cfn=(970) sysmalloc_mmap
+calls=7 2244 
+* 98
+* 1
++1 2
+4336 6
+cfn=(658) alloc_perturb
+calls=53 1887 
+* 10
+* 2
+4208 4
++5 16
++1 8
++24 16
++3 16
++2 8
++3 16
+-3 32
++3 8
+cfn=(790)
+calls=11008 1592 
+* 203
++3 48
++15 5
++1 10
++3 5
+-9 5
++9 10
++1 5
++1 5
++3 10
++1 2
++1 15
+2325 1
++36 4
++1 1
+-1 1
++1 1
++9 10
++6 3
++3 4
+2698 3
++1 1
++4 1
++1 2
++3 2
++5 2
+-2 1
++2 1
+-3 1
++2 1
++4 1
+-3 1
++1 1
+-1 3
++1 1
+4335 1
+-83 3
+-1 3
++1 6
+2441 2
++8 2
++11 2
++7 4
++8 2
++19 3
++2 3
++10 6
+cfi=(235)
+cfn=(972)
+calls=13 60 
+* 14
++5 1
++8 2
+-8 1
++8 1
+-8 1
++8 1
++2 1
+-6 1
++6 1
++2 1
++6 1
+-6 2
++9 2
+2653 1
+-1 1
++1 4
++12 1
+-11 1
++11 2
++7 1
++1 1
+-1 1
++1 3
++8 1
++2 1
++5 2
++2 10
+cfn=(726)
+calls=13 4351 
+* 114
+* 3
+3965 35
++3 35
+-4 70
++3 35
+-1 35
++1 70
++1 70
++1 70
++2 36
++4 18
++6 18
+-6 126
++2 54
++5 18
+-4 18
++4 36
+cfn=(658)
+calls=19273 1887 
+* 90
+-7 17
++6 17
+-6 119
++2 51
++5 17
+-4 17
++4 34
+cfn=(658)
+calls=22683 1887 
+* 85
++1 35
+2283 2
++6 3
+-6 2
++6 2
+-6 1
++3 3
++3 4
+cfi=(226)
+cfn=(820)
+calls=13 47 
+* 26
++3 3
+-3 1
++3 1
+1912 2
+2477 4
+cfi=(188)
+cfn=(652)
+calls=46 25 
+* 48
++1 3
+-1 1
++1 1
++2 1
++3 2
+2624 2
+-65 1
++84 2
+
+fn=(720)
+4559 28
++11 84
++8 14
++2 7
++1 21
++1 28
++4 14
++14 1
++53 2
+-53 2
++57 1
+-57 1
++57 2
+-2 2
++19 1
++1 28
+-79 14
++12 12
++12 42
+cfn=(650)
+calls=510 3790 
+* 2478
+* 6
++1 12
++3 6
++6 18
++36 1
+-4 1
++3 1
++5 1
+-4 1
+-1 1
++5 1
+-4 1
++4 1
+-1 1
++1 3
+cfn=(726)
+calls=249 4351 
+* 104
+* 1
+-60 6
+-1 12
++5 6
+cfn=(790)
+calls=217 1592 
+* 22
++44 5
+-48 2
++28 6
+fi=(214) ./malloc/../string/bits/string_fortified.h
+29 6
+fe=(155)
+4637 6
+fi=(214)
+29 12
+fe=(155)
+4638 12
+fi=(214)
+29 6
+cob=(3)
+cfi=(152)
+cfn=(722)
+calls=504 -29 
+* 1725508
+fe=(155)
+4642 36
+cfn=(726)
+calls=504 4351 
+* 840
++2 12
+-47 1
++1 1
+-2 2
+
+fn=(730) _int_free_maybe_trim
+4528 1529
++3 278
++2 36
++3 54
++14 1529
+
+fn=(790)
+1592 88
++2 264
+-2 88
++2 176
++3 88
++3 176
+-2 88
++2 176
++3 88
++1 88
++1 242
++2 34
++1 51
++3 34
++14 17
++1 17
++3 176
+
+fn=(658)
+1887 37
++1 111
+
+ob=(7)
+fl=(165)
+fn=(2522)
+0 29
+cfn=(964) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=1 0 
+0 369
+0 7
+cob=(2)
+cfi=(219) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+cfn=(796) __memset_avx2_unaligned_erms
+calls=1 198 
+0 65555
+0 59
+cfn=(2312)
+calls=1 0 
+0 65735
+0 896
+cfn=(2312)
+calls=64 0 
+0 4173629
+0 910
+cfn=(1816)
+calls=65 0 
+0 5962036
+0 392
+cfn=(2314)
+calls=1 0 
+0 44
+0 7
+cfn=(2526)
+calls=1 0 
+0 26
+0 6
+cfn=(2528)
+calls=1 0 
+0 69
+0 4
+cfn=(844)
+calls=1 0 
+0 170
+0 2
+
+fn=(2530) core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>
+0 10
+cfn=(2526)
+calls=1 0 
+0 26
+0 2
+cfn=(2532)
+calls=1 0 
+0 6576
+0 9
+cfn=(844)
+calls=1 0 
+0 150
+0 6
+cfn=(844)
+calls=1 0 
+0 150
+0 6
+cfn=(1092)
+calls=1 0 
+0 765
+0 77
+cfn=(2536)
+calls=14 0 
+0 14086
+0 35
+cfn=(844)
+calls=1 0 
+0 151
+0 266
+cfn=(844)
+calls=14 0 
+0 2500
+0 26
+cfn=(844)
+calls=1 0 
+0 35
+0 13
+cfn=(844)
+calls=1 0 
+0 35
+0 2
+cfn=(2538) core::ptr::drop_in_place<litchi_opc::source_backed::PartCache>
+calls=1 0 
+0 553
+0 11
+
+fn=(574) (below main)
+cob=(2)
+cfi=(166) ./csu/../csu/libc-start.c
+cfn=(576) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 10399234
+
+fn=(828)
+0 47
+
+fn=(848) litchi_perf_baseline::run
+cfn=(2286)
+calls=0 0 
+0 10399234
+
+fn=(964)
+0 231
+cfn=(880)
+calls=52 0 
+0 1730110
+0 20
+cfn=(828)
+calls=18447 0 
+0 2
+0 6
+cfn=(830)
+calls=18447 0 
+0 645
+0 103
+
+fn=(968)
+0 216
+cfn=(964)
+calls=18443 0 
+0 1730748
+0 72
+
+fn=(2288)
+cfn=(2514) litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream
+calls=1 0 
+0 10399234
+
+fn=(2316)
+0 715
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=113 255 
+0 4227469
+0 260
+
+fn=(1734) alloc::sync::Arc<T,A>::drop_slow
+0 8
+cfn=(844)
+calls=1 0 
+0 35
+0 14
+cfn=(2534)
+calls=1 0 
+0 226
+0 19
+cfn=(844)
+calls=1 0 
+0 35
+0 8
+cfn=(844)
+calls=1 0 
+0 150
+
+fn=(1735)
+0 8
+cfn=(844)
+calls=24 0 
+0 170
+0 9
+cfn=(844)
+calls=24 0 
+0 35
+
+fn=(1020)
+0 96
+cfn=(828)
+calls=12179 0 
+0 8
+0 24
+cfn=(830)
+calls=12179 0 
+0 876
+0 56
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=12179 255 
+0 88
+0 88
+
+fn=(840)
+cfn=(848)
+calls=0 0 
+0 10399234
+
+fn=(2382)
+0 30
+
+ob=(2)
+fl=(155)
+fn=(658)
+1890 37
+
+fn=(728)
+4407 1112
++7 695
+-6 139
++9 417
++5 417
++4 278
+-1 278
++1 278
+1895 417
+4433 278
++2 35
++2 35
++1 140
++2 35
+-4 35
++4 35
+cfn=(790)
+calls=37035 1592 
+* 683
++18 278
++6 276
++4 98
++4 276
++9 19
+-1 19
++2 38
++2 57
++7 238
++1 476
++1 119
++2 238
++3 714
++4 119
+-1 119
++2 119
++1 119
++2 357
++1 119
+-61 119
+-1 238
++1 714
+-1 119
+cfn=(730)
+calls=35894 +83 
+* 2856
++57 19
+-1 19
++2 19
++1 19
++2 57
++1 19
+-61 19
+-1 38
++1 114
+-1 19
+cfn=(730)
+calls=22467 +83 
+* 536
++1 1
+-1 2
++1 6
+-1 1
+cfn=(730)
+calls=33 +83 
+* 34
++70 1
++1 3
++1 2
+-52 40
++1 40
+-1 40
+cfn=(790)
+calls=10992 1592 
+* 859
++1 40
+
+fn=(970)
+2244 1
++4 4
+-4 3
++4 1
+-4 1
++2 2
++2 1
+-4 1
++2 1
++2 1
+-4 1
++4 1
+cfi=(226)
+cfn=(820)
+calls=7 47 
+* 26
+* 1
++3 2
++2 2
+1448 1
++1 1
+2261 1
+1449 2
+2261 3
++1 3
++3 3
++1 5
++4 1
++1 7
+1912 2
+2256 4
+cfi=(235)
+cfn=(972)
+calls=7 60 
+* 14
+1448 2
+
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(598) (below main)
+cob=(7)
+cfi=(165)
+cfn=(606)
+calls=0 0 
+59 10399234
+
+fl=(219)
+fn=(796)
+198 1
++1 2
++5 1
++1 1
++1 1
++1 1
++1 1
++21 1
++1 1
++91 1
++1 1
++1 1
++1 1
++1 1
++1 65537
++5 1
++2 2
+
+fl=(189)
+fn=(654)
+37 5
++6 2
+-3 2
++18 2
++4 2
++4 1
++1 1
+-1 3
++8 1
+cfi=(190) ./misc/../sysdeps/unix/sysv/linux/brk.c
+cfn=(656) brk
+calls=49 -38 
+* 11
+* 3
++4 1
+-28 1
++28 2
+
+fl=(190)
+fn=(656)
+36 1
+fi=(238) ./misc/../sysdeps/unix/sysv/linux/brk_call.h
+-12 2
+fe=(190)
++13 2
++1 2
++2 2
++1 2
+
+fl=(166)
+fn=(576)
+cfi=(168)
+cfn=(598)
+calls=0 30 
+360 10399234
+
+fl=(233)
+fn=(900)
+73 496
++7 496
++1 496
+
+ob=(7)
+fl=(165)
+fn=(2382)
+0 15
+
+fn=(2514)
+0 14
+cfn=(2382)
+calls=1 0 
+0 15
+0 8
+cfn=(2516)
+calls=1 0 
+0 199
+0 17
+cfn=(2506)
+calls=1 0 
+0 45705
+0 10
+cfn=(2504)
+calls=1 0 
+0 11553
+0 9
+cfn=(2506)
+calls=1 0 
+0 45705
+0 18
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 161
+0 6
+cfn=(2518) litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream
+calls=1 0 
+0 10295792
+0 22
+
+fn=(2518)
+0 17
+cfn=(2520)
+calls=1 0 
+0 16
+0 13
+cfn=(2542)
+calls=1 0 
+0 14
+0 6
+cfn=(2542)
+calls=1 0 
+0 18
+0 33
+cob=(2)
+cfi=(203)
+cfn=(724)
+calls=1 255 
+0 161
+0 8
+cfn=(2522)
+calls=1 0 
+0 10270011
+0 3
+cfn=(2530)
+calls=1 0 
+0 25490
+0 2
+
+fn=(2526)
+0 23
+cfn=(1734)
+calls=1 0 
+0 294
+0 11
+cfn=(1734)
+calls=1 0 
+0 43
+0 48
+
+ob=(2)
+fl=(233)
+fn=(900)
+84 176
++1 176
++1 176
++4 176
++1 176
++2 176
++1 176
++3 176
++1 176
++1 176
++3 176
++1 176
++3 176
++1 176
++3 24
++1 24
++1 24
++1 24
++1 24
++1 24
++1 24
++1 24
++1 24
++1 24
++3 24
++1 24
+240 24
++3 24
++2 24
++2 24
++5 24
++1 24
++2 24
++1 24
++2 24
++1 24
++2 24
++1 24
++2 24
++1 24
++1 24
++1 24
++1 24
++1 24
+-17 4206
++1 4206
++2 4206
++1 4206
++2 4206
++1 4206
++2 4206
++1 4206
++2 4206
++1 4206
++1 4206
++1 4206
++1 4206
++1 4206
++1 4230
++2 4230
++1 4230
++2 24
++2 24
++1 24
++2 18
++1 18
++1 18
++3 8
++1 8
++2 8
++1 8
++2 8
++2 8
++1 8
++2 8
++1 8
++1 8
++1 8
++2 8
++1 8
++1 8
++2 16
++8 10
++1 10
++1 10
++1 20
++4 10
++1 10
++1 10
++1 10
++1 10
+-4 6
++1 6
++1 6
++1 6
++1 6
++1 32
++5 152
++1 152
++1 152
++1 152
++1 152
++3 152
++1 152
++1 152
++1 152
++1 152
++1 304
++59 320
++1 320
++5 320
++1 320
++1 320
++1 320
++1 320
+
+ob=(7)
+fl=(165)
+fn=(2538)
+0 10
+cfn=(1092)
+calls=1 0 
+0 201
+0 2
+cfn=(1092)
+calls=1 0 
+0 68
+0 17
+cfn=(844)
+calls=1 0 
+0 35
+0 2
+cfn=(2540)
+calls=1 0 
+0 38
+0 5
+cfn=(1734)
+calls=1 0 
+0 158
+0 6
+
+ob=(2)
+fl=(233)
+fn=(900)
+414 308
++1 308
++1 308
++1 308
++3 308
++1 308
++1 308
++1 616
++6 12
++1 12
+
+ob=(7)
+fl=(165)
+fn=(2538)
+0 3
+
+ob=(2)
+fl=(233)
+fn=(900)
+432 12
++1 12
++2 12
++1 12
+
+ob=(7)
+fl=(165)
+fn=(2538)
+0 8
+
+ob=(2)
+fl=(233)
+fn=(900)
+438 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++2 12
++2 12
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(7)
+cfi=(165)
+cfn=(574)
+calls=0 0 
+0 10399234
+
+totals: 10399234

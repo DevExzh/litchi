@@ -1,0 +1,102 @@
+{
+  "revision": "11a14d2043f65b1a6a935beaa1b9c16d924b749c",
+  "created_utc": "2026-09-12T11:25:32.935064+00:00",
+  "hypothesis": "Attribute unchanged XLSX publication instructions after scanner pilots; no production candidate or speedup claim.",
+  "harness_enabler": null,
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "staged sets and MultiSourceEdit::commit; no publication/reopen/oracles"
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "scope": "Method body only; excludes returned MultiSnapshot destruction timed by native publication. Retain every lifecycle dump and isolate the measured final call only after verifying call order."
+  },
+  "cpu": 2,
+  "admission": "Attribution only; require source and binary custody, successful output oracles, exact owner dump and raw edge/self equations. No production retention or speedup gate.",
+  "owned_paths": [
+    "/tmp/litchi-goal-0528",
+    "/home/zhuhe/litchi-goal-0528-target"
+  ],
+  "status": "frozen-before-build-and-capture",
+  "resource_scope": "Existing limits/fences unchanged. Row span growth window and allocation topology change; all retained span data remains live with Layout until drop.",
+  "hardware": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 100,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole fresh child including corpus/setup/publication/oracles; diagnostic only, not isolated commit counters."
+  },
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/"
+  ],
+  "candidate_source_binding": "Exact source file inventory and SHA256 values captured independently for each stage; candidate diff must be nonempty and entirely within candidate_source_roots. Harness source is identical. Review exact production/test patch before application.",
+  "capture_lanes": [
+    "build-normal",
+    "profile"
+  ],
+  "native_reference": "Sealed0527baseline; phase means only contextual, not a same-run timing/instruction equivalence."
+}

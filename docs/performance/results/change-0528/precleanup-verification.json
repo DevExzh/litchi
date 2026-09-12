@@ -1,0 +1,620 @@
+{
+  "cleanup_seal_pending": true,
+  "components": {
+    "builds": {
+      "result": {
+        "binary": {
+          "bytes": 60130096,
+          "identity_sha256": "f8d74f6e7cae1ea4387f57bcf731903d23db7d784e7e053b91b1f52ad72d6359",
+          "path": "/tmp/litchi-goal-0528/baseline-normal",
+          "sha256": "b46a81550b74611cf3825308dd403d04574675593c8330310896eb2ab2f96c2f"
+        },
+        "interval": {
+          "end_utc": "2026-09-12T11:32:52.076584+00:00",
+          "start_utc": "2026-09-12T11:25:33.646218+00:00"
+        },
+        "receipt": "baseline/build-normal.receipt.json",
+        "receipt_sha256": "a58051b8df05049f21e1e49e80b8ae2cc1163b7a6236af3ef7b09f5bcf9e57a5",
+        "source": {
+          "baseline": {
+            "manifest_entries": 8584,
+            "manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+            "patch_empty": true,
+            "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "replayed_changed_files": [],
+            "xlsx_source_files": 451
+          },
+          "dependency_inputs": [
+            {
+              "retained": "inputs/quick-xml-0.41.0-src-name.rs.txt",
+              "sha256": "f2ac828a48ca16d6d605949771d57a1eb00829a93a6556c682971cf5f28cb336",
+              "source": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs"
+            },
+            {
+              "retained": "inputs/quick-xml-0.41.0-src-reader-ns_reader.rs.txt",
+              "sha256": "7ab687c3e93b896554f5754bd7c76042664f01d23cbfacb99605725c7ecc4a35",
+              "source": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs"
+            }
+          ],
+          "plan_sha256": "259454bb139493e82da98ad28c09332e65bcecfb0e1fea165a6b1ee6370f9b1e",
+          "prior_seals": [
+            {
+              "directory": "docs/performance/results/change-0525",
+              "entries": 550,
+              "seal_sha256": "ae8834847914ef936b6206f621d0e19c02960f407b27f3e2db797177e0a8b1ab"
+            },
+            {
+              "directory": "docs/performance/results/change-0527",
+              "entries": 307,
+              "seal_sha256": "16f51d610116ecdd7872d606802b9253fb7e2dcd15094f6722172db626202923"
+            }
+          ],
+          "publication_review_sha256": "2bfe328d000d3240e766405346601c4175aa0e440e2b664c8b3d6f0c6a106fc7",
+          "run_sha256": "a3de8c50d682a579173e52dbf56512cb27e41b37d8f08f6b10cc2777876dbfdc",
+          "source_binding_sha256": "8a133620217daf78a9ed91500ebf551a7db56d341df3ab02127588430935361f",
+          "source_review_sha256": "cd66a520c29d93f7fd33cd416a0138215d3078dd85dcfcf2c76ec73cfdd40724"
+        },
+        "storage": {
+          "post_cleanup": false,
+          "scratch": "/tmp/litchi-goal-0528",
+          "scratch_symlink": true,
+          "target": "/home/zhuhe/litchi-goal-0528-target/retained-binaries"
+        },
+        "symbols_sha256": "88d27ef31fd6c58ee2aed0c60fba970c026c594977a755aad52bfff49de068a5"
+      },
+      "status": "pass"
+    },
+    "decision": {
+      "result": {
+        "cleanup_and_seal_checked_separately": true,
+        "disposition": "attribution_complete",
+        "path": "decision.json",
+        "production_change_retained": false,
+        "sha256": "ea4d95a5047b3a98c37dd6f00007a954d9d169777f88bd423dab535fb1ce4574"
+      },
+      "status": "pass"
+    },
+    "profile-analysis": {
+      "result": {
+        "prior_seal_entries": 550,
+        "report": "profile-analysis.json",
+        "report_sha256": "46441db4b084576712e40f8c59aa729d5edce703e0b8d467220bea3a32dbbcbc",
+        "resolver_upper_bound_only": true,
+        "rows": 4
+      },
+      "status": "pass"
+    },
+    "profiles": {
+      "result": {
+        "binary_sha256": "b46a81550b74611cf3825308dd403d04574675593c8330310896eb2ab2f96c2f",
+        "rows": [
+          {
+            "callgrind_parts": 6,
+            "end_utc": "2026-09-12T11:33:43.498424+00:00",
+            "name": "profile-r1-medium",
+            "normalized_identity_sha256": "8f80281a3b7bb1b40057033123fc0c8cf0882aaa8ef7a5590e76737a4c810512",
+            "oracle": {
+              "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+              "corpus": {
+                "archive_bytes": 4226429,
+                "archive_member_count": 17,
+                "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+                "compression": "deflate",
+                "entry_bytes": 4,
+                "entry_count": 9216,
+                "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                "name": "xlsx-cell-values-medium",
+                "package_format": "XLSX/OPC/ZIP",
+                "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                "shape": "medium",
+                "target_entry": "Sheet1!A1",
+                "target_payload_bytes": 1,
+                "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                "uncompressed_payload_bytes": 4231168,
+                "xlsx": {
+                  "columns_per_sheet": 48,
+                  "one_percent_update_count": 93,
+                  "rows_per_sheet": 48,
+                  "sheet_count": 4,
+                  "source_members": {
+                    "shared_strings": null,
+                    "styles": "xl/styles.xml",
+                    "workbook": "xl/workbook.xml",
+                    "worksheets": [
+                      "xl/worksheets/sheet1.xml",
+                      "xl/worksheets/sheet2.xml",
+                      "xl/worksheets/sheet3.xml",
+                      "xl/worksheets/sheet4.xml"
+                    ]
+                  }
+                }
+              },
+              "name": "profile-r1-medium",
+              "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+              "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+              "source_members": null
+            },
+            "profile_sha256": "27b2b2b8eab4a59ff44b0aa91ab16466b801765ca22d940d81044ca49acf742b",
+            "receipt_sha256": "70d492d057475b17f54636f15661f5eb032364e62a18594efe7fba4d653eacb5",
+            "repeat": 1,
+            "shape": "medium",
+            "start_utc": "2026-09-12T11:33:11.926997+00:00"
+          },
+          {
+            "callgrind_parts": 6,
+            "end_utc": "2026-09-12T11:34:32.765103+00:00",
+            "name": "profile-r1-dense-sparse",
+            "normalized_identity_sha256": "4a42342a4ba0b4d74aff1c894f0a26666573fb381fee471b5d3a4255e8d04d44",
+            "oracle": {
+              "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+              "corpus": {
+                "archive_bytes": 4251863,
+                "archive_member_count": 17,
+                "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+                "compression": "deflate",
+                "entry_bytes": 4,
+                "entry_count": 17792,
+                "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                "name": "xlsx-cell-values-dense-sparse",
+                "package_format": "XLSX/OPC/ZIP",
+                "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                "shape": "dense-sparse",
+                "target_entry": "Sheet1!A1",
+                "target_payload_bytes": 1,
+                "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                "uncompressed_payload_bytes": 4265472,
+                "xlsx": {
+                  "columns_per_sheet": 128,
+                  "one_percent_update_count": 178,
+                  "rows_per_sheet": 128,
+                  "sheet_count": 4,
+                  "source_members": {
+                    "shared_strings": null,
+                    "styles": "xl/styles.xml",
+                    "workbook": "xl/workbook.xml",
+                    "worksheets": [
+                      "xl/worksheets/sheet1.xml",
+                      "xl/worksheets/sheet2.xml",
+                      "xl/worksheets/sheet3.xml",
+                      "xl/worksheets/sheet4.xml"
+                    ]
+                  }
+                }
+              },
+              "name": "profile-r1-dense-sparse",
+              "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+              "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+              "source_members": null
+            },
+            "profile_sha256": "1a0e685316ab32cf9a21d14c8be7a864af9af498fa5f80e0e42a2a7c91140934",
+            "receipt_sha256": "b03a46eb41a7673ce6572b9a74921a34c162da43d50d35620ad97f9eaabf72dc",
+            "repeat": 1,
+            "shape": "dense-sparse",
+            "start_utc": "2026-09-12T11:33:43.726179+00:00"
+          },
+          {
+            "callgrind_parts": 6,
+            "end_utc": "2026-09-12T11:35:04.790383+00:00",
+            "name": "profile-r2-medium",
+            "normalized_identity_sha256": "8f80281a3b7bb1b40057033123fc0c8cf0882aaa8ef7a5590e76737a4c810512",
+            "oracle": {
+              "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+              "corpus": {
+                "archive_bytes": 4226429,
+                "archive_member_count": 17,
+                "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+                "compression": "deflate",
+                "entry_bytes": 4,
+                "entry_count": 9216,
+                "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                "name": "xlsx-cell-values-medium",
+                "package_format": "XLSX/OPC/ZIP",
+                "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                "shape": "medium",
+                "target_entry": "Sheet1!A1",
+                "target_payload_bytes": 1,
+                "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                "uncompressed_payload_bytes": 4231168,
+                "xlsx": {
+                  "columns_per_sheet": 48,
+                  "one_percent_update_count": 93,
+                  "rows_per_sheet": 48,
+                  "sheet_count": 4,
+                  "source_members": {
+                    "shared_strings": null,
+                    "styles": "xl/styles.xml",
+                    "workbook": "xl/workbook.xml",
+                    "worksheets": [
+                      "xl/worksheets/sheet1.xml",
+                      "xl/worksheets/sheet2.xml",
+                      "xl/worksheets/sheet3.xml",
+                      "xl/worksheets/sheet4.xml"
+                    ]
+                  }
+                }
+              },
+              "name": "profile-r2-medium",
+              "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+              "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+              "source_members": null
+            },
+            "profile_sha256": "82f24a12b6fb4cb6d788f48d1826cf025ae68f98f6990625a96fad432a3d4484",
+            "receipt_sha256": "22cdc127757c7861fde76973b99470865230652cb2a44643a5577155d6cf92e8",
+            "repeat": 2,
+            "shape": "medium",
+            "start_utc": "2026-09-12T11:34:32.992172+00:00"
+          },
+          {
+            "callgrind_parts": 6,
+            "end_utc": "2026-09-12T11:35:53.767628+00:00",
+            "name": "profile-r2-dense-sparse",
+            "normalized_identity_sha256": "4a42342a4ba0b4d74aff1c894f0a26666573fb381fee471b5d3a4255e8d04d44",
+            "oracle": {
+              "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+              "corpus": {
+                "archive_bytes": 4251863,
+                "archive_member_count": 17,
+                "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+                "compression": "deflate",
+                "entry_bytes": 4,
+                "entry_count": 17792,
+                "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                "name": "xlsx-cell-values-dense-sparse",
+                "package_format": "XLSX/OPC/ZIP",
+                "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                "shape": "dense-sparse",
+                "target_entry": "Sheet1!A1",
+                "target_payload_bytes": 1,
+                "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                "uncompressed_payload_bytes": 4265472,
+                "xlsx": {
+                  "columns_per_sheet": 128,
+                  "one_percent_update_count": 178,
+                  "rows_per_sheet": 128,
+                  "sheet_count": 4,
+                  "source_members": {
+                    "shared_strings": null,
+                    "styles": "xl/styles.xml",
+                    "workbook": "xl/workbook.xml",
+                    "worksheets": [
+                      "xl/worksheets/sheet1.xml",
+                      "xl/worksheets/sheet2.xml",
+                      "xl/worksheets/sheet3.xml",
+                      "xl/worksheets/sheet4.xml"
+                    ]
+                  }
+                }
+              },
+              "name": "profile-r2-dense-sparse",
+              "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+              "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+              "source_members": null
+            },
+            "profile_sha256": "c68451ae848a2c175c942cb86066ca091c13ad9969e1c96d410a4cda1773980e",
+            "receipt_sha256": "f8486c7ccc7812b6e97587bf9edf208ed5aad07b522f4ace3d407a0a48525b3b",
+            "repeat": 2,
+            "shape": "dense-sparse",
+            "start_utc": "2026-09-12T11:35:05.021638+00:00"
+          }
+        ],
+        "sample_count": 4,
+        "serial": true,
+        "source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+        "status": "pass"
+      },
+      "status": "pass"
+    },
+    "publication": {
+      "result": {
+        "profiles": {
+          "binary_sha256": "b46a81550b74611cf3825308dd403d04574675593c8330310896eb2ab2f96c2f",
+          "rows": [
+            {
+              "callgrind_parts": 6,
+              "end_utc": "2026-09-12T11:33:43.498424+00:00",
+              "name": "profile-r1-medium",
+              "normalized_identity_sha256": "8f80281a3b7bb1b40057033123fc0c8cf0882aaa8ef7a5590e76737a4c810512",
+              "oracle": {
+                "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+                "corpus": {
+                  "archive_bytes": 4226429,
+                  "archive_member_count": 17,
+                  "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+                  "compression": "deflate",
+                  "entry_bytes": 4,
+                  "entry_count": 9216,
+                  "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                  "name": "xlsx-cell-values-medium",
+                  "package_format": "XLSX/OPC/ZIP",
+                  "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                  "shape": "medium",
+                  "target_entry": "Sheet1!A1",
+                  "target_payload_bytes": 1,
+                  "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                  "uncompressed_payload_bytes": 4231168,
+                  "xlsx": {
+                    "columns_per_sheet": 48,
+                    "one_percent_update_count": 93,
+                    "rows_per_sheet": 48,
+                    "sheet_count": 4,
+                    "source_members": {
+                      "shared_strings": null,
+                      "styles": "xl/styles.xml",
+                      "workbook": "xl/workbook.xml",
+                      "worksheets": [
+                        "xl/worksheets/sheet1.xml",
+                        "xl/worksheets/sheet2.xml",
+                        "xl/worksheets/sheet3.xml",
+                        "xl/worksheets/sheet4.xml"
+                      ]
+                    }
+                  }
+                },
+                "name": "profile-r1-medium",
+                "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+                "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+                "source_members": null
+              },
+              "profile_sha256": "27b2b2b8eab4a59ff44b0aa91ab16466b801765ca22d940d81044ca49acf742b",
+              "receipt_sha256": "70d492d057475b17f54636f15661f5eb032364e62a18594efe7fba4d653eacb5",
+              "repeat": 1,
+              "shape": "medium",
+              "start_utc": "2026-09-12T11:33:11.926997+00:00"
+            },
+            {
+              "callgrind_parts": 6,
+              "end_utc": "2026-09-12T11:34:32.765103+00:00",
+              "name": "profile-r1-dense-sparse",
+              "normalized_identity_sha256": "4a42342a4ba0b4d74aff1c894f0a26666573fb381fee471b5d3a4255e8d04d44",
+              "oracle": {
+                "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+                "corpus": {
+                  "archive_bytes": 4251863,
+                  "archive_member_count": 17,
+                  "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+                  "compression": "deflate",
+                  "entry_bytes": 4,
+                  "entry_count": 17792,
+                  "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                  "name": "xlsx-cell-values-dense-sparse",
+                  "package_format": "XLSX/OPC/ZIP",
+                  "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                  "shape": "dense-sparse",
+                  "target_entry": "Sheet1!A1",
+                  "target_payload_bytes": 1,
+                  "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                  "uncompressed_payload_bytes": 4265472,
+                  "xlsx": {
+                    "columns_per_sheet": 128,
+                    "one_percent_update_count": 178,
+                    "rows_per_sheet": 128,
+                    "sheet_count": 4,
+                    "source_members": {
+                      "shared_strings": null,
+                      "styles": "xl/styles.xml",
+                      "workbook": "xl/workbook.xml",
+                      "worksheets": [
+                        "xl/worksheets/sheet1.xml",
+                        "xl/worksheets/sheet2.xml",
+                        "xl/worksheets/sheet3.xml",
+                        "xl/worksheets/sheet4.xml"
+                      ]
+                    }
+                  }
+                },
+                "name": "profile-r1-dense-sparse",
+                "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+                "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+                "source_members": null
+              },
+              "profile_sha256": "1a0e685316ab32cf9a21d14c8be7a864af9af498fa5f80e0e42a2a7c91140934",
+              "receipt_sha256": "b03a46eb41a7673ce6572b9a74921a34c162da43d50d35620ad97f9eaabf72dc",
+              "repeat": 1,
+              "shape": "dense-sparse",
+              "start_utc": "2026-09-12T11:33:43.726179+00:00"
+            },
+            {
+              "callgrind_parts": 6,
+              "end_utc": "2026-09-12T11:35:04.790383+00:00",
+              "name": "profile-r2-medium",
+              "normalized_identity_sha256": "8f80281a3b7bb1b40057033123fc0c8cf0882aaa8ef7a5590e76737a4c810512",
+              "oracle": {
+                "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+                "corpus": {
+                  "archive_bytes": 4226429,
+                  "archive_member_count": 17,
+                  "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+                  "compression": "deflate",
+                  "entry_bytes": 4,
+                  "entry_count": 9216,
+                  "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                  "name": "xlsx-cell-values-medium",
+                  "package_format": "XLSX/OPC/ZIP",
+                  "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                  "shape": "medium",
+                  "target_entry": "Sheet1!A1",
+                  "target_payload_bytes": 1,
+                  "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                  "uncompressed_payload_bytes": 4231168,
+                  "xlsx": {
+                    "columns_per_sheet": 48,
+                    "one_percent_update_count": 93,
+                    "rows_per_sheet": 48,
+                    "sheet_count": 4,
+                    "source_members": {
+                      "shared_strings": null,
+                      "styles": "xl/styles.xml",
+                      "workbook": "xl/workbook.xml",
+                      "worksheets": [
+                        "xl/worksheets/sheet1.xml",
+                        "xl/worksheets/sheet2.xml",
+                        "xl/worksheets/sheet3.xml",
+                        "xl/worksheets/sheet4.xml"
+                      ]
+                    }
+                  }
+                },
+                "name": "profile-r2-medium",
+                "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+                "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+                "source_members": null
+              },
+              "profile_sha256": "82f24a12b6fb4cb6d788f48d1826cf025ae68f98f6990625a96fad432a3d4484",
+              "receipt_sha256": "22cdc127757c7861fde76973b99470865230652cb2a44643a5577155d6cf92e8",
+              "repeat": 2,
+              "shape": "medium",
+              "start_utc": "2026-09-12T11:34:32.992172+00:00"
+            },
+            {
+              "callgrind_parts": 6,
+              "end_utc": "2026-09-12T11:35:53.767628+00:00",
+              "name": "profile-r2-dense-sparse",
+              "normalized_identity_sha256": "4a42342a4ba0b4d74aff1c894f0a26666573fb381fee471b5d3a4255e8d04d44",
+              "oracle": {
+                "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+                "corpus": {
+                  "archive_bytes": 4251863,
+                  "archive_member_count": 17,
+                  "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+                  "compression": "deflate",
+                  "entry_bytes": 4,
+                  "entry_count": 17792,
+                  "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+                  "name": "xlsx-cell-values-dense-sparse",
+                  "package_format": "XLSX/OPC/ZIP",
+                  "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+                  "shape": "dense-sparse",
+                  "target_entry": "Sheet1!A1",
+                  "target_payload_bytes": 1,
+                  "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+                  "uncompressed_payload_bytes": 4265472,
+                  "xlsx": {
+                    "columns_per_sheet": 128,
+                    "one_percent_update_count": 178,
+                    "rows_per_sheet": 128,
+                    "sheet_count": 4,
+                    "source_members": {
+                      "shared_strings": null,
+                      "styles": "xl/styles.xml",
+                      "workbook": "xl/workbook.xml",
+                      "worksheets": [
+                        "xl/worksheets/sheet1.xml",
+                        "xl/worksheets/sheet2.xml",
+                        "xl/worksheets/sheet3.xml",
+                        "xl/worksheets/sheet4.xml"
+                      ]
+                    }
+                  }
+                },
+                "name": "profile-r2-dense-sparse",
+                "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+                "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+                "source_members": null
+              },
+              "profile_sha256": "c68451ae848a2c175c942cb86066ca091c13ad9969e1c96d410a4cda1773980e",
+              "receipt_sha256": "f8486c7ccc7812b6e97587bf9edf208ed5aad07b522f4ace3d407a0a48525b3b",
+              "repeat": 2,
+              "shape": "dense-sparse",
+              "start_utc": "2026-09-12T11:35:05.021638+00:00"
+            }
+          ],
+          "sample_count": 4,
+          "serial": true,
+          "source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+          "status": "pass"
+        },
+        "publication": {
+          "report": "publication-analysis.json",
+          "report_sha256": "a9568731fb89248cda69453762df2ecdba84074266c071de6ab52a08bd101f45",
+          "rows": [
+            {
+              "name": "profile-r1-medium",
+              "owner_ir": 95539471,
+              "owners": 15,
+              "parts": 6,
+              "selected": "baseline/profile-r1-medium.callgrind.6"
+            },
+            {
+              "name": "profile-r1-dense-sparse",
+              "owner_ir": 172376919,
+              "owners": 14,
+              "parts": 6,
+              "selected": "baseline/profile-r1-dense-sparse.callgrind.6"
+            },
+            {
+              "name": "profile-r2-medium",
+              "owner_ir": 95536593,
+              "owners": 15,
+              "parts": 6,
+              "selected": "baseline/profile-r2-medium.callgrind.6"
+            },
+            {
+              "name": "profile-r2-dense-sparse",
+              "owner_ir": 172377186,
+              "owners": 14,
+              "parts": 6,
+              "selected": "baseline/profile-r2-dense-sparse.callgrind.6"
+            }
+          ]
+        }
+      },
+      "status": "pass"
+    },
+    "quality": {
+      "result": {
+        "analyzer_tests": 2,
+        "exact_source_reuse": true,
+        "prior_checks": 12,
+        "prior_tests": 1297,
+        "status": "pass"
+      },
+      "status": "pass"
+    },
+    "source": {
+      "result": {
+        "baseline": {
+          "manifest_entries": 8584,
+          "manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+          "patch_empty": true,
+          "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "replayed_changed_files": [],
+          "xlsx_source_files": 451
+        },
+        "dependency_inputs": [
+          {
+            "retained": "inputs/quick-xml-0.41.0-src-name.rs.txt",
+            "sha256": "f2ac828a48ca16d6d605949771d57a1eb00829a93a6556c682971cf5f28cb336",
+            "source": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs"
+          },
+          {
+            "retained": "inputs/quick-xml-0.41.0-src-reader-ns_reader.rs.txt",
+            "sha256": "7ab687c3e93b896554f5754bd7c76042664f01d23cbfacb99605725c7ecc4a35",
+            "source": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs"
+          }
+        ],
+        "plan_sha256": "259454bb139493e82da98ad28c09332e65bcecfb0e1fea165a6b1ee6370f9b1e",
+        "prior_seals": [
+          {
+            "directory": "docs/performance/results/change-0525",
+            "entries": 550,
+            "seal_sha256": "ae8834847914ef936b6206f621d0e19c02960f407b27f3e2db797177e0a8b1ab"
+          },
+          {
+            "directory": "docs/performance/results/change-0527",
+            "entries": 307,
+            "seal_sha256": "16f51d610116ecdd7872d606802b9253fb7e2dcd15094f6722172db626202923"
+          }
+        ],
+        "publication_review_sha256": "2bfe328d000d3240e766405346601c4175aa0e440e2b664c8b3d6f0c6a106fc7",
+        "run_sha256": "a3de8c50d682a579173e52dbf56512cb27e41b37d8f08f6b10cc2777876dbfdc",
+        "source_binding_sha256": "8a133620217daf78a9ed91500ebf551a7db56d341df3ab02127588430935361f",
+        "source_review_sha256": "cd66a520c29d93f7fd33cd416a0138215d3078dd85dcfcf2c76ec73cfdd40724"
+      },
+      "status": "pass"
+    }
+  },
+  "performance_claim": "none",
+  "schema": "litchi-0528-attribution-verification-v1",
+  "scope": "precleanup",
+  "status": "pass"
+}

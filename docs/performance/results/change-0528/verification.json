@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "scope": "Seven pre-cleanup components passed; owned paths removed. Full sealed replay required after seal creation.",
+  "observed_utc": "2026-09-12T11:52:00.571193+00:00",
+  "precleanup_sha256": "6f4eaed77bd0f0d0b36ea5499f498cf5276611606a230784a0dd98251bed2c49",
+  "cleanup_sha256": "a95ad2895d3cf12c0a3a842efbe8d853414ae95dfdf1c604b5455ad801a8cc44",
+  "components": {
+    "builds": "pass",
+    "decision": "pass",
+    "profile-analysis": "pass",
+    "profiles": "pass",
+    "publication": "pass",
+    "quality": "pass",
+    "source": "pass"
+  },
+  "production_change": false,
+  "performance_claim": "none",
+  "overall_goal_complete": false
+}

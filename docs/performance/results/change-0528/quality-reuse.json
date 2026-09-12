@@ -1,0 +1,13 @@
+{
+  "status": "pass",
+  "reason": "No Rust source changes; complete source manifest is byte-identical to independently tested0527final source.",
+  "source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+  "prior_quality_summary": "docs/performance/results/change-0527/quality-summary.json",
+  "prior_quality_summary_sha256": "4d59ac3cc990f020dab9219b3a206140551284679f45a120ef50f37bcc670fb3",
+  "prior_seal_sha256": "16f51d610116ecdd7872d606802b9253fb7e2dcd15094f6722172db626202923",
+  "checks": 12,
+  "successful_test_executions": 1297,
+  "new_build_passed": true,
+  "new_profile_children_passed": 4,
+  "new_python_tests": 2
+}

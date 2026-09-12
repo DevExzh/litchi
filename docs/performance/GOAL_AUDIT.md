@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0528: progress through a new publication baseline
+
+[0528](changes/0528-xlsx-publication-attribution.md) The batch verifies a small resolver-cost ceiling and captures four fresh publication profiles, identifying shared authored-XML validation as the next concrete lead. Production remains unchanged and the full goal remains incomplete. OLE2/OOXML stays first, ODF deferred until that optimization goal completes, and iWork excluded.
+
 ## 0527: progress through measured rejection
 
 [0527](changes/0527-xlsx-row-primary-arena-pilot.md) The fresh XLSX pilot completed 2,440 native durations and 40 allocation samples. A failed dense repeat-2 gate caused restoration of production and retention of compatible tests/evidence. OLE2/OOXML performance remains the active priority; ODF is deferred until that optimization goal completes and iWork stays excluded. Overall completion is not claimed.
