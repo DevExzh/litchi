@@ -1,0 +1,16 @@
+{
+  "schema": "xlsx-svg-lifecycle-phase-verification-v1",
+  "picture_counts": [
+    16,
+    64,
+    256
+  ],
+  "processes_per_picture_count": 3,
+  "minimum_warmup": 2,
+  "minimum_samples_per_process": 20,
+  "receipts": 9,
+  "source_manifest_sha256": "a8f7021a6b8beed82a576a21ec65495cd25a2eae84d8d8ee661e1899e8e9f4d9",
+  "binary_identity_stable": true,
+  "semantic_checks_passed": true,
+  "raw_receipts_unchanged": true
+}
