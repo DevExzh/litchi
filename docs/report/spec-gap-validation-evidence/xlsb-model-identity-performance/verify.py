@@ -142,7 +142,9 @@ def verify_git_snapshot(paths: list[Path], root: Path, commit: str) -> None:
         )
 
 
-def verify_source_manifest(path: Path, root: Path) -> tuple[int, str, str]:
+def verify_source_manifest(
+    path: Path, root: Path, *, require_transitive: bool = True
+) -> tuple[int, str, str]:
     lines = path.read_text().splitlines()
     if not lines or lines[0] != f"format={SOURCE_MANIFEST_FORMAT}":
         fail("source manifest format changed")
@@ -188,7 +190,7 @@ def verify_source_manifest(path: Path, root: Path) -> tuple[int, str, str]:
                 fail(f"source package file count is malformed: {line}")
             if count <= 0 or len(parts[4]) != 64 or len(parts[6]) != 64:
                 fail(f"source package digest/count is malformed: {line}")
-            packages[key] = (count, parts[6])
+            packages[key] = (parts[2], count, parts[6])
         elif line.startswith("file="):
             if len(parts) != 5:
                 fail(f"malformed source file line: {line}")
@@ -206,11 +208,11 @@ def verify_source_manifest(path: Path, root: Path) -> tuple[int, str, str]:
         fail("source manifest Git head differs from pinned commit")
     if not packages or set(packages) != set(files):
         fail("source package/file manifest sets differ")
-    if len(packages) < 100:
+    if require_transitive and len(packages) < 100:
         fail(f"source manifest is not transitively complete: only {len(packages)} packages")
     checked = 0
     local_inputs = []
-    for key, (expected_count, expected_tree) in packages.items():
+    for key, (source, expected_count, expected_tree) in packages.items():
         entries = files[key]
         if len(entries) != expected_count:
             fail(f"source package file count changed: {key}")
@@ -221,7 +223,7 @@ def verify_source_manifest(path: Path, root: Path) -> tuple[int, str, str]:
             current = resolve(root, shown)
             if not current.is_file() or sha256(current) != expected:
                 fail(f"source manifest input changed or disappeared: {shown}")
-            if packages[key][0] == "path":
+            if source == "path":
                 local_inputs.append(current)
             checked += 1
     for shown, expected in extras:
@@ -230,7 +232,7 @@ def verify_source_manifest(path: Path, root: Path) -> tuple[int, str, str]:
             fail(f"source manifest extra changed or disappeared: {shown}")
         local_inputs.append(current)
         checked += 1
-    if checked < 1000:
+    if require_transitive and checked < 1000:
         fail(f"source manifest checked too few files: {checked}")
     try:
         verify_git_snapshot(local_inputs, root, git_commit)
