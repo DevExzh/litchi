@@ -1,0 +1,73 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "b89425227174704fc64b4bd92447c1ff154059089c78fdf4c960f6c1748aba69",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "16bd8245a32e7fa8f655753f7330cc6954ac5dbd4562d8f27791be4279bb6b4a",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-clippy.receipt.json",
+      "receipt_sha256": "05a1a5f6e495f67623d8a312d263bc359ec184bcaa17ee73f9aff8c2f2a97641",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "e32a032324be571346ebe50e343cf7a66d5a460ca64f4a1de1ee78ba1152a603",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "38a8af983cf8d4c3a371a90154bb4c59cac266cb45d6a0640054b68814965600",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-existing-metrics-tests.receipt.json",
+      "receipt_sha256": "55fac1810264200e2e382e690148bec593d4158d2f470c20d36029b858d3b9e3",
+      "exit_code": 0,
+      "executed_tests": 3
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "fc543c99f3503467784796cd8f509d649d02a8a2786ae8b0957c336baad711db",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-test.receipt.json",
+      "receipt_sha256": "e30979461c5a2b26f0dc7c31145569608b90de024292a6f23e2a0d0e576ed09d",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-rustdoc.receipt.json",
+      "receipt_sha256": "fa6338e3dbe4aa96ecb98e127907117d328235c8e1860e9ee3bfd9696b6ccb8b",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "649f7cf3d56a1975ad4008e0f50b1c4f0ef3532eab52d00f9c4614047ccf6ecc",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xlsx-tests.receipt.json",
+      "receipt_sha256": "82029836a53cffde97bf2a22bec0c4b9159040affb2bf66805f3bacf524d8610",
+      "exit_code": 0,
+      "executed_tests": 1274
+    }
+  ],
+  "executed_tests": 1278,
+  "scope": "All-feature XLSX tests and four focused harness metrics tests; workspace check is not a workspace test run."
+}

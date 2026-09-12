@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-xlsx",
+    "--lib",
+    "borrow_tests",
+    "--target-dir",
+    "/home/zhuhe/litchi-goal-0521-target"
+  ],
+  "start_utc": "2026-09-12T04:54:40.217072+00:00",
+  "end_utc": "2026-09-12T04:55:09.949936+00:00",
+  "exit_code": 101,
+  "source_hashes": {
+    "crates/litchi-xlsx/src/cell_values/validation.rs": "b51f7753e71808d2ea0b6d7a4da670ed7c1d098a8b084455aee585922d7e3f5d",
+    "crates/litchi-xlsx/src/cell_values/validation_borrow_tests.rs": "37baf9cf8998f2731f6d09ff83bc6be10d7d8db2f32833b975e66521f71acba9",
+    "tools/perf-baseline/src/lib.rs": "4a45ef0f89e18d9242c3b939706001bbf280bc9a1a0ef58aa57a1d4bad916479"
+  }
+}

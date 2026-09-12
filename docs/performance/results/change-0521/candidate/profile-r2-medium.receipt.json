@@ -1,0 +1,50 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--zero-before=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--dump-after=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0521/candidate/profile-r2-medium.callgrind",
+    "/tmp/litchi-goal-0521/candidate-normal",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0521/candidate/profile-r2-medium.json"
+  ],
+  "start_utc": "2026-09-12T05:14:52.251287+00:00",
+  "end_utc": "2026-09-12T05:15:23.990307+00:00",
+  "seconds": 31.739025238988688,
+  "exit_code": 0,
+  "binary_sha256": "2674fa92a0d1382c7f8607efe8dbd9995ed9b87a6640872462414c48bf359d7e",
+  "source_manifest_sha256": "765fe38ee9ec1ea9293081a3d439f85b8cf836c31b0068157a5f413f0fec6df8",
+  "script_sha256": "ef37fe884ec7d60819f08eb0ff1757e1010b684f514e29fe5d293972e4275812",
+  "plan_sha256": "711754fb64bcfa7a975509bd961befef6a5d2ddad3d36bf4267dbc04364cd171",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "profile-r2-medium.callgrind": "1dd456f2c131d7c930b666a6b73ef6126bb49ff2cbd829ea9e00bca15f2402b8",
+    "profile-r2-medium.callgrind.1": "d1ef57e8b6c26566154e558554d2cd068638ff65a04b7cae8256669210a4ab08",
+    "profile-r2-medium.callgrind.2": "0b38c8b51aa2db990066fa7702737e287a3fc2da67a1d4c002f14e07c95950d5",
+    "profile-r2-medium.callgrind.3": "cfc5cba13b681531fdb84265b0f89e2e2f27459b290bed14dccddc187042ef28",
+    "profile-r2-medium.callgrind.4": "e1120de577f26d9f9a0bfd3a9e4327c7dabf2290e5226d9187eee0d511f568f3",
+    "profile-r2-medium.json": "a4145e0a0b5392c44d075157b50250794bb4fb1b3d5e2b76723bda20c2a81f8e",
+    "profile-r2-medium.stderr": "ff32f45b9cceca25d8b5e3e2dbdf57591a0da41df1855104efdc2cdb81e039c8",
+    "profile-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

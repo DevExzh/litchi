@@ -5890,6 +5890,8 @@ struct XlsxCellValuesSourceSummary {
     open_ns: Vec<u64>,
     plan_ns: Vec<u64>,
     commit_ns: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    commit_allocation_metrics: Vec<allocation_metrics::Sample>,
     publication_ns: Vec<u64>,
     reopen_ns: Vec<u64>,
     source_read_calls: Vec<u64>,
@@ -6100,6 +6102,7 @@ struct XlsxCellValuesIterationEvidence {
     open_ns: u64,
     plan_ns: u64,
     commit_ns: u64,
+    commit_allocation_metrics: Option<allocation_metrics::Sample>,
     publication_ns: u64,
     reopen_ns: u64,
     source: SourceSnapshot,
@@ -8117,6 +8120,11 @@ impl SourceSummary {
         summary.open_ns.push(evidence.open_ns);
         summary.plan_ns.push(evidence.plan_ns);
         summary.commit_ns.push(evidence.commit_ns);
+        if let Some(commit_allocation_metrics) = evidence.commit_allocation_metrics {
+            summary
+                .commit_allocation_metrics
+                .push(commit_allocation_metrics);
+        }
         summary.publication_ns.push(evidence.publication_ns);
         summary.reopen_ns.push(evidence.reopen_ns);
         summary.source_read_calls.push(source.read_calls);
@@ -40772,9 +40780,8 @@ fn run_xlsx_update_commit(
         updates,
     )?;
     let mut output = result(case, corpus, elapsed, None);
-    output.operation_metrics = Some(
-        operation_metrics::from_in_process_observations_without_sink(&observations)?,
-    );
+    output.operation_metrics =
+        Some(operation_metrics::from_in_process_observations_without_sink(&observations)?);
     Ok(output)
 }
 
@@ -41202,6 +41209,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 open_ns,
                 plan_ns,
                 commit_ns,
+                commit_allocation_metrics: None,
                 publication_ns,
                 reopen_ns: 0,
                 source,
@@ -41260,6 +41268,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 open_ns,
                 plan_ns,
                 commit_ns,
+                commit_allocation_metrics: None,
                 publication_ns,
                 reopen_ns: 0,
                 source: SourceSnapshot::default(),
@@ -41770,9 +41779,11 @@ fn run_xlsx_cell_values_edit_save(
                 pre_publication_budget,
                 post_publication_budget,
                 commit_ns,
+                commit_allocation_metrics,
                 publication_ns,
                 budget_used_after_package_drop,
             ) = {
+                let allocation_region = allocation_metrics::begin();
                 let commit_started = Instant::now();
                 for coordinate in &updates {
                     edit.set(
@@ -41786,6 +41797,10 @@ fn run_xlsx_cell_values_edit_save(
                 }
                 let commit = edit.commit()?;
                 let commit_duration = commit_started.elapsed();
+                let commit_allocation_metrics = match allocation_region.finish() {
+                    Some(sample) => sample,
+                    None => allocation_metrics::unavailable_sample(),
+                };
                 let commit_ns = elapsed_ns(commit_duration)?;
                 duration += commit_duration;
                 if commit.diagnostics().touched_worksheets() != expected_touched {
@@ -41833,6 +41848,7 @@ fn run_xlsx_cell_values_edit_save(
                     pre_publication_budget,
                     post_publication_budget,
                     commit_ns,
+                    commit_allocation_metrics,
                     publication_ns,
                     budget_used_after_package_drop,
                 )
@@ -41887,6 +41903,7 @@ fn run_xlsx_cell_values_edit_save(
                 open_ns,
                 plan_ns,
                 commit_ns,
+                commit_allocation_metrics: Some(commit_allocation_metrics),
                 publication_ns,
                 reopen_ns: 0,
                 source: source_metrics
@@ -66397,6 +66414,62 @@ mod tests {
         assert_eq!(xlsx_cell_count(dense_spec).unwrap(), 17_792);
         assert_eq!(dense_spec.one_percent_updates.len(), 178);
         assert!(dense_first.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
+    }
+
+    #[test]
+    fn xlsx_source_cell_values_commit_allocation_metrics_align_with_phases() {
+        // The normal test binary does not install the allocator wrapper, so
+        // source-backed commit samples must carry explicit unavailable status.
+        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
+        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        let sample_count = 3;
+        let measured = run_case(
+            Case::XlsxSourceBackedCellValuesOneEditSave,
+            &corpus,
+            1,
+            sample_count,
+        )
+        .unwrap();
+        let evidence = measured
+            .source
+            .as_ref()
+            .and_then(|source| source.xlsx_cell_values.as_ref())
+            .expect("source-backed cell-values evidence");
+
+        assert_eq!(evidence.commit_allocation_metrics.len(), sample_count);
+        assert!(
+            evidence
+                .commit_allocation_metrics
+                .iter()
+                .all(|sample| sample.status == super::allocation_metrics::Status::Unavailable)
+        );
+        let serialized_metrics = serde_json::to_value(&evidence.commit_allocation_metrics).unwrap();
+        let serialized_samples = serialized_metrics
+            .as_array()
+            .expect("commit allocation metrics serialize as an array");
+        assert_eq!(serialized_samples.len(), sample_count);
+        for sample in serialized_samples {
+            assert_eq!(sample.as_object().map(|object| object.len()), Some(2));
+            assert_eq!(sample["status"], "unavailable");
+            assert_eq!(sample["scope"], "operation_global_system_allocator");
+        }
+        assert_eq!(evidence.open_ns.len(), sample_count);
+        assert_eq!(evidence.plan_ns.len(), sample_count);
+        assert_eq!(evidence.commit_ns.len(), sample_count);
+        assert_eq!(evidence.publication_ns.len(), sample_count);
+        assert_eq!(measured.elapsed_ns.sample_order.len(), sample_count);
+        for (sorted_index, &acquisition_index) in
+            measured.elapsed_ns.sample_order.iter().enumerate()
+        {
+            let phase_sum = evidence.open_ns[acquisition_index]
+                + evidence.plan_ns[acquisition_index]
+                + evidence.commit_ns[acquisition_index]
+                + evidence.publication_ns[acquisition_index];
+            assert_eq!(
+                phase_sum, measured.elapsed_ns.samples[sorted_index],
+                "source cell-values phase sum changed at acquisition index {acquisition_index}"
+            );
+        }
     }
 
     #[test]

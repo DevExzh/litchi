@@ -1,0 +1,5559 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 641421
+cmd:  /tmp/litchi-goal-0521/candidate-normal --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape dense-sparse --json /home/zhuhe/code/litchi/docs/performance/results/change-0521/candidate/profile-r1-dense-sparse.json
+part: 4
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 1691439701 - 3231079267
+desc: Trigger: --dump-after=litchi_xlsx::cell_values::source::MultiSourceEdit::commit
+
+positions: line
+events: Ir
+summary: 377182416
+
+
+ob=(7) /tmp/litchi-goal-0521/candidate-normal
+fl=(165) ???
+fn=(1522) core::ptr::drop_in_place<litchi_xlsx::cell::Cell>
+0 240908
+cfn=(1452) core::ptr::drop_in_place<litchi_xlsx::cell::Value>
+calls=534 0 
+0 49388
+
+fn=(838) std::sys::backtrace::__rust_begin_short_backtrace
+cfn=(840) litchi_perf_baseline::main
+calls=0 0 
+0 377182416
+
+fn=(1106) memchr::arch::x86_64::avx2::memchr::Two::find_raw_avx2
+0 3446768
+
+fn=(1138) quick_xml::events::attributes::IterState::check_for_duplicates
+0 2465167
+cob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+cfi=(233) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+cfn=(900) __memcmp_avx2_movbe
+calls=424 73 
+0 638
+0 455155
+cfn=(960) alloc::raw_vec::RawVec<T,A>::grow_one
+calls=569055 0 
+0 13091114
+0 2267897
+
+fn=(1144) quick_xml::name::QName::local_name
+0 5558707
+cfn=(1110) memchr::arch::x86_64::memchr::memchr_raw::find_avx2
+calls=2839359 0 
+0 19747428
+0 4042696
+
+fn=(1196) core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>
+0 32
+cfn=(844) __rustc::__rust_dealloc
+calls=8 0 
+0 628
+0 28
+cfn=(844)
+calls=8 0 
+0 507
+0 24
+cfn=(844)
+calls=8 0 
+0 600
+0 32
+cfn=(844)
+calls=8 0 
+0 140
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+0 7
+cfn=(844)
+calls=9 0 
+0 150
+0 6
+cfn=(844)
+calls=9 0 
+0 172
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+0 32
+cfn=(844)
+calls=35 0 
+0 600
+0 28
+cfn=(844)
+calls=35 0 
+0 283
+0 24
+cfn=(844)
+calls=35 0 
+0 600
+0 32
+cfn=(844)
+calls=35 0 
+0 140
+0 72
+cfn=(844)
+calls=24 0 
+0 775
+0 63
+cfn=(844)
+calls=24 0 
+0 775
+0 54
+cfn=(844)
+calls=24 0 
+0 1417
+0 72
+cfn=(844)
+calls=24 0 
+0 315
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+0 7
+cfn=(844)
+calls=9 0 
+0 35
+0 6
+cfn=(844)
+calls=9 0 
+0 150
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+
+fn=(1268) alloc::collections::btree::map::BTreeMap<K,V,A>::remove
+0 6080
+
+fn=(1294) <alloc::collections::btree::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next
+0 6443
+
+fn=(1304) litchi_xlsx::raw::worksheet::x14ac::may_contain_descent
+0 76
+cfn=(1306) memchr::memmem::FinderBuilder::build_forward_with_ranker
+calls=35 0 
+0 1976
+0 52
+cfn=(1312) memchr::memmem::searcher::searcher_kind_avx2
+calls=35 0 
+0 238594
+0 48
+
+fn=(1370) <alloc::collections::btree::map::IntoIter<K,V,A> as core::ops::drop::Drop>::drop
+0 44
+cfn=(920) alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+calls=8 0 
+0 112
+0 44
+
+fn=(1374) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit
+0 100
+cfn=(1092) <quick_xml::name::NamespaceResolver as core::default::Default>::default
+calls=8 0 
+0 4624
+0 806868
+cfn=(1186) quick_xml::name::NamespaceResolver::set_level
+calls=71800 0 
+0 753952
+0 143600
+cfn=(1094) quick_xml::reader::Reader<R>::read_event_impl
+calls=71800 0 
+0 14357252
+0 161088
+cfn=(1094)
+calls=107392 0 
+0 12063936
+0 358384
+cfn=(1118) quick_xml::reader::ns_reader::NsReader<R>::process_event
+calls=179192 0 
+0 10269030
+0 2598284
+cfn=(1122) quick_xml::name::NamespaceResolver::resolve_event
+calls=179192 0 
+0 10376352
+0 1825660
+cfn=(1480) quick_xml::events::BytesRef::decode
+calls=35584 0 
+0 1957892
+0 1236088
+cfn=(1376) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard
+calls=8 0 
+0 1348
+0 40
+cfn=(1380) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position
+calls=8 0 
+0 80
+0 36
+cfn=(1144)
+calls=8 0 
+0 392
+0 24
+cfn=(1144)
+calls=8 0 
+0 392
+0 68
+cfn=(1144)
+calls=8 0 
+0 392
+0 40
+cfn=(1376)
+calls=8 0 
+0 1348
+0 179460
+cfn=(1376)
+calls=71784 0 
+0 7798164
+0 215408
+cfn=(1144)
+calls=8 0 
+0 392
+0 88
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=8 73 
+0 68
+0 323040
+cfn=(1380)
+calls=71784 0 
+0 610176
+0 215352
+cfn=(1144)
+calls=71784 0 
+0 2084936
+0 215352
+cfn=(1144)
+calls=71784 0 
+0 2084936
+0 394840
+cfn=(1144)
+calls=71784 0 
+0 2084936
+0 179508
+cfn=(1382) litchi_xlsx::raw::namespace::is_spreadsheetml_name
+calls=8 0 
+0 704
+0 36
+cfn=(1384) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension
+calls=8 0 
+0 15216
+0 215388
+cfn=(1382)
+calls=8 0 
+0 583
+0 925192
+cfn=(880) __rustc::__rust_realloc
+calls=35584 0 
+0 5131746
+0 106836
+cfn=(1216) alloc::vec::Vec<T,A>::into_boxed_slice
+calls=8 0 
+0 72
+0 13712
+cfn=(1216)
+calls=608 0 
+0 42778
+0 6118
+cfn=(960)
+calls=38 0 
+0 12817
+0 149024
+cfn=(960)
+calls=35584 0 
+0 1878967
+0 389284
+cfn=(1378) litchi_xlsx::raw::worksheet::edit::codec::wire::tag
+calls=8 0 
+0 10298
+0 73028
+cfn=(1382)
+calls=608 0 
+0 44573
+0 3040
+cfn=(2578) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row
+calls=608 0 
+0 1216367
+0 108272
+cfn=(1382)
+calls=35584 0 
+0 2259584
+0 160128
+cfn=(2584) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell
+calls=35584 0 
+0 42207887
+0 160128
+cfn=(1144)
+calls=35584 0 
+0 1031936
+0 160220
+cfn=(1382)
+calls=8 0 
+0 468
+0 340200
+cfn=(960)
+calls=2144 0 
+0 617968
+0 444832
+cfn=(1144)
+calls=35584 0 
+0 1031936
+0 106752
+cfn=(1382)
+calls=35584 0 
+0 2259584
+0 124544
+cfn=(1144)
+calls=35584 0 
+0 1031936
+0 71192
+cfn=(1382)
+calls=8 0 
+0 704
+0 44
+cfn=(1378)
+calls=8 0 
+0 1500
+0 36
+cfn=(1394) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>
+calls=8 0 
+0 44
+0 877256
+cfn=(960)
+calls=16 0 
+0 2844
+0 969300
+cob=(2)
+cfi=(203) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+cfn=(716) __memcpy_avx_unaligned_erms
+calls=8 255 
+0 548
+0 16
+cfn=(1388) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout
+calls=8 0 
+0 3456
+0 28
+cfn=(844)
+calls=8 0 
+0 140
+0 8
+cfn=(1196)
+calls=8 0 
+0 1991
+0 36
+
+fn=(1376)
+0 718000
+cfn=(1144)
+calls=71800 0 
+0 2085720
+0 215400
+cfn=(1144)
+calls=71800 0 
+0 2085720
+0 215400
+cfn=(1144)
+calls=71800 0 
+0 2085720
+0 394900
+
+fn=(1404) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingMergeCells>>
+0 20
+
+fn=(1498) litchi_xlsx::raw::worksheet::codec::decode_cell_attribute
+0 213504
+cfn=(1154) quick_xml::events::attributes::Attribute::decoded_and_normalized_value
+calls=239227 0 
+0 3251250
+0 249088
+cfn=(828) __rustc::__rust_no_alloc_shim_is_unstable_v2
+calls=239227 0 
+0 17792
+0 53376
+cfn=(830) __rustc::__rust_alloc
+calls=239227 0 
+0 3019155
+0 142336
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=239227 255 
+0 278412
+0 338048
+
+fn=(1516) litchi_xlsx::cell::Number::validate_lexical
+0 142336
+cfn=(1512) core::str::<impl str>::trim_matches
+calls=239227 0 
+0 907222
+0 53376
+cfn=(1518) <f64 as core::str::traits::FromStr>::from_str
+calls=239227 0 
+0 2859966
+0 213504
+
+fn=(1580) core::slice::sort::shared::smallsort::insertion_sort_shift_left
+0 167
+
+fn=(1640) litchi_xlsx::calculation_properties::codec::check_attribute_count
+0 174
+cfn=(1150) <quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next
+calls=62 0 
+0 1587
+0 42
+cfn=(1150)
+calls=166 0 
+0 2753
+0 340
+
+fn=(1658) litchi_xlsx::calculation_properties::rewriter::escape_attribute
+0 301
+cfn=(1654) litchi_xlsx::calculation_properties::rewriter::Bounded::extend
+calls=10 0 
+0 653
+
+fn=(2446) litchi_xlsx::cell_values::validation::bind_dialect
+0 718700
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=236363 73 
+0 610895
+0 574915
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=236339 73 
+0 610742
+0 71861
+cfn=(828)
+calls=24 0 
+0 9
+0 27
+cfn=(830)
+calls=24 0 
+0 360
+0 63
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=24 255 
+0 108
+0 71888
+
+fn=(2448) litchi_xlsx::cell_values::validation::validate_element
+0 1042115
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=236363 73 
+0 610895
+0 1581355
+cfn=(2450) litchi_xlsx::cell_values::validation::validate_parent
+calls=236363 0 
+0 1047147
+0 287480
+cfn=(2452) litchi_xlsx::cell_values::validation::validate_attributes
+calls=236363 0 
+0 12663002
+0 359500
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=24 73 
+0 171
+0 66
+
+fn=(2454) litchi_xlsx::cell_values::validation::allowed_unqualified_attribute
+0 402208
+
+fn=(2512) litchi_xlsx::cell_values::source::MultiSourceEdit::commit
+0 58
+cfn=(2506) litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets
+calls=1 0 
+0 191
+0 10
+cfn=(2516) <alloc::boxed::Box<[T],A> as core::clone::Clone>::clone
+calls=1 0 
+0 9092
+0 184
+cfn=(2572) litchi_xlsx::cell_values::source::effective_action_count
+calls=4 0 
+0 93555
+0 47
+cfn=(962) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=1 0 
+0 486
+0 5
+cfn=(1276) <alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 34685
+0 255
+cfn=(2574) litchi_xlsx::cell_values::source::append_actions
+calls=4 0 
+0 4986
+0 1392
+cfn=(2574)
+calls=174 0 
+0 220907
+0 1144
+cfn=(1372) litchi_xlsx::raw::worksheet::edit::package::rewrite
+calls=4 0 
+0 146646520
+0 96
+cfn=(2594) litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source
+calls=4 0 
+0 229745760
+0 80
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 308
+0 3094
+cfn=(1360) litchi_xlsx::cell::Store::entry
+calls=178 0 
+0 46811
+0 890
+cfn=(2918) litchi_xlsx::cell::Content::as_cell
+calls=178 0 
+0 40944
+0 1246
+cfn=(1532) <litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq
+calls=178 0 
+0 13177
+0 534
+cfn=(1522)
+calls=178 0 
+0 32125
+0 376
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 356
+0 12
+cfn=(1184) alloc::vec::Vec<T,A>::push_mut
+calls=4 0 
+0 406
+0 27
+cfn=(2596) litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml
+calls=1 0 
+0 135049
+0 14
+cfn=(2514) <litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone
+calls=1 0 
+0 1573
+0 9
+cfn=(2514)
+calls=3 0 
+0 4930
+0 28
+cfn=(2598) litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook
+calls=4 0 
+0 135883
+0 72
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 308
+0 64
+cfn=(844)
+calls=4 0 
+0 140
+0 20
+cfn=(2558) core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>
+calls=4 0 
+0 4144
+0 68
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 308
+0 47
+
+fn=(970) alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle
+0 27
+cfn=(962)
+calls=18118 0 
+0 210
+0 3600
+cfn=(962)
+calls=15465 0 
+0 38244
+0 1197
+
+fn=(1016) hashbrown::raw::RawTable<T,A>::reserve_rehash
+0 33
+cfn=(1182) hashbrown::raw::RawTableInner::fallible_with_capacity
+calls=9 0 
+0 125
+0 820
+cfn=(1182)
+calls=248 0 
+0 3649
+0 5752
+cfn=(1022) core::hash::BuildHasher::hash_one
+calls=5209 0 
+0 58824
+0 15101
+cfn=(844)
+calls=194 0 
+0 1010
+0 1233
+cfn=(828)
+calls=386 0 
+0 20
+0 60
+cfn=(830)
+calls=386 0 
+0 2239
+0 380
+cob=(2)
+cfi=(219) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+cfn=(796) __memset_avx2_unaligned_erms
+calls=386 198 
+0 230
+0 1695
+cfn=(1022)
+calls=1785 0 
+0 35285
+0 4340
+cfn=(844)
+calls=250 0 
+0 525
+0 180
+
+fn=(846) __rustc::__rdl_dealloc
+0 187943
+cob=(2)
+cfi=(155) ./malloc/./malloc/malloc.c
+cfn=(758) free
+calls=1880222 3319 
+0 9126414
+
+fn=(880)
+0 19378
+cfn=(882) __rustc::__rdl_realloc
+calls=128448 0 
+0 7701901
+
+fn=(1154)
+0 162912
+cfn=(1156) quick_xml::events::attributes::Attribute::decoded_and_normalized_value_with
+calls=315812 0 
+0 9627838
+0 162912
+
+fn=(1156)
+0 977472
+cfn=(908) core::str::converts::from_utf8
+calls=315812 0 
+0 3625192
+0 814560
+cfn=(1158) quick_xml::escape::normalize_attribute_value
+calls=315812 0 
+0 3015926
+0 1194688
+
+fn=(1166) quick_xml::name::QName::decompose
+0 3864
+cfn=(1110)
+calls=72686 0 
+0 12886
+0 3884
+
+fn=(1190) quick_xml::reader::state::ReaderState::emit_text
+0 427160
+
+fn=(1216)
+0 5480
+cfn=(880)
+calls=624 0 
+0 89244
+0 6052
+cfn=(880)
+calls=256 0 
+0 36810
+0 2854
+
+fn=(1360)
+0 46811
+
+fn=(1392) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingDefaults>>
+0 20
+
+fn=(1490) litchi_xlsx::raw::worksheet::validation::optional_u32
+0 6080
+cfn=(1148) litchi_ooxml_common::xml::unqualified_attribute_value
+calls=6048 0 
+0 390572
+0 12160
+
+fn=(1512)
+0 2721666
+
+fn=(2298) litchi_perf_baseline::run_xlsx_cell_values_edit_save
+cfn=(2512)
+calls=1 0 
+0 377182416
+
+fn=(1634) <alloc::string::String>::from_utf8_lossy
+0 45
+cfn=(1636) <core::str::lossy::Utf8Chunks as core::iter::traits::iterator::Iterator>::next
+calls=27 0 
+0 1255
+0 60
+
+fn=(1644) core::ptr::drop_in_place<alloc::vec::Vec<litchi_xlsx::scenarios::model::RangeReference>>
+0 19
+
+fn=(2444) litchi_xlsx::cell_values::validation::validate_xml
+0 234
+cfn=(1092)
+calls=24 0 
+0 11062
+0 448952
+cfn=(1186)
+calls=236363 0 
+0 754787
+0 143740
+cfn=(1094)
+calls=236363 0 
+0 14379095
+0 161148
+cfn=(1094)
+calls=353847 0 
+0 12076306
+0 358604
+cfn=(1118)
+calls=590210 0 
+0 10306064
+0 2330926
+cfn=(1122)
+calls=590210 0 
+0 10384307
+0 1757570
+cfn=(2446)
+calls=236298 0 
+0 2657422
+0 323154
+cfn=(1144)
+calls=236298 0 
+0 2086208
+0 287248
+cfn=(828)
+calls=236298 0 
+0 35906
+0 143624
+cfn=(830)
+calls=236298 0 
+0 1293750
+0 251342
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=236298 255 
+0 575060
+0 323368
+cfn=(2446)
+calls=65 0 
+0 2146
+0 232
+cfn=(1144)
+calls=65 0 
+0 2367
+0 203
+cfn=(828)
+calls=65 0 
+0 29
+0 87
+cfn=(830)
+calls=65 0 
+0 3520
+0 203
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=65 255 
+0 427
+0 142597
+cfn=(1480)
+calls=117501 0 
+0 2008731
+0 985322
+cfn=(1110)
+calls=236298 0 
+0 1403994
+0 323154
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=236298 73 
+0 362131
+0 502684
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=236298 73 
+0 610402
+0 287248
+cfn=(844)
+calls=236298 0 
+0 1257515
+0 358416
+cfn=(1512)
+calls=117501 0 
+0 907222
+0 642441
+cfn=(2448)
+calls=65 0 
+0 49430
+0 261
+cfn=(844)
+calls=65 0 
+0 2050
+0 282
+cfn=(2448)
+calls=24 0 
+0 13132
+0 394867
+cfn=(2448)
+calls=236274 0 
+0 17529169
+0 287274
+cfn=(960)
+calls=37 0 
+0 3288
+0 771517
+cfn=(844)
+calls=24 0 
+0 315
+0 18
+cfn=(2456) core::ptr::drop_in_place<alloc::vec::Vec<alloc::boxed::Box<[u8]>>>
+calls=24 0 
+0 513
+0 18
+cfn=(1196)
+calls=24 0 
+0 3543
+0 81
+
+fn=(2514)
+0 88
+cfn=(1366) <alloc::boxed::Box<str> as core::clone::Clone>::clone
+calls=8 0 
+0 616
+0 88
+cfn=(1018) <alloc::string::String as core::clone::Clone>::clone
+calls=8 0 
+0 680
+0 16
+cfn=(1366)
+calls=8 0 
+0 704
+0 144
+cfn=(1018)
+calls=8 0 
+0 680
+0 16
+cfn=(1366)
+calls=8 0 
+0 704
+0 144
+cfn=(1366)
+calls=8 0 
+0 2026
+0 32
+cfn=(1366)
+calls=8 0 
+0 704
+0 32
+cfn=(1366)
+calls=8 0 
+0 1442
+0 80
+cfn=(1366)
+calls=8 0 
+0 1787
+0 32
+cfn=(1366)
+calls=8 0 
+0 704
+0 32
+cfn=(1366)
+calls=8 0 
+0 1700
+0 912
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=8 255 
+0 240
+0 224
+
+fn=(2578)
+0 4560
+cfn=(2580) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::row_position
+calls=608 0 
+0 423477
+0 2432
+cfn=(1378)
+calls=608 0 
+0 585547
+0 3952
+cfn=(2582) litchi_xlsx::raw::worksheet::x14ac::attribute_name
+calls=608 0 
+0 186671
+0 9728
+
+fn=(904) <alloc::string::String>::try_reserve
+0 498176
+cfn=(878) <alloc::raw_vec::RawVecInner>::finish_grow
+calls=240763 0 
+0 1251016
+0 213504
+
+fn=(962)
+0 410751
+cfn=(880)
+calls=2191 0 
+0 2342373
+0 57089
+cfn=(828)
+calls=55268 0 
+0 18459
+0 55377
+cfn=(830)
+calls=55268 0 
+0 901082
+0 254189
+cfn=(880)
+calls=366 0 
+0 85318
+0 1598461
+cfn=(880)
+calls=15154 0 
+0 35788
+0 227813
+cfn=(828)
+calls=569831 0 
+0 75863
+0 227589
+cfn=(830)
+calls=569831 0 
+0 8167957
+0 987451
+
+fn=(1024) <core::hash::sip::Hasher<S> as core::hash::Hasher>::write
+0 64474
+
+fn=(832) __rustc::__rdl_alloc
+0 1851012
+cob=(2)
+cfi=(155)
+cfn=(646) malloc
+calls=1864902 3283 
+0 13824116
+
+fn=(1090) <hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop
+0 75
+cfn=(844)
+calls=18 0 
+0 70
+0 12
+cfn=(844)
+calls=18 0 
+0 70
+0 22
+cfn=(844)
+calls=9 0 
+0 35
+0 48
+cfn=(844)
+calls=54 0 
+0 322
+0 335
+cfn=(844)
+calls=238 0 
+0 975
+0 37
+cfn=(844)
+calls=28 0 
+0 35
+0 72
+
+fn=(1092)
+0 266
+cfn=(960)
+calls=189 0 
+0 1995
+0 228
+cfn=(970)
+calls=189 0 
+0 3454
+0 1330
+cfn=(970)
+calls=189 0 
+0 5656
+0 171
+cfn=(970)
+calls=189 0 
+0 9529
+0 57
+
+fn=(1112) memchr::arch::x86_64::avx2::memchr::One::find_raw
+0 18380132
+cfn=(1114) memchr::arch::x86_64::avx2::memchr::One::find_raw_avx2
+calls=209 0 
+0 858
+0 50
+
+fn=(1116) quick_xml::reader::state::ReaderState::emit_question_mark
+0 570
+
+fn=(1194) core::ptr::drop_in_place<quick_xml::name::NamespaceResolver>
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+0 8
+cfn=(844)
+calls=9 0 
+0 35
+
+fn=(1276)
+0 68
+cfn=(920)
+calls=8 0 
+0 112
+0 3148
+cfn=(920)
+calls=284 0 
+0 6958
+0 1420
+cfn=(1450) core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::model::Action>
+calls=284 0 
+0 12968
+0 144
+cfn=(1450)
+calls=17560 0 
+0 2772
+0 534
+cfn=(920)
+calls=356 0 
+0 30864
+0 1129
+cfn=(920)
+calls=1 0 
+0 49
+0 12
+cfn=(920)
+calls=4 0 
+0 209
+0 5581
+cfn=(844)
+calls=178 0 
+0 28213
+0 210
+cfn=(844)
+calls=4 0 
+0 372
+0 228
+
+fn=(1306)
+0 1224
+cfn=(1308) <core::iter::adapters::take::Take<I> as core::iter::traits::iterator::Iterator>::nth
+calls=35 0 
+0 92
+0 104
+cfn=(1310) memchr::arch::x86_64::avx2::packedpair::Finder::with_pair_impl
+calls=35 0 
+0 144
+0 256
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=35 255 
+0 120
+0 36
+
+fn=(1312)
+0 84
+cfn=(1314) memchr::arch::x86_64::avx2::packedpair::Finder::find_impl
+calls=35 0 
+0 238510
+
+fn=(1320) litchi_sheet::Rect::from_a1
+0 656
+cfn=(1242) litchi_sheet::Cell::from_a1
+calls=53 0 
+0 1136
+0 80
+cfn=(1242)
+calls=53 0 
+0 1544
+0 304
+
+fn=(1380)
+0 610256
+
+fn=(1384)
+0 84
+cfn=(1148)
+calls=8 0 
+0 4744
+0 60
+cfn=(1320)
+calls=8 0 
+0 1860
+0 36
+cfn=(1378)
+calls=8 0 
+0 8156
+0 104
+cfn=(844)
+calls=8 0 
+0 140
+0 32
+
+fn=(1390) std::thread::local::LocalKey<T>::with
+0 16
+cfn=(986) core::ops::function::FnOnce::call_once
+calls=8 0 
+0 32
+0 36
+
+fn=(1414) litchi_xlsx::raw::worksheet::edit::validation::plan_sets_descent
+0 64
+
+fn=(1430) litchi_xlsx::raw::worksheet::edit::codec::wire::write_attribute
+0 5340
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=356 255 
+0 2848
+0 2670
+cfn=(1432) litchi_core::xml::escape::escape_xml
+calls=356 0 
+0 24396
+0 2314
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=356 255 
+0 2784
+0 1424
+cfn=(844)
+calls=356 0 
+0 8070
+0 2492
+
+fn=(1432)
+0 12828
+cfn=(828)
+calls=18148 0 
+0 178
+0 534
+cfn=(830)
+calls=18148 0 
+0 8440
+0 1602
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=18148 255 
+0 2674
+0 10858
+cfn=(828)
+calls=356 0 
+0 178
+0 534
+cfn=(830)
+calls=356 0 
+0 8440
+0 1602
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=356 255 
+0 2784
+0 534
+
+fn=(1494) litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+0 355840
+cfn=(1496) litchi_xlsx::raw::worksheet::codec::scan_cell_attributes
+calls=239227 0 
+0 19994061
+0 960768
+cfn=(1500) litchi_xlsx::raw::worksheet::validation::parse_a1
+calls=239227 0 
+0 3219445
+0 231296
+cfn=(844)
+calls=239227 0 
+0 643190
+0 355840
+cfn=(1502) litchi_xlsx::raw::worksheet::codec::parse_cell_u32
+calls=239227 0 
+0 391424
+0 604928
+cfn=(1502)
+calls=239227 0 
+0 391424
+0 480384
+cfn=(1502)
+calls=239227 0 
+0 391424
+0 338048
+cfn=(1338) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>
+calls=239227 0 
+0 195712
+0 587136
+
+fn=(1506) litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::push_text
+0 729472
+cfn=(904)
+calls=239227 0 
+0 1962696
+0 231296
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=239227 255 
+0 267244
+0 88960
+
+fn=(1508) litchi_xlsx::raw::worksheet::semantic::materialize
+0 1085312
+cfn=(1510) litchi_xlsx::raw::worksheet::semantic::parse_value
+calls=239227 0 
+0 7316139
+0 1067520
+cfn=(844)
+calls=239227 0 
+0 643912
+0 427008
+cfn=(1522)
+calls=239227 0 
+0 231296
+0 160128
+
+fn=(1534) <litchi_xlsx::cell::Value as core::cmp::PartialEq>::eq
+0 11742
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=532 73 
+0 11497
+0 2134
+
+fn=(1622) litchi_xlsx::calculation_properties::rewriter::inspect_start
+0 282
+cfn=(1150)
+calls=58 0 
+0 1587
+0 42
+cfn=(1150)
+calls=146 0 
+0 2753
+0 270
+cfn=(1166)
+calls=58 0 
+0 518
+0 36
+cfn=(1142) quick_xml::name::NamespaceResolver::resolve_prefix
+calls=58 0 
+0 324
+0 66
+cfn=(1110)
+calls=58 0 
+0 374
+0 48
+cfn=(1144)
+calls=58 0 
+0 488
+0 48
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=58 73 
+0 114
+0 114
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=58 73 
+0 102
+0 264
+cfn=(1150)
+calls=204 0 
+0 5699
+0 273
+cfn=(1166)
+calls=128 0 
+0 964
+0 96
+cfn=(1142)
+calls=128 0 
+0 524
+0 176
+cfn=(844)
+calls=49 0 
+0 175
+0 124
+cfn=(828)
+calls=58 0 
+0 6
+0 30
+cfn=(830)
+calls=58 0 
+0 482
+0 54
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=58 255 
+0 88
+0 93
+cfn=(1624) <[T] as alloc::slice::SpecCloneIntoVec<T,A>>::clone_into
+calls=9 0 
+0 291
+0 147
+cfn=(1626) litchi_xlsx::calculation_properties::rewriter::follows_calc_pr
+calls=13 0 
+0 12
+0 160
+cfn=(1628) litchi_xlsx::calculation_properties::rewriter::close_frame
+calls=40 0 
+0 296
+0 60
+cfn=(1184)
+calls=18 0 
+0 46
+0 78
+cfn=(844)
+calls=58 0 
+0 210
+0 48
+
+fn=(1624)
+0 16
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=9 255 
+0 13
+0 14
+cfn=(970)
+calls=9 0 
+0 246
+0 2
+
+fn=(1648) litchi_xlsx::calculation_properties::rewriter::sibling_name
+0 64
+cfn=(828)
+calls=2 0 
+0 1
+0 3
+cfn=(830)
+calls=2 0 
+0 36
+0 8
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=2 255 
+0 15
+0 10
+
+fn=(2510) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::cell_values::snapshot::CalculationChainState>>
+0 44
+
+fn=(2516)
+0 16
+cfn=(828)
+calls=3 0 
+0 1
+0 4
+cfn=(830)
+calls=3 0 
+0 286
+0 255
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=6 255 
+0 120
+0 52
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=6 255 
+0 120
+0 344
+cfn=(1366)
+calls=6 0 
+0 689
+0 56
+cfn=(1018)
+calls=6 0 
+0 783
+0 12
+cfn=(1366)
+calls=6 0 
+0 352
+0 76
+cfn=(1018)
+calls=6 0 
+0 340
+0 12
+cfn=(1366)
+calls=6 0 
+0 445
+0 76
+cfn=(1366)
+calls=6 0 
+0 976
+0 20
+cfn=(1366)
+calls=6 0 
+0 573
+0 20
+cfn=(1366)
+calls=6 0 
+0 858
+0 52
+cfn=(1366)
+calls=6 0 
+0 822
+0 20
+cfn=(1366)
+calls=6 0 
+0 492
+0 20
+cfn=(1366)
+calls=6 0 
+0 958
+0 219
+cfn=(1216)
+calls=3 0 
+0 15
+0 8
+
+fn=(2554) <alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop
+0 3382
+cfn=(844)
+calls=356 0 
+0 8070
+0 890
+
+fn=(2592) core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::codec::snapshot::model::RowSlot>
+0 2128
+cfn=(1458) core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::codec::snapshot::model::Tag>
+calls=608 0 
+0 230601
+0 216848
+cfn=(844)
+calls=35584 0 
+0 3122864
+0 20832
+cfn=(844)
+calls=608 0 
+0 48497
+
+fn=(1532)
+0 14952
+cfn=(1534)
+calls=534 0 
+0 25373
+
+fn=(836) std::rt::lang_start::{{closure}}
+cfn=(838)
+calls=0 0 
+0 377182416
+
+fn=(844)
+0 187943
+cfn=(846)
+calls=1880222 0 
+0 9314357
+
+fn=(952) <alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop
+0 27
+cfn=(844)
+calls=2 0 
+0 35
+0 92
+cfn=(844)
+calls=35 0 
+0 558
+
+fn=(1022)
+0 19
+cfn=(1024)
+calls=169 0 
+0 208
+0 5
+cfn=(1024)
+calls=169 0 
+0 35
+0 5541
+cfn=(1024)
+calls=3100 0 
+0 8512
+0 22287
+cfn=(1024)
+calls=1173 0 
+0 13195
+0 425
+cfn=(1024)
+calls=1173 0 
+0 3365
+0 5905
+cfn=(1024)
+calls=18 0 
+0 325
+0 10
+cfn=(1024)
+calls=18 0 
+0 70
+0 8
+cfn=(1024)
+calls=18 0 
+0 121
+0 10
+cfn=(1024)
+calls=18 0 
+0 70
+0 9428
+cfn=(1024)
+calls=5209 0 
+0 14448
+0 37368
+cfn=(1024)
+calls=1785 0 
+0 19755
+0 600
+cfn=(1024)
+calls=1785 0 
+0 4370
+0 8280
+
+fn=(1094)
+0 6134743
+cfn=(1102) memchr::arch::x86_64::memchr::memchr2_raw::find_avx2
+calls=1651884 0 
+0 10989253
+0 5175414
+cfn=(1110)
+calls=115 0 
+0 1428
+0 475
+cfn=(1116)
+calls=115 0 
+0 570
+0 209
+cfn=(1190)
+calls=115 0 
+0 152
+0 800678
+cfn=(1190)
+calls=410104 0 
+0 427008
+0 1021858
+cfn=(1126) memchr::arch::x86_64::memchr::memchr3_raw::find_avx2
+calls=825664 0 
+0 6463943
+0 3231420
+cfn=(1126)
+calls=825990 0 
+0 6464820
+0 1406326
+cfn=(1126)
+calls=416360 0 
+0 3266103
+0 489915
+cfn=(1126)
+calls=416360 0 
+0 3267107
+0 4703771
+cfn=(1188) quick_xml::reader::state::ReaderState::emit_end
+calls=825664 0 
+0 9918339
+0 1723900
+cfn=(1132) quick_xml::reader::state::ReaderState::emit_start
+calls=825990 0 
+0 10324537
+0 3497164
+
+fn=(1130) memchr::arch::x86_64::avx2::memchr::Three::find_raw_avx2
+0 6161954
+
+fn=(1148)
+0 750680
+cfn=(1150)
+calls=139922 0 
+0 13774028
+0 428960
+cfn=(1152) quick_xml::name::QName::prefix
+calls=70189 0 
+0 1158272
+0 107240
+cfn=(1144)
+calls=69961 0 
+0 1244064
+0 117744
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=42441 73 
+0 187192
+0 175704
+cfn=(1154)
+calls=39417 0 
+0 3374231
+0 276120
+cfn=(828)
+calls=39417 0 
+0 18408
+0 55224
+cfn=(830)
+calls=39417 0 
+0 803085
+0 147264
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=39417 255 
+0 289368
+0 242176
+cfn=(844)
+calls=69733 0 
+0 759765
+0 428960
+
+fn=(1158)
+0 3015926
+
+fn=(1188)
+0 5169696
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=960341 73 
+0 1086775
+0 3661868
+
+fn=(1242)
+0 2680
+
+fn=(1326) alloc::raw_vec::RawVecInner<A>::try_reserve
+0 236902
+cfn=(962)
+calls=554 0 
+0 1877925
+0 682
+
+fn=(1330) litchi_xlsx::cell::Store::from_unsorted
+0 2284
+cfn=(1332) litchi_xlsx::merge::Index::new
+calls=35 0 
+0 820
+0 92
+cfn=(1216)
+calls=35 0 
+0 60
+0 148
+cfn=(1336) litchi_xlsx::cell::Bounds::finish
+calls=35 0 
+0 184
+0 80
+cfn=(1336)
+calls=35 0 
+0 184
+0 80
+cfn=(1336)
+calls=35 0 
+0 36
+0 372
+cfn=(962)
+calls=35 0 
+0 324
+0 1017893
+cfn=(962)
+calls=140 0 
+0 7598
+0 177214
+cfn=(1580)
+calls=11 0 
+0 118
+0 18
+cfn=(1524) core::slice::sort::unstable::ipnsort
+calls=35 0 
+0 302432
+0 19
+cfn=(1524)
+calls=28 0 
+0 2304
+0 6
+
+fn=(1332)
+0 232
+cfn=(1276)
+calls=47 0 
+0 144
+0 224
+cfn=(1334) litchi_xlsx::merge::build
+calls=47 0 
+0 200
+0 96
+cfn=(1216)
+calls=47 0 
+0 144
+0 64
+cfn=(1216)
+calls=47 0 
+0 144
+0 64
+cfn=(1216)
+calls=47 0 
+0 144
+0 184
+
+fn=(1398) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingRow>>
+0 60
+
+fn=(1420) litchi_sheet::Cell::a1
+0 1958
+cfn=(828)
+calls=356 0 
+0 178
+0 534
+cfn=(830)
+calls=356 0 
+0 8518
+0 1602
+cfn=(828)
+calls=356 0 
+0 178
+0 712
+cfn=(830)
+calls=356 0 
+0 9192
+0 1958
+cfn=(1422) <alloc::string::String as core::iter::traits::collect::Extend<char>>::extend
+calls=356 0 
+0 11882
+0 890
+cfn=(1246) <u32>::_fmt
+calls=356 0 
+0 5449
+0 8216
+cfn=(828)
+calls=356 0 
+0 178
+0 712
+cfn=(830)
+calls=356 0 
+0 8935
+0 1246
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=356 255 
+0 3178
+0 1780
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=356 255 
+0 3178
+0 1068
+cfn=(844)
+calls=356 0 
+0 6230
+0 1780
+cfn=(844)
+calls=356 0 
+0 8070
+0 1958
+
+fn=(1446) litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_text_element
+0 2314
+cfn=(1440) litchi_xlsx::raw::catalog_edit::codec::sibling_name
+calls=18148 0 
+0 31529
+0 3738
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=18148 255 
+0 2848
+0 3560
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=18148 255 
+0 2674
+0 3560
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=18148 255 
+0 2848
+0 3738
+cfn=(844)
+calls=18148 0 
+0 8185
+
+fn=(1504) litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value
+0 195712
+
+fn=(1518)
+0 391424
+cfn=(1520) core::num::dec2flt::parse::parse_number
+calls=239227 0 
+0 1739070
+0 729472
+
+fn=(1626)
+0 12
+
+fn=(1632) <litchi_ooxml_common::mce::model::Capabilities as core::default::Default>::default
+0 1
+cfn=(1086) litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline
+calls=9 0 
+0 16909
+
+fn=(1636)
+0 1255
+
+fn=(1660) litchi_xlsx::calculation_properties::rewriter::bool_attr
+0 12
+cfn=(1656) litchi_xlsx::calculation_properties::rewriter::attr
+calls=4 0 
+0 1036
+0 3
+cfn=(1656)
+calls=2 0 
+0 340
+
+fn=(606) main
+cfn=(608) std::rt::lang_start_internal
+calls=0 0 
+0 377182416
+
+fn=(608)
+cfn=(836)
+calls=0 0 
+0 377182416
+
+fn=(1122)
+0 3656136
+cfn=(1110)
+calls=677 0 
+0 2920
+0 969408
+cfn=(1110)
+calls=789838 0 
+0 4210878
+0 1507828
+cfn=(1110)
+calls=789838 0 
+0 4210878
+0 1234640
+cfn=(1142)
+calls=789838 0 
+0 5169780
+0 1507828
+cfn=(1142)
+calls=789838 0 
+0 5169780
+0 1077245
+cfn=(1142)
+calls=677 0 
+0 2358
+0 2420172
+
+fn=(1134) quick_xml::name::NamespaceResolver::push
+0 3447904
+cfn=(1136) quick_xml::events::attributes::IterState::next
+calls=826430 0 
+0 10277554
+0 217740
+cfn=(1136)
+calls=417316 0 
+0 1757834
+0 2172810
+cfn=(1140) quick_xml::name::NamespaceResolver::add
+calls=238 0 
+0 14793
+0 1724108
+
+fn=(1136)
+0 16748256
+cfn=(1138)
+calls=988144 0 
+0 18279971
+0 7607018
+
+fn=(1142)
+0 2805123
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=112 73 
+0 40
+0 7545811
+
+fn=(1162) core::str::count::char_count_general_case
+0 860733
+
+fn=(1192) core::ptr::drop_in_place<quick_xml::events::Event>
+0 24
+
+fn=(1246)
+0 5470
+
+fn=(1310)
+0 144
+
+fn=(1324) litchi_xlsx::raw::worksheet::semantic::resolve_shared_formulas
+0 124704
+
+fn=(1388)
+0 648
+cfn=(1390)
+calls=8 0 
+0 84
+0 96
+cfn=(1272) alloc::raw_vec::RawVecInner<A>::try_reserve_exact
+calls=8 0 
+0 48
+0 56
+cfn=(1332)
+calls=8 0 
+0 820
+0 84
+cfn=(1272)
+calls=8 0 
+0 48
+0 32
+cfn=(1354) alloc::vec::Vec<T,A>::extend_trusted
+calls=8 0 
+0 96
+0 248
+cfn=(1216)
+calls=8 0 
+0 72
+0 36
+cfn=(1216)
+calls=8 0 
+0 72
+0 40
+cfn=(1216)
+calls=8 0 
+0 72
+0 32
+cfn=(1216)
+calls=8 0 
+0 60
+0 364
+cfn=(1356) core::ptr::drop_in_place<litchi_xlsx::merge::Index>
+calls=8 0 
+0 52
+0 8
+cfn=(1090)
+calls=8 0 
+0 16
+0 8
+cfn=(1392)
+calls=8 0 
+0 20
+0 8
+cfn=(1394)
+calls=8 0 
+0 44
+0 8
+cfn=(1396) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingColumns>>
+calls=8 0 
+0 60
+0 16
+cfn=(1398)
+calls=8 0 
+0 60
+0 8
+cfn=(1400) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingCell>>
+calls=8 0 
+0 20
+0 8
+cfn=(1402) core::ptr::drop_in_place<alloc::vec::Vec<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::FormulaStorage>>
+calls=8 0 
+0 76
+0 12
+cfn=(1404)
+calls=8 0 
+0 20
+0 4
+
+fn=(1394)
+0 88
+
+fn=(1396)
+0 60
+
+fn=(1406) litchi_xlsx::raw::worksheet::edit::validation::validate_actions
+0 5959
+cfn=(1294)
+calls=8 0 
+0 185
+0 46535
+cfn=(1248) litchi_xlsx::cell::Content::validate_for_write
+calls=18148 0 
+0 15446
+0 1780
+cfn=(1294)
+calls=356 0 
+0 6258
+0 368
+
+fn=(1408) litchi_xlsx::raw::worksheet::edit::validation::validate_column_actions
+0 120
+cfn=(962)
+calls=8 0 
+0 1170
+0 187380
+cfn=(844)
+calls=8 0 
+0 644
+0 4
+
+fn=(1412) litchi_xlsx::raw::worksheet::edit::validation::expanded_dimension
+0 3104982
+
+fn=(1434) litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_sheet_data
+0 156
+cfn=(920)
+calls=8 0 
+0 213
+0 534
+cfn=(920)
+calls=356 0 
+0 12466
+0 32394
+cfn=(1436) alloc::collections::btree::map::entry::Entry<K,V,A>::or_default
+calls=8 0 
+0 384
+0 414
+cfn=(1436)
+calls=576 0 
+0 16544
+0 72
+cfn=(1436)
+calls=17560 0 
+0 864
+0 5092
+cfn=(1254) alloc::collections::btree::map::entry::VacantEntry<K,V,A>::insert_entry
+calls=284 0 
+0 63223
+0 864
+cfn=(1254)
+calls=17560 0 
+0 3636
+0 884
+cfn=(920)
+calls=8 0 
+0 112
+0 108
+cfn=(920)
+calls=8 0 
+0 112
+0 36
+cfn=(920)
+calls=8 0 
+0 112
+0 92
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=8 255 
+0 52
+0 8176
+cfn=(920)
+calls=288 0 
+0 7838
+0 48863
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=324 255 
+0 5227
+0 3166
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=284 255 
+0 1846
+0 939912
+cfn=(828)
+calls=356 0 
+0 178
+0 534
+cfn=(830)
+calls=356 0 
+0 11004
+0 2314
+cfn=(960)
+calls=356 0 
+0 96710
+0 1958
+cfn=(828)
+calls=356 0 
+0 178
+0 534
+cfn=(830)
+calls=356 0 
+0 7120
+0 1424
+cfn=(1420)
+calls=356 0 
+0 89580
+0 5874
+cfn=(2590) litchi_xlsx::raw::worksheet::edit::codec::wire::write_cell_tag
+calls=356 0 
+0 60882
+0 2314
+cfn=(1444) litchi_xlsx::raw::worksheet::edit::codec::snapshot::write::sheet_data::write_payload
+calls=356 0 
+0 110712
+0 11392
+cfn=(1448) litchi_xlsx::raw::catalog_edit::codec::write_close
+calls=356 0 
+0 9790
+0 356
+cfn=(2554)
+calls=356 0 
+0 12342
+0 1424
+cfn=(844)
+calls=356 0 
+0 8185
+0 1246
+cfn=(844)
+calls=356 0 
+0 25889
+0 85625
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=33182 255 
+0 182501
+0 159013
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=284 255 
+0 2130
+0 710
+cfn=(1276)
+calls=284 0 
+0 59886
+0 372
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=8 255 
+0 120
+0 50
+cfn=(920)
+calls=4 0 
+0 432
+0 48
+cfn=(1370)
+calls=8 0 
+0 200
+0 92
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=8 255 
+0 52
+0 52
+
+fn=(1436)
+0 4006
+cfn=(828)
+calls=8 0 
+0 4
+0 12
+cfn=(830)
+calls=8 0 
+0 160
+0 4931
+cfn=(828)
+calls=72 0 
+0 17
+0 51
+cfn=(830)
+calls=72 0 
+0 1496
+0 595
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=72 255 
+0 187
+0 136
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=72 255 
+0 1101
+0 2380
+cfn=(828)
+calls=4 0 
+0 1
+0 3
+cfn=(830)
+calls=4 0 
+0 40
+0 36
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 11
+0 9
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 65
+0 28
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 12
+0 195
+cfn=(828)
+calls=10 0 
+0 2
+0 6
+cfn=(830)
+calls=10 0 
+0 80
+0 2228
+
+fn=(1444)
+0 6408
+cfn=(1432)
+calls=18148 0 
+0 26790
+0 1424
+cfn=(1446)
+calls=18148 0 
+0 64994
+0 1246
+cfn=(844)
+calls=18148 0 
+0 8070
+0 1780
+
+fn=(1448)
+0 4628
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=356 255 
+0 2848
+0 2314
+
+fn=(1450)
+0 4450
+cfn=(1452)
+calls=18148 0 
+0 11290
+
+fn=(1454) core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::codec::validation::ExtensionNames>
+0 48
+cfn=(844)
+calls=8 0 
+0 255
+0 40
+
+fn=(1486) litchi_xlsx::raw::worksheet::validation::parse_one_based_row
+0 31958
+
+fn=(1650) litchi_xlsx::calculation_properties::rewriter::serialize_properties
+0 19
+cfn=(1652) litchi_xlsx::calculation_properties::rewriter::Bounded::push
+calls=2 0 
+0 125
+0 7
+cfn=(1654)
+calls=2 0 
+0 56
+0 8
+cfn=(1246)
+calls=2 0 
+0 21
+0 7
+cfn=(828)
+calls=2 0 
+0 1
+0 4
+cfn=(830)
+calls=2 0 
+0 169
+0 7
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=2 255 
+0 16
+0 8
+cfn=(1656)
+calls=2 0 
+0 816
+0 8
+cfn=(844)
+calls=2 0 
+0 35
+0 17
+cfn=(1656)
+calls=2 0 
+0 704
+0 24
+cfn=(1660)
+calls=2 0 
+0 345
+0 11
+cfn=(1660)
+calls=2 0 
+0 709
+0 16
+cfn=(1660)
+calls=2 0 
+0 337
+0 7
+cfn=(1654)
+calls=2 0 
+0 59
+0 16
+
+fn=(1656)
+0 80
+cfn=(1652)
+calls=10 0 
+0 125
+0 35
+cfn=(1654)
+calls=10 0 
+0 1147
+0 35
+cfn=(1654)
+calls=10 0 
+0 295
+0 35
+cfn=(1658)
+calls=10 0 
+0 954
+0 65
+cfn=(1652)
+calls=10 0 
+0 125
+
+fn=(2572)
+0 50095
+cfn=(1532)
+calls=178 0 
+0 13504
+0 712
+cfn=(1522)
+calls=178 0 
+0 12460
+0 1602
+cfn=(1366)
+calls=178 0 
+0 13710
+0 1472
+
+fn=(2574)
+0 52151
+cfn=(1366)
+calls=178 0 
+0 43367
+0 3382
+cfn=(1532)
+calls=178 0 
+0 13644
+0 712
+cfn=(1522)
+calls=178 0 
+0 14415
+0 37300
+cfn=(1366)
+calls=178 0 
+0 15869
+0 816
+cfn=(1254)
+calls=4 0 
+0 1379
+0 3654
+cfn=(1254)
+calls=174 0 
+0 34244
+0 534
+cfn=(2576) core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::model::Action>>
+calls=178 0 
+0 1780
+0 2646
+
+fn=(2588) litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag
+0 729472
+cfn=(1150)
+calls=35584 0 
+0 6220761
+0 17792
+cfn=(1150)
+calls=35584 0 
+0 1014144
+0 391424
+cfn=(908)
+calls=35584 0 
+0 697413
+0 142336
+cfn=(1154)
+calls=35584 0 
+0 3277470
+0 960768
+cfn=(844)
+calls=35584 0 
+0 631690
+0 320256
+
+fn=(2594)
+0 76
+cfn=(2444)
+calls=4 0 
+0 89778652
+0 24
+cfn=(1302) litchi_xlsx::raw::worksheet::parse
+calls=4 0 
+0 139958288
+0 100
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 56
+cfn=(2514)
+calls=4 0 
+0 7324
+0 20
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 12
+cfn=(828)
+calls=4 0 
+0 4
+0 12
+cfn=(830)
+calls=4 0 
+0 160
+0 28
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 24
+cfn=(828)
+calls=4 0 
+0 4
+0 12
+cfn=(830)
+calls=4 0 
+0 160
+0 84
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 356
+0 4
+
+fn=(1524)
+0 304736
+
+fn=(828)
+0 205668
+
+fn=(882)
+0 426316
+cob=(2)
+cfi=(155)
+cfn=(744) realloc
+calls=128448 3380 
+0 7275585
+
+fn=(1032) hashbrown::map::HashMap<K,V,S,A>::insert
+0 12
+cfn=(1022)
+calls=85 0 
+0 336
+0 3417
+cfn=(1022)
+calls=3100 0 
+0 34656
+0 17511
+cfn=(1016)
+calls=248 0 
+0 85156
+0 75
+cfn=(1022)
+calls=18 0 
+0 794
+0 165
+cfn=(1016)
+calls=9 0 
+0 196
+0 1021
+cfn=(1022)
+calls=1173 0 
+0 24465
+0 6494
+cfn=(1016)
+calls=276 0 
+0 46149
+0 30
+
+fn=(986)
+0 32
+
+fn=(1084) litchi_ooxml_common::mce::codec::process_ooxml
+0 52
+cfn=(1086)
+calls=60 0 
+0 69750
+0 48
+cfn=(1088) litchi_ooxml_common::mce::codec::process_markup_compatibility
+calls=60 0 
+0 12197064
+0 1348
+cfn=(844)
+calls=1020 0 
+0 2380
+0 116
+cfn=(844)
+calls=60 0 
+0 140
+0 8
+cfn=(1090)
+calls=60 0 
+0 72
+0 36
+
+fn=(1102)
+0 4525227
+cfn=(1104) memchr::arch::x86_64::avx2::memchr::Two::find_raw
+calls=1921863 0 
+0 5817565
+0 646461
+
+fn=(1104)
+0 1939421
+cfn=(1106)
+calls=1921283 0 
+0 3446768
+0 431376
+
+fn=(1120) quick_xml::events::Event::into_owned
+0 410
+cfn=(828)
+calls=128 0 
+0 4
+0 16
+cfn=(830)
+calls=128 0 
+0 398
+0 28
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=128 255 
+0 56
+0 58
+cfn=(828)
+calls=380 0 
+0 14
+0 56
+cfn=(830)
+calls=380 0 
+0 812
+0 98
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=380 255 
+0 210
+0 346
+
+fn=(1140)
+0 570
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=189 255 
+0 228
+0 399
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=49 255 
+0 112
+0 84
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=49 255 
+0 154
+0 445
+cfn=(970)
+calls=49 0 
+0 3152
+0 128
+cfn=(970)
+calls=189 0 
+0 9483
+0 38
+
+fn=(1150)
+0 6080
+cfn=(1136)
+calls=1216 0 
+0 97180
+0 373168
+cfn=(1136)
+calls=478454 0 
+0 5848060
+0 1014344
+cfn=(1136)
+calls=252 0 
+0 3462
+0 542018
+cfn=(1136)
+calls=355332 0 
+0 6553689
+0 1665903
+cfn=(1136)
+calls=72832 0 
+0 5974934
+0 1462304
+cfn=(1136)
+calls=140226 0 
+0 12122532
+0 1222536
+
+fn=(1184)
+0 231296
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=239227 255 
+0 533760
+0 338048
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=239227 255 
+0 533760
+0 106804
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 330
+0 70
+
+fn=(1248)
+0 1780
+cfn=(1250) litchi_xlsx::cell::Value::validate_for_write
+calls=36118 0 
+0 13132
+0 534
+
+fn=(1254)
+0 10026
+cfn=(828)
+calls=292 0 
+0 146
+0 438
+cfn=(830)
+calls=292 0 
+0 53068
+0 16648
+cfn=(828)
+calls=4868 0 
+0 22
+0 66
+cfn=(830)
+calls=4868 0 
+0 8141
+0 968
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4868 255 
+0 264
+0 132
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4868 255 
+0 1574
+0 4001
+cfn=(828)
+calls=543 0 
+0 2
+0 6
+cfn=(830)
+calls=543 0 
+0 711
+0 78
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=543 255 
+0 24
+0 14
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=543 255 
+0 142
+0 64
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=543 255 
+0 24
+0 381
+cfn=(828)
+calls=319 0 
+0 2
+0 6
+cfn=(830)
+calls=319 0 
+0 692
+0 4842
+
+fn=(1302)
+0 52
+cfn=(1304)
+calls=4 0 
+0 240746
+0 68
+cfn=(1084)
+calls=4 0 
+0 12271014
+0 48
+cfn=(908)
+calls=4 0 
+0 222678
+0 52
+cfn=(1316) litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse
+calls=4 0 
+0 127223426
+0 44
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 40
+
+fn=(1308)
+0 92
+
+fn=(1318) litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start
+0 791040
+cfn=(1144)
+calls=70 0 
+0 784
+0 116
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=35 73 
+0 68
+0 24
+cfn=(1144)
+calls=35 0 
+0 392
+0 24
+cfn=(1144)
+calls=35 0 
+0 392
+0 24
+cfn=(1144)
+calls=35 0 
+0 392
+0 84
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=35 73 
+0 68
+0 251224
+cfn=(1144)
+calls=481478 0 
+0 2084544
+0 215328
+cfn=(1144)
+calls=481478 0 
+0 2084544
+0 324208
+cfn=(1144)
+calls=3024 0 
+0 20672
+0 76944
+cfn=(1144)
+calls=239227 0 
+0 1031936
+0 142336
+cfn=(1144)
+calls=239227 0 
+0 1031936
+0 373672
+cfn=(1382)
+calls=239227 0 
+0 2259584
+0 88960
+cfn=(1504)
+calls=239227 0 
+0 195712
+0 71472
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=3024 73 
+0 5168
+0 1824
+cfn=(1484) litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_row
+calls=3024 0 
+0 2580683
+0 19008
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=239227 73 
+0 302464
+0 106752
+cfn=(1494)
+calls=239227 0 
+0 29140920
+0 358372
+cfn=(1148)
+calls=35 0 
+0 4220
+0 76
+cfn=(1320)
+calls=35 0 
+0 1860
+0 68
+cfn=(844)
+calls=35 0 
+0 140
+0 4
+
+fn=(1328) litchi_xlsx::column::resolve
+0 92
+
+fn=(1366)
+0 7380
+cfn=(828)
+calls=1435 0 
+0 820
+0 2460
+cfn=(830)
+calls=1435 0 
+0 91914
+0 5740
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1435 255 
+0 12580
+0 4920
+
+fn=(1416) litchi_xlsx::raw::worksheet::edit::codec::validation::ExtensionNames::plan
+0 44
+cfn=(828)
+calls=8 0 
+0 4
+0 12
+cfn=(830)
+calls=8 0 
+0 404
+0 84
+
+fn=(1452)
+0 3026
+cfn=(844)
+calls=18148 0 
+0 8264
+0 9078
+cfn=(844)
+calls=534 0 
+0 40310
+
+fn=(1456) core::ptr::drop_in_place<litchi_xlsx::raw::worksheet::edit::codec::snapshot::model::Layout>
+0 36
+cfn=(1458)
+calls=8 0 
+0 1801
+0 16
+cfn=(1458)
+calls=8 0 
+0 454
+0 36
+cfn=(2592)
+calls=8 0 
+0 31487
+0 600
+cfn=(2592)
+calls=600 0 
+0 3610283
+0 928
+cfn=(844)
+calls=8 0 
+0 697
+0 24
+cfn=(1458)
+calls=8 0 
+0 2768
+0 88
+
+fn=(1496)
+0 569344
+cfn=(1150)
+calls=239227 0 
+0 6203900
+0 53376
+cfn=(1150)
+calls=239227 0 
+0 1014144
+0 338048
+cfn=(1152)
+calls=239227 0 
+0 960768
+0 71168
+cfn=(1144)
+calls=239227 0 
+0 1031936
+0 284672
+cfn=(1498)
+calls=239227 0 
+0 7562961
+0 427008
+cfn=(844)
+calls=239227 0 
+0 622720
+0 142336
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=239227 255 
+0 533760
+0 177920
+
+fn=(1514) litchi_xlsx::cell::Number::new
+0 177920
+cfn=(828)
+calls=239227 0 
+0 17792
+0 53376
+cfn=(830)
+calls=239227 0 
+0 666453
+0 124544
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=239227 255 
+0 267244
+0 71168
+cfn=(1516)
+calls=239227 0 
+0 4176404
+0 213504
+
+fn=(1620) litchi_xlsx::calculation_properties::codec::reject_unsafe_event
+0 360
+
+fn=(1652)
+0 289
+cfn=(962)
+calls=2 0 
+0 77
+0 9
+
+fn=(2450)
+0 1047147
+
+fn=(2452)
+0 1617075
+cfn=(1150)
+calls=236363 0 
+0 7339015
+0 54597
+cfn=(1150)
+calls=118969 0 
+0 1059397
+0 781712
+cfn=(2454)
+calls=118850 0 
+0 402208
+0 271218
+cfn=(844)
+calls=118838 0 
+0 634690
+0 503090
+
+fn=(2582)
+0 10640
+cfn=(1150)
+calls=1216 0 
+0 120588
+0 4864
+cfn=(1166)
+calls=608 0 
+0 19152
+0 2432
+cfn=(1142)
+calls=608 0 
+0 8208
+0 4256
+cfn=(844)
+calls=608 0 
+0 10755
+0 5776
+
+fn=(2584)
+0 231296
+cfn=(2586) litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address
+calls=35584 0 
+0 26843593
+0 142336
+cfn=(2588)
+calls=35584 0 
+0 14403526
+0 587136
+
+fn=(2586)
+0 355840
+cfn=(1148)
+calls=35584 0 
+0 21703926
+0 302464
+cfn=(1500)
+calls=35584 0 
+0 3219445
+0 213504
+cfn=(844)
+calls=35584 0 
+0 656990
+0 391424
+
+fn=(840)
+cfn=(848) litchi_perf_baseline::run
+calls=0 0 
+0 377182416
+
+fn=(848)
+cfn=(2298)
+calls=0 0 
+0 377182416
+
+fn=(1018)
+0 288
+cfn=(828)
+calls=3350 0 
+0 24
+0 72
+cfn=(830)
+calls=3350 0 
+0 1403
+0 168
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=3350 255 
+0 264
+0 264
+
+fn=(574) (below main)
+cob=(2)
+cfi=(166) ./csu/../csu/libc-start.c
+cfn=(576) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 377182416
+
+fn=(960)
+0 16080
+cfn=(962)
+calls=2144 0 
+0 592240
+0 14328
+cfn=(962)
+calls=624 0 
+0 82623
+0 270003
+cfn=(962)
+calls=35637 0 
+0 1457587
+0 160602
+cfn=(962)
+calls=38 0 
+0 12361
+0 231
+cfn=(962)
+calls=65 0 
+0 308
+0 2706
+cfn=(962)
+calls=677 0 
+0 92438
+0 1138482
+cfn=(962)
+calls=569055 0 
+0 11272106
+0 682593
+cfn=(962)
+calls=276 0 
+0 6719
+0 564
+cfn=(962)
+calls=189 0 
+0 1539
+0 171
+
+fn=(1110)
+0 10351705
+cfn=(1112)
+calls=5074767 0 
+0 18381040
+0 2388855
+
+fn=(1128) memchr::arch::x86_64::avx2::memchr::Three::find_raw
+0 2921157
+cfn=(1130)
+calls=2891169 0 
+0 6161954
+0 649292
+
+fn=(1086)
+0 745
+cfn=(828)
+calls=1173 0 
+0 85
+0 340
+cfn=(830)
+calls=1173 0 
+0 4146
+0 595
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1173 255 
+0 1065
+0 765
+cfn=(1032)
+calls=1173 0 
+0 78158
+0 760
+
+fn=(1088)
+0 130
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=69 73 
+0 70
+0 2034252
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=6809865 73 
+0 7119930
+0 3051528
+
+fn=(1152)
+0 353160
+cfn=(1110)
+calls=309416 0 
+0 1530440
+0 235440
+
+fn=(1250)
+0 3026
+cfn=(1162)
+calls=36296 0 
+0 8504
+0 1602
+
+fn=(1338)
+0 195756
+
+fn=(1356)
+0 52
+
+fn=(1378)
+0 5372
+cfn=(908)
+calls=632 0 
+0 19127
+0 6004
+cfn=(828)
+calls=632 0 
+0 316
+0 1580
+cfn=(830)
+calls=632 0 
+0 13890
+0 2528
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=632 255 
+0 5628
+0 8216
+cfn=(1150)
+calls=632 0 
+0 108070
+0 312
+cfn=(1150)
+calls=624 0 
+0 17784
+0 5940
+cfn=(908)
+calls=624 0 
+0 12519
+0 2808
+cfn=(828)
+calls=624 0 
+0 312
+0 1248
+cfn=(830)
+calls=624 0 
+0 53598
+0 2184
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=624 255 
+0 4996
+0 1560
+cfn=(1154)
+calls=624 0 
+0 50711
+0 4056
+cfn=(828)
+calls=624 0 
+0 312
+0 936
+cfn=(830)
+calls=624 0 
+0 52606
+0 2184
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=624 255 
+0 5526
+0 4056
+cfn=(960)
+calls=624 0 
+0 90111
+0 7812
+cfn=(844)
+calls=624 0 
+0 11035
+0 2844
+cfn=(1216)
+calls=632 0 
+0 96792
+0 2528
+
+fn=(1400)
+0 20
+
+fn=(1410) litchi_xlsx::raw::worksheet::edit::validation::validate_defaults_action
+0 84
+
+fn=(1422)
+0 11882
+
+fn=(1440)
+0 4094
+cfn=(910) <core::str::pattern::CharSearcher as core::str::pattern::Searcher>::next_match
+calls=36244 0 
+0 10680
+0 1068
+cfn=(828)
+calls=36244 0 
+0 178
+0 712
+cfn=(830)
+calls=36244 0 
+0 8567
+0 1246
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=36244 255 
+0 2848
+0 2136
+
+fn=(1458)
+0 3792
+cfn=(844)
+calls=632 0 
+0 57889
+0 5316
+cfn=(844)
+calls=624 0 
+0 54361
+0 1872
+cfn=(844)
+calls=624 0 
+0 54156
+0 3432
+cfn=(844)
+calls=624 0 
+0 54782
+0 24
+
+fn=(1482) quick_xml::encoding::Decoder::decode_cow
+0 800640
+cfn=(908)
+calls=410104 0 
+0 4320698
+0 693888
+
+fn=(1492) litchi_xlsx::raw::worksheet::validation::optional_bool
+0 21280
+cfn=(1148)
+calls=21168 0 
+0 1348914
+0 38304
+
+fn=(1500)
+0 2942008
+cfn=(908)
+calls=274811 0 
+0 1767960
+0 1728922
+
+fn=(1520)
+0 1739070
+
+fn=(1646) litchi_xlsx::calculation_properties::rewriter::rewrite
+0 62
+cfn=(962)
+calls=2 0 
+0 81
+0 20
+cfn=(1648)
+calls=2 0 
+0 137
+0 9
+cfn=(1650)
+calls=2 0 
+0 3552
+0 14
+cfn=(844)
+calls=2 0 
+0 35
+0 72
+cfn=(1272)
+calls=2 0 
+0 120
+0 57
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=2 255 
+0 77
+0 16
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=2 255 
+0 22
+0 9
+cfn=(844)
+calls=2 0 
+0 35
+0 6
+cfn=(952)
+calls=2 0 
+0 62
+0 16
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=2 255 
+0 13
+0 7
+
+fn=(1654)
+0 502
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=34 255 
+0 266
+0 255
+cfn=(962)
+calls=8 0 
+0 1139
+0 48
+
+fn=(1662) core::ptr::drop_in_place<litchi_xlsx::calculation_properties::rewriter::Layout>
+0 30
+cfn=(844)
+calls=2 0 
+0 35
+
+fn=(2576)
+0 1780
+
+fn=(2598)
+0 76
+cfn=(2444)
+calls=4 0 
+0 135371
+0 124
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 308
+0 4
+
+fn=(910)
+0 10680
+
+fn=(1118)
+0 5969833
+cfn=(1134)
+calls=825664 0 
+0 19581221
+0 4410519
+cfn=(1134)
+calls=326 0 
+0 31522
+0 862246
+
+fn=(1126)
+0 8756613
+cfn=(1128)
+calls=2891741 0 
+0 9732403
+0 972957
+
+fn=(1132)
+0 4164148
+cfn=(960)
+calls=276 0 
+0 7463
+0 2046188
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=960341 255 
+0 1724956
+0 2369874
+cfn=(970)
+calls=408 0 
+0 11758
+0 150
+
+fn=(1182)
+0 1105
+cfn=(828)
+calls=257 0 
+0 24
+0 72
+cfn=(830)
+calls=257 0 
+0 1501
+0 408
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=257 198 
+0 376
+0 288
+
+fn=(1186)
+0 2262983
+
+fn=(1272)
+0 124
+cfn=(962)
+calls=7 0 
+0 81
+0 11
+
+fn=(1316)
+0 104
+cfn=(1092)
+calls=4 0 
+0 4794
+0 248
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 358788
+cfn=(1186)
+calls=35900 0 
+0 753952
+0 143600
+cfn=(1094)
+calls=35900 0 
+0 14357431
+0 161088
+cfn=(1094)
+calls=53696 0 
+0 12062997
+0 358384
+cfn=(1118)
+calls=89596 0 
+0 10268642
+0 2329496
+cfn=(1122)
+calls=89596 0 
+0 10376352
+0 1344016
+cfn=(1318)
+calls=4 0 
+0 7148
+0 32
+cfn=(1322) litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish
+calls=4 0 
+0 108
+0 984140
+cfn=(1318)
+calls=35892 0 
+0 43560891
+0 1076820
+cfn=(1322)
+calls=35896 0 
+0 7380431
+0 143604
+cfn=(1144)
+calls=4 0 
+0 392
+0 132
+cfn=(1144)
+calls=4 0 
+0 392
+0 88
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=4 73 
+0 68
+0 107708
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=4 73 
+0 68
+0 28
+cfn=(960)
+calls=4 0 
+0 404
+0 464204
+cfn=(1480)
+calls=17792 0 
+0 2008731
+0 195712
+cfn=(1506)
+calls=17792 0 
+0 3279668
+0 374956
+cfn=(1192)
+calls=4 0 
+0 16
+0 36
+cfn=(1324)
+calls=4 0 
+0 124704
+0 106812
+cfn=(1326)
+calls=4 0 
+0 1529
+0 68
+cfn=(1328)
+calls=4 0 
+0 92
+0 160268
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=17792 255 
+0 533760
+0 71168
+cfn=(1508)
+calls=17792 0 
+0 10931315
+0 729472
+cfn=(1184)
+calls=17792 0 
+0 871808
+0 71196
+cfn=(952)
+calls=4 0 
+0 650
+0 100
+cfn=(1330)
+calls=4 0 
+0 1512266
+0 28
+cfn=(844)
+calls=4 0 
+0 140
+0 8
+cfn=(1276)
+calls=4 0 
+0 72
+0 8
+cfn=(1338)
+calls=4 0 
+0 44
+0 8
+cfn=(1090)
+calls=4 0 
+0 370
+0 8
+cfn=(1196)
+calls=4 0 
+0 1739
+0 4
+
+fn=(1372)
+0 116
+cfn=(1374)
+calls=4 0 
+0 137515223
+0 44
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 356
+0 32
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 356
+0 40
+cfn=(1406)
+calls=4 0 
+0 76531
+0 44
+cfn=(1408)
+calls=4 0 
+0 189318
+0 32
+cfn=(1410)
+calls=4 0 
+0 84
+0 24
+cfn=(1412)
+calls=4 0 
+0 3104982
+0 8
+cfn=(1414)
+calls=4 0 
+0 64
+0 16
+cfn=(1416)
+calls=4 0 
+0 548
+0 148
+cfn=(1326)
+calls=4 0 
+0 1594
+0 68
+
+ob=(2)
+fl=(203)
+fn=(716)
+255 308515
++1 308515
++6 308515
++1 308515
++2 72317
++1 72317
++1 72317
++3 312
++1 312
++1 312
++3 624
++30 236198
++1 236198
++2 219411
++1 219411
++2 219164
++4 219164
++1 154369
++1 154369
++1 154369
++1 154369
++1 10709
++1 10709
++2 10709
++2 10709
+-2 143660
++2 143660
++6 64795
++1 64795
++1 64795
++1 64795
++1 64795
++7 16787
++1 16787
++1 16787
++1 16787
++2 16787
++17 247
++1 247
++1 247
++1 247
++1 247
++7 94
++1 94
++1 94
++1 94
++1 94
++1 94
++1 188
++5 72005
++1 72005
++5 71991
++1 71991
++2 71336
++1 71336
++1 71336
++2 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 71242
++1 142484
++4 655
++1 655
++4 655
++2 655
++4 655
++1 655
++11 655
++3 655
++2 655
++2 655
++4 655
++1 655
++9 646
++1 646
++2 646
++2 646
++1 646
++1 646
++3 646
++2 646
++2 646
++2 1292
++6 646
++1 646
++1 646
++1 646
++1 646
++1 646
++1 646
++1 646
++1 646
++1 646
++1 646
++1 646
+-11 6012
++1 6012
++1 6012
++1 6012
++1 6012
++1 6012
++1 6012
++1 6012
++1 6012
++1 6012
++1 6012
++1 6012
++2 646
++1 646
++1 646
++1 646
++2 646
++4 1292
++13 9
++1 9
++2 9
++1 9
++1 9
++2 9
++2 9
++2 18
++6 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
++1 9
+-11 122
++1 122
++1 122
++1 122
++1 122
++1 122
++1 122
++1 122
++1 122
++1 122
++1 122
++1 122
++2 9
++1 9
++1 9
++1 9
++2 9
++1 18
++9 13
++7 13
++1 13
++6 1
++3 1
++2 1
++3 1
++1 1
++2 1
++2 917465
++2 1
++2 1
++2 2
++5 14
++1 14
++4 14
++2 14
++3 14
++4 14
++1 14
++4 13
++4 13
++24 12
++2 12
++2 12
++2 12
++3 12
++1 12
++2 716508
++3 12
++2 12
++2 24
++17 1
++1 1
++1 1
++5 1
++1 1
++1 1
++7 1
++6 1
++2 1
++8 1
++1 1
++2 1
++2 1
++2 1
++2 1
++8 1
++1 1
++1 1
++1 1
++5 1
++1 1
++1 1
++3 1
++2 2
++5 1
++2 2
++1 2
++1 2
++1 2
++2 4
++1 4
++1 1
++2 4
++1 4
++1 1
++1 1
++1 1
+-15 222
++2 444
++1 444
++1 444
++1 444
++2 888
++1 888
++1 222
++2 888
++1 888
++1 222
++1 222
++1 222
+-13 13826
++1 13826
++1 13826
++1 13826
++2 27652
++1 27652
++1 6913
++2 27652
++1 27652
++1 6913
++1 6913
++1 6913
++1 223
++1 223
++1 223
++1 223
++1 1
++3 1
++1 1
++5 126
++1 126
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++1 63
++4 1
++1 1
++1 1
++1 1
++2 1
++1 1
++1 1
++1 1
++1 2
+
+fl=(219)
+fn=(796)
+198 44
++1 88
++5 44
++1 44
++1 25
++1 25
++1 25
++2 18
++1 18
++1 36
++9 3
++1 3
++2 6
++5 7
++1 7
++6 7
++1 7
++12 7
++3 7
++1 7
++12 4
++1 4
++13 4
++1 4
++2 4
++3 2
++3 2
++3 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 4
++3 2
++1 2
++1 2
++1 2
++3 4
+-6 2
++1 2
++1 2
++1 2
++3 4
++35 19
++9 19
++1 19
++31 19
++1 19
++1 19
+
+fl=(155)
+fn=(790) unlink_chunk.isra.0
+1592 57927
++2 173781
+-2 57927
++2 115854
++3 57927
++3 115854
+-2 57927
++2 115854
++3 57927
++1 57927
++1 211506
++2 21906
++1 32859
++3 21906
++14 10953
++1 10953
++3 115854
+
+fn=(646)
+3283 205668
+1269 411336
++19 205668
+3287 205668
+1288 506651
+3287 190630
++2 285378
++2 190252
++2 1232874
+3030 333824
++4 667648
++4 166912
++1 166912
+3294 166912
+-7 220706
++19 38756
+cfn=(648) __libc_malloc2
+calls=307132 -59 
+* 8407615
+-17 220706
+
+fn=(650) _int_malloc
+3790 355635
++32 79030
+1288 217164
+3831 39178
++16 39178
++54 2775
++18 39095
+-1 39095
++12 78190
+-11 78190
+-1 117285
++12 78190
+-6 30189
++5 30189
+-7 30189
++2 60378
++9 60378
++3 60378
+-3 736
++3 736
++1 91671
+-3 30557
++5 30557
++1 122228
++2 122228
+-10 30557
++12 61114
++1 61114
++2 61114
++11 121646
++29 11070
++1 11070
++4 22140
++31 22094
++8 60228
++1 4107
++1 4107
+-1 4107
++4 8214
+-4 6843
++1 6843
+-1 6843
++4 13686
++5 1032
+-2 258
++3 516
++6 513
++3 513
++2 342
++33 342
++9 171
+-9 684
++1 171
++1 171
++1 171
++1 171
++6 342
+-10 22040
++9 11020
+-9 44080
++1 11020
++1 11020
++1 11020
++1 11020
++6 22040
+3053 44
+-27 44
++27 44
+-27 44
++4 88
++4 176
++4 44
++1 44
+4113 44
+3831 79704
+1288 19926
+3850 19926
++2 19926
+-2 19926
++2 39852
+-2 19034
++2 19034
+-2 19034
++2 38068
++2 420
++1 840
++2 420
++1 420
++1 420
++2 1680
++6 1260
++1 840
+2919 840
+3872 1260
++4 3379
++1 830
++2 24
++2 12
++1 12
++1 24
++2 12
+2999 12
++16 12
+3886 12
+3003 24
++4 48
++1 12
++7 12
++32 852
+1888 420
+3893 420
+1888 840
+4340 355635
+3901 20473
+-52 114204
+4105 33573
+3930 33705
+4111 43468
++13 19729
+-2 39458
++2 1066
++3 533
+-3 533
++3 1066
++1 80
++3 72
++3 44
+-2 400
++6 72
++2 8
++1 16
++2 8
++1 16
+-1 32
++1 8
+cfn=(790)
+calls=342 1592 
+* 248
+-1 28
++1 56
+-1 112
++1 28
+cfn=(790)
+calls=592 1592 
+* 868
++3 216
++13 25
++1 50
++3 25
+-8 25
++8 50
++1 25
++1 25
++1 50
+4277 20346
++3 81384
++2 30519
++1 10173
+1888 10173
+4286 10173
+1888 20346
+4280 62960
++2 23610
++1 7870
+1888 7870
+4286 7870
+1888 17426
+4286 1686
+1888 3372
+3994 66
++1 66
+-1 66
++1 132
+2919 132
+3998 198
++4 132
++1 132
+3003 44
+3981 44
+3015 44
+4006 44
+3003 44
++4 176
++1 44
++7 44
+4007 44
++24 41559
+1888 66
+4083 10692
+-51 10692
++51 32098
+-70 44
+-54 59850
++2 19487
+-1 38974
++27 187
++1 187
++4 374
++31 720
++2 288
++1 432
++1 144
+-1 144
++1 144
+-2 194
++1 291
++1 97
+-1 97
++1 4867
++4 19080
++26 261
++3 49
++1 147
+-3 272
++6 87
++7 70
+-1 210
++2 140
++2 70
++1 210
++2 70
++1 140
+-1 17
++1 34
+-47 7596
++36 34
+-36 900
+4195 19693
++1 19693
++1 19693
+-1 19693
++1 19693
++1 39386
++1 59079
++5 105053
++16 208958
++2 417916
+-4 479122
++8 30603
++3 61206
++2 21820
++1 10910
++1 10910
+-2 10910
+-27 10910
++4 39732
++3 52976
+-3 29187
++3 38916
+-3 17241
++3 22988
+-3 13244
++5 52976
++1 26488
++24 39386
++3 39386
++2 19693
++3 39386
+-3 78772
++3 19693
+cfn=(790)
+calls=58689 1592 
+* 499519
++3 118158
++15 18018
++1 36036
++3 18018
+-9 18018
++9 36036
++1 18018
++1 18018
++3 36036
++1 17521
++1 46193
+-23 1686
+-1 1686
++1 3372
+3965 19300
++3 19300
+-4 38600
++3 19300
+-1 19300
++1 38600
++1 38600
++1 38600
++2 35068
++4 17534
++6 17534
+-6 122738
++2 52602
++5 17534
+-4 17534
++4 35068
+cfn=(658) alloc_perturb
+calls=225701 1887 
+* 87670
+-7 1766
++6 1766
+-6 12362
++2 5298
++5 1766
+-4 1766
++4 3532
+cfn=(658)
+calls=23360 1887 
+* 8830
++1 19300
+
+fn=(752) _int_free_merge_chunk
+4407 323048
++7 201905
+-6 40381
++9 121143
++5 121143
++4 80762
+-1 80762
++1 80762
+1895 121143
+4433 80762
++2 19269
++2 19269
++1 77076
++2 19269
+-4 19269
++4 19269
+cfn=(790)
+calls=312921 1592 
+* 400722
++18 80762
++6 80762
++4 21812
++4 80762
++9 21761
+-1 21761
++2 43522
++2 65283
++7 37240
++1 74480
++1 18620
++2 37240
++3 111720
++4 18620
+-1 18620
++2 18620
++1 18620
++2 55860
++1 18620
+-61 18620
+-1 37240
++1 111720
+-1 18620
+cfn=(754) _int_free_maybe_trim
+calls=72410 +83 
+* 446880
++57 21761
+-1 21761
++2 21761
++1 21761
++2 65283
++1 21761
+-61 21761
+-1 43522
++1 130566
+-1 21761
+cfn=(754)
+calls=309006 +83 
+* 531074
++20 18569
++1 18569
+-1 18569
+cfn=(790)
+calls=41246 1592 
+* 383168
++1 18569
+
+fn=(748) _int_realloc
+4559 77424
++11 232272
++8 38712
++2 19356
++1 58068
++1 77424
+
+ob=(7)
+fl=(165)
+fn=(1372)
+0 96
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 88
+cfn=(1434)
+calls=4 0 
+0 2106615
+0 80
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 52
+0 48
+cfn=(1276)
+calls=4 0 
+0 204
+0 16
+cfn=(1454)
+calls=4 0 
+0 343
+0 8
+cfn=(1456)
+calls=4 0 
+0 3649218
+0 4
+
+fn=(1402)
+0 76
+
+fn=(1480)
+0 160128
+cfn=(1482)
+calls=410104 0 
+0 5815226
+
+fn=(1484)
+0 5472
+cfn=(1148)
+calls=3024 0 
+0 314189
+0 3648
+cfn=(1486)
+calls=3024 0 
+0 15979
+0 3344
+cfn=(844)
+calls=3024 0 
+0 14665
+0 912
+cfn=(1032)
+calls=3024 0 
+0 140718
+0 3952
+cfn=(1488) litchi_xlsx::raw::worksheet::validation::optional_f64
+calls=3024 0 
+0 201518
+0 3952
+cfn=(1490)
+calls=3024 0 
+0 206990
+0 4864
+cfn=(1490)
+calls=3024 0 
+0 201822
+0 7600
+cfn=(1492)
+calls=3024 0 
+0 201214
+0 3648
+cfn=(1492)
+calls=3024 0 
+0 201214
+0 3648
+cfn=(1492)
+calls=3024 0 
+0 201214
+0 3648
+cfn=(1492)
+calls=3024 0 
+0 201214
+0 3648
+cfn=(1492)
+calls=3024 0 
+0 201214
+0 3648
+cfn=(1492)
+calls=3024 0 
+0 201214
+0 3648
+cfn=(1492)
+calls=3024 0 
+0 201214
+0 10336
+cfn=(1268)
+calls=3024 0 
+0 6080
+0 4256
+
+fn=(1510)
+0 231296
+cfn=(1512)
+calls=239227 0 
+0 907222
+0 106752
+cfn=(1514)
+calls=239227 0 
+0 5768405
+0 302464
+
+fn=(1614) litchi_xlsx::raw::recalc::invalidate
+0 22
+cfn=(1616) litchi_xlsx::calculation_properties::codec::inspect_with_policy
+calls=2 0 
+0 97614
+0 17
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=2 255 
+0 65
+0 36
+cfn=(1646)
+calls=2 0 
+0 4422
+0 17
+cfn=(1662)
+calls=2 0 
+0 65
+0 9
+
+fn=(1628)
+0 180
+cfn=(844)
+calls=54 0 
+0 210
+0 45
+
+fn=(1630) core::ptr::drop_in_place<alloc::vec::Vec<litchi_xlsx::calculation_properties::rewriter::Frame>>
+0 23
+cfn=(844)
+calls=9 0 
+0 148
+
+fn=(2456)
+0 198
+cfn=(844)
+calls=24 0 
+0 315
+
+fn=(2506)
+0 115
+cfn=(1216)
+calls=7 0 
+0 15
+0 11
+cfn=(1580)
+calls=2 0 
+0 49
+0 1
+
+fn=(2558)
+0 40
+cfn=(844)
+calls=9 0 
+0 140
+0 24
+cfn=(844)
+calls=9 0 
+0 140
+0 44
+cfn=(844)
+calls=9 0 
+0 600
+0 24
+cfn=(844)
+calls=9 0 
+0 140
+0 44
+cfn=(844)
+calls=9 0 
+0 600
+0 24
+cfn=(844)
+calls=9 0 
+0 140
+0 24
+cfn=(844)
+calls=9 0 
+0 600
+0 24
+cfn=(844)
+calls=9 0 
+0 600
+0 24
+cfn=(844)
+calls=9 0 
+0 140
+0 24
+cfn=(844)
+calls=9 0 
+0 600
+0 32
+cfn=(2510)
+calls=9 0 
+0 44
+0 72
+
+fn=(2590)
+0 4984
+cfn=(1430)
+calls=356 0 
+0 52338
+0 3560
+
+fn=(2596)
+0 21
+cfn=(1614)
+calls=1 0 
+0 102267
+0 11
+cfn=(2444)
+calls=1 0 
+0 32683
+0 5
+cfn=(828)
+calls=1 0 
+0 1
+0 3
+cfn=(830)
+calls=1 0 
+0 40
+0 18
+
+fn=(830)
+0 205668
+cfn=(832)
+calls=1865061 0 
+0 15675128
+
+fn=(878)
+0 284672
+cfn=(828)
+calls=317837 0 
+0 17792
+0 53376
+cfn=(830)
+calls=317837 0 
+0 663880
+0 231296
+
+fn=(908)
+0 10665587
+
+fn=(920)
+0 135
+cfn=(844)
+calls=1 0 
+0 35
+0 4328
+cfn=(844)
+calls=6 0 
+0 217
+0 7
+cfn=(844)
+calls=4 0 
+0 35
+0 36
+cfn=(844)
+calls=8 0 
+0 140
+0 338
+cfn=(844)
+calls=76 0 
+0 802
+0 15836
+cfn=(844)
+calls=187 0 
+0 126
+0 7
+cfn=(844)
+calls=145 0 
+0 126
+0 1030
+cfn=(844)
+calls=296 0 
+0 23870
+0 2127
+cfn=(844)
+calls=8382 0 
+0 3024
+0 7370
+
+fn=(1114)
+0 858
+
+fn=(1314)
+0 238510
+
+fn=(1322)
+0 1882772
+cfn=(1326)
+calls=3024 0 
+0 15358
+0 202400
+cfn=(1162)
+calls=239227 0 
+0 852229
+0 640512
+cfn=(1326)
+calls=239227 0 
+0 2097028
+0 800640
+cfn=(1184)
+calls=239227 0 
+0 871808
+0 17792
+
+fn=(1334)
+0 200
+
+fn=(1336)
+0 404
+
+fn=(1354)
+0 96
+
+fn=(1382)
+0 590656
+cfn=(1144)
+calls=311057 0 
+0 3118048
+0 322160
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=311027 73 
+0 539964
+0 859024
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=311019 73 
+0 912696
+0 483236
+
+fn=(1488)
+0 3040
+cfn=(1148)
+calls=3024 0 
+0 192702
+0 5776
+
+fn=(1502)
+0 1174272
+
+fn=(1616)
+0 18
+cfn=(1618) litchi_xlsx::calculation_properties::rewriter::inspect_layout
+calls=9 0 
+0 38943
+0 21
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=9 255 
+0 30
+0 13
+cfn=(1632)
+calls=9 0 
+0 16910
+0 4
+cfn=(1634)
+calls=9 0 
+0 528
+0 10
+cfn=(828)
+calls=9 0 
+0 1
+0 4
+cfn=(830)
+calls=9 0 
+0 133
+0 7
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=9 255 
+0 22
+0 9
+cfn=(1032)
+calls=9 0 
+0 421
+0 4
+cfn=(1634)
+calls=9 0 
+0 458
+0 10
+cfn=(828)
+calls=9 0 
+0 1
+0 4
+cfn=(830)
+calls=9 0 
+0 369
+0 7
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=9 255 
+0 12
+0 6
+cfn=(828)
+calls=9 0 
+0 1
+0 3
+cfn=(830)
+calls=9 0 
+0 36
+0 13
+cfn=(1638) litchi_ooxml_common::mce::model::Capabilities::preserve_extension_element
+calls=9 0 
+0 697
+0 5
+cfn=(1634)
+calls=9 0 
+0 374
+0 10
+cfn=(828)
+calls=9 0 
+0 1
+0 4
+cfn=(830)
+calls=9 0 
+0 40
+0 7
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=9 255 
+0 12
+0 4
+cfn=(828)
+calls=9 0 
+0 1
+0 3
+cfn=(830)
+calls=9 0 
+0 36
+0 13
+cfn=(1638)
+calls=9 0 
+0 497
+0 15
+cfn=(1088)
+calls=9 0 
+0 8846
+0 34
+cfn=(1092)
+calls=9 0 
+0 1088
+0 139
+cfn=(1186)
+calls=58 0 
+0 146
+0 30
+cfn=(1094)
+calls=58 0 
+0 3242
+0 16
+cfn=(1094)
+calls=36 0 
+0 2780
+0 40
+cfn=(1118)
+calls=94 0 
+0 5734
+0 120
+cfn=(1120)
+calls=94 0 
+0 1377
+0 30
+cfn=(1620)
+calls=94 0 
+0 180
+0 130
+cfn=(828)
+calls=94 0 
+0 10
+0 50
+cfn=(830)
+calls=94 0 
+0 400
+0 70
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=94 255 
+0 284
+0 220
+cfn=(828)
+calls=94 0 
+0 10
+0 40
+cfn=(830)
+calls=94 0 
+0 892
+0 680
+cfn=(1122)
+calls=94 0 
+0 1420
+0 234
+cfn=(1640)
+calls=40 0 
+0 3462
+0 68
+cfn=(1110)
+calls=40 0 
+0 236
+0 32
+cfn=(1640)
+calls=18 0 
+0 1434
+0 34
+cfn=(1110)
+calls=18 0 
+0 138
+0 36
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=18 73 
+0 34
+0 116
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=40 73 
+0 68
+0 89
+cfn=(844)
+calls=27 0 
+0 105
+0 301
+cfn=(844)
+calls=40 0 
+0 140
+0 33
+cfn=(1642) litchi_xlsx::calculation_properties::codec::validate_core_order
+calls=9 0 
+0 38
+0 23
+cfn=(844)
+calls=18 0 
+0 70
+0 111
+cfn=(844)
+calls=85 0 
+0 315
+0 63
+cfn=(844)
+calls=85 0 
+0 315
+0 92
+cfn=(1192)
+calls=9 0 
+0 4
+0 5
+cfn=(1194)
+calls=9 0 
+0 86
+0 14
+cfn=(1644)
+calls=9 0 
+0 19
+0 2
+cfn=(1196)
+calls=9 0 
+0 421
+0 7
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=9 255 
+0 65
+0 26
+cfn=(1090)
+calls=9 0 
+0 1382
+0 2
+cfn=(1090)
+calls=9 0 
+0 268
+0 1
+
+fn=(1618)
+0 26
+cfn=(1092)
+calls=9 0 
+0 1118
+0 153
+cfn=(1186)
+calls=58 0 
+0 146
+0 24
+cfn=(1094)
+calls=58 0 
+0 3242
+
+ob=(2)
+fl=(155)
+fn=(748)
+4586 38712
++14 18597
++53 37194
+-53 37194
++57 18597
+-57 18597
++57 37194
+-2 37194
++2 32
++1 16
++16 16
++1 64
+-1 18581
++1 77360
+-79 2238
++12 2238
++12 5313
+cfn=(650)
+calls=4875 3790 
+* 200293
+* 759
++1 1518
++3 759
++6 2277
++36 18581
+-4 18581
++3 18581
++5 18581
+-4 18581
+-1 18581
++5 18581
+-4 18581
++4 18581
+-1 18581
++1 55743
+cfn=(750) _int_free_chunk
+calls=50248 4351 
+* 2414450
+* 18581
+-60 468
+-1 936
++5 2160
+cfn=(790)
+calls=13914 1592 
+* 10317
++44 1800
+-48 720
++28 759
+fi=(214) ./malloc/../string/bits/string_fortified.h
+29 759
+fe=(155)
+4637 759
+fi=(214)
+29 1518
+fe=(155)
+4638 1518
+fi=(214)
+29 759
+cob=(3) ???
+cfi=(152) ???
+cfn=(714) 0x0000000007947680
+calls=4875 -29 
+* 1938669
+fe=(155)
+4642 4554
+cfn=(750)
+calls=4875 4351 
+* 88950
++2 1518
+
+fn=(750)
+4351 161524
++8 40381
+-3 40381
++3 40381
+-3 80762
++6 80762
++6 40381
+cfn=(752)
+calls=381314 +39 
+* 4683935
++5 80762
++27 121143
+
+fn=(658)
+1887 19300
++1 57900
++2 19300
+
+fn=(754)
+4528 444191
++3 80762
++2 3524
++3 5286
++14 444191
+
+fn=(758)
+3319 187943
++3 375886
++15 375886
+-4 563829
++8 563829
++6 562734
++6 187578
+-3 375156
++3 187578
+-3 187578
++1 375156
++2 562734
+3007 166902
++8 166902
+-12 166902
++4 500706
++1 166902
++7 166902
+3354 166902
++10 62028
+-34 21041
++40 42082
+fi=(154) ./malloc/./malloc/arena.c
+151 63123
+fe=(155)
+3374 63123
+cfn=(750)
+calls=326191 4351 
+* 2867012
+
+fn=(744)
+3380 38756
++7 38756
+-7 174402
++11 38756
+4837 19378
++1 19378
+-1 19378
++1 19378
+-1 38756
++2 58134
+3425 19356
+-22 19356
++22 96780
++4 38712
+1288 116136
+3436 38712
+fi=(154)
+151 58068
+fe=(155)
+3469 38712
+4840 19378
+3411 38756
++2 36518
++1 36518
++36 22
++51 174402
+-30 77424
+cfn=(748)
+calls=91896 4559 
+* 5788747
+* 19356
++1 96780
+fi=(154)
+151 58068
+fe=(155)
+3472 38712
+
+fn=(648)
+3247 232536
++4 77512
++28 193780
+
+ob=(7)
+fl=(165)
+fn=(1618)
+0 12
+cfn=(1094)
+calls=36 0 
+0 2852
+0 40
+cfn=(1118)
+calls=94 0 
+0 5871
+0 180
+cfn=(1120)
+calls=94 0 
+0 1129
+0 50
+cfn=(1620)
+calls=94 0 
+0 180
+0 130
+cfn=(828)
+calls=94 0 
+0 10
+0 40
+cfn=(830)
+calls=94 0 
+0 400
+0 70
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=94 255 
+0 284
+0 220
+cfn=(828)
+calls=94 0 
+0 10
+0 40
+cfn=(830)
+calls=94 0 
+0 400
+0 730
+cfn=(1122)
+calls=94 0 
+0 1420
+0 184
+cfn=(844)
+calls=27 0 
+0 105
+0 155
+cfn=(1622)
+calls=40 0 
+0 12624
+0 100
+cfn=(1628)
+calls=18 0 
+0 139
+0 82
+cfn=(1622)
+calls=18 0 
+0 4938
+0 101
+cfn=(844)
+calls=85 0 
+0 315
+0 54
+cfn=(844)
+calls=85 0 
+0 315
+0 67
+cfn=(962)
+calls=9 0 
+0 304
+0 17
+cfn=(1192)
+calls=9 0 
+0 4
+0 5
+cfn=(1194)
+calls=9 0 
+0 86
+0 53
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=9 255 
+0 53
+0 7
+cfn=(1630)
+calls=9 0 
+0 171
+0 2
+cfn=(1196)
+calls=9 0 
+0 284
+0 1
+
+fn=(1638)
+0 8
+cfn=(1032)
+calls=18 0 
+0 1180
+0 6
+
+fn=(1642)
+0 38
+
+fn=(2580)
+0 4256
+cfn=(1148)
+calls=608 0 
+0 379218
+0 1824
+
+ob=(2)
+fl=(155)
+fn=(648)
+3253 116268
+cfn=(650)
+calls=307132 3790 
+* 7516227
++1 193780
+fi=(154)
+151 77512
+fe=(155)
+
+fl=(233)
+fn=(900)
+73 940678
++7 940678
++1 940678
++3 724086
++1 724086
++1 724086
++4 724086
++1 724086
++2 215524
++1 215524
++62 508922
++10 508922
++1 508922
++1 508922
++3 1017844
+337 215524
++1 215524
++1 215524
++1 215524
++1 215524
++1 431036
++40 6
++1 6
++8 6
++1 6
++1 6
++2 12
++6 216592
++1 216592
++5 2169
++1 2169
++1 2169
++1 2169
++1 2169
++3 1944
++1 1944
++1 1944
++1 1944
++3 1944
++1 1944
++1 1584
++1 3168
++6 225
++1 225
++2 225
++1 225
++2 221
++1 221
++2 50
++1 50
++1 50
++1 50
++1 50
++1 50
++1 50
++1 50
++1 50
++2 50
++2 26
++4 214423
++1 214423
++1 214423
++1 214423
++2 214423
+
+ob=(7)
+fl=(165)
+fn=(2580)
+0 1824
+cfn=(1486)
+calls=608 0 
+0 15979
+0 3040
+cfn=(844)
+calls=608 0 
+0 11560
+0 5776
+
+fn=(2918)
+0 2848
+cfn=(1366)
+calls=178 0 
+0 36316
+0 1780
+
+ob=(2)
+fl=(233)
+fn=(900)
+463 25
++1 25
++2 25
++10 4
++1 4
++1 4
++1 4
++1 3
++1 3
++1 3
++2 3
++2 3
++67 171
++1 171
++1 171
++1 171
++1 171
++1 171
++1 171
++1 171
++1 171
++1 171
++2 171
++2 171
+
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(598) (below main)
+cob=(7)
+cfi=(165)
+cfn=(606)
+calls=0 0 
+59 377182416
+
+fl=(166)
+fn=(576)
+cfi=(168)
+cfn=(598)
+calls=0 30 
+360 377182416
+
+ob=(3)
+fl=(152)
+fn=(714)
+0 1518
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4875 255 
+0 1937151
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(7)
+cfi=(165)
+cfn=(574)
+calls=0 0 
+0 377182416
+
+totals: 377182416

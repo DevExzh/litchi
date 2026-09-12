@@ -1,0 +1,18 @@
+diff --git a/crates/litchi-xlsx/src/cell_values/validation.rs b/crates/litchi-xlsx/src/cell_values/validation.rs
+--- a/crates/litchi-xlsx/src/cell_values/validation.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation.rs
+@@ -37,10 +37,10 @@ fn validate_xml(content: &[u8], owner: XmlOwner) -> Result<()> {
+     loop {
+         let event = reader
+             .read_event()
+-            .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?
+-            .into_owned();
+-        let resolver = reader.resolver().clone();
+-        let (namespace, event) = resolver.resolve_event(event);
++            .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?;
++        // Events borrow the input slice; namespaces are inspected before the
++        // next read advances the resolver's scope.
++        let (namespace, event) = reader.resolver().resolve_event(event);
+         match event {
+             Event::Start(element) => {
+                 bind_dialect(&namespace, &mut dialect)?;

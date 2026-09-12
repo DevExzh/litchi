@@ -1,0 +1,38 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0521/baseline-alloc",
+    "--warmup",
+    "0",
+    "--samples",
+    "5",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0521/baseline/alloc-r2-dense-sparse.json"
+  ],
+  "start_utc": "2026-09-12T05:05:04.700286+00:00",
+  "end_utc": "2026-09-12T05:05:06.693108+00:00",
+  "seconds": 1.9928248429932864,
+  "exit_code": 0,
+  "binary_sha256": "cf00c45e09745766ec0d3b17d3c336298ce4de20402fa65eb8cf5e34d59c9a43",
+  "source_manifest_sha256": "e21a054732bf171e423c1b8c087ac2111dcb8f17cb9f653b8e9c72224ff90c37",
+  "script_sha256": "ef37fe884ec7d60819f08eb0ff1757e1010b684f514e29fe5d293972e4275812",
+  "plan_sha256": "711754fb64bcfa7a975509bd961befef6a5d2ddad3d36bf4267dbc04364cd171",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "alloc-r2-dense-sparse.json": "48957f7c3f2e5fa72f00aff2d450f60c2fa65d5725e6e7d3df6e34252965e3d3",
+    "alloc-r2-dense-sparse.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "alloc-r2-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

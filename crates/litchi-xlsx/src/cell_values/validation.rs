@@ -10,6 +10,10 @@ use crate::error::{Result, invalid};
 const TRANSITIONAL_SML: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_SML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
 
+#[cfg(test)]
+#[path = "validation_borrow_tests.rs"]
+mod borrow_tests;
+
 pub(super) fn workbook_xml(content: &[u8]) -> Result<()> {
     validate_xml(content, XmlOwner::Workbook)
 }
@@ -33,10 +37,10 @@ fn validate_xml(content: &[u8], owner: XmlOwner) -> Result<()> {
     loop {
         let event = reader
             .read_event()
-            .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?
-            .into_owned();
-        let resolver = reader.resolver().clone();
-        let (namespace, event) = resolver.resolve_event(event);
+            .map_err(|error| invalid(format!("value-only XML scan failed: {error}")))?;
+        // Events borrow the input slice; namespaces are inspected before the
+        // next read advances the resolver's scope.
+        let (namespace, event) = reader.resolver().resolve_event(event);
         match event {
             Event::Start(element) => {
                 bind_dialect(&namespace, &mut dialect)?;

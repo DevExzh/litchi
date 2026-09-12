@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## 0521: borrow within the existing XML validation lifetime
+
+[0521](changes/0521-xlsx-borrow-validation-events.md) retains validation
+order, namespace scope, candidate readback and source/patch identity. The
+slice-backed event and resolver are inspected before the next reader mutation;
+owned stack names and dialect remain. No API, dependency, unsafe code, budget
+policy or crate ownership changes. All 30 previously read ADR/index hashes
+remain unchanged. Eleven old-loop differential tests cover namespace and
+malformed-input behavior. Source-bound native/allocator/profile evidence
+supports ADR 0005; unchanged source/patch and preservation oracles support
+ADRs 0003/0006. Scope and every adverse phase flag are retained in the change
+record; broad provider/scaling/fuzz/producer requirements remain open.
+
 ## 0520: source-backed XLSX measurement only
 
 [0520](changes/0520-xlsx-source-edit-phase-attribution.md) changes evidence, Python capture/analysis helpers and documentation.
