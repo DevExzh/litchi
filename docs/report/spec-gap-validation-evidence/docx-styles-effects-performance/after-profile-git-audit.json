@@ -1,0 +1,19 @@
+{
+  "schema": "docx-styles-effects-after-git-audit-v1",
+  "retention_commit": "0274fa5dcccb868b23762985887aa4a9a34644e8",
+  "retained_directory": "docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-after-5f4dd8954",
+  "audited_files": 314,
+  "raw_files": 307,
+  "raw_bytes": 12383248,
+  "raw_git_bytes_match_originals": true,
+  "all_retained_git_bytes_match_isolated_copy": true,
+  "independent_frozen_verifier_exit": 0,
+  "independent_verification_sha256": "1a0c174ee77a270f1b54f9058cfa082ca767eb6785cc966db931cbbadbe571e6",
+  "bundle_sha256": "5b66dde8ddd50f7c57c11965fb0aa3afe27df629ece8bd34a3ed16a0705b9ad7",
+  "removed_owned_paths": [
+    "/var/tmp/litchi-docx-styles-effects-profile-results-5f4dd8954-20260912-a",
+    "/var/tmp/litchi-docx-styles-effects-profile-after-506e6f8e5-a/docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/results/profile-after-5f4dd8954"
+  ],
+  "source_worktree_preserved": "/var/tmp/litchi-docx-styles-effects-profile-after-506e6f8e5-a",
+  "target_removed_by_success_sentinel": true
+}
