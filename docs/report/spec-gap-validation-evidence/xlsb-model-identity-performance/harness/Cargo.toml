@@ -1,0 +1,20 @@
+[package]
+name = "litchi-xlsb-model-identity-profile"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+build = "build.rs"
+
+[workspace]
+
+[[bin]]
+name = "xlsb-model-identity-profile"
+path = "main.rs"
+
+[dependencies]
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+litchi-xldm = { path = "../../../../../crates/litchi-xldm" }
+litchi-xlsb = { path = "../../../../../crates/litchi-xlsb" }
+serde_json = "1"
+sha2 = "0.11"
