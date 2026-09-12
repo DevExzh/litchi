@@ -10,7 +10,7 @@ XML-version cases), and caller XML event/depth limits. The adapter calls the
 committed public API and records typed errors; it does not synthesize timing or
 refusal results.
 
-The smoke pins production inputs to commit
+The historical `run_smoke.sh` pins production inputs to commit
 `d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119`. The runner requires a clean,
 committed descendant checkout containing the harness and four hashed native
 fixtures, checks the transitive local Cargo source closure against Git blobs,
@@ -29,8 +29,11 @@ python3 -B -m unittest test_source_snapshot test_verify
 Both test modules are required committed inputs and appear in the smoke's
 before/after source manifests.
 
-Prepare an isolated checkout at the committed scaffold descendant outside the
-active worktree, choose two absent external paths, then run:
+To reproduce that historical smoke, restore its frozen historical scaffold
+checkout outside the active worktree and choose two absent external paths.
+Do not combine `run_smoke.sh` with the current harness, whose receipt source
+pin is different. The current-source gate uses `run_current_smoke.sh` as
+described below. Historical invocation:
 
 ```bash
 git worktree add --detach /tmp/litchi-docx-styles-effects-smoke <scaffold-commit>
@@ -64,6 +67,18 @@ aggregate bytes at commit and adds the focused regression. The fresh
 including the existing-owner commit-time cap and opaque-member checks. The
 runner and root verifier replays agree. This closes the correctness-smoke
 gate for that recorded source; the smoke itself is not performance evidence.
+
+The current attribution baseline has a separate, unrun 52-lane gate in
+[`run_current_smoke.sh`](run_current_smoke.sh). It binds the clean descendant
+to `8702fd4db8723acceb7deb51bcb40ff66604bf10`, verifies the same native
+package and member hashes through `current-corpus-manifest.json`, and invokes
+`verify_current_smoke.py`. It writes `smoke-*` receipts only into a fresh
+external results directory supplied by `DOCX_STYLES_EFFECTS_RESULTS`; it does
+not read or rewrite the retained `clean-46c456848` receipts. Run it only after
+the current-source preflight is reviewed. The repaired frozen harness passed
+the [current-source 52-lane correctness smoke](results/smoke-current-637082e31/)
+with independent review and root verifier replay. No current-source timing
+capture is included.
 
 The separate performance scaffold passed independent review and uses a
 refusal-by-default runner. It requires a reviewed committed descendant, fresh
