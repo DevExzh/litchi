@@ -1,6 +1,6 @@
 {
   "schema": "pptx-ink-actions-performance-scaffold-v2",
-  "status": "docs-only-scaffold",
+  "status": "harness-scaffold-api-wired-no-profile-capture",
   "build_performed": false,
   "timings_collected": false,
   "owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
@@ -10,11 +10,17 @@
     "git_blob": "ad7e43e8c2c362c1b9e1938806f59b9fb3ab1dea",
     "kind": "synthetic_complete_opc_owner_helper"
   },
-  "retained_opc_generator": null,
+  "retained_opc_generator": {
+    "path": "harness/adapter.rs",
+    "sha256": "1ae80e1d904b3a56490d98ec48709c7611bd0b7ea0bbc1dced6db5230114deac",
+    "git_blob": "8553f2a5d11ce839798f10f223852b678df6bba9",
+    "kind": "bounded_synthetic_complete_opc_generator"
+  },
   "native_fixture": null,
   "native_powerpoint_claim": false,
   "planned_isolated_lockfile": "harness/Cargo.lock",
-  "isolated_lockfile_present": false,
+  "isolated_lockfile_present": true,
+  "isolated_lockfile_sha256": "1f1f159ca62f4d0499849ef6c4ee0dae5165be7602ea5ce51313486f0caa5d27",
   "retained_opc_limits": {
     "policy": "ReadLimits::default() for positive lanes; every field is serialized in a future receipt",
     "separate_from_owner_limits": true

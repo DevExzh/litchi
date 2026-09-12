@@ -2,9 +2,10 @@
 
 Independent design review approved this bounded plan. Root verified the
 23-recipe/42-lane inventory, complete recipe use, and pinned helper hash.
-The unchecked items below remain implementation and execution gates for the
-future harness; design approval is not proof that those gates have run. No
-build or timing capture is authorized by this document alone.
+The unchecked items below remain implementation review and execution gates;
+the scaffold API is present, but design approval is not proof that those gates
+have passed. No release profile or timing capture is authorized by this
+document alone.
 
 - [ ] The full source pin is
       `cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`, or a reviewed replacement
