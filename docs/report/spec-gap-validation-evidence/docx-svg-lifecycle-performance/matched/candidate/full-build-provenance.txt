@@ -1,0 +1,12 @@
+label=candidate
+production_commit=ceeecf972e716be850547917fe348c1437186906
+harness_source_commit=211806feea6e83279975ff77adeb5c8fa7be01a6
+binary=/var/tmp/litchi-docx-matched-target-candidate/release/docx-svg-lifecycle-profile
+binary_sha256=e924a1949b5ea1e204ded1e1f2a53fa43d4cdf4e7e229e5339bf5cff97b7d611
+rustc=rustc 1.95.0 (59807616e 2026-04-14) binary: rustc commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860 commit-date: 2026-04-14 host: x86_64-unknown-linux-gnu release: 1.95.0 LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target=/var/tmp/litchi-docx-matched-target-candidate
+allocator=CountingAllocator (process-local GlobalAlloc observer)
+rss=/usr/bin/time -v Maximum resident set size
+mode=full processes=3 warmup=2 samples=20
+flags=CARGO_INCREMENTAL=0;RUSTFLAGS unset;CARGO_ENCODED_RUSTFLAGS unset;RUSTC_BOOTSTRAP unset;LC_ALL=C

@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "mode": "full",
+  "lanes": 21,
+  "processes": 63,
+  "samples": 1260,
+  "manifest_inputs_checked": 26,
+  "expected_refusals": [
+    "batch_attach_64",
+    "exact_inverse_batch_64"
+  ],
+  "allocation_peak_rss_separate": true,
+  "report_recomputed_from_raw_receipts": true,
+  "fail_closed_gates": [
+    "source_snapshot",
+    "source_manifest",
+    "fixture_hash",
+    "semantic",
+    "opaque",
+    "lazy_media",
+    "exact_inverse",
+    "typed_error",
+    "failure_physical_readback",
+    "failure_metadata_readback",
+    "allocator",
+    "rss",
+    "process_exit"
+  ]
+}
