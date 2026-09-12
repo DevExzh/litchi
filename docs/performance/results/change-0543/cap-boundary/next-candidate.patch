@@ -1,0 +1,153 @@
+diff --git a/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs b/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
+index 36fde309945ee834c256878e5941b36f8ef157f2..451d57d68842fa225479750716c6dd11a5c6a7d6 100644
+--- a/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
++++ b/crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs
+@@ -4,7 +4,7 @@
+     reason = "focused shared-traversal boundary assertions"
+ )]
+ 
+-use std::sync::Arc;
++use std::{fmt::Write as _, sync::Arc};
+ 
+ use litchi_core::OwnedSource;
+ use litchi_opc::constants::content_type as ct;
+@@ -51,9 +51,39 @@ fn worksheet_over_event_cap(tail: &str) -> Vec<u8> {
+     let xml = worksheet_with_comments(count, tail);
+     assert!(xml.len() < crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES);
+     assert!(crate::raw::worksheet::source_stream_eligible(&xml));
++    assert!(!crate::raw::worksheet::shared_event_bound_within_cap(&xml));
+     xml
+ }
+ 
++fn worksheet_numeric_grid(side: usize) -> Vec<u8> {
++    fn column_name(mut index: usize) -> String {
++        let mut name = String::new();
++        loop {
++            name.push((b'A' + (index % 26) as u8) as char);
++            if index < 26 {
++                break;
++            }
++            index = index / 26 - 1;
++        }
++        name.chars().rev().collect()
++    }
++
++    let columns: Vec<String> = (0..side).map(column_name).collect();
++    let mut xml = String::with_capacity(side * side * 32);
++    xml.push_str("<worksheet xmlns=\"");
++    xml.push_str(SML);
++    xml.push_str("\"><sheetData>");
++    for row in 1..=side {
++        write!(xml, "<row r=\"{row}\">").expect("row XML");
++        for column in &columns {
++            write!(xml, "<c r=\"{column}{row}\"><v>1</v></c>").expect("cell XML");
++        }
++        xml.push_str("</row>");
++    }
++    xml.push_str("</sheetData></worksheet>");
++    xml.into_bytes()
++}
++
+ fn package_with_sheet(sheet: &[u8]) -> Vec<u8> {
+     let content_types = format!(
+         "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"{}\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"{}\"/></Types>",
+@@ -156,6 +186,16 @@ fn provisional_event_cap_falls_back_without_refusing_valid_or_late_failures() {
+     assert_rejected_with_retry(&worksheet_over_event_cap(LATE_RAW_TAIL), LATE_RAW_ERROR);
+ }
+ 
++#[test]
++fn event_bound_admits_main_numeric_grids() {
++    for side in [96, 128] {
++        let xml = worksheet_numeric_grid(side);
++        assert!(xml.len() < crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES);
++        assert!(crate::raw::worksheet::source_stream_eligible(&xml));
++        assert!(crate::raw::worksheet::shared_event_bound_within_cap(&xml));
++    }
++}
++
+ #[test]
+ fn eligible_small_source_uses_successful_value_edit_control() {
+     let sheet = worksheet_with_comments(3, VALID_TAIL);
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+index e67bdcc173a66e9ff00aa4a88055adcc4a62fa2e..51a029d0306c26cf2be2414ddc144a2e4ec881b7 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+@@ -37,6 +37,10 @@ pub(crate) const MAX_SHARED_SOURCE_BYTES: usize = 8 * 1024 * 1024;
+ /// caller repeats the authoritative passes.
+ pub(crate) const MAX_SHARED_PROVISIONAL_EVENTS: usize = 131_072;
+ 
++#[expect(
++    clippy::large_enum_variant,
++    reason = "short-lived owned parser result avoids an extra heap allocation"
++)]
+ pub(crate) enum SourceParseAttempt {
+     Complete(Result<Store>),
+     ProvisionalFailed,
+@@ -65,6 +69,57 @@ fn contains(content: &[u8], marker: &[u8]) -> bool {
+     memchr::memmem::find(content, marker).is_some()
+ }
+ 
++/// Return whether a conservative lexical upper bound fits the provisional
++/// shared-reader event cap. This runs before constructing `NsReader` or the
++/// raw parser. False positives fall back to the authoritative two-pass path;
++/// this predicate can never admit a source whose reader event count exceeds
++/// the cap.
++pub(crate) fn shared_event_bound_within_cap(content: &[u8]) -> bool {
++    let mut bound = 1usize; // The reader emits one terminal `Event::Eof`.
++
++    if let Some(&first) = content.first()
++        && !matches!(first, b'<' | b'&')
++        && !add_shared_event_bound(&mut bound)
++    {
++        return false;
++    }
++
++    // Every markup or general reference event begins at one of these bytes.
++    for _ in memchr::memchr2_iter(b'<', b'&', content) {
++        if !add_shared_event_bound(&mut bound) {
++            return false;
++        }
++    }
++
++    // A text event can begin after markup (`>`) or a completed reference
++    // (`;`) when the next source byte is neither another delimiter nor EOF.
++    // Delimiters inside attributes, comments, CDATA, and ordinary text make
++    // this deliberately over-count, which only causes a safe fallback.
++    for index in memchr::memchr2_iter(b'>', b';', content) {
++        if content
++            .get(index + 1)
++            .is_some_and(|&next| !matches!(next, b'<' | b'&'))
++            && !add_shared_event_bound(&mut bound)
++        {
++            return false;
++        }
++    }
++
++    true
++}
++
++#[inline]
++fn add_shared_event_bound(bound: &mut usize) -> bool {
++    let Some(next) = bound.checked_add(1) else {
++        return false;
++    };
++    if next > MAX_SHARED_PROVISIONAL_EVENTS {
++        return false;
++    }
++    *bound = next;
++    true
++}
++
+ pub(crate) fn parse_source_with_observer<'a, F, O>(
+     content: &[u8],
+     strings: F,
+@@ -74,6 +129,9 @@ where
+     F: FnOnce() -> Result<Option<&'a [Text]>>,
+     O: for<'event> FnMut(&ResolveResult<'event>, &Event<'event>) -> bool,
+ {
++    if !shared_event_bound_within_cap(content) {
++        return SourceParseAttempt::ProvisionalFailed;
++    }
+     codec::parse_source_with_observer(content, strings, observer)
+ }
+ 

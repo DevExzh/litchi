@@ -1,5 +1,13 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0543: valid-input regression prevents retention
+
+[0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) completes the main pilot and conditional lanes, then rejects the
+candidate on a supplemental valid event-boundary sweep and warning-denied
+Clippy. Production is restored; the public post-EOF regression test and complete
+evidence remain. A conservative admission preflight is an unmeasured proposal.
+OLE2/OOXML optimization remains active; ODF is deferred until that goal completes.
+
 ## 0542: concrete progress; broad OLE2/OOXML goal remains active
 
 [0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) adds a measured valid/late-error planning guard and identifies why a

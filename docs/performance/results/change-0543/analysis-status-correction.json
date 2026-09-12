@@ -1,0 +1,15 @@
+{
+  "created_utc": "2026-09-12T23:01:25.264232+00:00",
+  "failed_command": [
+    "python3",
+    "-B",
+    "docs/performance/results/change-0543/analyze_allocation.py"
+  ],
+  "exit_code": 1,
+  "diagnostic": "evidence check failed: 0543 allocation gates are not frozen before capture",
+  "cause": "Analyzer required an exact status spelling from 0542; the 0543 plan was frozen before builds with status frozen-before-build-and-capture. Timestamp/hash freeze and numeric gates remain unchanged.",
+  "before_sha256": "84617bfa84a66d8fbc88713dedcdc9879dcbb4a5cfd111f42e6c0b853e2da217",
+  "after_sha256": "5ad8e7be298a357dd86ed433fe80b6aa947df93905599913668cb712bb888ad9",
+  "plan_sha256": "c329bfe2eae6c5509ce6f92c80a55f36bcce1a91bdc287d38a376bb4bda9c96f",
+  "measurement_receipts_changed": false
+}

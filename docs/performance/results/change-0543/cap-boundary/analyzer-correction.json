@@ -1,0 +1,50 @@
+{
+  "schema": "litchi.xlsx.cap-boundary-analyzer-correction.v1",
+  "status": "corrected",
+  "created_utc": "2026-09-12T23:36:30+00:00",
+  "initial": {
+    "path": "analyze.initial.py",
+    "sha256": "7e135e7bbacad86e98046418fe9ee0109a9faedee81c191164171315bf2dc30c",
+    "frozen_analyzer_sha256": "7e135e7bbacad86e98046418fe9ee0109a9faedee81c191164171315bf2dc30c"
+  },
+  "final": {
+    "path": "analyze.py",
+    "sha256": "8b9473f333d0ba3196a78ab952180bd958cb62ca13f875224ad8caaa833c77e3"
+  },
+  "corrections": [
+    {
+      "id": "fixture-matrix-path-independent",
+      "rationale": "The initial comparison required each baseline fixture dictionary to equal its candidate dictionary, although the file field necessarily includes a stage-specific path. The corrected comparison requires identical fixture SHA-256 and byte count for all four rows at each size, while retaining the four evidence paths separately."
+    },
+    {
+      "id": "rss-adverse-and-drift-diagnostics",
+      "rationale": "The corrected comparison carries max_rss_kib for every matched row and emits greater-than-five-percent candidate adverse records and same-build repeat drift records. RSS remains diagnostic and is excluded from admission."
+    },
+    {
+      "id": "terminal-replay-bindings",
+      "rationale": "The finalized ABBA evidence binds baseline repeat 1 to the baseline working manifest, retained baseline repeat 2 to the candidate working manifest, and reports the guard phase sample count as a scalar. These custody/schema corrections are required to replay the completed receipts and do not change captures or gates."
+    }
+  ],
+  "admission": {
+    "unchanged": true,
+    "gate_metrics": [
+      "planning p50",
+      "planning mean"
+    ],
+    "candidate_to_baseline_max_ratio": 1.05,
+    "rss_used_for_gate": false,
+    "captures_changed": false,
+    "plan_driver_guard_changed": false
+  },
+  "frozen_input_hashes_unchanged": {
+    "plan.json": "ee3f8e4289b4b854fb558db39ef004d85cac8b956a29ae6840f197abf7f6d85d",
+    "cap_run.py": "b2196b6b475dcdcc3703276bd4d85b9ed2cb7b254be3ac85e663f7885786eadc",
+    "guard.rs": "fad2ffef9725c8cead1b67f43765f025e61f39aa6d94782ceb8861ad64acb23a"
+  },
+  "replayed_analysis": {
+    "path": "cap-analysis.json",
+    "sha256": "aed4da35f9f8762653e3f86a17445c2a73077f383452309801e4f36aed1bc32c",
+    "status": "reject",
+    "reason": "The supplemental gate correctly rejects candidate planning p50/mean above 1.05 times baseline at sizes 164 and 256; this is a measured result, not an analyzer failure."
+  }
+}

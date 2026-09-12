@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0543: pilot gains do not survive the valid cap boundary
+
+[0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) records candidate planning p50 reductions of 28.5–31.6% and workflow
+p50 reductions of 5.9–11.9% on the original pilot, with passing memory/refusal
+and conditional instruction gates. A fresh 1,200-sample valid boundary sweep
+finds 59.0–61.4% planning p50 regressions just above the event cap and 23.9–25.8%
+at 256×256 cells. Production is restored; no runtime speedup is retained.
+
 ## 0542: shared XLSX traversal rejected by late-error guard
 
 [0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) records 2,440 main native samples, 240 allocator samples per phase,

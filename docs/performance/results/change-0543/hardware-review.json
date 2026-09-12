@@ -1,0 +1,75 @@
+{
+  "schema": "litchi.0543.hardware-review.v1",
+  "status": "complete",
+  "hardware_analysis_sha256": "cf13875e24087f1d5c4b324c3741c6613cc5be9c1fe150fd184abeab1c5d7e28",
+  "derivation_sha256": "4142fb2bbfb0549faaa5a0f9cd3043fa9d4ce23b83a7d59e5d595fda706fde23",
+  "threshold_percent": 5,
+  "ipc_adverse_direction": "decrease",
+  "other_metrics_adverse_direction": "increase",
+  "same_build_drift_direction": "absolute",
+  "scope": "All seven measured counters plus IPC and branch miss percentage; whole-child diagnostics only.",
+  "adverse_count": 1,
+  "drift_count": 4,
+  "flags": [
+    {
+      "kind": "candidate_adverse",
+      "shape": "dense-sparse",
+      "repeat": 1,
+      "metric": "context-switches",
+      "baseline": 140,
+      "candidate": 174,
+      "change_percent": 24.28571428571429,
+      "id": "0543-hardware-001",
+      "interpretation": "Process/OS diagnostic; this single child counter does not establish an operation-local resource regression or its cause. Retain this individual adverse comparison despite lower native workflow medians.",
+      "disposition": "reviewed; candidate rejected by cap latency and Clippy; no retained runtime claim"
+    },
+    {
+      "kind": "same_build_drift",
+      "stage": "baseline",
+      "shape": "dense-sparse",
+      "metric": "context-switches",
+      "first": 140,
+      "second": 189,
+      "change_percent": 35.00000000000001,
+      "id": "0543-hardware-002",
+      "interpretation": "Process/OS diagnostic; this single child counter does not establish an operation-local resource regression or its cause. Absolute repeat drift remains visible without an asserted noise cause.",
+      "disposition": "reviewed; candidate rejected by cap latency and Clippy; no retained runtime claim"
+    },
+    {
+      "kind": "same_build_drift",
+      "stage": "baseline",
+      "shape": "medium",
+      "metric": "context-switches",
+      "first": 112,
+      "second": 118,
+      "change_percent": 5.35714285714286,
+      "id": "0543-hardware-003",
+      "interpretation": "Process/OS diagnostic; this single child counter does not establish an operation-local resource regression or its cause. Absolute repeat drift remains visible without an asserted noise cause.",
+      "disposition": "reviewed; candidate rejected by cap latency and Clippy; no retained runtime claim"
+    },
+    {
+      "kind": "same_build_drift",
+      "stage": "candidate",
+      "shape": "dense-sparse",
+      "metric": "context-switches",
+      "first": 174,
+      "second": 131,
+      "change_percent": -24.712643678160916,
+      "id": "0543-hardware-004",
+      "interpretation": "Process/OS diagnostic; this single child counter does not establish an operation-local resource regression or its cause. Absolute repeat drift remains visible without an asserted noise cause.",
+      "disposition": "reviewed; candidate rejected by cap latency and Clippy; no retained runtime claim"
+    },
+    {
+      "kind": "same_build_drift",
+      "stage": "candidate",
+      "shape": "medium",
+      "metric": "context-switches",
+      "first": 114,
+      "second": 105,
+      "change_percent": -7.8947368421052655,
+      "id": "0543-hardware-005",
+      "interpretation": "Process/OS diagnostic; this single child counter does not establish an operation-local resource regression or its cause. Absolute repeat drift remains visible without an asserted noise cause.",
+      "disposition": "reviewed; candidate rejected by cap latency and Clippy; no retained runtime claim"
+    }
+  ]
+}

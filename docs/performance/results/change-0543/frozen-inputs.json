@@ -1,0 +1,18 @@
+{
+  "created_utc": "2026-09-12T22:36:09.946033+00:00",
+  "stage": "before first baseline freeze/build/capture; candidate patch frozen separately before application",
+  "files": {
+    "plan.json": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+    "allocation-gates.json": "c329bfe2eae6c5509ce6f92c80a55f36bcce1a91bdc287d38a376bb4bda9c96f",
+    "quality-plan.json": "46cc5730ef6842ca35de6ef6c11be03bdabe5940f5f2afcfebd3ebd577518fb4",
+    "run.py": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+    "guard_run.py": "7aa05029afaf41737578142207747ecbe49a383f340e48071c6f32d1b5cc6858",
+    "baseline_phase.py": "0c9b5a7b238e9a2fbde25416b5806fbc12991d5b6d7f5cff7b70adf72d942447",
+    "candidate_phase.py": "848099b4cabc854cc548afcecb1b034f8d9575f2619fdb8ff3155bb64f7592f4",
+    "final_quality.py": "00cc1b476a7b838b7efb20ad139cce96a0b3eece2f7257a49ba8e28fc126b7d1",
+    "differential-tests.patch": "e0e7181ab8d7551ff1b40befabfb7d660f31ecba4a20a1967d2d144071d54bd2",
+    "test-design.md": "8406941b7467ff6b29791752d4199325ac347834504dfc144a191c964fbbb8a2",
+    "protocol.md": "822a9bf20e3c24882b62774a5f6856cdb854b531359bc16caae15c0ea72a6bb0",
+    "adr-manifest.json": "43b3a7b6dbc9fb95a8094ee8b3ea0b8c75e2a8837fccc33544971335b7aa6651"
+  }
+}

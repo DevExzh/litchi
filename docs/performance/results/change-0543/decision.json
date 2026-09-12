@@ -1,0 +1,120 @@
+{
+  "decision": "reject",
+  "final_stage": "baseline",
+  "runtime_restored": true,
+  "native_passed": true,
+  "allocation_passed": true,
+  "guard_passed": true,
+  "cap_boundary_passed": false,
+  "candidate_final_quality_passed": false,
+  "full_test_count": 1299,
+  "performance_claim": "No retained runtime speedup; measured candidate only.",
+  "rationale": "Main pilot and conditional lanes passed, but valid worksheets above the provisional event cap regress planning p50/mean beyond the supplemental 1.05x envelope. Candidate final Clippy also fails large_enum_variant. Exact production baseline restored; public post-EOF differential test retained.",
+  "retained_enabler": [
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs",
+    "crates/litchi-xlsx/tests/source_backed_cell_values/post_eof_raw_differential.rs"
+  ],
+  "candidate_cap_tests_retained_in_live_source": false,
+  "temporary_cap_example_removed": true,
+  "conditional_lanes": "Completed profile/hardware/eager ABBA captures after main pilot passed; candidate admission still rejected by supplemental cap lane and final Clippy.",
+  "priority": "OLE2/OOXML first; ODF deferred until that optimization goal completes.",
+  "baseline_manifest_sha256": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+  "candidate_manifest_sha256": "e8ef70b14231083e2e28a7a10bb6cfd0c72e590b186091c265617df1655cda3a",
+  "final_source_manifest_sha256": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+  "comparison_sha256": "a1eecddb1a6a9a745a60b5f167b05351daaffc816a106935fb18a6055f493283",
+  "allocation_analysis_sha256": "be5184a16cc4e97b265d0a73c3a42e8b4fe7fe29a97a391a19399e5e02c5c491",
+  "guard_analysis_sha256": "38227cc4e49546bb29b55b2ff129da3f32a3a6d0390ddcdf9dac5a9d1e279dab",
+  "plan_sha256": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+  "cap_analysis_sha256": "aed4da35f9f8762653e3f86a17445c2a73077f383452309801e4f36aed1bc32c",
+  "candidate_final_clippy_receipt_sha256": "e1c27ffcc9fbb19d474f1956dff3e14b1e671739dbd0f40b0b204b219cd86262",
+  "cap_refusal_failures": [
+    {
+      "size": 164,
+      "repeat": 1,
+      "metric": "mean",
+      "baseline": 16745320.03,
+      "candidate": 26298592.66,
+      "candidate_to_baseline_ratio": 1.570504034135202,
+      "change_percent": 57.050403413520186,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    },
+    {
+      "size": 164,
+      "repeat": 1,
+      "metric": "p50",
+      "baseline": 16479196,
+      "candidate": 26197369,
+      "candidate_to_baseline_ratio": 1.5897237340947945,
+      "change_percent": 58.97237340947945,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    },
+    {
+      "size": 256,
+      "repeat": 1,
+      "metric": "mean",
+      "baseline": 39711972.75,
+      "candidate": 50186667.44,
+      "candidate_to_baseline_ratio": 1.2637666669430316,
+      "change_percent": 26.376666694303164,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    },
+    {
+      "size": 256,
+      "repeat": 1,
+      "metric": "p50",
+      "baseline": 39669794,
+      "candidate": 49918583,
+      "candidate_to_baseline_ratio": 1.2583524633377223,
+      "change_percent": 25.835246333772233,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    },
+    {
+      "size": 164,
+      "repeat": 2,
+      "metric": "mean",
+      "baseline": 16401408.8,
+      "candidate": 26063418.69,
+      "candidate_to_baseline_ratio": 1.5890963396997946,
+      "change_percent": 58.90963396997946,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    },
+    {
+      "size": 164,
+      "repeat": 2,
+      "metric": "p50",
+      "baseline": 16148781,
+      "candidate": 26062844,
+      "candidate_to_baseline_ratio": 1.6139202085903575,
+      "change_percent": 61.392020859035746,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    },
+    {
+      "size": 256,
+      "repeat": 2,
+      "metric": "mean",
+      "baseline": 40031507.16,
+      "candidate": 49483723.34,
+      "candidate_to_baseline_ratio": 1.2361194181927975,
+      "change_percent": 23.611941819279746,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    },
+    {
+      "size": 256,
+      "repeat": 2,
+      "metric": "p50",
+      "baseline": 39941336,
+      "candidate": 49469462,
+      "candidate_to_baseline_ratio": 1.238553011847175,
+      "change_percent": 23.855301184717504,
+      "max_allowed_ratio": 1.05,
+      "passed": false
+    }
+  ]
+}

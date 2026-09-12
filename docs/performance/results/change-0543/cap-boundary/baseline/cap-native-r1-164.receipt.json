@@ -1,0 +1,48 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0543/cap-boundary/baseline/cap-native-r1-164.rss.json",
+    "/home/zhuhe/litchi-goal-0543-target/cap-boundary-binaries/baseline-cap-boundary",
+    "--size",
+    "164",
+    "--warmup",
+    "10",
+    "--samples",
+    "100",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0543/cap-boundary/baseline/cap-native-r1-164.json",
+    "--fixture-out",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0543/cap-boundary/baseline/cap-native-r1-164.fixture.bin"
+  ],
+  "start_utc": "2026-09-12T23:33:17.380461+00:00",
+  "end_utc": "2026-09-12T23:33:19.483126+00:00",
+  "seconds": 2.102661889977753,
+  "exit_code": 0,
+  "binary_sha256": "3b4fa3d78947d2ad666d4d9f46c44250ffe52449878df3de015b39e180a2fbc9",
+  "source_manifest_sha256": "9c80de17533991ce203191edf003ae782ac6e2094fd3b5f6ccc240539d6b775d",
+  "working_source_manifest_sha256": "9c80de17533991ce203191edf003ae782ac6e2094fd3b5f6ccc240539d6b775d",
+  "script_sha256": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+  "plan_sha256": "ee3f8e4289b4b854fb558db39ef004d85cac8b956a29ae6840f197abf7f6d85d",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0543-target/test-tmp"
+  },
+  "artifacts": {
+    "cap-native-r1-164.fixture.bin": "c8608d872c25ff5635226050ca6dbf04c0f6114d63b10243a123e57280216209",
+    "cap-native-r1-164.json": "843ed1ab62c713cbf9e81426a29c788ee3aeddb040a15839171cf989586e983f",
+    "cap-native-r1-164.rss.json": "fd6fb21748dee58d8c08cac68e721f0e85e0deb5f0e524a71f1ad0fa78c10a4e",
+    "cap-native-r1-164.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cap-native-r1-164.stdout": "04775b080e4deb19e58839cfeb065e0af1acb59514049e82b95a6a14335ae805"
+  },
+  "cap_driver_sha256": "b2196b6b475dcdcc3703276bd4d85b9ed2cb7b254be3ac85e663f7885786eadc"
+}

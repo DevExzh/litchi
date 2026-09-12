@@ -1,0 +1,485 @@
+{
+  "schema": "litchi.xlsx.planning-refusal-guard.v1",
+  "tool": "xlsx_planning_guard",
+  "case": "valid",
+  "shape": "dense-sparse",
+  "warmup_iterations": 5,
+  "samples": 30,
+  "source": {
+    "generator": "litchi-xlsx-planning-refusal-guard-fixed-grid-v1",
+    "shape": "dense-sparse",
+    "rows": 128,
+    "columns": 128,
+    "archive_bytes": 451155,
+    "worksheet_bytes": 449341,
+    "source_sha256": "e4c51c656446a3bad48f34ddd1f7f5c2d0538ce4b14aa68b1d1377431a642e1d",
+    "worksheet_sha256": "9ab9bb0c9e1f7894ae9b9e75fa64df2282a23090dfd743daaedbe1669bc011dc",
+    "worksheet_member": "xl/worksheets/sheet1.xml",
+    "compression": "stored",
+    "fixture_kind": "raw_zip_input_no_opc_authored_xml_validation"
+  },
+  "source_sha256": "e4c51c656446a3bad48f34ddd1f7f5c2d0538ce4b14aa68b1d1377431a642e1d",
+  "logical_error": {
+    "status": "accepted",
+    "variant": null,
+    "message": null
+  },
+  "phase": {
+    "name": "edit_sheets",
+    "sample_order": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+    ],
+    "duration_ns": [
+      8611277,
+      8579727,
+      8611497,
+      8600537,
+      8587457,
+      8608357,
+      8729128,
+      8624047,
+      8626097,
+      8596097,
+      8600177,
+      8599247,
+      8636397,
+      8631337,
+      8591407,
+      8568817,
+      8937268,
+      9135360,
+      8578567,
+      8632597,
+      8601207,
+      8632677,
+      8610997,
+      8625047,
+      8644457,
+      8586237,
+      8587077,
+      8600317,
+      8594887,
+      8614638
+    ],
+    "allocation_metrics": [
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      },
+      {
+        "status": "unavailable",
+        "scope": "operation_global_system_allocator"
+      }
+    ],
+    "samples": [
+      {
+        "order": 0,
+        "duration_ns": 8611277,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 1,
+        "duration_ns": 8579727,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 2,
+        "duration_ns": 8611497,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 3,
+        "duration_ns": 8600537,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 4,
+        "duration_ns": 8587457,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 5,
+        "duration_ns": 8608357,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 6,
+        "duration_ns": 8729128,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 7,
+        "duration_ns": 8624047,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 8,
+        "duration_ns": 8626097,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 9,
+        "duration_ns": 8596097,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 10,
+        "duration_ns": 8600177,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 11,
+        "duration_ns": 8599247,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 12,
+        "duration_ns": 8636397,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 13,
+        "duration_ns": 8631337,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 14,
+        "duration_ns": 8591407,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 15,
+        "duration_ns": 8568817,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 16,
+        "duration_ns": 8937268,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 17,
+        "duration_ns": 9135360,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 18,
+        "duration_ns": 8578567,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 19,
+        "duration_ns": 8632597,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 20,
+        "duration_ns": 8601207,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 21,
+        "duration_ns": 8632677,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 22,
+        "duration_ns": 8610997,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 23,
+        "duration_ns": 8625047,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 24,
+        "duration_ns": 8644457,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 25,
+        "duration_ns": 8586237,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 26,
+        "duration_ns": 8587077,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 27,
+        "duration_ns": 8600317,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 28,
+        "duration_ns": 8594887,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      },
+      {
+        "order": 29,
+        "duration_ns": 8614638,
+        "allocation_metrics": {
+          "status": "unavailable",
+          "scope": "operation_global_system_allocator"
+        }
+      }
+    ]
+  },
+  "correctness": {
+    "source_unchanged": true,
+    "retry_preserved_error": false,
+    "valid_snapshot_values": true,
+    "empty_commit_is_noop": true,
+    "expected_error_exact": false,
+    "commit_outside_timing": true
+  },
+  "binary": {
+    "path": "/home/zhuhe/litchi-goal-0543-target/retained-binaries/candidate-guard-normal",
+    "sha256": "e4b863cb5687a6d3f7b5d6e9201c4eee85f010becc8d0258833ffbcee9a249e6",
+    "bytes": 7342256
+  },
+  "runner": {
+    "git_revision": "9c0b36a82e5bd96373510674a4744cc531f554ae",
+    "git_dirty": true,
+    "rustc_vv": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+    "os": "linux",
+    "arch": "x86_64",
+    "profile": "release"
+  },
+  "allocation_scope": "operation_global_system_allocator",
+  "allocator": "Rust system allocator",
+  "instrumentation": "none",
+  "counter_revision": null,
+  "timing_scope": "source_open_and_fixture_and_selector_setup_excluded; edit_sheets_result_retained_until_clock_and_allocation_end; inspection_commit_and_drop_excluded",
+  "performance_claim": "none: correctness and planning diagnostic only; no speedup claim"
+}

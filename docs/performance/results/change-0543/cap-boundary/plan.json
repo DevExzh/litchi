@@ -1,0 +1,74 @@
+{
+  "revision": "9c0b36a82e5bd96373510674a4744cc531f554ae",
+  "created_utc": "2026-09-12T23:31:14.188705+00:00",
+  "status": "frozen-before-build-and-capture",
+  "priority": "OLE2/OOXML first; ODF deferred until the OLE2/OOXML optimization goal completes.",
+  "hypothesis": "The valid source-backed XLSX path has a performance cliff near its bounded shared-traversal boundary; a fresh size sweep must show that the candidate stays within a small matched baseline envelope before retention.",
+  "scope": "Supplemental valid-path cap-boundary refusal guard for the 0543 XLSX candidate. This lane never changes the main native, allocation, refusal, profile, eager, or hardware gates.",
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0543-target"
+  ],
+  "cpu": 2,
+  "native_order": [
+    "baseline repeat 1",
+    "candidate repeat 1",
+    "candidate repeat 2",
+    "retained baseline repeat 2 under candidate source checkout"
+  ],
+  "cap_boundary": {
+    "sizes": [
+      160,
+      164,
+      256
+    ],
+    "repeats": 2,
+    "warmup": 10,
+    "samples": 100,
+    "case": "valid",
+    "binary": "perf_cap_boundary",
+    "fixture_output": "stage/cap-native-r{repeat}-{size}.fixture.bin",
+    "timing_scope": "Fresh child /usr/bin/time surrounds the guard; guard phase reports edit_sheets planning only, with fixture construction, open, selector setup, and correctness checks outside its phase clock.",
+    "performance_claim": "valid planning p50 and mean diagnostic gate only"
+  },
+  "admission": "For every size and repeat, candidate planning p50 and mean must be no greater than 1.05 times the matched baseline. Every candidate increase above 5% and every same-build repeat drift above 5% receives an individual review. A missing or malformed fixture/report, semantic failure, or source identity mismatch rejects the lane. This stricter supplemental valid guard does not alter the main frozen gates.",
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/src/cell_values/",
+    "crates/litchi-xlsx/src/raw/worksheet/",
+    "crates/litchi-xlsx/examples/"
+  ],
+  "candidate_files": [
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+    "crates/litchi-xlsx/src/cell_values/validation.rs",
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs"
+  ],
+  "shared_test_source_prefixes": [
+    "crates/litchi-xlsx/tests/source_backed_cell_values"
+  ],
+  "temporary_enabler": {
+    "source": "crates/litchi-xlsx/examples/perf_cap_boundary.rs",
+    "purpose": "Public example binary used only to generate and measure the supplemental cap-boundary fixtures.",
+    "source_root_included_for_snapshot": true,
+    "retained_runtime_api": false
+  },
+  "build": {
+    "package": "litchi-xlsx",
+    "example": "perf_cap_boundary",
+    "profile": "release",
+    "features": "all",
+    "jobs": 2,
+    "incremental": false,
+    "locked": true,
+    "target_dir": "/home/zhuhe/litchi-goal-0543-target"
+  },
+  "source_binding": "Baseline and candidate freeze the complete source manifest. The cap example is present in both manifests as a temporary enabler; the only candidate diff permitted by candidate_files is the original five implementation/test files. Shared source-backed integration tests remain byte-identical in both stages.",
+  "guard": {
+    "schema": "litchi.xlsx.cap-boundary-guard.v1",
+    "tool": "perf_cap_boundary",
+    "case": "valid",
+    "report_identity": "Parent receipts bind binary and fixture SHA-256; report binds size, byte lengths, event counts, sample order and correctness.",
+    "allocator": "not measured",
+    "profile": "not measured"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "created_utc": "2026-09-12T22:39:56.136614+00:00",
+  "stage": "before corrected baseline freeze/build/capture",
+  "files": {
+    "differential-tests-final.patch": "9f7d3f5c06130445dd439baf72a47d506e209329e08a90e49e0bac151257af1b"
+  },
+  "test_sources": {
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs": "d3a30e7577bad6a0f2b832fe730b6734abbf1635d48704a96dea352f7b381cdb",
+    "crates/litchi-xlsx/tests/source_backed_cell_values/post_eof_raw_differential.rs": "58cc03176b0b5903f89713147b16d43f68539d9145a49df3c2d04920b9943721"
+  },
+  "failed_attempt": "failed-baseline-1",
+  "failed_source_manifest_sha256": "1620b9c59e3f56b73638edfbde71162518aebd9bf9263b229675e2e0d78caa53",
+  "failed_receipt_sha256": "073065b8e4bd7c332e035e842bf78d70dbd6852cb705c07219bc16837fb498af",
+  "initial_frozen_inputs_sha256": "28a3f6c052dc4ed412d63bd149f1958b2fd130ceca91b9ecea3fefccc8f26d2f",
+  "reason": "Correct new test single-sheet snapshot API misuse; check unaffected-sheet XML through byte-exact multi-sheet no-op publication. No runtime changes or captures preceded the correction."
+}

@@ -1,0 +1,84 @@
+{
+  "status": "pass",
+  "final_source": "baseline",
+  "final_checks": [
+    {
+      "command": "quality-tests",
+      "receipt": "baseline/final-quality-tests.receipt.json",
+      "sha256": "8ec6e9a671c583853c5b21c7fccd6270d60e7f0ebb79603738c25f1357a5a495",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-check",
+      "receipt": "baseline/final-quality-check.receipt.json",
+      "sha256": "24c3095830b9b4d7d18e4195ec628950a438b6ecb4bedc322a75d81f69e2e0d6",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-clippy",
+      "receipt": "baseline/final-quality-clippy.receipt.json",
+      "sha256": "debf17937adc2a3833eb632a29620d1fb0b50ba8f8791762a49e1564099b92f1",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-rustdoc",
+      "receipt": "baseline/final-quality-rustdoc.receipt.json",
+      "sha256": "5d6364be149d3a9cbfb11ff737144bd4df8002990216e5873f690ed2b4b366fe",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-fmt",
+      "receipt": "baseline/final-quality-fmt.receipt.json",
+      "sha256": "9c13f8f248286b1ea78016afe476a07b454aee044c1f86cafaccaee398ffc5fa",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-boundaries",
+      "receipt": "baseline/final-quality-boundaries.receipt.json",
+      "sha256": "09fa4becbb14c057b3c75ca5affd133603492fcac47506861b8fed9ae022e1e5",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-guard-clippy",
+      "receipt": "baseline/final-quality-guard-clippy.receipt.json",
+      "sha256": "13a8e947078286709485c050f8505e3e6108d4a2fc3e3838a941b70870e93730",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-guard-fmt",
+      "receipt": "baseline/final-quality-guard-fmt.receipt.json",
+      "sha256": "7e0af96384b6603ccd4cfef022e24c43139b71fa169f2636436ac0902efb6ede",
+      "exit_code": 0
+    }
+  ],
+  "test_counts": {
+    "baseline/final-quality-tests": 1299,
+    "baseline/quality-tests": 1299,
+    "candidate/final-quality-tests": 1302,
+    "candidate/quality-tests": 1302,
+    "failed-baseline-1/quality-tests": 1113
+  },
+  "total_test_executions": 6316,
+  "failed_command_receipts": [
+    {
+      "receipt": "candidate/final-quality-clippy.receipt.json",
+      "sha256": "e1c27ffcc9fbb19d474f1956dff3e14b1e671739dbd0f40b0b204b219cd86262",
+      "exit_code": 101
+    },
+    {
+      "receipt": "cap-boundary/failed-baseline-1/build-cap-boundary.receipt.json",
+      "sha256": "4e86543e150cbc1071e724f6209b7b7bf7fc121b232bfcc99ea6a470fd6853e8",
+      "exit_code": 101
+    },
+    {
+      "receipt": "failed-baseline-1/quality-tests.receipt.json",
+      "sha256": "073065b8e4bd7c332e035e842bf78d70dbd6852cb705c07219bc16837fb498af",
+      "exit_code": 101
+    }
+  ],
+  "failed_build_or_capture_receipts": 1,
+  "failed_test_or_lint_receipts": 2,
+  "scope": "Final restored baseline passes all eight frozen checks; failed candidate Clippy and earlier fixture/guard compilation attempts remain retained.",
+  "total_passed_test_executions": 6315,
+  "total_failed_test_executions": 1
+}

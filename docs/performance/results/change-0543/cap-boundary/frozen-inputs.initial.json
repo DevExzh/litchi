@@ -1,0 +1,16 @@
+{
+  "created_utc": "2026-09-12T23:31:14.188861+00:00",
+  "status": "frozen-before-build-and-capture",
+  "sha256": {
+    "cap-boundary/plan.json": "ee3f8e4289b4b854fb558db39ef004d85cac8b956a29ae6840f197abf7f6d85d",
+    "cap-boundary/cap_run.py": "b2196b6b475dcdcc3703276bd4d85b9ed2cb7b254be3ac85e663f7885786eadc",
+    "cap-boundary/guard.rs": "6c4808af5587fac549116f221e41b91e9c79580c996cc72bd35d6400074463a1",
+    "cap-boundary/analyze.py": "7e135e7bbacad86e98046418fe9ee0109a9faedee81c191164171315bf2dc30c",
+    "cap-boundary/source-preparation.json": "af88b243a8c15916d4ada0f605bc44db2704a32369f0fde29cbc0fd238f2aaef",
+    "run.py": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+    "plan.json": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+    "applied-candidate.patch": "bd3252181951573b738dfb01a86e64387b9be89932c5520097670e04c606c496",
+    "baseline/source-manifest.json": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+    "candidate/source-manifest.json": "e8ef70b14231083e2e28a7a10bb6cfd0c72e590b186091c265617df1655cda3a"
+  }
+}

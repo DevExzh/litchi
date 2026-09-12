@@ -1,0 +1,182 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "focused shared-traversal boundary assertions"
+)]
+
+use std::sync::Arc;
+
+use litchi_core::OwnedSource;
+use litchi_opc::constants::content_type as ct;
+use soapberry_zip::office::StreamingArchiveWriter;
+
+use crate::cell_values::{SheetCellValueEdit, SourceBackedEditor};
+use crate::{Address, Error, Number, Value};
+
+const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const COMMENT: &str = "<!--x-->";
+const VALID_TAIL: &str =
+    "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData></worksheet>";
+const LATE_VALIDATOR_TAIL: &str =
+    "<mergeCells/><sheetData><row r=\"1\"><c r=\"A1\"><v>1</v></c></row></sheetData></worksheet>";
+const LATE_RAW_TAIL: &str =
+    "<sheetData><row r=\"1\"><c r=\"A1\"><v>1</v><v>2</v></c></row></sheetData></worksheet>";
+const LATE_VALIDATOR_ERROR: &str =
+    "value-only edits refuse dependency-bearing or unknown element 'mergeCells'";
+const LATE_RAW_ERROR: &str = "duplicate worksheet cell value";
+
+fn worksheet_with_comments(comment_count: usize, tail: &str) -> Vec<u8> {
+    let mut xml = String::with_capacity(64 + comment_count * COMMENT.len() + tail.len());
+    xml.push_str("<worksheet xmlns=\"");
+    xml.push_str(SML);
+    xml.push_str("\">");
+    for _ in 0..comment_count {
+        xml.push_str(COMMENT);
+    }
+    xml.push_str(tail);
+    xml.into_bytes()
+}
+
+fn worksheet_over_byte_cap(tail: &str) -> Vec<u8> {
+    let count = crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES / COMMENT.len() + 1;
+    let xml = worksheet_with_comments(count, tail);
+    assert!(xml.len() > crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES);
+    assert!(!crate::raw::worksheet::source_stream_eligible(&xml));
+    xml
+}
+
+fn worksheet_over_event_cap(tail: &str) -> Vec<u8> {
+    let count = crate::raw::worksheet::MAX_SHARED_PROVISIONAL_EVENTS + 1;
+    let xml = worksheet_with_comments(count, tail);
+    assert!(xml.len() < crate::raw::worksheet::MAX_SHARED_SOURCE_BYTES);
+    assert!(crate::raw::worksheet::source_stream_eligible(&xml));
+    xml
+}
+
+fn package_with_sheet(sheet: &[u8]) -> Vec<u8> {
+    let content_types = format!(
+        "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"{}\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"{}\"/></Types>",
+        ct::SML_SHEET_MAIN,
+        ct::SML_WORKSHEET,
+    );
+    let workbook = format!(
+        "<workbook xmlns=\"{SML}\" xmlns:r=\"{REL}\"><sheets><sheet name=\"Sheet1\" sheetId=\"1\" r:id=\"rIdSheet\"/></sheets></workbook>"
+    );
+    let workbook_relationships = format!(
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdSheet\" Type=\"{REL}/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>"
+    );
+    let mut writer = StreamingArchiveWriter::new();
+    writer
+        .write_stored("[Content_Types].xml", content_types.as_bytes())
+        .expect("content-types member");
+    writer
+        .write_stored(
+            "_rels/.rels",
+            b"<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rIdRoot\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>",
+        )
+        .expect("package relationships member");
+    writer
+        .write_stored("xl/workbook.xml", workbook.as_bytes())
+        .expect("workbook member");
+    writer
+        .write_stored(
+            "xl/_rels/workbook.xml.rels",
+            workbook_relationships.as_bytes(),
+        )
+        .expect("workbook relationships member");
+    writer
+        .write_stored("xl/worksheets/sheet1.xml", sheet)
+        .expect("worksheet member");
+    writer.finish_to_bytes().expect("test XLSX archive")
+}
+
+fn source_and_editor(sheet: &[u8]) -> (Vec<u8>, Arc<OwnedSource>, SourceBackedEditor) {
+    let bytes = package_with_sheet(sheet);
+    let source = Arc::new(OwnedSource::new(bytes.clone()));
+    let editor = SourceBackedEditor::from_read_at(source.clone()).expect("accepted XLSX source");
+    (bytes, source, editor)
+}
+
+fn assert_invalid<T>(result: crate::Result<T>, expected: &str) {
+    match result {
+        Err(Error::Invalid(actual)) => assert_eq!(actual, expected),
+        Err(other) => panic!("expected typed Invalid error, got {other:?}"),
+        Ok(_) => panic!("expected source-backed edit to be rejected"),
+    }
+}
+
+fn assert_valid_noop(sheet: &[u8]) {
+    let (bytes, source, editor) = source_and_editor(sheet);
+    let commit = editor
+        .edit_sheets(["Sheet1".into()])
+        .expect("cap fallback should accept valid worksheet")
+        .commit()
+        .expect("valid no-op commit");
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    assert_eq!(
+        commit
+            .snapshot()
+            .value(0, Address::from_a1("A1").expect("A1 address")),
+        Some(&Value::Number(Number::new("1").expect("source number")))
+    );
+    assert_eq!(source.as_slice(), bytes.as_slice());
+}
+
+fn assert_rejected_with_retry(sheet: &[u8], expected: &str) {
+    let (bytes, source, editor) = source_and_editor(sheet);
+    for attempt in 0..2 {
+        assert_invalid(editor.edit_sheets(["Sheet1".into()]), expected);
+        assert_eq!(
+            source.as_slice(),
+            bytes.as_slice(),
+            "source changed after rejected attempt {attempt}"
+        );
+    }
+}
+
+#[test]
+fn source_size_cap_falls_back_without_refusing_valid_or_late_failures() {
+    assert_valid_noop(&worksheet_over_byte_cap(VALID_TAIL));
+    assert_rejected_with_retry(
+        &worksheet_over_byte_cap(LATE_VALIDATOR_TAIL),
+        LATE_VALIDATOR_ERROR,
+    );
+    assert_rejected_with_retry(&worksheet_over_byte_cap(LATE_RAW_TAIL), LATE_RAW_ERROR);
+}
+
+#[test]
+fn provisional_event_cap_falls_back_without_refusing_valid_or_late_failures() {
+    assert_valid_noop(&worksheet_over_event_cap(VALID_TAIL));
+    assert_rejected_with_retry(
+        &worksheet_over_event_cap(LATE_VALIDATOR_TAIL),
+        LATE_VALIDATOR_ERROR,
+    );
+    assert_rejected_with_retry(&worksheet_over_event_cap(LATE_RAW_TAIL), LATE_RAW_ERROR);
+}
+
+#[test]
+fn eligible_small_source_uses_successful_value_edit_control() {
+    let sheet = worksheet_with_comments(3, VALID_TAIL);
+    assert!(crate::raw::worksheet::source_stream_eligible(&sheet));
+    let (bytes, source, editor) = source_and_editor(&sheet);
+    let mut edit = editor
+        .edit_sheets(["Sheet1".into()])
+        .expect("eligible worksheet");
+    edit.apply_batch([SheetCellValueEdit::set(
+        "Sheet1",
+        Address::from_a1("A1").expect("A1 address"),
+        2u32,
+    )])
+    .expect("stage value edit");
+    let commit = edit.commit().expect("commit value edit");
+    assert!(commit.changed());
+    assert_eq!(
+        commit
+            .snapshot()
+            .value(0, Address::from_a1("A1").expect("A1 address")),
+        Some(&Value::Number(Number::new("2").expect("edited number")))
+    );
+    assert_eq!(source.as_slice(), bytes.as_slice());
+}
