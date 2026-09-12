@@ -386,12 +386,19 @@ impl BodyTableLockCommit {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BodyTableTarget {
     pub(crate) table_position: usize,
     pub(crate) table_name: Box<str>,
     pub(crate) table_rows: u32,
     pub(crate) table_columns: u32,
+    /// UTF-16 character offset of the body's object-replacement entry.
+    ///
+    /// The deletion transaction uses this source witness to remove exactly
+    /// one body-table anchor after the graph has been proved.  Keeping the
+    /// offset beside the private target avoids a second text scan in sibling
+    /// phases while leaving the public selector and snapshot archive-free.
+    pub(crate) anchor_character_index: usize,
     pub(crate) sheet_identifier: NonZeroU64,
     pub(crate) sheet_component_index: usize,
     pub(crate) sheet_object_index: usize,
@@ -568,7 +575,7 @@ pub(crate) fn validate_body_table_target(
     validate_selected_ownership(package, target, budget)
 }
 
-fn native_body_table_targets_with_budget(
+pub(crate) fn native_body_table_targets_with_budget(
     package: &Package,
     budget: &mut WireBudget,
 ) -> Result<Vec<BodyTableTarget>, BodyTableLockError> {
@@ -923,6 +930,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
             table_name,
             table_rows,
             table_columns,
+            anchor_character_index: entry.character_index,
             // Pages' rooted body is the section/sheet owner for table
             // attachment dependencies. Keep this proof on the target so
             // sibling semantic adapters can inspect the exact body payload
@@ -3004,7 +3012,7 @@ impl WireBudget {
         self.charge_payload_work(work)
     }
 
-    fn charge_sort_work(&mut self, length: usize) -> Result<(), BodyTableLockError> {
+    pub(crate) fn charge_sort_work(&mut self, length: usize) -> Result<(), BodyTableLockError> {
         let levels = if length <= 1 {
             0
         } else {
@@ -3342,6 +3350,7 @@ mod tests {
             table_name: "private-table-name".into(),
             table_rows: 5,
             table_columns: 4,
+            anchor_character_index: 0,
             sheet_identifier: NonZeroU64::new(0xfeed_babe).expect("identifier"),
             sheet_component_index: 1,
             sheet_object_index: 2,
@@ -3841,6 +3850,7 @@ mod tests {
             table_name: "test-table".into(),
             table_rows: 5,
             table_columns: 4,
+            anchor_character_index: 0,
             sheet_identifier: identifier,
             sheet_component_index: 0,
             sheet_object_index: 0,

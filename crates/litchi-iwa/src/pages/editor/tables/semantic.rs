@@ -145,6 +145,75 @@ fn map_focused_cells_limit(
     })
 }
 
+fn map_focused_deletion_error(error: litchi_pages::BodyTableDeletionError) -> Error {
+    let message = error.to_string();
+    match error {
+        litchi_pages::BodyTableDeletionError::TableNotFound
+        | litchi_pages::BodyTableDeletionError::AmbiguousTableName
+        | litchi_pages::BodyTableDeletionError::AmbiguousSelector => Error::ParseError(message),
+        litchi_pages::BodyTableDeletionError::Allocation { amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "Pages body-table deletion",
+                amount,
+            })
+        },
+        litchi_pages::BodyTableDeletionError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => {
+            let Some(kind) = map_focused_deletion_limit(kind) else {
+                return Error::InvalidFormat(format!("focused Pages table deletion: {message}"));
+            };
+            let (Ok(observed), Ok(maximum)) = (usize::try_from(observed), usize::try_from(maximum))
+            else {
+                return Error::InvalidFormat(format!("focused Pages table deletion: {message}"));
+            };
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind,
+                observed,
+                limit: maximum,
+            })
+        },
+        litchi_pages::BodyTableDeletionError::UnsupportedSource
+        | litchi_pages::BodyTableDeletionError::InvalidSource
+        | litchi_pages::BodyTableDeletionError::Verification
+        | litchi_pages::BodyTableDeletionError::PatchConflict => {
+            Error::InvalidFormat(format!("focused Pages table deletion: {message}"))
+        },
+        litchi_pages::BodyTableDeletionError::UnsupportedDependency => Error::ParseError(message),
+        _ => Error::InvalidFormat(format!("focused Pages table deletion: {message}")),
+    }
+}
+
+fn map_focused_deletion_limit(kind: litchi_pages::BodyTableDeletionLimitKind) -> Option<LimitKind> {
+    use litchi_pages::BodyTableDeletionLimitKind as Focused;
+    match kind {
+        Focused::InputBytes | Focused::WireBytes => Some(LimitKind::InputBytes),
+        Focused::OutputBytes | Focused::WireOutputBytes => Some(LimitKind::OutputBytes),
+        Focused::WireFields => Some(LimitKind::Fields),
+        Focused::WireNesting => Some(LimitKind::Nesting),
+        Focused::WireWork | Focused::TransactionWork => Some(LimitKind::RewriteWork),
+        Focused::Entries
+        | Focused::EntryBytes
+        | Focused::TotalEntryBytes
+        | Focused::PackageBytes
+        | Focused::PayloadBytes
+        | Focused::TotalPayloadBytes
+        | Focused::PayloadObjects
+        | Focused::PayloadMessages
+        | Focused::PayloadItems
+        | Focused::PayloadReferences => None,
+        _ => None,
+    }
+}
+
+fn body_table_not_attached_error(model_object_id: u64) -> Error {
+    Error::ParseError(format!(
+        "Pages table model {model_object_id} is not attached to the body"
+    ))
+}
+
 trait IntoWireLimitKind {
     fn into_wire_limit_kind(self) -> Option<LimitKind>;
 }
@@ -185,11 +254,7 @@ pub(super) fn focused_body_table_source(
         .into_iter()
         .enumerate()
         .find(|(_position, table)| table.model_object_id == model_object_id)
-        .ok_or_else(|| {
-            Error::ParseError(format!(
-                "Pages table model {model_object_id} is not attached to the body"
-            ))
-        })?;
+        .ok_or_else(|| body_table_not_attached_error(model_object_id))?;
     let bytes = editor.package().to_bytes()?;
     let package_limits = editor.package().limits();
     let archive_limits = package_limits.effective_archive_limits()?;
@@ -226,6 +291,77 @@ fn focused_body_table_package(editor: &PagesEditor) -> Result<FocusedPagesPackag
     .map_err(|error| Error::InvalidFormat(format!("Pages table archive limits: {error}")))?;
     FocusedPagesPackage::from_bytes_with_limits(source, focused_limits)
         .map_err(|error| Error::InvalidFormat(format!("focused Pages table source: {error}")))
+}
+
+/// Admit one compatibility model identifier to the focused body-table
+/// deletion owner.
+///
+/// A source-built or normalized legacy `IWorkPackage` has no exact ZIP
+/// baseline of its own. Its current package state is therefore serialized once
+/// and reparsed by the focused package, which gives the deletion transaction
+/// an exact source artifact without changing the editor's compatibility
+/// provenance. Flat exact packages use the metadata-only selector scan and
+/// retain their original byte baseline. If that scan cannot resolve a table
+/// that the host projection can see, the serialized package is admitted
+/// through the same focused source parser.
+fn focused_body_table_deletion_source(
+    editor: &PagesEditor,
+    model_object_id: u64,
+) -> Result<(FocusedPagesPackage, usize, PagesTableInfo, bool)> {
+    if editor.package().exact_source_owner().is_none() {
+        let (focused, table_position, info) = focused_body_table_source(editor, model_object_id)?;
+        return Ok((focused, table_position, info, true));
+    }
+
+    if let Some(table_position) =
+        super::reader::focused_table_position_for_mutation(editor, model_object_id)?
+    {
+        let info = editor
+            .tables()?
+            .into_iter()
+            .find(|table| table.model_object_id == model_object_id)
+            .ok_or_else(|| body_table_not_attached_error(model_object_id))?;
+        let focused = focused_body_table_package(editor)?;
+        return Ok((focused, table_position, info, false));
+    }
+
+    // A few legacy exact packages expose a rooted table through the host
+    // projection before the metadata-only catalog can resolve its route.
+    // Serialize that already parsed package and admit it through the same
+    // focused source parser rather than reviving the host graph writer. A
+    // genuinely missing model returns the established host error category.
+    let host_position = editor
+        .tables()?
+        .into_iter()
+        .enumerate()
+        .find(|(_position, table)| table.model_object_id == model_object_id);
+    let Some((host_position, host_info)) = host_position else {
+        return Err(body_table_not_attached_error(model_object_id));
+    };
+    let (focused, focused_position, focused_info) =
+        focused_body_table_source(editor, model_object_id)?;
+    if focused_position != host_position || focused_info != host_info {
+        return Err(Error::InvalidFormat(
+            "focused Pages table deletion compatibility ingress selected an unexpected table"
+                .to_owned(),
+        ));
+    }
+    Ok((focused, focused_position, host_info, false))
+}
+
+/// Reopen a focused deletion result through the host package boundary while
+/// retaining the source-built/legacy provenance of the editor that requested
+/// the mutation.
+fn pages_editor_from_deletion_bytes(
+    bytes: &[u8],
+    package_limits: crate::pages::editor::PackageLimits,
+    compatibility_source: bool,
+) -> Result<PagesEditor> {
+    let mut package = IWorkPackage::from_bytes_with_limits(bytes, package_limits)?;
+    if compatibility_source {
+        package.discard_exact_source_for_compatibility();
+    }
+    PagesEditor::from_package(package)
 }
 
 impl PagesEditor {
@@ -3744,150 +3880,41 @@ impl PagesEditor {
     /// formula owner family, component references, and UUID registrations are
     /// removed transactionally. Storage shared with another table is retained.
     pub fn remove_table(&mut self, model_object_id: u64) -> Result<PagesTableInfo> {
-        let graph = self.require_body_table(model_object_id)?;
-        let tables = body_table_graphs(self)?;
-        let owned = crate::numbers::editor::table_owned_object_ids_in_package(
-            self.package(),
-            model_object_id,
-        )?;
-        let mut shared_owned = HashSet::new();
-        for table in tables
-            .iter()
-            .filter(|table| table.info.model_object_id != model_object_id)
+        let (focused, table_position, info, compatibility_source) =
+            focused_body_table_deletion_source(self, model_object_id)?;
+        let commit = focused
+            .remove_body_table(BodyTableSelector::index(table_position))
+            .map_err(map_focused_deletion_error)?;
+        let removed = commit.removed_table();
+        if removed.index() != table_position
+            || removed.name() != info.name
+            || usize::try_from(removed.rows()).ok() != Some(info.rows)
+            || usize::try_from(removed.columns()).ok() != Some(info.columns)
         {
-            shared_owned.extend(crate::numbers::editor::table_owned_object_ids_in_package(
-                self.package(),
-                table.info.model_object_id,
-            )?);
+            return Err(Error::InvalidFormat(
+                "focused Pages table deletion selected an unexpected table".to_owned(),
+            ));
         }
-        let private_owned = owned
-            .into_iter()
-            .filter(|identifier| !shared_owned.contains(identifier));
-        let mut removed_identifiers = vec![
-            graph.attachment_object_id,
-            graph.info.drawable_object_id,
-            graph.info.model_object_id,
-        ];
-        removed_identifiers.extend(private_owned);
-        let unique = removed_identifiers.iter().copied().collect::<HashSet<_>>();
-        if unique.len() != removed_identifiers.len() {
-            return Err(Error::InvalidFormat(format!(
-                "Pages table model {model_object_id} reuses private graph identifiers"
-            )));
-        }
-
-        let mut object_components = Vec::with_capacity(removed_identifiers.len());
-        for &identifier in &removed_identifiers {
-            let archive_name = find_object_archive(self.package(), identifier)?;
-            let component = component_identifier_for_entry(self.package(), &archive_name)?;
-            object_components.push((identifier, archive_name, component));
-        }
-
-        let mut text_editor = IWorkTextEditor::from_package(self.package().clone());
-        let anchor_end = graph
-            .info
-            .anchor_character_index
-            .checked_add(1)
-            .ok_or_else(|| Error::ParseError("Pages table anchor overflow".to_owned()))?;
-        text_editor.replace_text(
-            self.body_storage_id,
-            graph.info.anchor_character_index..anchor_end,
-            "",
+        let mut bytes = Vec::new();
+        commit
+            .package()
+            .write_to(&mut bytes)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        let verified = pages_editor_from_deletion_bytes(
+            &bytes,
+            self.package().limits(),
+            compatibility_source,
         )?;
-        let mut staged = text_editor.into_package();
-        let mut formula_context_ids = graph.formula_context_ids.clone();
-        for &identifier in &removed_identifiers {
-            if !formula_context_ids.contains(&identifier) {
-                formula_context_ids.push(identifier);
-            }
-        }
-        let formula_identifiers = crate::numbers::editor::remove_table_formula_graph_in_package(
-            &mut staged,
-            &formula_context_ids,
-        )?;
-        let mut removed_components = HashMap::new();
-        for (identifier, archive_name, component) in object_components {
-            if let Some(component) = component {
-                remove_component_external_references_to_object(&mut staged, component, identifier)?;
-                if component_uuid_identifiers(&staged, component)?
-                    .is_some_and(|identifiers| identifiers.contains(&identifier))
-                {
-                    remove_component_object_uuids(&mut staged, component, &[identifier])?;
-                }
-            }
-            if remove_table_object(&mut staged, &archive_name, identifier)?
-                && let Some(component) = component
-            {
-                removed_components.insert(archive_name, component);
-            }
-        }
-        for (archive_name, component) in removed_components {
-            if !staged.contains_entry(&archive_name) {
-                remove_component_registration(&mut staged, component)?;
-            }
-        }
-        removed_identifiers.extend(formula_identifiers);
-        let mut pending = graph.formula_context_ids.clone();
-        let mut examined = HashSet::new();
-        while let Some(identifier) = pending.pop() {
-            if !examined.insert(identifier)
-                || removed_identifiers.contains(&identifier)
-                || package_references_object(&staged, identifier)?
-            {
-                continue;
-            }
-            let Ok(archive_name) = find_object_archive(&staged, identifier) else {
-                continue;
-            };
-            let archive = staged.archive(&archive_name)?;
-            let object = archive.object(identifier).ok_or_else(|| {
-                Error::InvalidFormat(format!(
-                    "Pages table context object {identifier} is missing"
-                ))
-            })?;
-            pending.extend(
-                object
-                    .archive_info
-                    .message_infos
-                    .iter()
-                    .flat_map(|message| {
-                        message.object_references.iter().copied().chain(
-                            message
-                                .field_infos
-                                .iter()
-                                .flat_map(|field| field.object_references.iter().copied()),
-                        )
-                    }),
-            );
-            let component = component_identifier_for_entry(&staged, &archive_name)?;
-            if let Some(component) = component {
-                remove_component_external_references_to_object(&mut staged, component, identifier)?;
-                if component_uuid_identifiers(&staged, component)?
-                    .is_some_and(|identifiers| identifiers.contains(&identifier))
-                {
-                    remove_component_object_uuids(&mut staged, component, &[identifier])?;
-                }
-            }
-            if remove_table_object(&mut staged, &archive_name, identifier)?
-                && let Some(component) = component
-            {
-                remove_component_registration(&mut staged, component)?;
-            }
-            removed_identifiers.push(identifier);
-        }
-        release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
-
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
         if verified
             .tables()?
             .iter()
             .any(|table| table.model_object_id == model_object_id)
         {
             return Err(Error::InvalidFormat(
-                "Pages table deletion failed validation".to_owned(),
+                "focused Pages table deletion failed validation".to_owned(),
             ));
         }
         *self = verified;
-        Ok(graph.info)
+        Ok(info)
     }
 }

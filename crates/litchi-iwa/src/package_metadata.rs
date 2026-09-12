@@ -527,83 +527,46 @@ pub(crate) fn remove_component_registration(
     if !package.contains_entry(PACKAGE_METADATA_ENTRY) {
         return Ok(());
     }
+    let read_options = package_metadata_read_options(package);
+    let options = RewriteOptions::new(
+        read_options.max_input_bytes(),
+        read_options.max_output_bytes(),
+        read_options.max_fields(),
+        read_options.max_work_bytes(),
+        read_options.recursion_limit(),
+        read_options.max_components(),
+        read_options.max_references(),
+        read_options.max_additions().max(1),
+    );
     package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
         let (object_index, message_index) = package_metadata_location(archive)?;
         let object = &mut archive.objects[object_index];
         let original = &object.messages[message_index];
-        let metadata = crate::protobuf::tsp::PackageMetadata::decode(original.data.as_slice())?;
-        if metadata
-            .components
-            .iter()
-            .filter(|component| component.identifier == component_identifier)
-            .count()
-            != 1
-            || metadata
-                .versioned_components
-                .iter()
-                .any(|component| component.identifier == component_identifier)
-        {
+        let mut visitor = ComponentRemovalSelectorVisitor {
+            component_identifier,
+            current_locator: None,
+            current_matches: 0,
+            versioned_matches: 0,
+        };
+        inspect_package_metadata_source(original.data.as_slice(), options, &mut visitor)?;
+        if visitor.current_matches != 1 || visitor.versioned_matches != 0 {
             return Err(Error::InvalidFormat(format!(
                 "PackageMetadata must contain exactly one unversioned component {component_identifier}"
             )));
         }
-        let mut data = original.data.clone();
-        for field in [3, 11] {
-            data = transform_length_delimited_fields_at_path(&data, &[field], |component_data| {
-                let mut component_data = component_data.to_vec();
-                let component = crate::protobuf::tsp::ComponentInfo::decode(
-                    component_data.as_slice(),
-                )?;
-                for (reference_field, references) in [
-                    (6, component.external_references.as_slice()),
-                    (18, component.versioned_external_references.as_slice()),
-                ] {
-                    for reference in references
-                        .iter()
-                        .filter(|reference| {
-                            reference.component_identifier == component_identifier
-                        })
-                    {
-                        component_data = remove_repeated_length_delimited_field_where(
-                            &component_data,
-                            reference_field,
-                            |payload| {
-                                Ok(
-                                    crate::protobuf::tsp::ComponentExternalReference::decode(
-                                        payload,
-                                    )? == *reference,
-                                )
-                            },
-                        )?;
-                    }
-                }
-                Ok(component_data)
-            })?;
-        }
-        data = remove_repeated_length_delimited_field_where(&data, 3, |payload| {
-            Ok(crate::protobuf::tsp::ComponentInfo::decode(payload)?.identifier
-                == component_identifier)
+        let locator = visitor.current_locator.as_deref().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "PackageMetadata has no locator for component {component_identifier}"
+            ))
         })?;
-        let verified = crate::protobuf::tsp::PackageMetadata::decode(data.as_slice())?;
-        if verified
-            .components
-            .iter()
-            .chain(&verified.versioned_components)
-            .any(|component| {
-                component.identifier == component_identifier
-                    || component
-                        .external_references
-                        .iter()
-                        .chain(&component.versioned_external_references)
-                        .any(|reference| {
-                            reference.component_identifier == component_identifier
-                        })
-            })
-        {
-            return Err(Error::InvalidFormat(
-                "Package component removal failed validation".to_owned(),
-            ));
-        }
+        let selector = ComponentSelector::new(component_identifier, locator);
+        let data = litchi_iwa_protos::package_metadata_codec::rewrite_package_metadata_component_removal(
+            original.data.as_slice(),
+            selector,
+            options,
+        )
+        .map_err(package_metadata_inspection_error)?
+        .into_bytes();
         object.replace_message(
             message_index,
             RawMessage {
@@ -1193,6 +1156,43 @@ impl PackageMetadataVisitor for ComponentLocatorVisitor<'_> {
                 .checked_add(1)
                 .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
             self.first_match.get_or_insert(component.identifier());
+        }
+        Ok(())
+    }
+}
+
+struct ComponentRemovalSelectorVisitor {
+    component_identifier: u64,
+    current_locator: Option<String>,
+    current_matches: usize,
+    versioned_matches: usize,
+}
+
+impl PackageMetadataVisitor for ComponentRemovalSelectorVisitor {
+    fn visit_component(
+        &mut self,
+        component: ComponentDescriptor<'_>,
+    ) -> std::result::Result<(), RewriteError> {
+        if component.identifier() != self.component_identifier {
+            return Ok(());
+        }
+        if component.is_current() {
+            self.current_matches = self
+                .current_matches
+                .checked_add(1)
+                .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
+            let locator = component.effective_locator();
+            let mut owned_locator = String::new();
+            owned_locator
+                .try_reserve_exact(locator.len())
+                .map_err(|_error| RewriteError::allocation(locator.len()))?;
+            owned_locator.push_str(locator);
+            self.current_locator = Some(owned_locator);
+        } else {
+            self.versioned_matches = self
+                .versioned_matches
+                .checked_add(1)
+                .ok_or_else(|| RewriteError::allocation(usize::MAX))?;
         }
         Ok(())
     }
@@ -2519,6 +2519,78 @@ mod tests {
                 .messages[0]
                 .data,
             original
+        );
+    }
+
+    #[test]
+    fn component_registration_removal_preserves_versioned_edges_and_unknown_root() {
+        let metadata = PackageMetadata {
+            last_object_identifier: 100,
+            components: vec![
+                ComponentInfo {
+                    identifier: 1,
+                    preferred_locator: "Source".to_owned(),
+                    external_references: vec![ComponentExternalReference {
+                        component_identifier: 30,
+                        object_identifier: Some(11),
+                        is_weak: None,
+                    }],
+                    versioned_external_references: vec![ComponentExternalReference {
+                        component_identifier: 30,
+                        object_identifier: Some(12),
+                        is_weak: Some(true),
+                    }],
+                    ..Default::default()
+                },
+                ComponentInfo {
+                    identifier: 2,
+                    preferred_locator: "Keep".to_owned(),
+                    external_references: vec![ComponentExternalReference {
+                        component_identifier: 99,
+                        object_identifier: Some(13),
+                        is_weak: None,
+                    }],
+                    ..Default::default()
+                },
+                ComponentInfo {
+                    identifier: 30,
+                    preferred_locator: "Target".to_owned(),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let mut source = metadata.encode_to_vec();
+        source.extend_from_slice(&[0xd0, 0x05, 0x07]);
+        let mut package = package_with_metadata_data(source);
+
+        remove_component_registration(&mut package, 30).unwrap();
+
+        let updated = metadata_payload(&package);
+        assert!(updated.ends_with(&[0xd0, 0x05, 0x07]));
+        let decoded = PackageMetadata::decode(updated.as_slice()).unwrap();
+        assert!(
+            decoded
+                .components
+                .iter()
+                .all(|component| component.identifier != 30)
+        );
+        let source_component = decoded
+            .components
+            .iter()
+            .find(|component| component.identifier == 1)
+            .unwrap();
+        assert!(source_component.external_references.is_empty());
+        assert!(source_component.versioned_external_references.is_empty());
+        let keep_component = decoded
+            .components
+            .iter()
+            .find(|component| component.identifier == 2)
+            .unwrap();
+        assert_eq!(keep_component.external_references.len(), 1);
+        assert_eq!(
+            keep_component.external_references[0].component_identifier,
+            99
         );
     }
 }

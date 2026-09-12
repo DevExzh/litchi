@@ -70100,6 +70100,453 @@ IWA_TABLE_MERGE_FORMULA_CODEC_ENCODER = re.compile(
     r"[A-Za-z0-9_]*\b"
 )
 
+# Pages table deletion is a package-owned structural transaction.  Keep the
+# physical graph/archive/metadata/formula/text proof in five private children so a
+# semantic caller can only select by ``BodyTableSelector`` and receive the
+# archive-free snapshot/transaction vocabulary.  The audit is dormant until
+# the owner source appears: package re-exports may land before the implementation
+# while the migration is staged in several commits.
+IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE = Path(
+    "crates/litchi-pages/src/package/body_table_deletion.rs"
+)
+IWA_PAGES_BODY_TABLE_DELETION_CHILD_ROOT = Path(
+    "crates/litchi-pages/src/package/body_table_deletion"
+)
+IWA_PAGES_BODY_TABLE_DELETION_CHILD_MODULES = (
+    "graph",
+    "archive",
+    "metadata",
+    "formula",
+    "text",
+)
+IWA_PAGES_BODY_TABLE_DELETION_CHILD_SOURCES = tuple(
+    IWA_PAGES_BODY_TABLE_DELETION_CHILD_ROOT / f"{name}.rs"
+    for name in IWA_PAGES_BODY_TABLE_DELETION_CHILD_MODULES
+)
+IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE = Path(
+    "crates/litchi-pages/src/package.rs"
+)
+IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE = Path(
+    "crates/litchi-pages/src/lib.rs"
+)
+IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES = frozenset(
+    {
+        "BodyTableDeletionCommit",
+        "BodyTableDeletionDiagnostics",
+        "BodyTableDeletionError",
+        "BodyTableDeletionLimitKind",
+        "BodyTableDeletionPatch",
+    }
+)
+IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS = (
+    "remove_body_table",
+    "apply_body_table_deletion",
+)
+IWA_PAGES_BODY_TABLE_DELETION_CHILD_MARKER_GROUPS = {
+    "graph selector and ownership proof": (
+        "BodyTableTarget",
+        "validate_body_table_target",
+        "discover_table_graph",
+        "selected_position",
+        "selected_roots",
+        "OwnershipRole",
+        "prove_inbound_references",
+        "ownership",
+    ),
+    "graph references and bounded accounting": (
+        "references",
+        "inbound",
+        "shared",
+        "private",
+        "checked_add",
+        "checked_mul",
+        "Budget",
+        "Limits",
+    ),
+    "archive source-preserving removal": (
+        "Archive",
+        "archive",
+        "SourceCatalog",
+        "source_preserving",
+        "source-preserving",
+        "remove_object",
+        "remove_message",
+        "candidate",
+    ),
+    "archive verification": (
+        "verify",
+        "verification",
+        "reopen",
+        "absence",
+        "checked",
+        "exact",
+        "validate_plan",
+        "validate_canonical_object_framing",
+        "has_live_records",
+    ),
+    "metadata component registration": (
+        "package_metadata_codec",
+        "component_removal",
+        "ComponentRemoval",
+        "component registration",
+        "registration",
+    ),
+    "metadata identity/reference cleanup": (
+        "uuid",
+        "UUID",
+        "external_reference",
+        "external-reference",
+        "remove_component_registration",
+        "object_uuid",
+    ),
+    "formula dependency pruning": (
+        "numbers_table_cell_dependency_codec",
+        "dependency_wire",
+        "formula_engine",
+        "CalculationEngine",
+        "formula_owner",
+        "owner",
+    ),
+    "formula tile pruning and counters": (
+        "tile",
+        "tiled",
+        "prune",
+        "remove_formula",
+        "number_of_formulas",
+        "checked_sub",
+    ),
+    "text-wire delegation": (
+        "litchi_iwa_text_wire",
+        "text_wire",
+        "rewrite_storage_text",
+        "prepare_storage_text_rewrite",
+        "StorageText",
+    ),
+    "UTF-16 selected-anchor proof": (
+        "utf16_index",
+        "utf16_len",
+        "UTF_16",
+        "UTF-16",
+        "anchor",
+        "character_index",
+        "selected_anchor",
+        "TextSpan",
+        "Position",
+    ),
+    "bounded text accounting": (
+        "try_reserve",
+        "checked_add",
+        "checked_sub",
+        "WireBudget",
+        "budget",
+        "limit",
+        "max",
+    ),
+}
+IWA_PAGES_BODY_TABLE_DELETION_OWNER_MARKER_GROUPS = {
+    "selector admission": (
+        "BodyTableSelector",
+        "remove_body_table",
+        "resolve_body_table",
+        "select_body_table",
+        "body_table_catalog",
+    ),
+    "semantic deletion patch": (
+        "BodyTableDeletionPatch",
+        "BodyTableSnapshot",
+        "removed_table",
+        "staged",
+        "deletion",
+    ),
+    "bounded graph/rewrite accounting": (
+        "Budget",
+        "Limits",
+        "limit",
+        "checked_add",
+        "checked_mul",
+        "try_reserve",
+    ),
+    "candidate reassembly and readback": (
+        "reassemble",
+        "prepare_reassembly",
+        "candidate",
+        "reopen",
+        "from_bytes",
+        "verify",
+        "readback",
+    ),
+    "exact-source conflict and inverse": (
+        "PatchConflict",
+        "source_fingerprint",
+        "source_fingerprint",
+        "exact_source",
+        "inverse",
+    ),
+}
+IWA_PAGES_BODY_TABLE_DELETION_LEGACY_FALLBACK = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"table_cell_merges_in_package|regions_in_package|"
+    r"legacy_table_deletion|fallback_table_deletion|"
+    r"delete_table_in_host|remove_table_in_host"
+    r")(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_RAW_ID = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|table_id|table_identifier|"
+    r"model_id|model_identifier|native_id|object_id|drawable_id|"
+    r"component_id|archive_id|message_id|storage_id|uuid_id|"
+    r"source_bytes|package_bytes|raw_bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:Option[ \t\r\n]*<[ \t\r\n]*)?"
+    r"(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)\b"
+)
+IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_BYTES = re.compile(
+    r"&[ \t\r\n]*\[[ \t\r\n]*u8\s*\]|"
+    r"\b(?:Vec|Box|Arc)[ \t\r\n]*<[ \t\r\n]*(?:u8|\[[ \t\r\n]*u8\s*\])"
+    r"|\b(?:Bytes|ByteString)\b"
+)
+IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_PHYSICAL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"Archive|ArchiveObject|ComponentCatalog|EntryEdit|ExactArtifacts|"
+    r"OwnedExactArtifacts|RawMessage|SnappyStream|SourceCatalog|SharedBytes|"
+    r"PhysicalSource|Document|Body|Show|Slide|Sheet|TableModelArchive|"
+    r"TableInfoArchive|FormulaArchive|AstNodeArchive|AstNodeType|"
+    r"WireView|WireLimits|DecodeOptions|RawMessage|"
+    r"litchi_iwa(?:_archive|_core|_protos)?|prost|prost_types|buffa|"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*Generated|[A-Za-z_][A-Za-z0-9_]*ArchiveView)"
+    r")(?![A-Za-z0-9_])"
+)
+
+# The metadata and dependency codecs keep their raw-wire inputs private to a
+# hidden protos facade, but their structural removals are still separate child
+# modules.  These audits activate as soon as the child declaration or source
+# appears and require Buffa lazy validation, bounded planning, and exact
+# candidate verification without assuming one concrete helper spelling.
+IWA_PACKAGE_METADATA_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/package_metadata_codec.rs"
+)
+IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/package_metadata_codec/component_removal.rs"
+)
+IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_MODULE = "component_removal"
+IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_BUILD_MARKER = (
+    'println!("cargo:rerun-if-changed=src/package_metadata_codec.rs");'
+)
+IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_PUBLIC_PREPARED = re.compile(
+    r"(?m)^\s*pub\s+struct\s+Prepared[A-Za-z0-9_]*"
+    r"(?:Component|component)[A-Za-z0-9_]*(?:Removal|removal)[A-Za-z0-9_]*\b"
+)
+IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_PREPARE_FUNCTION = re.compile(
+    r"(?m)^\s*pub\s+fn\s+prepare_[A-Za-z0-9_]*"
+    r"(?:component|Component)[A-Za-z0-9_]*(?:removal|Removal)[A-Za-z0-9_]*\b"
+)
+IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_MARKER_GROUPS = {
+    "whole component registration": (
+        "ComponentRemovalBatch",
+        "component registration",
+        "current-component",
+        "component_removal",
+        "component_header",
+    ),
+    "prepared execution": (
+        "Prepared",
+        "prepare_",
+        "execute",
+        "rewrite_",
+    ),
+    "Buffa lazy view": (
+        "buffa",
+        "Buffa",
+        "decode_lazy_view",
+        "LazyView",
+    ),
+    "source-preserving candidate": (
+        "source",
+        "source-preserving",
+        "unknown_fields",
+        "candidate",
+        "Verification",
+        "validate_candidate",
+    ),
+    "bounded accounting": (
+        "RewriteExecutionRequirements",
+        "preflight_execution",
+        "try_reserve",
+        "checked_add",
+        "Budget",
+        "max_output",
+    ),
+}
+IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_cell_dependency_codec.rs"
+)
+IWA_NUMBERS_DEPENDENCY_REMOVAL_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_cell_dependency_codec/removal.rs"
+)
+IWA_NUMBERS_DEPENDENCY_REMOVAL_MODULE = "removal"
+IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_cell_dependency_codec/inbound.rs"
+)
+IWA_NUMBERS_DEPENDENCY_INBOUND_MODULE = "inbound"
+IWA_NUMBERS_DEPENDENCY_INBOUND_TYPES = (
+    "FormulaDependencyFact",
+    "FormulaOwnerInternalDependencyFact",
+    "FormulaOwnerInternalDependencyKind",
+    "FormulaOwnerUuidDependencyFact",
+    "FormulaOwnerUuidDependencyKind",
+)
+IWA_NUMBERS_DEPENDENCY_INBOUND_PARENT_FUNCTIONS = (
+    "decode_formula_owner_dependency_facts_with_visitor",
+    "decode_formula_owner_dependency_facts",
+    "decode_formula_owner_dependency_facts_with_report",
+)
+IWA_NUMBERS_DEPENDENCY_INBOUND_MARKER_GROUPS = {
+    "volatile dependency facts": (
+        "decode_volatile_dependencies_in",
+        "VolatileGeometry",
+    ),
+    "spanning dependency facts": (
+        "decode_spanning_dependencies_in",
+        "SpanningColumn",
+        "SpanningRow",
+    ),
+    "whole-owner dependency facts": (
+        "decode_whole_owner_dependencies_in",
+        "WholeOwner",
+    ),
+    "UUID dependency facts": (
+        "decode_uuid_references_in",
+        "TableUuidReference",
+        "OwnerUuid",
+    ),
+    "typed visitor dispatch": (
+        "visit_formula_owner_internal_dependency",
+        "visit_formula_owner_uuid_dependency",
+        "FormulaDependencyFact",
+    ),
+    "coordinate validation": (
+        "decode_cell_coordinate_in",
+        "decode_range_coordinate_in",
+        "coord_set",
+        "range_context",
+    ),
+    "bounded borrowed traversal": (
+        "budget.message",
+        "child_depth",
+        "checked_add",
+        "set_once",
+        "DecodeError::invalid",
+    ),
+}
+IWA_NUMBERS_DEPENDENCY_REMOVAL_PUBLIC_PREPARED = re.compile(
+    r"(?m)^\s*pub\s+struct\s+(?:Prepared[A-Za-z0-9_]*|"
+    r"[A-Za-z0-9_]*(?:Removal|Rewrite)Plan|[A-Za-z0-9_]*Plan)\b"
+)
+IWA_NUMBERS_DEPENDENCY_REMOVAL_PREPARE_FUNCTION = re.compile(
+    r"(?m)^\s*pub\s+fn\s+(?:prepare|execute|rewrite)_[A-Za-z0-9_]*"
+    r"(?:dependency|formula|owner|tile|remov|prun)[A-Za-z0-9_]*\b",
+    re.IGNORECASE,
+)
+IWA_NUMBERS_DEPENDENCY_REMOVAL_MARKER_GROUPS = {
+    "formula engine owner removal": (
+        "CalculationEngine",
+        "calculation_engine",
+        "formula_engine",
+        "formula_owner",
+        "owner_id_map",
+        "number_of_formulas",
+    ),
+    "dependency tile pruning": (
+        "cell_record_tile",
+        "cell_record_tiles",
+        "range_precedents_tile",
+        "tiled",
+        "tile",
+        "prune",
+        "remove",
+    ),
+    "prepared bounded rewrite": (
+        "Prepared",
+        "CalculationEngineOwnerRemovalPlan",
+        "FormulaDependencyRewriteRequirements",
+        "prepare_calculation_engine_owner_removal",
+        "prepare_formula_owner_cell_edges_removal",
+        "prepare_cell_record_tile_edges_removal",
+        "execute_calculation_engine_owner_removal",
+        "execute_formula_owner_cell_edges_removal",
+        "execute_cell_record_tile_edges_removal",
+        "rewrite_calculation_engine_owner_removal",
+        "rewrite_formula_owner_cell_edges",
+        "rewrite_cell_record_tile_edges",
+    ),
+    "Buffa lazy source preservation": (
+        "buffa",
+        "Buffa",
+        "decode_lazy_view",
+        "LazyView",
+        "source",
+        "unknown",
+        "candidate",
+    ),
+    "checked accounting": (
+        "checked_add",
+        "checked_sub",
+        "try_reserve",
+        "limit",
+        "budget",
+        "bounded",
+    ),
+}
+IWA_DEPENDENCY_CODEC_PUBLIC_PHYSICAL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"prost|prost_types|OwnedView|RawMessage|ArchiveObject|"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*Generated|[A-Za-z_][A-Za-z0-9_]*ArchiveView)"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_CODEC_PRODUCTION_GUARD_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/production_codec_guard.rs"
+)
+IWA_CODEC_BUILD_SOURCE = Path("crates/litchi-iwa-protos/build.rs")
+IWA_CODEC_BRIDGE_SPECS = (
+    {
+        "label": "PackageMetadata",
+        "path": Path("crates/litchi-iwa/src/package_metadata.rs"),
+        "route": re.compile(
+            r"(?:litchi_iwa_protos\s*::\s*)?package_metadata_codec\s*::"
+            r"[A-Za-z0-9_]*component[A-Za-z0-9_]*(?:removal|registration)"
+        ),
+    },
+    {
+        "label": "formula clone",
+        "path": Path("crates/litchi-iwa/src/numbers/editor/formula_clone.rs"),
+        "route": re.compile(
+            r"(?:"
+            r"(?:litchi_iwa_protos\s*::\s*)?numbers_table_cell_dependency_codec"
+            r"\s*::|\bdependency_wire\s*::|\bremoval\s*::|"
+            r"\b(?:dependency_wire|removal)\s*::?\s*\{)"
+        ),
+        "alias_import": re.compile(
+            r"\buse\s+(?:litchi_iwa_protos\s*::\s*)?"
+            r"numbers_table_cell_dependency_codec\s+as\s+"
+            r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\s*;"
+        ),
+    },
+    {
+        "label": "formula dependency wire",
+        "path": Path(
+            "crates/litchi-iwa/src/numbers/editor/formula_clone/dependency_wire.rs"
+        ),
+        "route": re.compile(
+            r"(?:litchi_iwa_protos\s*::\s*)?numbers_table_cell_dependency_codec"
+            r"\s*::"
+        ),
+        "alias_import": re.compile(
+            r"\buse\s+(?:litchi_iwa_protos\s*::\s*)?"
+            r"numbers_table_cell_dependency_codec\s+as\s+"
+            r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\s*;"
+        ),
+    },
+)
+
 # The compatibility editors retain their raw-ID table methods for callers that
 # have not moved yet, but merged-cell reads have a complete focused owner. Keep
 # this ratchet scoped to the two read methods: Numbers still owns the shared
@@ -73164,6 +73611,759 @@ def audit_iwa_table_merge_formula_codec_source_topology(
     return sorted(set(violations))
 
 
+def _boundary_marker_present(code: str, markers: Iterable[str]) -> bool:
+    """Return whether one token or phrase marker occurs in masked Rust code."""
+
+    for marker in markers:
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", marker):
+            if re.search(
+                rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])",
+                code,
+            ):
+                return True
+        elif marker in code:
+            return True
+    return False
+
+
+def _audit_pages_body_table_deletion_public_surface(
+    root: Path,
+    sources: tuple[tuple[Path, str], ...],
+    package_source: str,
+    library_source: str,
+) -> list[str]:
+    """Reject native values from the Pages deletion transaction's public API."""
+
+    violations: list[str] = []
+    canonical = IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES
+
+    for path, source in sources:
+        production = _mask_rust_cfg_test_items(source)
+        for name in sorted(canonical):
+            struct = _rust_named_struct_body(production, name)
+            if struct is None:
+                continue
+            body, offset = struct
+            for match in IWA_TABLE_MERGE_TRANSACTION_PUBLIC_FIELD.finditer(body):
+                line = production.count("\n", 0, offset + match.start()) + 1
+                violations.append(
+                    "Pages body-table deletion transaction exposes a public field: "
+                    f"{path}:{line}"
+                )
+
+    for path, source in sources:
+        production = _mask_rust_cfg_test_items(source)
+        for type_name in (*canonical, "Package"):
+            for method_name, declaration, line in _rust_public_methods_in_impl(
+                production, type_name
+            ):
+                raw_id = IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_RAW_ID.search(
+                    declaration
+                )
+                if raw_id is not None:
+                    violations.append(
+                        "Pages body-table deletion public method exposes a raw ID "
+                        f"parameter {raw_id.group(0).strip()}: {path}:{line}"
+                    )
+                if IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_BYTES.search(declaration):
+                    violations.append(
+                        "Pages body-table deletion public method exposes raw bytes: "
+                        f"{path}:{line}"
+                    )
+                physical = IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_PHYSICAL.search(
+                    declaration
+                )
+                if physical is not None:
+                    violations.append(
+                        "Pages body-table deletion public method exposes a native, "
+                        f"generated, or wire type {physical.group()}: {path}:{line}"
+                    )
+
+    # Public re-exports are checked independently from the owner methods: a
+    # future facade alias must not reintroduce a physical type through a
+    # declaration that never appears in the transaction child itself.
+    for path, source in (
+        (IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE, package_source),
+        (IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE, library_source),
+    ):
+        for declaration, line in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not identifiers & canonical:
+                continue
+            raw_id = IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_RAW_ID.search(declaration)
+            if raw_id is not None:
+                violations.append(
+                    "Pages body-table deletion facade exposes a raw ID parameter "
+                    f"{raw_id.group(0).strip()}: {path}:{line}"
+                )
+            if IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_BYTES.search(declaration):
+                violations.append(
+                    "Pages body-table deletion facade exposes raw bytes: "
+                    f"{path}:{line}"
+                )
+            physical = IWA_PAGES_BODY_TABLE_DELETION_PUBLIC_PHYSICAL.search(
+                declaration
+            )
+            if physical is not None:
+                violations.append(
+                    "Pages body-table deletion facade exposes a native, generated, "
+                    f"or wire type {physical.group()}: {path}:{line}"
+                )
+
+    return violations
+
+
+def audit_pages_body_table_deletion_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Pages table deletion selector-first and physically modular."""
+
+    owner_path = IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+    owner_absolute = root / owner_path
+    # The package declaration may be staged before the owner implementation.
+    # Waiting for the owner file keeps the checker useful during that split
+    # while still failing closed as soon as the transaction is present.
+    if not owner_absolute.is_file():
+        return []
+
+    violations: list[str] = []
+    owner_source = _mask_rust_cfg_test_items(owner_absolute.read_text(encoding="utf-8"))
+    owner_code = _mask_rust_non_code(owner_source)
+    sources: list[tuple[Path, str]] = [(owner_path, owner_source)]
+
+    modules = _rust_root_level_module_declarations(
+        owner_source,
+        frozenset(IWA_PAGES_BODY_TABLE_DELETION_CHILD_MODULES),
+    )
+    for child_name in IWA_PAGES_BODY_TABLE_DELETION_CHILD_MODULES:
+        matches = [item for item in modules if item[0] == child_name]
+        if not matches:
+            violations.append(
+                "Pages body-table deletion owner is missing private child module "
+                f"{child_name}: {owner_path}"
+            )
+            continue
+        for _name, visibility, shape, _body, line in matches:
+            if visibility is not None and visibility.strip() == "pub":
+                violations.append(
+                    "Pages body-table deletion child module must remain private: "
+                    f"{owner_path}:{line}"
+                )
+            if shape == "inline":
+                violations.append(
+                    "Pages body-table deletion child must use a dedicated source: "
+                    f"{owner_path}:{line}"
+                )
+
+    for child_path in IWA_PAGES_BODY_TABLE_DELETION_CHILD_SOURCES:
+        absolute = root / child_path
+        if not absolute.is_file():
+            violations.append(
+                "Pages body-table deletion owner is missing child source: "
+                f"{child_path}"
+            )
+            continue
+        child_source = _mask_rust_cfg_test_items(absolute.read_text(encoding="utf-8"))
+        sources.append((child_path, child_source))
+
+    package_absolute = root / IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE
+    library_absolute = root / IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE
+    package_source = (
+        _mask_rust_cfg_test_items(package_absolute.read_text(encoding="utf-8"))
+        if package_absolute.is_file()
+        else ""
+    )
+    library_source = (
+        _mask_rust_cfg_test_items(library_absolute.read_text(encoding="utf-8"))
+        if library_absolute.is_file()
+        else ""
+    )
+    if not package_source:
+        violations.append(
+            "Pages body-table deletion package facade is missing: "
+            f"{IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE}"
+        )
+    if not library_source:
+        violations.append(
+            "Pages body-table deletion crate facade is missing: "
+            f"{IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE}"
+        )
+
+    package_modules = _rust_root_level_module_declarations(
+        package_source, frozenset({"body_table_deletion"})
+    )
+    if not package_modules:
+        violations.append(
+            "Pages body-table deletion package module is missing: "
+            f"{IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE}"
+        )
+    elif any(
+        visibility is not None and visibility.strip() == "pub"
+        for _name, visibility, _shape, _body, _line in package_modules
+    ):
+        violations.append(
+            "Pages body-table deletion package module must remain private: "
+            f"{IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE}"
+        )
+
+    canonical = IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES
+    for name in sorted(canonical):
+        if name not in _rust_canonical_exports(owner_source, canonical):
+            violations.append(
+                "Pages body-table deletion owner is missing canonical type "
+                f"{name}: {owner_path}"
+            )
+        if package_source and name not in _rust_canonical_exports(package_source, canonical):
+            violations.append(
+                "Pages body-table deletion package facade is missing canonical export "
+                f"{name}: {IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE}"
+            )
+        if library_source and name not in _rust_canonical_exports(library_source, canonical):
+            violations.append(
+                "Pages body-table deletion crate facade is missing canonical export "
+                f"{name}: {IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE}"
+            )
+
+    all_source = "\n".join(source for _path, source in sources)
+    all_code = _mask_rust_non_code(all_source)
+    for child_name, child_path in zip(
+        IWA_PAGES_BODY_TABLE_DELETION_CHILD_MODULES,
+        IWA_PAGES_BODY_TABLE_DELETION_CHILD_SOURCES,
+    ):
+        child_absolute = root / child_path
+        if not child_absolute.is_file():
+            continue
+        child = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(child_absolute.read_text(encoding="utf-8"))
+        )
+        # The graph/archive split has a few established naming families.  A
+        # child must still prove every concern assigned to it, so moving a
+        # helper between private files cannot silently remove an entire proof.
+        if child_name == "graph":
+            groups = (
+                ("graph selector and ownership proof",),
+                ("graph references and bounded accounting",),
+            )
+        elif child_name == "archive":
+            groups = (
+                ("archive source-preserving removal",),
+                ("archive verification",),
+            )
+        elif child_name == "metadata":
+            groups = (
+                ("metadata component registration",),
+                ("metadata identity/reference cleanup",),
+            )
+        elif child_name == "formula":
+            groups = (
+                ("formula dependency pruning",),
+                ("formula tile pruning and counters",),
+            )
+        else:
+            groups = (
+                ("text-wire delegation",),
+                ("UTF-16 selected-anchor proof",),
+                ("bounded text accounting",),
+            )
+        for group_name_tuple in groups:
+            group_name = group_name_tuple[0]
+            if not _boundary_marker_present(
+                child, IWA_PAGES_BODY_TABLE_DELETION_CHILD_MARKER_GROUPS[group_name]
+            ):
+                violations.append(
+                    "Pages body-table deletion child is missing "
+                    f"{group_name} marker: {child_path}"
+                )
+
+    for label, markers in IWA_PAGES_BODY_TABLE_DELETION_OWNER_MARKER_GROUPS.items():
+        if not _boundary_marker_present(all_code, markers):
+            violations.append(
+                "Pages body-table deletion transaction is missing "
+                f"{label} marker: {owner_path}"
+            )
+
+    # Keep the public operation's admission fence ahead of any staging or
+    # publication helper.  The patch-apply route admits its exact source patch
+    # before the same physical rewrite machinery is reached.
+    package_method_records: dict[str, list[tuple[str, str, int, Path]]] = {
+        name: [] for name in IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS
+    }
+    for path, source in sources:
+        for method_name in package_method_records:
+            for declaration, body, line in _rust_public_method_bodies(
+                source, method_name, type_name="Package"
+            ):
+                package_method_records[method_name].append(
+                    (declaration, body, line, path)
+                )
+
+    remove_records = package_method_records["remove_body_table"]
+    if not remove_records:
+        violations.append(
+            "Pages body-table deletion Package method is missing remove_body_table: "
+            f"{owner_path}"
+        )
+    for declaration, body, line, path in remove_records:
+        if re.search(r"\bBodyTableSelector\b", declaration) is None:
+            violations.append(
+                "Pages remove_body_table must accept BodyTableSelector: "
+                f"{path}:{line}"
+            )
+        if re.search(r"\bBodyTableDeletion(?:Error|LimitKind)?\b", declaration) is None:
+            violations.append(
+                "Pages remove_body_table must return the typed deletion result: "
+                f"{path}:{line}"
+            )
+        body_code = _mask_rust_non_code(body)
+        body_opening = body_code.find("{")
+        if body_opening >= 0:
+            body_code = body_code[body_opening + 1 :]
+        admission = re.search(
+            r"\b(?:BodyTableSelector|resolve_body_table|select_body_table|"
+            r"body_table_catalog)\b",
+            body_code,
+        )
+        staging = re.search(
+            r"\b(?:BodyTableDeletionPatch|stage|staged|reassemble|rewrite|"
+            r"candidate)\b",
+            body_code,
+        )
+        if admission is None:
+            violations.append(
+                "Pages remove_body_table must resolve its typed selector before staging: "
+                f"{path}:{line}"
+            )
+        elif staging is not None and staging.start() < admission.start():
+            violations.append(
+                "Pages remove_body_table stages deletion before selector admission: "
+                f"{path}:{line}"
+            )
+        if IWA_PAGES_BODY_TABLE_DELETION_LEGACY_FALLBACK.search(body_code):
+            violations.append(
+                "Pages remove_body_table retains a legacy/catchall deletion fallback: "
+                f"{path}:{line}"
+            )
+        if re.search(r"\bErr\s*\(\s*_\s*\)\s*=>", body_code):
+            violations.append(
+                "Pages remove_body_table uses a post-admission catchall error arm: "
+                f"{path}:{line}"
+            )
+
+    apply_records = package_method_records["apply_body_table_deletion"]
+    if not apply_records:
+        violations.append(
+            "Pages body-table deletion Package method is missing "
+            "apply_body_table_deletion: "
+            f"{owner_path}"
+        )
+    for declaration, body, line, path in apply_records:
+        if re.search(r"\bBodyTableDeletionPatch\b", declaration) is None:
+            violations.append(
+                "Pages apply_body_table_deletion must accept BodyTableDeletionPatch: "
+                f"{path}:{line}"
+            )
+        if re.search(r"\bBodyTableDeletionCommit\b", declaration) is None:
+            violations.append(
+                "Pages apply_body_table_deletion must return BodyTableDeletionCommit: "
+                f"{path}:{line}"
+            )
+        body_code = _mask_rust_non_code(body)
+        body_opening = body_code.find("{")
+        if body_opening >= 0:
+            body_code = body_code[body_opening + 1 :]
+        admission = re.search(
+            r"\b(?:PatchConflict|source_fingerprint|target_fingerprint|"
+            r"exact_source|authoriz|validate_patch|BodyTableDeletionPatch)\b",
+            body_code,
+        )
+        staging = re.search(
+            r"\b(?:stage|staged|reassemble|rewrite|candidate)\b",
+            body_code,
+        )
+        if admission is None:
+            violations.append(
+                "Pages apply_body_table_deletion must validate its exact patch before "
+                f"staging: {path}:{line}"
+            )
+        elif staging is not None and staging.start() < admission.start():
+            violations.append(
+                "Pages apply_body_table_deletion stages deletion before patch admission: "
+                f"{path}:{line}"
+            )
+        if IWA_PAGES_BODY_TABLE_DELETION_LEGACY_FALLBACK.search(body_code):
+            violations.append(
+                "Pages apply_body_table_deletion retains a legacy/catchall deletion "
+                f"fallback: {path}:{line}"
+            )
+        if re.search(r"\bErr\s*\(\s*_\s*\)\s*=>", body_code):
+            violations.append(
+                "Pages apply_body_table_deletion uses a post-admission catchall error "
+                f"arm: {path}:{line}"
+            )
+
+    commit_methods = {
+        method_name
+        for path, source in sources
+        for method_name, _declaration, _line in _rust_public_methods_in_impl(
+            _mask_rust_cfg_test_items(source), "BodyTableDeletionCommit"
+        )
+    }
+    for required in ("package", "into_package", "patch", "diagnostics", "removed_table"):
+        if required not in commit_methods:
+            violations.append(
+                "Pages BodyTableDeletionCommit is missing public "
+                f"{required}: {owner_path}"
+            )
+
+    removed_table_records = [
+        (path, declaration, line)
+        for path, source in sources
+        for method_name, declaration, line in _rust_public_methods_in_impl(
+            _mask_rust_cfg_test_items(source), "BodyTableDeletionCommit"
+        )
+        if method_name == "removed_table"
+    ]
+    if removed_table_records and not any(
+        re.search(r"\bBodyTableSnapshot\b", declaration)
+        for _path, declaration, _line in removed_table_records
+    ):
+        path, _declaration, line = removed_table_records[0]
+        violations.append(
+            "Pages BodyTableDeletionCommit::removed_table must return semantic "
+            f"BodyTableSnapshot: {path}:{line}"
+        )
+
+    violations.extend(
+        _audit_pages_body_table_deletion_public_surface(
+            root, tuple(sources), package_source, library_source
+        )
+    )
+    return sorted(set(violations))
+
+
+def _audit_iwa_component_removal_codec_source_topology(
+    root: Path,
+    *,
+    parent_path: Path,
+    child_path: Path,
+    module_name: str,
+    label: str,
+    prepared_pattern: re.Pattern[str],
+    prepare_pattern: re.Pattern[str],
+    marker_groups: dict[str, tuple[str, ...]],
+    build_marker: str,
+    guard_marker: str,
+) -> list[str]:
+    """Audit one private source-preserving component/dependency codec child."""
+
+    parent_absolute = root / parent_path
+    child_absolute = root / child_path
+    # A parent module declaration can land before its child during a staged
+    # migration.  Only activate once the child source or directory is present;
+    # an existing parent directory still fails closed on a missing child.
+    if not child_absolute.is_file() and not child_absolute.parent.is_dir():
+        return []
+    violations: list[str] = []
+    if not parent_absolute.is_file():
+        return [f"{label} codec parent source is missing: {parent_path}"]
+    if not child_absolute.is_file():
+        return [f"{label} codec child source is missing: {child_path}"]
+
+    parent_source = _mask_rust_cfg_test_items(parent_absolute.read_text(encoding="utf-8"))
+    parent_code = _mask_rust_non_code(parent_source)
+    child_source = _mask_rust_cfg_test_items(child_absolute.read_text(encoding="utf-8"))
+    child_code = _mask_rust_non_code(child_source)
+
+    modules = _rust_root_level_module_declarations(parent_source, frozenset({module_name}))
+    if not modules:
+        violations.append(
+            f"{label} codec parent is missing private child module {module_name}: "
+            f"{parent_path}"
+        )
+    else:
+        for _name, visibility, shape, _body, line in modules:
+            if visibility is not None and visibility.strip() == "pub":
+                violations.append(
+                    f"{label} codec child module must remain private: {parent_path}:{line}"
+                )
+            if shape == "inline":
+                violations.append(
+                    f"{label} codec child must use a dedicated source: {parent_path}:{line}"
+                )
+
+    if prepared_pattern.search(child_code) is None:
+        violations.append(
+            f"{label} codec child is missing its prepared removal plan: {child_path}"
+        )
+    if prepare_pattern.search(child_code) is None:
+        violations.append(
+            f"{label} codec child is missing its narrow prepare/rewrite entry point: "
+            f"{child_path}"
+        )
+
+    for marker_label, markers in marker_groups.items():
+        if not _boundary_marker_present(child_code, markers):
+            violations.append(
+                f"{label} codec child is missing {marker_label} marker: {child_path}"
+            )
+
+    if re.search(r"\b(?:prost|prost_types)\b|\b(?:Message|RawMessage)::(?:decode|encode)", child_code):
+        violations.append(f"{label} codec child must not use Prost: {child_path}")
+    for declaration, line in _rust_public_declarations(child_source):
+        physical = IWA_DEPENDENCY_CODEC_PUBLIC_PHYSICAL.search(declaration)
+        if physical is not None:
+            violations.append(
+                f"{label} codec child exposes a generated or owned wire type "
+                f"{physical.group()}: {child_path}:{line}"
+            )
+
+    for name in (
+        "PreparedPackageMetadataComponentRemovalRewrite"
+        if "package_metadata" in str(parent_path)
+        else "CalculationEngineOwnerRemovalPlan",
+    ):
+        # Parent re-export checks remain name-flexible for the dependency
+        # child, but ensure at least the prepared public type crosses the
+        # hidden facade rather than becoming an unreachable private helper.
+        if name in child_code and name not in _rust_canonical_exports(
+            parent_source, frozenset({name})
+        ):
+            violations.append(
+                f"{label} codec parent does not re-export prepared type {name}: "
+                f"{parent_path}"
+            )
+
+    build_absolute = root / IWA_CODEC_BUILD_SOURCE
+    if not build_absolute.is_file():
+        violations.append(
+            f"{label} codec build source is missing: {IWA_CODEC_BUILD_SOURCE}"
+        )
+    else:
+        build_source = build_absolute.read_text(encoding="utf-8")
+        if build_marker not in build_source:
+            violations.append(
+                f"{label} codec build is missing its rerun marker: "
+                f"{IWA_CODEC_BUILD_SOURCE}"
+            )
+
+    guard_absolute = root / IWA_CODEC_PRODUCTION_GUARD_SOURCE
+    if not guard_absolute.is_file():
+        violations.append(
+            f"{label} codec production inventory source is missing: "
+            f"{IWA_CODEC_PRODUCTION_GUARD_SOURCE}"
+        )
+    elif guard_marker not in guard_absolute.read_text(encoding="utf-8"):
+        violations.append(
+            f"{label} codec child is missing production inventory registration: "
+            f"{IWA_CODEC_PRODUCTION_GUARD_SOURCE}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_package_metadata_component_removal_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    return _audit_iwa_component_removal_codec_source_topology(
+        root,
+        parent_path=IWA_PACKAGE_METADATA_CODEC_SOURCE,
+        child_path=IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_SOURCE,
+        module_name=IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_MODULE,
+        label="PackageMetadata component-removal",
+        prepared_pattern=IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_PUBLIC_PREPARED,
+        prepare_pattern=IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_PREPARE_FUNCTION,
+        marker_groups=IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_MARKER_GROUPS,
+        build_marker=IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_BUILD_MARKER,
+        guard_marker='include_str!("package_metadata_codec/component_removal.rs")',
+    )
+
+
+def audit_iwa_numbers_table_cell_dependency_removal_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    return _audit_iwa_component_removal_codec_source_topology(
+        root,
+        parent_path=IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE,
+        child_path=IWA_NUMBERS_DEPENDENCY_REMOVAL_SOURCE,
+        module_name=IWA_NUMBERS_DEPENDENCY_REMOVAL_MODULE,
+        label="Numbers dependency-removal",
+        prepared_pattern=IWA_NUMBERS_DEPENDENCY_REMOVAL_PUBLIC_PREPARED,
+        prepare_pattern=IWA_NUMBERS_DEPENDENCY_REMOVAL_PREPARE_FUNCTION,
+        marker_groups=IWA_NUMBERS_DEPENDENCY_REMOVAL_MARKER_GROUPS,
+        build_marker='println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");',
+        guard_marker='include_str!("numbers_table_cell_dependency_codec/removal.rs")',
+    )
+
+
+def audit_iwa_numbers_table_cell_dependency_inbound_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep expanded inbound dependency facts in one private Buffa child."""
+
+    parent_path = IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE
+    child_path = IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE
+    parent_absolute = root / parent_path
+    child_absolute = root / child_path
+    parent_source = (
+        parent_absolute.read_text(encoding="utf-8")
+        if parent_absolute.is_file()
+        else ""
+    )
+    parent_modules = _rust_root_level_module_declarations(
+        parent_source, frozenset({IWA_NUMBERS_DEPENDENCY_INBOUND_MODULE})
+    )
+    # The inbound visitor is being staged independently of the removal child;
+    # do not report a missing child until its private module declaration lands.
+    if not child_absolute.is_file() and not parent_modules:
+        return []
+
+    violations: list[str] = []
+    if not parent_absolute.is_file():
+        violations.append(f"Numbers dependency inbound codec parent is missing: {parent_path}")
+        return violations
+    if not child_absolute.is_file():
+        violations.append(f"Numbers dependency inbound codec child is missing: {child_path}")
+        return violations
+
+    parent_code = _mask_rust_non_code(parent_source)
+    child_source = _mask_rust_cfg_test_items(child_absolute.read_text(encoding="utf-8"))
+    child_code = _mask_rust_non_code(child_source)
+
+    if not parent_modules:
+        violations.append(
+            "Numbers dependency inbound codec parent is missing private child module "
+            f"{IWA_NUMBERS_DEPENDENCY_INBOUND_MODULE}: {parent_path}"
+        )
+    else:
+        for _name, visibility, shape, _body, line in parent_modules:
+            if visibility is not None and visibility.strip() == "pub":
+                violations.append(
+                    "Numbers dependency inbound codec child module must remain private: "
+                    f"{parent_path}:{line}"
+                )
+            if shape == "inline":
+                violations.append(
+                    "Numbers dependency inbound codec child must use a dedicated source: "
+                    f"{parent_path}:{line}"
+                )
+
+    for name in IWA_NUMBERS_DEPENDENCY_INBOUND_TYPES:
+        if not _rust_canonical_exports(child_source, frozenset({name})):
+            violations.append(
+                "Numbers dependency inbound codec child is missing public typed fact "
+                f"{name}: {child_path}"
+            )
+        if name not in _rust_canonical_exports(
+            parent_source, frozenset({name})
+        ):
+            violations.append(
+                "Numbers dependency inbound codec parent does not re-export typed fact "
+                f"{name}: {parent_path}"
+            )
+
+    for function_name in IWA_NUMBERS_DEPENDENCY_INBOUND_PARENT_FUNCTIONS:
+        if re.search(
+            rf"(?m)^\s*pub\s+fn\s+{re.escape(function_name)}\b", parent_code
+        ) is None:
+            violations.append(
+                "Numbers dependency inbound codec parent is missing public fact API "
+                f"{function_name}: {parent_path}"
+            )
+
+    for marker_label, markers in IWA_NUMBERS_DEPENDENCY_INBOUND_MARKER_GROUPS.items():
+        if not _boundary_marker_present(child_code, markers):
+            violations.append(
+                "Numbers dependency inbound codec child is missing "
+                f"{marker_label} marker: {child_path}"
+            )
+
+    if re.search(
+        r"\b(?:prost|prost_types)\b|\b(?:Message|RawMessage)::(?:decode|encode)",
+        child_code,
+    ):
+        violations.append(f"Numbers dependency inbound codec child must not use Prost: {child_path}")
+    for declaration, line in _rust_public_declarations(child_source):
+        physical = IWA_DEPENDENCY_CODEC_PUBLIC_PHYSICAL.search(declaration)
+        if physical is not None:
+            violations.append(
+                "Numbers dependency inbound codec child exposes a generated or owned "
+                f"wire type {physical.group()}: {child_path}:{line}"
+            )
+        if RUST_BYTE_SLICE.search(declaration) is not None:
+            violations.append(
+                "Numbers dependency inbound codec child exposes raw bytes: "
+                f"{child_path}:{line}"
+            )
+
+    build_absolute = root / IWA_CODEC_BUILD_SOURCE
+    build_marker = 'println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec/inbound.rs");'
+    if not build_absolute.is_file():
+        violations.append(
+            "Numbers dependency inbound codec build source is missing: "
+            f"{IWA_CODEC_BUILD_SOURCE}"
+        )
+    elif build_marker not in build_absolute.read_text(encoding="utf-8"):
+        violations.append(
+            "Numbers dependency inbound codec build is missing its rerun marker: "
+            f"{IWA_CODEC_BUILD_SOURCE}"
+        )
+
+    guard_absolute = root / IWA_CODEC_PRODUCTION_GUARD_SOURCE
+    guard_marker = 'include_str!("numbers_table_cell_dependency_codec/inbound.rs")'
+    if not guard_absolute.is_file():
+        violations.append(
+            "Numbers dependency inbound codec production inventory source is missing: "
+            f"{IWA_CODEC_PRODUCTION_GUARD_SOURCE}"
+        )
+    elif guard_marker not in guard_absolute.read_text(encoding="utf-8"):
+        violations.append(
+            "Numbers dependency inbound codec child is missing production inventory "
+            f"registration: {IWA_CODEC_PRODUCTION_GUARD_SOURCE}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_table_deletion_host_bridges_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require legacy host helpers to route deletion support through codecs."""
+
+    # Host migration is coupled to the focused Pages owner.  During the
+    # staged split, the old host APIs remain valid and should not be judged as
+    # if the focused deletion operation were already published.
+    if not (root / IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE).is_file():
+        return []
+
+    violations: list[str] = []
+    for spec in IWA_CODEC_BRIDGE_SPECS:
+        path = root / spec["path"]
+        if not path.is_file():
+            violations.append(
+                f"Pages body-table deletion {spec['label']} bridge is missing: "
+                f"{spec['path']}"
+            )
+            continue
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        code = _mask_rust_non_code(source)
+        route_found = spec["route"].search(code) is not None
+        if not route_found:
+            alias_import = spec.get("alias_import")
+            if alias_import is not None:
+                alias_match = alias_import.search(code)
+                if alias_match is not None:
+                    alias = re.escape(alias_match.group("alias"))
+                    route_found = re.search(rf"\b{alias}\s*::", code) is not None
+        if not route_found:
+            violations.append(
+                f"Pages body-table deletion {spec['label']} bridge must delegate to "
+                f"its focused protos codec: {spec['path']}"
+            )
+    return sorted(set(violations))
+
+
 def audit_iwa_common_table_read_source_topology(root: Path = ROOT) -> list[str]:
     """Keep the archive-free table-read vocabulary in the common crate."""
 
@@ -75663,6 +76863,11 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_merge_transaction_source_topology()
         + audit_keynote_table_merge_transaction_source_topology()
         + audit_iwa_table_merge_formula_codec_source_topology()
+        + audit_pages_body_table_deletion_source_topology()
+        + audit_iwa_package_metadata_component_removal_source_topology()
+        + audit_iwa_numbers_table_cell_dependency_removal_source_topology()
+        + audit_iwa_numbers_table_cell_dependency_inbound_source_topology()
+        + audit_iwa_pages_table_deletion_host_bridges_source_topology()
         + audit_iwa_table_merge_host_read_delegation_source_topology()
         + audit_pages_table_cells_source_topology()
         + audit_keynote_table_cells_source_topology()

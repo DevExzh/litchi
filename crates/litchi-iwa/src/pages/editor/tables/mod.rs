@@ -19,7 +19,7 @@ pub use formula::{
     PagesTableFormulaCellReference, PagesTableFormulaExpression,
 };
 pub use sort::PagesTableSortRowRange;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use super::*;
 use litchi_iwa_common::table::appearance::Appearance as TableAppearance;
@@ -68,7 +68,5 @@ pub use litchi_iwa_common::table::cell::layout::{
 };
 
 pub use semantic::{PagesTable, PagesTableInfo};
-use storage::{
-    PagesTableGraph, body_table_graphs, clone_body_table_attachment, remove_table_object,
-};
+use storage::{PagesTableGraph, body_table_graphs, clone_body_table_attachment};
 use validation::decode_unique_table_model;

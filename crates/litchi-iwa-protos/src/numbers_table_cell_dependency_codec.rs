@@ -14,11 +14,29 @@ use core::fmt;
 use crate::buffa_numbers_table_cell_dependency_generated::LitchiIwaTableCellDependencyProjection as projection;
 use crate::numbers_table_cell_storage_codec as wire;
 
+mod inbound;
+mod removal;
+
+pub use inbound::{
+    FormulaDependencyFact, FormulaOwnerInternalDependencyFact, FormulaOwnerInternalDependencyKind,
+    FormulaOwnerUuidDependencyFact, FormulaOwnerUuidDependencyKind,
+};
+
+pub use removal::{
+    CalculationEngineOwnerRemovalPlan, CellRecordTileEdgesRemovalPlan,
+    FormulaDependencyRewriteReport, FormulaDependencyRewriteRequirements,
+    FormulaOwnerCellEdgesRemovalPlan, execute_calculation_engine_owner_removal,
+    execute_cell_record_tile_edges_removal, execute_formula_owner_cell_edges_removal,
+    prepare_calculation_engine_owner_removal, prepare_cell_record_tile_edges_removal,
+    prepare_formula_owner_cell_edges_removal, rewrite_calculation_engine_owner_removal,
+    rewrite_cell_record_tile_edges, rewrite_formula_owner_cell_edges,
+};
+
 pub use wire::{
     DecodeError, DecodeLimit, DecodeOptions, DecodeReport, ReferenceRecord, ReferenceSnapshot,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UuidSnapshot {
     lower: u64,
     upper: u64,
@@ -479,6 +497,36 @@ impl_redacted_debug!(
 /// back by the codec. Callers must stage mutations until the decode returns
 /// `Ok`, or supply an explicit reversible rollback discipline.
 pub trait DependencyVisitor {
+    /// Visit one exact inbound dependency fact from a typed formula-owner
+    /// dependency envelope. The default is intentionally empty so existing
+    /// visitors remain source-compatible as new dependency families gain
+    /// borrowed projections.
+    fn visit_formula_dependency_fact(
+        &mut self,
+        _fact: FormulaDependencyFact,
+    ) -> Result<(), DecodeError> {
+        Ok(())
+    }
+
+    /// Visit one internal-owner inbound dependency. This forwards through the
+    /// generic fact hook so callers may override either level of the API.
+    fn visit_formula_owner_internal_dependency(
+        &mut self,
+        fact: FormulaOwnerInternalDependencyFact,
+    ) -> Result<(), DecodeError> {
+        self.visit_formula_dependency_fact(FormulaDependencyFact::InternalOwner(fact))
+    }
+
+    /// Visit one owner-UUID inbound dependency. Nested table/UUID references
+    /// retain both UUIDs in the borrowed fact when the native envelope has
+    /// them.
+    fn visit_formula_owner_uuid_dependency(
+        &mut self,
+        fact: FormulaOwnerUuidDependencyFact,
+    ) -> Result<(), DecodeError> {
+        self.visit_formula_dependency_fact(FormulaDependencyFact::OwnerUuid(fact))
+    }
+
     fn visit_formula_owner_dependency(
         &mut self,
         _reference: ReferenceRecord<'_>,
@@ -714,6 +762,36 @@ pub fn decode_formula_owner_dependencies_with_visitor<'source>(
     Ok((snapshot, budget.report()))
 }
 
+/// Decode a formula-owner dependency envelope while streaming typed inbound
+/// facts through [`DependencyVisitor`]. This explicit spelling is useful to
+/// callers whose only interest is the dependency proof; it is an alias of the
+/// regular owner projection and shares its one strict aggregate budget.
+pub fn decode_formula_owner_dependency_facts_with_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn DependencyVisitor,
+) -> Result<(FormulaOwnerDependenciesSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_formula_owner_dependencies_with_visitor(source, options, visitor)
+}
+
+/// Decode a formula-owner dependency envelope and retain only the borrowed
+/// owner snapshot. Typed facts are available through the visitor variant.
+pub fn decode_formula_owner_dependency_facts(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<FormulaOwnerDependenciesSnapshot<'_>, DecodeError> {
+    decode_formula_owner_dependencies(source, options)
+}
+
+/// Decode a formula-owner dependency envelope and return its aggregate strict
+/// accounting. Typed facts are available through the visitor variant.
+pub fn decode_formula_owner_dependency_facts_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(FormulaOwnerDependenciesSnapshot<'_>, DecodeReport), DecodeError> {
+    decode_formula_owner_dependencies_with_report(source, options)
+}
+
 fn decode_formula_owner_dependencies_in<'source>(
     source: &'source [u8],
     budget: &mut wire::Budget,
@@ -753,7 +831,35 @@ fn decode_formula_owner_dependencies_in<'source>(
                 let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
                 decode_range_dependencies(payload, budget, child_depth, visitor)?;
             },
-            6..=10 | 14 | 16 => {
+            6 => {
+                let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
+                inbound::decode_volatile_dependencies_in(payload, budget, child_depth, visitor)?;
+            },
+            7 => {
+                let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
+                inbound::decode_spanning_dependencies_in(
+                    payload,
+                    budget,
+                    child_depth,
+                    inbound::SpanningDependencyAxis::Column,
+                    visitor,
+                )?;
+            },
+            8 => {
+                let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
+                inbound::decode_spanning_dependencies_in(
+                    payload,
+                    budget,
+                    child_depth,
+                    inbound::SpanningDependencyAxis::Row,
+                    visitor,
+                )?;
+            },
+            9 => {
+                let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
+                inbound::decode_whole_owner_dependencies_in(payload, budget, child_depth, visitor)?;
+            },
+            10 | 16 => {
                 let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
                 wire::scan_opaque_message(payload, budget, child_depth)?;
             },
@@ -768,6 +874,10 @@ fn decode_formula_owner_dependencies_in<'source>(
             13 => {
                 let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
                 decode_reference_container(payload, budget, child_depth, visitor, false)?;
+            },
+            14 => {
+                let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
+                inbound::decode_uuid_references_in(payload, budget, child_depth, visitor)?;
             },
             15 => {
                 let payload = unique_raw(&mut raw[index - 1], field.bytes()?)?;
@@ -1415,7 +1525,7 @@ fn decode_cell_rect_in(
     Ok(snapshot)
 }
 
-fn decode_cfuuid_in<'source>(
+pub(super) fn decode_cfuuid_in<'source>(
     source: &'source [u8],
     budget: &mut wire::Budget,
     depth: u32,

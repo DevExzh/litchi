@@ -12271,3 +12271,80 @@ in rectangle area. The legacy transactional CRUD regression passes with these li
 
 The full all-feature workspace library/integration run passed 23,051 tests across
 1,029 targets (12 existing ignored tests), and the workspace doctest hook passed.
+
+## 2026-09-13 Pages body-table deletion ownership
+
+`litchi-pages::Package::{remove_body_table, apply_body_table_deletion}` now owns
+body-table deletion through semantic position/name selectors. The private graph,
+formula, body-text, metadata, and archive phases share one cumulative budget.
+They remove the selected UTF-16 attachment marker and private storage graph,
+retain shared storage, prune formula owner families and dependency tuples,
+remove component registrations, and release the trailing object watermark.
+Object and data references remain separate namespaces. Empty physical IWA
+members are removed even without a PackageMetadata registration. Changed
+publication invalidates canonical previews, verifies surviving ownership and
+references, and returns an exact-source patch with a byte-exact inverse.
+
+Formula dependency and component removal use bounded Buffa codecs with
+source-preserving wire rewrites and prepared execution requirements. Expanded
+dependency arrays are pruned as complete parallel tuples. Metadata removal
+authorizes intermediate UUID, external-reference, and data-owner edits before
+component registrations disappear; valid aggregate-only attachment headers and
+legacy empty effective component locators remain supported. Sorting, closure
+walks, sparse metadata traversal, retained allocations, and repeated codec scans
+are accounted for before publication.
+
+The legacy Pages `remove_table` method is now selector resolution, delegation,
+error conversion, and atomic reopen. Its old graph mutation implementation and
+unused physical deletion helper are removed. Source-built and normalized legacy
+packages obtain an exact transaction source by serializing their current state;
+the adapter preserves their compatibility provenance after reopening. Missing
+model errors retain their previous host category. Existing source-built formula,
+Unicode body, and pop-up-menu deletion behavior is covered by host regressions;
+the pop-up case checks both removal of private control objects and preservation
+of the surviving table's menu values.
+
+### Native Pages body-table deletion receipt
+
+Before migration, the host accepted eight deletions across the checked-in
+catalog, cells, merges, comment/hidden-axis, and cross-reference fixtures. It
+refused deletion of the table referenced by a surviving formula. The focused
+facade reproduces all eight successes and the atomic dependency refusal, with
+unchanged surviving cell data, merged ranges, and hidden-axis read behavior.
+It also supports deleting the final table and applying successive exact inverses.
+
+Eight disposable focused outputs opened in Pages 14.4 without repair warnings.
+Each received the native body marker `Focused deletion verified`, was saved,
+closed, and reopened. The surviving data table rendered its numeric values,
+booleans, Unicode text, merged cells, formula total, and retained comment. The
+comment-bearing last-table deletion reopened with only body text and no table.
+Strict focused readback verified all eight saved packages, their marker, table
+counts, surviving cells and merge geometry, supported hidden-axis state, and
+byte-exact unchanged writes. Rebuilding each deletion from the final source
+produced bytes identical to its saved pre-GUI candidate.
+
+The following rows identify disposable outputs by fixture stem and zero-based
+deleted-table position; sizes and hashes are from the native-saved artifacts.
+
+| Fixture / deleted position | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `body-table-catalog-native` / 0 | 112529 | `48f2a53175efd8e1cba8421e217f449e313bcaab9ec59eae93be86752ddd1663` |
+| `body-table-catalog-native` / 1 | 116471 | `6ae538dcbd9540e66ced7f1402ecb0e6fa4e2d6325543bb2ccef61ab6b35cd86` |
+| `body-table-cells-native` / 0 | 114691 | `1a4f310cfcde2d8fce1abfede2aefca2db38640a6433f20eb984527b01f415e0` |
+| `body-table-cells-native` / 1 | 124610 | `4c5309fad4f68849130f504182d217281f0474d8382cb785ddf48505b17d0d4c` |
+| `body-table-merges-native` / 0 | 114824 | `f7aed8c85d625f780112345ab33ca062bca0601565d39cb2fd63e575c43596cf` |
+| `body-table-merges-native` / 1 | 124705 | `d6428abb3fe7724995cd662c147068e857a95c8c89c329bfac50c2a25d3a5aca` |
+| `body-table-comment-hidden-native-saved` / 0 | 96512 | `5e251b7fe064b6354f14cb2fe73c8a87189e1039d0addd9dd587068fd19afaf5` |
+| `body-table-cross-reference-native` / 1 | 124817 | `18157952a8de4e47d8e5f4f71850b12d6d33001014efc2b2f91d9c5a8e414911` |
+
+Focused package regressions cover finite-limit atomicity, exact source conflicts,
+preview restoration, unrelated ZIP-member locality, and physical empty-component
+removal with and without metadata registration. Temporary native outputs and
+producer/readback harnesses are removed after verification. Table creation,
+duplication, row/column lifecycle, and the remaining migration debt are outside
+this completed deletion vertical; the monolith deletion gate remains open.
+
+The boundary regression suite passed 1,129 tests, and the final live audit
+reported 64 workspace packages, 241 internal dependency declarations, and the
+same 11 explicit migration debt items. Strict workspace library lint passed
+without lint exceptions.
