@@ -1,0 +1,5 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+   Compiling litchi v0.0.1 (/home/zhuhe/code/litchi/crates/litchi)
+   Compiling litchi-perf-baseline v0.1.0 (/home/zhuhe/code/litchi/tools/perf-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 44.44s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0522-target/debug/deps/litchi_perf_baseline-de63a3d1ba7725b7)

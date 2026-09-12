@@ -1,0 +1,551 @@
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+index 3d97fee6e..10217a750 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+@@ -1,9 +1,12 @@
+ //! Streaming `SpreadsheetML` scanner for worksheet snapshots.
+ 
++use std::borrow::Cow;
+ use std::collections::HashMap;
+ 
++use litchi_ooxml_common::XmlError;
+ use litchi_ooxml_common::xml::unqualified_attribute_value;
+ use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Rect};
++use quick_xml::XmlVersion;
+ use quick_xml::encoding::Decoder;
+ use quick_xml::events::{BytesStart, Event};
+ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+@@ -118,6 +121,39 @@ struct PendingMerge {
+     start: usize,
+ }
+ 
++/// Decode the unqualified cell reference once and prove whether the raw
++/// element can use the compact cell-tag representation. The checked attribute
++/// iteration, error mapping, and reference decode order mirror
++/// `unqualified_attribute_value`; the raw-name proof lets callers elide the
++/// second `cell_tag` scan only for an unprefixed `c` with no attributes or one
++/// unqualified `r` attribute.
++fn cell_reference<'a>(
++    element: &'a BytesStart<'_>,
++    decoder: Decoder,
++) -> Result<(Option<Cow<'a, str>>, bool)> {
++    let mut value: Option<Cow<'a, str>> = None;
++    let mut plain = element.name().as_ref() == b"c";
++    for attribute in element.attributes() {
++        let attribute = attribute.map_err(|error| XmlError::Malformed(error.to_string()))?;
++        plain &= attribute.key.as_ref() == b"r";
++        if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == b"r" {
++            if value.is_some() {
++                return Err(XmlError::Invalid(format!(
++                    "duplicate XML attribute '{}'",
++                    String::from_utf8_lossy(b"r")
++                ))
++                .into());
++            }
++            value = Some(
++                attribute
++                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
++                    .map_err(|error| XmlError::Malformed(error.to_string()))?,
++            );
++        }
++    }
++    Ok((value, plain))
++}
++
+ fn merge_range(element: &BytesStart<'_>, decoder: Decoder) -> Result<Rect> {
+     let value = unqualified_attribute_value(element, b"ref", decoder)?
+         .ok_or_else(|| invalid("mergeCell is missing ref during edit"))?;
+@@ -652,8 +688,12 @@ impl Scanner {
+         }
+         if parent == Some(FrameKind::Row) && is_spreadsheetml_name(namespace, element.name(), b"c")
+         {
+-            let address = self.cell_address(element, decoder)?;
+-            let tag = cell_tag(element, decoder)?;
++            let (address, plain) = self.cell_address(element, decoder)?;
++            let tag = if plain {
++                None
++            } else {
++                cell_tag(element, decoder)?
++            };
+             self.row
+                 .as_mut()
+                 .ok_or_else(|| invalid("empty cell outside row"))?
+@@ -956,8 +996,12 @@ impl Scanner {
+         start: usize,
+         end: usize,
+     ) -> Result<()> {
+-        let address = self.cell_address(element, decoder)?;
+-        let tag = cell_tag(element, decoder)?;
++        let (address, plain) = self.cell_address(element, decoder)?;
++        let tag = if plain {
++            None
++        } else {
++            cell_tag(element, decoder)?
++        };
+         self.cell = Some(PendingCell {
+             address,
+             start,
+@@ -970,15 +1014,20 @@ impl Scanner {
+         Ok(())
+     }
+ 
+-    fn cell_address(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<Address> {
++    fn cell_address(
++        &mut self,
++        element: &BytesStart<'_>,
++        decoder: Decoder,
++    ) -> Result<(Address, bool)> {
+         let row = self
+             .row
+             .as_ref()
+             .ok_or_else(|| invalid("cell outside edit row"))?
+             .number;
+-        let column = match unqualified_attribute_value(element, b"r", decoder)? {
++        let (reference, plain) = cell_reference(element, decoder)?;
++        let column = match reference {
+             Some(reference) => {
+-                let (reference_row, column) = parse_a1(&reference)?;
++                let (reference_row, column) = parse_a1(reference.as_ref())?;
+                 if reference_row != row {
+                     return Err(invalid(format!(
+                         "cell reference '{reference}' does not belong to row {row}"
+@@ -998,7 +1047,8 @@ impl Scanner {
+             .as_mut()
+             .ok_or_else(|| invalid("cell outside edit row"))?;
+         pending.last_column = column;
+-        Address::at(row - 1, column - 1).map_err(Into::into)
++        let address = Address::at(row - 1, column - 1)?;
++        Ok((address, plain))
+     }
+ 
+     fn scan_formula(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
+index 88b05c915..a1dfb0853 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs
+@@ -2,6 +2,7 @@
+ 
+ use std::mem::size_of;
+ 
++use litchi_ooxml_common::xml::unqualified_attribute_value;
+ use quick_xml::encoding::Decoder;
+ use quick_xml::events::{BytesStart, Event};
+ use quick_xml::reader::NsReader;
+@@ -9,6 +10,7 @@ use quick_xml::reader::NsReader;
+ use super::wire::{cell_tag, tag as owned_tag, write_cell_tag};
+ use super::{Attribute, Tag, scan, scan_with_event_limit, sibling_name, write_tag};
+ use crate::raw::worksheet::model::MAX_XML_DEPTH;
++use crate::raw::worksheet::parse_a1;
+ 
+ const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+ 
+@@ -269,6 +271,148 @@ fn snapshot_scan_marks_only_plain_cells_as_tagless() {
+     assert!(cells[4].tag.is_some());
+ }
+ 
++#[test]
++fn snapshot_scan_keeps_legacy_cell_reference_and_tag_semantics_together() {
++    let cases: &[(&[u8], &str, bool)] = &[
++        (br#"<c/>"#, "A7", true),
++        (br#"<c><v>1</v></c>"#, "B7", false),
++        (br#"<c r="C7"/>"#, "C7", true),
++        (br#"<x:c r="D7"/>"#, "D7", true),
++        (br#"<c r="E&#x37;"/>"#, "E7", true),
++        (
++            br#"<c z='before' r='F7' xmlns:x='urn:future' x:opaque='a&amp;b'/>"#,
++            "F7",
++            true,
++        ),
++    ];
++    let cells_xml = cases
++        .iter()
++        .map(|(xml, _, _)| std::str::from_utf8(xml).expect("cell XML is UTF-8"))
++        .collect::<String>();
++    let source = format!(
++        r#"<worksheet xmlns="{MAIN}" xmlns:x="{MAIN}"><sheetData><row r="7">{cells_xml}</row></sheetData></worksheet>"#
++    );
++    let layout = scan(source.as_bytes()).expect("worksheet scan");
++    let cells = &layout.sheet_data.rows[0].cells;
++    assert_eq!(cells.len(), cases.len());
++
++    for (&(xml, expected_a1, expected_empty), cell) in cases.iter().zip(cells) {
++        let (element, decoder) = start_element(xml);
++        let reference = unqualified_attribute_value(&element, b"r", decoder)
++            .expect("legacy cell reference lookup");
++        if let Some(reference) = reference.as_deref() {
++            let (reference_row, _) = parse_a1(reference).expect("legacy cell reference parse");
++            assert_eq!(reference_row, 7);
++        } else {
++            assert!(matches!(expected_a1, "A7" | "B7"));
++        }
++        let expected_tag = cell_tag(&element, decoder).expect("legacy compact cell tag");
++
++        assert_eq!(cell.address.a1(), expected_a1);
++        assert_eq!(cell.empty, expected_empty);
++        assert_eq!(cell.tag.is_some(), expected_tag.is_some());
++        if let (Some(actual), Some(expected)) = (&cell.tag, &expected_tag) {
++            assert_eq!(actual.name, expected.name);
++            assert_eq!(actual.attributes.len(), expected.attributes.len());
++            for (actual, expected) in actual.attributes.iter().zip(&expected.attributes) {
++                assert_eq!(actual.name, expected.name);
++                assert_eq!(actual.value, expected.value);
++            }
++        }
++    }
++
++    let prefixed = cells[3].tag.as_ref().expect("prefixed cell tag");
++    assert_eq!(prefixed.name.as_ref(), "x:c");
++    let retained = cells[5].tag.as_ref().expect("attribute-rich cell tag");
++    assert_eq!(
++        retained
++            .attributes
++            .iter()
++            .map(|attribute| attribute.name.as_ref())
++            .collect::<Vec<_>>(),
++        ["z", "r", "xmlns:x", "x:opaque"]
++    );
++    assert_eq!(retained.attributes[0].value.as_ref(), "before");
++    assert_eq!(retained.attributes[1].value.as_ref(), "F7");
++    assert_eq!(retained.attributes[2].value.as_ref(), "urn:future");
++    assert_eq!(retained.attributes[3].value.as_ref(), "a&b");
++}
++
++fn legacy_cell_pipeline_error(xml: &[u8]) -> (String, String) {
++    let (element, decoder) = start_element(xml);
++    let reference = match unqualified_attribute_value(&element, b"r", decoder) {
++        Ok(reference) => reference,
++        Err(error) => {
++            let error = crate::error::Error::from(error);
++            return (format!("{error:?}"), error.to_string());
++        },
++    };
++    if let Some(reference) = reference {
++        if let Err(error) = parse_a1(&reference) {
++            return (format!("{error:?}"), error.to_string());
++        }
++    }
++    if let Err(error) = cell_tag(&element, decoder) {
++        return (format!("{error:?}"), error.to_string());
++    }
++    panic!("legacy cell pipeline unexpectedly accepted {xml:?}");
++}
++
++fn worksheet_with_cell(cell: &[u8]) -> Vec<u8> {
++    let mut source = format!(r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1">"#).into_bytes();
++    source.extend_from_slice(cell);
++    source.extend_from_slice(b"</row></sheetData></worksheet>");
++    source
++}
++
++#[test]
++fn snapshot_scan_preserves_cell_error_precedence_through_trailing_attributes() {
++    let cases: &[&[u8]] = &[
++        br#"<c r="A1" future="&missing;"/>"#,
++        br#"<c r="A1" future="one" future="two"/>"#,
++        br#"<c r="not-a-cell" future="&missing;"/>"#,
++        b"<c r=\"\xff\" future=\"&missing;\"/>",
++        b"<c r=\"A1\" future=\"\xff\"/>",
++    ];
++
++    for cell in cases {
++        let expected = legacy_cell_pipeline_error(cell);
++        let source = worksheet_with_cell(cell);
++        let error = scan(&source).expect_err("cell pipeline should reject malformed input");
++        assert_eq!(
++            format!("{error:?}"),
++            expected.0,
++            "typed error changed for {cell:?}"
++        );
++        assert_eq!(
++            error.to_string(),
++            expected.1,
++            "display error changed for {cell:?}"
++        );
++    }
++}
++
++#[test]
++fn snapshot_scan_rejects_a_truncated_cell_start_after_reference_attributes() {
++    let source =
++        format!(r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1"><c r="A1" future="value""#)
++            .into_bytes();
++    let expected = {
++        let mut reader = NsReader::from_reader(source.as_slice());
++        reader.config_mut().check_end_names = true;
++        loop {
++            match reader.read_event() {
++                Ok(Event::Eof) => panic!("truncated worksheet unexpectedly reached EOF"),
++                Ok(_) => {},
++                Err(error) => break crate::error::invalid(error.to_string()),
++            }
++        }
++    };
++    let error = scan(&source).expect_err("truncated cell start should be rejected");
++    assert_eq!(format!("{error:?}"), format!("{expected:?}"));
++    assert_eq!(error.to_string(), expected.to_string());
++}
++
+ #[test]
+ fn snapshot_scan_reports_cell_address_errors_before_compact_tag_errors() {
+     let duplicate_reference = format!(
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 52a4eed90..95e6b9d04 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -497,6 +497,7 @@ impl XlsbShape {
+ enum XlsxCellCrudShape {
+     Medium,
+     DenseSparse,
++    Noncompact,
+     VendorExtension,
+ }
+ 
+@@ -507,6 +508,7 @@ impl XlsxCellCrudShape {
+         match self {
+             Self::Medium => "medium",
+             Self::DenseSparse => "dense-sparse",
++            Self::Noncompact => "noncompact",
+             Self::VendorExtension => "vendor-extension",
+         }
+     }
+@@ -12055,6 +12057,7 @@ fn parse_xlsx_cell_crud_shape(value: &str) -> Option<XlsxCellCrudShape> {
+     match value {
+         "medium" => Some(XlsxCellCrudShape::Medium),
+         "dense-sparse" => Some(XlsxCellCrudShape::DenseSparse),
++        "noncompact" => Some(XlsxCellCrudShape::Noncompact),
+         "vendor-extension" => Some(XlsxCellCrudShape::VendorExtension),
+         _ => None,
+     }
+@@ -12428,7 +12431,7 @@ fn usage_text() -> String {
+            --writer-shape LIST         tiny,large,payload-heavy\n\
+            --xlsx-shape LIST           tiny,medium,dense-wide\n\
+            --xlsb-shape LIST           tiny,medium,large,sparse (only used by opt-in XLSB semantic cases)\n\
+-           --xlsx-cell-crud-shape LIST medium,dense-sparse,vendor-extension (used by matched scalar-cell and edit-composition cases)\n\
++           --xlsx-cell-crud-shape LIST medium,dense-sparse,noncompact,vendor-extension (used by matched scalar-cell and edit-composition cases)\n\
+            --xlsx-row-visibility-shape LIST medium,large (only used by matched row-visibility cases)\n\
+            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
+            --rtf-variant LIST          plain,byte1252,lzfu,watermark (default: plain)\n\
+@@ -20463,7 +20466,9 @@ fn xlsx_cell_crud_inventory(shape: XlsxCellCrudShape) -> Vec<Vec<XlsxCoordinate>
+     for sheet in 0..sheet_count {
+         let mut cells = Vec::new();
+         match shape {
+-            XlsxCellCrudShape::Medium | XlsxCellCrudShape::VendorExtension => {
++            XlsxCellCrudShape::Medium
++            | XlsxCellCrudShape::Noncompact
++            | XlsxCellCrudShape::VendorExtension => {
+                 for row in 0..48 {
+                     for column in 0..48 {
+                         cells.push(XlsxCoordinate { sheet, row, column });
+@@ -20583,11 +20588,104 @@ fn strip_xlsx_cell_crud_calc_properties(package: &mut OpcPackage) -> Result<(),
+     Ok(())
+ }
+ 
++fn rewrite_xlsx_cell_crud_noncompact_worksheet(
++    package: &mut OpcPackage,
++    sheet_index: usize,
++    expected_cell_count: usize,
++) -> Result<(), Box<dyn Error>> {
++    let worksheet_uri = PackURI::new(format!("/xl/worksheets/sheet{}.xml", sheet_index + 1))?;
++    let source = package.get_part(&worksheet_uri)?.blob().to_vec();
++    let worksheet_start = source
++        .windows(b"<worksheet".len())
++        .position(|window| window == b"<worksheet")
++        .ok_or("XLSX noncompact worksheet root is missing")?;
++    let worksheet_name_end = worksheet_start + b"<worksheet".len();
++    let mut namespaced = Vec::with_capacity(
++        source
++            .len()
++            .checked_add(
++                b" xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"".len(),
++            )
++            .ok_or("XLSX noncompact namespace insertion overflows usize")?,
++    );
++    namespaced.extend_from_slice(&source[..worksheet_name_end]);
++    namespaced.extend_from_slice(
++        br#" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main""#,
++    );
++    namespaced.extend_from_slice(&source[worksheet_name_end..]);
++
++    let cell_open = b"<c r=\"";
++    let cell_close = b"</c>";
++    let rewritten_capacity = namespaced
++        .len()
++        .checked_add(
++            expected_cell_count
++                .checked_mul(6)
++                .ok_or("XLSX noncompact cell rewrite capacity overflows usize")?,
++        )
++        .ok_or("XLSX noncompact cell rewrite capacity overflows usize")?;
++    let mut rewritten = Vec::with_capacity(rewritten_capacity);
++    let mut cursor = 0;
++    let mut cell_index = 0usize;
++    while let Some(offset) = namespaced[cursor..]
++        .windows(cell_open.len())
++        .position(|window| window == cell_open)
++    {
++        let cell_start = cursor + offset;
++        let opening_end = namespaced[cell_start..]
++            .iter()
++            .position(|byte| *byte == b'>')
++            .map(|offset| cell_start + offset + 1)
++            .ok_or("XLSX noncompact cell start tag is unterminated")?;
++        let reference_start = cell_start + cell_open.len();
++        let reference_end = namespaced[reference_start..]
++            .iter()
++            .position(|byte| *byte == b'"')
++            .map(|offset| reference_start + offset)
++            .filter(|reference_end| *reference_end < opening_end)
++            .ok_or("XLSX noncompact cell reference is unterminated")?;
++        if cell_index.is_multiple_of(2) {
++            rewritten.extend_from_slice(&namespaced[cursor..cell_start]);
++            rewritten.extend_from_slice(b"<c r=\"");
++            rewritten.extend_from_slice(&namespaced[reference_start..reference_end]);
++            rewritten.extend_from_slice(b"\" t=\"n\">");
++            cursor = opening_end;
++        } else {
++            rewritten.extend_from_slice(&namespaced[cursor..cell_start]);
++            rewritten.extend_from_slice(b"<x:c r=\"");
++            rewritten.extend_from_slice(&namespaced[reference_start..reference_end]);
++            rewritten.extend_from_slice(b"\">");
++            let closing_start = namespaced[opening_end..]
++                .windows(cell_close.len())
++                .position(|window| window == cell_close)
++                .map(|offset| opening_end + offset)
++                .ok_or("XLSX noncompact cell end tag is missing")?;
++            rewritten.extend_from_slice(&namespaced[opening_end..closing_start]);
++            rewritten.extend_from_slice(b"</x:c>");
++            cursor = closing_start + cell_close.len();
++        }
++        cell_index = cell_index
++            .checked_add(1)
++            .ok_or("XLSX noncompact cell count overflows usize")?;
++    }
++    if cell_index != expected_cell_count {
++        return Err(format!(
++            "XLSX noncompact worksheet cell count mismatch: expected {expected_cell_count}, observed {cell_index}"
++        )
++        .into());
++    }
++    rewritten.extend_from_slice(&namespaced[cursor..]);
++    package.get_part_mut(&worksheet_uri)?.set_blob(rewritten);
++    Ok(())
++}
++
+ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<dyn Error>> {
+     let inventory = xlsx_cell_crud_inventory(shape);
+     let updates = xlsx_cell_crud_updates(&inventory)?;
+     let (row_count, column_count) = match shape {
+-        XlsxCellCrudShape::Medium | XlsxCellCrudShape::VendorExtension => (48, 48),
++        XlsxCellCrudShape::Medium
++        | XlsxCellCrudShape::Noncompact
++        | XlsxCellCrudShape::VendorExtension => (48, 48),
+         XlsxCellCrudShape::DenseSparse => (128, 128),
+     };
+     let spec = XlsxCorpus {
+@@ -20601,6 +20699,17 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
+     let mut archive = workbook.to_bytes()?;
+     let mut package = OpcPackage::from_bytes(&archive)?;
+     strip_xlsx_cell_crud_calc_properties(&mut package)?;
++    if shape == XlsxCellCrudShape::Noncompact {
++        for (sheet_index, cells) in spec
++            .cell_inventory
++            .as_ref()
++            .ok_or("XLSX noncompact corpus is missing cell inventory")?
++            .iter()
++            .enumerate()
++        {
++            rewrite_xlsx_cell_crud_noncompact_worksheet(&mut package, sheet_index, cells.len())?;
++        }
++    }
+     for index in 0..XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT {
+         package.try_add_part(Box::new(BlobPart::new(
+             PackURI::new(format!("/xl/media/litchi-cell-crud-{index:02}.png"))?,
+@@ -20656,6 +20765,8 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
+             shape: shape.name(),
+             payload_kind: if shape == XlsxCellCrudShape::VendorExtension {
+                 "deterministic-multi-sheet-scalar-grid-with-media-and-unknown-vendor-extension"
++            } else if shape == XlsxCellCrudShape::Noncompact {
++                "deterministic-multi-sheet-scalar-grid-with-media-and-noncompact-cell-tags"
+             } else {
+                 "deterministic-multi-sheet-scalar-grid-with-media"
+             },
+@@ -66472,6 +66583,79 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn xlsx_noncompact_cell_reference_guard_is_deterministic_and_editable() {
++        let first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Noncompact).unwrap();
++        let second = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Noncompact).unwrap();
++        assert_eq!(first.archive, second.archive);
++        assert_eq!(
++            super::parse_xlsx_cell_crud_shape("noncompact"),
++            Some(XlsxCellCrudShape::Noncompact)
++        );
++        assert!(!XlsxCellCrudShape::ALL.contains(&XlsxCellCrudShape::Noncompact));
++        assert_eq!(first.manifest.shape, "noncompact");
++        let spec = first.xlsx.as_ref().unwrap();
++        assert_eq!(spec.row_count, 48);
++        assert_eq!(spec.column_count, 48);
++
++        let package = super::OpcPackage::from_bytes(&first.archive).unwrap();
++        let contains =
++            |xml: &[u8], needle: &[u8]| xml.windows(needle.len()).any(|window| window == needle);
++        for sheet_index in 0..spec.sheet_count {
++            let uri = super::PackURI::new(format!("/xl/worksheets/sheet{}.xml", sheet_index + 1))
++                .unwrap();
++            let xml = package.get_part(&uri).unwrap().blob();
++            let expected_cells = spec.cell_inventory.as_ref().unwrap()[sheet_index].len();
++            let unprefixed_cells = xml
++                .windows(b"<c r=\"".len())
++                .filter(|window| *window == b"<c r=\"")
++                .count();
++            let prefixed_cells = xml
++                .windows(b"<x:c r=\"".len())
++                .filter(|window| *window == b"<x:c r=\"")
++                .count();
++            assert_eq!(unprefixed_cells, expected_cells.div_ceil(2));
++            assert_eq!(prefixed_cells, expected_cells / 2);
++            assert!(
++                contains(xml, b"<c r=\""),
++                "worksheet {sheet_index} has no unprefixed cell tag"
++            );
++            assert!(
++                contains(xml, b"<x:c r=\""),
++                "worksheet {sheet_index} has no prefixed cell tag"
++            );
++            assert!(
++                contains(
++                    xml,
++                    b"xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""
++                ),
++                "worksheet {sheet_index} has no SpreadsheetML x prefix binding"
++            );
++            assert_eq!(
++                xml.windows(b" t=\"n\">".len())
++                    .filter(|window| *window == b" t=\"n\">")
++                    .count(),
++                unprefixed_cells
++            );
++        }
++
++        let workbook = super::Workbook::from_bytes(first.archive.clone()).unwrap();
++        super::verify_xlsx_cells(&workbook, spec, &[]).unwrap();
++        let measured = run_case(Case::XlsxSourceBackedCellValuesOneEditSave, &first, 0, 1).unwrap();
++        assert_eq!(
++            measured.case,
++            Case::XlsxSourceBackedCellValuesOneEditSave.name()
++        );
++        let evidence = measured
++            .source
++            .as_ref()
++            .and_then(|source| source.xlsx_cell_values.as_ref())
++            .expect("noncompact source cell-values evidence");
++        assert_eq!(evidence.output_sha256.len(), 1);
++        assert_eq!(evidence.semantic_sha256.len(), 1);
++        assert!(evidence.untouched_member_count > 0);
++    }
++
+     #[test]
+     fn xlsx_cell_values_range_accounting_identity_is_source_backed_only() {
+         assert_eq!(

@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0522: reject a scanner optimization and strengthen XLSX guards
+
+[0522](changes/0522-xlsx-cell-reference-guard.md) rejects the common-cell
+scanner candidate: primary medium p50 changes +1.29%/−1.30%, while
+dense-sparse changes −2.06%/−1.32%. Useful repeatable primary total improvement
+is not established. Lower scoped commit instructions and allocation calls do
+not override the frozen native rule. Production is restored to the baseline;
+three codec tests, an opt-in noncompact shape and complete evidence remain.
+The bundle retains 1,640 native samples, 40 allocation samples, eight profiles,
+43 adverse phase metrics and 67 same-build variations. OLE2/OOXML optimization
+remains active, ODF deferred until that goal completes, and iWork excluded.
+
 ## 0521: remove temporary XLSX validation ownership
 
 [0521](changes/0521-xlsx-borrow-validation-events.md) borrows XML events and

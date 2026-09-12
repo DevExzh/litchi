@@ -1,0 +1,24 @@
+{
+  "command": [
+    "env",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-xlsx",
+    "--lib",
+    "raw::worksheet::edit::codec::tests",
+    "--target-dir",
+    "/home/zhuhe/litchi-goal-0522-target"
+  ],
+  "start_utc": "2026-09-12T05:47:37.143507+00:00",
+  "end_utc": "2026-09-12T05:48:16.276063+00:00",
+  "seconds": 39.13256257600733,
+  "exit_code": 101,
+  "source_hashes": {
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs": "88549673fdcda62bdc622b0b398941f585d482edffae3fda18626202dc0a32f9",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/tests.rs": "12c48807380995c5e0973e5ed03478e40b93b39207e7951f1cedfb5f552730ab"
+  }
+}

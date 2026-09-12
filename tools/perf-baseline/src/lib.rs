@@ -497,6 +497,7 @@ impl XlsbShape {
 enum XlsxCellCrudShape {
     Medium,
     DenseSparse,
+    Noncompact,
     VendorExtension,
 }
 
@@ -507,6 +508,7 @@ impl XlsxCellCrudShape {
         match self {
             Self::Medium => "medium",
             Self::DenseSparse => "dense-sparse",
+            Self::Noncompact => "noncompact",
             Self::VendorExtension => "vendor-extension",
         }
     }
@@ -12055,6 +12057,7 @@ fn parse_xlsx_cell_crud_shape(value: &str) -> Option<XlsxCellCrudShape> {
     match value {
         "medium" => Some(XlsxCellCrudShape::Medium),
         "dense-sparse" => Some(XlsxCellCrudShape::DenseSparse),
+        "noncompact" => Some(XlsxCellCrudShape::Noncompact),
         "vendor-extension" => Some(XlsxCellCrudShape::VendorExtension),
         _ => None,
     }
@@ -12428,7 +12431,7 @@ fn usage_text() -> String {
            --writer-shape LIST         tiny,large,payload-heavy\n\
            --xlsx-shape LIST           tiny,medium,dense-wide\n\
            --xlsb-shape LIST           tiny,medium,large,sparse (only used by opt-in XLSB semantic cases)\n\
-           --xlsx-cell-crud-shape LIST medium,dense-sparse,vendor-extension (used by matched scalar-cell and edit-composition cases)\n\
+           --xlsx-cell-crud-shape LIST medium,dense-sparse,noncompact,vendor-extension (used by matched scalar-cell and edit-composition cases)\n\
            --xlsx-row-visibility-shape LIST medium,large (only used by matched row-visibility cases)\n\
            --semantic-shape LIST       tiny,medium,large (only used by opt-in Office semantic cases)\n\
            --rtf-variant LIST          plain,byte1252,lzfu,watermark (default: plain)\n\
@@ -20463,7 +20466,9 @@ fn xlsx_cell_crud_inventory(shape: XlsxCellCrudShape) -> Vec<Vec<XlsxCoordinate>
     for sheet in 0..sheet_count {
         let mut cells = Vec::new();
         match shape {
-            XlsxCellCrudShape::Medium | XlsxCellCrudShape::VendorExtension => {
+            XlsxCellCrudShape::Medium
+            | XlsxCellCrudShape::Noncompact
+            | XlsxCellCrudShape::VendorExtension => {
                 for row in 0..48 {
                     for column in 0..48 {
                         cells.push(XlsxCoordinate { sheet, row, column });
@@ -20583,11 +20588,104 @@ fn strip_xlsx_cell_crud_calc_properties(package: &mut OpcPackage) -> Result<(), 
     Ok(())
 }
 
+fn rewrite_xlsx_cell_crud_noncompact_worksheet(
+    package: &mut OpcPackage,
+    sheet_index: usize,
+    expected_cell_count: usize,
+) -> Result<(), Box<dyn Error>> {
+    let worksheet_uri = PackURI::new(format!("/xl/worksheets/sheet{}.xml", sheet_index + 1))?;
+    let source = package.get_part(&worksheet_uri)?.blob().to_vec();
+    let worksheet_start = source
+        .windows(b"<worksheet".len())
+        .position(|window| window == b"<worksheet")
+        .ok_or("XLSX noncompact worksheet root is missing")?;
+    let worksheet_name_end = worksheet_start + b"<worksheet".len();
+    let mut namespaced = Vec::with_capacity(
+        source
+            .len()
+            .checked_add(
+                b" xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"".len(),
+            )
+            .ok_or("XLSX noncompact namespace insertion overflows usize")?,
+    );
+    namespaced.extend_from_slice(&source[..worksheet_name_end]);
+    namespaced.extend_from_slice(
+        br#" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main""#,
+    );
+    namespaced.extend_from_slice(&source[worksheet_name_end..]);
+
+    let cell_open = b"<c r=\"";
+    let cell_close = b"</c>";
+    let rewritten_capacity = namespaced
+        .len()
+        .checked_add(
+            expected_cell_count
+                .checked_mul(6)
+                .ok_or("XLSX noncompact cell rewrite capacity overflows usize")?,
+        )
+        .ok_or("XLSX noncompact cell rewrite capacity overflows usize")?;
+    let mut rewritten = Vec::with_capacity(rewritten_capacity);
+    let mut cursor = 0;
+    let mut cell_index = 0usize;
+    while let Some(offset) = namespaced[cursor..]
+        .windows(cell_open.len())
+        .position(|window| window == cell_open)
+    {
+        let cell_start = cursor + offset;
+        let opening_end = namespaced[cell_start..]
+            .iter()
+            .position(|byte| *byte == b'>')
+            .map(|offset| cell_start + offset + 1)
+            .ok_or("XLSX noncompact cell start tag is unterminated")?;
+        let reference_start = cell_start + cell_open.len();
+        let reference_end = namespaced[reference_start..]
+            .iter()
+            .position(|byte| *byte == b'"')
+            .map(|offset| reference_start + offset)
+            .filter(|reference_end| *reference_end < opening_end)
+            .ok_or("XLSX noncompact cell reference is unterminated")?;
+        if cell_index.is_multiple_of(2) {
+            rewritten.extend_from_slice(&namespaced[cursor..cell_start]);
+            rewritten.extend_from_slice(b"<c r=\"");
+            rewritten.extend_from_slice(&namespaced[reference_start..reference_end]);
+            rewritten.extend_from_slice(b"\" t=\"n\">");
+            cursor = opening_end;
+        } else {
+            rewritten.extend_from_slice(&namespaced[cursor..cell_start]);
+            rewritten.extend_from_slice(b"<x:c r=\"");
+            rewritten.extend_from_slice(&namespaced[reference_start..reference_end]);
+            rewritten.extend_from_slice(b"\">");
+            let closing_start = namespaced[opening_end..]
+                .windows(cell_close.len())
+                .position(|window| window == cell_close)
+                .map(|offset| opening_end + offset)
+                .ok_or("XLSX noncompact cell end tag is missing")?;
+            rewritten.extend_from_slice(&namespaced[opening_end..closing_start]);
+            rewritten.extend_from_slice(b"</x:c>");
+            cursor = closing_start + cell_close.len();
+        }
+        cell_index = cell_index
+            .checked_add(1)
+            .ok_or("XLSX noncompact cell count overflows usize")?;
+    }
+    if cell_index != expected_cell_count {
+        return Err(format!(
+            "XLSX noncompact worksheet cell count mismatch: expected {expected_cell_count}, observed {cell_index}"
+        )
+        .into());
+    }
+    rewritten.extend_from_slice(&namespaced[cursor..]);
+    package.get_part_mut(&worksheet_uri)?.set_blob(rewritten);
+    Ok(())
+}
+
 fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<dyn Error>> {
     let inventory = xlsx_cell_crud_inventory(shape);
     let updates = xlsx_cell_crud_updates(&inventory)?;
     let (row_count, column_count) = match shape {
-        XlsxCellCrudShape::Medium | XlsxCellCrudShape::VendorExtension => (48, 48),
+        XlsxCellCrudShape::Medium
+        | XlsxCellCrudShape::Noncompact
+        | XlsxCellCrudShape::VendorExtension => (48, 48),
         XlsxCellCrudShape::DenseSparse => (128, 128),
     };
     let spec = XlsxCorpus {
@@ -20601,6 +20699,17 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     let mut archive = workbook.to_bytes()?;
     let mut package = OpcPackage::from_bytes(&archive)?;
     strip_xlsx_cell_crud_calc_properties(&mut package)?;
+    if shape == XlsxCellCrudShape::Noncompact {
+        for (sheet_index, cells) in spec
+            .cell_inventory
+            .as_ref()
+            .ok_or("XLSX noncompact corpus is missing cell inventory")?
+            .iter()
+            .enumerate()
+        {
+            rewrite_xlsx_cell_crud_noncompact_worksheet(&mut package, sheet_index, cells.len())?;
+        }
+    }
     for index in 0..XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT {
         package.try_add_part(Box::new(BlobPart::new(
             PackURI::new(format!("/xl/media/litchi-cell-crud-{index:02}.png"))?,
@@ -20656,6 +20765,8 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
             shape: shape.name(),
             payload_kind: if shape == XlsxCellCrudShape::VendorExtension {
                 "deterministic-multi-sheet-scalar-grid-with-media-and-unknown-vendor-extension"
+            } else if shape == XlsxCellCrudShape::Noncompact {
+                "deterministic-multi-sheet-scalar-grid-with-media-and-noncompact-cell-tags"
             } else {
                 "deterministic-multi-sheet-scalar-grid-with-media"
             },
@@ -66470,6 +66581,79 @@ mod tests {
                 "source cell-values phase sum changed at acquisition index {acquisition_index}"
             );
         }
+    }
+
+    #[test]
+    fn xlsx_noncompact_cell_reference_guard_is_deterministic_and_editable() {
+        let first = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Noncompact).unwrap();
+        let second = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Noncompact).unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(
+            super::parse_xlsx_cell_crud_shape("noncompact"),
+            Some(XlsxCellCrudShape::Noncompact)
+        );
+        assert!(!XlsxCellCrudShape::ALL.contains(&XlsxCellCrudShape::Noncompact));
+        assert_eq!(first.manifest.shape, "noncompact");
+        let spec = first.xlsx.as_ref().unwrap();
+        assert_eq!(spec.row_count, 48);
+        assert_eq!(spec.column_count, 48);
+
+        let package = super::OpcPackage::from_bytes(&first.archive).unwrap();
+        let contains =
+            |xml: &[u8], needle: &[u8]| xml.windows(needle.len()).any(|window| window == needle);
+        for sheet_index in 0..spec.sheet_count {
+            let uri = super::PackURI::new(format!("/xl/worksheets/sheet{}.xml", sheet_index + 1))
+                .unwrap();
+            let xml = package.get_part(&uri).unwrap().blob();
+            let expected_cells = spec.cell_inventory.as_ref().unwrap()[sheet_index].len();
+            let unprefixed_cells = xml
+                .windows(b"<c r=\"".len())
+                .filter(|window| *window == b"<c r=\"")
+                .count();
+            let prefixed_cells = xml
+                .windows(b"<x:c r=\"".len())
+                .filter(|window| *window == b"<x:c r=\"")
+                .count();
+            assert_eq!(unprefixed_cells, expected_cells.div_ceil(2));
+            assert_eq!(prefixed_cells, expected_cells / 2);
+            assert!(
+                contains(xml, b"<c r=\""),
+                "worksheet {sheet_index} has no unprefixed cell tag"
+            );
+            assert!(
+                contains(xml, b"<x:c r=\""),
+                "worksheet {sheet_index} has no prefixed cell tag"
+            );
+            assert!(
+                contains(
+                    xml,
+                    b"xmlns:x=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\""
+                ),
+                "worksheet {sheet_index} has no SpreadsheetML x prefix binding"
+            );
+            assert_eq!(
+                xml.windows(b" t=\"n\">".len())
+                    .filter(|window| *window == b" t=\"n\">")
+                    .count(),
+                unprefixed_cells
+            );
+        }
+
+        let workbook = super::Workbook::from_bytes(first.archive.clone()).unwrap();
+        super::verify_xlsx_cells(&workbook, spec, &[]).unwrap();
+        let measured = run_case(Case::XlsxSourceBackedCellValuesOneEditSave, &first, 0, 1).unwrap();
+        assert_eq!(
+            measured.case,
+            Case::XlsxSourceBackedCellValuesOneEditSave.name()
+        );
+        let evidence = measured
+            .source
+            .as_ref()
+            .and_then(|source| source.xlsx_cell_values.as_ref())
+            .expect("noncompact source cell-values evidence");
+        assert_eq!(evidence.output_sha256.len(), 1);
+        assert_eq!(evidence.semantic_sha256.len(), 1);
+        assert!(evidence.untouched_member_count > 0);
     }
 
     #[test]

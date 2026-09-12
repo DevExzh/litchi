@@ -1,0 +1,25 @@
+{
+  "command": [
+    "env",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "cargo",
+    "test",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--lib",
+    "xlsx_noncompact_cell_reference_guard",
+    "--target-dir",
+    "/home/zhuhe/litchi-goal-0522-target"
+  ],
+  "start_utc": "2026-09-12T05:58:04.874595+00:00",
+  "end_utc": "2026-09-12T05:58:34.188298+00:00",
+  "seconds": 29.313709349997225,
+  "exit_code": 0,
+  "source_hashes": {
+    "tools/perf-baseline/src/lib.rs": "3f8ea064c82f7a5d5884b2bbc5686df71f4b3e44e164b0078c0521dd9699f29a"
+  }
+}

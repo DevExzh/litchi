@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## 0522: redundant cell-tag work is insufficient for admission
+
+[0522](changes/0522-xlsx-cell-reference-guard.md) proves a narrow common-cell
+tag scan can be omitted while retaining checked error order and fallback.
+The measured candidate removes the profile edge and lowers commit Ir
+3.76–4.17% and allocation calls 15.52–15.76%, but medium primary total timing
+is mixed. The production change is reverted under the frozen gate. Retain the
+new noncompact guard and inspect a larger measured end-to-end opportunity;
+required semantic parsing/readback and rejected 0514/0516 fusion are not
+shortcuts. The next-priority review selects fresh CFB/OLE2 source-open
+attribution before another small XLSX ownership candidate. OLE2/OOXML stays
+ahead of deferred ODF.
+
 ## 0521: temporary validator ownership removed
 
 [0521](changes/0521-xlsx-borrow-validation-events.md) removes per-event owned

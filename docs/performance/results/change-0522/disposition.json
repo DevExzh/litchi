@@ -1,0 +1,18 @@
+{
+  "status": "rejected_and_reverted",
+  "command": [
+    "git",
+    "apply",
+    "--reverse",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0522/cell-reference-candidate.patch"
+  ],
+  "start_utc": "2026-09-12T06:38:20.573067+00:00",
+  "end_utc": "2026-09-12T06:38:20.693329+00:00",
+  "exit_code": 0,
+  "production_change_retained": false,
+  "final_source_manifest_sha256": "837c58ada06400725a9152203d3daec3dce022068aa56f3731f58034ad294657",
+  "measured_candidate_source_manifest_sha256": "d9bac2799c7b75a8bf8829e0e0956ae94927fdda985def2aab58f8496bd773de",
+  "comparison_sha256": "da7bcdac0a6c8b7736d3a415d2966ba562db3afc83671431662264bd3f7afb27",
+  "plan_sha256": "d7560f2aa733fdae98621d0fb2a6d85d926acd23751b87a3adb09f3e8a4703d0",
+  "reason": "Frozen useful repeatable primary total improvement is not established: medium first repeat regresses, second improves. Lower instruction/allocation counts do not override native admission. Tests and opt-in noncompact guard remain identical to captured baseline."
+}

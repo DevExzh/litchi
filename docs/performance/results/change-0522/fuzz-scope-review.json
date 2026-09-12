@@ -1,0 +1,49 @@
+{
+  "status": "no_existing_target_for_changed_scanner",
+  "commands": [
+    {
+      "command": [
+        "rg",
+        "--files",
+        "crates/litchi-xlsx"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "rg",
+        "-n",
+        "xlsx|worksheet::|WorksheetEdit|cell_values",
+        "crates/litchi/fuzz/fuzz_targets",
+        "crates/litchi/fuzz/Cargo.toml",
+        "docs/performance/results/change-0497/fuzz"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "fuzz",
+        "--version"
+      ],
+      "exit_code": 101,
+      "stdout": "",
+      "stderr": "error: no such command: `fuzz`\n\nhelp: a command with a similar name exists: `fix`\n\nhelp: view all installed commands with `cargo --list`\nhelp: find a package to install `fuzz` with `cargo search cargo-fuzz`\n"
+    },
+    {
+      "command": [
+        "rustup",
+        "toolchain",
+        "list"
+      ],
+      "exit_code": 0,
+      "stdout": "stable-x86_64-unknown-linux-gnu (default)\n1.56-x86_64-unknown-linux-gnu\n1.56.0-x86_64-unknown-linux-gnu\n1.65-x86_64-unknown-linux-gnu\n1.89-x86_64-unknown-linux-gnu\n1.89.0-x86_64-unknown-linux-gnu\n1.95-x86_64-unknown-linux-gnu\n1.95.0-x86_64-unknown-linux-gnu (active)\n1.98.1-x86_64-unknown-linux-gnu\n",
+      "stderr": ""
+    }
+  ],
+  "scope": "No XLSX-owner fuzz directory or facade target references this worksheet scanner. cargo-fuzz and nightly are not installed. Focused differential/adversarial tests and existing XLSX suite are required; broad fuzz goal remains open."
+}

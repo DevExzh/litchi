@@ -1,0 +1,802 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 941785
+cmd:  /tmp/litchi-goal-0522/candidate-normal --warmup 0 --samples 1 --case xlsx_source_backed_cell_values_one_percent_edit_save --xlsx-cell-crud-shape dense-sparse --json /home/zhuhe/code/litchi/docs/performance/results/change-0522/candidate/profile-r1-dense-sparse.json
+part: 1
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 0 - 448128075
+desc: Trigger: --dump-after=litchi_xlsx::cell_values::source::MultiSourceEdit::commit
+
+positions: line
+events: Ir
+summary: 21842
+
+
+ob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+fl=(203) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+fn=(716) __memcpy_avx_unaligned_erms
+255 104
++1 104
++6 104
++1 104
++2 48
++1 48
++1 48
++38 56
++1 56
++2 32
++1 32
++2 24
++4 24
++16 24
++1 24
++1 24
++1 24
++1 24
++7 24
++1 24
++1 24
++1 24
++2 24
++17 8
++1 8
++1 8
++1 8
++1 8
++7 32
++1 32
++1 32
++1 32
++1 32
++1 32
++1 64
++5 48
++1 48
++5 48
++1 48
++2 44
++1 44
++1 44
++2 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 12
++1 24
++4 4
++1 4
++4 4
++2 4
++4 4
++1 4
++11 4
++3 4
++2 4
++2 4
++4 4
++1 4
++9 3
++1 3
++2 3
++2 3
++1 3
++1 3
++3 3
++2 3
++2 3
++2 6
++6 3
++1 3
++1 3
++1 3
++1 3
++1 3
++1 3
++1 3
++1 3
++1 3
++1 3
++1 3
+-11 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++1 8
++2 3
++1 3
++1 3
++1 3
++2 3
++4 6
++13 1
++1 1
++2 1
++1 1
++1 1
++2 1
++2 1
++2 2
++6 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 1
+-11 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++1 2
++2 1
++1 1
++1 1
++1 1
++2 1
++1 2
+
+fl=(155) ./malloc/./malloc/malloc.c
+fn=(648) __libc_malloc2
+3247 420
++4 140
++28 350
+-26 210
+cfn=(650) _int_malloc
+calls=118492 3790 
+* 9996
++1 350
+fi=(154) ./malloc/./malloc/arena.c
+151 140
+fe=(155)
+
+fn=(790) unlink_chunk.isra.0
+1592 9
++2 27
+-2 9
++2 18
++3 9
++3 18
+-2 9
++2 18
++3 9
++1 9
++1 30
++2 8
++1 12
++3 8
++14 4
++1 4
++3 18
+
+fn=(646) malloc
+3283 90
+1269 180
++19 90
+3287 90
+1288 246
+3287 132
++2 192
++2 128
++2 528
+3030 40
++4 80
++4 20
++1 20
+3294 20
+-7 48
++19 70
+cfn=(648)
+calls=118491 -59 
+* 11606
+-17 48
+
+fn=(650)
+3790 630
++32 140
+1288 401
+3831 102
++16 102
++54 10
++18 69
+-1 69
++12 138
+-11 138
+-1 207
++12 138
+-6 66
++5 66
+-7 66
++2 132
++9 132
++3 132
+-3 2
++3 2
++1 201
+-3 67
++5 67
++1 268
++2 268
+-10 67
++12 134
++1 134
++2 134
++11 262
++29 5
++1 5
++4 10
++31 10
++8 12
++1 3
++1 3
+-1 3
++4 6
++50 14
++9 7
+-9 28
++1 7
++1 7
++1 7
++1 7
++6 14
+3053 1
+-27 1
++27 1
+-27 1
++4 2
++4 4
++4 1
++1 1
+4113 1
+3831 76
+1288 19
+3850 19
++2 19
+-2 19
++2 38
+-2 49
++2 49
+-2 49
++2 98
++2 1
++1 2
++2 1
++1 1
++1 1
++2 4
++6 3
++1 2
+2919 2
+3872 3
++4 8
++1 2
+3047 2
+1888 1
+3893 1
+1888 2
+4340 630
+3901 49
+-52 294
+4105 21
+3930 24
+4111 28
++13 9
+-2 18
++2 4
++3 2
+-3 2
++3 4
+4277 8
++3 32
++2 12
++1 4
+1888 4
+4286 4
+1888 8
+4280 24
++2 9
++1 3
+1888 3
+4286 3
+1888 6
+
+ob=(7) /tmp/litchi-goal-0522/candidate-normal
+fl=(165) ???
+fn=(828) __rustc::__rust_no_alloc_shim_is_unstable_v2
+0 90
+
+fn=(840) litchi_perf_baseline::main
+cfn=(848) litchi_perf_baseline::run
+calls=0 0 
+0 21842
+
+fn=(848)
+cfn=(2296) litchi_perf_baseline::run_xlsx_cell_values_edit_save
+calls=0 0 
+0 21842
+
+fn=(574) (below main)
+cob=(2)
+cfi=(166) ./csu/../csu/libc-start.c
+cfn=(576) __libc_start_main@@GLIBC_2.34
+calls=0 242 
+0 21842
+
+fn=(2296)
+cfn=(2298) litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates
+calls=0 0 
+0 21842
+
+fn=(2504) litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets
+0 115
+cfn=(1216) alloc::vec::Vec<T,A>::into_boxed_slice
+calls=2 0 
+0 15
+0 11
+cfn=(1580) core::slice::sort::shared::smallsort::insertion_sort_shift_left
+calls=2 0 
+0 49
+0 1
+
+fn=(830) __rustc::__rust_alloc
+0 90
+cfn=(832) __rustc::__rdl_alloc
+calls=682410 0 
+0 14438
+
+fn=(920) alloc::collections::btree::map::IntoIter<K,V,A>::dying_next
+0 27
+
+fn=(838) std::sys::backtrace::__rust_begin_short_backtrace
+cfn=(840)
+calls=0 0 
+0 21842
+
+fn=(2510) litchi_xlsx::cell_values::source::MultiSourceEdit::commit
+0 58
+cfn=(2504)
+calls=1 0 
+0 191
+0 10
+cfn=(2514) <alloc::boxed::Box<[T],A> as core::clone::Clone>::clone
+calls=1 0 
+0 11511
+0 29
+cfn=(964) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=1 0 
+0 480
+0 5
+cfn=(1276) <alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 57
+0 37
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 330
+0 108
+cfn=(2512) <litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone
+calls=4 0 
+0 8984
+0 42
+
+ob=(2)
+fl=(155)
+fn=(650)
+1888 2
+4286 2
+1888 4
+3994 1
++1 1
+-1 1
++1 2
+2919 2
+3998 3
++4 2
++1 3
+3003 1
+3981 1
+3015 1
+4006 1
+3003 1
++4 4
++1 1
++7 1
+4007 1
++24 21
++52 3
+-51 3
++51 9
+3959 128
++2 62
+-1 124
++27 3
++1 3
++4 6
++31 10
++2 4
++1 6
++1 2
+-1 2
++1 2
+-2 4
++1 6
++1 2
+-1 2
++1 4
++4 8
+4195 9
++1 9
++1 9
+-1 9
++1 9
++1 18
++1 27
++5 49
++16 91
++2 182
+-4 210
++8 14
++3 28
++2 10
++1 5
++1 5
+-2 5
+-27 5
++4 21
+
+ob=(7)
+fl=(165)
+fn=(1366) <alloc::boxed::Box<str> as core::clone::Clone>::clone
+0 648
+cfn=(828)
+calls=35680 0 
+0 72
+0 216
+cfn=(830)
+calls=35680 0 
+0 12273
+0 504
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=35680 255 
+0 1256
+0 432
+
+fn=(1216)
+0 30
+
+fn=(1580)
+0 49
+
+fn=(2512)
+0 44
+cfn=(1366)
+calls=4 0 
+0 574
+0 44
+cfn=(1020) <alloc::string::String as core::clone::Clone>::clone
+calls=4 0 
+0 620
+0 8
+cfn=(1366)
+calls=4 0 
+0 1089
+0 72
+cfn=(1020)
+calls=4 0 
+0 340
+0 8
+cfn=(1366)
+calls=4 0 
+0 774
+0 72
+cfn=(1366)
+calls=4 0 
+0 576
+0 16
+cfn=(1366)
+calls=4 0 
+0 865
+0 16
+cfn=(1366)
+calls=4 0 
+0 596
+0 40
+cfn=(1366)
+calls=4 0 
+0 707
+0 16
+cfn=(1366)
+calls=4 0 
+0 1075
+0 16
+cfn=(1366)
+calls=4 0 
+0 728
+0 456
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 112
+
+fn=(1020)
+0 192
+cfn=(828)
+calls=34938 0 
+0 16
+0 48
+cfn=(830)
+calls=34938 0 
+0 1480
+0 112
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=34938 255 
+0 176
+0 176
+
+fn=(832)
+0 810
+cob=(2)
+cfi=(155)
+cfn=(646)
+calls=682363 3283 
+0 13628
+
+fn=(1276)
+0 19
+cfn=(920)
+calls=1 0 
+0 27
+0 11
+
+fn=(2514)
+0 16
+cfn=(828)
+calls=1 0 
+0 1
+0 4
+cfn=(830)
+calls=1 0 
+0 336
+0 255
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 52
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 120
+0 344
+cfn=(1366)
+calls=4 0 
+0 927
+0 56
+cfn=(1020)
+calls=4 0 
+0 900
+0 12
+cfn=(1366)
+calls=4 0 
+0 969
+0 76
+cfn=(1020)
+calls=4 0 
+0 340
+
+ob=(2)
+fl=(155)
+fn=(650)
+4211 28
+-3 3
++3 4
+-3 7
++5 28
++1 14
++24 18
++3 18
++2 9
++3 18
+-3 36
++3 9
+cfn=(790)
+calls=9994 1592 
+* 219
++3 54
++15 7
++1 14
++3 7
+-9 7
++9 14
++1 7
++1 7
++3 14
++1 5
++1 18
+-23 2
+-1 2
++1 4
+3965 59
++3 59
+-4 118
++3 59
+-1 59
++1 118
++1 118
++1 118
++2 72
++4 36
++6 36
+-6 252
++2 108
++5 36
+-4 36
++4 72
+cfn=(658) alloc_perturb
+calls=42411 1887 
+* 180
+-7 23
++6 23
+-6 161
++2 69
++5 23
+-4 23
++4 46
+cfn=(658)
+calls=38478 1887 
+* 115
++1 59
+
+ob=(7)
+fl=(165)
+fn=(2514)
+0 12
+cfn=(1366)
+calls=4 0 
+0 1017
+0 76
+cfn=(1366)
+calls=4 0 
+0 863
+0 20
+cfn=(1366)
+calls=4 0 
+0 1113
+
+ob=(2)
+fl=(155)
+fn=(658)
+1887 59
++1 177
+
+ob=(7)
+fl=(165)
+fn=(2514)
+0 20
+cfn=(1366)
+calls=4 0 
+0 884
+0 52
+cfn=(1366)
+calls=4 0 
+0 848
+0 20
+cfn=(1366)
+calls=4 0 
+0 920
+0 20
+cfn=(1366)
+calls=4 0 
+0 876
+0 219
+cfn=(1216)
+calls=1 0 
+0 15
+0 8
+
+fn=(836) std::rt::lang_start::{{closure}}
+cfn=(838)
+calls=0 0 
+0 21842
+
+fn=(2298)
+cfn=(2510)
+calls=1 0 
+0 21842
+
+fn=(606) main
+cfn=(608) std::rt::lang_start_internal
+calls=0 0 
+0 21842
+
+fn=(964)
+0 24
+cfn=(828)
+calls=197 0 
+0 1
+0 3
+cfn=(830)
+calls=197 0 
+0 439
+0 13
+
+ob=(2)
+fl=(155)
+fn=(658)
+1890 59
+
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(598) (below main)
+cob=(7)
+cfi=(165)
+cfn=(606)
+calls=0 0 
+59 21842
+
+fl=(166)
+fn=(576)
+cfi=(168)
+cfn=(598)
+calls=0 30 
+360 21842
+
+ob=(7)
+fl=(165)
+fn=(608)
+cfn=(836)
+calls=0 0 
+0 21842
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(7)
+cfi=(165)
+cfn=(574)
+calls=0 0 
+0 21842
+
+totals: 21842

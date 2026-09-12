@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0522: complete a mixed XLSX scanner ABBA comparison
+
+[0522](changes/0522-xlsx-cell-reference-guard.md) retains 1,640 native
+samples, 40 canonical allocation samples and eight isolated commit profiles.
+Dense-sparse primary p50 changes −2.06%/−1.32%; medium changes +1.29%/−1.30%.
+The candidate fails the frozen useful-repeatable-primary-total gate and is
+reverted. Its instruction and allocation reductions are rejected-candidate
+diagnostics, not adopted speedups. All 43 adverse phase metrics and 67
+same-build variations remain. A new explicit noncompact guard covers prefixed
+and multi-attribute numeric cells in normal and managed source-backed paths.
+
 ## 0521: matched XLSX ownership comparison
 
 [0521](changes/0521-xlsx-borrow-validation-events.md) compares identical

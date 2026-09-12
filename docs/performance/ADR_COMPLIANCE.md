@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0522: reject the candidate; retain semantic and benchmark guards
+
+[0522](changes/0522-xlsx-cell-reference-guard.md) restores the baseline
+production scanner after failed native admission. Retained changes are three
+codec tests, the opt-in noncompact harness and source-bound evidence. The
+measured candidate preserved checked attribute/error order, validation,
+readback and budgets; no production behavior change is adopted. All 30
+previously read ADR/index hashes remain unchanged. ADR 0005 requires keeping
+the mixed native results despite lower instruction/allocation costs. Source,
+output, preservation and budget oracles remain equal under ADRs 0003/0006.
+OLE2/OOXML remains active; ODF is deferred.
+
 ## 0521: borrow within the existing XML validation lifetime
 
 [0521](changes/0521-xlsx-borrow-validation-events.md) retains validation

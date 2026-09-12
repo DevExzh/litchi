@@ -1,0 +1,39 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/tmp/litchi-goal-0522/candidate-alloc",
+    "--warmup",
+    "0",
+    "--samples",
+    "5",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0522/candidate/alloc-r2-dense-sparse.json"
+  ],
+  "start_utc": "2026-09-12T06:25:42.039923+00:00",
+  "end_utc": "2026-09-12T06:25:43.819761+00:00",
+  "seconds": 1.77983012299228,
+  "exit_code": 0,
+  "binary_sha256": "8d63bfe7def37f1cf78e91771c0b550539ad5022b4b78e5e382cf13bf09dba94",
+  "source_manifest_sha256": "d9bac2799c7b75a8bf8829e0e0956ae94927fdda985def2aab58f8496bd773de",
+  "working_source_manifest_sha256": "d9bac2799c7b75a8bf8829e0e0956ae94927fdda985def2aab58f8496bd773de",
+  "script_sha256": "65850ecb6deb28fa99b3c639aeb588fda28a3637172dc2a5c33373760b6b52a1",
+  "plan_sha256": "d7560f2aa733fdae98621d0fb2a6d85d926acd23751b87a3adb09f3e8a4703d0",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "alloc-r2-dense-sparse.json": "6c7b4f9754bbd89436d767babf6e82b95573cbc531594533be1cc3c22ce66015",
+    "alloc-r2-dense-sparse.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "alloc-r2-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
