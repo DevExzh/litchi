@@ -1,0 +1,19 @@
+[package]
+name = "litchi-docx-svg-lifecycle-profile"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "docx-svg-lifecycle-profile"
+path = "main.rs"
+
+[dependencies]
+litchi-core = { path = "../../../../../crates/litchi-core" }
+litchi-docx = { path = "../../../../../crates/litchi-docx" }
+litchi-opc = { path = "../../../../../crates/litchi-opc" }
+serde_json = "1"
+sha2 = "0.11"
