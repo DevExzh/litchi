@@ -11,6 +11,10 @@ publish = false
 name = "xlsx-svg-lifecycle-profile"
 path = "main.rs"
 
+[[bin]]
+name = "xlsx-svg-lifecycle-phase-profile"
+path = "phase_main.rs"
+
 [dependencies]
 litchi-opc = { path = "../../../../../crates/litchi-opc" }
 litchi-xlsx = { path = "../../../../../crates/litchi-xlsx" }

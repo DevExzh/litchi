@@ -258,6 +258,17 @@ receipts. With n=3, those ranges are descriptive rather than confidence
 intervals; this summary must not be used to claim a speedup, regression,
 causal effect, or scaling law.
 
+The optional exploratory phase decomposition is a separate binary and receipt
+schema. For `multi_picture_same_drawing_{16,64,256}`, it measures only the
+named public phases `open`, `stages`, `commit`, `firstsave`,
+`reopen_secondsave`, and complete `validation`. Every phase records elapsed
+time, phase-local requested allocation, allocator equations, and the live
+bytes retained at its boundary. The phase harness must preserve the complete
+semantic predicate and must expose retained live sets so phase allocation
+values are not summed or subtracted across unlike lifetimes. It is outside the
+69-lane acceptance matrix and cannot be used to make a baseline comparison or
+speedup, regression, causal, or scaling claim.
+
 ## Runner and source-integrity requirements
 
 `run_profile.sh` must:

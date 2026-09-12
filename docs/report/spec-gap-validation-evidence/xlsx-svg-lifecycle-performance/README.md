@@ -117,6 +117,16 @@ owners. Its source-shape receipt is paired with the retained scope probe at
 which records retained owner source bytes only. Neither artifact is a timing,
 peak-memory, or final performance result.
 
+The separate [`phase-decomposition.md`](phase-decomposition.md) harness is an
+exploratory diagnostic for the three same-drawing attach fixtures. Its
+`xlsx-svg-lifecycle-phase-profile` binary and `run_phase_profile.sh` runner
+split each public operation into `open`, `stages`, `commit`, `firstsave`,
+`reopen_secondsave`, and complete `validation` clocks. Each phase records
+phase-local requested allocation and the live bytes retained across the
+boundary; phase values are never summed or subtracted across unlike live
+sets. This harness is outside the 69-lane acceptance matrix and has no
+baseline comparison or performance conclusion.
+
 When the owner and adapter are frozen, the intended command is:
 
 ```sh
