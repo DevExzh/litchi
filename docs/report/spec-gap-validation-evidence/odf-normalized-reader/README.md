@@ -1,0 +1,7 @@
+# Normalized ODF namespace reader
+
+ResolvedReader normalizes UTF-8 namespace declaration values before resolver insertion, admitting legal escaped reserved-prefix bindings. Borrowed and buffered APIs preserve original event bytes and source offsets. Declaration count, prefix/URI bytes, active namespace bytes and scope depth have explicit bounds; malformed and duplicate declarations fail closed. Normalized namespace values are compared directly by consumers and must not be decoded a second time.
+
+Independent adapter-only review approved the exact files in source.json. Tests cover 13 adapter cases, 7 shared namespace semantics cases and 16 namespace unit cases. Root combined ODS/ODT/common validation passed 2,227 tests across 127 targets, with one ignored test, strict all-target Clippy and warning-denied rustdoc. The combined source capture, commands, exits, compressed logs and resolved lockfile are retained; host changes in that capture are separate from this shared-adapter commit. A dedicated target and TMPDIR=/var/tmp were used without inherited warning suppressions.
+
+This is a bounded UTF-8 namespace adapter, not a whole-document XML/schema validator or an allocator-exact memory claim. Unknown QName-prefix copies performed by quick-xml remain bounded by caller source/input limits rather than the declaration-prefix limit. Host grammar validation and host integration review remain necessary. No runtime improvement is claimed by these correctness gates.

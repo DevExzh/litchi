@@ -779,11 +779,46 @@ pub fn validate_namespace_binding<'uri>(
         return Ok(None);
     };
 
+    validate_normalized_namespace_binding(prefix, uri, context)?;
+    Ok(resolved)
+}
+
+/// Validate a namespace binding whose URI has already undergone XML
+/// attribute-value normalization.
+///
+/// This is kept separate from [`validate_namespace_binding`] so readers that
+/// normalize a declaration before adding it to a resolver do not normalize it
+/// a second time when applying the reserved-prefix rules.
+pub fn validate_normalized_namespace_binding(
+    prefix: Option<&[u8]>,
+    uri: &str,
+    context: &str,
+) -> Result<()> {
+    if let Some(prefix) = prefix {
+        if prefix.is_empty() {
+            return Err(invalid_namespace(
+                context,
+                "a named namespace binding must have a non-empty prefix",
+            ));
+        }
+        if prefix == b"xmlns" {
+            return Err(invalid_namespace(
+                context,
+                "the xmlns prefix is reserved and cannot be declared",
+            ));
+        }
+    }
     let prefix = prefix.unwrap_or_default();
     if uri.is_empty() && !prefix.is_empty() {
         return Err(invalid_namespace(
             context,
             "a non-empty prefix cannot be bound to the empty namespace URI",
+        ));
+    }
+    if uri == XMLNS_DECLARATION_NAMESPACE {
+        return Err(invalid_namespace(
+            context,
+            "the XMLNS namespace URI is reserved for namespace declarations",
         ));
     }
     if uri == XMLNS {
@@ -799,8 +834,17 @@ pub fn validate_namespace_binding<'uri>(
             "the xml prefix must be bound to the XML namespace URI",
         ));
     }
+    Ok(())
+}
 
-    Ok(resolved)
+/// Normalize one lexical namespace declaration value with the shared byte,
+/// entity-expansion, and XML-character bounds.
+pub fn normalize_namespace_uri<'uri>(
+    raw: &'uri [u8],
+    decoder: quick_xml::Decoder,
+    context: &str,
+) -> Result<Cow<'uri, str>> {
+    decode_namespace_uri(raw, decoder, context)
 }
 
 fn invalid_namespace(context: &str, reason: &str) -> Error {
