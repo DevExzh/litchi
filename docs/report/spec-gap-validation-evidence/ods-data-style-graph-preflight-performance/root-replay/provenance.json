@@ -1,0 +1,14 @@
+{
+  "base": "8e3ad310426a534c0bb17a789eb2c42a96e61310",
+  "repeats": 7,
+  "captures": {
+    "before": {
+      "source_sha256": "0d1fad5bd849a0e34a1f60cdfec6dd62185bff2ac35673aa6148a63da3df3677",
+      "binary_sha256": "7579d4bbda59e0b3cac5d7dd79de6b4336070c42145a65c98be32a05a3cc8952"
+    },
+    "after": {
+      "source_sha256": "20eb69aa8402ac5c621efdf767a1069b89712f327e83d03d2f0a305a55e0822a",
+      "binary_sha256": "136a96bf5d6b31d9171eeab72fddeb797b291bcfa487cbe5e7980a9c8851d61f"
+    }
+  }
+}

@@ -3846,11 +3846,12 @@ pub(crate) fn put_extended_style_graph(
     if markup_len == 0 {
         return Ok(source.to_vec());
     }
-    let owner_range = ensure_extended_names_available(source, graph, max_output)?;
-    preflight_extended_graph_candidate(source, owner_range.as_ref(), markup_len, max_output)?;
+    let owner = ensure_extended_names_available(source, graph, max_output)?;
+    preflight_extended_graph_candidate(&owner, markup_len, max_output)?;
     let markup = graph.to_xml()?;
     debug_assert_eq!(markup.len(), markup_len);
-    let candidate = insert_extended_automatic_styles(source, &markup, max_output, owner_range)?;
+    let candidate =
+        insert_extended_automatic_styles(source, &markup, max_output, owner.owner_range.clone())?;
     verify_extended_graph_visible(&candidate, graph, max_output)?;
     Ok(candidate)
 }
@@ -3873,9 +3874,22 @@ fn extended_graph_markup_size(graph: &crate::data_style::Graph) -> Result<usize>
     Ok(size)
 }
 
+#[derive(Clone, Debug)]
+struct ExtendedGraphOwner {
+    owner_range: Option<Range<usize>>,
+    content_len: usize,
+    opening: Option<ExtendedGraphOwnerOpening>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ExtendedGraphOwnerOpening {
+    opening_len: usize,
+    closing_len: usize,
+    self_closing: bool,
+}
+
 fn preflight_extended_graph_candidate(
-    source: &[u8],
-    owner_range: Option<&Range<usize>>,
+    owner: &ExtendedGraphOwner,
     markup_len: usize,
     max_output: usize,
 ) -> Result<()> {
@@ -3884,55 +3898,29 @@ fn preflight_extended_graph_candidate(
             "ODS extended style graph markup exceeds its {max_output} byte limit"
         ));
     }
-    let (xml, spans) = content_spans(source)?;
-    let candidate_len = match owner_range {
-        Some(range) => {
-            let automatic = spans
-                .iter()
-                .find(|span| span.start == range.start && span.end == range.end)
-                .ok_or_else(|| {
-                    invalid_error(
-                        "ODS extended data-style direct automatic-styles owner changed before preflight",
-                    )
-                })?;
-            if xml.as_bytes()[automatic.start..automatic.tag_end].ends_with(b"/>") {
-                let opening = &xml.as_bytes()[automatic.start..automatic.tag_end];
-                let slash = opening
-                    .len()
-                    .checked_sub(2)
-                    .ok_or_else(|| invalid_error("ODS automatic-styles opening is empty"))?;
-                let name_end = opening[1..slash]
-                    .iter()
-                    .position(|byte| byte.is_ascii_whitespace())
-                    .map_or(slash, |offset| offset + 1);
-                let name_len = name_end
-                    .checked_sub(1)
-                    .ok_or_else(|| invalid_error("ODS automatic-styles QName is missing"))?;
-                let closing_len = 2usize
-                    .checked_add(name_len)
-                    .and_then(|length| length.checked_add(1))
-                    .ok_or_else(|| {
-                        invalid_error("ODS automatic-styles closing tag size overflows")
-                    })?;
-                let replacement_len = opening
-                    .len()
-                    .checked_sub(1)
-                    .and_then(|length| length.checked_add(markup_len))
-                    .and_then(|length| length.checked_add(closing_len))
-                    .ok_or_else(|| {
-                        invalid_error("ODS automatic-styles insertion size overflows")
-                    })?;
-                xml.len()
-                    .checked_sub(automatic.end - automatic.start)
-                    .and_then(|length| length.checked_add(replacement_len))
-                    .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?
-            } else {
-                xml.len()
-                    .checked_add(markup_len)
-                    .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?
-            }
+    let candidate_len = match (&owner.owner_range, owner.opening) {
+        (Some(range), Some(opening)) if opening.self_closing => {
+            let replacement_len = opening
+                .opening_len
+                .checked_sub(1)
+                .and_then(|length| length.checked_add(markup_len))
+                .and_then(|length| length.checked_add(opening.closing_len))
+                .ok_or_else(|| invalid_error("ODS automatic-styles insertion size overflows"))?;
+            owner
+                .content_len
+                .checked_sub(
+                    range.end.checked_sub(range.start).ok_or_else(|| {
+                        invalid_error("ODS automatic-styles owner range is reversed")
+                    })?,
+                )
+                .and_then(|length| length.checked_add(replacement_len))
+                .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?
         },
-        None => {
+        (Some(_), Some(_)) => owner
+            .content_len
+            .checked_add(markup_len)
+            .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?,
+        (None, None) => {
             let container_len = "<office:automatic-styles xmlns:office=\""
                 .len()
                 .checked_add(OFFICE.len())
@@ -3940,9 +3928,16 @@ fn preflight_extended_graph_candidate(
                 .and_then(|length| length.checked_add(markup_len))
                 .and_then(|length| length.checked_add("</office:automatic-styles>".len()))
                 .ok_or_else(|| invalid_error("ODS automatic-styles container size overflows"))?;
-            xml.len()
+            owner
+                .content_len
                 .checked_add(container_len)
                 .ok_or_else(|| invalid_error("ODS automatic-styles candidate size overflows"))?
+        },
+        (Some(_), None) => {
+            return invalid("ODS automatic-styles owner opening metadata is missing");
+        },
+        (None, Some(_)) => {
+            return invalid("ODS automatic-styles owner range is missing");
         },
     };
     if candidate_len > max_output {
@@ -3957,7 +3952,7 @@ fn ensure_extended_names_available(
     source: &[u8],
     graph: &crate::data_style::Graph,
     max_output: usize,
-) -> Result<Option<Range<usize>>> {
+) -> Result<ExtendedGraphOwner> {
     let package = Package::from_bytes(copy_package_bytes(
         source,
         max_output,
@@ -3990,7 +3985,73 @@ fn ensure_extended_names_available(
             ));
         }
     }
-    Ok(catalog.owner_range())
+    let owner_range = catalog.owner_range();
+    let opening = owner_range
+        .as_ref()
+        .map(|range| owner_opening_metadata(package.content_xml().as_bytes(), range))
+        .transpose()?;
+    Ok(ExtendedGraphOwner {
+        owner_range,
+        content_len: package.content_xml().len(),
+        opening,
+    })
+}
+
+fn owner_opening_metadata(
+    source: &[u8],
+    range: &Range<usize>,
+) -> Result<ExtendedGraphOwnerOpening> {
+    if range.start >= range.end || range.end > source.len() {
+        return invalid("ODS automatic-styles owner range is outside content.xml");
+    }
+    let opening_len = source
+        .get(range.start..range.end)
+        .and_then(|value| unquoted_tag_end(value).map(|end| end + 1))
+        .ok_or_else(|| invalid_error("ODS automatic-styles owner opening is missing"))?;
+    let opening = source
+        .get(range.start..range.start + opening_len)
+        .ok_or_else(|| {
+            invalid_error("ODS automatic-styles owner opening is outside content.xml")
+        })?;
+    let self_closing = opening.ends_with(b"/>");
+    let closing_len = if self_closing {
+        let slash = opening
+            .len()
+            .checked_sub(2)
+            .ok_or_else(|| invalid_error("ODS automatic-styles opening is empty"))?;
+        let name_end = opening[1..slash]
+            .iter()
+            .position(|byte| byte.is_ascii_whitespace())
+            .map_or(slash, |offset| offset + 1);
+        let name_len = name_end
+            .checked_sub(1)
+            .ok_or_else(|| invalid_error("ODS automatic-styles QName is missing"))?;
+        2usize
+            .checked_add(name_len)
+            .and_then(|length| length.checked_add(1))
+            .ok_or_else(|| invalid_error("ODS automatic-styles closing tag size overflows"))?
+    } else {
+        0
+    };
+    Ok(ExtendedGraphOwnerOpening {
+        opening_len,
+        closing_len,
+        self_closing,
+    })
+}
+
+fn unquoted_tag_end(source: &[u8]) -> Option<usize> {
+    let mut quote = None;
+    for (index, byte) in source.iter().copied().enumerate() {
+        match (quote, byte) {
+            (Some(delimiter), value) if value == delimiter => quote = None,
+            (Some(_), _) => {},
+            (None, b'\'' | b'"') => quote = Some(byte),
+            (None, b'>') => return Some(index),
+            _ => {},
+        }
+    }
+    None
 }
 
 /// Read one source-qualified data-style definition from either package style
