@@ -1,0 +1,7 @@
+$ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/home/zhuhe/xlsx-content-part-final-target-20260912 cargo test -p litchi-xlsx --all-features --locked --offline --test drawing_svg_lifecycle --quiet
+
+running 51 tests
+...................................................
+test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+exit=0

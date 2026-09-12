@@ -127,6 +127,9 @@ fn scan_limits(workbook: &Workbook) -> source::ScanLimits {
         max_pictures: defaults
             .max_pictures
             .min(caller.max_relationships_per_part()),
+        max_content_parts: defaults
+            .max_content_parts
+            .min(caller.max_relationships_per_part()),
         max_relationship_references: defaults
             .max_relationship_references
             .min(caller.max_relationships_per_part()),

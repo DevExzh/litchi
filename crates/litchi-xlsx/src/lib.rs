@@ -145,6 +145,8 @@ pub mod timeline;
 mod timelines;
 pub mod volatile_dependencies;
 pub mod web;
+
+pub use drawing::ContentPartSelector;
 pub mod workbook;
 pub mod workbook_metadata;
 pub mod writer;
@@ -355,7 +357,9 @@ pub use workbook::{
     SourceBackedMergeCommit, SourceBackedMergeDiagnostics, SourceBackedMergeEdit,
     SourceBackedMergeEditor, SourceBackedMergePatch, SourceBackedMergeSnapshot,
     SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet, State, TabEdit,
-    ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetEdit, WorksheetKind,
+    ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetContentPart,
+    WorksheetContentPartOutboundRelationship, WorksheetContentPartPayload,
+    WorksheetContentPartRelationship, WorksheetEdit, WorksheetKind,
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,

@@ -14,10 +14,10 @@ pub mod worksheet_source;
 pub use super::chart::Anchor;
 pub use codec::parse;
 pub(crate) use codec::parse_with_limits;
-pub use model::{Chart, Drawing, Object, Picture, Unknown, UnknownKind, text};
+pub use model::{Chart, ContentPartSelector, Drawing, Object, Picture, Unknown, UnknownKind, text};
 pub use source::{
-    ByteRange, DrawingDialect, ElementRange, PictureSource, RelationshipDialect,
-    RelationshipReference, ScanLimits, SourceDrawing, SvgOwner, SvgOwnerState,
+    ByteRange, ContentPartProfile, ContentPartSource, DrawingDialect, ElementRange, PictureSource,
+    RelationshipDialect, RelationshipReference, ScanLimits, SourceDrawing, SvgOwner, SvgOwnerState,
 };
 pub use svg::{PictureSelector, SvgInput};
 pub use worksheet_source::{

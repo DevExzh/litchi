@@ -21,8 +21,9 @@ mod source_merge;
 mod tests;
 
 pub use drawing::{
-    WorksheetDrawing, WorksheetImageReference, WorksheetPicture, WorksheetSvgDescriptor,
-    WorksheetSvgImage,
+    WorksheetContentPart, WorksheetContentPartOutboundRelationship, WorksheetContentPartPayload,
+    WorksheetContentPartRelationship, WorksheetDrawing, WorksheetImageReference, WorksheetPicture,
+    WorksheetSvgDescriptor, WorksheetSvgImage,
 };
 pub use edit::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, DurablePatch, Edit,

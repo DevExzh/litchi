@@ -1,0 +1,126 @@
+$ CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/home/zhuhe/xlsx-content-part-final-target-20260912 cargo lint
+    Checking litchi-core v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-core)
+    Checking simd-adler32 v0.3.10
+    Checking getrandom v0.2.17
+    Checking rand_core v0.6.4
+    Checking rayon v1.12.0
+    Checking adler2 v2.0.1
+   Compiling vcpkg v0.2.15
+   Compiling libz-sys v1.1.29
+    Checking miniz_oxide v0.9.1
+    Checking zlib-rs v0.6.7
+    Checking flate2 v1.1.10
+    Checking base64ct v1.6.0
+    Checking num-integer v0.1.47
+    Checking pem-rfc7468 v0.7.0
+   Compiling der_derive v0.7.3
+   Compiling fastrand v2.5.0
+    Checking flagset v0.4.7
+    Checking der v0.7.10
+    Checking sha2 v0.10.9
+    Checking spki v0.7.3
+    Checking ppv-lite86 v0.2.21
+    Checking rand_chacha v0.3.1
+    Checking pkcs8 v0.10.2
+    Checking rand v0.8.8
+    Checking bitflags v2.13.1
+    Checking spin v0.9.9
+    Checking lazy_static v1.5.0
+    Checking ff v0.13.1
+    Checking base16ct v0.2.0
+    Checking sec1 v0.7.3
+    Checking group v0.13.0
+    Checking cipher v0.5.2
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/soapberry-zip)
+error: very complex type used. Consider factoring parts into `type` definitions
+   --> crates/soapberry-zip/src/office.rs:305:10
+    |
+305 |     ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+    = note: `-D clippy::type-complexity` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::type_complexity)]`
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:2731:10
+     |
+2731 |     ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error> {
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:2748:10
+     |
+2748 |     ) -> Result<Vec<(String, Result<Vec<u8>, Error>)>, Error> {
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:4308:10
+     |
+4308 |     ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error>
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:4328:10
+     |
+4328 |     ) -> Result<Vec<(String, Result<Vec<u8>, Error>)>, Error>
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:7222:22
+     |
+7222 |         read_member: &mut dyn FnMut(&str, &mut ZipOperationAccounting) -> Result<Vec<u8>, Error>,
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:7343:10
+     |
+7343 |     ) -> Vec<(&'name str, Result<std::sync::Arc<Vec<u8>>, Error>)> {
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:7394:10
+     |
+7394 |     ) -> Result<Vec<(&'name str, Result<Vec<u8>, Error>)>, Error> {
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: very complex type used. Consider factoring parts into `type` definitions
+    --> crates/soapberry-zip/src/office.rs:7411:10
+     |
+7411 |     ) -> Result<Vec<(String, Result<Vec<u8>, Error>)>, Error> {
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#type_complexity
+
+error: this function has too many arguments (8/7)
+   --> crates/soapberry-zip/src/writer.rs:978:5
+    |
+978 | /     fn write_precompressed_file_classified(
+979 | |         &mut self,
+980 | |         name: &str,
+981 | |         compression_method: CompressionMethod,
+...   |
+986 | |         accounting_kind: AccountingWriteKind,
+987 | |     ) -> Result<(), Error> {
+    | |__________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#too_many_arguments
+    = note: `-D clippy::too-many-arguments` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`
+
+error: could not compile `soapberry-zip` (lib) due to 10 previous errors
+exit=101

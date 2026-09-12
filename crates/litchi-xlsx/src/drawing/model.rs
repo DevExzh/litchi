@@ -183,6 +183,26 @@ impl Unknown {
     }
 }
 
+/// A semantic worksheet drawing/content-part selector.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct ContentPartSelector {
+    /// Zero-based worksheet drawing position.
+    pub drawing: usize,
+    /// Zero-based direct core content-part position within that drawing.
+    pub content_part: usize,
+}
+
+impl ContentPartSelector {
+    /// Construct a zero-based drawing/content-part selector.
+    pub const fn new(drawing: usize, content_part: usize) -> Self {
+        Self {
+            drawing,
+            content_part,
+        }
+    }
+}
+
 /// Shared `DrawingML` text-body vocabulary used by `SpreadsheetDrawing` shapes.
 pub mod text {
     pub use litchi_drawingml::text::body::{Body, Insets, Paragraph, Properties, Run};

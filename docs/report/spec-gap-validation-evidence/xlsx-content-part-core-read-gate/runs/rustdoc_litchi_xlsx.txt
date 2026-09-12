@@ -1,0 +1,20 @@
+$ RUSTDOCFLAGS=-D warnings CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/home/zhuhe/xlsx-content-part-final-target-20260912 cargo doc -p litchi-xlsx --all-features --locked --offline --lib --no-deps
+    Checking litchi-core v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-cfb)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-codepage)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/soapberry-zip)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/xml-minifier)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-ole-common)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-crypto)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-opc)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-vba)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-spreadsheet-drawing)
+    Checking litchi-xldm v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-xldm)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-sheet)
+ Documenting litchi-xlsx v0.0.1 (/home/zhuhe/xlsx-content-part-final-gate-20260912/crates/litchi-xlsx)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.13s
+   Generated /home/zhuhe/xlsx-content-part-final-target-20260912/doc/litchi_xlsx/index.html
+exit=0
