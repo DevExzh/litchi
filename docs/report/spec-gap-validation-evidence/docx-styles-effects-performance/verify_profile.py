@@ -47,8 +47,8 @@ NATIVE_EFFECTS_MEMBERS = {
 # The profile prerequisite is the separately reviewed current-source smoke.
 # The historical d1/clean-46 smoke remains owned by verify.py/run_smoke.sh and
 # is intentionally not accepted as this profile's correctness gate.
-CURRENT_SMOKE_COMMIT = "fa927a8a9de94891858a6bb3d44c21d5fa63697d"
-CURRENT_SMOKE_RESULT_DIR = "results/smoke-current-637082e31"
+CURRENT_SMOKE_COMMIT = "c4ac516353591f88a9b797349002d05737614e78"
+CURRENT_SMOKE_RESULT_DIR = "results/smoke-after-d000d977b"
 CURRENT_SMOKE_SOURCE_COMMIT = PROFILE_SOURCE_COMMIT
 
 # Compatibility name for profile receipt builders.  Keep the profile source

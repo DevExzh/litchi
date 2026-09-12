@@ -34,7 +34,7 @@ use support::{AllocSnapshot, begin_window};
 
 const DEFAULT_WARMUP: usize = 2;
 const DEFAULT_SAMPLES: usize = 20;
-const SOURCE_COMMIT: &str = "8702fd4db8723acceb7deb51bcb40ff66604bf10";
+const SOURCE_COMMIT: &str = "d000d977b99e03f8542c7dae74acf767a91b1feb";
 const PROFILE_SCHEMA: &str = "docx-styles-effects-profile-scaffold-v2";
 
 const LANES: &[&str] = &[

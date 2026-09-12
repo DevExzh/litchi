@@ -20,7 +20,7 @@ fi
 
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 ROOT=$(git -C "$HERE/../../../.." rev-parse --show-toplevel)
-SOURCE_COMMIT=8702fd4db8723acceb7deb51bcb40ff66604bf10
+SOURCE_COMMIT=d000d977b99e03f8542c7dae74acf767a91b1feb
 HARNESS="$HERE/harness/Cargo.toml"
 MANIFEST_TOOL="$HERE/source_manifest.py"
 VERIFY_TOOL="$HERE/verify_current_smoke.py"

@@ -26,11 +26,11 @@ ROOT=$(cd -- "$HERE/../../../.." && pwd -P)
 # Rustup and Cargo discover toolchain/config files from the working directory.
 # Anchor their execution to this frozen checkout, regardless of the caller.
 cd -- "$ROOT"
-SOURCE_COMMIT=8702fd4db8723acceb7deb51bcb40ff66604bf10
+SOURCE_COMMIT=d000d977b99e03f8542c7dae74acf767a91b1feb
 # The profile's correctness prerequisite is the separately reviewed current
-# source smoke retained in fa927a8a9.  The historical d1/clean-46 smoke remains
+# source smoke retained in c4ac5163. The historical d1/clean-46 smoke remains
 # replayable through run_smoke.sh and verify.py, but must not gate this profile.
-CURRENT_SMOKE_COMMIT=fa927a8a9de94891858a6bb3d44c21d5fa63697d
+CURRENT_SMOKE_COMMIT=c4ac516353591f88a9b797349002d05737614e78
 HARNESS=$HERE/profile-harness/Cargo.toml
 MANIFEST_TOOL=$HERE/source_manifest.py
 PROFILE_VERIFIER=$HERE/verify_profile.py

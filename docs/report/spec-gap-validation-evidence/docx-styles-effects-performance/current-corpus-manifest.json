@@ -1,6 +1,6 @@
 {
   "schema": "docx-styles-effects-corpus-v1",
-  "source_commit": "8702fd4db8723acceb7deb51bcb40ff66604bf10",
+  "source_commit": "d000d977b99e03f8542c7dae74acf767a91b1feb",
   "fixtures": [
     {
       "name": "Bug54849.docx",
