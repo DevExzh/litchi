@@ -73,3 +73,11 @@ The later verification report retains host/load metadata, command start/exit
 provenance and output paths, and `/usr/bin/time -v` user/system/elapsed fields.
 Status-zero cleanup requires an exact verification-success sentinel in addition
 to the ownership sentinel; a missing or mismatching receipt retains the target.
+
+The timing-free correctness operator is [`operator_capture.py`](operator_capture.py).
+It requires an explicit full `--expected-head`, independently checks that HEAD,
+uses fresh external results and target directories with symlink-free lineage,
+and stops at the first failed preflight, build, host probe, or matrix gate while
+retaining final diagnostics. Its pure checks and mocked orchestration regressions
+are in [`operator_capture_tests.py`](operator_capture_tests.py); these tests do
+not build or invoke the executable.
