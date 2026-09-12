@@ -611,7 +611,12 @@ pub fn run_matrix() -> Result<String> {
         let limits = owner_limits_for(recipe, lane)?;
         let (prepared, setup) = prepare_with_phase(lane, recipe, limits, ReadLimits::default())?;
         let receipt = run_sample(prepared, setup, false, lane.expected.as_deref())?;
-        if receipt.semantic_ok && receipt.preservation_ok && receipt.inverse_ok {
+        if receipt.semantic_ok
+            && receipt.preservation_ok
+            && receipt.inverse_ok
+            && receipt.baseline_reopenable
+            && receipt.retained_baseline_balance_ok
+        {
             accepted += 1;
             if lane
                 .expected
