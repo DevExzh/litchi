@@ -1,0 +1,19 @@
+{
+  "status": "provisional: after binary/source binding pending",
+  "artifact_hashes_match_recorded_manifest": true,
+  "all_120_samples_semantic_opaque_inverse_allocation_balance_pass": true,
+  "all_120_samples_same_member_resource_digests_and_metrics": true,
+  "observations": {
+    "before": {
+      "samples": 60,
+      "allocation_calls_median": 1101390.0,
+      "requested_alloc_bytes_median": 116701991.0
+    },
+    "after": {
+      "samples": 60,
+      "allocation_calls_median": 1055118.0,
+      "requested_alloc_bytes_median": 111307100.0
+    }
+  },
+  "performance_claim": false
+}
