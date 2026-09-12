@@ -143,6 +143,53 @@ impl Package {
         ))
     }
 
+    /// Read the typed, source-backed InkAction snapshots owned by the
+    /// presentation's slides in semantic slide order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the package graph or one typed action closure is
+    /// malformed or outside the default bounds.
+    pub fn ink_actions(&self) -> Result<Vec<crate::presentation::embedded::ink_actions::Snapshot>> {
+        self.presentation()?.ink_actions()
+    }
+
+    /// Read InkAction snapshots under explicit owner and target bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if one selected slide exceeds the supplied bounds or
+    /// has an unsupported or malformed typed action closure.
+    pub fn ink_actions_with_limits(
+        &self,
+        limits: crate::presentation::embedded::ink_actions::Limits,
+    ) -> Result<Vec<crate::presentation::embedded::ink_actions::Snapshot>> {
+        self.presentation()?.ink_actions_with_limits(limits)
+    }
+
+    /// Apply an existing-target InkAction patch with exact source checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for stale source, signature policy, invalid closure,
+    /// or bounded readback failure. The package remains unchanged on error.
+    pub fn apply_ink_actions_patch(
+        &mut self,
+        patch: &crate::presentation::embedded::ink_actions::Patch,
+    ) -> Result<crate::presentation::embedded::ink_actions::Snapshot> {
+        self.ensure_graph_current("apply_ink_actions_patch")?;
+        self.ensure_plain_mutation("apply_ink_actions_patch")?;
+        let changed = patch.is_changed();
+        // The InkAction package owner stages and publishes its own candidate
+        // atomically.  Avoid wrapping that operation in `edit_typed`, whose
+        // generic rollback snapshot would duplicate the complete OPC graph.
+        let snapshot = patch.apply(&mut self.opc)?;
+        if changed {
+            self.mutable_pres = None;
+        }
+        Ok(snapshot)
+    }
+
     /// Borrow the mutable presentation model for a newly authored package.
     ///
     /// # Errors
