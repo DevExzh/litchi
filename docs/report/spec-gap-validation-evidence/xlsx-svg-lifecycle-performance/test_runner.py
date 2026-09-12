@@ -3,12 +3,31 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
 
 class RunnerInputTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("awk"), "host metadata reader requires awk")
+    def test_embedded_host_metadata_programs_decode_proc_fields(self):
+        script = Path(__file__).with_name("run_profile.sh").read_text()
+        cases = [
+            (r"awk -F: '([^']+)'", ["-F:"], "model name : Fixture CPU\n", "Fixture CPU"),
+            (r"awk '([^']+)'", [], "MemTotal: 12345 kB\n", "12345 kB"),
+        ]
+        for pattern, options, source, expected in cases:
+            with self.subTest(expected=expected):
+                program = re.search(pattern, script)
+                self.assertIsNotNone(program, "host metadata program is missing")
+                run = subprocess.run(
+                    ["awk", *options, program.group(1)], input=source,
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertEqual(run.stdout.strip(), expected)
+
     def test_declared_manifest_extras_exist_in_committed_checkout(self):
         here = Path(__file__).resolve().parent
         root = here.parents[3]

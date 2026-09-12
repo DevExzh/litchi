@@ -79,17 +79,20 @@ The current root review has eleven adversarial Python verifier tests. They
 reject missing/nonempty stderr, missing/failed/duplicate exit-status records,
 changed or malformed executable digests, incorrect process identities, and
 input-size drift despite matching claimed hashes, and native receipts that
-disagree with the documented producer fixture. The separate eight-test runner
+disagree with the documented producer fixture. The separate nine-test runner
 suite proves missing or reused external output refusal, checkout/target/symlink
 separation, symlinked-checkout resolution, and owned-target cleanup while
 retaining failed-run diagnostics. It also checks that every explicitly declared
 manifest extra exists in Git HEAD, catching missing inputs before a build.
+The embedded CPU and memory metadata programs are executed against fixed
+`/proc`-shaped inputs, so quoting errors cannot silently produce unavailable
+host fields.
 Namespace tests reject missing, malformed,
 inconsistent, or changing first-refused binding counts. Caller-limit tests
 reject missing, floating-point, boolean, nonpositive, and cross-process-drift
 ceiling values. A separate five-test source-snapshot suite exercises real
 temporary Git trees, including untracked, assume-unchanged, and tampered
-path-source inputs. All 24 Python tests pass. Shell syntax and three early
+path-source inputs. All 25 Python tests pass. Shell syntax and three early
 refusal gates (unfrozen, unwired, insufficient process count) also pass without
 creating a Cargo target. These checks are verifier evidence, not lifecycle
 performance measurements or production acceptance.
