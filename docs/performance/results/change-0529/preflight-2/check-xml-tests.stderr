@@ -1,0 +1,7 @@
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0529-target/debug/deps/xml_minifier-2656281fc4cee06e)
+     Running tests/audit.rs (/home/zhuhe/litchi-goal-0529-target/debug/deps/audit-6ce5c87c04e748d4)
+     Running tests/ooxml_assets.rs (/home/zhuhe/litchi-goal-0529-target/debug/deps/ooxml_assets-065a043d87fe170e)
+     Running tests/stream_audit.rs (/home/zhuhe/litchi-goal-0529-target/debug/deps/stream_audit-67b94862797bae38)
+   Doc-tests xml_minifier

@@ -1,0 +1,31 @@
+{
+  "schema": "litchi_0529_pilot_decision_v1",
+  "disposition": "rejected_and_reverted",
+  "pilot_gates_passed": false,
+  "production_change_retained": false,
+  "final_source": "final",
+  "final_source_manifest_sha256": "c5a7cfbd0d7da965c7d945aea3355d24e34685b91f9dbbb25baedbed97140a08",
+  "plan_sha256": "17988e94a8d0993a6b453ca8c3ec3c46689bc89f2f823cace045a47f92b06a33",
+  "comparison_sha256": "70b58d3e35525883f8f122d27cc429cb291e00a0e6c2e3fde3a1c9b6107f1722",
+  "adverse_review_sha256": "147c094087c08d7433eb51d195dc34629437c9ace5881313034ab8ad85623ef1",
+  "quality_summary_sha256": "704a3b4bfcec601ae9d76c3cdb440d86e57612e4206d4f44418a48117af99316",
+  "conditional_lanes": {
+    "profile": {
+      "status": "unmeasured",
+      "reason": "Pilot gate failed; conditional capture was not admitted and this lane is unmeasured.",
+      "metric": "publication_ir",
+      "required_reduction_percent": 3.0,
+      "used_for_gate": false
+    },
+    "hardware": {
+      "status": "unmeasured",
+      "reason": "Pilot gate failed; conditional capture was not admitted and this lane is unmeasured."
+    },
+    "eager": {
+      "status": "unmeasured",
+      "reason": "Pilot gate failed; conditional capture was not admitted and this lane is unmeasured."
+    }
+  },
+  "observed_utc": "2026-09-12T12:50:22.174540+00:00",
+  "review": "Reject and restore the XML auditor probe: every total-mean row fails the frozen 2% gate; first-repeat publication p50 also fails 5%. Publication allocation calls improve 97.8489\u201398.8695% but do not override native failure. Managed noncompact repeat 1 total p50 worsens 5.3910%; all 46 adverse and 76 drift flags remain reviewed. Conditional profile/hardware/eager are unmeasured after pilot failure. Final source restores audit.rs exactly and retains four public tests plus the identical publication-counter harness. All 14 final quality checks pass. OLE2/OOXML remains active, ODF deferred and iWork excluded; the overall goal remains incomplete."
+}

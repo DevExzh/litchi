@@ -1,0 +1,122 @@
+{
+  "revision": "3f4c7be06159dc3d742d9c815800dc55bf7c2db6",
+  "created_utc": "2026-09-12T12:01:24.951209+00:00",
+  "hypothesis": "Avoid duplicate-key bookkeeping only for proven zero/one-attribute tags in the shared XML auditor; all ambiguous or error probes replay the checked iterator before any semantic/state mutation.",
+  "harness_enabler": "Separate publication_allocation_metrics vector alongside existing commit counters, identical in baseline and candidate.",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "Publication including returned MultiSnapshot drop; commit allocations separately retained as diagnostics."
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "scope": "Exact-name zero-before/dump-after/toggle; sixth unique measured runner call; prior five lifecycle calls retained. Excludes returned MultiSnapshot drop."
+  },
+  "cpu": 2,
+  "admission": "Require at least 2% p50 improvement in primary total and at least 5% p50 improvement in primary publication, plus at least 2% mean improvement in primary total in both repeats of both shapes. Require at least 8% publication allocation-call reduction in both allocator repeats/shapes. If these pilot gates pass, require at least 3% publication Ir reduction in both shapes/repeats, full quality and eager guards before retention. Flag every >5% adverse timing, mean, RSS or incremental allocation peak and all >5% absolute same-build drift. Reject if any pilot gate fails; no profiler/hardware speedup claim then. Preserve all captured evidence. No cold/range/native-producer/scaling claim.",
+  "owned_paths": [
+    "/tmp/litchi-goal-0529",
+    "/home/zhuhe/litchi-goal-0529-target",
+    "/home/zhuhe/litchi-goal-0529-draft",
+    "/home/zhuhe/litchi-goal-0529-tests",
+    "/home/zhuhe/litchi-goal-0529-metrics"
+  ],
+  "native_order": [
+    "baseline native-r1 before candidate application",
+    "candidate native-r1",
+    "candidate native-r2",
+    "retained baseline native-r2 under candidate source checkout"
+  ],
+  "retained_baseline_custody": "Retained baseline binary and build manifest remain hash-bound; candidate checkout source is independently bound during final A2 and differs only in the frozen candidate file inventory.",
+  "status": "frozen-before-build-and-capture",
+  "resource_scope": "Unchanged audit scope, attribute/token/aggregate charging, xml:space semantics and ordered checked fallback.",
+  "hardware": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 100,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole fresh child including corpus/setup/publication/oracles; diagnostic only, not isolated commit counters."
+  },
+  "candidate_source_roots": [
+    "crates/xml-minifier/"
+  ],
+  "candidate_source_binding": "Exact source file inventory and SHA256 values captured independently for each stage; candidate diff must be nonempty and entirely within candidate_source_roots. Harness source is identical. Review exact production/test patch before application.",
+  "gates": {
+    "total_p50_reduction_percent": 2.0,
+    "total_mean_reduction_percent": 2.0,
+    "allocation_calls_reduction_percent": 8.0,
+    "require_every_shape_repeat": true,
+    "publication_p50_reduction_percent": 5.0,
+    "publication_ir_reduction_percent": 3.0
+  },
+  "conditional_lanes": {
+    "profile": "Required for retention only after pilot gates pass; preserved baseline binaries may run under candidate checkout.",
+    "hardware": "Diagnostic only after pilot gates pass.",
+    "eager": "Required before retention; no primary gain claim."
+  },
+  "draft_patch_sha256": "ca0970a03ab76e0bd6ebffd4ced9501fadb656ac4bb55acb515a2371d471e509",
+  "harness_patch_sha256": "ffa36478217bc16df797043e49147c5c487a5cbf01df97f8850e56e9a2dde5e2"
+}

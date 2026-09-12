@@ -1,0 +1,8 @@
+{
+  "initial_attempt": "preflight-1",
+  "exit_code": 101,
+  "cause": "New integration test discarded must-use audit Report; no runtime error.",
+  "correction": "Bind report and assert one normalized xml:space attribute. Also root rustfmt formatting is reflected in exact source snapshots.",
+  "passing_attempt": "preflight-2",
+  "tests_source_sha256": "b44929d36d2db850e4fc43d310ca32253c67ec67fcb5c5ada047ce93ce908832"
+}

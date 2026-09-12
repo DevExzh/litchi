@@ -1,0 +1,7 @@
+{
+  "revision": "3f4c7be06159dc3d742d9c815800dc55bf7c2db6",
+  "priority": "OLE2/OOXML first; ODF deferred; iWork excluded",
+  "baseline_runtime_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+  "plan_sha256": "17988e94a8d0993a6b453ca8c3ec3c46689bc89f2f823cace045a47f92b06a33",
+  "previous_turn": "progress"
+}

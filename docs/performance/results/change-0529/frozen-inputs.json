@@ -1,0 +1,7 @@
+{
+  "plan.json": "17988e94a8d0993a6b453ca8c3ec3c46689bc89f2f823cace045a47f92b06a33",
+  "run.py": "92f2039bd788f1fc93c46d767930e0d2928104678fa7a2c7453263770aff8af4",
+  "checks.py": "9922e9a0a0aec9dbd701f1a333325de67beae2c3bfc4c93fa42690443c11804e",
+  "harness.patch": "ffa36478217bc16df797043e49147c5c487a5cbf01df97f8850e56e9a2dde5e2",
+  "production.patch": "ca0970a03ab76e0bd6ebffd4ced9501fadb656ac4bb55acb515a2371d471e509"
+}

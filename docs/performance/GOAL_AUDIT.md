@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0529: progress through measured rejection and reusable instrumentation
+
+[0529](changes/0529-xml-attribute-probe-pilot.md) rejects the zero/one-attribute probe after native gates fail, retaining publication counters, four public regression tests and all evidence. OLE2/OOXML remains the active priority; ODF is deferred until that optimization goal completes and iWork stays excluded. The full goal remains incomplete.
+
 ## 0528: progress through a new publication baseline
 
 [0528](changes/0528-xlsx-publication-attribution.md) The batch verifies a small resolver-cost ceiling and captures four fresh publication profiles, identifying shared authored-XML validation as the next concrete lead. Production remains unchanged and the full goal remains incomplete. OLE2/OOXML stays first, ODF deferred until that optimization goal completes, and iWork excluded.

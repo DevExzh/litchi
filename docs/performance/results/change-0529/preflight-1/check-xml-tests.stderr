@@ -1,0 +1,21 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling syn v2.0.114
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: unused `xml_minifier::audit::Report` that must be used
+   --> crates/xml-minifier/tests/stream_audit.rs:405:5
+    |
+405 | /     audit::verify_authored(normalized, limits_for(normalized))
+406 | |         .expect("normalized xml:space value must preserve the text run");
+    | |________________________________________________________________________^
+    |
+    = note: requested on the command line with `-D unused-must-use`
+help: use `let _ = ...` to ignore the resulting value
+    |
+405 |     let _ = audit::verify_authored(normalized, limits_for(normalized))
+    |     +++++++
+
+error: could not compile `xml-minifier` (test "stream_audit") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

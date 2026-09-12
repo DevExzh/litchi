@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "scope": "all",
+  "components": {
+    "source": "pass",
+    "builds": "pass",
+    "captures": "pass",
+    "analysis": "pass",
+    "flags": "pass",
+    "quality": "pass",
+    "decision": "pass",
+    "cleanup": "pass",
+    "seal": "pass",
+    "probes": "pass"
+  },
+  "note": "Compact outcome of the completed post-cleanup all-component verifier; omits recursive seal/report hashes. Replayed after adding this record to the seal."
+}

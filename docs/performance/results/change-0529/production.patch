@@ -1,0 +1,117 @@
+diff --git a/crates/xml-minifier/src/audit.rs b/crates/xml-minifier/src/audit.rs
+index fb1ee700a1b218ef832d582dbd946be2fc78a529..a7e4b4ee9fc6707b6432158931c316ec745dab49 100644
+--- a/crates/xml-minifier/src/audit.rs
++++ b/crates/xml-minifier/src/audit.rs
+@@ -14,6 +14,7 @@
+ use quick_xml::Reader;
+ use quick_xml::XmlVersion;
+ use quick_xml::encoding::Decoder;
++use quick_xml::events::attributes::Attribute;
+ use quick_xml::events::{BytesStart, Event};
+ use std::io::{self, BufRead, Read};
+ 
+@@ -1509,34 +1510,82 @@
+     limits: Limits,
+     offset: usize,
+ ) -> Result<Space, Error> {
++    let mut probe = tag.attributes();
++    probe.with_checks(false);
++    match probe.next() {
++        None => return Ok(inherited),
++        Some(Err(_)) => {
++            drop(probe);
++        },
++        Some(Ok(attribute)) => {
++            if probe.next().is_none() {
++                drop(probe);
++                let mut space = inherited;
++                inspect_attribute(
++                    attribute,
++                    decoder,
++                    &mut space,
++                    state,
++                    limits,
++                    offset,
++                )?;
++                return Ok(space);
++            }
++            drop(probe);
++        },
++    }
++
++    inspect_attributes_checked(tag, decoder, inherited, state, limits, offset)
++}
++
++fn inspect_attributes_checked(
++    tag: &BytesStart<'_>,
++    decoder: Decoder,
++    inherited: Space,
++    state: &mut State,
++    limits: Limits,
++    offset: usize,
++) -> Result<Space, Error> {
+     let mut space = inherited;
+     for attribute_result in tag.attributes() {
+         let attribute =
+             attribute_result.map_err(|error| Error::malformed(offset, error.to_string()))?;
+-        state.attributes = checked_add(
+-            state.attributes,
+-            1,
+-            Resource::Attributes,
+-            limits.attributes,
+-            offset,
+-        )?;
+-        if attribute.key.as_ref() == b"xml:space" {
+-            let value = attribute
+-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+-                .map_err(|error| Error::malformed(offset, error.to_string()))?;
+-            space = match value.as_ref() {
+-                "default" => Space::Default,
+-                "preserve" => Space::Preserve,
+-                _ => {
+-                    return Err(Error::malformed(
+-                        offset,
+-                        "xml:space must be 'default' or 'preserve'",
+-                    ));
+-                },
+-            };
+-        }
++        inspect_attribute(attribute, decoder, &mut space, state, limits, offset)?;
+     }
+     Ok(space)
++}
++
++fn inspect_attribute(
++    attribute: Attribute<'_>,
++    decoder: Decoder,
++    space: &mut Space,
++    state: &mut State,
++    limits: Limits,
++    offset: usize,
++) -> Result<(), Error> {
++    state.attributes = checked_add(
++        state.attributes,
++        1,
++        Resource::Attributes,
++        limits.attributes,
++        offset,
++    )?;
++    if attribute.key.as_ref() == b"xml:space" {
++        let value = attribute
++            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
++            .map_err(|error| Error::malformed(offset, error.to_string()))?;
++        *space = match value.as_ref() {
++            "default" => Space::Default,
++            "preserve" => Space::Preserve,
++            _ => {
++                return Err(Error::malformed(
++                    offset,
++                    "xml:space must be 'default' or 'preserve'",
++                ));
++            },
++        };
++    }
++    Ok(())
+ }
+ 
+ fn check_declaration(raw: &[u8], offset: usize) -> Result<(), Error> {

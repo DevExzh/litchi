@@ -1,0 +1,207 @@
+diff --git a/crates/xml-minifier/tests/stream_audit.rs b/crates/xml-minifier/tests/stream_audit.rs
+index cee29f5..29438fc 100644
+--- a/crates/xml-minifier/tests/stream_audit.rs
++++ b/crates/xml-minifier/tests/stream_audit.rs
+@@ -62,6 +62,48 @@ fn assert_same_result(input: &[u8], authored: bool) {
+     }
+ }
+ 
++fn assert_authored_with_limits(input: &[u8], limits: Limits) {
++    let expected = audit::verify_authored(input, limits);
++
++    for chunks in [
++        &[1usize][..],
++        &[2usize][..],
++        &[3usize][..],
++        &[7usize][..],
++        &[31usize, 1, 5, 2][..],
++    ] {
++        let actual = audit::verify_authored_reader(Chunked::new(input, chunks), limits);
++        match (&expected, actual) {
++            (Ok(expected), Ok(actual)) => assert_eq!(expected, &actual, "chunks {chunks:?}"),
++            (Err(expected), Err(StreamError::Audit(actual))) => {
++                assert_error_kind_and_offset(expected, &actual, chunks);
++            },
++            (Err(expected), Err(StreamError::Input(actual))) => {
++                panic!("slice error {expected:?} became input error {actual}")
++            },
++            (Err(_), Err(_)) => panic!("slice error became an unknown stream error"),
++            (Ok(expected), Err(actual)) => {
++                panic!("slice success {expected:?} became stream error {actual:?}")
++            },
++            (Err(expected), Ok(actual)) => {
++                panic!("slice error {expected:?} became stream success {actual:?}")
++            },
++        }
++    }
++}
++
++fn authored_limits(input: &[u8], max_attributes: usize) -> Limits {
++    Limits::new(
++        input.len(),
++        32,
++        128,
++        max_attributes,
++        input.len().max(1),
++        input.len(),
++    )
++    .unwrap()
++}
++
+ fn assert_same_category(input: &[u8], authored: bool) {
+     let expected = if authored {
+         audit::verify_authored(input, limits_for(input))
+@@ -316,6 +358,153 @@ fn authored_space_and_entity_state_survive_every_chunk_boundary() {
+     }
+ }
+ 
++#[test]
++fn authored_attribute_probe_covers_zero_one_many_and_namespace_attributes() {
++    let zero = b"<root><child/></root>";
++    let one = br#"<root a="1"/>"#;
++    let many = br#"<root a="1" b="2" c="3"/>"#;
++    let namespaced = br#"<p:root xmlns:p="urn:test" p:value="v"/>"#;
++
++    for (xml, attributes) in [
++        (zero.as_slice(), 0),
++        (one.as_slice(), 1),
++        (many.as_slice(), 3),
++        (namespaced.as_slice(), 2),
++    ] {
++        let report = audit::verify_authored(xml, limits_for(xml))
++            .expect("valid authored attribute fixture");
++        assert_eq!(report.attributes(), attributes, "fixture {xml:?}");
++        assert_same_result(xml, true);
++    }
++}
++
++#[test]
++fn authored_attribute_probe_preserves_xml_space_state_and_limit_precedence() {
++    let preserved = b"<root xml:space=\"preserve\">\n<child/></root>";
++    let report = audit::verify_authored(preserved, limits_for(preserved))
++        .expect("xml:space=preserve must carry into the child text run");
++    assert_eq!(report.attributes(), 1);
++    assert_same_result(preserved, true);
++
++    let many_preserved = b"<root a=\"1\" xml:space=\"preserve\" b=\"2\">\n</root>";
++    let report = audit::verify_authored(many_preserved, limits_for(many_preserved))
++        .expect("checked multi-attribute path must carry xml:space state");
++    assert_eq!(report.attributes(), 3);
++    assert_same_result(many_preserved, true);
++
++    let reset = b"<root xml:space=\"preserve\"><child xml:space=\"default\">\n</child></root>";
++    let error = audit::verify_authored(reset, limits_for(reset)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::NotCompact(violation) if violation.kind() == Kind::FormattingWhitespace
++    ));
++    assert_same_result(reset, true);
++
++    let normalized = br#"<root xml:space="pre&#115;erve">
++</root>"#;
++    audit::verify_authored(normalized, limits_for(normalized))
++        .expect("normalized xml:space value must preserve the text run");
++    assert_same_result(normalized, true);
++
++    let invalid = br#"<root xml:space="keep"/>"#;
++    let error = audit::verify_authored(invalid, limits_for(invalid)).unwrap_err();
++    assert!(matches!(error, Error::Malformed { ref detail, .. } if detail.contains("xml:space")));
++    assert_same_result(invalid, true);
++
++    let limited = b"<root xml:space=\"default\">\n</root>";
++    let limits = authored_limits(limited, 0);
++    let error = audit::verify_authored(limited, limits).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 0,
++            actual: 1,
++            ..
++        }
++    ));
++    assert_authored_with_limits(limited, limits);
++}
++
++#[test]
++fn authored_attribute_probe_keeps_duplicate_and_value_error_order() {
++    let cases = [
++        (
++            br#"<root xml:space="preserve" xml:space="keep"/>"#.as_slice(),
++            "duplicated attribute",
++        ),
++        (
++            br#"<root xml:space="keep"/>"#.as_slice(),
++            "xml:space must be 'default' or 'preserve'",
++        ),
++        (
++            br#"<root a="ok" xml:space="keep"/>"#.as_slice(),
++            "xml:space must be 'default' or 'preserve'",
++        ),
++    ];
++
++    for (xml, detail) in cases {
++        let error = audit::verify_authored(xml, limits_for(xml)).unwrap_err();
++        assert!(
++            matches!(error, Error::Malformed { detail: ref actual, .. } if actual.contains(detail)),
++            "unexpected malformed ordering for {xml:?}: {error:?}"
++        );
++        assert_authored_with_limits(xml, limits_for(xml));
++    }
++}
++
++#[test]
++fn authored_attribute_limits_remain_aggregate_and_inclusive() {
++    let same_tag = br#"<root a="1" b="2"/>"#;
++    let accepted = audit::verify_authored(same_tag, authored_limits(same_tag, 2))
++        .expect("the inclusive attribute limit must accept its boundary");
++    assert_eq!(accepted.attributes(), 2);
++    assert_authored_with_limits(same_tag, authored_limits(same_tag, 2));
++
++    let error = audit::verify_authored(same_tag, authored_limits(same_tag, 1)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 1,
++            actual: 2,
++            ..
++        }
++    ));
++    assert_authored_with_limits(same_tag, authored_limits(same_tag, 1));
++
++    let one = br#"<root a="1"/>"#;
++    let error = audit::verify_authored(one, authored_limits(one, 0)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 0,
++            actual: 1,
++            ..
++        }
++    ));
++    assert_authored_with_limits(one, authored_limits(one, 0));
++
++    let aggregate = br#"<root a="1"><child b="2"/><leaf c="3"/></root>"#;
++    let report = audit::verify_authored(aggregate, authored_limits(aggregate, 3))
++        .expect("aggregate attributes across one-attribute tags must be counted");
++    assert_eq!(report.attributes(), 3);
++    assert_authored_with_limits(aggregate, authored_limits(aggregate, 3));
++
++    let error = audit::verify_authored(aggregate, authored_limits(aggregate, 2)).unwrap_err();
++    assert!(matches!(
++        error,
++        Error::Limit {
++            resource: Resource::Attributes,
++            limit: 2,
++            actual: 3,
++            ..
++        }
++    ));
++    assert_authored_with_limits(aggregate, authored_limits(aggregate, 2));
++}
++
+ #[test]
+ fn accumulated_text_and_entity_bytes_match() {
+     let xml = b"<a>abc&amp;def<![CDATA[ghi]]></a>";

@@ -1,0 +1,15 @@
+{
+  "revision": "3f4c7be06159dc3d742d9c815800dc55bf7c2db6",
+  "stage": "final",
+  "source_files": {
+    "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+    "rust-toolchain.toml": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+    "tools/perf-baseline/Cargo.lock": "13333f511914d8146c60282b5d6385693cf89c0f939fa52b12e4db821c9b8b36",
+    "tools/perf-baseline/src/lib.rs": "bdeeeef53b276cb72d813ff3c7345a302e72e0d8575e13d6757d07875189585f",
+    "crates/xml-minifier/src/audit.rs": "40c7dfea199aa8f2e1951d0d75cd9a47e84f13bf49f2abcd1232230b64b355ac",
+    "crates/xml-minifier/tests/stream_audit.rs": "b44929d36d2db850e4fc43d310ca32253c67ec67fcb5c5ada047ce93ce908832",
+    "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+    "docs/CRUD_Scenario_Checklist.md": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a"
+  },
+  "priority": "OLE2/OOXML; ODF deferred; iWork excluded"
+}
