@@ -32,8 +32,14 @@ fn prepare(package: &Package) -> Prepared<'_> {
         &mut budget,
     )
     .expect("native fixture has the expected rooted selectors");
-    let model = resolve_model_payload(package, sheet_position, table_position, &mut budget)
-        .expect("native fixture has a selected table model");
+    let model = resolve_model_payload(
+        &package.state.components,
+        &package.state.index,
+        sheet_position,
+        table_position,
+        &mut budget,
+    )
+    .expect("native fixture has a selected table model");
     let expected = merge_wire::read_table_merges(model, merge_wire::ReadLimits::default())
         .expect("native fixture has a valid merge owner");
     Prepared {
@@ -50,7 +56,13 @@ fn run_preflight(package: &Package, mut budget: Budget) -> Result<(), TableMerge
         TableSelector::name(TABLE_NAME),
         &mut budget,
     )?;
-    let _ = resolve_model_payload(package, sheet_position, table_position, &mut budget)?;
+    let _ = resolve_model_payload(
+        &package.state.components,
+        &package.state.index,
+        sheet_position,
+        table_position,
+        &mut budget,
+    )?;
     Ok(())
 }
 

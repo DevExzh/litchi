@@ -14,7 +14,10 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tst};
-use litchi_numbers::{Package, SheetSelector, TableMergesError, TableSelector};
+use litchi_numbers::{
+    MergeReader, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
+    TableMergesError, TableSelector,
+};
 use prost::Message as _;
 
 const NATIVE_SOURCE: &[u8] = include_bytes!(concat!(
@@ -36,6 +39,7 @@ const SHEET_MESSAGE_TYPE: u32 = 2;
 const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+const TILE_MESSAGE_TYPE: u32 = 6_002;
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
 
@@ -119,6 +123,247 @@ fn rewrite_native_table_model(
     mutate: impl FnOnce(&mut tst::TableModelArchive),
 ) -> TestResult<Vec<u8>> {
     rewrite_table_model(source, first_table_model, mutate)
+}
+
+/// Corrupt the selected table's referenced tile payload while preserving the
+/// table-model merge metadata.  A strict Package construction must inspect
+/// this BNC tile and refuse; MergeReader must stop before it and still return
+/// the selected merge geometry.
+fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let mut tile_identifier = None;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data())?;
+        let archive = Archive::parse(stream.as_bytes())?;
+        for object in &archive.objects {
+            for message in &object.messages {
+                if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
+                    continue;
+                }
+                let Ok(model) = tst::TableModelArchive::decode(message.data.as_slice()) else {
+                    continue;
+                };
+                if !first_table_model(&model) {
+                    continue;
+                }
+                let tile = model
+                    .base_data_store
+                    .tiles
+                    .tiles
+                    .first()
+                    .ok_or_else(|| "native merge tile reference is missing".to_owned())?;
+                tile_identifier = Some(tile.tile.identifier);
+                break;
+            }
+            if tile_identifier.is_some() {
+                break;
+            }
+        }
+        if tile_identifier.is_some() {
+            break;
+        }
+    }
+    let tile_identifier = tile_identifier
+        .ok_or_else(|| "native merge table-model tile reference is missing".to_owned())?;
+
+    let mut replacement = None;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data())?;
+        let mut archive = Archive::parse(stream.as_bytes())?;
+        let mut changed = false;
+        for object in &mut archive.objects {
+            if object.archive_info.identifier != Some(tile_identifier) {
+                continue;
+            }
+            let message_index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == TILE_MESSAGE_TYPE)
+                .ok_or_else(|| "native merge tile payload is missing".to_owned())?;
+            object.replace_message_preserving_header(
+                message_index,
+                RawMessage {
+                    type_: TILE_MESSAGE_TYPE,
+                    data: vec![0xff],
+                },
+            )?;
+            changed = true;
+            break;
+        }
+        if changed {
+            replacement = Some((
+                entry.name().to_owned(),
+                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+            ));
+            break;
+        }
+    }
+
+    let Some((name, component)) = replacement else {
+        return Err("native merge tile object is missing".into());
+    };
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(&name, component.as_slice())],
+        ArchiveLimits::default(),
+    )?)
+}
+
+/// Give the two rooted compatibility-oracle tables one visible name.  Their
+/// index positions remain distinct, so only an exact name selector is
+/// ambiguous.
+fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Document.iwa")
+        .ok_or_else(|| "rooted oracle document component is missing".to_owned())?;
+    let stream = SnappyStream::decompress(entry.data())?;
+    let mut archive = Archive::parse(stream.as_bytes())?;
+    let mut changed = false;
+    for object in &mut archive.objects {
+        for message_index in 0..object.messages.len() {
+            let message = &object.messages[message_index];
+            if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
+                continue;
+            }
+            let Ok(mut model) = tst::TableModelArchive::decode(message.data.as_slice()) else {
+                continue;
+            };
+            if model.table_name != "Second canonical" {
+                continue;
+            }
+            model.table_name = "First canonical".to_owned();
+            object.replace_message_preserving_header(
+                message_index,
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: model.encode_to_vec(),
+                },
+            )?;
+            changed = true;
+        }
+    }
+    if !changed {
+        return Err("rooted oracle second table model is missing".into());
+    }
+    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(entry.name(), component.as_slice())],
+        ArchiveLimits::default(),
+    )?)
+}
+
+/// Duplicate the selected sheet's document edge while leaving its aggregate
+/// archive metadata unchanged.  A focused index query must reject the
+/// multiply-rooted owner instead of selecting whichever repeated protobuf
+/// field happens to be visited first.
+fn duplicate_native_document_sheet_edge(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Document.iwa")
+        .ok_or_else(|| "native Numbers document component is missing".to_owned())?;
+    let stream = SnappyStream::decompress(entry.data())?;
+    let mut archive = Archive::parse(stream.as_bytes())?;
+    let document = archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(1))
+        .ok_or_else(|| "native Numbers document object is missing".to_owned())?;
+    let message_index = document
+        .messages
+        .iter()
+        .position(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
+        .ok_or_else(|| "native Numbers document message is missing".to_owned())?;
+    let message = document
+        .messages
+        .get(message_index)
+        .ok_or_else(|| "native Numbers document payload is missing".to_owned())?;
+    let mut decoded = tn::DocumentArchive::decode(message.data.as_slice())?;
+    let sheet = decoded
+        .sheets
+        .first()
+        .copied()
+        .ok_or_else(|| "native Numbers document has no sheet edge".to_owned())?;
+    decoded.sheets.push(sheet);
+    document.replace_message_preserving_header(
+        message_index,
+        RawMessage {
+            type_: DOCUMENT_MESSAGE_TYPE,
+            data: decoded.encode_to_vec(),
+        },
+    )?;
+    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(entry.name(), component.as_slice())],
+        ArchiveLimits::default(),
+    )?)
+}
+
+/// Duplicate the selected sheet's first table-info edge while leaving the
+/// sheet message metadata's aggregate references unchanged.  This exercises
+/// the same ownership invariant at the table level.
+fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let mut replacement = None;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data())?;
+        let mut archive = Archive::parse(stream.as_bytes())?;
+        let mut changed = false;
+        for object in &mut archive.objects {
+            let Some(message_index) = object.messages.iter().position(|message| {
+                message.type_ == SHEET_MESSAGE_TYPE
+                    && tn::SheetArchive::decode(message.data.as_slice())
+                        .map(|sheet| sheet.name == SHEET_NAME)
+                        .unwrap_or(false)
+            }) else {
+                continue;
+            };
+            let message = object
+                .messages
+                .get(message_index)
+                .ok_or_else(|| "native Numbers sheet payload is missing".to_owned())?;
+            let mut sheet = tn::SheetArchive::decode(message.data.as_slice())?;
+            let table = sheet
+                .drawable_infos
+                .first()
+                .copied()
+                .ok_or_else(|| "native Numbers sheet has no table edge".to_owned())?;
+            sheet.drawable_infos.push(table);
+            object.replace_message_preserving_header(
+                message_index,
+                RawMessage {
+                    type_: SHEET_MESSAGE_TYPE,
+                    data: sheet.encode_to_vec(),
+                },
+            )?;
+            changed = true;
+            break;
+        }
+        if changed {
+            replacement = Some((
+                entry.name().to_owned(),
+                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+            ));
+            break;
+        }
+    }
+    let Some((name, component)) = replacement else {
+        return Err("native Numbers sheet payload is missing".into());
+    };
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(&name, component.as_slice())],
+        ArchiveLimits::default(),
+    )?)
 }
 
 /// Convert the selected native sheet to Numbers' form based sheet envelope.
@@ -626,4 +871,276 @@ fn out_of_bounds_merge_region_is_refused() -> TestResult {
         tract.absolute_row[0].range_end = Some(u32::MAX);
     })?;
     assert_invalid(&out_of_bounds)
+}
+
+fn assert_metadata_invalid(source: &[u8]) -> TestResult {
+    let reader = MergeReader::from_bytes(source)?;
+    assert_eq!(
+        reader.table_merges(SheetSelector::index(0), TableSelector::index(0)),
+        Err(TableMergesError::InvalidSource)
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_reader_matches_native_name_and_position_selection() -> TestResult {
+    let reader = MergeReader::from_bytes(NATIVE_SOURCE)?;
+    let expected = [Region::new(10, 1, 2, 2)?];
+
+    assert_eq!(
+        reader.table_merges(SHEET_NAME, TABLE_NAME)?,
+        expected,
+        "metadata-only name selection must match the rooted package reader"
+    );
+    assert_eq!(
+        reader.table_merges(SheetSelector::index(0), TableSelector::index(0))?,
+        expected,
+        "metadata-only index selection must match the rooted package reader"
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_reader_reports_typed_selector_errors_and_ambiguity() -> TestResult {
+    let reader = MergeReader::from_bytes(NATIVE_SOURCE)?;
+
+    assert_eq!(
+        reader.table_merges("missing sheet", TABLE_NAME),
+        Err(TableMergesError::SheetNotFound)
+    );
+    assert_eq!(
+        reader.table_merges(SHEET_NAME, "missing table"),
+        Err(TableMergesError::TableNotFound)
+    );
+    assert_eq!(
+        reader.table_merges(usize::MAX, 0usize),
+        Err(TableMergesError::SheetNotFound)
+    );
+    assert_eq!(
+        reader.table_merges(0usize, usize::MAX),
+        Err(TableMergesError::TableNotFound)
+    );
+
+    let rooted = decorate_rooted_oracle_metadata(&decode_hex(ROOTED_ORACLE_HEX)?)?;
+    let duplicate = duplicate_rooted_oracle_table_name(&rooted)?;
+    let duplicate_reader = MergeReader::from_bytes(&duplicate)?;
+    assert_eq!(
+        duplicate_reader.table_merges("Rooted sheet", "First canonical"),
+        Err(TableMergesError::AmbiguousSelector)
+    );
+    assert_eq!(
+        duplicate_reader.table_merges(0usize, 0usize)?,
+        Vec::<Region>::new(),
+        "index selectors must remain usable when a visible name is duplicated"
+    );
+    assert_eq!(
+        duplicate_reader.table_merges(0usize, 1usize)?,
+        Vec::<Region>::new(),
+        "index selectors must retain the second rooted table"
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_reader_rejects_repeated_selected_root_edges() -> TestResult {
+    let duplicate_sheet = duplicate_native_document_sheet_edge(NATIVE_SOURCE)?;
+    assert!(
+        Package::from_bytes(&duplicate_sheet).is_err(),
+        "eager construction must reject a document that roots one sheet twice"
+    );
+    assert_metadata_invalid(&duplicate_sheet)?;
+
+    let duplicate_table = duplicate_native_sheet_table_edge(NATIVE_SOURCE)?;
+    assert!(
+        Package::from_bytes(&duplicate_table).is_err(),
+        "eager construction must reject a sheet that roots one table twice"
+    );
+    assert_metadata_invalid(&duplicate_table)
+}
+
+#[test]
+fn metadata_reader_accepts_malformed_unneeded_cell_storage() -> TestResult {
+    let malformed = rewrite_native_table_tile_as_malformed(NATIVE_SOURCE)?;
+    assert!(
+        Package::from_bytes(&malformed).is_err(),
+        "full semantic construction must inspect and reject malformed BNC"
+    );
+
+    let reader = MergeReader::from_bytes(&malformed)?;
+    assert_eq!(
+        reader.table_merges(SHEET_NAME, TABLE_NAME)?,
+        [Region::new(10, 1, 2, 2)?],
+        "metadata-only merge read must not visit the selected table's BNC tile"
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_reader_honors_tight_projection_profile_without_materializing_cells() -> TestResult {
+    let semantic = PackageSemanticLimits::default()
+        .with_projection_limits(1, PackageSemanticLimits::MAX_OUTPUT_TEXT_BYTES)?;
+    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+
+    assert!(
+        Package::from_bytes_with_options(NATIVE_SOURCE, options).is_err(),
+        "the native table exceeds a one-cell semantic projection ceiling"
+    );
+    let reader = MergeReader::from_bytes_with_options(NATIVE_SOURCE, options)?;
+    assert_eq!(
+        reader.table_merges(SheetSelector::index(0), TableSelector::index(0))?,
+        [Region::new(10, 1, 2, 2)?]
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_reader_applies_sheet_and_table_limits_during_selection() -> TestResult {
+    let semantic = PackageSemanticLimits::new(
+        PackageSemanticLimits::MAX_OBJECTS,
+        1,
+        1,
+        PackageSemanticLimits::MAX_REFERENCES,
+    )?;
+    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let native = MergeReader::from_bytes_with_options(NATIVE_SOURCE, options)?;
+    assert_eq!(
+        native.table_merges(0usize, 0usize)?,
+        [Region::new(10, 1, 2, 2)?],
+        "one rooted sheet/table must fit an exact one-sheet/one-table profile"
+    );
+
+    let rooted = decorate_rooted_oracle_metadata(&decode_hex(ROOTED_ORACLE_HEX)?)?;
+    let reader = MergeReader::from_bytes_with_options(&rooted, options)?;
+    assert!(matches!(
+        reader.table_merges(0usize, 1usize),
+        Err(TableMergesError::LimitExceeded {
+            kind: litchi_numbers::TableMergesLimitKind::Tables,
+            ..
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn metadata_reader_keeps_form_based_and_selected_topology_strict() -> TestResult {
+    let form = rewrite_native_sheet_as_form_based(NATIVE_SOURCE)?;
+    let form_reader = MergeReader::from_bytes(&form)?;
+    assert_eq!(
+        form_reader.table_merges(SHEET_NAME, TABLE_NAME)?,
+        [Region::new(10, 1, 2, 2)?],
+        "nested form-sheet ownership must select the same model"
+    );
+
+    let flattened = rewrite_message_metadata(
+        &form,
+        |object, message_index| {
+            object.messages[message_index].type_ == FORM_BASED_SHEET_MESSAGE_TYPE
+                && tn::FormBasedSheetArchive::decode(object.messages[message_index].data.as_slice())
+                    .map(|sheet| sheet.super_.name == SHEET_NAME)
+                    .unwrap_or(false)
+        },
+        |object, message_index| {
+            let info = object
+                .archive_info
+                .message_infos
+                .get_mut(message_index)
+                .expect("form based sheet metadata exists");
+            let field = info
+                .field_infos
+                .iter_mut()
+                .find(|field| field.path.path.as_slice() == [1, 2])
+                .expect("nested form based ownership exists");
+            field.path.path = vec![2];
+        },
+    )?;
+    assert_metadata_invalid(&flattened)?;
+
+    let malformed_formula = rewrite_native_table_model(NATIVE_SOURCE, |model| {
+        let formula = first_formula_mut(model).expect("native formula exists");
+        let function = formula
+            .ast_node_array
+            .ast_node
+            .iter_mut()
+            .find(|node| {
+                node.ast_node_type == tsce::ast_node_array_archive::AstNodeType::FunctionNode as i32
+            })
+            .expect("native merge formula has a function node");
+        function.ast_function_node_index = Some(167);
+    })?;
+    assert_metadata_invalid(&malformed_formula)?;
+
+    let out_of_bounds = rewrite_native_table_model(NATIVE_SOURCE, |model| {
+        let formula = first_formula_mut(model).expect("native formula exists");
+        let range = formula
+            .ast_node_array
+            .ast_node
+            .iter_mut()
+            .find(|node| {
+                node.ast_node_type
+                    == tsce::ast_node_array_archive::AstNodeType::ColonTractNode as i32
+            })
+            .expect("native merge formula has a range node");
+        let tract = range
+            .ast_colon_tract
+            .as_mut()
+            .expect("native merge formula has a colon tract");
+        tract.absolute_row[0].range_begin = u32::MAX;
+        tract.absolute_row[0].range_end = Some(u32::MAX);
+    })?;
+    assert_metadata_invalid(&out_of_bounds)
+}
+
+#[test]
+fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() -> TestResult {
+    let physical = PackageLimits::default().with_archive_limits(
+        litchi_iwa_core::ArchiveLimits::default().with_header_fields(2_048)?,
+    )?;
+    let options = PackageReadOptions::new(physical, PackageSemanticLimits::default());
+
+    for many_fields in [false, true] {
+        let padding = if many_fields {
+            // Canonical unknown varint field 9999 with value zero.
+            [0xf8, 0xf0, 0x04, 0].repeat(20_000)
+        } else {
+            // One unknown length-delimited field 9999 containing 20,000 bytes.
+            let mut bytes = vec![0xfa, 0xf0, 0x04, 0xa0, 0x9c, 0x01];
+            bytes.resize(bytes.len() + 20_000, 0);
+            bytes
+        };
+        let source = rewrite_message_metadata(
+            NATIVE_SOURCE,
+            |object, index| {
+                let message = &object.messages[index];
+                message.type_ == TABLE_MODEL_MESSAGE_TYPE
+                    && tst::TableModelArchive::decode(message.data.as_slice())
+                        .is_ok_and(|model| first_table_model(&model))
+            },
+            |object, index| {
+                let mut message = object.messages[index].clone();
+                message.data.extend_from_slice(&padding);
+                object
+                    .replace_message_preserving_header(index, message)
+                    .expect("unknown payload padding preserves the IWA envelope");
+            },
+        )?;
+        assert_eq!(
+            MergeReader::from_bytes(&source)?.table_merges(SHEET_NAME, "missing table"),
+            Err(TableMergesError::TableNotFound),
+            "the padded metadata remains valid with default budgets"
+        );
+        let reader = MergeReader::from_bytes_with_options(&source, options)?;
+        let result = reader.table_merges(SHEET_NAME, "missing table");
+        if many_fields {
+            assert!(matches!(
+                result,
+                Err(TableMergesError::LimitExceeded {
+                    kind: litchi_numbers::TableMergesLimitKind::WireFields,
+                    ..
+                })
+            ));
+        } else {
+            assert_eq!(result, Err(TableMergesError::TableNotFound));
+        }
+    }
+    Ok(())
 }

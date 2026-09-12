@@ -368,8 +368,8 @@ pub use package::{
 pub use package::{ChartDataError, ChartDataLimitKind};
 pub use package::{ChartMetadataError, ChartMetadataLimitKind};
 pub use package::{
-    Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
-    PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
+    Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, MergeReader,
+    Package, PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
     ResourceError as PackageResourceError, Result as PackageResult, SaveError, SemanticLimitKind,
     SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
     SemanticPath as PackageSemanticPath, SheetImageAdjustmentsCommit,

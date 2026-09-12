@@ -16,6 +16,7 @@ const MAX_RECURSION: u32 = 64;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DecodeOptions {
     bytes: usize,
+    total_input_bytes: usize,
     fields: usize,
     work: usize,
     recursion: u32,
@@ -25,11 +26,23 @@ impl DecodeOptions {
     pub const fn new(bytes: usize, fields: usize, work: usize, recursion: u32) -> Self {
         Self {
             bytes,
+            total_input_bytes: usize::MAX,
             fields,
             work,
             recursion,
         }
     }
+    /// Bound the aggregate source bytes visited by one decode, including
+    /// both the outer and nested messages of a form-based sheet.
+    ///
+    /// The default preserves the existing per-message byte policy. This
+    /// additional ceiling lets callers share a residual budget across codecs.
+    #[must_use]
+    pub const fn with_total_input_bytes(mut self, maximum: usize) -> Self {
+        self.total_input_bytes = maximum;
+        self
+    }
+
     fn buffa(self) -> BuffaDecodeOptions {
         BuffaDecodeOptions::new()
             .with_max_message_size(self.bytes)
@@ -65,6 +78,43 @@ impl<'source> TableNamesSnapshot<'source> {
     #[must_use]
     pub const fn table_name(self) -> &'source str {
         self.table_name
+    }
+}
+
+/// Exact strict traversal cost for one successful Numbers name decode.
+///
+/// The byte total counts every source message passed through the strict
+/// scanner.  Form-based sheets therefore include both the outer envelope and
+/// its nested `super` payload.  The work total retains the codec's existing
+/// two-pass accounting for the strict scanner and borrowed Buffa parity view;
+/// the field total counts strict visits.  Buffa's borrowed parity projection
+/// performs no owned allocation and is covered by the caller's existing wire
+/// admission policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct DecodeReport {
+    input_bytes: usize,
+    fields: usize,
+    work: usize,
+}
+
+impl DecodeReport {
+    /// Total source bytes visited by the strict scanner.
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    /// Number of strict wire fields visited, including unknown fields.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Aggregate strict-plus-Buffa work charged for the visited source
+    /// messages.
+    #[must_use]
+    pub const fn work(self) -> usize {
+        self.work
     }
 }
 
@@ -193,6 +243,14 @@ pub fn decode_sheet_name(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<SheetNameSnapshot<'_>, DecodeError> {
+    Ok(decode_sheet_name_with_report(source, options)?.0)
+}
+
+/// Decode one sheet name and return exact strict traversal accounting.
+pub fn decode_sheet_name_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(SheetNameSnapshot<'_>, DecodeReport), DecodeError> {
     validate(source, options)?;
     let mut budget = Budget::new(options);
     let strict = sheet(source, options.recursion - 1, &mut budget)?;
@@ -201,13 +259,22 @@ pub fn decode_sheet_name(
     if view.name != strict.name {
         return Err(DecodeError(Kind::Projection));
     }
-    Ok(strict)
+    Ok((strict, budget.report()))
 }
 /// Decode the nested `TN.FormBasedSheetArchive.super.name` without allocation.
 pub fn decode_form_sheet_name(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<SheetNameSnapshot<'_>, DecodeError> {
+    Ok(decode_form_sheet_name_with_report(source, options)?.0)
+}
+
+/// Decode a nested form-sheet name and return exact strict traversal
+/// accounting.
+pub fn decode_form_sheet_name_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(SheetNameSnapshot<'_>, DecodeReport), DecodeError> {
     validate(source, options)?;
     let mut budget = Budget::new(options);
     budget.message(source.len())?;
@@ -235,13 +302,22 @@ pub fn decode_form_sheet_name(
     if super_view.name != strict.name {
         return Err(DecodeError(Kind::Projection));
     }
-    Ok(strict)
+    Ok((strict, budget.report()))
 }
 /// Decode required `TST.TableModelArchive` identity and display names without allocation.
 pub fn decode_table_names(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<TableNamesSnapshot<'_>, DecodeError> {
+    Ok(decode_table_names_with_report(source, options)?.0)
+}
+
+/// Decode table identity/display names and return exact strict traversal
+/// accounting.
+pub fn decode_table_names_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TableNamesSnapshot<'_>, DecodeReport), DecodeError> {
     validate(source, options)?;
     let mut budget = Budget::new(options);
     budget.message(source.len())?;
@@ -274,7 +350,7 @@ pub fn decode_table_names(
     if view.table_id != strict.table_id || view.table_name != strict.table_name {
         return Err(DecodeError(Kind::Projection));
     }
-    Ok(strict)
+    Ok((strict, budget.report()))
 }
 
 fn validate(source: &[u8], o: DecodeOptions) -> Result<(), DecodeError> {
@@ -301,6 +377,8 @@ fn validate(source: &[u8], o: DecodeOptions) -> Result<(), DecodeError> {
     Ok(())
 }
 struct Budget {
+    input_bytes: usize,
+    max_input_bytes: usize,
     fields: usize,
     work: usize,
     max_fields: usize,
@@ -310,6 +388,8 @@ struct Budget {
 impl Budget {
     const fn new(o: DecodeOptions) -> Self {
         Self {
+            input_bytes: 0,
+            max_input_bytes: o.total_input_bytes,
             fields: 0,
             work: 0,
             max_fields: o.fields,
@@ -332,6 +412,16 @@ impl Budget {
         Ok(())
     }
     fn message(&mut self, n: usize) -> Result<(), DecodeError> {
+        let input_bytes = self
+            .input_bytes
+            .checked_add(n)
+            .ok_or(DecodeError(Kind::Projection))?;
+        if input_bytes > self.max_input_bytes {
+            return Err(DecodeError::resource(WireResourceLimit::Bytes {
+                observed: input_bytes,
+                maximum: self.max_input_bytes,
+            }));
+        }
         let observed = n
             .checked_mul(2)
             .and_then(|x| self.work.checked_add(x))
@@ -342,8 +432,16 @@ impl Budget {
                 maximum: self.max_work,
             }));
         }
+        self.input_bytes = input_bytes;
         self.work = observed;
         Ok(())
+    }
+    const fn report(&self) -> DecodeReport {
+        DecodeReport {
+            input_bytes: self.input_bytes,
+            fields: self.fields,
+            work: self.work,
+        }
     }
     const fn nesting(&self) -> DecodeError {
         DecodeError::resource(WireResourceLimit::Nesting {
@@ -548,6 +646,71 @@ mod tests {
         );
         let names = decode_table_names(&table, options(&table))?;
         assert_eq!((names.table_id(), names.table_name()), ("id", "Table"));
+        Ok(())
+    }
+
+    #[test]
+    fn reports_every_strict_name_source_pass() -> Result<(), DecodeError> {
+        let sheet = [0x0a, 0x05, b'S', b'h', b'e', b'e', b't'];
+        let form = [0x0a, 0x07, 0x0a, 0x05, b'S', b'h', b'e', b'e', b't'];
+        let table = [
+            0x0a, 0x02, b'i', b'd', 0x42, 0x05, b'T', b'a', b'b', b'l', b'e',
+        ];
+
+        let (_, report) = decode_sheet_name_with_report(&sheet, options(&sheet))?;
+        assert_eq!(report.input_bytes(), sheet.len());
+        assert_eq!(report.fields(), 1);
+        assert_eq!(report.work(), sheet.len() * 2);
+
+        let (_, report) = decode_form_sheet_name_with_report(&form, options(&form))?;
+        assert_eq!(report.input_bytes(), form.len() + 7);
+        assert_eq!(report.fields(), 2);
+        assert_eq!(report.work(), (form.len() + 7) * 2);
+
+        let (_, report) = decode_table_names_with_report(&table, options(&table))?;
+        assert_eq!(report.input_bytes(), table.len());
+        assert_eq!(report.fields(), 2);
+        assert_eq!(report.work(), table.len() * 2);
+        Ok(())
+    }
+
+    #[test]
+    fn form_name_aggregate_byte_limit_precedes_nested_decoding() -> Result<(), DecodeError> {
+        let form = [0x0a, 0x03, 0x0a, 0x01, b'N'];
+        let total = form.len() + 3;
+        let (_, report) = decode_form_sheet_name_with_report(
+            &form,
+            options(&form).with_total_input_bytes(total),
+        )?;
+        assert_eq!(report.input_bytes(), total);
+        let error = decode_form_sheet_name_with_report(
+            &form,
+            options(&form).with_total_input_bytes(total - 1),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.wire_resource_limit(),
+            Some(WireResourceLimit::Bytes {
+                observed: total,
+                maximum: total - 1,
+            })
+        );
+
+        // The envelope is valid but its nested name has a truncated length.
+        // Exhaustion must be detected before that nested payload is decoded.
+        let malformed_nested = [0x0a, 0x02, 0x0a, 0x80];
+        let error = decode_form_sheet_name_with_report(
+            &malformed_nested,
+            options(&malformed_nested).with_total_input_bytes(malformed_nested.len()),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.wire_resource_limit(),
+            Some(WireResourceLimit::Bytes {
+                observed: malformed_nested.len() + 2,
+                maximum: malformed_nested.len(),
+            })
+        );
         Ok(())
     }
 

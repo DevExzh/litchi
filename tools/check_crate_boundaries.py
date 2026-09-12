@@ -69786,6 +69786,9 @@ KEYNOTE_TABLE_MERGE_SELECTOR_TYPES = frozenset({"SlideSelector", "TableSelector"
 NUMBERS_TABLE_MERGE_SOURCE = Path(
     "crates/litchi-numbers/src/package/table_merges.rs"
 )
+NUMBERS_TABLE_MERGE_READER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_merges/reader.rs"
+)
 NUMBERS_TABLE_MERGE_PACKAGE_SOURCE = Path("crates/litchi-numbers/src/package.rs")
 NUMBERS_TABLE_MERGE_MODULE = re.compile(
     r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
@@ -69796,6 +69799,55 @@ NUMBERS_TABLE_MERGE_SELECTOR_TYPES = frozenset({"SheetSelector", "TableSelector"
 NUMBERS_TABLE_MERGE_FORBIDDEN_PUBLIC_BNC = re.compile(
     r"(?<![A-Za-z0-9_])(?:BncCell|BncCellView|PreBncCellView|"
     r"StoredValue|CachedScalar)(?![A-Za-z0-9_])"
+)
+# The package-level Numbers merge owner keeps the shared geometry/budget seam,
+# while this optional private child owns ZIP ingress and rooted metadata
+# selection.  Keep its source-facing surface deliberately small: callers may
+# construct a reader from a path or immutable package bytes, then query with
+# typed selectors.  The child may use the borrowed name codec, but generated
+# protobuf/BNC values and byte-returning escape hatches stay below this seam.
+NUMBERS_TABLE_MERGE_READER_ALLOWED_METHODS = frozenset(
+    {
+        "open",
+        "open_with_options",
+        "from_bytes",
+        "from_bytes_with_options",
+        "from_shared_bytes",
+        "from_shared_bytes_with_options",
+        "table_merges",
+    }
+)
+NUMBERS_TABLE_MERGE_READER_FUNCTION_NAME = re.compile(
+    r"\bfn[ \t\r\n]+(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+NUMBERS_TABLE_MERGE_READER_PROTO_TOKEN = re.compile(
+    r"(?<![A-Za-z0-9_])litchi_iwa_protos(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_MERGE_READER_FORBIDDEN_TYPES = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"FormulaArchive|AstNodeArchive|AstNodeType|MergeRegionMapArchive|"
+    r"DocumentArchive|SheetArchive|FormBasedSheetArchive|"
+    r"TableInfoArchive|TableModelArchive|"
+    r"BncCell|BncCellView|PreBncCellView|StoredValue|CachedScalar|"
+    r"numbers_formula_codec|numbers_table_cell_storage_codec|"
+    r"prost|prost_types|buffa"
+    r")(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_MERGE_READER_USE_STATEMENT = re.compile(
+    r"(?ms)^[ \t]*(?:pub(?:[ \t]*\([^()\r\n]*\))?[ \t]+)?"
+    r"use\b.*?;"
+)
+NUMBERS_TABLE_MERGE_READER_ALLOWED_PROTO_IMPORT = re.compile(
+    r"(?m)^[ \t]*use[ \t]+litchi_iwa_protos[ \t]*::[ \t]*"
+    r"numbers_names_codec[ \t]*;"
+)
+NUMBERS_TABLE_MERGE_READER_BYTE_RETURN = re.compile(
+    r"(?<![A-Za-z0-9_])(?:Vec|Box|Arc)[ \t]*<[ \t]*(?:u8|\[[ \t]*u8[ \t]*\])"
+    r"|\b(?:Bytes|ByteString)\b"
+)
+NUMBERS_TABLE_MERGE_READER_PUBLIC_FIELD = re.compile(
+    r"(?:^|,)[ \t\r\n]*pub(?:[ \t]*\([^()\r\n]*\))?[ \t]+"
+    r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*:"
 )
 PAGES_TABLE_MERGE_FORBIDDEN_MODULES = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
@@ -71252,6 +71304,190 @@ def audit_keynote_table_merge_source_topology(root: Path = ROOT) -> list[str]:
     )
 
 
+def audit_numbers_table_merge_reader_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the optional Numbers merge-reader child at the ingress seam.
+
+    ``table_merges.rs`` owns the archive-free geometry boundary.  When the
+    private ``reader.rs`` child exists, it may expose only path/byte ingress
+    constructors and the typed-selector query, plus the borrowed Numbers name
+    codec import needed for metadata selection.  This audit is intentionally
+    dormant while the child is absent so the migration can land in stages.
+    """
+
+    reader_path = root / NUMBERS_TABLE_MERGE_READER_SOURCE
+    if not reader_path.is_file():
+        return []
+
+    owner_path = root / NUMBERS_TABLE_MERGE_SOURCE
+    violations: list[str] = []
+    reader_source = reader_path.read_text(encoding="utf-8")
+    production_source = _mask_rust_cfg_test_items(reader_source)
+    code = _mask_rust_non_code(production_source)
+    relative_reader = NUMBERS_TABLE_MERGE_READER_SOURCE
+
+    if not owner_path.is_file():
+        violations.append(
+            "Numbers table-merge reader child has no package owner: "
+            f"{NUMBERS_TABLE_MERGE_SOURCE}"
+        )
+    else:
+        owner_source = owner_path.read_text(encoding="utf-8")
+        module_declarations = _rust_root_level_module_declarations(
+            owner_source, frozenset({"reader"})
+        )
+        if not module_declarations:
+            violations.append(
+                "Numbers table-merge reader child is not wired from its owner: "
+                f"{NUMBERS_TABLE_MERGE_SOURCE}"
+            )
+        elif any(visibility is not None for _name, visibility, *_rest in module_declarations):
+            violations.append(
+                "Numbers table-merge reader child module must remain private: "
+                f"{NUMBERS_TABLE_MERGE_SOURCE}"
+            )
+
+    # The only physical-protobuf import admitted above the wire reader is the
+    # exact borrowed Numbers name codec.  Inspect use statements separately so
+    # a broad/aliased litchi_iwa_protos import cannot hide an owned projection.
+    allowed_import_spans: list[tuple[int, int]] = []
+    for statement in NUMBERS_TABLE_MERGE_READER_USE_STATEMENT.finditer(code):
+        if not NUMBERS_TABLE_MERGE_READER_PROTO_TOKEN.search(statement.group(0)):
+            continue
+        if NUMBERS_TABLE_MERGE_READER_ALLOWED_PROTO_IMPORT.fullmatch(
+            statement.group(0).strip()
+        ) is None:
+            line_number = code.count("\n", 0, statement.start()) + 1
+            violations.append(
+                "Numbers table-merge reader must use only the exact "
+                "numbers_names_codec import: "
+                f"{relative_reader}:{line_number}"
+            )
+        else:
+            allowed_import_spans.append(statement.span())
+
+    for match in NUMBERS_TABLE_MERGE_READER_PROTO_TOKEN.finditer(code):
+        if any(start <= match.start() < end for start, end in allowed_import_spans):
+            continue
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "Numbers table-merge reader contains an unapproved litchi_iwa_protos "
+            f"path: {relative_reader}:{line_number}"
+        )
+
+    for match in NUMBERS_TABLE_MERGE_READER_FORBIDDEN_TYPES.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "Numbers table-merge reader contains generated/owned protobuf or "
+            f"BNC type {match.group(0)}: {relative_reader}:{line_number}"
+        )
+
+    merge_reader_struct = _rust_named_struct_body(production_source, "MergeReader")
+    if merge_reader_struct is not None:
+        struct_body, body_offset = merge_reader_struct
+        for match in NUMBERS_TABLE_MERGE_READER_PUBLIC_FIELD.finditer(struct_body):
+            line_number = code.count("\n", 0, body_offset + match.start()) + 1
+            violations.append(
+                "Numbers table-merge reader exposes a public MergeReader field: "
+                f"{relative_reader}:{line_number}"
+            )
+
+    public_declarations = _rust_public_declarations(production_source)
+    merge_reader_method_lines = {
+        line
+        for _name, _declaration, line in _rust_public_methods_in_impl(
+            production_source, "MergeReader"
+        )
+    }
+    for declaration, line_number in public_declarations:
+        function = NUMBERS_TABLE_MERGE_READER_FUNCTION_NAME.search(declaration)
+        if function is None:
+            if re.search(r"\bstruct[ \t]+(?:r#)?MergeReader\b", declaration):
+                continue
+            violations.append(
+                "Numbers table-merge reader exposes an unsupported public "
+                f"declaration: {relative_reader}:{line_number}"
+            )
+            continue
+
+        name = function.group("name")
+        if line_number not in merge_reader_method_lines:
+            violations.append(
+                "Numbers table-merge reader public method must be an associated "
+                f"MergeReader method ({name}): {relative_reader}:{line_number}"
+            )
+        arrow = declaration.find("->")
+        return_type = declaration[arrow + 2 :] if arrow >= 0 else ""
+        if (
+            RUST_BYTE_SLICE.search(return_type) is not None
+            or NUMBERS_TABLE_MERGE_READER_BYTE_RETURN.search(return_type) is not None
+        ):
+            violations.append(
+                "Numbers table-merge reader exposes raw bytes from public method "
+                f"{name}: {relative_reader}:{line_number}"
+            )
+
+        raw_id = IWA_FOCUSED_TABLE_MERGES_RAW_ID_PARAMETER.search(declaration)
+        if raw_id is not None:
+            violations.append(
+                "Numbers table-merge reader exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: {relative_reader}:{line_number}"
+            )
+
+        if name not in NUMBERS_TABLE_MERGE_READER_ALLOWED_METHODS:
+            violations.append(
+                "Numbers table-merge reader exposes unsupported public method "
+                f"{name}: {relative_reader}:{line_number}"
+            )
+            continue
+
+        if not re.search(r"\bResult[ \t]*<[ \t]*Self\b", return_type):
+            if name != "table_merges":
+                violations.append(
+                    "Numbers table-merge reader source ingress method must return "
+                    f"Result<Self, _> ({name}): {relative_reader}:{line_number}"
+                )
+        if name in {"open", "open_with_options"}:
+            if re.search(r"\bAsRef[ \t]*<[ \t]*Path[ \t]*>", declaration) is None:
+                violations.append(
+                    "Numbers table-merge reader path ingress must accept "
+                    f"AsRef<Path> ({name}): {relative_reader}:{line_number}"
+                )
+        elif name in {"from_bytes", "from_bytes_with_options"}:
+            if RUST_BYTE_SLICE.search(declaration) is None:
+                violations.append(
+                    "Numbers table-merge reader byte ingress must accept &[u8] "
+                    f"({name}): {relative_reader}:{line_number}"
+                )
+        elif name in {"from_shared_bytes", "from_shared_bytes_with_options"}:
+            if re.search(
+                r"\bArc[ \t]*<[ \t]*\[[ \t]*u8[ \t]*\][ \t]*>", declaration
+            ) is None:
+                violations.append(
+                    "Numbers table-merge reader shared ingress must accept "
+                    f"Arc<[u8]> ({name}): {relative_reader}:{line_number}"
+                )
+        elif name == "table_merges":
+            if not re.search(r"\bSheetSelector\b", declaration):
+                violations.append(
+                    "Numbers table-merge reader table_merges must use "
+                    f"SheetSelector: {relative_reader}:{line_number}"
+                )
+            if not re.search(r"\bTableSelector\b", declaration):
+                violations.append(
+                    "Numbers table-merge reader table_merges must use "
+                    f"TableSelector: {relative_reader}:{line_number}"
+                )
+            if re.search(r"\bResult[ \t]*<[ \t]*Vec[ \t]*<[ \t]*Region\b", return_type) is None:
+                violations.append(
+                    "Numbers table-merge reader table_merges must return "
+                    f"semantic Region values: {relative_reader}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_numbers_table_merge_source_topology(root: Path = ROOT) -> list[str]:
     """Keep Numbers merged-cell reads selector-first and archive-free.
 
@@ -71261,7 +71497,7 @@ def audit_numbers_table_merge_source_topology(root: Path = ROOT) -> list[str]:
     package owner and keeps BNC/pre-BNC views private to the wire layer.
     """
 
-    return _audit_focused_table_merge_source_topology(
+    violations = _audit_focused_table_merge_source_topology(
         root,
         format_name="Numbers",
         owner_path=NUMBERS_TABLE_MERGE_SOURCE,
@@ -71274,6 +71510,8 @@ def audit_numbers_table_merge_source_topology(root: Path = ROOT) -> list[str]:
         selector_types=NUMBERS_TABLE_MERGE_SELECTOR_TYPES,
         forbidden_public_types=NUMBERS_TABLE_MERGE_FORBIDDEN_PUBLIC_BNC,
     )
+    violations.extend(audit_numbers_table_merge_reader_source_topology(root))
+    return sorted(set(violations))
 
 
 def _rust_match_arm_contains_offset(
