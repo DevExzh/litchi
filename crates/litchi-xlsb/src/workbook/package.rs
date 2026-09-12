@@ -16,6 +16,7 @@ use crate::package::vba_project::{
 use crate::package::web_extension_bindings::PackageAppRefs;
 use crate::raw::Records;
 use crate::sparkline;
+use litchi_core::ExecutionContext;
 use litchi_ooxml_common::embedded;
 use litchi_ooxml_common::ribbon;
 use litchi_ooxml_common::web;
@@ -56,6 +57,83 @@ fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
 }
 
 impl Workbook {
+    /// Read the source-bound XLSB Custom Data catalog.
+    pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load(&self.package)
+    }
+
+    /// Read Custom Data with an explicit finite policy.
+    pub fn custom_data_with_limits(
+        &self,
+        limits: crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits(&self.package, limits)
+    }
+
+    /// Read Custom Data with an explicit policy and owned execution context.
+    pub fn custom_data_with_limits_and_context(
+        &self,
+        limits: crate::custom_data::Limits,
+        context: ExecutionContext,
+    ) -> Result<crate::custom_data::Snapshot> {
+        crate::custom_data::Snapshot::load_with_limits_and_context(
+            &self.package,
+            limits,
+            Some(context),
+        )
+    }
+
+    /// Start a detached source-bound Custom Data transaction.
+    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package(self.package.clone())
+    }
+
+    /// Start a detached Custom Data transaction with an explicit finite policy.
+    pub fn edit_custom_data_with_limits(
+        &self,
+        limits: crate::custom_data::Limits,
+    ) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package_with_limits(self.package.clone(), limits)
+    }
+
+    /// Start a detached Custom Data transaction with an owned execution context.
+    pub fn edit_custom_data_with_limits_and_context(
+        &self,
+        limits: crate::custom_data::Limits,
+        context: ExecutionContext,
+    ) -> Result<crate::custom_data::Transaction> {
+        crate::custom_data::Transaction::from_package_with_limits_and_context(
+            self.package.clone(),
+            limits,
+            Some(context),
+        )
+    }
+
+    /// Apply a source-checked Custom Data commit and return its read-back snapshot.
+    pub fn apply_custom_data(
+        &mut self,
+        commit: &crate::custom_data::Commit,
+    ) -> Result<crate::custom_data::Snapshot> {
+        self.apply_custom_data_patch(commit.patch())
+    }
+
+    /// Apply a source-checked Custom Data patch through the workbook reparse seam.
+    pub fn apply_custom_data_patch(
+        &mut self,
+        patch: &crate::custom_data::Patch,
+    ) -> Result<crate::custom_data::Snapshot> {
+        let mut candidate = self.package.clone();
+        patch.apply_to_opc(&mut candidate)?;
+        let validated = self.reparse_candidate(candidate)?;
+        let snapshot = crate::custom_data::Snapshot::load_with_limits_and_context(
+            &validated.package,
+            patch.after().limits(),
+            patch.after().execution_context(),
+        )?;
+        *self = validated;
+        Ok(snapshot)
+    }
+
     /// Read the optional workbook Theme part with conservative finite limits.
     pub fn theme(&self) -> Result<Option<crate::theme::Snapshot>> {
         self.theme_with_limits(crate::theme::Limits::DEFAULT)
