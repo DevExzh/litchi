@@ -1,0 +1,6 @@
+{
+  "failed_tmp_fixture_removed": true,
+  "path": "/home/zhuhe/litchi-goal-0538-target",
+  "removed": true,
+  "scope": "Owned build, rustdoc, binary and test temporary files; logs and reports retained in bundle"
+}

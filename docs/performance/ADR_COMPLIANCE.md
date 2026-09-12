@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0538: XLSX planning allocation observation
+
+[0538](changes/0538-xlsx-planning-allocation-metrics.md) changes only the
+benchmark harness and tests. The existing safe allocator observer now brackets
+`edit_sheets` independently of commit/publication, with unchanged production
+validation, preservation, source ownership and dependencies. This supplies the
+ADR 0005 measurement prerequisite identified in 0537; no parser candidate or
+performance claim is admitted. OLE2/OOXML remain first; ODF is deferred.
+
 ## 0537: raw XLSX attribute ownership and planning allocation gap
 
 [0537](changes/0537-xlsx-transient-attribute-attribution.md) replays four sealed

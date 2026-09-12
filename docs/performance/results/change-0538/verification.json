@@ -1,0 +1,19 @@
+{
+  "initial_environment_failure": "Default /tmp quota; exact test passed with owned TMPDIR",
+  "measured_planning_samples": 48,
+  "receipts": 15,
+  "records": 32,
+  "runtime_changed": false,
+  "scope": "Debug correctness/schema smoke only; no performance comparison",
+  "source_manifest_sha256": "7bcbfe9b0d201ff7c7fea6a72f48f206fe6043e04a20d3e969229eb985de077c",
+  "status": "pass",
+  "successful_receipts": 14,
+  "test_counts": {
+    "test-allocator": 20,
+    "test-integration": 1,
+    "test-wrapper": 5,
+    "test-xlsx": 42,
+    "test-xlsx-tmpdir": 1
+  },
+  "unavailable_planning_samples": 48
+}

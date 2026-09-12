@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0538: XLSX planning allocation metrics, no optimization claim
+
+[0538](changes/0538-xlsx-planning-allocation-metrics.md) is a harness enabler:
+it observes planning separately from commit/publication, emits explicit normal
+binary unavailability, and validates actual allocator samples across managed
+and unmanaged source-backed cell-value selectors. Debug smoke results are
+correctness/schema evidence only. Production and the unapplied 0537 candidate
+are unchanged; fresh matched release measurements remain the next step.
+
 ## 0537: raw XLSX attribute ownership and planning allocation gap
 
 [0537](changes/0537-xlsx-transient-attribute-attribution.md) replays four sealed

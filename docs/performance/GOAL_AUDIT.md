@@ -1,5 +1,15 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0538: close the XLSX planning allocation evidence gap
+
+[0538](changes/0538-xlsx-planning-allocation-metrics.md) implements the
+measurement prerequisite identified in 0537, with real normal/allocator binary
+checks and acquisition-order phase alignment. The initial filesystem test's
+`/tmp` quota failure is retained and its successful owned-TMPDIR rerun is
+recorded separately. Production remains unchanged. Next is fresh matched
+measurement of the transient attribute candidate; the broad goal remains
+active, prioritizing OLE2/OOXML with ODF deferred and iWork excluded.
+
 ## 0537: raw XLSX attribute ownership and planning allocation gap
 
 [0537](changes/0537-xlsx-transient-attribute-attribution.md) replays four sealed

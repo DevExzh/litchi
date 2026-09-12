@@ -1,0 +1,12 @@
+{
+  "litchi-perf-baseline": {
+    "bytes": 143187416,
+    "path": "/home/zhuhe/litchi-goal-0538-target/debug/litchi-perf-baseline",
+    "sha256": "1499b8eb0e84f090b6937e501ad38a4edcc2e146a58b17d04d4eed1d8a5c4a0d"
+  },
+  "litchi-perf-baseline-alloc": {
+    "bytes": 142954600,
+    "path": "/home/zhuhe/litchi-goal-0538-target/debug/litchi-perf-baseline-alloc",
+    "sha256": "11409b80c69dbdcc750efdf50486f07e2aee40fe29aea48e83ebaea415f397db"
+  }
+}

@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0538: planning allocation measurement enabler
+
+[0538](changes/0538-xlsx-planning-allocation-metrics.md) adds aligned planning
+allocation vectors to all eight source-backed XLSX cell-value publication
+selectors. Normal binaries explicitly report unavailable counters. Retained
+debug schema smoke captures cover medium and dense-sparse shapes and validate
+separate planning/commit/publication regions; they are not performance
+baselines. A fresh matched release baseline is required for the 0537 candidate.
+
 ## 0537: raw XLSX attribute ownership and planning allocation gap
 
 [0537](changes/0537-xlsx-transient-attribute-attribution.md) replays four sealed

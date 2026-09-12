@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cargo",
+    "doc",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--locked",
+    "--all-features",
+    "--no-deps"
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0538-target",
+    "RUSTDOCFLAGS": "-D warnings",
+    "TMPDIR": "/home/zhuhe/litchi-goal-0538-target/tmp"
+  },
+  "exit_code": 0,
+  "finished": 1789240587.0890772,
+  "pid": 4165082,
+  "source_sha256": "7aa7f27232068d3bf95419d31b920bfaa4f75fee2eedd47714558b4e38a75822",
+  "started": 1789240580.1328
+}

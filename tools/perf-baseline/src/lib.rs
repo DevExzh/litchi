@@ -5891,6 +5891,8 @@ struct XlsxCellValuesSourceSummary {
     selected_worksheet_count: usize,
     open_ns: Vec<u64>,
     plan_ns: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    plan_allocation_metrics: Vec<allocation_metrics::Sample>,
     commit_ns: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     commit_allocation_metrics: Vec<allocation_metrics::Sample>,
@@ -6105,6 +6107,7 @@ struct XlsxCellValuesIterationEvidence {
     selected_worksheet_count: usize,
     open_ns: u64,
     plan_ns: u64,
+    plan_allocation_metrics: Option<allocation_metrics::Sample>,
     commit_ns: u64,
     commit_allocation_metrics: Option<allocation_metrics::Sample>,
     publication_ns: u64,
@@ -8124,6 +8127,11 @@ impl SourceSummary {
         let source = evidence.source;
         summary.open_ns.push(evidence.open_ns);
         summary.plan_ns.push(evidence.plan_ns);
+        if let Some(plan_allocation_metrics) = evidence.plan_allocation_metrics {
+            summary
+                .plan_allocation_metrics
+                .push(plan_allocation_metrics);
+        }
         summary.commit_ns.push(evidence.commit_ns);
         if let Some(commit_allocation_metrics) = evidence.commit_allocation_metrics {
             summary
@@ -41327,6 +41335,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 selected_worksheet_count: 1,
                 open_ns,
                 plan_ns,
+                plan_allocation_metrics: None,
                 commit_ns,
                 commit_allocation_metrics: None,
                 publication_ns,
@@ -41387,6 +41396,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 selected_worksheet_count: 1,
                 open_ns,
                 plan_ns,
+                plan_allocation_metrics: None,
                 commit_ns,
                 commit_allocation_metrics: None,
                 publication_ns,
@@ -41890,9 +41900,14 @@ fn run_xlsx_cell_values_edit_save(
             let open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
             let selectors = xlsx_update_sheet_selectors(&updates);
+            let plan_allocation_region = allocation_metrics::begin();
             let plan_started = Instant::now();
             let mut edit = editor.edit_sheets(selectors)?;
             let plan_duration = plan_started.elapsed();
+            let plan_allocation_metrics = match plan_allocation_region.finish() {
+                Some(sample) => sample,
+                None => allocation_metrics::unavailable_sample(),
+            };
             let plan_ns = elapsed_ns(plan_duration)?;
             duration += plan_duration;
             let (
@@ -42030,6 +42045,7 @@ fn run_xlsx_cell_values_edit_save(
                 selected_worksheet_count: expected_touched,
                 open_ns,
                 plan_ns,
+                plan_allocation_metrics: Some(plan_allocation_metrics),
                 commit_ns,
                 commit_allocation_metrics: Some(commit_allocation_metrics),
                 publication_ns,
@@ -66605,6 +66621,54 @@ mod tests {
         assert_eq!(xlsx_cell_count(dense_spec).unwrap(), 17_792);
         assert_eq!(dense_spec.one_percent_updates.len(), 178);
         assert!(dense_first.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
+    }
+
+    #[test]
+    fn xlsx_source_cell_values_plan_allocation_metrics_align_with_phases() {
+        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
+        let corpus = build_xlsx_cell_crud_corpus(XlsxCellCrudShape::Medium).unwrap();
+        let sample_count = 3;
+        for case in [
+            Case::XlsxSourceBackedCellValuesOneEditSave,
+            Case::XlsxSourceBackedManagedCellValuesMultiSheetEditSave,
+        ] {
+            let measured = run_case(case, &corpus, 1, sample_count).unwrap();
+            let evidence = measured
+                .source
+                .as_ref()
+                .unwrap()
+                .xlsx_cell_values
+                .as_ref()
+                .unwrap();
+            let serialized = serde_json::to_value(evidence).unwrap();
+            let samples = serialized["plan_allocation_metrics"].as_array().unwrap();
+            assert_eq!(samples.len(), sample_count);
+            // This test executable installs no allocator wrapper. Never serialize
+            // fabricated zero counters in place of unavailable observations.
+            for sample in samples {
+                assert_eq!(
+                    sample,
+                    &serde_json::json!({
+                        "status": "unavailable",
+                        "scope": "operation_global_system_allocator",
+                    })
+                );
+            }
+            assert_eq!(evidence.plan_ns.len(), sample_count);
+            assert_eq!(evidence.commit_allocation_metrics.len(), sample_count);
+            assert_eq!(evidence.publication_allocation_metrics.len(), sample_count);
+            for (sorted_index, &acquisition_index) in
+                measured.elapsed_ns.sample_order.iter().enumerate()
+            {
+                assert_eq!(
+                    evidence.open_ns[acquisition_index]
+                        + evidence.plan_ns[acquisition_index]
+                        + evidence.commit_ns[acquisition_index]
+                        + evidence.publication_ns[acquisition_index],
+                    measured.elapsed_ns.samples[sorted_index],
+                );
+            }
+        }
     }
 
     #[test]

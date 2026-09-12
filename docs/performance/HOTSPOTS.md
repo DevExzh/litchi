@@ -1,5 +1,15 @@
 # Performance hotspot inventory
 
+## 0538: XLSX transient decoding candidate can now be measured locally
+
+[0538](changes/0538-xlsx-planning-allocation-metrics.md) adds planning-local
+allocation observations around `edit_sheets`, closing the gap found in 0537.
+Commit/publication counters remain separate. The raw worksheet transient
+attribute ownership candidate is still unapplied: freeze fresh release sources
+and acceptance gates before comparing planning allocation/instruction changes
+and native, commit/publication, eager-read and semantic guards. OLE2/OOXML
+remain the priority; no new speedup is claimed.
+
 ## 0537: raw XLSX attribute ownership and planning allocation gap
 
 [0537](changes/0537-xlsx-transient-attribute-attribution.md) replays four sealed
