@@ -141,6 +141,15 @@ pub struct AllocSnapshot {
 }
 
 impl AllocSnapshot {
+    /// Start a phase with a local peak baseline at the currently retained live
+    /// set. This keeps the phase peak independent of earlier warmups and
+    /// phases while preserving the absolute live equation.
+    pub fn phase_start() -> Self {
+        let live = LIVE_BYTES.load(Ordering::Acquire);
+        PEAK_BYTES.store(live, Ordering::Release);
+        Self::now()
+    }
+
     pub fn now() -> Self {
         Self {
             calls: ALLOC_CALLS.load(Ordering::Acquire),
@@ -155,6 +164,10 @@ impl AllocSnapshot {
             failed: ALLOC_FAILED.load(Ordering::Acquire),
             invalid: INVALID.load(Ordering::Acquire),
         }
+    }
+
+    pub fn live_bytes(self) -> u64 {
+        self.live
     }
 
     pub fn delta(self, after: Self, elapsed: Duration) -> PhaseRecord {
@@ -174,6 +187,7 @@ impl AllocSnapshot {
             live_after_bytes: after.live,
             live_delta_bytes: live_delta,
             retained_live_bytes_after: after.live,
+            peak_live_during_bytes: after.peak,
             peak_live_delta_bytes: after.peak.saturating_sub(self.peak),
             alloc_balance_ok: balance(
                 self.live,
@@ -216,7 +230,7 @@ fn balance(
         == Some(after)
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct PhaseRecord {
     pub elapsed_ns: u64,
     pub requested_alloc_bytes: u64,
@@ -228,6 +242,7 @@ pub struct PhaseRecord {
     pub live_after_bytes: u64,
     pub live_delta_bytes: i64,
     pub retained_live_bytes_after: u64,
+    pub peak_live_during_bytes: u64,
     pub peak_live_delta_bytes: u64,
     pub alloc_balance_ok: bool,
     pub alloc_invalid: bool,

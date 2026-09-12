@@ -21,7 +21,9 @@ requested allocation bytes, incremental peak-live bytes, and process maximum
 RSS initially; p50/p95/p99 are descriptive summaries of the captured process
 samples. The opaque recipe retains both an unknown internal outbound
 diagnostic and an unknown external outbound diagnostic without traversal or
-fetch.
+fetch. Its `opaque_mce_scalar_edit` lane uses the public
+`Package::apply_ink_actions_patch()` publication route and checks the exact
+opaque target slice after serialization and reopen.
 
 The fixed later-run budget is 126 fresh process launches, 252 warm-up calls,
 2,520 measured calls, and 2,772 operation calls. The run can begin only after
@@ -30,3 +32,14 @@ with its own authoritative `harness/Cargo.lock`. Every receipt must carry the
 full source/toolchain/host/binary/fixture hashes, disjoint phase allocation
 equations, source-preservation checks, and the actual typed error/resource for
 each refusal lane.
+The scaffold records exact content-type/member/relationship manifests,
+phase-local allocator peaks, retained-baseline release equations, and
+`/usr/bin/time -v` user/system/elapsed/RSS fields for the later authorized run.
+Its final verification report retains host/load metadata and setup, build,
+preflight, lane, postflight, and verifier command exits, argv, environments,
+and output paths. Cleanup requires the exact verification-success sentinel
+written only after verification passes.
+The executable timing-free scaffold checks exercise the matrix contract,
+untracked-GOAL exclusion, transitive path guard rejection, typed verifier
+rejection, the frozen capture gate, and the actual fail-closed target cleanup
+helper for valid, malformed, mismatching, symlink, and failed-run cases.

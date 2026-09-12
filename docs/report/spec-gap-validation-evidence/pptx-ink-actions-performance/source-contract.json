@@ -1,0 +1,16 @@
+{
+  "schema": "pptx-ink-actions-profile-contract-v1",
+  "owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "plan": "PLAN.md",
+  "goal_reference": {
+    "path": "docs/GOAL.md",
+    "committed_at_owner_pin": false,
+    "profile_input": false,
+    "reason": "The workspace GOAL file is untracked; the committed PLAN and accepted ADR/design inputs are the reproducible contract."
+  },
+  "scope": {
+    "native_powerpoint": false,
+    "timing_capture": "review-and-authorization-gated",
+    "matrix": "23 recipes, 42 lanes"
+  }
+}

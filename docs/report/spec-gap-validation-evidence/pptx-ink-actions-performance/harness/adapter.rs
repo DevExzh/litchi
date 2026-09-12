@@ -23,7 +23,7 @@ use std::time::Instant;
 
 use litchi_drawingml::ink::actions::{ActionSelector, ActionType, ChildSelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, ReadLimits, TargetMode};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, ReadLimits, TargetMode};
 use litchi_pptx::presentation::embedded::ink_actions::{Commit, Limits, Patch, Snapshot};
 use litchi_pptx::{Error as PptxError, Package};
 use serde::{Deserialize, Serialize};
@@ -49,6 +49,12 @@ const ACTION: &str = "http://schemas.microsoft.com/office/powerpoint/2014/inkAct
 const INKML: &str = "http://www.w3.org/2003/InkML";
 const SLIDE_PREFIX: &str = "/ppt/slides/slide";
 const ACTION_PREFIX: &str = "/ppt/custom/action";
+const OPAQUE_CHOICE_MARKER: &[u8] = b"<v:u";
+const OPAQUE_FALLBACK_MARKER: &[u8] = b"<v:f";
+const OPAQUE_PAYLOAD_MARKER: &[u8] = b"opaque";
+const OPAQUE_DEFAULT_NAMESPACE_MARKER: &[u8] = b"defaultOpaque";
+const OPAQUE_PREFIX_MARKER: &[u8] = b"prefixOpaque";
+const OPAQUE_UNKNOWN_REQUIRES_MARKER: &[u8] = b"unknownInkFeature";
 
 const MANIFEST_BYTES: &[u8] = include_bytes!("../corpus-manifest.json");
 const GENERATOR_SOURCE_BYTES: &[u8] = include_bytes!("adapter.rs");
@@ -58,9 +64,17 @@ struct Manifest {
     schema: String,
     owner_commit: String,
     fixture_authority: FixtureAuthority,
+    retained_opc_generator: GeneratorAuthority,
     recipes: Vec<RecipeSpec>,
     lanes: Vec<LaneSpec>,
     measurement_gate: MeasurementGate,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct GeneratorAuthority {
+    path: String,
+    sha256: String,
+    git_blob: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -122,6 +136,8 @@ struct FixtureFacts {
     source_bytes: Vec<u8>,
     source_sha256: String,
     source_fnv1a64: u64,
+    package_manifest: PackageManifest,
+    package_manifest_sha256: String,
     slide_names: Vec<PackURI>,
     target_names: Vec<PackURI>,
 }
@@ -130,8 +146,12 @@ struct Prepared {
     lane: LaneSpec,
     recipe: RecipeSpec,
     package: Package,
+    operation_package: Option<Package>,
+    retained_baseline_live_bytes: u64,
     facts: FixtureFacts,
     package_before_bytes: Vec<u8>,
+    package_before_manifest: PackageManifest,
+    package_before_manifest_sha256: String,
     read_limits: ReadLimits,
     owner_limits: Limits,
     source_snapshot: Option<Snapshot>,
@@ -170,9 +190,53 @@ enum HeldResult {
 
 #[derive(Clone, Debug)]
 struct ActualError {
+    kind: String,
     debug: String,
     display: String,
     resource: Option<String>,
+    limit: Option<u64>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct RelationshipManifest {
+    id: String,
+    relationship_type: String,
+    target_ref: String,
+    target_mode: String,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct RelationshipMemberManifest {
+    present: bool,
+    bytes: usize,
+    sha256: String,
+    relationships: Vec<RelationshipManifest>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct PartManifest {
+    name: String,
+    content_type: String,
+    bytes: usize,
+    sha256: String,
+    relationships: RelationshipMemberManifest,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+struct NonPartMemberManifest {
+    name: String,
+    reason: String,
+    bytes: usize,
+    sha256: String,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct PackageManifest {
+    content_types_bytes: usize,
+    content_types_sha256: String,
+    package_relationships: RelationshipMemberManifest,
+    parts: Vec<PartManifest>,
+    non_part_members: Vec<NonPartMemberManifest>,
 }
 
 #[derive(Debug)]
@@ -187,9 +251,11 @@ struct ValidationSummary {
     preservation_ok: bool,
     inverse_ok: bool,
     source_unchanged_on_refusal: bool,
+    package_manifest_preserved: bool,
     expected_error: Option<String>,
     actual_error_type: Option<String>,
     actual_error_resource: Option<String>,
+    actual_error_limit: Option<u64>,
     actual_error_debug: Option<String>,
     actual_error_display: Option<String>,
 }
@@ -199,6 +265,8 @@ struct GraphMetrics {
     source_bytes: usize,
     owner_xml_bytes: usize,
     unique_target_bytes: usize,
+    baseline_unique_target_bytes: usize,
+    expected_unique_target_bytes: usize,
     anchors: usize,
     unique_targets: usize,
     inbound_edges: usize,
@@ -212,6 +280,14 @@ struct GraphMetrics {
     outbound_diagnostic_modes: Vec<String>,
     unknown_internal_outbound_preserved: bool,
     unknown_external_outbound_preserved: bool,
+    opaque_choice_preserved: bool,
+    opaque_fallback_preserved: bool,
+    opaque_payload_preserved: bool,
+    opaque_default_namespace_preserved: bool,
+    opaque_prefix_preserved: bool,
+    opaque_unknown_requires_preserved: bool,
+    owner_xml_sha256: String,
+    profile_source_sha256: String,
 }
 
 #[derive(Clone, Debug)]
@@ -219,24 +295,33 @@ struct ValidationReport {
     summary: ValidationSummary,
     metrics: GraphMetrics,
     output_bytes: Option<usize>,
+    output_manifest_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
 struct SampleReceipt {
+    process_id: u32,
     semantic_ok: bool,
     preservation_ok: bool,
     inverse_ok: bool,
     source_unchanged_on_refusal: bool,
+    package_manifest_preserved: bool,
     expected_error: Option<String>,
     actual_error_type: Option<String>,
     actual_error_resource: Option<String>,
+    actual_error_limit: Option<u64>,
     actual_error_debug: Option<String>,
     actual_error_display: Option<String>,
     source_sha256: String,
     source_fnv1a64: u64,
+    source_manifest_sha256: String,
+    package_before_manifest_sha256: String,
+    output_manifest_sha256: Option<String>,
     source_bytes: usize,
     owner_xml_bytes: usize,
     unique_target_bytes: usize,
+    baseline_unique_target_bytes: usize,
+    expected_unique_target_bytes: usize,
     output_bytes: Option<usize>,
     anchors: usize,
     unique_targets: usize,
@@ -251,16 +336,138 @@ struct SampleReceipt {
     outbound_diagnostic_modes: Vec<String>,
     unknown_internal_outbound_preserved: bool,
     unknown_external_outbound_preserved: bool,
+    opaque_choice_preserved: bool,
+    opaque_fallback_preserved: bool,
+    opaque_payload_preserved: bool,
+    opaque_default_namespace_preserved: bool,
+    opaque_prefix_preserved: bool,
+    opaque_unknown_requires_preserved: bool,
+    owner_xml_sha256: String,
+    profile_source_sha256: String,
+    retained_baseline_live_bytes: u64,
+    after_drop_live_bytes: u64,
+    after_postdrop_live_bytes: u64,
+    baseline_release_bytes: u64,
+    baseline_reopenable: bool,
+    retained_baseline_balance_ok: bool,
     phases: PhaseSet,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 struct PhaseSet {
     setup: PhaseRecord,
     operation: PhaseRecord,
     validation: PhaseRecord,
     drop: PhaseRecord,
     postdrop: PhaseRecord,
+}
+
+/// Fixed-size receipt staging keeps validation text and metric strings out of
+/// the drop/post-drop retained set.  Dynamic receipt allocations are created
+/// only after the prepared baseline has been released.
+#[derive(Clone, Copy)]
+struct FixedText {
+    length: u16,
+    bytes: [u8; 512],
+}
+
+impl FixedText {
+    fn from_str(value: &str) -> Self {
+        let source = value.as_bytes();
+        let length = source.len().min(512);
+        let mut bytes = [0; 512];
+        bytes[..length].copy_from_slice(&source[..length]);
+        Self {
+            length: length as u16,
+            bytes,
+        }
+    }
+
+    fn to_string(self) -> String {
+        String::from_utf8_lossy(&self.bytes[..usize::from(self.length)]).into_owned()
+    }
+}
+
+#[derive(Clone, Copy)]
+struct DigestBytes([u8; 32]);
+
+fn digest_bytes(value: &str) -> Result<DigestBytes> {
+    if value.len() != 64 {
+        return Err(format!("digest has {} characters, expected 64", value.len()).into());
+    }
+    let mut bytes = [0; 32];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
+            .map_err(|error| format!("invalid digest: {error}"))?;
+    }
+    Ok(DigestBytes(bytes))
+}
+
+fn digest_string(value: DigestBytes) -> String {
+    value.0.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+#[derive(Clone, Copy)]
+struct CompactError {
+    kind: FixedText,
+    debug: FixedText,
+    display: FixedText,
+    resource: Option<FixedText>,
+    limit: Option<u64>,
+}
+
+#[derive(Clone, Copy)]
+struct CompactMetrics {
+    source_bytes: usize,
+    owner_xml_bytes: usize,
+    unique_target_bytes: usize,
+    baseline_unique_target_bytes: usize,
+    expected_unique_target_bytes: usize,
+    anchors: usize,
+    unique_targets: usize,
+    inbound_edges: usize,
+    outbound_edges: usize,
+    action_count: usize,
+    action_group_count: usize,
+    retained_owner_xml_bytes: usize,
+    retained_target_bytes: usize,
+    retained_profile_bytes: usize,
+    shared_pointer_observation: FixedText,
+    diagnostic_modes: u8,
+    unknown_internal_outbound_preserved: bool,
+    unknown_external_outbound_preserved: bool,
+    opaque_choice_preserved: bool,
+    opaque_fallback_preserved: bool,
+    opaque_payload_preserved: bool,
+    opaque_default_namespace_preserved: bool,
+    opaque_prefix_preserved: bool,
+    opaque_unknown_requires_preserved: bool,
+    owner_xml_sha256: DigestBytes,
+    profile_source_sha256: DigestBytes,
+}
+
+#[derive(Clone, Copy)]
+struct CompactSample {
+    semantic_ok: bool,
+    preservation_ok: bool,
+    inverse_ok: bool,
+    source_unchanged_on_refusal: bool,
+    package_manifest_preserved: bool,
+    error: Option<CompactError>,
+    source_sha256: DigestBytes,
+    source_fnv1a64: u64,
+    source_manifest_sha256: DigestBytes,
+    package_before_manifest_sha256: DigestBytes,
+    output_manifest_sha256: Option<DigestBytes>,
+    metrics: CompactMetrics,
+    output_bytes: Option<usize>,
+    retained_baseline_live_bytes: u64,
+    after_drop_live_bytes: u64,
+    after_postdrop_live_bytes: u64,
+    baseline_release_bytes: u64,
+    baseline_reopenable: bool,
+    retained_baseline_balance_ok: bool,
+    phases: PhaseSet,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -276,6 +483,8 @@ struct Receipt {
     generator_source_sha256: String,
     source_sha256: String,
     source_fnv1a64: u64,
+    source_manifest_sha256: String,
+    package_before_manifest_sha256: String,
     retained_opc_limits: Value,
     owner_limits: Value,
     warmup: usize,
@@ -312,13 +521,18 @@ pub fn run_lane(lane_id: &str, warmup: usize, samples: usize) -> Result<String> 
 
     for _ in 0..warmup {
         let (prepared, setup) = prepare_with_phase(&lane, &recipe, owner_limits, read_limits)?;
-        let _ = run_sample(prepared, setup, true)?;
+        let _ = run_sample(prepared, setup, true, lane.expected.as_deref())?;
     }
 
     let mut receipts = Vec::with_capacity(samples);
     for _ in 0..samples {
         let (prepared, setup) = prepare_with_phase(&lane, &recipe, owner_limits, read_limits)?;
-        receipts.push(run_sample(prepared, setup, false)?);
+        receipts.push(run_sample(
+            prepared,
+            setup,
+            false,
+            lane.expected.as_deref(),
+        )?);
     }
 
     let receipt = Receipt {
@@ -336,6 +550,14 @@ pub fn run_lane(lane_id: &str, warmup: usize, samples: usize) -> Result<String> 
             .map(|sample| sample.source_sha256.clone())
             .unwrap_or_default(),
         source_fnv1a64: receipts.first().map_or(0, |sample| sample.source_fnv1a64),
+        source_manifest_sha256: receipts
+            .first()
+            .map(|sample| sample.source_manifest_sha256.clone())
+            .unwrap_or_default(),
+        package_before_manifest_sha256: receipts
+            .first()
+            .map(|sample| sample.package_before_manifest_sha256.clone())
+            .unwrap_or_default(),
         retained_opc_limits: read_limits_json(read_limits),
         owner_limits: limits_json(owner_limits),
         warmup,
@@ -348,8 +570,9 @@ pub fn run_lane(lane_id: &str, warmup: usize, samples: usize) -> Result<String> 
 pub fn run_matrix() -> Result<String> {
     let manifest = manifest();
     validate_manifest(&manifest)?;
-    let mut successful = 0usize;
-    let mut refusals = 0usize;
+    let mut accepted = 0usize;
+    let mut failed = Vec::new();
+    let mut expected_refusals = 0usize;
     for lane in &manifest.lanes {
         let recipe = manifest
             .recipes
@@ -358,12 +581,27 @@ pub fn run_matrix() -> Result<String> {
             .ok_or_else(|| format!("lane recipe is absent: {}", lane.recipe))?;
         let limits = owner_limits_for(recipe, lane)?;
         let (prepared, setup) = prepare_with_phase(lane, recipe, limits, ReadLimits::default())?;
-        let receipt = run_sample(prepared, setup, false)?;
-        if receipt.semantic_ok && receipt.preservation_ok {
-            successful += 1;
+        let receipt = run_sample(prepared, setup, false, lane.expected.as_deref())?;
+        if receipt.semantic_ok && receipt.preservation_ok && receipt.inverse_ok {
+            accepted += 1;
+            if lane
+                .expected
+                .as_deref()
+                .is_some_and(|expected| expected != "success")
+            {
+                expected_refusals += 1;
+            }
         } else {
-            refusals += 1;
+            failed.push(lane.id.clone());
         }
+    }
+    if !failed.is_empty() {
+        return Err(format!(
+            "correctness matrix failed {} lane(s): {}",
+            failed.len(),
+            failed.join(", ")
+        )
+        .into());
     }
     serde_json::to_string(&json!({
         "schema": "pptx-ink-actions-correctness-matrix-v1",
@@ -372,8 +610,9 @@ pub fn run_matrix() -> Result<String> {
         "helper_sha256": HELPER_SHA256,
         "recipe_count": manifest.recipes.len(),
         "lane_count": manifest.lanes.len(),
-        "successful_lanes": successful,
-        "refusal_or_failed_lanes": refusals,
+        "accepted_lanes": accepted,
+        "expected_refusal_lanes": expected_refusals,
+        "failed_lanes": failed.len(),
     }))
     .map_err(Into::into)
 }
@@ -411,6 +650,80 @@ pub fn host_probe() -> Result<String> {
         .map(|snapshot| snapshot.anchors().len())
         .sum::<usize>();
     drop(prepared);
+    let opaque_lane = manifest
+        .lanes
+        .iter()
+        .find(|lane| lane.id == "opaque_mce_scalar_edit")
+        .ok_or("opaque host probe lane is absent")?;
+    let opaque_recipe = manifest
+        .recipes
+        .iter()
+        .find(|recipe| recipe.id == opaque_lane.recipe)
+        .ok_or("opaque host probe recipe is absent")?;
+    let opaque_limits = owner_limits_for(opaque_recipe, opaque_lane)?;
+    let mut opaque_prepared = prepare(
+        opaque_lane,
+        opaque_recipe,
+        opaque_limits,
+        ReadLimits::default(),
+    )?;
+    let opaque_snapshots = active_package(&opaque_prepared)
+        .ink_actions_with_limits(opaque_limits)
+        .map_err(|error| format!("opaque host probe failed: {error:?}"))?;
+    let opaque_metrics = graph_metrics(&opaque_prepared.facts, &opaque_snapshots);
+    if !preservation_ok(&opaque_prepared, &opaque_metrics) {
+        return Err("opaque host probe did not retain unknown MCE markers".into());
+    }
+    let opaque_manifest_preserved = opaque_prepared
+        .package
+        .to_bytes()
+        .ok()
+        .and_then(|bytes| package_manifest_from_bytes(&bytes, ReadLimits::default()).ok())
+        .is_some_and(|(manifest, _)| manifest == opaque_prepared.package_before_manifest);
+    if !opaque_manifest_preserved {
+        return Err("opaque host probe did not preserve exact member manifests".into());
+    }
+    let opaque_source = opaque_prepared
+        .source_snapshot
+        .as_ref()
+        .ok_or("opaque host probe source snapshot is absent")?;
+    let opaque_commit = make_commit(opaque_source, true)?;
+    let applied = active_package_mut(&mut opaque_prepared)
+        .apply_ink_actions_patch(opaque_commit.patch())
+        .map_err(|error| format!("opaque publication host probe failed: {error:?}"))?;
+    drop(applied);
+    let published_bytes = active_package_mut(&mut opaque_prepared)
+        .to_bytes()
+        .map_err(|error| format!("opaque publication serialization failed: {error:?}"))?;
+    let (published_manifest, _) =
+        package_manifest_from_bytes(&published_bytes, ReadLimits::default())?;
+    let opaque_target_names = mutable_target_names(&opaque_prepared);
+    let opaque_patch_manifest_preserved = manifest_preserves_topology(
+        &opaque_prepared.package_before_manifest,
+        &published_manifest,
+        &opaque_target_names,
+    );
+    let opaque_patch_slices_preserved = opaque_target_bytes_preserved(
+        &opaque_prepared.package_before_bytes,
+        &published_bytes,
+        &opaque_target_names,
+        ReadLimits::default(),
+        true,
+    );
+    let reopened = Package::from_vec_with_limits(published_bytes, ReadLimits::default())
+        .map_err(|error| format!("opaque publication reopen failed: {error:?}"))?;
+    let reopened_snapshots = reopened
+        .ink_actions_with_limits(opaque_limits)
+        .map_err(|error| format!("opaque publication readback failed: {error:?}"))?;
+    let reopened_metrics = graph_metrics(&opaque_prepared.facts, &reopened_snapshots);
+    let opaque_patch_publication_preserved = opaque_patch_manifest_preserved
+        && opaque_patch_slices_preserved
+        && preservation_ok(&opaque_prepared, &reopened_metrics);
+    if !opaque_patch_publication_preserved {
+        return Err(
+            "opaque host probe did not preserve exact bytes through patch publication".into(),
+        );
+    }
     serde_json::to_string(&json!({
         "schema": "pptx-ink-actions-host-probe-v1",
         "source_commit": SOURCE_COMMIT,
@@ -419,6 +732,16 @@ pub fn host_probe() -> Result<String> {
         "presentation_route": "Presentation::ink_actions",
         "package_anchors": package_anchors,
         "presentation_anchors": presentation_anchors,
+        "opaque_choice_preserved": opaque_metrics.opaque_choice_preserved,
+        "opaque_fallback_preserved": opaque_metrics.opaque_fallback_preserved,
+        "opaque_payload_preserved": opaque_metrics.opaque_payload_preserved,
+        "opaque_default_namespace_preserved": opaque_metrics.opaque_default_namespace_preserved,
+        "opaque_prefix_preserved": opaque_metrics.opaque_prefix_preserved,
+        "opaque_unknown_requires_preserved": opaque_metrics.opaque_unknown_requires_preserved,
+        "opaque_internal_outbound_preserved": opaque_metrics.unknown_internal_outbound_preserved,
+        "opaque_external_outbound_preserved": opaque_metrics.unknown_external_outbound_preserved,
+        "opaque_manifest_preserved": opaque_manifest_preserved,
+        "opaque_patch_publication_preserved": opaque_patch_publication_preserved,
         "native_powerpoint_claim": false,
         "synthetic_complete_opc": true,
     }))
@@ -434,6 +757,12 @@ fn validate_manifest(manifest: &Manifest) -> Result<()> {
     }
     if manifest.fixture_authority.sha256 != HELPER_SHA256 {
         return Err("manifest helper hash differs from compiled provenance".into());
+    }
+    if manifest.retained_opc_generator.path != "harness/adapter.rs"
+        || manifest.retained_opc_generator.sha256 != support::sha256_hex(GENERATOR_SOURCE_BYTES)
+        || manifest.retained_opc_generator.git_blob.len() != 40
+    {
+        return Err("manifest retained generator hash differs from compiled source".into());
     }
     if manifest.measurement_gate.recipe_count != manifest.recipes.len()
         || manifest.measurement_gate.lane_count != manifest.lanes.len()
@@ -500,6 +829,7 @@ fn operation_for(lane: &LaneSpec) -> Result<OperationKind> {
     } else if id.starts_with("package_apply")
         || id.starts_with("stale_")
         || id.starts_with("signed_")
+        || id == "opaque_mce_scalar_edit"
     {
         OperationKind::Apply
     } else if id.starts_with("package_inverse") {
@@ -510,10 +840,7 @@ fn operation_for(lane: &LaneSpec) -> Result<OperationKind> {
         OperationKind::SaveReopen
     } else if id.starts_with("limit_") {
         OperationKind::Limit
-    } else if id == "opaque_mce_scalar_edit"
-        || id == "unknown_outbound_read_edit"
-        || id == "strict_shared_edit"
-    {
+    } else if id == "unknown_outbound_read_edit" || id == "strict_shared_edit" {
         OperationKind::PackageEdit
     } else {
         return Err(format!("lane operation is not wired: {id}").into());
@@ -567,26 +894,34 @@ fn prepare(
     };
     let inverse_patch = commit.as_ref().map(|commit| commit.patch().inverse());
 
-    let target_opc = if recipe.stale_input.is_some() {
-        let (mutated, _) = build_opc(recipe)?;
-        let mut mutated = mutated;
-        mutate_stale(&mut mutated, recipe.stale_input.as_deref().unwrap())?;
-        mutated
-    } else {
-        build_opc(recipe)?.0
-    };
+    let target_opc = target_opc_for_recipe(recipe)?;
     let mut package = Package::from_opc_package(target_opc)
         .map_err(|error| format!("public mutable package setup failed: {error:?}"))?;
     let package_before_bytes = package
         .to_bytes()
         .map_err(|error| format!("package baseline serialization failed: {error:?}"))?;
-
+    let (package_before_manifest, package_before_manifest_sha256) =
+        package_manifest_from_bytes(&package_before_bytes, read_limits)?;
+    let retained_baseline_live_bytes = AllocSnapshot::now().live_bytes();
+    let operation_package = if operation == OperationKind::Apply {
+        let operation_opc = target_opc_for_recipe(recipe)?;
+        Some(
+            Package::from_opc_package(operation_opc)
+                .map_err(|error| format!("apply operation package setup failed: {error:?}"))?,
+        )
+    } else {
+        None
+    };
     Ok(Prepared {
         lane: lane.clone(),
         recipe: recipe.clone(),
         package,
+        operation_package,
+        retained_baseline_live_bytes,
         facts: baseline_facts,
         package_before_bytes,
+        package_before_manifest,
+        package_before_manifest_sha256,
         read_limits,
         owner_limits,
         source_snapshot,
@@ -596,13 +931,24 @@ fn prepare(
     })
 }
 
+fn target_opc_for_recipe(recipe: &RecipeSpec) -> Result<OpcPackage> {
+    if recipe.stale_input.is_some() {
+        let (mutated, _) = build_opc(recipe)?;
+        let mut mutated = mutated;
+        mutate_stale(&mut mutated, recipe.stale_input.as_deref().unwrap())?;
+        Ok(mutated)
+    } else {
+        Ok(build_opc(recipe)?.0)
+    }
+}
+
 fn prepare_with_phase(
     lane: &LaneSpec,
     recipe: &RecipeSpec,
     owner_limits: Limits,
     read_limits: ReadLimits,
 ) -> Result<(Prepared, PhaseRecord)> {
-    let before = AllocSnapshot::now();
+    let before = AllocSnapshot::phase_start();
     let started = Instant::now();
     let prepared = prepare(lane, recipe, owner_limits, read_limits)?;
     let after = AllocSnapshot::now();
@@ -702,11 +1048,8 @@ fn build_opc(recipe: &RecipeSpec) -> Result<(OpcPackage, FixtureFacts)> {
         .collect::<std::result::Result<Vec<_>, String>>()?;
 
     for target_name in &target_names {
-        let target = BlobPart::new(
-            target_name.clone(),
-            "text/xml".to_owned(),
-            action_payload(recipe.target_bytes)?,
-        );
+        let target_payload = action_payload(recipe.target_bytes, recipe.opaque_mce)?;
+        let target = BlobPart::new(target_name.clone(), "text/xml".to_owned(), target_payload);
         package.add_part(Box::new(target));
     }
 
@@ -736,7 +1079,7 @@ fn build_opc(recipe: &RecipeSpec) -> Result<(OpcPackage, FixtureFacts)> {
         let mut slide = BlobPart::new(
             slide_name.clone(),
             ct::PML_SLIDE.to_owned(),
-            slide_xml(strict, &relationship_ids),
+            slide_xml(strict, &relationship_ids, recipe.opaque_mce),
         );
         for (index, relationship_id) in relationship_ids.iter().enumerate() {
             let relationship_type = if strict {
@@ -806,12 +1149,12 @@ fn build_opc(recipe: &RecipeSpec) -> Result<(OpcPackage, FixtureFacts)> {
                 .rels_mut()
                 .add_relationship(
                     "urn:vendor:opaque-action-dependency".to_owned(),
-                    "opaque-dependency.xml".to_owned(),
+                    "opaque-dependency.bin".to_owned(),
                     "rIdOpaqueInternal".to_owned(),
                     false,
                 );
             package.add_part(Box::new(BlobPart::new(
-                PackURI::new("/ppt/custom/opaque-dependency.xml")
+                PackURI::new("/ppt/custom/opaque-dependency.bin")
                     .map_err(|error| format!("opaque URI failed: {error:?}"))?,
                 "application/octet-stream".to_owned(),
                 b"opaque-internal-target".to_vec(),
@@ -838,12 +1181,16 @@ fn build_opc(recipe: &RecipeSpec) -> Result<(OpcPackage, FixtureFacts)> {
     let source_bytes = serialize_opc(&package)?;
     let source_sha256 = support::sha256_hex(&source_bytes);
     let source_fnv1a64 = support::fnv1a64(&source_bytes);
+    let package_manifest = package_manifest(&package, &source_bytes)?;
+    let package_manifest_sha256 = package_manifest_sha256(&package_manifest)?;
     Ok((
         package,
         FixtureFacts {
             source_bytes,
             source_sha256,
             source_fnv1a64,
+            package_manifest,
+            package_manifest_sha256,
             slide_names,
             target_names,
         },
@@ -866,40 +1213,79 @@ fn target_index(recipe: &RecipeSpec, anchor: usize) -> usize {
     }
 }
 
-fn action_payload(target_bytes: usize) -> Result<Vec<u8>> {
-    let prefix = format!(
-        r###"<?xml version="1.0" encoding="UTF-8"?><ia:actions xmlns:ia="{ACTION}" xmlns:i="{INKML}" xmlns:v="urn:vendor" lengthUnit="cm" timeUnit="ms" xml:id="root"><i:definitions><v:future v:flag="keep"/></i:definitions><ia:action xml:id="a0" type="add" startTime="0"><ia:property name="kind" value="old"/><ia:actionData xml:id="d0" name="stroke" ref="#d1"><ia:transform matrix="1,0,0,1"/><i:trace><v:opaque>"###
-    );
+fn action_payload(target_bytes: usize, opaque_mce: bool) -> Result<Vec<u8>> {
+    let prefix = if opaque_mce {
+        format!(
+            r###"<?xml version="1.0" encoding="UTF-8"?><ia:actions xmlns:ia="{ACTION}" xmlns:i="{INKML}" xmlns:v="urn:vendor" xmlns:mc="{MCE}" xmlns:zz="urn:vendor-prefix" lengthUnit="cm" timeUnit="ms" xml:id="root"><i:definitions><v:future v:flag="keep"/><zz:prefixOpaque/><zz:defaultOpaque xmlns="urn:vendor-default"><defaultNode/></zz:defaultOpaque></i:definitions><ia:action xml:id="a0" type="add" startTime="0"><ia:property name="kind" value="old"/><ia:actionData xml:id="d0" name="stroke" ref="#d1"><ia:transform matrix="1,0,0,1"/><i:trace><v:opaque>opaque<mc:AlternateContent><mc:Choice Requires="v unknownInkFeature"><v:u/><zz:unknownNode/></mc:Choice><mc:Fallback><v:f/></mc:Fallback></mc:AlternateContent>"###
+        )
+    } else {
+        format!(
+            r###"<?xml version="1.0" encoding="UTF-8"?><ia:actions xmlns:ia="{ACTION}" xmlns:i="{INKML}" xmlns:v="urn:vendor" xmlns:mc="{MCE}" lengthUnit="cm" timeUnit="ms" xml:id="root"><i:definitions><v:future v:flag="keep"/></i:definitions><ia:action xml:id="a0" type="add" startTime="0"><ia:property name="kind" value="old"/><ia:actionData xml:id="d0" name="stroke" ref="#d1"><ia:transform matrix="1,0,0,1"/><i:trace><v:opaque>opaque<mc:AlternateContent><mc:Choice Requires="v"><v:u/></mc:Choice><mc:Fallback><v:f/></mc:Fallback></mc:AlternateContent>"###
+        )
+    };
     let suffix = r###"</v:opaque></i:trace><i:traceView/></ia:actionData><ia:actionDataGroup xml:id="dg0" name="group"><ia:actionData xml:id="d1" name="other"/></ia:actionDataGroup></ia:action><ia:actionGroup xml:id="ag0" type="transform" startTime="1"><ia:action xml:id="a1" type="remove" startTime="2"><ia:actionData/></ia:action></ia:actionGroup></ia:actions>"###;
     if target_bytes < prefix.len() + suffix.len() {
         return Err(format!("target recipe is below valid payload minimum: {target_bytes}").into());
     }
-    let filler = "x".repeat(target_bytes - prefix.len() - suffix.len());
+    let filler = xml_filler(target_bytes - prefix.len() - suffix.len());
     let mut output = Vec::with_capacity(target_bytes);
     output.extend_from_slice(prefix.as_bytes());
-    output.extend_from_slice(filler.as_bytes());
+    output.extend_from_slice(&filler);
     output.extend_from_slice(suffix.as_bytes());
     debug_assert_eq!(output.len(), target_bytes);
     Ok(output)
 }
 
-fn action_owner_anchor(relationship_id: &str) -> String {
-    format!(
-        r#"<compat:AlternateContent><compat:Choice Requires="p14main inkAction"><pp:contentPart rr:id="{relationship_id}"/></compat:Choice><compat:Fallback><pp:pic><pp:nvPicPr><pp:cNvPr id="42" name="Fallback"/><pp:cNvPicPr/><pp:nvPr/></pp:nvPicPr><pp:blipFill/><pp:spPr/></pp:pic></compat:Fallback></compat:AlternateContent>"#
-    )
+fn xml_filler(length: usize) -> Vec<u8> {
+    let open = b"<v:chunk>";
+    let close = b"</v:chunk>";
+    let overhead = open.len() + close.len();
+    let mut output = Vec::with_capacity(length);
+    if length <= 4096 {
+        output.resize(length, b'x');
+        return output;
+    }
+    while output.len().saturating_add(overhead).saturating_add(1) <= length {
+        output.extend_from_slice(open);
+        let remaining = length - output.len() - close.len();
+        let chunk = remaining.min(1024);
+        output.resize(output.len() + chunk, b'x');
+        output.extend_from_slice(close);
+    }
+    output.resize(length, b'x');
+    output
 }
 
-fn slide_xml(strict: bool, relationship_ids: &[String]) -> Vec<u8> {
+fn action_owner_anchor(relationship_id: &str, opaque_mce: bool) -> String {
+    if opaque_mce {
+        format!(
+            r#"<compat:AlternateContent><compat:Choice Requires="p14main inkAction"><pp:contentPart rr:id="{relationship_id}"/></compat:Choice><compat:Fallback><pp:pic><pp:nvPicPr><pp:cNvPr id="42" name="Fallback"/><pp:cNvPicPr/><pp:nvPr/></pp:nvPicPr><pp:blipFill/><pp:spPr/></pp:pic></compat:Fallback></compat:AlternateContent>"#
+        )
+    } else {
+        format!(
+            r#"<compat:AlternateContent><compat:Choice Requires="p14main inkAction"><pp:contentPart rr:id="{relationship_id}"/></compat:Choice><compat:Fallback><pp:pic><pp:nvPicPr><pp:cNvPr id="42" name="Fallback"/><pp:cNvPicPr/><pp:nvPr/></pp:nvPicPr><pp:blipFill/><pp:spPr/></pp:pic></compat:Fallback></compat:AlternateContent>"#
+        )
+    }
+}
+
+fn slide_xml(strict: bool, relationship_ids: &[String], opaque_mce: bool) -> Vec<u8> {
     let anchors = relationship_ids
         .iter()
-        .map(|relationship_id| action_owner_anchor(relationship_id))
+        .map(|relationship_id| action_owner_anchor(relationship_id, opaque_mce))
         .collect::<String>();
     let pml = if strict { STRICT_PML } else { PML };
     let rel = if strict { STRICT_REL } else { REL };
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?><pp:sld xmlns:pp="{pml}" xmlns:rr="{rel}" xmlns:compat="{MCE}" xmlns:p14main="{P14_MAIN}" xmlns:inkAction="{ACTION}" compat:Ignorable="p14main inkAction"><pp:cSld><pp:spTree><pp:nvGrpSpPr/><pp:grpSpPr/>{anchors}</pp:spTree></pp:cSld></pp:sld>"#
-    )
-    .into_bytes()
+    if opaque_mce {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:p="{pml}" xmlns:q="{rel}" xmlns:pp="{pml}" xmlns:rr="{rel}" xmlns:compat="{MCE}" xmlns:p14main="{P14_MAIN}" xmlns:inkAction="{ACTION}" xmlns:unknownInkFeature="urn:vendor:unknown" xmlns:mceAlias="{MCE}" mceAlias:Ignorable="p14main inkAction unknownInkFeature"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{anchors}</p:spTree></p:cSld></p:sld>"#
+        )
+        .into_bytes()
+    } else {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><pp:sld xmlns:pp="{pml}" xmlns:rr="{rel}" xmlns:compat="{MCE}" xmlns:p14main="{P14_MAIN}" xmlns:inkAction="{ACTION}" compat:Ignorable="p14main inkAction"><pp:cSld><pp:spTree><pp:nvGrpSpPr/><pp:grpSpPr/>{anchors}</pp:spTree></pp:cSld></pp:sld>"#
+        )
+        .into_bytes()
+    }
 }
 
 fn serialize_opc(package: &OpcPackage) -> Result<Vec<u8>> {
@@ -908,6 +1294,177 @@ fn serialize_opc(package: &OpcPackage) -> Result<Vec<u8>> {
         .to_stream(&mut bytes)
         .map_err(|error| format!("OPC serialization failed: {error:?}"))?;
     Ok(bytes)
+}
+
+fn relationship_manifest(
+    package: &OpcPackage,
+    owner: &PackURI,
+    relationships: &litchi_opc::Relationships,
+) -> Result<RelationshipMemberManifest> {
+    let source = package
+        .source_relationships(owner)
+        .map_err(|error| format!("source relationship manifest failed for {owner}: {error:?}"))?;
+    let mut entries = relationships
+        .iter()
+        .map(|relationship| RelationshipManifest {
+            id: relationship.r_id().to_owned(),
+            relationship_type: relationship.reltype().to_owned(),
+            target_ref: relationship.target_ref().to_owned(),
+            target_mode: match relationship.target_mode() {
+                TargetMode::Internal => "Internal".to_owned(),
+                TargetMode::External => "External".to_owned(),
+            },
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(RelationshipMemberManifest {
+        present: source.member_present(),
+        bytes: source.bytes().len(),
+        sha256: support::sha256_hex(source.bytes()),
+        relationships: entries,
+    })
+}
+
+fn package_manifest(package: &OpcPackage, archive_bytes: &[u8]) -> Result<PackageManifest> {
+    let content_types = package
+        .source_content_types()
+        .map_err(|error| format!("source content-type manifest failed: {error:?}"))?;
+    let root = PackURI::new("/").map_err(|error| format!("package URI failed: {error:?}"))?;
+    let package_relationships = relationship_manifest(package, &root, package.rels())?;
+    let mut parts = package
+        .iter_parts()
+        .map(|part| {
+            Ok(PartManifest {
+                name: part.partname().as_str().to_owned(),
+                content_type: part.content_type().to_owned(),
+                bytes: part.blob().len(),
+                sha256: support::sha256_hex(part.blob()),
+                relationships: relationship_manifest(package, part.partname(), part.rels())?,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    parts.sort_by(|left, right| left.name.cmp(&right.name));
+    let archive = soapberry_zip::office::LazyArchiveReader::new(archive_bytes)
+        .map_err(|error| format!("non-part ZIP payload index failed: {error:?}"))?;
+    let mut non_part_members = package
+        .non_part_members()
+        .iter()
+        .map(|member| {
+            let payload = archive.read(member.name()).map_err(|error| {
+                format!(
+                    "non-part ZIP payload read failed for {}: {error:?}",
+                    member.name()
+                )
+            })?;
+            Ok(NonPartMemberManifest {
+                name: member.name().to_owned(),
+                reason: member.reason().to_string(),
+                bytes: payload.len(),
+                sha256: support::sha256_hex(&payload),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    non_part_members.sort();
+    Ok(PackageManifest {
+        content_types_bytes: content_types.bytes().len(),
+        content_types_sha256: support::sha256_hex(content_types.bytes()),
+        package_relationships,
+        parts,
+        non_part_members,
+    })
+}
+
+fn package_manifest_sha256(manifest: &PackageManifest) -> Result<String> {
+    let bytes = serde_json::to_vec(manifest)
+        .map_err(|error| format!("package manifest serialization failed: {error}"))?;
+    Ok(support::sha256_hex(&bytes))
+}
+
+fn package_manifest_from_bytes(
+    bytes: &[u8],
+    read_limits: ReadLimits,
+) -> Result<(PackageManifest, String)> {
+    let package = OpcPackage::from_bytes_with_limits(bytes, read_limits)
+        .map_err(|error| format!("output OPC manifest reopen failed: {error:?}"))?;
+    let manifest = package_manifest(&package, bytes)?;
+    let digest = package_manifest_sha256(&manifest)?;
+    Ok((manifest, digest))
+}
+
+fn package_part_bytes(bytes: &[u8], name: &PackURI, read_limits: ReadLimits) -> Result<Vec<u8>> {
+    let package = OpcPackage::from_bytes_with_limits(bytes, read_limits)
+        .map_err(|error| format!("part-preservation OPC reopen failed: {error:?}"))?;
+    let part = package
+        .get_part(name)
+        .map_err(|error| format!("part-preservation member missing {name}: {error:?}"))?;
+    Ok(part.blob().to_vec())
+}
+
+fn opaque_region(bytes: &[u8]) -> Option<&[u8]> {
+    let start_marker = b"<v:opaque>";
+    let end_marker = b"</v:opaque>";
+    let start = bytes
+        .windows(start_marker.len())
+        .position(|window| window == start_marker)?;
+    let end_start = start + start_marker.len();
+    let relative_end = bytes[end_start..]
+        .windows(end_marker.len())
+        .position(|window| window == end_marker)?;
+    let end = end_start + relative_end + end_marker.len();
+    Some(&bytes[start..end])
+}
+
+fn opaque_target_bytes_preserved(
+    before_bytes: &[u8],
+    after_bytes: &[u8],
+    target_names: &[PackURI],
+    read_limits: ReadLimits,
+    require_opaque: bool,
+) -> bool {
+    target_names.iter().all(|name| {
+        let before = package_part_bytes(before_bytes, name, read_limits);
+        let after = package_part_bytes(after_bytes, name, read_limits);
+        match (before, after) {
+            (Ok(before), Ok(after)) if before == after => true,
+            (Ok(before), Ok(after)) if require_opaque => {
+                opaque_region(&before).is_some() && opaque_region(&before) == opaque_region(&after)
+            },
+            (Ok(_), Ok(_)) => true,
+            _ => false,
+        }
+    })
+}
+
+fn mutable_target_names(prepared: &Prepared) -> Vec<PackURI> {
+    prepared
+        .facts
+        .target_names
+        .first()
+        .cloned()
+        .into_iter()
+        .collect()
+}
+
+fn manifest_preserves_topology(
+    before: &PackageManifest,
+    after: &PackageManifest,
+    mutable_parts: &[PackURI],
+) -> bool {
+    if before.content_types_bytes != after.content_types_bytes
+        || before.content_types_sha256 != after.content_types_sha256
+        || before.package_relationships != after.package_relationships
+        || before.non_part_members != after.non_part_members
+        || before.parts.len() != after.parts.len()
+    {
+        return false;
+    }
+    before.parts.iter().zip(&after.parts).all(|(left, right)| {
+        let mutable = mutable_parts.iter().any(|part| part.as_str() == left.name);
+        left.name == right.name
+            && left.content_type == right.content_type
+            && left.relationships == right.relationships
+            && (mutable || (left.bytes == right.bytes && left.sha256 == right.sha256))
+    })
 }
 
 fn mutate_stale(package: &mut OpcPackage, input: &str) -> Result<()> {
@@ -921,7 +1478,21 @@ fn mutate_stale(package: &mut OpcPackage, input: &str) -> Result<()> {
                 .get_part_mut(&slide_name)
                 .map_err(|error| format!("stale owner part missing: {error:?}"))?;
             let mut bytes = part.blob().to_vec();
-            bytes.push(b' ');
+            let candidates: &[(&[u8], &[u8])] = &[
+                (br#"id="42""#, br#"id="43""#),
+                (br#"name="Fallback""#, br#"name="FallbacK""#),
+            ];
+            let (index, marker, replacement) = candidates
+                .iter()
+                .copied()
+                .find_map(|(marker, replacement)| {
+                    bytes
+                        .windows(marker.len())
+                        .position(|window| window == marker)
+                        .map(|index| (index, marker, replacement))
+                })
+                .ok_or("stale owner XML marker is absent")?;
+            bytes[index..index + marker.len()].copy_from_slice(replacement);
             part.set_blob(bytes);
         },
         "owner_relationship_source" => {
@@ -949,7 +1520,7 @@ fn mutate_stale(package: &mut OpcPackage, input: &str) -> Result<()> {
             {
                 bytes.splice(index..index + marker.len(), replacement.iter().copied());
             } else {
-                bytes.push(b' ');
+                return Err("stale target marker is absent".into());
             }
             part.set_blob(bytes);
         },
@@ -970,86 +1541,288 @@ fn empty_phase() -> PhaseRecord {
     snapshot.delta(snapshot, std::time::Duration::ZERO)
 }
 
-fn run_sample(mut prepared: Prepared, setup: PhaseRecord, _warmup: bool) -> Result<SampleReceipt> {
-    let operation_before = AllocSnapshot::now();
+fn compact_error(summary: &ValidationSummary) -> Option<CompactError> {
+    Some(CompactError {
+        kind: FixedText::from_str(summary.actual_error_type.as_deref()?),
+        debug: FixedText::from_str(summary.actual_error_debug.as_deref().unwrap_or_default()),
+        display: FixedText::from_str(summary.actual_error_display.as_deref().unwrap_or_default()),
+        resource: summary
+            .actual_error_resource
+            .as_deref()
+            .map(FixedText::from_str),
+        limit: summary.actual_error_limit,
+    })
+}
+
+fn diagnostic_bits(metrics: &GraphMetrics) -> u8 {
+    metrics
+        .outbound_diagnostic_modes
+        .iter()
+        .fold(0, |bits, mode| {
+            bits | match mode.as_str() {
+                "internal_unknown" => 1,
+                "external_unknown" => 2,
+                _ => 0,
+            }
+        })
+}
+
+fn compact_metrics(metrics: &GraphMetrics) -> Result<CompactMetrics> {
+    Ok(CompactMetrics {
+        source_bytes: metrics.source_bytes,
+        owner_xml_bytes: metrics.owner_xml_bytes,
+        unique_target_bytes: metrics.unique_target_bytes,
+        baseline_unique_target_bytes: metrics.baseline_unique_target_bytes,
+        expected_unique_target_bytes: metrics.expected_unique_target_bytes,
+        anchors: metrics.anchors,
+        unique_targets: metrics.unique_targets,
+        inbound_edges: metrics.inbound_edges,
+        outbound_edges: metrics.outbound_edges,
+        action_count: metrics.action_count,
+        action_group_count: metrics.action_group_count,
+        retained_owner_xml_bytes: metrics.retained_owner_xml_bytes,
+        retained_target_bytes: metrics.retained_target_bytes,
+        retained_profile_bytes: metrics.retained_profile_bytes,
+        shared_pointer_observation: FixedText::from_str(&metrics.shared_pointer_observation),
+        diagnostic_modes: diagnostic_bits(metrics),
+        unknown_internal_outbound_preserved: metrics.unknown_internal_outbound_preserved,
+        unknown_external_outbound_preserved: metrics.unknown_external_outbound_preserved,
+        opaque_choice_preserved: metrics.opaque_choice_preserved,
+        opaque_fallback_preserved: metrics.opaque_fallback_preserved,
+        opaque_payload_preserved: metrics.opaque_payload_preserved,
+        opaque_default_namespace_preserved: metrics.opaque_default_namespace_preserved,
+        opaque_prefix_preserved: metrics.opaque_prefix_preserved,
+        opaque_unknown_requires_preserved: metrics.opaque_unknown_requires_preserved,
+        owner_xml_sha256: digest_bytes(&metrics.owner_xml_sha256)?,
+        profile_source_sha256: digest_bytes(&metrics.profile_source_sha256)?,
+    })
+}
+
+fn baseline_reopenable(prepared: &Prepared) -> bool {
+    let bytes = prepared.package_before_bytes.clone();
+    let mut reopened = match Package::from_vec_with_limits(bytes, prepared.read_limits) {
+        Ok(package) => package,
+        Err(_) => return false,
+    };
+    let snapshots = match reopened.ink_actions() {
+        Ok(snapshots) => snapshots,
+        Err(_) => return false,
+    };
+    let anchors = snapshots
+        .iter()
+        .map(|snapshot| snapshot.anchors().len())
+        .sum::<usize>();
+    if anchors != prepared.recipe.anchors {
+        return false;
+    }
+    let serialized = match reopened.to_bytes() {
+        Ok(bytes) => bytes,
+        Err(_) => return false,
+    };
+    package_manifest_from_bytes(&serialized, prepared.read_limits)
+        .map(|(manifest, _)| manifest == prepared.package_before_manifest)
+        .unwrap_or(false)
+}
+
+fn diagnostic_modes(bits: u8) -> Vec<String> {
+    let mut modes = Vec::with_capacity(2);
+    if bits & 1 != 0 {
+        modes.push("internal_unknown".to_owned());
+    }
+    if bits & 2 != 0 {
+        modes.push("external_unknown".to_owned());
+    }
+    modes
+}
+
+fn receipt_from_compact(compact: CompactSample, expected_error: Option<&str>) -> SampleReceipt {
+    let metrics = compact.metrics;
+    let (
+        actual_error_type,
+        actual_error_resource,
+        actual_error_limit,
+        actual_error_debug,
+        actual_error_display,
+    ) = match compact.error {
+        Some(error) => (
+            Some(error.kind.to_string()),
+            error.resource.map(FixedText::to_string),
+            error.limit,
+            Some(error.debug.to_string()),
+            Some(error.display.to_string()),
+        ),
+        None => (None, None, None, None, None),
+    };
+    SampleReceipt {
+        process_id: std::process::id(),
+        semantic_ok: compact.semantic_ok,
+        preservation_ok: compact.preservation_ok,
+        inverse_ok: compact.inverse_ok,
+        source_unchanged_on_refusal: compact.source_unchanged_on_refusal,
+        package_manifest_preserved: compact.package_manifest_preserved,
+        expected_error: expected_error.map(str::to_owned),
+        actual_error_type,
+        actual_error_resource,
+        actual_error_limit,
+        actual_error_debug,
+        actual_error_display,
+        source_sha256: digest_string(compact.source_sha256),
+        source_fnv1a64: compact.source_fnv1a64,
+        source_manifest_sha256: digest_string(compact.source_manifest_sha256),
+        package_before_manifest_sha256: digest_string(compact.package_before_manifest_sha256),
+        output_manifest_sha256: compact.output_manifest_sha256.map(digest_string),
+        source_bytes: metrics.source_bytes,
+        owner_xml_bytes: metrics.owner_xml_bytes,
+        unique_target_bytes: metrics.unique_target_bytes,
+        baseline_unique_target_bytes: metrics.baseline_unique_target_bytes,
+        expected_unique_target_bytes: metrics.expected_unique_target_bytes,
+        output_bytes: compact.output_bytes,
+        anchors: metrics.anchors,
+        unique_targets: metrics.unique_targets,
+        inbound_edges: metrics.inbound_edges,
+        outbound_edges: metrics.outbound_edges,
+        action_count: metrics.action_count,
+        action_group_count: metrics.action_group_count,
+        retained_owner_xml_bytes: metrics.retained_owner_xml_bytes,
+        retained_target_bytes: metrics.retained_target_bytes,
+        retained_profile_bytes: metrics.retained_profile_bytes,
+        shared_pointer_observation: metrics.shared_pointer_observation.to_string(),
+        outbound_diagnostic_modes: diagnostic_modes(metrics.diagnostic_modes),
+        unknown_internal_outbound_preserved: metrics.unknown_internal_outbound_preserved,
+        unknown_external_outbound_preserved: metrics.unknown_external_outbound_preserved,
+        opaque_choice_preserved: metrics.opaque_choice_preserved,
+        opaque_fallback_preserved: metrics.opaque_fallback_preserved,
+        opaque_payload_preserved: metrics.opaque_payload_preserved,
+        opaque_default_namespace_preserved: metrics.opaque_default_namespace_preserved,
+        opaque_prefix_preserved: metrics.opaque_prefix_preserved,
+        opaque_unknown_requires_preserved: metrics.opaque_unknown_requires_preserved,
+        owner_xml_sha256: digest_string(metrics.owner_xml_sha256),
+        profile_source_sha256: digest_string(metrics.profile_source_sha256),
+        retained_baseline_live_bytes: compact.retained_baseline_live_bytes,
+        after_drop_live_bytes: compact.after_drop_live_bytes,
+        after_postdrop_live_bytes: compact.after_postdrop_live_bytes,
+        baseline_release_bytes: compact.baseline_release_bytes,
+        baseline_reopenable: compact.baseline_reopenable,
+        retained_baseline_balance_ok: compact.retained_baseline_balance_ok,
+        phases: compact.phases,
+    }
+}
+
+fn run_sample(
+    mut prepared: Prepared,
+    setup: PhaseRecord,
+    _warmup: bool,
+    expected_error: Option<&str>,
+) -> Result<SampleReceipt> {
+    let operation_before = AllocSnapshot::phase_start();
     let operation_started = Instant::now();
     let outcome = execute_operation(&mut prepared)?;
     let operation_after = AllocSnapshot::now();
     let operation_phase = operation_before.delta(operation_after, operation_started.elapsed());
 
-    let validation_before = AllocSnapshot::now();
+    let validation_before = AllocSnapshot::phase_start();
     let validation_started = Instant::now();
     let report = validate_outcome(&mut prepared, &outcome)?;
-    let validation_after = AllocSnapshot::now();
-    let validation_phase = validation_before.delta(validation_after, validation_started.elapsed());
 
-    let drop_before = AllocSnapshot::now();
-    let drop_started = Instant::now();
-    drop(outcome);
-    let drop_after = AllocSnapshot::now();
-    let drop_phase = drop_before.delta(drop_after, drop_started.elapsed());
-
-    let postdrop_before = AllocSnapshot::now();
-    let postdrop_started = Instant::now();
-    let source_sha256 = prepared.facts.source_sha256.clone();
-    let source_fnv1a64 = prepared.facts.source_fnv1a64;
-    let receipt = SampleReceipt {
+    let compact_metrics = compact_metrics(&report.metrics)?;
+    let compact_error = compact_error(&report.summary);
+    let compact_source_sha256 = digest_bytes(&prepared.facts.source_sha256)?;
+    let compact_source_manifest_sha256 = digest_bytes(&prepared.facts.package_manifest_sha256)?;
+    let compact_package_before_manifest_sha256 =
+        digest_bytes(&prepared.package_before_manifest_sha256)?;
+    let retained_baseline_live_bytes = prepared.retained_baseline_live_bytes;
+    let output_manifest_sha256 = report
+        .output_manifest_sha256
+        .as_deref()
+        .map(digest_bytes)
+        .transpose()?;
+    let mut compact = CompactSample {
         semantic_ok: report.summary.semantic_ok,
         preservation_ok: report.summary.preservation_ok,
         inverse_ok: report.summary.inverse_ok,
         source_unchanged_on_refusal: report.summary.source_unchanged_on_refusal,
-        expected_error: report.summary.expected_error.clone(),
-        actual_error_type: report.summary.actual_error_type.clone(),
-        actual_error_resource: report.summary.actual_error_resource.clone(),
-        actual_error_debug: report.summary.actual_error_debug.clone(),
-        actual_error_display: report.summary.actual_error_display.clone(),
-        source_sha256,
-        source_fnv1a64,
-        source_bytes: report.metrics.source_bytes,
-        owner_xml_bytes: report.metrics.owner_xml_bytes,
-        unique_target_bytes: report.metrics.unique_target_bytes,
+        package_manifest_preserved: report.summary.package_manifest_preserved,
+        error: compact_error,
+        source_sha256: compact_source_sha256,
+        source_fnv1a64: prepared.facts.source_fnv1a64,
+        source_manifest_sha256: compact_source_manifest_sha256,
+        package_before_manifest_sha256: compact_package_before_manifest_sha256,
+        output_manifest_sha256,
+        metrics: compact_metrics,
         output_bytes: report.output_bytes,
-        anchors: report.metrics.anchors,
-        unique_targets: report.metrics.unique_targets,
-        inbound_edges: report.metrics.inbound_edges,
-        outbound_edges: report.metrics.outbound_edges,
-        action_count: report.metrics.action_count,
-        action_group_count: report.metrics.action_group_count,
-        retained_owner_xml_bytes: report.metrics.retained_owner_xml_bytes,
-        retained_target_bytes: report.metrics.retained_target_bytes,
-        retained_profile_bytes: report.metrics.retained_profile_bytes,
-        shared_pointer_observation: report.metrics.shared_pointer_observation,
-        outbound_diagnostic_modes: report.metrics.outbound_diagnostic_modes,
-        unknown_internal_outbound_preserved: report.metrics.unknown_internal_outbound_preserved,
-        unknown_external_outbound_preserved: report.metrics.unknown_external_outbound_preserved,
+        retained_baseline_live_bytes,
+        after_drop_live_bytes: 0,
+        after_postdrop_live_bytes: 0,
+        baseline_release_bytes: 0,
+        baseline_reopenable: false,
+        retained_baseline_balance_ok: false,
         phases: PhaseSet {
             setup,
             operation: operation_phase,
-            validation: validation_phase,
-            drop: drop_phase,
+            validation: empty_phase(),
+            drop: empty_phase(),
             postdrop: empty_phase(),
         },
     };
+    let validation_after = AllocSnapshot::now();
+    compact.phases.validation =
+        validation_before.delta(validation_after, validation_started.elapsed());
+    let drop_before = AllocSnapshot::phase_start();
+    let drop_started = Instant::now();
+    drop(report);
+    drop(outcome);
+    drop(prepared.operation_package.take());
+    let drop_after = AllocSnapshot::now();
+    let drop_phase = drop_before.delta(drop_after, drop_started.elapsed());
+
+    let postdrop_before = AllocSnapshot::phase_start();
+    let postdrop_started = Instant::now();
+    let baseline_reopenable = baseline_reopenable(&prepared);
     drop(prepared);
     let postdrop_after = AllocSnapshot::now();
-    let mut receipt = receipt;
-    receipt.phases.postdrop = postdrop_before.delta(postdrop_after, postdrop_started.elapsed());
-    Ok(receipt)
+    let postdrop_phase = postdrop_before.delta(postdrop_after, postdrop_started.elapsed());
+    let after_drop_live_bytes = drop_phase.live_after_bytes;
+    let after_postdrop_live_bytes = postdrop_phase.live_after_bytes;
+    let compact = CompactSample {
+        after_drop_live_bytes,
+        after_postdrop_live_bytes,
+        baseline_release_bytes: after_drop_live_bytes.saturating_sub(after_postdrop_live_bytes),
+        baseline_reopenable,
+        retained_baseline_balance_ok: after_drop_live_bytes == retained_baseline_live_bytes,
+        phases: PhaseSet {
+            drop: drop_phase,
+            postdrop: postdrop_phase,
+            ..compact.phases
+        },
+        ..compact
+    };
+    Ok(receipt_from_compact(compact, expected_error))
+}
+
+fn active_package(prepared: &Prepared) -> &Package {
+    prepared
+        .operation_package
+        .as_ref()
+        .unwrap_or(&prepared.package)
+}
+
+fn active_package_mut(prepared: &mut Prepared) -> &mut Package {
+    prepared
+        .operation_package
+        .as_mut()
+        .unwrap_or(&mut prepared.package)
 }
 
 fn execute_operation(prepared: &mut Prepared) -> Result<HeldOutcome> {
     let outcome = match prepared.operation {
-        OperationKind::PackageRead => public_snapshots(prepared.package.ink_actions()),
+        OperationKind::PackageRead => public_snapshots(active_package(prepared).ink_actions()),
         OperationKind::PresentationRead => public_snapshots(
-            prepared
-                .package
+            active_package(prepared)
                 .presentation()
                 .and_then(|presentation| presentation.ink_actions()),
         ),
         OperationKind::PackageReadWithLimits => public_snapshots(
-            prepared
-                .package
-                .ink_actions_with_limits(prepared.owner_limits),
+            active_package(prepared).ink_actions_with_limits(prepared.owner_limits),
         ),
         OperationKind::PackageEdit
         | OperationKind::PresentationEdit
@@ -1092,29 +1865,34 @@ fn execute_operation(prepared: &mut Prepared) -> Result<HeldOutcome> {
                 .commit
                 .as_ref()
                 .ok_or("apply operation has no prepared patch")?
-                .patch();
-            public_snapshot(prepared.package.apply_ink_actions_patch(patch))
+                .patch()
+                .clone();
+            public_snapshot(active_package_mut(prepared).apply_ink_actions_patch(&patch))
         },
         OperationKind::Inverse => {
             let patch = prepared
                 .commit
                 .as_ref()
                 .ok_or("inverse operation has no prepared patch")?
-                .patch();
+                .patch()
+                .clone();
             let inverse = prepared
                 .inverse_patch
                 .as_ref()
-                .ok_or("inverse operation has no inverse patch")?;
-            match prepared.package.apply_ink_actions_patch(patch) {
-                Ok(_) => public_snapshot(prepared.package.apply_ink_actions_patch(inverse)),
+                .ok_or("inverse operation has no inverse patch")?
+                .clone();
+            match active_package_mut(prepared).apply_ink_actions_patch(&patch) {
+                Ok(_) => {
+                    public_snapshot(active_package_mut(prepared).apply_ink_actions_patch(&inverse))
+                },
                 Err(error) => HeldOutcome::Error(actual_error(&error)),
             }
         },
-        OperationKind::Save => match prepared.package.to_bytes() {
+        OperationKind::Save => match active_package_mut(prepared).to_bytes() {
             Ok(bytes) => HeldOutcome::Success(HeldResult::Bytes(bytes)),
             Err(error) => HeldOutcome::Error(actual_error(&error)),
         },
-        OperationKind::SaveReopen => match prepared.package.to_bytes() {
+        OperationKind::SaveReopen => match active_package_mut(prepared).to_bytes() {
             Ok(bytes) => {
                 let reopened = Package::from_vec_with_limits(bytes.clone(), prepared.read_limits);
                 match reopened {
@@ -1130,9 +1908,7 @@ fn execute_operation(prepared: &mut Prepared) -> Result<HeldOutcome> {
             Err(error) => HeldOutcome::Error(actual_error(&error)),
         },
         OperationKind::Limit => public_snapshots(
-            prepared
-                .package
-                .ink_actions_with_limits(prepared.owner_limits),
+            active_package(prepared).ink_actions_with_limits(prepared.owner_limits),
         ),
     };
     Ok(outcome)
@@ -1155,15 +1931,37 @@ fn public_snapshot(result: std::result::Result<Snapshot, PptxError>) -> HeldOutc
 fn actual_error(error: &PptxError) -> ActualError {
     let debug = format!("{error:?}");
     let display = error.to_string();
-    let resource = debug
-        .split("resource:")
-        .nth(1)
-        .and_then(|value| value.split(',').next())
-        .map(|value| value.trim().trim_matches('"').to_owned());
+    let (kind, resource, limit) = match error {
+        PptxError::Limit { resource, limit } => (
+            "Error::Limit".to_owned(),
+            Some((*resource).to_owned()),
+            Some(u64::try_from(*limit).unwrap_or(u64::MAX)),
+        ),
+        PptxError::ContentType { .. } => ("Error::ContentType".to_owned(), None, None),
+        PptxError::StaleSource => ("Error::StaleSource".to_owned(), None, None),
+        PptxError::Opc(opc_error) => match opc_error {
+            OpcError::SignedSourceRequiresExplicitPolicy => (
+                "Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)".to_owned(),
+                None,
+                None,
+            ),
+            OpcError::ReadLimit {
+                resource, maximum, ..
+            } => (
+                "Error::Opc(OpcError::ReadLimit)".to_owned(),
+                Some(resource.to_string()),
+                Some(*maximum),
+            ),
+            _ => ("Error::Opc".to_owned(), None, None),
+        },
+        _ => ("Error::Other".to_owned(), None, None),
+    };
     ActualError {
+        kind,
         debug,
         display,
         resource,
+        limit,
     }
 }
 
@@ -1174,56 +1972,131 @@ fn validate_outcome(prepared: &mut Prepared, outcome: &HeldOutcome) -> Result<Va
         preservation_ok: false,
         inverse_ok: true,
         source_unchanged_on_refusal: false,
+        package_manifest_preserved: false,
         expected_error: expected_error.clone(),
         actual_error_type: None,
         actual_error_resource: None,
+        actual_error_limit: None,
         actual_error_debug: None,
         actual_error_display: None,
     };
 
     let mut metrics = empty_metrics(&prepared.facts);
     let mut output_bytes = None;
+    let mut output_manifest_sha256 = None;
     match outcome {
         HeldOutcome::Error(error) => {
-            summary.actual_error_type =
-                Some(error.debug.lines().next().unwrap_or_default().to_owned());
+            summary.actual_error_type = Some(error.kind.clone());
             summary.actual_error_resource = error.resource.clone();
+            summary.actual_error_limit = error.limit;
             summary.actual_error_debug = Some(error.debug.clone());
             summary.actual_error_display = Some(error.display.clone());
             let expected = expected_error.as_deref().unwrap_or("success");
             summary.semantic_ok = expected != "success" && error_matches(expected, error);
-            summary.source_unchanged_on_refusal = prepared
-                .package
+            summary.source_unchanged_on_refusal = active_package_mut(prepared)
                 .to_bytes()
                 .map(|bytes| bytes == prepared.package_before_bytes)
                 .unwrap_or(false);
-            summary.preservation_ok = summary.source_unchanged_on_refusal;
+            if let Ok(bytes) = active_package_mut(prepared).to_bytes() {
+                if let Ok((manifest, digest)) =
+                    package_manifest_from_bytes(&bytes, prepared.read_limits)
+                {
+                    summary.package_manifest_preserved =
+                        manifest == prepared.package_before_manifest;
+                    output_manifest_sha256 = Some(digest);
+                }
+            }
+            summary.preservation_ok =
+                summary.source_unchanged_on_refusal && summary.package_manifest_preserved;
         },
         HeldOutcome::Success(result) => {
             let snapshots = match result {
-                HeldResult::Snapshots(snapshots) => snapshots.clone(),
-                HeldResult::Snapshot(snapshot) => vec![snapshot.clone()],
-                HeldResult::Commit(commit) => vec![commit.snapshot().clone()],
+                HeldResult::Snapshots(snapshots) => {
+                    if let Ok(bytes) = active_package_mut(prepared).to_bytes() {
+                        if let Ok((manifest, digest)) =
+                            package_manifest_from_bytes(&bytes, prepared.read_limits)
+                        {
+                            summary.package_manifest_preserved =
+                                manifest == prepared.package_before_manifest;
+                            output_manifest_sha256 = Some(digest);
+                        }
+                    }
+                    snapshots.clone()
+                },
+                HeldResult::Snapshot(snapshot) => {
+                    if let Ok(bytes) = active_package_mut(prepared).to_bytes() {
+                        if let Ok((manifest, digest)) =
+                            package_manifest_from_bytes(&bytes, prepared.read_limits)
+                        {
+                            summary.package_manifest_preserved =
+                                if prepared.operation == OperationKind::Inverse {
+                                    manifest == prepared.package_before_manifest
+                                } else {
+                                    manifest_preserves_topology(
+                                        &prepared.package_before_manifest,
+                                        &manifest,
+                                        &mutable_target_names(prepared),
+                                    )
+                                };
+                            if summary.package_manifest_preserved
+                                && prepared.operation == OperationKind::Apply
+                            {
+                                summary.package_manifest_preserved = opaque_target_bytes_preserved(
+                                    &prepared.package_before_bytes,
+                                    &bytes,
+                                    &mutable_target_names(prepared),
+                                    prepared.read_limits,
+                                    prepared.recipe.opaque_mce,
+                                );
+                            }
+                            output_manifest_sha256 = Some(digest);
+                        }
+                    }
+                    vec![snapshot.clone()]
+                },
+                HeldResult::Commit(commit) => {
+                    if let Ok(bytes) = active_package_mut(prepared).to_bytes() {
+                        if let Ok((manifest, digest)) =
+                            package_manifest_from_bytes(&bytes, prepared.read_limits)
+                        {
+                            summary.package_manifest_preserved =
+                                manifest == prepared.package_before_manifest;
+                            output_manifest_sha256 = Some(digest);
+                        }
+                    }
+                    vec![commit.snapshot().clone()]
+                },
                 HeldResult::SaveReopen { bytes, snapshots } => {
                     output_bytes = Some(bytes.len());
+                    if let Ok((manifest, digest)) =
+                        package_manifest_from_bytes(bytes, prepared.read_limits)
+                    {
+                        summary.package_manifest_preserved =
+                            manifest == prepared.package_before_manifest;
+                        output_manifest_sha256 = Some(digest);
+                    }
                     snapshots.clone()
                 },
                 HeldResult::Bytes(bytes) => {
                     output_bytes = Some(bytes.len());
+                    if let Ok((manifest, digest)) =
+                        package_manifest_from_bytes(bytes, prepared.read_limits)
+                    {
+                        summary.package_manifest_preserved =
+                            manifest == prepared.package_before_manifest;
+                        output_manifest_sha256 = Some(digest);
+                    }
                     match Package::from_vec_with_limits(bytes.clone(), prepared.read_limits)
                         .and_then(|package| package.ink_actions_with_limits(prepared.owner_limits))
                     {
                         Ok(snapshots) => snapshots,
                         Err(error) => {
-                            summary.actual_error_type = Some(
-                                format!("{error:?}")
-                                    .lines()
-                                    .next()
-                                    .unwrap_or_default()
-                                    .to_owned(),
-                            );
-                            summary.actual_error_debug = Some(format!("{error:?}"));
-                            summary.actual_error_display = Some(error.to_string());
+                            let actual = actual_error(&error);
+                            summary.actual_error_type = Some(actual.kind);
+                            summary.actual_error_resource = actual.resource;
+                            summary.actual_error_limit = actual.limit;
+                            summary.actual_error_debug = Some(actual.debug);
+                            summary.actual_error_display = Some(actual.display);
                             Vec::new()
                         },
                     }
@@ -1231,8 +2104,15 @@ fn validate_outcome(prepared: &mut Prepared, outcome: &HeldOutcome) -> Result<Va
             };
             if !snapshots.is_empty() {
                 metrics = graph_metrics(&prepared.facts, &snapshots);
+                metrics.expected_unique_target_bytes =
+                    if prepared.operation == OperationKind::Inverse {
+                        prepared.recipe.target_bytes * prepared.recipe.unique_targets
+                    } else {
+                        snapshot_unique_target_bytes(&snapshots)
+                    };
                 summary.semantic_ok = semantic_shape_ok(prepared, &metrics);
-                summary.preservation_ok = preservation_ok(prepared, &metrics);
+                summary.preservation_ok =
+                    preservation_ok(prepared, &metrics) && summary.package_manifest_preserved;
                 if prepared.operation == OperationKind::Inverse {
                     summary.inverse_ok = prepared
                         .source_snapshot
@@ -1257,6 +2137,7 @@ fn validate_outcome(prepared: &mut Prepared, outcome: &HeldOutcome) -> Result<Va
         summary,
         metrics,
         output_bytes,
+        output_manifest_sha256,
     })
 }
 
@@ -1264,21 +2145,8 @@ fn error_matches(expected: &str, actual: &ActualError) -> bool {
     if expected == "success" {
         return false;
     }
-    let expected_type = expected
-        .strip_prefix("Error::")
-        .unwrap_or(expected)
-        .split_whitespace()
-        .next()
-        .unwrap_or(expected);
-    let type_match = match expected_type {
-        "Opc(OpcError::SignedSourceRequiresExplicitPolicy)" => {
-            actual.debug.contains("SignedSourceRequiresExplicitPolicy")
-        },
-        "ContentType" => actual.debug.contains("ContentType"),
-        "StaleSource" => actual.debug.contains("StaleSource"),
-        "Limit" => actual.debug.contains("Limit"),
-        other => actual.debug.contains(other),
-    };
+    let expected_type = expected.split(" {").next().unwrap_or(expected);
+    let type_match = actual.kind == expected_type;
     let resource_match = expected
         .split("resource:")
         .nth(1)
@@ -1295,7 +2163,8 @@ fn error_matches(expected: &str, actual: &ActualError) -> bool {
         .split("limit:")
         .nth(1)
         .and_then(|value| value.split('}').next())
-        .map(|value| actual.debug.contains(&format!("limit: {}", value.trim())))
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(|expected_limit| actual.limit == Some(expected_limit))
         .unwrap_or(true);
     type_match && resource_match && limit_match
 }
@@ -1305,6 +2174,8 @@ fn empty_metrics(facts: &FixtureFacts) -> GraphMetrics {
         source_bytes: facts.source_bytes.len(),
         owner_xml_bytes: 0,
         unique_target_bytes: 0,
+        baseline_unique_target_bytes: 0,
+        expected_unique_target_bytes: 0,
         anchors: 0,
         unique_targets: 0,
         inbound_edges: 0,
@@ -1318,6 +2189,14 @@ fn empty_metrics(facts: &FixtureFacts) -> GraphMetrics {
         outbound_diagnostic_modes: Vec::new(),
         unknown_internal_outbound_preserved: false,
         unknown_external_outbound_preserved: false,
+        opaque_choice_preserved: false,
+        opaque_fallback_preserved: false,
+        opaque_payload_preserved: false,
+        opaque_default_namespace_preserved: false,
+        opaque_prefix_preserved: false,
+        opaque_unknown_requires_preserved: false,
+        owner_xml_sha256: support::sha256_hex(&[]),
+        profile_source_sha256: support::sha256_hex(&[]),
     }
 }
 
@@ -1355,6 +2234,8 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
     let mut action_count = 0usize;
     let mut action_group_count = 0usize;
     let mut modes = BTreeSet::new();
+    let mut owner_xml = Vec::new();
+    let mut profile_source = Vec::new();
     for (target_bytes, inbound, outbound, profile_bytes, target_modes) in targets.values() {
         unique_target_bytes = unique_target_bytes.saturating_add(*target_bytes);
         inbound_edges = inbound_edges.saturating_add(*inbound);
@@ -1375,11 +2256,51 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
             });
         }
     }
-    let expected_pointer_observation = if shared { "shared" } else { "distinct" };
+    for anchor in &anchors {
+        owner_xml.extend_from_slice(anchor.owner_xml());
+        profile_source.extend_from_slice(anchor.profile().source());
+    }
+    let opaque_choice_preserved = profile_source
+        .windows(OPAQUE_CHOICE_MARKER.len())
+        .any(|window| window == OPAQUE_CHOICE_MARKER);
+    let opaque_fallback_preserved = profile_source
+        .windows(OPAQUE_FALLBACK_MARKER.len())
+        .any(|window| window == OPAQUE_FALLBACK_MARKER);
+    let opaque_payload_preserved = profile_source
+        .windows(OPAQUE_PAYLOAD_MARKER.len())
+        .any(|window| window == OPAQUE_PAYLOAD_MARKER);
+    let opaque_default_namespace_preserved = profile_source
+        .windows(OPAQUE_DEFAULT_NAMESPACE_MARKER.len())
+        .any(|window| window == OPAQUE_DEFAULT_NAMESPACE_MARKER);
+    let opaque_prefix_preserved = profile_source
+        .windows(OPAQUE_PREFIX_MARKER.len())
+        .any(|window| window == OPAQUE_PREFIX_MARKER);
+    let opaque_unknown_requires_preserved = profile_source
+        .windows(OPAQUE_UNKNOWN_REQUIRES_MARKER.len())
+        .any(|window| window == OPAQUE_UNKNOWN_REQUIRES_MARKER);
+    let expected_pointer_observation = if targets.len() == 1 || shared {
+        "shared"
+    } else {
+        "distinct"
+    };
+    let baseline_unique_target_bytes = facts
+        .target_names
+        .iter()
+        .filter_map(|name| {
+            facts
+                .package_manifest
+                .parts
+                .iter()
+                .find(|part| part.name == name.as_str())
+                .map(|part| part.bytes)
+        })
+        .sum();
     GraphMetrics {
         source_bytes: facts.source_bytes.len(),
         owner_xml_bytes,
         unique_target_bytes,
+        baseline_unique_target_bytes,
+        expected_unique_target_bytes: baseline_unique_target_bytes,
         anchors: anchors.len(),
         unique_targets: targets.len(),
         inbound_edges,
@@ -1403,7 +2324,26 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
                 .iter()
                 .any(|reference| reference.target_mode() == TargetMode::External)
         }),
+        opaque_choice_preserved,
+        opaque_fallback_preserved,
+        opaque_payload_preserved,
+        opaque_default_namespace_preserved,
+        opaque_prefix_preserved,
+        opaque_unknown_requires_preserved,
+        owner_xml_sha256: support::sha256_hex(&owner_xml),
+        profile_source_sha256: support::sha256_hex(&profile_source),
     }
+}
+
+fn snapshot_unique_target_bytes(snapshots: &[Snapshot]) -> usize {
+    let mut targets = HashMap::<String, usize>::new();
+    for anchor in snapshots.iter().flat_map(Snapshot::anchors) {
+        targets.insert(
+            anchor.target_part_name().as_str().to_owned(),
+            anchor.target_bytes().len(),
+        );
+    }
+    targets.values().copied().sum()
 }
 
 fn semantic_shape_ok(prepared: &Prepared, metrics: &GraphMetrics) -> bool {
@@ -1411,8 +2351,9 @@ fn semantic_shape_ok(prepared: &Prepared, metrics: &GraphMetrics) -> bool {
         && metrics.unique_targets == prepared.recipe.unique_targets
         && metrics.inbound_edges == prepared.recipe.edges
         && metrics.outbound_edges == prepared.recipe.outbound_edges
-        && metrics.unique_target_bytes
+        && metrics.baseline_unique_target_bytes
             == prepared.recipe.target_bytes * prepared.recipe.unique_targets
+        && metrics.unique_target_bytes == metrics.expected_unique_target_bytes
         && metrics.action_count > 0
         && metrics.action_group_count > 0
 }
@@ -1424,7 +2365,14 @@ fn preservation_ok(prepared: &Prepared, metrics: &GraphMetrics) -> bool {
         _ => true,
     };
     let opaque_ok = !prepared.recipe.opaque_mce
-        || (metrics.owner_xml_bytes > 0 && metrics.retained_profile_bytes > 0);
+        || (metrics.owner_xml_bytes > 0
+            && metrics.retained_profile_bytes > 0
+            && metrics.opaque_choice_preserved
+            && metrics.opaque_fallback_preserved
+            && metrics.opaque_payload_preserved
+            && metrics.opaque_default_namespace_preserved
+            && metrics.opaque_prefix_preserved
+            && metrics.opaque_unknown_requires_preserved);
     topology_ok
         && opaque_ok
         && (!prepared.recipe.unknown_internal_outbound

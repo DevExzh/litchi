@@ -1,6 +1,6 @@
 # PPTX existing InkAction owner performance plan
 
-Status: **prepared; no build or timing run has been performed**.
+Status: **implementation scaffold present; no release timing run has been performed**.
 
 This profile is a bounded absolute observation of the committed
 source-backed existing-target `iact:actions` owner at
@@ -10,7 +10,10 @@ Cartesian expansion, generator-selected scale, or hidden lane. The profile
 does not make a blanket `docs/GOAL.md` performance claim; it may report scoped
 Litchi host observations for these recipes after the later run gate passes.
 
-It follows `docs/GOAL.md` and accepted ADRs 0001, 0003, 0005, and 0006. The
+Planning consulted the workspace `docs/GOAL.md` and follows accepted ADRs
+0001, 0003, 0005, and 0006. Because that GOAL file is untracked at the owner
+pin, it is recorded for context but excluded from the reproducible source
+input set; the committed `source-contract.json` is the profile contract. The
 owner contract is
 [`pptx-ink-actions-design.md`](../pptx-ink-actions-design.md). The owner is
 the slide MCE anchor plus its relationship, content-type, target, and inbound
@@ -27,7 +30,8 @@ Git blob ID is `ad7e43e8c2c362c1b9e1938806f59b9fb3ab1dea`. That helper is the
 fixture authority and must be hashed again from the isolated checkout before
 any future build. The adapter may retain a separate OPC recipe generator only
 inside this profile directory; once present, its path and SHA-256 become
-required source inputs. The current scaffold has no generator or executable.
+required source inputs. The implementation scaffold also includes the
+executable harness and its independently locked Cargo manifest.
 
 The helper builds a complete synthetic owner closure with a slide, a
 PresentationML presentation relationship, owner `.rels`, target part, and
@@ -71,6 +75,14 @@ operation:
    changed or exact no-op patch from the signed baseline. The timed operation
    receives an already-prepared public package and only applies the patch; no
    stale mutation or raw OPC edit is hidden inside the timer.
+
+Apply lanes retain a fresh baseline `Package` for the source-preservation
+receipt and construct a second fresh `Package::from_opc_package` working
+package during setup. The retained-baseline live snapshot is taken after the
+baseline package and manifest are ready but before that setup-only working
+package; the working package is released in the named drop phase. This keeps
+the timed apply call limited to patch publication while making the post-drop
+baseline equation explicit.
 
 The public routes under test are `Package::{ink_actions,
 ink_actions_with_limits, apply_ink_actions_patch, to_bytes,
@@ -146,7 +158,7 @@ may not add a Cartesian scale point without a reviewed plan update.
 | `package_save_medium_shared`, `package_save_reopen_medium_shared` | `r04_medium_shared` | `to_bytes()`; save then `from_vec_with_limits` and read |
 | `stale_owner`, `stale_owner_rels`, `stale_target`, `stale_content_type` | `r16`, `r17`, `r18`, `r19` | changed patch application with one changed source input |
 | `signed_noop`, `signed_changed_refusal` | `r15_signed` | exact no-op or changed patch on signed package |
-| `opaque_mce_scalar_edit`, `opaque_mce_save_reopen`, `unknown_outbound_read_edit` | `r14_opaque_unknown_external` | scalar edit/read/save with retained MCE and internal/external outbound diagnostics |
+| `opaque_mce_scalar_edit`, `opaque_mce_save_reopen`, `unknown_outbound_read_edit` | `r14_opaque_unknown_external` | Package patch publication, save/reopen, and read/edit with retained MCE and internal/external outbound diagnostics |
 | `strict_shared_edit` | `r13_strict_shared` | strict read and existing-target scalar edit |
 | `limit_anchor_one_under`, `limit_anchor_exact`, `limit_anchor_one_over` | `r20_limit_anchor` | owner anchor limits `7`, `8`, `9` |
 | `limit_target_one_under`, `limit_target_exact`, `limit_target_one_over` | `r21_limit_target` | owner target-byte limits `16383`, `16384`, `16385` |
@@ -210,12 +222,11 @@ for a large recipe, retry failed correctness, or expand a recipe into a
 Cartesian product. A correctness failure stops that lane and is reported as a
 failed receipt rather than silently spending an unbounded retry budget.
 
-Before any later build, the implementation must materialize a tracked
-`harness/Cargo.lock` from the isolated harness manifest and record its
-SHA-256 in the source/build-input manifest. A missing, dirty, or root-lockfile
-substitution fails preflight. This docs-only scaffold intentionally has no
-harness manifest or lockfile; materialization belongs to the later reviewed
-implementation step and no command here creates one.
+The implementation has materialized a tracked `harness/Cargo.lock` from the
+isolated harness manifest and records its SHA-256 in the source/build-input
+manifest. A missing, dirty, or root-lockfile substitution fails preflight.
+Compile and host-probe checks validate this scaffold; release timing remains
+gated on review and explicit authorization.
 
 ## Timed scope and disjoint phases
 
@@ -245,8 +256,11 @@ Each sample has disjoint phases:
 4. **Drop:** drop operation results/errors and validation temporaries while the
    prepared source/package retained baseline remains live. Record this phase
    separately and do not subtract its deallocations from operation totals.
-5. **Post-drop:** check the retained baseline live set and source reopenability;
-   then release the baseline after the receipt has been serialized.
+5. **Post-drop:** reopen the retained baseline with
+   `Package::from_vec_with_limits` under retained OPC limits, perform the
+   public `Package::ink_actions()` read and expected-anchor check, verify the
+   source manifest, then release the baseline after the receipt has been
+   serialized.
 
 The process allocator records cumulative counters at every boundary. For any
 phase `P`, with direct allocations `A_P`, realloc-new bytes `R+_P`,
@@ -282,12 +296,13 @@ added to phase allocations or treated as a leak proof.
 
 ## Provenance and later run gate
 
-No timing or build may run before this scaffold is committed and reviewed and
-the parent records the production-freeze decision. The future harness owns an
-isolated `harness/Cargo.lock`; it is the authoritative profile lockfile and is
-hashed as a build input. The repository root lockfile is not silently reused
-as the profile lock. The isolated run must capture the full source/build-input
-manifest, owner/helper/generator hashes, lockfile hash, Rust/Cargo/toolchain,
+No release timing capture may run before this scaffold is committed and
+reviewed and the parent records the production-freeze decision. The harness
+owns an isolated `harness/Cargo.lock`; it is the authoritative profile
+lockfile and is hashed as a build input. The repository root lockfile is not
+silently reused as the profile lock. The isolated run must capture the full
+source/build-input manifest, owner/helper/generator hashes, lockfile hash,
+Rust/Cargo/toolchain,
 target and flags, allocator, CPU/host/OS/load, binary SHA-256, and all recipe
 package hashes before and after execution.
 
@@ -296,5 +311,13 @@ samples, and twenty measured samples per process. It rejects dirty or
 untracked production inputs, source drift, missing/duplicate receipts,
 nonempty `RUSTFLAGS`/bootstrap overrides, allocator equation failures,
 unexpected typed errors, and executable hash changes. It may delete only a
-new isolated target that it created. This scaffold itself has no harness lock,
-binary, host receipt, or timing result.
+new isolated target that it created. This scaffold has no release binary, host
+receipt, or timing result; the harness lock is present and hashed above.
+
+The sealed verification report retains the host/load metadata, every setup,
+build, preflight, lane, postflight, and verifier command's start/exit status,
+argv, environment, and stdout/stderr paths, together with each `/usr/bin/time
+-v` user/system/elapsed field. A status-zero run writes an exact
+verification-success sentinel only after that report passes; cleanup deletes a
+target only when both the ownership and verification-success sentinels match
+the canonical fresh target path.

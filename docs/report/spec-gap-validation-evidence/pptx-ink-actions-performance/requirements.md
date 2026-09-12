@@ -105,8 +105,10 @@ target content type and must return the actual typed `Error::ContentType`
 refusal. A retained OPC read-limit mismatch is not in this initial 42-lane
 matrix; it remains a separately recorded input to `from_vec_with_limits`.
 
-Refusal samples record the actual debug/display error type and resource. They
-are valid only if all source members remain unchanged and reopenable.
+Refusal samples record the actual public error variant, resource, and numeric
+limit structurally; bounded debug/display text is retained only as diagnostic
+context. They are valid only if all source members remain unchanged and
+reopenable.
 
 ## Disjoint timing and memory phases
 
@@ -130,7 +132,9 @@ The harness snapshots these disjoint boundaries:
    and expected typed-error checks, all outside the operation timer;
 4. `drop`: operation result/error and validation temporaries dropped while the
    prepared source/package baseline remains retained; and
-5. `postdrop`: baseline live bytes and source reopenability checked before the
+5. `postdrop`: the baseline is reopened with `Package::from_vec_with_limits`
+   using retained OPC limits, read through public `Package::ink_actions()`,
+   checked for the expected anchor count, and manifest-reopened before the
    retained baseline is released.
 
 For each phase `P`, the process-local allocator must record direct allocations
@@ -143,9 +147,14 @@ requested_alloc_P = A_P + R+_P
 peak_live_delta_P = peak_live_during_P - live_before_P
 ```
 
-`live_before_operation` is the retained prepared baseline. Operation
-deallocations are not mixed with validation/drop deallocations. After drop,
-the retained baseline must be accounted for explicitly; allocator cache
+`live_before_operation` is the retained prepared set. For an apply lane, setup
+keeps one baseline `Package` and builds a second fresh
+`Package::from_opc_package` working package after the baseline live snapshot;
+the working package is setup-only, and is dropped in the named `drop` phase.
+The operation timer therefore contains only patch publication, while its
+`live_before` includes the retained working package that will be released in
+`drop`. After drop, the retained baseline must be accounted for explicitly;
+allocator cache
 behavior means equality is a bounded accounting check, not a language-level
 leak proof. Failed allocations, underflow, and invalid counters are separate
 receipt fields. The harness expects
@@ -173,6 +182,7 @@ outbound_diagnostic_modes, unknown_internal_outbound_preserved,
 unknown_external_outbound_preserved,
 action_count, action_group_count, semantic_ok, preservation_ok,
 inverse_ok, expected_error, actual_error_type, actual_error_resource,
+actual_error_limit,
 elapsed_ns, requested_alloc_bytes, peak_live_delta_bytes,
 rss_max_kib, allocation_equation_ok, process_id, warmup
 ```

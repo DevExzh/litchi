@@ -6,6 +6,9 @@ at `cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`. The public adapter, executable
 host probe, matrix preflight, verifier, full-source manifest tool, and
 isolated lockfile are present. No release profile or timing receipt has been
 captured, and there is no native PowerPoint acceptance result or speedup claim.
+The committed [`source-contract.json`](source-contract.json) records the
+reproducible profile contract; the workspace-only untracked `docs/GOAL.md` is
+explicitly excluded from the source input set.
 
 The initial profile is deliberately finite: exactly 23 recipes and 42 lanes,
 with no Cartesian expansion. [`PLAN.md`](PLAN.md) defines the public
@@ -15,7 +18,9 @@ allocator/drop accounting. [`requirements.md`](requirements.md) defines the
 receipt and later run gate. [`corpus-manifest.json`](corpus-manifest.json)
 records the complete recipe/lane mapping and retained helper hash. Its matrix
 preflight requires every recipe to be used by at least one lane and every lane
-to resolve to a real recipe; orphaned or unresolved entries fail review.
+to resolve to a real recipe; orphaned or unresolved entries fail with a
+nonzero status. The owner guard derives every transitive local path package
+from Cargo metadata and pins its source closure to the owner commit.
 
 The fixture authority is the synthetic complete OPC helper at
 [`crates/litchi-pptx/tests/pptx_ink_actions.rs`](../../../../crates/litchi-pptx/tests/pptx_ink_actions.rs),
@@ -25,6 +30,15 @@ checked corpus has no native `inkAction` package. Synthetic owner graphs
 establish only the named Litchi host behavior; they cannot establish
 PowerPoint acceptance, rendering, playback, recognition, or producer-specific
 path/MIME behavior.
+
+Each fixture records exact member, content-type, package-relationship, and
+part-relationship manifests. Successful save/reopen and apply lanes verify
+those manifests, while refusal lanes require the complete serialized source to
+remain unchanged. The opaque fixture contains an unknown MCE choice, an
+inactive fallback, retained opaque profile bytes, and both internal and
+external outbound diagnostics. Its `opaque_mce_scalar_edit` lane publishes a
+prepared scalar patch through `Package::apply_ink_actions_patch()` and checks
+the exact opaque target slice after serialization and reopen.
 
 The adapter owns the isolated `harness/Cargo.lock`; the repository root
 lockfile is not the profile lock. The lockfile is materialized and included in
@@ -37,3 +51,12 @@ warm-ups, 2,520 measured calls, and 2,772 operation calls. Until that review
 gate passes,
 [`report.md`](report.md), [`root-review.md`](root-review.md), and
 [`results/`](results/) remain free of timing receipts.
+
+The runner delegates target cleanup to [`cleanup_target.sh`](cleanup_target.sh).
+The executable timing-free scaffold tests run that helper through valid,
+missing, malformed, mismatching, symlink, and failed-run cases, and verify that
+capture-gate and verifier failures do not create or delete diagnostic paths.
+The later verification report retains host/load metadata, command start/exit
+provenance and output paths, and `/usr/bin/time -v` user/system/elapsed fields.
+Status-zero cleanup requires an exact verification-success sentinel in addition
+to the ownership sentinel; a missing or mismatching receipt retains the target.
