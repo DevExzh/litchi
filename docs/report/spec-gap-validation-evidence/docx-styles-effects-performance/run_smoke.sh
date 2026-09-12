@@ -18,7 +18,7 @@ fi
 
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 ROOT=$(git -C "$HERE/../../../.." rev-parse --show-toplevel)
-SOURCE_COMMIT=d687e38349e4348506a56dc4ae996298844d4091
+SOURCE_COMMIT=d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119
 HARNESS="$HERE/harness/Cargo.toml"
 MANIFEST_TOOL="$HERE/source_manifest.py"
 RESULTS_INPUT=${DOCX_STYLES_EFFECTS_RESULTS:-}
@@ -65,7 +65,7 @@ if [[ -n "$(git -C "$ROOT" --no-replace-objects status --porcelain --untracked-f
 fi
 for required in \
     "$HARNESS" "$HERE/harness/Cargo.lock" "$HERE/harness/adapter.rs" "$HERE/harness/main.rs" "$HERE/harness/support.rs" \
-    "$HERE/source_manifest.py" "$HERE/test_source_snapshot.py" "$HERE/verify.py" "$HERE/requirements.md" "$HERE/corpus-manifest.json" "$HERE/README.md" \
+    "$HERE/source_manifest.py" "$HERE/test_source_snapshot.py" "$HERE/test_verify.py" "$HERE/verify.py" "$HERE/requirements.md" "$HERE/corpus-manifest.json" "$HERE/README.md" \
     "$HERE/run_smoke.sh" "$HERE/fixtures/Bug54849.docx" "$HERE/fixtures/ms-office-2010-signed.docx" \
     "$HERE/fixtures/ComplexNumberedLists.docx" "$HERE/fixtures/testGlossary.docx"; do
     [[ -f "$required" ]] || { echo "committed smoke input is missing: $required" >&2; exit 2; }
@@ -87,6 +87,9 @@ LANES=(
     malformed_duplicate_owner malformed_third_orphan malformed_external
     malformed_wrong_content_type malformed_outbound malformed_shared_inbound
     malformed_root malformed_namespace malformed_opaque_xml
+    malformed_unbound_descendant malformed_invalid_qname malformed_raw_attribute
+    malformed_raw_text malformed_control malformed_invalid_char_ref
+    malformed_empty_prefix malformed_reserved_xml_uri malformed_xml_version
     malformed_xml_events malformed_xml_depth
 )
 
@@ -123,6 +126,7 @@ EXTRA_ARGS=(
     --extra "$HERE/run_smoke.sh"
     --extra "$HERE/source_manifest.py"
     --extra "$HERE/test_source_snapshot.py"
+    --extra "$HERE/test_verify.py"
     --extra "$HERE/verify.py"
     --extra "$HARNESS"
     --extra "$HERE/harness/Cargo.lock"

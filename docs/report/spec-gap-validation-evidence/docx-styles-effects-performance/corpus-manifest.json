@@ -1,6 +1,6 @@
 {
   "schema": "docx-styles-effects-corpus-v1",
-  "source_commit": "d687e38349e4348506a56dc4ae996298844d4091",
+  "source_commit": "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119",
   "fixtures": [
     {
       "name": "Bug54849.docx",
@@ -60,6 +60,9 @@
     "malformed_duplicate_owner", "malformed_third_orphan", "malformed_external",
     "malformed_wrong_content_type", "malformed_outbound", "malformed_shared_inbound",
     "malformed_root", "malformed_namespace", "malformed_opaque_xml",
+    "malformed_unbound_descendant", "malformed_invalid_qname", "malformed_raw_attribute",
+    "malformed_raw_text", "malformed_control", "malformed_invalid_char_ref",
+    "malformed_empty_prefix", "malformed_reserved_xml_uri", "malformed_xml_version",
     "malformed_xml_events", "malformed_xml_depth"
   ],
   "expected_refusals": [
@@ -67,6 +70,9 @@
     "malformed_duplicate_owner", "malformed_third_orphan", "malformed_external",
     "malformed_wrong_content_type", "malformed_outbound", "malformed_shared_inbound",
     "malformed_root", "malformed_namespace", "malformed_opaque_xml",
+    "malformed_unbound_descendant", "malformed_invalid_qname", "malformed_raw_attribute",
+    "malformed_raw_text", "malformed_control", "malformed_invalid_char_ref",
+    "malformed_empty_prefix", "malformed_reserved_xml_uri", "malformed_xml_version",
     "malformed_xml_events", "malformed_xml_depth"
   ]
 }

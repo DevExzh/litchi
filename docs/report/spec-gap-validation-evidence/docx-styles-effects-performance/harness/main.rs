@@ -22,7 +22,7 @@ use support::{AllocSnapshot, begin_window};
 
 const DEFAULT_WARMUP: usize = 0;
 const DEFAULT_SAMPLES: usize = 1;
-const SOURCE_COMMIT: &str = "d687e38349e4348506a56dc4ae996298844d4091";
+const SOURCE_COMMIT: &str = "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119";
 const OPC_SOURCE_LABEL: &str = "styles-effects-source-committed";
 
 fn usage() {
@@ -119,6 +119,9 @@ fn cap_evidence_json(value: &CapEvidence) -> Value {
         "source_metrics": metrics_json(value.source_metrics),
         "projected_metrics": metrics_json(value.projected_metrics),
         "exact_fit_ok": value.exact_fit_ok,
+        "exact_opaque_ok": value.exact_opaque_ok,
+        "source_unrelated_member_digest": value.source_unrelated_member_digest,
+        "exact_unrelated_member_digest": value.exact_unrelated_member_digest,
         "under_refused_ok": value.under_refused_ok,
         "commit_stage_checked": value.commit_stage_checked,
         "refusal": value.refusal.as_ref().map(error_json),

@@ -87,6 +87,15 @@ pub const LANES: &[&str] = &[
     "malformed_root",
     "malformed_namespace",
     "malformed_opaque_xml",
+    "malformed_unbound_descendant",
+    "malformed_invalid_qname",
+    "malformed_raw_attribute",
+    "malformed_raw_text",
+    "malformed_control",
+    "malformed_invalid_char_ref",
+    "malformed_empty_prefix",
+    "malformed_reserved_xml_uri",
+    "malformed_xml_version",
     "malformed_xml_events",
     "malformed_xml_depth",
 ];
@@ -104,6 +113,15 @@ const EXPECTED_REFUSALS: &[&str] = &[
     "malformed_root",
     "malformed_namespace",
     "malformed_opaque_xml",
+    "malformed_unbound_descendant",
+    "malformed_invalid_qname",
+    "malformed_raw_attribute",
+    "malformed_raw_text",
+    "malformed_control",
+    "malformed_invalid_char_ref",
+    "malformed_empty_prefix",
+    "malformed_reserved_xml_uri",
+    "malformed_xml_version",
     "malformed_xml_events",
     "malformed_xml_depth",
 ];
@@ -184,6 +202,9 @@ pub struct CapEvidence {
     pub source_metrics: PackageMetrics,
     pub projected_metrics: PackageMetrics,
     pub exact_fit_ok: bool,
+    pub exact_opaque_ok: bool,
+    pub source_unrelated_member_digest: Option<String>,
+    pub exact_unrelated_member_digest: Option<String>,
     pub under_refused_ok: bool,
     pub commit_stage_checked: bool,
     pub refusal: Option<ErrorReceipt>,
@@ -298,6 +319,15 @@ pub fn fixture_for_lane(lane: &str) -> Result<Fixture> {
                 | "malformed_root"
                 | "malformed_namespace"
                 | "malformed_opaque_xml"
+                | "malformed_unbound_descendant"
+                | "malformed_invalid_qname"
+                | "malformed_raw_attribute"
+                | "malformed_raw_text"
+                | "malformed_control"
+                | "malformed_invalid_char_ref"
+                | "malformed_empty_prefix"
+                | "malformed_reserved_xml_uri"
+                | "malformed_xml_version"
                 | "malformed_xml_events"
                 | "malformed_xml_depth"
         ) {
@@ -385,6 +415,21 @@ pub fn run_once(lane: &str, fixture: &Fixture) -> Result<RunResult> {
         "independent_glossary" => run_independent(fixture, Owner::Glossary),
         name if name.starts_with("cap_") => run_cap(fixture, cap_from_lane(name)?),
         "malformed_opaque_xml" => run_malformed_opaque_xml(fixture),
+        name if matches!(
+            name,
+            "malformed_unbound_descendant"
+                | "malformed_invalid_qname"
+                | "malformed_raw_attribute"
+                | "malformed_raw_text"
+                | "malformed_control"
+                | "malformed_invalid_char_ref"
+                | "malformed_empty_prefix"
+                | "malformed_reserved_xml_uri"
+                | "malformed_xml_version"
+        ) =>
+        {
+            run_malformed_xml_case(fixture, name)
+        },
         "malformed_xml_events" => run_xml_limit_refusal(fixture, false),
         "malformed_xml_depth" => run_xml_limit_refusal(fixture, true),
         name if name.starts_with("malformed_") => run_malformed(fixture, name),
@@ -1200,9 +1245,21 @@ fn run_cap(fixture: &Fixture, kind: CapKind) -> Result<RunResult> {
     let mut exact = Package::from_reader_with_limits(Cursor::new(baseline.clone()), exact_limits)?;
     let exact_result = exact.put_styles_with_effects(Owner::MainDocument, resource.clone())?;
     let exact_output = package_bytes(&mut exact)?;
+    let exact_members = member_hashes(&exact_output)?;
+    let exact_opaque = unchanged_except(
+        &input_members,
+        &exact_members,
+        &[
+            effects_member(Owner::MainDocument),
+            owner_relationship_member(Owner::MainDocument),
+            target_relationship_member(Owner::MainDocument),
+            "[Content_Types].xml",
+        ],
+    );
     let exact_ok = exact_result
         && metrics_equal(&package_metrics(&exact_output)?, &projected)
-        && member_hashes(&exact_output)?.contains_key(effects_member(Owner::MainDocument));
+        && exact_members.contains_key(effects_member(Owner::MainDocument))
+        && exact_opaque;
     let exact_reopened = Package::from_reader(Cursor::new(exact_output.as_slice()))?;
     let exact_owner = exact_reopened.styles_with_effects(Owner::MainDocument)?;
     let exact_ok = exact_ok
@@ -1262,14 +1319,14 @@ fn run_cap(fixture: &Fixture, kind: CapKind) -> Result<RunResult> {
     let graph = Instant::now();
     let output_metrics = package_metrics(&exact_output)?;
     let input_metrics = package_metrics(&baseline)?;
-    let output_member_digest = member_digest(&member_hashes(&exact_output)?);
+    let output_member_digest = member_digest(&exact_members);
     let graph_ns = elapsed(graph);
     Ok(RunResult {
         actual_success: true,
         ingress_refusal: false,
         no_output_ok: true,
         semantic_ok,
-        opaque_ok: physical && metadata && opaque_unchanged,
+        opaque_ok: exact_opaque && physical && metadata && opaque_unchanged,
         exact_inverse_ok: true,
         source_readback_physical_ok: Some(physical && stage_source_unchanged),
         source_readback_metadata_ok: Some(metadata),
@@ -1325,6 +1382,40 @@ fn run_malformed_opaque_xml(fixture: &Fixture) -> Result<RunResult> {
     run_malformed_bytes(
         malformed_opaque_fixture(fixture.package.as_ref())?,
         ExpectedError::MalformedOpaque,
+    )
+}
+
+fn malformed_xml_case_fixture(source: &[u8], lane: &str) -> Result<Vec<u8>> {
+    let (attributes, body, prolog) = match lane {
+        "malformed_unbound_descendant" => ("", "<x:future/>", ""),
+        "malformed_invalid_qname" => ("", "<1bad/>", ""),
+        "malformed_raw_attribute" => (" bad=\"<\"", "", ""),
+        "malformed_raw_text" => ("", "]]>", ""),
+        "malformed_control" => ("", "\u{1}", ""),
+        "malformed_invalid_char_ref" => ("", "&#x1;", ""),
+        "malformed_empty_prefix" => (" xmlns:x=\"\" x:y=\"z\"", "", ""),
+        "malformed_reserved_xml_uri" => (" xmlns=\"http://www.w3.org/XML/1998/namespace\"", "", ""),
+        "malformed_xml_version" => ("", "", "<?xml version=\"2.0\"?>"),
+        _ => return Err(format!("unknown malformed XML lane: {lane}").into()),
+    };
+    let xml =
+        format!("{prolog}<w:styles xmlns:w=\"{TRANSITIONAL_W}\"{attributes}>{body}</w:styles>");
+    rewrite_zip(
+        source,
+        |name, bytes| {
+            if name == effects_member(Owner::MainDocument) {
+                return Ok(Some(xml.as_bytes().to_vec()));
+            }
+            Ok(Some(bytes.to_vec()))
+        },
+        &[],
+    )
+}
+
+fn run_malformed_xml_case(fixture: &Fixture, lane: &str) -> Result<RunResult> {
+    run_malformed_bytes(
+        malformed_xml_case_fixture(fixture.package.as_ref(), lane)?,
+        ExpectedError::Malformed,
     )
 }
 
@@ -1814,6 +1905,22 @@ fn unchanged_except(
         .all(|name| allowed.contains(name.as_str()) || before.get(&name) == after.get(&name))
 }
 
+fn unrelated_member_digest(members: &BTreeMap<String, MemberDigest>, allowed: &[&str]) -> String {
+    let allowed = allowed.iter().copied().collect::<BTreeSet<_>>();
+    let mut hasher = Sha256::new();
+    for (name, digest) in members {
+        if allowed.contains(name.as_str()) {
+            continue;
+        }
+        hasher.update(name.as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.length.to_le_bytes());
+        hasher.update(digest.sha256.as_bytes());
+        hasher.update([0]);
+    }
+    hex_bytes(&hasher.finalize())
+}
+
 fn package_metrics(bytes: &[u8]) -> Result<PackageMetrics> {
     let opc = OpcPackage::from_vec(bytes.to_vec())?;
     let mut total_part_bytes = 0_u64;
@@ -2011,6 +2118,15 @@ fn target_relationship_member(owner: Owner) -> &'static str {
     }
 }
 
+fn owner_edit_members(owner: Owner) -> [&'static str; 4] {
+    [
+        effects_member(owner),
+        owner_relationship_member(owner),
+        target_relationship_member(owner),
+        "[Content_Types].xml",
+    ]
+}
+
 fn is_relationship_member(name: &str) -> bool {
     name == "_rels/.rels" || (name.contains("/_rels/") && name.ends_with(".rels"))
 }
@@ -2086,6 +2202,8 @@ fn native_bug_fixture() -> Fixture {
 fn existing_owner_cap_evidence(fixture: &Fixture, kind: CapKind) -> Result<CapEvidence> {
     let mut generous = open_package(fixture)?;
     let baseline = package_bytes(&mut generous)?;
+    let source_members = member_hashes(&baseline)?;
+    let allowed_members = owner_edit_members(Owner::MainDocument);
     let source_metrics = package_metrics(&baseline)?;
     let snapshot = generous.styles_with_effects(Owner::MainDocument)?;
     let replacement = changed_resource(
@@ -2104,6 +2222,9 @@ fn existing_owner_cap_evidence(fixture: &Fixture, kind: CapKind) -> Result<CapEv
             source_metrics,
             projected_metrics,
             exact_fit_ok: false,
+            exact_opaque_ok: false,
+            source_unrelated_member_digest: None,
+            exact_unrelated_member_digest: None,
             under_refused_ok: false,
             commit_stage_checked: false,
             refusal: None,
@@ -2116,15 +2237,20 @@ fn existing_owner_cap_evidence(fixture: &Fixture, kind: CapKind) -> Result<CapEv
     let exact_before = package_bytes(&mut exact)?;
     let exact_changed = exact.put_styles_with_effects(Owner::MainDocument, replacement.clone())?;
     let exact_output = package_bytes(&mut exact)?;
+    let exact_members = member_hashes(&exact_output)?;
     let exact_metrics = package_metrics(&exact_output)?;
     let exact_reopened = Package::from_reader(Cursor::new(exact_output.as_slice()))?;
     let exact_owner = exact_reopened.styles_with_effects(Owner::MainDocument)?;
+    let exact_opaque_ok = unchanged_except(&source_members, &exact_members, &allowed_members);
     let exact_fit_ok = exact_before == baseline
         && exact_changed
         && metrics_equal(&exact_metrics, &projected_metrics)
+        && exact_opaque_ok
         && exact_owner
             .resource()
             .is_some_and(|resource| resource.xml_bytes() == replacement.xml_bytes());
+    let source_unrelated_member_digest = unrelated_member_digest(&source_members, &allowed_members);
+    let exact_unrelated_member_digest = unrelated_member_digest(&exact_members, &allowed_members);
 
     let under_limits = limits_with_cap(kind, projected_value - 1)?;
     let mut under = Package::from_reader_with_limits(Cursor::new(baseline.clone()), under_limits)?;
@@ -2169,6 +2295,9 @@ fn existing_owner_cap_evidence(fixture: &Fixture, kind: CapKind) -> Result<CapEv
         source_metrics,
         projected_metrics,
         exact_fit_ok,
+        exact_opaque_ok,
+        source_unrelated_member_digest: Some(source_unrelated_member_digest),
+        exact_unrelated_member_digest: Some(exact_unrelated_member_digest),
         under_refused_ok: under_receipt.typed_match
             && under_physical
             && under_metadata

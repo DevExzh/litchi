@@ -4,17 +4,28 @@ This directory contains the correctness scaffold for the public DOCX
 `stylesWithEffects` owner API. It exercises native captures, source snapshot
 no-op, projection reads, replacement, removal, absent-owner addition, exact
 inverse, stale and signed refusals, main/glossary independence, exact OPC cap
-boundaries, malformed relationship topologies, malformed opaque XML, and
-caller XML event/depth limits. The adapter calls the committed public API and
-records typed errors; it does not synthesize timing or refusal results.
+boundaries, malformed relationship topologies, malformed opaque XML grammar
+(including QName, namespace, delimiter, control, character-reference, and
+XML-version cases), and caller XML event/depth limits. The adapter calls the
+committed public API and records typed errors; it does not synthesize timing or
+refusal results.
 
 The smoke pins production inputs to commit
-`d687e38349e4348506a56dc4ae996298844d4091`. The runner requires a clean,
+`d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119`. The runner requires a clean,
 committed descendant checkout containing the harness and four hashed native
 fixtures, checks the transitive local Cargo source closure against Git blobs,
 and uses only fresh external results and target directories. The standalone
 `harness/Cargo.lock` is authoritative for this isolated workspace; the
 repository-root ignored lock is not part of the evidence closure.
+
+Run the source-capture and replay-verifier regression tests from this directory:
+
+```bash
+python3 -B -m unittest test_source_snapshot test_verify
+```
+
+Both test modules are required committed inputs and appear in the smoke's
+before/after source manifests.
 
 Prepare an isolated checkout at the committed scaffold descendant outside the
 active worktree, choose two absent external paths, then run:
@@ -34,10 +45,12 @@ scaling, and speedup claims remain gated until this smoke is independently
 reviewed and a measurement harness is approved.
 
 The first frozen-source run executed all 43 lanes, but only 42 passed the
-fail-closed verifier. Existing-owner replacement in `cap_total_part_bytes`
+fail-closed verifier. Its raw receipts remain outside the checkout at
+`/var/tmp/litchi-docx-styles-effects-first-failed-raw-20260912-b` with a
+per-file SHA manifest. Existing-owner replacement in `cap_total_part_bytes`
 grew aggregate part bytes from 110,027 to 110,151. With a 110,150-byte limit,
-publication correctly returned a `ReadLimit` for `TotalPartBytes`, while transaction
-commit had incorrectly succeeded. The receipt records
-`commit_stage_checked=false`; this is a production preflight defect, not an
-approved smoke result. The production fix and an independent commit-time
-regression are required before a fresh source pin and rerun.
+publication returned a typed `ReadLimit` while transaction commit incorrectly
+succeeded. Production commit `d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119`
+projects replacement aggregate bytes at commit and adds the focused regression;
+a fresh clean 52-lane smoke must validate that sealed source pin before any
+timing run.
