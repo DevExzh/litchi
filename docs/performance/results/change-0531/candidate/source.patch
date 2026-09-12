@@ -1,0 +1,16 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 8d0a925a8..530b8ede4 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -535,10 +535,7 @@ pub fn process_markup_compatibility<'a>(
+     if xml.len() > lim.max_input_bytes {
+         return Err(limit("input bytes"));
+     }
+-    if !xml
+-        .windows(NAMESPACE.len())
+-        .any(|w| w == NAMESPACE.as_bytes())
+-    {
++    if memchr::memmem::find(xml, NAMESPACE.as_bytes()).is_none() {
+         if xml.len() > lim.max_output_bytes {
+             return Err(limit("output bytes"));
+         }

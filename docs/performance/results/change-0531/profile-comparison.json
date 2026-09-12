@@ -1,0 +1,1756 @@
+{
+  "comparison": {
+    "decision": "retainable-conditional-lane",
+    "passed": true,
+    "required_reduction_percent": 1.0,
+    "rows": [
+      {
+        "baseline_profile": "profile-r1-dense-sparse",
+        "candidate_profile": "profile-r1-dense-sparse",
+        "mce_process_markup_compatibility_ir": {
+          "baseline": 12219020,
+          "candidate": 204527,
+          "delta_ir": -12014493
+        },
+        "planning_ir": {
+          "baseline": 237178343,
+          "candidate": 225065014,
+          "delta_ir": -12113329,
+          "passed": true,
+          "reduction_percent": 5.1072660542197985,
+          "required_reduction_percent": 1.0
+        },
+        "profile_identity_equal": true,
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      {
+        "baseline_profile": "profile-r1-medium",
+        "candidate_profile": "profile-r1-medium",
+        "mce_process_markup_compatibility_ir": {
+          "baseline": 6466820,
+          "candidate": 122148,
+          "delta_ir": -6344672
+        },
+        "planning_ir": {
+          "baseline": 125648982,
+          "candidate": 121534778,
+          "delta_ir": -4114204,
+          "passed": true,
+          "reduction_percent": 3.274363177888699,
+          "required_reduction_percent": 1.0
+        },
+        "profile_identity_equal": true,
+        "repeat": 1,
+        "shape": "medium"
+      },
+      {
+        "baseline_profile": "profile-r2-dense-sparse",
+        "candidate_profile": "profile-r2-dense-sparse",
+        "mce_process_markup_compatibility_ir": {
+          "baseline": 12219020,
+          "candidate": 204527,
+          "delta_ir": -12014493
+        },
+        "planning_ir": {
+          "baseline": 237077736,
+          "candidate": 225112535,
+          "delta_ir": -11965201,
+          "passed": true,
+          "reduction_percent": 5.046952616419452,
+          "required_reduction_percent": 1.0
+        },
+        "profile_identity_equal": true,
+        "repeat": 2,
+        "shape": "dense-sparse"
+      },
+      {
+        "baseline_profile": "profile-r2-medium",
+        "candidate_profile": "profile-r2-medium",
+        "mce_process_markup_compatibility_ir": {
+          "baseline": 6466820,
+          "candidate": 122148,
+          "delta_ir": -6344672
+        },
+        "planning_ir": {
+          "baseline": 125610546,
+          "candidate": 119278225,
+          "delta_ir": -6332321,
+          "passed": true,
+          "reduction_percent": 5.041233560118432,
+          "required_reduction_percent": 1.0
+        },
+        "profile_identity_equal": true,
+        "repeat": 2,
+        "shape": "medium"
+      }
+    ],
+    "scope": "Planning Ir is conditional Callgrind mechanism evidence; it is not latency or a whole-workflow speedup."
+  },
+  "limitations": [
+    "Callgrind Ir is a mechanism diagnostic, not native latency, hardware cycles, or allocation counts.",
+    "The four generated profiles cover two shapes and two repeats; no cold-cache, range, scaling, or native-producer claim follows."
+  ],
+  "native_admission": {
+    "admission_status": "eligible-for-conditional-lanes",
+    "file": "comparison.json",
+    "native_rows": 4,
+    "sha256": "99a8b1bb06d3d1e46e7b29882dad39baf4dc1bc4aa7aa1dab28c07299e26026b"
+  },
+  "plan": "plan.json",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "planning_analyzer": {
+    "path": "change-0530/analyze_planning.py",
+    "sha256": "98ad390e346792267f23deef2b5c06c2968d2b693341d640b873560ad2598932"
+  },
+  "raw_helpers": {
+    "path": "change-0521/analyze_profiles.py",
+    "sha256": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7"
+  },
+  "schema": "xlsx_mce_conditional_planning_profile_analysis_v1",
+  "scope": "Conditional XLSX planning profile for the shared OOXML MCE namespace-search pilot.",
+  "selected_function": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+  "stage_selection": [
+    "baseline",
+    "candidate"
+  ],
+  "stages": {
+    "baseline": {
+      "metadata": {
+        "binary_bytes": 60132200,
+        "binary_identity": "baseline/binary-normal.json",
+        "binary_path": "/tmp/litchi-goal-0531/baseline-normal",
+        "binary_sha256": "44b70af7bc9e613770fd79902c4f20167ee25100c9a177299612e07130482456",
+        "build_receipt": "baseline/build-normal.receipt.json",
+        "build_receipt_sha256": "948d270356d59163ce09a392561fd5f498e3d0d388f49128df6bcf368ce8c7cd",
+        "source_manifest": "baseline/source-manifest.json",
+        "source_manifest_entries": 8584,
+        "source_manifest_sha256": "c5a7cfbd0d7da965c7d945aea3355d24e34685b91f9dbbb25baedbed97140a08",
+        "stage": "baseline"
+      },
+      "profile_count": 4,
+      "profiles": [
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 125648924
+              },
+              "file": "baseline/profile-r1-medium.inclusive.txt",
+              "owner_ir": 125648982,
+              "owner_self_ir": 43,
+              "sha256": "cda60a0d5311d20066f5227e17fd87d805eeedecd3120a3c0adac06448db1f08"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "__memcmp_avx2_movbe": 3772174
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 6466820
+                    }
+                  ],
+                  "inclusive_ir": 6466820,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 6516863
+                    }
+                  ],
+                  "inclusive_ir": 6516863,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 6466820,
+              "process_markup_compatibility_self_ir": 2694646
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 125648924
+                  }
+                ],
+                "inclusive_ir": 125648924,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "baseline/profile-r1-medium.callgrind.4",
+            "self": {
+              "file": "baseline/profile-r1-medium.self.txt",
+              "sha256": "4fac6885db633023896da4ede113eb21df05b20521a46261d1f606fc44b94a01"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r1-medium",
+          "native_result": {
+            "file": "baseline/native-r1-primary-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "a2c154572628e43eade2c91e35c1314cc19179fa1330b0fa0ee75d39d052faec"
+          },
+          "planning_ir": 125648982,
+          "profile_result": {
+            "file": "baseline/profile-r1-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "c211424e5cb7489ea590fe8fb60675ffe7c911b579d691b5c76652aa77b4ad91"
+          },
+          "raw_dumps": [
+            {
+              "file": "baseline/profile-r1-medium.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 125572286
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "29a262d2ff2ddd44b4e4235a7c1f11887e3efdbe0cfb9b8b44b69bd3cadddcae",
+              "summary_ir": 125572286
+            },
+            {
+              "file": "baseline/profile-r1-medium.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31246676
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "468867ef6957895810dca648690ea776fdf7cf59093aaceef52612c0b0cb403b",
+              "summary_ir": 31246676
+            },
+            {
+              "file": "baseline/profile-r1-medium.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31286196
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "564be781305af718806d3f5120518570c0352bf11dca00dad7e7629da379176e",
+              "summary_ir": 31286196
+            },
+            {
+              "file": "baseline/profile-r1-medium.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 125648982
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "57721dae3da4677f1e7adf26ba80f0430b4c5cfb91872b07b9fd28979bb42229",
+              "summary_ir": 125648982
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r1-medium.callgrind": "21583f10eb46b7cc8049e1fcd206c5fbebafd0244eadbe9cdcdc15ef1c46b68b",
+              "profile-r1-medium.callgrind.1": "29a262d2ff2ddd44b4e4235a7c1f11887e3efdbe0cfb9b8b44b69bd3cadddcae",
+              "profile-r1-medium.callgrind.2": "468867ef6957895810dca648690ea776fdf7cf59093aaceef52612c0b0cb403b",
+              "profile-r1-medium.callgrind.3": "564be781305af718806d3f5120518570c0352bf11dca00dad7e7629da379176e",
+              "profile-r1-medium.callgrind.4": "57721dae3da4677f1e7adf26ba80f0430b4c5cfb91872b07b9fd28979bb42229",
+              "profile-r1-medium.json": "c211424e5cb7489ea590fe8fb60675ffe7c911b579d691b5c76652aa77b4ad91",
+              "profile-r1-medium.stderr": "3490f9b2e65790d7a9b04735ab5576ba59d802e64133d08f3c7a0c45c6819b83",
+              "profile-r1-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:51:40.353980+00:00",
+            "file": "baseline/profile-r1-medium.receipt.json",
+            "sha256": "f080cc032c020216c4fcb7043498ff4831ed9d07386bd1edeacec3a8215264b5",
+            "start_utc": "2026-09-12T13:51:08.205980+00:00"
+          },
+          "repeat": 1,
+          "shape": "medium",
+          "termination": {
+            "file": "baseline/profile-r1-medium.callgrind",
+            "part": 5,
+            "sha256": "21583f10eb46b7cc8049e1fcd206c5fbebafd0244eadbe9cdcdc15ef1c46b68b",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        },
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 237178285
+              },
+              "file": "baseline/profile-r1-dense-sparse.inclusive.txt",
+              "owner_ir": 237178343,
+              "owner_self_ir": 43,
+              "sha256": "e57b369841f62c1c6cb0362d2a13ae124d9e51752a043c0c3112d04bbd60011b"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "__memcmp_avx2_movbe": 7127624
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 12219020
+                    }
+                  ],
+                  "inclusive_ir": 12219020,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 12269004
+                    }
+                  ],
+                  "inclusive_ir": 12269004,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 12219020,
+              "process_markup_compatibility_self_ir": 5091396
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 237178285
+                  }
+                ],
+                "inclusive_ir": 237178285,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "baseline/profile-r1-dense-sparse.callgrind.4",
+            "self": {
+              "file": "baseline/profile-r1-dense-sparse.self.txt",
+              "sha256": "3ef140d097292abeb4609ecf89d7b7dec4adb3b1a94af0792b12a20c93f2cbcc"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r1-dense-sparse",
+          "native_result": {
+            "file": "baseline/native-r1-primary-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "4ee8c3ce37a440cf86e8ed946d62304a6fb5ae5f78bc20bbb8cda8ab362b425b"
+          },
+          "planning_ir": 237178343,
+          "profile_result": {
+            "file": "baseline/profile-r1-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "b06d90151a3d4a1607d479318ce92bfb4aa33443fdea6b1d2c7f9c91c7baa940"
+          },
+          "raw_dumps": [
+            {
+              "file": "baseline/profile-r1-dense-sparse.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 237014236
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "87cad957005ed3425942de8df21f0b7bdd78614e27137000cbd56fd1052aa9d1",
+              "summary_ir": 237014236
+            },
+            {
+              "file": "baseline/profile-r1-dense-sparse.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 214984194
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "234ec36e6f2aeed3c4796b4155cee130b45139e2efa66d0ffb3ec431b7214f9c",
+              "summary_ir": 214984194
+            },
+            {
+              "file": "baseline/profile-r1-dense-sparse.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 215040705
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "e6a379825aaa02f1c28698982d2b038231f0c50ec38b452b8e8f05d1e5ee39de",
+              "summary_ir": 215040705
+            },
+            {
+              "file": "baseline/profile-r1-dense-sparse.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 237178343
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "975d1298771693dccf683b552686ee00c6f607d6e59ce3d5f8a7a7b75b0bcb69",
+              "summary_ir": 237178343
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r1-dense-sparse.callgrind": "b3e0db549c3ee72563262cf908f2ac88de350caf93104857ac0a3a7bfb0561a0",
+              "profile-r1-dense-sparse.callgrind.1": "87cad957005ed3425942de8df21f0b7bdd78614e27137000cbd56fd1052aa9d1",
+              "profile-r1-dense-sparse.callgrind.2": "234ec36e6f2aeed3c4796b4155cee130b45139e2efa66d0ffb3ec431b7214f9c",
+              "profile-r1-dense-sparse.callgrind.3": "e6a379825aaa02f1c28698982d2b038231f0c50ec38b452b8e8f05d1e5ee39de",
+              "profile-r1-dense-sparse.callgrind.4": "975d1298771693dccf683b552686ee00c6f607d6e59ce3d5f8a7a7b75b0bcb69",
+              "profile-r1-dense-sparse.json": "b06d90151a3d4a1607d479318ce92bfb4aa33443fdea6b1d2c7f9c91c7baa940",
+              "profile-r1-dense-sparse.stderr": "6c31c9c0553a4cdfb60f0a12b2b8b890d60362d19e1f5572f2159a035c7d3b89",
+              "profile-r1-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:52:29.122431+00:00",
+            "file": "baseline/profile-r1-dense-sparse.receipt.json",
+            "sha256": "f18eae048c34b72c35a998ce3bd05d2d103780509e1bcf31725345f7138f1bdb",
+            "start_utc": "2026-09-12T13:51:40.587415+00:00"
+          },
+          "repeat": 1,
+          "shape": "dense-sparse",
+          "termination": {
+            "file": "baseline/profile-r1-dense-sparse.callgrind",
+            "part": 5,
+            "sha256": "b3e0db549c3ee72563262cf908f2ac88de350caf93104857ac0a3a7bfb0561a0",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        },
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 125610488
+              },
+              "file": "baseline/profile-r2-medium.inclusive.txt",
+              "owner_ir": 125610546,
+              "owner_self_ir": 43,
+              "sha256": "6c5ddaddf7f3b8b1260f9d2369d328f9fbcc726daa593337f5e002affb5d589a"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "__memcmp_avx2_movbe": 3772174
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 6466820
+                    }
+                  ],
+                  "inclusive_ir": 6466820,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 6517191
+                    }
+                  ],
+                  "inclusive_ir": 6517191,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 6466820,
+              "process_markup_compatibility_self_ir": 2694646
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 125610488
+                  }
+                ],
+                "inclusive_ir": 125610488,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "baseline/profile-r2-medium.callgrind.4",
+            "self": {
+              "file": "baseline/profile-r2-medium.self.txt",
+              "sha256": "23ebcaf9cdf50ad69cd9b86a3015cdddb6be9897d53c865ba10c9d4c586a134e"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r2-medium",
+          "native_result": {
+            "file": "baseline/native-r2-primary-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "8e651e7635e7de87551c097d40573ad3d6a30ae7e7867437c9a4eb187997cd62"
+          },
+          "planning_ir": 125610546,
+          "profile_result": {
+            "file": "baseline/profile-r2-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "3f9f2716945b82a996808087e7ba4808a67e8b6a815f7f3f817f0e36d2a87ac6"
+          },
+          "raw_dumps": [
+            {
+              "file": "baseline/profile-r2-medium.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 125592647
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "f4313bb8153cba5bf04cc09f16991409efd30d4736a13eedbcd4b79dd795bdec",
+              "summary_ir": 125592647
+            },
+            {
+              "file": "baseline/profile-r2-medium.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31193345
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "41cac9e356e5cc0b41d26b6fae78d9ade93ddf1af338ae06d144bdb16b4abe6b",
+              "summary_ir": 31193345
+            },
+            {
+              "file": "baseline/profile-r2-medium.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31290847
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "625a0240f11cf666e7847810e4737e05adf34173239f996047212d7a68c4610a",
+              "summary_ir": 31290847
+            },
+            {
+              "file": "baseline/profile-r2-medium.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 125610546
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "c98a802ce4a41a848810eee90dea350d3364e79777f824c34d110b22a49afac8",
+              "summary_ir": 125610546
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r2-medium.callgrind": "4136d2cf1c4c8c8292b978f91e45e8f9a649806d68086afe1cfc3a0cc8028a8e",
+              "profile-r2-medium.callgrind.1": "f4313bb8153cba5bf04cc09f16991409efd30d4736a13eedbcd4b79dd795bdec",
+              "profile-r2-medium.callgrind.2": "41cac9e356e5cc0b41d26b6fae78d9ade93ddf1af338ae06d144bdb16b4abe6b",
+              "profile-r2-medium.callgrind.3": "625a0240f11cf666e7847810e4737e05adf34173239f996047212d7a68c4610a",
+              "profile-r2-medium.callgrind.4": "c98a802ce4a41a848810eee90dea350d3364e79777f824c34d110b22a49afac8",
+              "profile-r2-medium.json": "3f9f2716945b82a996808087e7ba4808a67e8b6a815f7f3f817f0e36d2a87ac6",
+              "profile-r2-medium.stderr": "bfc0cffb17f2563c05399be768ee0befed01538d82572a2b698e9621a8c0d1e5",
+              "profile-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:53:00.659106+00:00",
+            "file": "baseline/profile-r2-medium.receipt.json",
+            "sha256": "3458c653a49cb1fc7c14e00d383d5d1a157b0faedac6d8a2fcf3ffd3a8106833",
+            "start_utc": "2026-09-12T13:52:29.353426+00:00"
+          },
+          "repeat": 2,
+          "shape": "medium",
+          "termination": {
+            "file": "baseline/profile-r2-medium.callgrind",
+            "part": 5,
+            "sha256": "4136d2cf1c4c8c8292b978f91e45e8f9a649806d68086afe1cfc3a0cc8028a8e",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        },
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 237077678
+              },
+              "file": "baseline/profile-r2-dense-sparse.inclusive.txt",
+              "owner_ir": 237077736,
+              "owner_self_ir": 43,
+              "sha256": "8d8acec8858f9ef66f0d3a0072029e604cdd0f1e091da8e792a15f2ff332c7c6"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "__memcmp_avx2_movbe": 7127624
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 12219020
+                    }
+                  ],
+                  "inclusive_ir": 12219020,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 12269496
+                    }
+                  ],
+                  "inclusive_ir": 12269496,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 12219020,
+              "process_markup_compatibility_self_ir": 5091396
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 237077678
+                  }
+                ],
+                "inclusive_ir": 237077678,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "baseline/profile-r2-dense-sparse.callgrind.4",
+            "self": {
+              "file": "baseline/profile-r2-dense-sparse.self.txt",
+              "sha256": "be996e99bd5c1664623a85f9cf649b9432c7ed6fd0c3ff8526aeb5afc566dafe"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r2-dense-sparse",
+          "native_result": {
+            "file": "baseline/native-r2-primary-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "6913e3be990514c08762e67eb95cfce425867043a72599b1ce48d85ac87e2e34"
+          },
+          "planning_ir": 237077736,
+          "profile_result": {
+            "file": "baseline/profile-r2-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "5a730f246fd9a3ecc29119e8174915c689c51506989287a303e3593811f76999"
+          },
+          "raw_dumps": [
+            {
+              "file": "baseline/profile-r2-dense-sparse.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 237031524
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "84c011de537f17aa97342547921a64ad1bd75986125a2e5fe6cb469c238125cc",
+              "summary_ir": 237031524
+            },
+            {
+              "file": "baseline/profile-r2-dense-sparse.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 214986833
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "8f1945cc9afeb1596c2c7291ea3e18a647cdf2134e389d1e326f6ed4905899c1",
+              "summary_ir": 214986833
+            },
+            {
+              "file": "baseline/profile-r2-dense-sparse.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 215043678
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "04a0f72f9bbf93c44f6d4f2ee48ca48f2f71d635b6c92b577363aeb5eaa99a89",
+              "summary_ir": 215043678
+            },
+            {
+              "file": "baseline/profile-r2-dense-sparse.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 237077736
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "349dd2ae08bde2ccc9b0b900333d023eec1300e2c7f826b116c68e4d75880e50",
+              "summary_ir": 237077736
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r2-dense-sparse.callgrind": "3cd79da093347b2e0da397fcb5c67a925166460a01b976381278fab6b59ccc64",
+              "profile-r2-dense-sparse.callgrind.1": "84c011de537f17aa97342547921a64ad1bd75986125a2e5fe6cb469c238125cc",
+              "profile-r2-dense-sparse.callgrind.2": "8f1945cc9afeb1596c2c7291ea3e18a647cdf2134e389d1e326f6ed4905899c1",
+              "profile-r2-dense-sparse.callgrind.3": "04a0f72f9bbf93c44f6d4f2ee48ca48f2f71d635b6c92b577363aeb5eaa99a89",
+              "profile-r2-dense-sparse.callgrind.4": "349dd2ae08bde2ccc9b0b900333d023eec1300e2c7f826b116c68e4d75880e50",
+              "profile-r2-dense-sparse.json": "5a730f246fd9a3ecc29119e8174915c689c51506989287a303e3593811f76999",
+              "profile-r2-dense-sparse.stderr": "bc36c1bd31c260ea5e9ad3c86e2c709337559607c71a6a7079eccebd96b86f88",
+              "profile-r2-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:53:49.322375+00:00",
+            "file": "baseline/profile-r2-dense-sparse.receipt.json",
+            "sha256": "2cf52e2ac7a4942ca16249eaf094bbb037edf0088581cadab39a2adfa69e2092",
+            "start_utc": "2026-09-12T13:53:00.892282+00:00"
+          },
+          "repeat": 2,
+          "shape": "dense-sparse",
+          "termination": {
+            "file": "baseline/profile-r2-dense-sparse.callgrind",
+            "part": 5,
+            "sha256": "3cd79da093347b2e0da397fcb5c67a925166460a01b976381278fab6b59ccc64",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        }
+      ],
+      "stage": "baseline",
+      "status": "pass",
+      "validation": {
+        "exact_source_binary_receipt_bindings": true,
+        "profile_matrix_complete": true,
+        "raw_dumps_complete": true
+      }
+    },
+    "candidate": {
+      "metadata": {
+        "binary_bytes": 60122200,
+        "binary_identity": "candidate/binary-normal.json",
+        "binary_path": "/tmp/litchi-goal-0531/candidate-normal",
+        "binary_sha256": "6f52c6aef8d1c7f480054c9aa47d29874cc02044b2911ee8532e988a2c26fac9",
+        "build_receipt": "candidate/build-normal.receipt.json",
+        "build_receipt_sha256": "6f9357bef65e4523d229ac004c67c9a13df2c8be271f6d023c9831c393014bd2",
+        "source_manifest": "candidate/source-manifest.json",
+        "source_manifest_entries": 8585,
+        "source_manifest_sha256": "1d4d1349f4c61567f12985b5b6e0af48c55a81bc58c74a9704c0f43dc401e252",
+        "stage": "candidate"
+      },
+      "profile_count": 4,
+      "profiles": [
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 121534720
+              },
+              "file": "candidate/profile-r1-medium.inclusive.txt",
+              "owner_ir": 121534778,
+              "owner_self_ir": 43,
+              "sha256": "f6a950a37d901cbec142cb075a19a1cb867ba873327b1cfa10ce1b017cc42e1d"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "memchr::memmem::FinderBuilder::build_forward_with_ranker": 28356,
+                "memchr::memmem::searcher::searcher_kind_two_way_with_prefilter": 93372
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 122148
+                    }
+                  ],
+                  "inclusive_ir": 122148,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 184150
+                    }
+                  ],
+                  "inclusive_ir": 184150,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 122148,
+              "process_markup_compatibility_self_ir": 420
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 121534720
+                  }
+                ],
+                "inclusive_ir": 121534720,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "candidate/profile-r1-medium.callgrind.4",
+            "self": {
+              "file": "candidate/profile-r1-medium.self.txt",
+              "sha256": "16766e5791e361a947a11e5edc30bb3450536bbe658aaf1ebdcf992d8b2c2179"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r1-medium",
+          "native_result": {
+            "file": "candidate/native-r1-primary-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "74e087190b79b843578c7d7c5b1d80605b5aaa3cf5f8df11b99c9ed668aa38c4"
+          },
+          "planning_ir": 121534778,
+          "profile_result": {
+            "file": "candidate/profile-r1-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "d4a98de2a1730e7eba77790853d08970fe6b0012eb738355ea02eb731a07316f"
+          },
+          "raw_dumps": [
+            {
+              "file": "candidate/profile-r1-medium.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 119220234
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "7c8ae9566108cbef7f6f774d16c6d9f735d255e83ee74babe308a4e74cfebe02",
+              "summary_ir": 119220234
+            },
+            {
+              "file": "candidate/profile-r1-medium.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 29744481
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "dbe7266228fb3484b48a49c79f8e6bc65142f9342c07830bb7232a133f62e823",
+              "summary_ir": 29744481
+            },
+            {
+              "file": "candidate/profile-r1-medium.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 29779898
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "ceca2e42cd881205c6093f6be0afe77a6dd5c29c2e8f7b6c1cfbb0d367ae25e8",
+              "summary_ir": 29779898
+            },
+            {
+              "file": "candidate/profile-r1-medium.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 121534778
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "1ca29779cdefd4bcef70dae22c1bcd9d74b98429fc7cb931cfb3e5a5c28e192c",
+              "summary_ir": 121534778
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r1-medium.callgrind": "86fa909891f4c23f6db16c362dafa8286ffcc1e00cd552d868bbe957a7eccc38",
+              "profile-r1-medium.callgrind.1": "7c8ae9566108cbef7f6f774d16c6d9f735d255e83ee74babe308a4e74cfebe02",
+              "profile-r1-medium.callgrind.2": "dbe7266228fb3484b48a49c79f8e6bc65142f9342c07830bb7232a133f62e823",
+              "profile-r1-medium.callgrind.3": "ceca2e42cd881205c6093f6be0afe77a6dd5c29c2e8f7b6c1cfbb0d367ae25e8",
+              "profile-r1-medium.callgrind.4": "1ca29779cdefd4bcef70dae22c1bcd9d74b98429fc7cb931cfb3e5a5c28e192c",
+              "profile-r1-medium.json": "d4a98de2a1730e7eba77790853d08970fe6b0012eb738355ea02eb731a07316f",
+              "profile-r1-medium.stderr": "da30703d3b3856ce52451d9ed715bafb39ea30d4872c5e05a885c0df50337607",
+              "profile-r1-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:54:21.022350+00:00",
+            "file": "candidate/profile-r1-medium.receipt.json",
+            "sha256": "2ec718952c48a1ec530d3b9d927cb89f6c11427ffd5ae347998f9b50e1247347",
+            "start_utc": "2026-09-12T13:53:50.123858+00:00"
+          },
+          "repeat": 1,
+          "shape": "medium",
+          "termination": {
+            "file": "candidate/profile-r1-medium.callgrind",
+            "part": 5,
+            "sha256": "86fa909891f4c23f6db16c362dafa8286ffcc1e00cd552d868bbe957a7eccc38",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        },
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 225064956
+              },
+              "file": "candidate/profile-r1-dense-sparse.inclusive.txt",
+              "owner_ir": 225065014,
+              "owner_self_ir": 43,
+              "sha256": "67fc2a4412569459562b3a3c902e3b4f99f7a7f59010611fbb9c4e943604a978"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "memchr::memmem::FinderBuilder::build_forward_with_ranker": 28356,
+                "memchr::memmem::searcher::searcher_kind_two_way_with_prefilter": 175751
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 204527
+                    }
+                  ],
+                  "inclusive_ir": 204527,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 266957
+                    }
+                  ],
+                  "inclusive_ir": 266957,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 204527,
+              "process_markup_compatibility_self_ir": 420
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 225064956
+                  }
+                ],
+                "inclusive_ir": 225064956,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "candidate/profile-r1-dense-sparse.callgrind.4",
+            "self": {
+              "file": "candidate/profile-r1-dense-sparse.self.txt",
+              "sha256": "7ea0ba15ed5c94c0640690dca35fe8d5f7dbecb7dd5ad0cb0f9f0e9210b08607"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r1-dense-sparse",
+          "native_result": {
+            "file": "candidate/native-r1-primary-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "b8b60b3b83314909e9a47fac7bdaaba004875b530d98d8c4c76fefd6cf6f2176"
+          },
+          "planning_ir": 225065014,
+          "profile_result": {
+            "file": "candidate/profile-r1-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "379fe245772af26d06c92c316ed4eb9d7b1f6a21ddc1fd14c368b5b6f14fc55c"
+          },
+          "raw_dumps": [
+            {
+              "file": "candidate/profile-r1-dense-sparse.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 224985843
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "7717e282715aaee8d36a3849f964111f9e2f2bc51ff85d75b6ef48660f358040",
+              "summary_ir": 224985843
+            },
+            {
+              "file": "candidate/profile-r1-dense-sparse.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 204053115
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "ce13f4b656ca90bc25781fd5951f0ed67733ec510ea4c33d06322b8e74cfdd21",
+              "summary_ir": 204053115
+            },
+            {
+              "file": "candidate/profile-r1-dense-sparse.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 204085113
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "f7128adb5569830760ea0f454049224e789d3c04b3aefc9f86f5e081dd2facbf",
+              "summary_ir": 204085113
+            },
+            {
+              "file": "candidate/profile-r1-dense-sparse.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 225065014
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "c8ae9f61b771b845f5cb48346569b8b34d407fb318fdb7b021f4c0885e7d4993",
+              "summary_ir": 225065014
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r1-dense-sparse.callgrind": "ed8c013a8b35f187723e64b8d190bb682102f1e2110581941016a63e8c432746",
+              "profile-r1-dense-sparse.callgrind.1": "7717e282715aaee8d36a3849f964111f9e2f2bc51ff85d75b6ef48660f358040",
+              "profile-r1-dense-sparse.callgrind.2": "ce13f4b656ca90bc25781fd5951f0ed67733ec510ea4c33d06322b8e74cfdd21",
+              "profile-r1-dense-sparse.callgrind.3": "f7128adb5569830760ea0f454049224e789d3c04b3aefc9f86f5e081dd2facbf",
+              "profile-r1-dense-sparse.callgrind.4": "c8ae9f61b771b845f5cb48346569b8b34d407fb318fdb7b021f4c0885e7d4993",
+              "profile-r1-dense-sparse.json": "379fe245772af26d06c92c316ed4eb9d7b1f6a21ddc1fd14c368b5b6f14fc55c",
+              "profile-r1-dense-sparse.stderr": "8a2c8bac983c2bbff8a5b50b430b04b29d3f7192aced7f89d12022918b264d68",
+              "profile-r1-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:55:08.718810+00:00",
+            "file": "candidate/profile-r1-dense-sparse.receipt.json",
+            "sha256": "cade5e62aec625c578dacc5c8837b3c180e30469172b09ae968cb0afa2df00aa",
+            "start_utc": "2026-09-12T13:54:21.250445+00:00"
+          },
+          "repeat": 1,
+          "shape": "dense-sparse",
+          "termination": {
+            "file": "candidate/profile-r1-dense-sparse.callgrind",
+            "part": 5,
+            "sha256": "ed8c013a8b35f187723e64b8d190bb682102f1e2110581941016a63e8c432746",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        },
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 119278167
+              },
+              "file": "candidate/profile-r2-medium.inclusive.txt",
+              "owner_ir": 119278225,
+              "owner_self_ir": 43,
+              "sha256": "c9cfa55019566c9dc310f5f016fc1c4fc57083ee9ce7b0613d1db24aa2864156"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "memchr::memmem::FinderBuilder::build_forward_with_ranker": 28356,
+                "memchr::memmem::searcher::searcher_kind_two_way_with_prefilter": 93372
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 122148
+                    }
+                  ],
+                  "inclusive_ir": 122148,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 184334
+                    }
+                  ],
+                  "inclusive_ir": 184334,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 122148,
+              "process_markup_compatibility_self_ir": 420
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 119278167
+                  }
+                ],
+                "inclusive_ir": 119278167,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "candidate/profile-r2-medium.callgrind.4",
+            "self": {
+              "file": "candidate/profile-r2-medium.self.txt",
+              "sha256": "74311f79a8a52c9a5b3c7f986b009fd8e3527039402af7f9673a465dff54ef0f"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r2-medium",
+          "native_result": {
+            "file": "candidate/native-r2-primary-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "5a4390ab2ef73f77b427e88e26806087ed3e9f7357f44fedf2f007b29443a5cc"
+          },
+          "planning_ir": 119278225,
+          "profile_result": {
+            "file": "candidate/profile-r2-medium.json",
+            "logical_identity_sha256": "f95db6a118e133d28b9e442478712db7ee0863746d802b2b5f610b3e4536c100",
+            "sha256": "d1c5016eb8c028fa0910e4b4d7fd00de23588a236b156b18763356b713f0a098"
+          },
+          "raw_dumps": [
+            {
+              "file": "candidate/profile-r2-medium.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 119219721
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "14e80c114bfbdd08441648931d56980a5c584b8548a477ea2f6f16265e602607",
+              "summary_ir": 119219721
+            },
+            {
+              "file": "candidate/profile-r2-medium.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 29745103
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "8500308c0f2e2c2e1dc6a252ab06a2c6c8654336550d42ae0bf4386febf691b2",
+              "summary_ir": 29745103
+            },
+            {
+              "file": "candidate/profile-r2-medium.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 29778577
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "9f0dbb2894788f16cd5c964051509a6c8c91d6a4334409c772162f53505aa1e0",
+              "summary_ir": 29778577
+            },
+            {
+              "file": "candidate/profile-r2-medium.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 119278225
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "385fb035115be7e12efecdd2553f9198ffd17fbd12695ffe7e7444a496b3b2f5",
+              "summary_ir": 119278225
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r2-medium.callgrind": "ba18132fa127a93f1ac32ba65993818af23c6d632a205d468f7ad51b2347e49d",
+              "profile-r2-medium.callgrind.1": "14e80c114bfbdd08441648931d56980a5c584b8548a477ea2f6f16265e602607",
+              "profile-r2-medium.callgrind.2": "8500308c0f2e2c2e1dc6a252ab06a2c6c8654336550d42ae0bf4386febf691b2",
+              "profile-r2-medium.callgrind.3": "9f0dbb2894788f16cd5c964051509a6c8c91d6a4334409c772162f53505aa1e0",
+              "profile-r2-medium.callgrind.4": "385fb035115be7e12efecdd2553f9198ffd17fbd12695ffe7e7444a496b3b2f5",
+              "profile-r2-medium.json": "d1c5016eb8c028fa0910e4b4d7fd00de23588a236b156b18763356b713f0a098",
+              "profile-r2-medium.stderr": "242698557fee806420c2260073bfd6050857aff607fbb9d46f4e19fb89e55078",
+              "profile-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:55:40.082349+00:00",
+            "file": "candidate/profile-r2-medium.receipt.json",
+            "sha256": "37c12eca7c314aa81f45839119fc19dfb2df0585d109e513b755cb8b3a47a6f1",
+            "start_utc": "2026-09-12T13:55:08.947825+00:00"
+          },
+          "repeat": 2,
+          "shape": "medium",
+          "termination": {
+            "file": "candidate/profile-r2-medium.callgrind",
+            "part": 5,
+            "sha256": "ba18132fa127a93f1ac32ba65993818af23c6d632a205d468f7ad51b2347e49d",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        },
+        {
+          "annotations": {
+            "inclusive": {
+              "direct_callee_ir": {
+                "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 225112477
+              },
+              "file": "candidate/profile-r2-dense-sparse.inclusive.txt",
+              "owner_ir": 225112535,
+              "owner_self_ir": 43,
+              "sha256": "e3cb0b777d193df0dc5a4179e3bf5a5a80295476f34131ee09b7bed22d31b855"
+            },
+            "mce": {
+              "direct_callee_ir": {
+                "memchr::memmem::FinderBuilder::build_forward_with_ranker": 28356,
+                "memchr::memmem::searcher::searcher_kind_two_way_with_prefilter": 175751
+              },
+              "parent_edges": {
+                "process_ooxml_to_process_markup_compatibility": {
+                  "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "calls": 57,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_markup_compatibility",
+                      "caller": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "calls": 57,
+                      "inclusive_ir": 204527
+                    }
+                  ],
+                  "inclusive_ir": 204527,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_markup_compatibility"
+                },
+                "worksheet_parse_to_process_ooxml": {
+                  "caller": "litchi_xlsx::raw::worksheet::parse",
+                  "calls": 4,
+                  "edges": [
+                    {
+                      "callee": "litchi_ooxml_common::mce::codec::process_ooxml",
+                      "caller": "litchi_xlsx::raw::worksheet::parse",
+                      "calls": 4,
+                      "inclusive_ir": 266355
+                    }
+                  ],
+                  "inclusive_ir": 266355,
+                  "positive_edge_count": 1,
+                  "target": "litchi_ooxml_common::mce::codec::process_ooxml"
+                }
+              },
+              "process_markup_compatibility_ir": 204527,
+              "process_markup_compatibility_self_ir": 420
+            },
+            "raw_direct_edges": {
+              "litchi_opc::source_backed::SourceBackedPackage::check_execution": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_opc::source_backed::SourceBackedPackage::check_execution",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 15
+                  }
+                ],
+                "inclusive_ir": 15,
+                "positive_edge_count": 1,
+                "target": "litchi_opc::source_backed::SourceBackedPackage::check_execution"
+              },
+              "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+                "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "calls": 1,
+                "edges": [
+                  {
+                    "callee": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed",
+                    "caller": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                    "calls": 1,
+                    "inclusive_ir": 225112477
+                  }
+                ],
+                "inclusive_ir": 225112477,
+                "positive_edge_count": 1,
+                "target": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+              }
+            },
+            "selected_dump": "candidate/profile-r2-dense-sparse.callgrind.4",
+            "self": {
+              "file": "candidate/profile-r2-dense-sparse.self.txt",
+              "sha256": "c2da132c8322f7394af07a8bf4edbed7962f5d7895b69ac7463ea974419f195e"
+            },
+            "validation": {
+              "mce_parent_edges_present": true,
+              "mce_self_plus_direct_equation": true,
+              "owner_annotation_edges_match_raw": true,
+              "owner_raw_inclusive_matches": true,
+              "owner_self_plus_direct_equation": true
+            }
+          },
+          "name": "profile-r2-dense-sparse",
+          "native_result": {
+            "file": "candidate/native-r2-primary-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "295ba0ccb3146657a725ec68d9312f8c4065cea2893b7d7e5b2912c8d33ff101"
+          },
+          "planning_ir": 225112535,
+          "profile_result": {
+            "file": "candidate/profile-r2-dense-sparse.json",
+            "logical_identity_sha256": "a23864bbed614531e1d4b0332a53618a783bd57ab7ed030c2b0c5e9d254b6c0c",
+            "sha256": "182b4bdc78a513811528cf90e7ca200908ee4eb3b6d97883a6010e271f89a98c"
+          },
+          "raw_dumps": [
+            {
+              "file": "candidate/profile-r2-dense-sparse.callgrind.1",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 225005948
+              },
+              "parent_edge_unique": true,
+              "part": 1,
+              "sha256": "3f17e4801176f1ba44ffaaf8dcad8713de343fe465e0325b3729dea18d677c55",
+              "summary_ir": 225005948
+            },
+            {
+              "file": "candidate/profile-r2-dense-sparse.callgrind.2",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 204051697
+              },
+              "parent_edge_unique": true,
+              "part": 2,
+              "sha256": "2136d7f1a615446655912c2858fa27906bfa1bf33ae477f81eed2a9a2e1af27f",
+              "summary_ir": 204051697
+            },
+            {
+              "file": "candidate/profile-r2-dense-sparse.callgrind.3",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 204092588
+              },
+              "parent_edge_unique": true,
+              "part": 3,
+              "sha256": "89faa005b2e102647c548d62eaf8535220be5ed1db09250bd904be903376b4dd",
+              "summary_ir": 204092588
+            },
+            {
+              "file": "candidate/profile-r2-dense-sparse.callgrind.4",
+              "parent_edge": {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 225112535
+              },
+              "parent_edge_unique": true,
+              "part": 4,
+              "sha256": "08a1a329656843be5364068152a02c6cf45137aa5c1118ceb9083b5bf7f8571d",
+              "summary_ir": 225112535
+            }
+          ],
+          "receipt": {
+            "artifacts": {
+              "profile-r2-dense-sparse.callgrind": "4e1be246d882f03af302d7626a5d640465136f77602d05b1a877bf55a39953b5",
+              "profile-r2-dense-sparse.callgrind.1": "3f17e4801176f1ba44ffaaf8dcad8713de343fe465e0325b3729dea18d677c55",
+              "profile-r2-dense-sparse.callgrind.2": "2136d7f1a615446655912c2858fa27906bfa1bf33ae477f81eed2a9a2e1af27f",
+              "profile-r2-dense-sparse.callgrind.3": "89faa005b2e102647c548d62eaf8535220be5ed1db09250bd904be903376b4dd",
+              "profile-r2-dense-sparse.callgrind.4": "08a1a329656843be5364068152a02c6cf45137aa5c1118ceb9083b5bf7f8571d",
+              "profile-r2-dense-sparse.json": "182b4bdc78a513811528cf90e7ca200908ee4eb3b6d97883a6010e271f89a98c",
+              "profile-r2-dense-sparse.stderr": "e5128afb03db0c88569efdd4bf83dc581746d0929236df0f48b2869dff0d87af",
+              "profile-r2-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            "end_utc": "2026-09-12T13:56:27.576089+00:00",
+            "file": "candidate/profile-r2-dense-sparse.receipt.json",
+            "sha256": "ec264a58615a0af85827f2afd453a0787d42d0e7f57f908037e314779c5fb791",
+            "start_utc": "2026-09-12T13:55:40.309729+00:00"
+          },
+          "repeat": 2,
+          "shape": "dense-sparse",
+          "termination": {
+            "file": "candidate/profile-r2-dense-sparse.callgrind",
+            "part": 5,
+            "sha256": "4e1be246d882f03af302d7626a5d640465136f77602d05b1a877bf55a39953b5",
+            "summary_ir": 0
+          },
+          "validation": {
+            "mce_parent_edges_present": true,
+            "mce_self_plus_direct_equation": true,
+            "owner_annotation_edges_match_raw": true,
+            "owner_raw_inclusive_matches": true,
+            "owner_self_plus_direct_equation": true,
+            "profile_native_identity_equal": true,
+            "termination_zero_ir": true,
+            "three_lifecycle_dumps": true,
+            "unique_final_measured_parent": true
+          }
+        }
+      ],
+      "stage": "candidate",
+      "status": "pass",
+      "validation": {
+        "exact_source_binary_receipt_bindings": true,
+        "profile_matrix_complete": true,
+        "raw_dumps_complete": true
+      }
+    }
+  },
+  "status": "pass"
+}

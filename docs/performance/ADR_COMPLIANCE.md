@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## 0531: reject the final OOXML MCE binary
+
+[0531](changes/0531-ooxml-mce-namespace-search.md) restores the production
+MCE namespace-search implementation after the final test-only rebuild produced
+a release binary different from the initially measured candidate. The fresh
+44-child native ABBA comparison rejects retention: dense-sparse repeat 2 lowers
+total p50 by only 0.8937% and mean by 0.6056%, below the 1% gate. The final
+conditional profile remains diagnostic; its planning-Ir reductions do not
+override native admission. Nine MCE regression tests and a test-only
+`repeat_n` lint correction remain, with no runtime API, dependency, unsafe-code,
+validation-policy or resource-policy change adopted. All eight restored-source quality gates pass, including 4,757 successful
+test executions. OLE2/OOXML remains active, ODF is deferred, and iWork is excluded.
+
 ## 0530: unchanged planning attribution and exact-search follow-up
 
 [0530](changes/0530-xlsx-planning-attribution.md) preserves all runtime source and reuses the exact 0529 final quality binding. The next draft replaces a namespace substring predicate without bypassing MCE processing, changing limits or weakening validation. Fresh performance and correctness gates remain required before adoption.

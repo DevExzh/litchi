@@ -1,0 +1,14 @@
+
+running 9 tests
+test every_namespace_byte_mutation_and_near_match_remain_borrowed ... ok
+test absent_namespace_bytes_are_borrowed_without_xml_or_utf8_validation ... ok
+test repeated_namespace_occurrences_remain_owned_and_unmodified ... ok
+test input_limit_precedes_output_limit_and_both_paths_report_exact_resources ... ok
+test exact_namespace_at_raw_boundaries_retains_parser_errors ... ok
+test exact_namespace_occurrences_cross_search_boundary_offsets ... ok
+test exact_namespace_occurrences_in_xml_contexts_enter_the_parser ... ok
+test real_alternate_content_processing_still_selects_the_fallback ... ok
+test string_and_part_arc_wrappers_preserve_ownership_contract ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

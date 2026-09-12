@@ -1,0 +1,36 @@
+{
+  "schema": "litchi-0531-final-native-plan-v1",
+  "created_utc": "2026-09-12T14:40:02.643533+00:00",
+  "primary_plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "quality_summary_sha256": "ae778b38bf753ffda5f86956bf2ea402ec1ac85b4582ae804c698a8e7ce7305e",
+  "reason": "Final test-only source corrections rebuilt a nonidentical release binary; fresh complete native ABBA matrix required before acceptance. Original candidate reports remain unchanged.",
+  "baseline_binary_sha256": "44b70af7bc9e613770fd79902c4f20167ee25100c9a177299612e07130482456",
+  "final_binary_sha256": "0da73c5ab5f152bfa535a5259efe41c952e027f9fe31d70190400bf507c87ef1",
+  "final_source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "order": [
+    [
+      "baseline",
+      1
+    ],
+    [
+      "final",
+      1
+    ],
+    [
+      "final",
+      2
+    ],
+    [
+      "baseline",
+      2
+    ]
+  ],
+  "gates": {
+    "total_p50_reduction_percent": 1.0,
+    "total_mean_reduction_percent": 1.0,
+    "planning_p50_reduction_percent": 2.0,
+    "planning_ir_reduction_percent": 1.0,
+    "require_every_shape_repeat": true
+  },
+  "matrix": "Exact primary and guard matrix, counts and native thresholds from primary plan; all44children under final checkout; labels final-native-*."
+}

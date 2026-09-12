@@ -1,0 +1,8 @@
+{
+  "previous_goal_turn": "progress",
+  "previous_commit": "b2dffa3d7",
+  "priority": "OLE2/OOXML performance; ODF deferred until completion; iWork excluded",
+  "baseline_source": "byte-identical to0530baseline and0529final",
+  "adr_read_custody": "All30prior-read ADR/index hashes revalidated unchanged before build; accepted constraints remain binding.",
+  "observed_utc": "2026-09-12T13:31:22.026286+00:00"
+}

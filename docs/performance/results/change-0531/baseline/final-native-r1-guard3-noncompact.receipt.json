@@ -1,0 +1,47 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/baseline/final-native-r1-guard3-noncompact.rss.json",
+    "/tmp/litchi-goal-0531/baseline-normal",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "noncompact",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/baseline/final-native-r1-guard3-noncompact.json"
+  ],
+  "start_utc": "2026-09-12T14:40:56.737553+00:00",
+  "end_utc": "2026-09-12T14:40:59.986415+00:00",
+  "seconds": 3.2488622139935615,
+  "exit_code": 0,
+  "binary_sha256": "44b70af7bc9e613770fd79902c4f20167ee25100c9a177299612e07130482456",
+  "source_manifest_sha256": "c5a7cfbd0d7da965c7d945aea3355d24e34685b91f9dbbb25baedbed97140a08",
+  "working_source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "script_sha256": "4baebdc3bc93c62da30994635cab66974b8dfd0a24cf2d2649abe45503af01e5",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0531-target/test-tmp"
+  },
+  "artifacts": {
+    "final-native-r1-guard3-noncompact.host.json": "589822d043a9c96f4c57ec24dfb5bb02097c37b9b6dca60f5777e7e4756615e3",
+    "final-native-r1-guard3-noncompact.json": "8ab8f694529630a93eaa77da9cdc11684ae924aa42d6616bdb60f1ce055c475c",
+    "final-native-r1-guard3-noncompact.rss.json": "fa50379386c59117ffe98f85a26e23f925cc82e4da374910951f1ea1f6bc38a7",
+    "final-native-r1-guard3-noncompact.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-native-r1-guard3-noncompact.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

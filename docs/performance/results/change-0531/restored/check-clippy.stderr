@@ -1,0 +1,8 @@
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 50.03s

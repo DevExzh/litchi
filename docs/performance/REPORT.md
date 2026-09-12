@@ -1,5 +1,21 @@
 # Performance program phase report
 
+## 0531: reject the final OOXML MCE namespace-search candidate
+
+[0531](changes/0531-ooxml-mce-namespace-search.md) completes a fresh native
+ABBA comparison because the final test-only rebuild did not match the initial
+measured candidate binary. The authoritative [final native report](results/change-0531/final-native-comparison.json)
+rejects retention: three primary rows pass, but dense-sparse repeat 2 lowers
+total p50 by only **0.8937%** and mean by **0.6056%**, below the required 1%
+gates. The final conditional profile still lowers planning Ir by 5.0205–5.0844%,
+but Callgrind remains mechanism evidence and no runtime speedup is retained.
+Production is restored; nine MCE regression tests and a test-only `repeat_n`
+lint correction remain. All eight restored-source quality gates pass, including 4,757 successful test
+executions. The next OLE2 measurement is the bounded CFB
+ownership/reconciliation attribution in the
+[0531 OLE2 review](results/change-0531/next-ole2-review.md). ODF remains
+deferred and iWork excluded.
+
 ## 0530: unchanged XLSX planning costs attributed
 
 [0530](changes/0530-xlsx-planning-attribution.md) completes four fresh edit_sheets profiles and identifies raw worksheet parsing plus full validation as the dominant instruction owners. Source and harness remain unchanged. An exact namespace-search draft is the next pilot; no native gain is claimed.

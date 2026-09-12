@@ -1,0 +1,10 @@
+{
+  "owned_paths": [
+    "/tmp/litchi-goal-0531",
+    "/home/zhuhe/litchi-goal-0531-target"
+  ],
+  "alias": "/tmp/litchi-goal-0531",
+  "alias_target": "/home/zhuhe/litchi-goal-0531-target/retained-binaries",
+  "purpose": "Disk-backed release/debug targets, retained binaries and reversible candidate source backup. Owned paths removed only after live process reference scan and verification.",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15"
+}

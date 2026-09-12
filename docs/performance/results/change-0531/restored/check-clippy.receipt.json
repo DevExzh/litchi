@@ -1,0 +1,51 @@
+{
+  "command": [
+    "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0531-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "cargo",
+    "clippy",
+    "--locked",
+    "-p",
+    "litchi-ooxml-common",
+    "-p",
+    "litchi-xlsx",
+    "-p",
+    "litchi-docx",
+    "-p",
+    "litchi-pptx",
+    "-p",
+    "litchi-drawingml",
+    "-p",
+    "litchi-xlsb",
+    "--all-features",
+    "--lib",
+    "--tests",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "start_utc": "2026-09-12T15:00:06.100175+00:00",
+  "end_utc": "2026-09-12T15:00:56.504393+00:00",
+  "seconds": 50.404218012001365,
+  "exit_code": 0,
+  "binary_sha256": null,
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "working_source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "script_sha256": "4baebdc3bc93c62da30994635cab66974b8dfd0a24cf2d2649abe45503af01e5",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0531-target/test-tmp"
+  },
+  "artifacts": {
+    "check-clippy.stderr": "924d7fd630b76818f95b1b842ab6592ae7ca71c60cbf8f3ed99ad7dcc7331fb2",
+    "check-clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

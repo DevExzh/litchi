@@ -1,0 +1,46 @@
+{
+  "schema": "litchi-0531-eager-guard-plan-v1",
+  "primary_plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "run_script_sha256": "4baebdc3bc93c62da30994635cab66974b8dfd0a24cf2d2649abe45503af01e5",
+  "guard_script_sha256": "74e603aff5e7c031ba8ed46e363aa6bf8059c40787ca9aa5fd9dddc7406e35bc",
+  "case": "xlsx_eager_cell_values_one_percent_edit_save",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "repeats": 2,
+  "warmup": 10,
+  "samples": 30,
+  "cpu": 2,
+  "native_order": [
+    "baseline-r1",
+    "candidate-r1",
+    "candidate-r2",
+    "baseline-r2"
+  ],
+  "stage_source_protocol": {
+    "baseline-r1": "retained baseline binary under candidate source checkout",
+    "candidate-r1": "candidate binary under candidate source checkout",
+    "candidate-r2": "candidate binary under candidate source checkout",
+    "baseline-r2": "retained baseline binary under candidate source checkout"
+  },
+  "binary_sha256": {
+    "baseline": "44b70af7bc9e613770fd79902c4f20167ee25100c9a177299612e07130482456",
+    "candidate": "6f52c6aef8d1c7f480054c9aa47d29874cc02044b2911ee8532e988a2c26fac9"
+  },
+  "source_manifest_sha256": {
+    "baseline": "c5a7cfbd0d7da965c7d945aea3355d24e34685b91f9dbbb25baedbed97140a08",
+    "candidate": "1d4d1349f4c61567f12985b5b6e0af48c55a81bc58c74a9704c0f43dc401e252"
+  },
+  "adverse_threshold_percent": 5.0,
+  "purpose": "Conditional ordinary eager XLSX rewrite consumer guard for the shared OOXML namespace predicate. This lane is diagnostic and supplies no primary speedup claim.",
+  "gate": "No speedup threshold. Validate every raw eager source/sink/phase/output identity, compare elapsed p50/p95/p99/mean and whole-child peak RSS, and retain a separate review record for every adverse change or same-build repeat drift over 5%.",
+  "raw_identity_contract": {
+    "source": "result.source is explicitly null; operation_metrics.source is recursively not_applicable",
+    "sink": "bounded sink summary and measured per-sample sink vectors must reconcile exactly",
+    "phases": "operation_metrics.process, publication, materialization, and cfb_phases are recursively not_applicable; eager reports have no source-backed phase vectors",
+    "output": "result.output_sha256 is a lowercase SHA-256 digest and must be stable for matched shape/repeat identities"
+  },
+  "no_speedup_requirement": true,
+  "status": "frozen-before-capture"
+}

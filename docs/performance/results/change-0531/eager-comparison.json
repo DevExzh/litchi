@@ -1,0 +1,2307 @@
+{
+  "baseline": {
+    "binary_identity": {
+      "bytes": 60132200,
+      "path": "/tmp/litchi-goal-0531/baseline-normal",
+      "sha256": "44b70af7bc9e613770fd79902c4f20167ee25100c9a177299612e07130482456"
+    },
+    "custody": {
+      "receipt_count": 4,
+      "receipts_non_overlapping": true,
+      "source_manifest_entries": 8584
+    },
+    "manifest_sha256": "c5a7cfbd0d7da965c7d945aea3355d24e34685b91f9dbbb25baedbed97140a08",
+    "rows": [
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          22739362,
+          22761802,
+          22770682,
+          22770762,
+          22772371,
+          22777242,
+          22783371,
+          22798412,
+          22803292,
+          22809252,
+          22811142,
+          22813832,
+          22820152,
+          22823202,
+          22835712,
+          22835762,
+          22838952,
+          22839922,
+          22845662,
+          22858692,
+          22861182,
+          22868622,
+          22872072,
+          22917592,
+          22938882,
+          22959673,
+          22972333,
+          22974072,
+          23050972,
+          23060933
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "medium"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4226429,
+            "archive_member_count": 17,
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 9216,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-medium",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "medium",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4231168,
+            "xlsx": {
+              "columns_per_sheet": 48,
+              "one_percent_update_count": 93,
+              "rows_per_sheet": 48,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "sink": {
+            "accepted_bytes": 4226788,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 64,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 4,
+              "bytes_513_to_4096": 0,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "ba40b5a1270e7264167311b453ea2f344443bad65b7aa4e41143d11e4258fb81",
+        "name": "eager-r1-medium",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:25.275338+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:22.907194+00:00",
+        "repeat": 1,
+        "report_sha256": "c2bcb2dbcf70763ce0dde83b238e28762701b00b3c85491158e9662a123935cc",
+        "rss": {
+          "elapsed_seconds": 2.13,
+          "max_rss_kib": 69972,
+          "scope": "whole_child_process",
+          "system_seconds": 0.25,
+          "user_seconds": 1.87
+        },
+        "samples": 30,
+        "shape": "medium",
+        "stage": "baseline",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 22821822.169545487,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 22883905.230454512
+            },
+            "max": 23060933,
+            "mean": 22852863.7,
+            "min": 22739362,
+            "p50": 22835737,
+            "p95": 23050972,
+            "p99": 23060933,
+            "samples": [
+              22739362,
+              22761802,
+              22770682,
+              22770762,
+              22772371,
+              22777242,
+              22783371,
+              22798412,
+              22803292,
+              22809252,
+              22811142,
+              22813832,
+              22820152,
+              22823202,
+              22835712,
+              22835762,
+              22838952,
+              22839922,
+              22845662,
+              22858692,
+              22861182,
+              22868622,
+              22872072,
+              22917592,
+              22938882,
+              22959673,
+              22972333,
+              22974072,
+              23050972,
+              23060933
+            ],
+            "standard_deviation": 83140.08043725762,
+            "unit": "ns"
+          }
+        }
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          42788296,
+          42792147,
+          42802247,
+          42804187,
+          42810337,
+          42812737,
+          42814347,
+          42843837,
+          42855067,
+          42856677,
+          42860257,
+          42871777,
+          42873997,
+          42887197,
+          42892967,
+          42905327,
+          42914678,
+          42953738,
+          42957957,
+          42965478,
+          42985517,
+          42990368,
+          42992197,
+          43017488,
+          43051628,
+          43055008,
+          43070488,
+          43119818,
+          43147498,
+          43263519
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "dense-sparse"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4251863,
+            "archive_member_count": 17,
+            "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 17792,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-dense-sparse",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "dense-sparse",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4265472,
+            "xlsx": {
+              "columns_per_sheet": 128,
+              "one_percent_update_count": 178,
+              "rows_per_sheet": 128,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "sink": {
+            "accepted_bytes": 4252436,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 65,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 0,
+              "bytes_513_to_4096": 3,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "a56677386210036daea394214ea9af1bdc10f26cf476c45c66280a7e3a923200",
+        "name": "eager-r1-dense-sparse",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:29.168483+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:25.507859+00:00",
+        "repeat": 1,
+        "report_sha256": "b914ed28961734ae4d71481d36ff552817fda673552bd0ad0811b0c9077be542",
+        "rss": {
+          "elapsed_seconds": 3.43,
+          "max_rss_kib": 92780,
+          "scope": "whole_child_process",
+          "system_seconds": 0.15,
+          "user_seconds": 3.27
+        },
+        "samples": 30,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 42887390.139412135,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 42976395.26058787
+            },
+            "max": 43263519,
+            "mean": 42931892.7,
+            "min": 42788296,
+            "p50": 42899147,
+            "p95": 43147498,
+            "p99": 43263519,
+            "samples": [
+              42788296,
+              42792147,
+              42802247,
+              42804187,
+              42810337,
+              42812737,
+              42814347,
+              42843837,
+              42855067,
+              42856677,
+              42860257,
+              42871777,
+              42873997,
+              42887197,
+              42892967,
+              42905327,
+              42914678,
+              42953738,
+              42957957,
+              42965478,
+              42985517,
+              42990368,
+              42992197,
+              43017488,
+              43051628,
+              43055008,
+              43070488,
+              43119818,
+              43147498,
+              43263519
+            ],
+            "standard_deviation": 119193.42934336071,
+            "unit": "ns"
+          }
+        }
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          22610252,
+          22639212,
+          22640852,
+          22657232,
+          22658942,
+          22660912,
+          22681392,
+          22688082,
+          22689933,
+          22693082,
+          22700632,
+          22704462,
+          22707122,
+          22707872,
+          22708072,
+          22714822,
+          22720332,
+          22725203,
+          22726452,
+          22754603,
+          22756233,
+          22764323,
+          22765852,
+          22774272,
+          22779182,
+          22779273,
+          22781212,
+          22792892,
+          22798643,
+          22881933
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "medium"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4226429,
+            "archive_member_count": 17,
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 9216,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-medium",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "medium",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4231168,
+            "xlsx": {
+              "columns_per_sheet": 48,
+              "one_percent_update_count": 93,
+              "rows_per_sheet": 48,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "sink": {
+            "accepted_bytes": 4226788,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 64,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 4,
+              "bytes_513_to_4096": 0,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "ba40b5a1270e7264167311b453ea2f344443bad65b7aa4e41143d11e4258fb81",
+        "name": "eager-r2-medium",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:44.878518+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:42.508310+00:00",
+        "repeat": 2,
+        "report_sha256": "fc86db71cb3af75ac5d220411e8ab17f7e74a0c0fec7c35187a10552531c944f",
+        "rss": {
+          "elapsed_seconds": 2.14,
+          "max_rss_kib": 69508,
+          "scope": "whole_child_process",
+          "system_seconds": 0.24,
+          "user_seconds": 1.89
+        },
+        "samples": 30,
+        "shape": "medium",
+        "stage": "baseline",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 22700275.47583719,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 22743943.057496134
+            },
+            "max": 22881933,
+            "mean": 22722109.266666662,
+            "min": 22610252,
+            "p50": 22711447,
+            "p95": 22798643,
+            "p99": 22881933,
+            "samples": [
+              22610252,
+              22639212,
+              22640852,
+              22657232,
+              22658942,
+              22660912,
+              22681392,
+              22688082,
+              22689933,
+              22693082,
+              22700632,
+              22704462,
+              22707122,
+              22707872,
+              22708072,
+              22714822,
+              22720332,
+              22725203,
+              22726452,
+              22754603,
+              22756233,
+              22764323,
+              22765852,
+              22774272,
+              22779182,
+              22779273,
+              22781212,
+              22792892,
+              22798643,
+              22881933
+            ],
+            "standard_deviation": 58478.531800249744,
+            "unit": "ns"
+          }
+        }
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          42879655,
+          42902375,
+          42904346,
+          42922075,
+          42927315,
+          42938606,
+          42943925,
+          42959976,
+          42969086,
+          42984676,
+          42985965,
+          42991416,
+          42997766,
+          43001666,
+          43001706,
+          43006366,
+          43009746,
+          43016436,
+          43020946,
+          43046096,
+          43046236,
+          43064146,
+          43086056,
+          43096116,
+          43124546,
+          43209016,
+          43225947,
+          43371337,
+          43433038,
+          43673489
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "dense-sparse"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4251863,
+            "archive_member_count": 17,
+            "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 17792,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-dense-sparse",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "dense-sparse",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4265472,
+            "xlsx": {
+              "columns_per_sheet": 128,
+              "one_percent_update_count": 178,
+              "rows_per_sheet": 128,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "sink": {
+            "accepted_bytes": 4252436,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 65,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 0,
+              "bytes_513_to_4096": 3,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "a56677386210036daea394214ea9af1bdc10f26cf476c45c66280a7e3a923200",
+        "name": "eager-r2-dense-sparse",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:48.771556+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:45.108313+00:00",
+        "repeat": 2,
+        "report_sha256": "07ebf9251a9fdccc5589da8da913721bcd85fe198813a7b45dbfadf4bb7bdf3d",
+        "rss": {
+          "elapsed_seconds": 3.43,
+          "max_rss_kib": 88496,
+          "scope": "whole_child_process",
+          "system_seconds": 0.16,
+          "user_seconds": 3.27
+        },
+        "samples": 30,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 42993382.29340403,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 43122622.43992932
+            },
+            "max": 43673489,
+            "mean": 43058002.366666675,
+            "min": 42879655,
+            "p50": 43004036,
+            "p95": 43433038,
+            "p99": 43673489,
+            "samples": [
+              42879655,
+              42902375,
+              42904346,
+              42922075,
+              42927315,
+              42938606,
+              42943925,
+              42959976,
+              42969086,
+              42984676,
+              42985965,
+              42991416,
+              42997766,
+              43001666,
+              43001706,
+              43006366,
+              43009746,
+              43016436,
+              43020946,
+              43046096,
+              43046236,
+              43064146,
+              43086056,
+              43096116,
+              43124546,
+              43209016,
+              43225947,
+              43371337,
+              43433038,
+              43673489
+            ],
+            "standard_deviation": 173075.1676948046,
+            "unit": "ns"
+          }
+        }
+      }
+    ],
+    "stage": "baseline",
+    "validation": {
+      "expected_matrix": true,
+      "raw_output_identity": "digest_and_matched_identity",
+      "raw_phase_identity": "explicit_not_applicable",
+      "raw_sink_identity": "reconciled",
+      "raw_source_identity": "explicit_null",
+      "receipt_bindings": true
+    }
+  },
+  "candidate": {
+    "binary_identity": {
+      "bytes": 60122200,
+      "path": "/tmp/litchi-goal-0531/candidate-normal",
+      "sha256": "6f52c6aef8d1c7f480054c9aa47d29874cc02044b2911ee8532e988a2c26fac9"
+    },
+    "custody": {
+      "receipt_count": 4,
+      "receipts_non_overlapping": true,
+      "source_manifest_entries": 8585
+    },
+    "manifest_sha256": "1d4d1349f4c61567f12985b5b6e0af48c55a81bc58c74a9704c0f43dc401e252",
+    "rows": [
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          22275372,
+          22313581,
+          22329682,
+          22329942,
+          22339842,
+          22348881,
+          22357482,
+          22372142,
+          22377402,
+          22412002,
+          22414052,
+          22418823,
+          22419242,
+          22442802,
+          22462662,
+          22464013,
+          22464912,
+          22473972,
+          22573063,
+          22632233,
+          22637223,
+          22652763,
+          22692333,
+          22698873,
+          22708533,
+          22759764,
+          22765983,
+          22771223,
+          22902174,
+          23038614
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "medium"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4226429,
+            "archive_member_count": 17,
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 9216,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-medium",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "medium",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4231168,
+            "xlsx": {
+              "columns_per_sheet": 48,
+              "one_percent_update_count": 93,
+              "rows_per_sheet": 48,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "sink": {
+            "accepted_bytes": 4226788,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 64,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 4,
+              "bytes_513_to_4096": 0,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "ba40b5a1270e7264167311b453ea2f344443bad65b7aa4e41143d11e4258fb81",
+        "name": "eager-r1-medium",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:31.805211+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:29.432875+00:00",
+        "repeat": 1,
+        "report_sha256": "5cc8c6d4e81c9bbcd52f41e99d59132943d5ce7abec7eec55c536e31028282bf",
+        "rss": {
+          "elapsed_seconds": 2.14,
+          "max_rss_kib": 69332,
+          "scope": "whole_child_process",
+          "system_seconds": 0.27,
+          "user_seconds": 1.86
+        },
+        "samples": 30,
+        "shape": "medium",
+        "stage": "candidate",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 22455470.723198533,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 22601168.276801467
+            },
+            "max": 23038614,
+            "mean": 22528319.5,
+            "min": 22275372,
+            "p50": 22463337,
+            "p95": 22902174,
+            "p99": 23038614,
+            "samples": [
+              22275372,
+              22313581,
+              22329682,
+              22329942,
+              22339842,
+              22348881,
+              22357482,
+              22372142,
+              22377402,
+              22412002,
+              22414052,
+              22418823,
+              22419242,
+              22442802,
+              22462662,
+              22464013,
+              22464912,
+              22473972,
+              22573063,
+              22632233,
+              22637223,
+              22652763,
+              22692333,
+              22698873,
+              22708533,
+              22759764,
+              22765983,
+              22771223,
+              22902174,
+              23038614
+            ],
+            "standard_deviation": 195114.5151140477,
+            "unit": "ns"
+          }
+        }
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          41578323,
+          41658433,
+          41659313,
+          41683273,
+          41684223,
+          41709313,
+          41713202,
+          41713713,
+          41728293,
+          41734073,
+          41734703,
+          41780723,
+          41784113,
+          41785263,
+          41789433,
+          41822883,
+          41848094,
+          41855074,
+          41877064,
+          41877163,
+          41893003,
+          41895724,
+          41906894,
+          41917303,
+          41964514,
+          41977544,
+          42020204,
+          42025824,
+          42072724,
+          42111354
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "dense-sparse"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4251863,
+            "archive_member_count": 17,
+            "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 17792,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-dense-sparse",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "dense-sparse",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4265472,
+            "xlsx": {
+              "columns_per_sheet": 128,
+              "one_percent_update_count": 178,
+              "rows_per_sheet": 128,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "sink": {
+            "accepted_bytes": 4252436,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 65,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 0,
+              "bytes_513_to_4096": 3,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "a56677386210036daea394214ea9af1bdc10f26cf476c45c66280a7e3a923200",
+        "name": "eager-r1-dense-sparse",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:35.614719+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:32.031945+00:00",
+        "repeat": 1,
+        "report_sha256": "6668694bec276788b3b701f5b480e054d992f711aa00cd31a0f66a1ed9d318d4",
+        "rss": {
+          "elapsed_seconds": 3.35,
+          "max_rss_kib": 92652,
+          "scope": "whole_child_process",
+          "system_seconds": 0.16,
+          "user_seconds": 3.18
+        },
+        "samples": 30,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 41776602.58508474,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 41876848.081581905
+            },
+            "max": 42111354,
+            "mean": 41826725.33333332,
+            "min": 41578323,
+            "p50": 41806158,
+            "p95": 42072724,
+            "p99": 42111354,
+            "samples": [
+              41578323,
+              41658433,
+              41659313,
+              41683273,
+              41684223,
+              41709313,
+              41713202,
+              41713713,
+              41728293,
+              41734073,
+              41734703,
+              41780723,
+              41784113,
+              41785263,
+              41789433,
+              41822883,
+              41848094,
+              41855074,
+              41877064,
+              41877163,
+              41893003,
+              41895724,
+              41906894,
+              41917303,
+              41964514,
+              41977544,
+              42020204,
+              42025824,
+              42072724,
+              42111354
+            ],
+            "standard_deviation": 134246.2584836223,
+            "unit": "ns"
+          }
+        }
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          22025281,
+          22025360,
+          22064681,
+          22079531,
+          22107701,
+          22112081,
+          22118971,
+          22127161,
+          22135411,
+          22154611,
+          22155321,
+          22188761,
+          22273741,
+          22300012,
+          22312552,
+          22412292,
+          22479693,
+          22494473,
+          22518883,
+          22526293,
+          22553982,
+          22554473,
+          22563672,
+          22584793,
+          22587553,
+          22678643,
+          22779983,
+          22840294,
+          22854943,
+          23025134
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "medium"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4226429,
+            "archive_member_count": 17,
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 9216,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-medium",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "medium",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4231168,
+            "xlsx": {
+              "columns_per_sheet": 48,
+              "one_percent_update_count": 93,
+              "rows_per_sheet": 48,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "sink": {
+            "accepted_bytes": 4226788,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 64,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 4,
+              "bytes_513_to_4096": 0,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "ba40b5a1270e7264167311b453ea2f344443bad65b7aa4e41143d11e4258fb81",
+        "name": "eager-r2-medium",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:38.267942+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:35.879531+00:00",
+        "repeat": 2,
+        "report_sha256": "9dc9aa98a0c5392dceef0a3151f30cb7e4cf94e1220173ee86b0937447fbdedc",
+        "rss": {
+          "elapsed_seconds": 2.15,
+          "max_rss_kib": 69064,
+          "scope": "whole_child_process",
+          "system_seconds": 0.29,
+          "user_seconds": 1.86
+        },
+        "samples": 30,
+        "shape": "medium",
+        "stage": "candidate",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 22283085.9833512,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 22492666.0166488
+            },
+            "max": 23025134,
+            "mean": 22387876.0,
+            "min": 22025281,
+            "p50": 22362422,
+            "p95": 22854943,
+            "p99": 23025134,
+            "samples": [
+              22025281,
+              22025360,
+              22064681,
+              22079531,
+              22107701,
+              22112081,
+              22118971,
+              22127161,
+              22135411,
+              22154611,
+              22155321,
+              22188761,
+              22273741,
+              22300012,
+              22312552,
+              22412292,
+              22479693,
+              22494473,
+              22518883,
+              22526293,
+              22553982,
+              22554473,
+              22563672,
+              22584793,
+              22587553,
+              22678643,
+              22779983,
+              22840294,
+              22854943,
+              23025134
+            ],
+            "standard_deviation": 280664.33212659677,
+            "unit": "ns"
+          }
+        }
+      },
+      {
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "elapsed_values": [
+          43223259,
+          43260159,
+          43311438,
+          43347459,
+          43369719,
+          43390998,
+          43394049,
+          43407129,
+          43410139,
+          43421229,
+          43428369,
+          43433279,
+          43438968,
+          43447379,
+          43462190,
+          43462407,
+          43468880,
+          43475519,
+          43478237,
+          43485300,
+          43493980,
+          43502228,
+          43513280,
+          43533140,
+          43533629,
+          43617298,
+          43640160,
+          43646908,
+          43648610,
+          43770400
+        ],
+        "identity": {
+          "configuration": {
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "execution_workers": [
+              1
+            ],
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "opc_cache_lock_diagnostics": false,
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "range_simulation": {
+              "bandwidth_bytes_per_second": 52428800,
+              "fixed_latency_us": 100,
+              "max_physical_range_bytes": 4096,
+              "request_overhead_us": 25
+            },
+            "rtf_variants": [
+              "plain"
+            ],
+            "samples_per_case": 30,
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "warmup_iterations_per_case": 10,
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "dense-sparse"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ]
+          },
+          "corpus": {
+            "archive_bytes": 4251863,
+            "archive_member_count": 17,
+            "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+            "compression": "deflate",
+            "entry_bytes": 4,
+            "entry_count": 17792,
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "name": "xlsx-cell-values-dense-sparse",
+            "package_format": "XLSX/OPC/ZIP",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "shape": "dense-sparse",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "uncompressed_payload_bytes": 4265472,
+            "xlsx": {
+              "columns_per_sheet": 128,
+              "one_percent_update_count": 178,
+              "rows_per_sheet": 128,
+              "sheet_count": 4,
+              "source_members": {
+                "shared_strings": null,
+                "styles": "xl/styles.xml",
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ]
+              }
+            }
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "sink": {
+            "accepted_bytes": 4252436,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 65,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 0,
+              "bytes_513_to_4096": 3,
+              "bytes_over_65536": 0
+            }
+          }
+        },
+        "identity_sha256": "a56677386210036daea394214ea9af1bdc10f26cf476c45c66280a7e3a923200",
+        "name": "eager-r2-dense-sparse",
+        "operation_metrics": {
+          "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+          "latency_claim": "comparable_timed_operation",
+          "phase_metrics": "not_applicable",
+          "sample_count": 30,
+          "source": "explicit_not_applicable"
+        },
+        "raw_identity": {
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+          "phase_fields": "explicit_not_applicable",
+          "sink": "summary_and_vectors_reconciled",
+          "source_field": "absent_by_eager_schema"
+        },
+        "receipt_end_utc": "2026-09-12T14:07:42.240880+00:00",
+        "receipt_start_utc": "2026-09-12T14:07:38.496638+00:00",
+        "repeat": 2,
+        "report_sha256": "e0cf3e88af73c3a251132515ce827b3ce0cdeec441ffc271a735f3e0f24ef4ef",
+        "rss": {
+          "elapsed_seconds": 3.51,
+          "max_rss_kib": 87900,
+          "scope": "whole_child_process",
+          "system_seconds": 0.28,
+          "user_seconds": 3.22
+        },
+        "samples": 30,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "timing": {
+          "elapsed_ns": {
+            "confidence_interval_95": {
+              "lower": 43423482.61945843,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 43510899.980541535
+            },
+            "max": 43770400,
+            "mean": 43467191.29999998,
+            "min": 43223259,
+            "p50": 43462298,
+            "p95": 43648610,
+            "p99": 43770400,
+            "samples": [
+              43223259,
+              43260159,
+              43311438,
+              43347459,
+              43369719,
+              43390998,
+              43394049,
+              43407129,
+              43410139,
+              43421229,
+              43428369,
+              43433279,
+              43438968,
+              43447379,
+              43462190,
+              43462407,
+              43468880,
+              43475519,
+              43478237,
+              43485300,
+              43493980,
+              43502228,
+              43513280,
+              43533140,
+              43533629,
+              43617298,
+              43640160,
+              43646908,
+              43648610,
+              43770400
+            ],
+            "standard_deviation": 117067.14078922546,
+            "unit": "ns"
+          }
+        }
+      }
+    ],
+    "stage": "candidate",
+    "validation": {
+      "expected_matrix": true,
+      "raw_output_identity": "digest_and_matched_identity",
+      "raw_phase_identity": "explicit_not_applicable",
+      "raw_sink_identity": "reconciled",
+      "raw_source_identity": "explicit_null",
+      "receipt_bindings": true
+    }
+  },
+  "capture_authority": {
+    "path": "run.py",
+    "sha256": "4baebdc3bc93c62da30994635cab66974b8dfd0a24cf2d2649abe45503af01e5"
+  },
+  "capture_order": [
+    {
+      "end_utc": "2026-09-12T14:07:29.168483+00:00",
+      "group": "baseline-r1",
+      "repeat": 1,
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "start_utc": "2026-09-12T14:07:22.907194+00:00"
+    },
+    {
+      "end_utc": "2026-09-12T14:07:35.614719+00:00",
+      "group": "candidate-r1",
+      "repeat": 1,
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "start_utc": "2026-09-12T14:07:29.432875+00:00"
+    },
+    {
+      "end_utc": "2026-09-12T14:07:42.240880+00:00",
+      "group": "candidate-r2",
+      "repeat": 2,
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "start_utc": "2026-09-12T14:07:35.879531+00:00"
+    },
+    {
+      "end_utc": "2026-09-12T14:07:48.771556+00:00",
+      "group": "baseline-r2",
+      "repeat": 2,
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "start_utc": "2026-09-12T14:07:42.508310+00:00"
+    }
+  ],
+  "comparison": {
+    "adverse_flags_over_five_percent": [],
+    "all_metrics_compared": [
+      "elapsed_ns.p50",
+      "elapsed_ns.p95",
+      "elapsed_ns.p99",
+      "elapsed_ns.mean",
+      "max_rss_kib.peak"
+    ],
+    "individual_review_count": 1,
+    "individual_reviews": [
+      {
+        "baseline": 92652,
+        "candidate": 87900,
+        "change_percent": -5.128869317445927,
+        "kind": "same_build_drift",
+        "lane": "candidate",
+        "metric": "max_rss_kib",
+        "reason": "Metric increased by more than the frozen 5% review threshold; this guard has no automatic speedup admission gate.",
+        "repeat": "1-to-2",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "review_id": "same_build_drift:candidate:1-to-2:dense-sparse:max_rss_kib:peak",
+        "shape": "dense-sparse",
+        "stat": "peak",
+        "status": "individual-review-required",
+        "threshold_percent": 5.0
+      }
+    ],
+    "no_speedup_requirement": true,
+    "phase_metrics": {
+      "reason": "eager raw reports have explicit null source and no source-backed phase vectors",
+      "status": "not_applicable"
+    },
+    "runtime_comparison_performed": true,
+    "same_build_drift": [
+      {
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 22852863.7,
+              "candidate": 22722109.266666662,
+              "change_percent": -0.5721577612758377
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 22835737,
+              "candidate": 22711447,
+              "change_percent": -0.5442784701890746
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 23050972,
+              "candidate": 22798643,
+              "change_percent": -1.094656659163873
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 23060933,
+              "candidate": 22881933,
+              "change_percent": -0.7762045013530061
+            }
+          },
+          "max_rss_kib": {
+            "peak": {
+              "adverse_over_five_percent": false,
+              "baseline": 69972,
+              "candidate": 69508,
+              "change_percent": -0.663122391813864
+            }
+          }
+        },
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "baseline"
+      },
+      {
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 42931892.7,
+              "candidate": 43058002.366666675,
+              "change_percent": 0.29374355225357807
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 42899147,
+              "candidate": 43004036,
+              "change_percent": 0.24450136502713882
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 43147498,
+              "candidate": 43433038,
+              "change_percent": 0.6617764951284189
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 43263519,
+              "candidate": 43673489,
+              "change_percent": 0.9476113119693208
+            }
+          },
+          "max_rss_kib": {
+            "peak": {
+              "adverse_over_five_percent": false,
+              "baseline": 92780,
+              "candidate": 88496,
+              "change_percent": -4.617374434145294
+            }
+          }
+        },
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline"
+      },
+      {
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 22528319.5,
+              "candidate": 22387876.0,
+              "change_percent": -0.6234086834572827
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 22463337,
+              "candidate": 22362422,
+              "change_percent": -0.4492431378294359
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 22902174,
+              "candidate": 22854943,
+              "change_percent": -0.20622933001905874
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 23038614,
+              "candidate": 23025134,
+              "change_percent": -0.05851046421455619
+            }
+          },
+          "max_rss_kib": {
+            "peak": {
+              "adverse_over_five_percent": false,
+              "baseline": 69332,
+              "candidate": 69064,
+              "change_percent": -0.386545895113366
+            }
+          }
+        },
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate"
+      },
+      {
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 41826725.33333332,
+              "candidate": 43467191.29999998,
+              "change_percent": 3.922052117618957
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 41806158,
+              "candidate": 43462298,
+              "change_percent": 3.9614738096717783
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 42072724,
+              "candidate": 43648610,
+              "change_percent": 3.7456238868678993
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 42111354,
+              "candidate": 43770400,
+              "change_percent": 3.939664348004568
+            }
+          },
+          "max_rss_kib": {
+            "peak": {
+              "adverse_over_five_percent": false,
+              "baseline": 92652,
+              "candidate": 87900,
+              "change_percent": -5.128869317445927
+            }
+          }
+        },
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate"
+      }
+    ],
+    "same_build_drift_over_five_percent": [
+      {
+        "baseline": 92652,
+        "candidate": 87900,
+        "change_percent": -5.128869317445927,
+        "kind": "same_build_drift",
+        "lane": "candidate",
+        "metric": "max_rss_kib",
+        "reason": "Metric increased by more than the frozen 5% review threshold; this guard has no automatic speedup admission gate.",
+        "repeat": "1-to-2",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "review_id": "same_build_drift:candidate:1-to-2:dense-sparse:max_rss_kib:peak",
+        "shape": "dense-sparse",
+        "stat": "peak",
+        "status": "individual-review-required",
+        "threshold_percent": 5.0
+      }
+    ],
+    "threshold_percent": 5.0,
+    "timing_comparisons": [
+      {
+        "identity_equal": true,
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 42931892.7,
+              "candidate": 41826725.33333332,
+              "change_percent": -2.574233971908446
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 42899147,
+              "candidate": 41806158,
+              "change_percent": -2.5478105660236117
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 43147498,
+              "candidate": 42072724,
+              "change_percent": -2.4909300650526767
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 43263519,
+              "candidate": 42111354,
+              "change_percent": -2.6631328810770127
+            }
+          },
+          "max_rss_kib": {
+            "adverse_over_five_percent": false,
+            "baseline": 92780,
+            "candidate": 92652,
+            "change_percent": -0.137960767406764
+          }
+        },
+        "repeat": 1,
+        "shape": "dense-sparse"
+      },
+      {
+        "identity_equal": true,
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 22852863.7,
+              "candidate": 22528319.5,
+              "change_percent": -1.4201467451101069
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 22835737,
+              "candidate": 22463337,
+              "change_percent": -1.6307772330711234
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 23050972,
+              "candidate": 22902174,
+              "change_percent": -0.6455172476024007
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 23060933,
+              "candidate": 23038614,
+              "change_percent": -0.09678272774132912
+            }
+          },
+          "max_rss_kib": {
+            "adverse_over_five_percent": false,
+            "baseline": 69972,
+            "candidate": 69332,
+            "change_percent": -0.9146515749156814
+          }
+        },
+        "repeat": 1,
+        "shape": "medium"
+      },
+      {
+        "identity_equal": true,
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 43058002.366666675,
+              "candidate": 43467191.29999998,
+              "change_percent": 0.9503202908690556
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 43004036,
+              "candidate": 43462298,
+              "change_percent": 1.0656255612845333
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 43433038,
+              "candidate": 43648610,
+              "change_percent": 0.49633184765938143
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 43673489,
+              "candidate": 43770400,
+              "change_percent": 0.2218989190444498
+            }
+          },
+          "max_rss_kib": {
+            "adverse_over_five_percent": false,
+            "baseline": 88496,
+            "candidate": 87900,
+            "change_percent": -0.6734767673115205
+          }
+        },
+        "repeat": 2,
+        "shape": "dense-sparse"
+      },
+      {
+        "identity_equal": true,
+        "metrics": {
+          "elapsed_ns": {
+            "mean": {
+              "adverse_over_five_percent": false,
+              "baseline": 22722109.266666662,
+              "candidate": 22387876.0,
+              "change_percent": -1.470960564198065
+            },
+            "p50": {
+              "adverse_over_five_percent": false,
+              "baseline": 22711447,
+              "candidate": 22362422,
+              "change_percent": -1.5367801091669797
+            },
+            "p95": {
+              "adverse_over_five_percent": false,
+              "baseline": 22798643,
+              "candidate": 22854943,
+              "change_percent": 0.24694452209281792
+            },
+            "p99": {
+              "adverse_over_five_percent": false,
+              "baseline": 22881933,
+              "candidate": 23025134,
+              "change_percent": 0.6258256240851745
+            }
+          },
+          "max_rss_kib": {
+            "adverse_over_five_percent": false,
+            "baseline": 69508,
+            "candidate": 69064,
+            "change_percent": -0.6387753927605488
+          }
+        },
+        "repeat": 2,
+        "shape": "medium"
+      }
+    ]
+  },
+  "guard_authority": {
+    "path": "eager_guard.py",
+    "sha256": "74e603aff5e7c031ba8ed46e363aa6bf8059c40787ca9aa5fd9dddc7406e35bc"
+  },
+  "no_speedup_requirement": true,
+  "output": "eager-comparison.json",
+  "plan_sha256": "daf5503904ccef55f8529c19f84e3132fa16beb9af523a07a9c6c6c08ddfe8de",
+  "primary_plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "scope": "Conditional ordinary eager XLSX rewrite consumer guard for the shared OOXML namespace predicate. This lane is diagnostic and supplies no primary speedup claim.",
+  "stage": "compare",
+  "status": "pass"
+}

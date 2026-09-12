@@ -1,0 +1,8 @@
+{
+  "observed_utc": "2026-09-12T13:47:26.283482+00:00",
+  "processes": [
+    "2668157  298594       00:00 cargo",
+    "2668171 2668157       00:00 rustc"
+  ],
+  "scope": "Pre-capture cargo/rustc snapshot, not proof of an idle host; external work uncontrolled."
+}
