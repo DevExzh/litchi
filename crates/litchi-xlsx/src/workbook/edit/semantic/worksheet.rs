@@ -28,6 +28,7 @@ use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 use super::super::model::{
     PartChange, StyleGuard, defaults_after, ensure_merge_area, merge_conflicts, project_merges,
 };
+use super::super::svg::{PictureSelector, SvgInput};
 use super::super::validation::{
     Added, FinalOrder, MergeIntent, MoveIntent, OrderPlan, PanesAction, Placement, SheetActions,
     TabAction, Target, pending_merge,
@@ -97,6 +98,28 @@ pub struct WorksheetEdit<'a> {
 }
 
 impl WorksheetEdit<'_> {
+    /// Attach one borrowed SVG payload to an existing direct worksheet
+    /// picture selected by source-order drawing and picture ordinals.
+    ///
+    /// The payload is validated against the transaction's finite input limit
+    /// before a staged copy is allocated. Package IDs, relationship IDs, and
+    /// media names remain transaction-owned.
+    pub fn attach_svg<'svg>(
+        &mut self,
+        picture: PictureSelector,
+        input: SvgInput<'svg>,
+    ) -> Result<&mut Self> {
+        self.edit.stage_svg_attach(self.position, picture, input)?;
+        Ok(self)
+    }
+
+    /// Detach the admitted embedded SVG owner from one existing direct
+    /// worksheet picture while retaining its raster fallback.
+    pub fn detach_svg(&mut self, picture: PictureSelector) -> Result<&mut Self> {
+        let _ = self.edit.stage_svg_detach(self.position, picture)?;
+        Ok(self)
+    }
+
     /// Replace all worksheet Office Add-in range bindings by moving one
     /// already-validated collection into the transaction.
     pub fn set_bindings(&mut self, bindings: WebBindings) -> &mut Self {

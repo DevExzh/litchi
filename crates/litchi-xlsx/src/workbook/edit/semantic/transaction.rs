@@ -34,9 +34,11 @@ use crate::style::StyleLineage;
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 use super::super::model::{
-    PartChange, PatchAuthority, RelationshipChange, StyleGuard, defaults_after, ensure_merge_area,
-    merge_conflicts, project_merges,
+    ContentTypesChange, PartChange, PatchAuthority, RelationshipChange, StyleGuard, SvgPartChange,
+    defaults_after, ensure_merge_area, merge_conflicts, project_merges,
+    validate_svg_final_removals,
 };
+use super::super::svg_lifecycle as svg_plan;
 use super::super::validation::{
     Added, FinalOrder, HyperlinkAction, MergeIntent, OptionalAction, OrderPlan, PanesAction,
     Placement, SheetActions, TabAction, Target, pending_merge,
@@ -48,7 +50,18 @@ use super::super::{
 use super::super::{codec, package};
 
 use self::snapshot::Snapshot;
+use super::super::svg::{PictureSelector, SvgInput};
 use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
+
+const MAX_SVG_INPUT_BYTES: usize = 32 * 1024 * 1024;
+
+#[derive(Debug, Clone)]
+pub(crate) struct SvgLifecycleIntent {
+    pub(crate) position: usize,
+    pub(crate) selector: PictureSelector,
+    pub(crate) attach: bool,
+    pub(crate) payload: Option<Arc<Vec<u8>>>,
+}
 
 const MAX_CELL_TRANSFER: u64 = 65_536;
 const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
@@ -213,11 +226,19 @@ pub struct Edit {
     pub(in crate::workbook::edit) added: Vec<Added>,
     pub(in crate::workbook::edit) removed: BTreeSet<usize>,
     pub(in crate::workbook::edit) cross_workbook_scalar: bool,
+    pub(in crate::workbook::edit) svg_lifecycle: Vec<SvgLifecycleIntent>,
+    pub(in crate::workbook::edit) svg_preflight:
+        HashMap<(usize, usize), super::super::svg_lifecycle::DrawingPreflight>,
+    pub(in crate::workbook::edit) svg_projected_owners:
+        HashMap<(usize, PictureSelector), super::super::svg_lifecycle::ProjectedSvgOwner>,
+    pub(in crate::workbook::edit) svg_staged_payload_bytes: usize,
+    pub(in crate::workbook::edit) svg_base_part_bytes: usize,
 }
 
 impl Edit {
     pub(crate) fn new(base: Workbook) -> Result<Self> {
         codec::ensure_unsigned(&base)?;
+        let svg_base_part_bytes = svg_plan::materialized_part_bytes(&base)?;
         Ok(Self {
             base,
             panes: None,
@@ -229,7 +250,105 @@ impl Edit {
             added: Vec::new(),
             removed: BTreeSet::new(),
             cross_workbook_scalar: false,
+            svg_lifecycle: Vec::new(),
+            svg_preflight: HashMap::new(),
+            svg_projected_owners: HashMap::new(),
+            svg_staged_payload_bytes: 0,
+            svg_base_part_bytes,
         })
+    }
+
+    pub(super) fn stage_svg_attach(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+        input: SvgInput<'_>,
+    ) -> Result<()> {
+        guard::no_removal(self, "SVG lifecycle")?;
+        if self.svg_lifecycle.len() >= svg_plan::MAX_SVG_LIFECYCLE_INTENTS {
+            return Err(invalid(format!(
+                "SVG lifecycle intents exceed {}",
+                svg_plan::MAX_SVG_LIFECYCLE_INTENTS
+            )));
+        }
+        let bytes = input.as_bytes();
+        if bytes.is_empty() {
+            return Err(invalid("SVG payload cannot be empty"));
+        }
+        let input_limit = svg_plan::payload_limit(&self.base).min(MAX_SVG_INPUT_BYTES);
+        if bytes.len() > input_limit {
+            return Err(invalid(format!(
+                "SVG attachment input exceeds {} bytes",
+                input_limit
+            )));
+        }
+        svg_plan::check_payload_budget(
+            &self.base,
+            self.svg_base_part_bytes,
+            self.svg_staged_payload_bytes,
+            bytes.len(),
+        )?;
+        svg_plan::preflight_with_pending(
+            &self.base,
+            position,
+            selector,
+            true,
+            &mut self.svg_preflight,
+            &mut self.svg_projected_owners,
+        )?;
+        self.svg_lifecycle
+            .try_reserve(1)
+            .map_err(|source| allocation("SVG lifecycle intents", source))?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| allocation("SVG attachment input", source))?;
+        owned.extend_from_slice(bytes);
+        self.svg_lifecycle.push(SvgLifecycleIntent {
+            position,
+            selector,
+            attach: true,
+            payload: Some(Arc::new(owned)),
+        });
+        self.svg_staged_payload_bytes = self
+            .svg_staged_payload_bytes
+            .checked_add(bytes.len())
+            .ok_or_else(|| invalid("SVG lifecycle staged payload bytes overflow"))?;
+        Ok(())
+    }
+
+    pub(super) fn stage_svg_detach(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+    ) -> Result<bool> {
+        guard::no_removal(self, "SVG lifecycle")?;
+        if self.svg_lifecycle.len() >= svg_plan::MAX_SVG_LIFECYCLE_INTENTS {
+            return Err(invalid(format!(
+                "SVG lifecycle intents exceed {}",
+                svg_plan::MAX_SVG_LIFECYCLE_INTENTS
+            )));
+        }
+        if !svg_plan::preflight_with_pending(
+            &self.base,
+            position,
+            selector,
+            false,
+            &mut self.svg_preflight,
+            &mut self.svg_projected_owners,
+        )? {
+            return Ok(false);
+        }
+        self.svg_lifecycle
+            .try_reserve(1)
+            .map_err(|source| allocation("SVG lifecycle intents", source))?;
+        self.svg_lifecycle.push(SvgLifecycleIntent {
+            position,
+            selector,
+            attach: false,
+            payload: None,
+        });
+        Ok(true)
     }
 
     /// Create or replace the complete persisted Office Add-in task-pane graph.
@@ -976,6 +1095,7 @@ impl Edit {
                 .saturating_add(usize::from(self.panes.is_some()))
                 .saturating_add(usize::from(self.defined_names.is_some()))
                 .saturating_add(self.drawings.len())
+                .saturating_add(self.svg_lifecycle.len())
                 .saturating_add(usize::from(self.active.is_some()))
                 .saturating_add(
                     self.order
@@ -1006,6 +1126,7 @@ impl Edit {
             && self.panes.is_none()
             && self.defined_names.is_none()
             && self.drawings.is_empty()
+            && self.svg_lifecycle.is_empty()
             && self
                 .order
                 .as_ref()
@@ -1058,6 +1179,18 @@ impl Edit {
                 rejected: Box::new(other),
             });
         }
+        if self.svg_lifecycle.iter().any(|intent| {
+            other.svg_lifecycle.iter().any(|candidate| {
+                intent.position == candidate.position && intent.selector == candidate.selector
+            })
+        }) {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
         let conflicts = self.conflicts_with(&other);
         if !conflicts.is_empty() {
             return Err(JoinError {
@@ -1067,6 +1200,74 @@ impl Edit {
         }
 
         let other_cross_workbook_scalar = other.cross_workbook_scalar;
+        let Some(combined_svg_intents) = self
+            .svg_lifecycle
+            .len()
+            .checked_add(other.svg_lifecycle.len())
+        else {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        };
+        if combined_svg_intents > super::super::svg_lifecycle::MAX_SVG_LIFECYCLE_INTENTS {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
+        let other_svg_staged_payload_bytes = other.svg_staged_payload_bytes;
+        let Some(combined_svg_staged_payload_bytes) = self
+            .svg_staged_payload_bytes
+            .checked_add(other_svg_staged_payload_bytes)
+        else {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        };
+        if svg_plan::check_payload_budget(
+            &self.base,
+            self.svg_base_part_bytes,
+            0,
+            combined_svg_staged_payload_bytes,
+        )
+        .is_err()
+        {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
+        if self
+            .svg_lifecycle
+            .try_reserve(other.svg_lifecycle.len())
+            .is_err()
+            || self
+                .svg_preflight
+                .try_reserve(other.svg_preflight.len())
+                .is_err()
+            || self
+                .svg_projected_owners
+                .try_reserve(other.svg_projected_owners.len())
+                .is_err()
+            || self.added.try_reserve(other.added.len()).is_err()
+        {
+            return Err(JoinError {
+                failure: JoinFailure::Overlap(ConflictSet {
+                    conflicts: Box::new([]),
+                }),
+                rejected: Box::new(other),
+            });
+        }
         let added_offset = self.added.len();
         if self.panes.is_none() {
             self.panes = other.panes;
@@ -1075,6 +1276,10 @@ impl Edit {
             self.defined_names = other.defined_names;
         }
         self.drawings.extend(other.drawings);
+        self.svg_lifecycle.extend(other.svg_lifecycle);
+        self.svg_preflight.extend(other.svg_preflight);
+        self.svg_projected_owners.extend(other.svg_projected_owners);
+        self.svg_staged_payload_bytes = combined_svg_staged_payload_bytes;
         if self.active.is_none() {
             self.active = other.active.map(|target| match target {
                 Target::Base(position) => Target::Base(position),
@@ -1186,7 +1391,13 @@ impl Edit {
             added,
             removed: _,
             cross_workbook_scalar,
+            svg_lifecycle: svg_intents,
+            svg_preflight: _,
+            svg_projected_owners: _,
+            svg_staged_payload_bytes: _,
+            svg_base_part_bytes,
         } = self;
+        let has_svg_lifecycle = !svg_intents.is_empty();
         ensure_defined_name_edit_is_composable(
             requested_defined_names.as_deref(),
             requested_order.as_ref(),
@@ -1201,6 +1412,8 @@ impl Edit {
         let mut validated_worksheet_stores = Vec::new();
         let mut needs_recalculation = false;
         let mut drawing_graph = Vec::new();
+        let mut svg_parts = Vec::new();
+        let mut content_types = None;
 
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
@@ -2013,6 +2226,8 @@ impl Edit {
                 uri: data.part_uri.clone(),
                 before,
                 after,
+                before_source: None,
+                after_source: None,
             });
         }
         if !drawings.is_empty() {
@@ -2600,6 +2815,8 @@ impl Edit {
                     uri: base.inner.workbook_uri.clone(),
                     before,
                     after: Arc::new(after),
+                    before_source: None,
+                    after_source: None,
                 });
             }
         }
@@ -2625,6 +2842,20 @@ impl Edit {
         graph.extend(created.into_iter().map(|sheet| sheet.graph));
         graph.extend(calculation_graph);
         graph.extend(drawing_graph);
+
+        let preexisting_relationship_changes = relationship_changes.clone();
+        svg_plan::plan(
+            &base,
+            &svg_intents,
+            svg_base_part_bytes,
+            &graph,
+            &preexisting_relationship_changes,
+            &mut parts,
+            &mut relationship_changes,
+            &mut svg_parts,
+            &mut content_types,
+            &mut package_changes,
+        )?;
 
         let web_patch = match requested_panes {
             Some(PanesAction::Put { panes, conformance }) => {
@@ -2659,6 +2890,8 @@ impl Edit {
             && package_changes.is_empty()
             && parts.is_empty()
             && relationship_changes.is_empty()
+            && content_types.is_none()
+            && svg_parts.is_empty()
             && graph.is_empty()
             && web_patch.is_none()
         {
@@ -2676,11 +2909,44 @@ impl Edit {
         for change in &relationship_changes {
             change.validate(&package)?;
         }
-        for part in &parts {
-            package
-                .get_part_mut(&part.uri)?
-                .set_blob_shared(Arc::clone(&part.after));
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Add {
+                change.validate(&package)?;
+            }
         }
+        // Source-proven XML transitions are applied through their proofs so
+        // stale provenance cannot silently fall back to a canonical rewrite.
+        for change in &parts {
+            if let (Some(expected), Some(replacement)) =
+                (&change.before_source, &change.after_source)
+            {
+                if expected.bytes() != change.before.as_slice()
+                    || replacement.bytes() != change.after.as_slice()
+                {
+                    return Err(Error::PatchConflict {
+                        part: change.uri.to_string(),
+                    });
+                }
+                package.try_replace_owned_xml_part(expected.bytes(), replacement.clone())?;
+            } else {
+                package
+                    .get_part_mut(&change.uri)?
+                    .set_blob_shared(Arc::clone(&change.after));
+            }
+        }
+        if let Some(change) = &content_types {
+            change.validate(&package)?;
+            change.apply(&mut package)?;
+        }
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Add {
+                change.apply(&mut package)?;
+            }
+        }
+        // Manifest edits must be validated before graph publication and are
+        // applied after changed XML/relationship members are staged.
+        // (The concrete SVG planner supplies this token when needed.)
+        // Content types are otherwise untouched by ordinary worksheet edits.
         for change in &relationship_changes {
             change.apply(&mut package)?;
         }
@@ -2688,8 +2954,23 @@ impl Edit {
             change.validate(&package)?;
             change.apply(&mut package)?;
         }
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Remove {
+                change.validate(&package)?;
+            }
+        }
+        // SVG media removals happen only after all graph transitions are
+        // visible to the final incoming-edge census.
+        for change in &svg_parts {
+            if change.action == super::super::model::GraphAction::Remove {
+                change.apply(&mut package)?;
+            }
+        }
         if let Some(web) = &web_patch {
             web.apply(&mut package)?;
+        }
+        if has_svg_lifecycle {
+            validate_svg_final_removals(&package, &svg_parts)?;
         }
         let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
         if needs_recalculation {
@@ -2716,6 +2997,16 @@ impl Edit {
             codec::validate_web_integrity(&workbook)?;
         }
         workbook.adopt_validated_worksheet_stores(&base, validated_worksheet_stores)?;
+        let svg_read_guards = if has_svg_lifecycle {
+            svg_plan::read_guards(&base, &workbook, &svg_intents)?
+        } else {
+            Box::new([])
+        };
+        let svg_final_guards = if has_svg_lifecycle {
+            svg_plan::capture_final_guards(&base, &workbook, &svg_intents)?
+        } else {
+            Box::new([])
+        };
         let authority =
             cross_workbook_scalar.then(|| PatchAuthority::new(base.clone(), workbook.clone()));
         Ok(Commit {
@@ -2725,12 +3016,16 @@ impl Edit {
                 package_changes: package_changes.into_boxed_slice(),
                 parts: parts.into_boxed_slice(),
                 relationships: relationship_changes.into_boxed_slice(),
+                content_types,
+                svg_parts: svg_parts.into_boxed_slice(),
                 graph: graph.into_boxed_slice(),
                 web: web_patch,
                 style_guard,
                 source: Some(base),
                 target: Some(workbook),
                 authority,
+                svg_read_guards,
+                svg_final_guards,
             },
         })
     }
@@ -3285,6 +3580,7 @@ impl Edit {
         self.panes.is_some()
             || self.defined_names.is_some()
             || !self.drawings.is_empty()
+            || !self.svg_lifecycle.is_empty()
             || self.active.is_some()
             || self.order.as_ref().is_some_and(OrderPlan::is_effective)
             || self.sheets.values().any(|actions| !actions.is_empty())
@@ -3406,6 +3702,8 @@ fn project_hyperlink_actions(
                 owner: owner.clone(),
                 before: previous_relationship,
                 after: next_relationship,
+                before_source: None,
+                after_source: None,
             };
             apply_relationship_change_to_collection(&mut verification_relationships, &delta)?;
             physical_changes.push(delta);

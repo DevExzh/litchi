@@ -28,6 +28,8 @@ pub(super) fn compose_part(
             uri: uri.clone(),
             before,
             after: Arc::new(after),
+            before_source: None,
+            after_source: None,
         });
     }
     Ok(())
@@ -56,6 +58,8 @@ pub(super) fn compose_part_optional(
             uri: uri.clone(),
             before,
             after: Arc::new(after),
+            before_source: None,
+            after_source: None,
         });
     }
     Ok(())
