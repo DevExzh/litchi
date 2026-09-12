@@ -1,0 +1,22 @@
+source_manifest_before_sha256=c347f6640a6c2bda22ed51e3b202f53eaf857f30eb915631c31836e0ad790d52
+source_manifest_after_sha256=c347f6640a6c2bda22ed51e3b202f53eaf857f30eb915631c31836e0ad790d52
+git_head=cd5dc456b4d64a6aba6b4833a424d6bcc32e1707
+approved_source_pin=ac288a303264f9ea0bb4081baa44031bee5b79a7
+committed_input_guard=profile_pins.py + committed_inputs.py + source_manifest.py
+source_sha256:
+264b63935cdf58b9aadfdc092f315f4115118821dcd4e75585bd4914c7fe30fd  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/crates/litchi-xlsx/src/drawing/mod.rs
+41741377e361a91180c5d49be740a1f2e1693e3c91de9dafaa6876eec01dc12a  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/crates/litchi-xlsx/src/drawing/model.rs
+c957b218b59cda78f0fc1c4615d68a33e084d410d889289f86cd2a60b9eef679  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/crates/litchi-xlsx/src/drawing/codec.rs
+35a4b181b0a13b3179045054977ce721daaf23b5b5bdc3ac7e6e71fd5f025d62  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/crates/litchi-xlsx/src/workbook/edit/model.rs
+f3f6e4a2994934d8f2b90941a740f6ab7c6d552ab93d39119f80f10c58418fb7  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs
+e8a1e480d249b834f286e0deec083f8044257faf3b95905fb5b771e83f71605a  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/crates/litchi-drawingml/src/svg_blip.rs
+harness_sha256:
+12d4c700806b2b29e08ff3162e1aa9c44f49c14ae312467c0bdbc6c338caafe2  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.lock
+189fb1a1a2cdfb18a81d69002dc4427044ebf7ed73f2ee8b37d0ab493e768073  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.toml
+15f63363ead5ac3c8c777c819c39696da312b6d73999aad8518a610a430813d8  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/adapter.rs
+0b8e9e8d94b6d4fecebb7f419b83dbef207670accfde09be452e22ae89b1de74  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/main.rs
+b26d4b5a68fb188fb19bd65e7ee0d7d44061379f8202859ba484b3b76dc0fad4  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/support.rs
+guard_sha256:
+7507cb713b85c7cc2fe5e5810a44890999e77b4ab7f740b6901c1b2a8dfd839f  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/profile_pins.py
+69a0905415ec7a68f28b3f2a89693db17923f9bc591d66ff71aa0c46055a9be4  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/committed_inputs.py
+66960efafad7d7666a1a5cb43237a0e1dd5f19d4f22f5c1a705638322a2ccf18  /var/tmp/litchi-xlsx-svg-lifecycle-clean-4b81e22f9/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/source_manifest.py

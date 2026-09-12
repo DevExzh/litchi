@@ -1,0 +1,10 @@
+kind=contemporaneous_host_supplement_after_cd5dc_run
+runner_source_commit=cd5dc456b4d64a6aba6b4833a424d6bcc32e1707
+runner_host_metadata_fix_commit=e7b80f056
+captured_at_utc=2026-09-12T03:38:20Z
+note=The measured cd5dc build-provenance used malformed awk quoting and recorded cpu_model/memory_total as unavailable; this file supplements host context and does not rewrite measured provenance.
+os=Linux 7.0.0-1012-aws x86_64
+cpu_model=AMD EPYC 9R45
+core_count=32
+memory_total=129447068 kB
+storage=/dev/root       2033087068 706658468 1326412216      35% /
