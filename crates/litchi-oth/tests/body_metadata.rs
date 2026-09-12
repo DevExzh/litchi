@@ -26,6 +26,8 @@ const XML_PREFIX: &str = concat!(
 const XML_SUFFIX: &str = r##"</office:text></office:body></office:document-content>"##;
 
 const BODY: &str = concat!(
+    r##"<text:tracked-changes text:track-changes="false"><text:changed-region xml:id="change-forward"><text:insertion><office:change-info><dc:creator>Ada</dc:creator><dc:date>2026-09-02T03:04:05Z</dc:date><text:p>insert reason</text:p><text:p>second reason</text:p></office:change-info></text:insertion></text:changed-region><text:changed-region xml:id="change-delete" text:id="change-delete"><text:deletion><office:change-info><dc:creator>Bob</dc:creator><dc:date>2026-09-03T04:05:06Z</dc:date></office:change-info><text:p>deleted body</text:p></text:deletion></text:changed-region><text:changed-region xml:id="change-format"><text:format-change><office:change-info><dc:creator>Cy</dc:creator><dc:date>2026-09-04T05:06:07Z</dc:date></office:change-info></text:format-change></text:changed-region></text:tracked-changes>"##,
+    r##"<text:change-start text:change-id="change-forward"/>"##,
     r##"<!-- keep-before --><text:section text:name="EditSection" xml:id="section-id"><!-- section-comment --><?section keep?><text:p>editable</text:p><foreign:opaque foreign:flag="x &amp; y"><![CDATA[opaque &lt;bytes&gt;]]></foreign:opaque></text:section>"##,
     r##"<office:annotation office:name="comment" office:display="false" draw:caption="Comment &amp; caption" draw:style-name="CommentStyle" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><dc:creator>Ada &amp; Co</dc:creator><dc:date>2026-09-01T01:02:03Z</dc:date><meta:date-string>September &amp; 1</meta:date-string><meta:creator-initials>A&amp;C</meta:creator-initials><text:list><text:list-item><text:p>rich &amp; list</text:p></text:list-item></text:list></office:annotation>"##,
     r##"<table:table table:name="Data" table:style-name="DataStyle" table:template-name="Template &amp; Name" table:use-first-row-styles="false" table:use-last-row-styles="true" table:use-first-column-styles="false" table:use-last-column-styles="true" table:use-banding-rows-styles="false" table:use-banding-columns-styles="true" table:protected="true" table:protection-key="key &amp; one" table:protection-key-digest-algorithm="urn:example:digest?x=1&amp;y=2" table:print="false" table:print-ranges="$Data.$A$1:$B$2 arbitrary &amp; range" xml:id="table-id" table:is-sub-table="true"><!-- table-comment --><?table keep?><table:table-source table:mode="copy-results-only" table:table-name="External" xlink:type="simple" xlink:href="https://example.test/data?a=1&amp;b=2" xlink:actuate="onRequest" table:filter-name="Filter &amp; Name" table:filter-options="option=&amp;raw" table:refresh-delay="P1Y2M3DT4H5M6.789S"/><table:table-column-group table:display="false"><table:table-column table:number-columns-repeated="2" table:style-name="ColumnStyle" table:visibility="collapse" table:default-cell-style-name="DefaultCell" xml:id="column-collapse"/></table:table-column-group><table:table-column table:style-name="VisibleColumn" table:visibility="visible" xml:id="column-visible"/><table:table-column table:style-name="FilterColumn" table:visibility="filter" xml:id="column-filter"/><table:table-row-group table:display="false"><table:table-row table:number-rows-repeated="2" table:style-name="RowStyle" table:default-cell-style-name="RowDefault" table:visibility="collapse" xml:id="row-collapse"><table:table-cell table:number-columns-repeated="2" table:style-name="FloatCell" table:content-validation-name="AmountValidation" table:formula="of:=SUM([.A1:.B1])" office:value-type="float" office:value="1.2300" table:protect="false" table:protected="true" xml:id="cell-float" table:number-columns-spanned="2" table:number-rows-spanned="3" table:number-matrix-columns-spanned="4" table:number-matrix-rows-spanned="5" xhtml:about="#item" xhtml:property="schema:price dc:title" xhtml:datatype="xsd:decimal" xhtml:content="1.2300"><text:p>one point two three</text:p></table:table-cell><table:table-cell office:value-type="percentage" office:value="25.00"><text:p>25%</text:p></table:table-cell><table:table-cell office:value-type="currency" office:value="-7.500" office:currency="USD"><text:p>USD</text:p></table:table-cell><table:table-cell office:value-type="date" office:date-value="2024-02-03T04:05:06Z"><text:p>date</text:p></table:table-cell><table:table-cell office:value-type="time" office:time-value="P1Y2M3DT4H5M6.789S"><text:p>time</text:p></table:table-cell><table:table-cell office:value-type="boolean" office:boolean-value="false"><text:p>false</text:p></table:table-cell><table:table-cell office:value-type="string" office:string-value="&amp;escaped"><text:p>visible string</text:p></table:table-cell><table:table-cell office:value-type="error" office:string-value="#N/A"><text:p>error</text:p></table:table-cell><table:covered-table-cell><text:p>covered</text:p></table:covered-table-cell></table:table-row></table:table-row-group><table:table-row table:style-name="VisibleRow" table:visibility="visible" xml:id="row-visible"><table:table-cell><text:p>visible row</text:p></table:table-cell></table:table-row><table:table-row table:style-name="FilterRow" table:visibility="filter" xml:id="row-filter"><table:table-cell><text:p>filter row</text:p></table:table-cell></table:table-row></table:table>"##,
@@ -37,7 +39,7 @@ const BODY: &str = concat!(
     r##"<text:user-index text:name="UserIndexRoot"><text:user-index-source text:use-index-marks="true" text:use-index-source-styles="false" text:use-graphics="true" text:use-tables="false" text:use-floating-frames="true" text:use-objects="false" text:copy-outline-levels="true" text:index-name="UserMarks" text:index-scope="chapter" text:relative-tab-stop-position="false"/><text:index-body><text:p>cached user</text:p></text:index-body></text:user-index>"##,
     r##"<text:alphabetical-index text:name="Alphabetical"><text:alphabetical-index-source text:ignore-case="true" text:main-entry-style-name="MainEntry" text:alphabetical-separators="false" text:combine-entries="true" text:combine-entries-with-dash="false" text:combine-entries-with-pp="true" text:use-keys-as-entries="false" text:capitalize-entries="true" text:comma-separated="false" fo:language="en" fo:country="US" fo:script="Latn" style:rfc-language-tag="en-US" text:sort-algorithm="unicode" text:index-scope="document" text:relative-tab-stop-position="true"/><text:index-body><text:p>cached alphabetical</text:p></text:index-body></text:alphabetical-index>"##,
     r##"<text:bibliography text:name="Bibliography"><text:bibliography-source/><text:index-body><text:p>cached bibliography</text:p></text:index-body></text:bibliography>"##,
-    r##"<text:change-start text:change-id="change-forward"/><text:tracked-changes text:track-changes="false"><text:changed-region xml:id="change-forward"><text:insertion><office:change-info><dc:creator>Ada</dc:creator><dc:date>2026-09-02T03:04:05Z</dc:date><text:p>insert reason</text:p><text:p>second reason</text:p></office:change-info></text:insertion></text:changed-region><text:changed-region xml:id="change-delete" text:id="change-delete"><text:deletion><office:change-info><dc:creator>Bob</dc:creator><dc:date>2026-09-03T04:05:06Z</dc:date></office:change-info><text:p>deleted body</text:p></text:deletion></text:changed-region><text:changed-region xml:id="change-format"><text:format-change><office:change-info><dc:creator>Cy</dc:creator><dc:date>2026-09-04T05:06:07Z</dc:date></office:change-info></text:format-change></text:changed-region></text:tracked-changes><text:change-end text:change-id="change-forward"/><text:change text:change-id="change-delete"/>"##,
+    r##"<text:change-end text:change-id="change-forward"/><text:change text:change-id="change-delete"/>"##,
     r##"<foreign:wrapper><table:table table:name="foreign-table"><table:table-row><table:table-cell><text:p>foreign table</text:p></table:table-cell></table:table-row></table:table><text:table-of-content text:name="foreign-index"><text:table-of-content-source/><text:index-body/></text:table-of-content><text:changed-region xml:id="foreign-change"><text:insertion><office:change-info><dc:creator>foreign</dc:creator><dc:date>2026-01-01T00:00:00Z</dc:date></office:change-info></text:insertion></text:changed-region></foreign:wrapper><?keep-after?>"##,
 );
 
@@ -51,6 +53,19 @@ fn content(body: &str) -> String {
 
 fn template(body: &str) -> Template {
     Template::from_bytes(Builder::new().content_xml(content(body)).build().unwrap()).unwrap()
+}
+
+fn template_with_escaped_table_alias(body: &str) -> Template {
+    let prefix = XML_PREFIX.replace(
+        r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+        r#"xmlns:tbl="urn:oasis:names&#x3A;tc&#x3A;opendocument&#x3A;xmlns&#x3A;table&#x3A;1.0" "#,
+    );
+    let body = body.replace("table:", "tbl:");
+    let mut xml = String::with_capacity(prefix.len() + body.len() + XML_SUFFIX.len());
+    xml.push_str(&prefix);
+    xml.push_str(&body);
+    xml.push_str(XML_SUFFIX);
+    Template::from_bytes(Builder::new().content_xml(xml).build().unwrap()).unwrap()
 }
 
 fn table_by_name<'a>(tables: &'a [table::Table], name: &str) -> &'a table::Table {
@@ -239,6 +254,36 @@ fn table_metadata_covers_scalars_source_layout_and_typed_values() {
     assert_eq!(sparse_cell.repeat_count(), 1);
     assert_eq!(sparse_cell.columns_spanned(), 1);
     assert_eq!(sparse_cell.rows_spanned(), 1);
+}
+
+#[test]
+fn entity_escaped_table_namespace_alias_projects_the_same_table_family() {
+    let source = template_with_escaped_table_alias(BODY);
+    let body = source.text_body().unwrap();
+    let tables = body.tables().unwrap();
+    assert_eq!(tables.len(), 2);
+    assert_eq!(
+        table_by_name(tables, "Data").source().unwrap().table_name(),
+        Some("External")
+    );
+    assert_eq!(
+        table_by_name(tables, "Sparse").rows()[0].cells()[0].text(),
+        "sparse"
+    );
+}
+
+#[test]
+fn xsd_double_special_lexicals_are_accepted_and_retained() {
+    let source = template(
+        r#"<table:table table:name="SpecialDoubles"><table:table-row><table:table-cell office:value-type="float" office:value="INF"/><table:table-cell office:value-type="percentage" office:value="-INF"/><table:table-cell office:value-type="currency" office:value="NaN" office:currency="USD"/></table:table-row></table:table>"#,
+    );
+    let body = source.text_body().unwrap();
+    let table = table_by_name(body.tables().unwrap(), "SpecialDoubles");
+    let cells = table.rows()[0].cells();
+    assert_eq!(cells[0].typed_value().unwrap().lexical(), Some("INF"));
+    assert_eq!(cells[1].typed_value().unwrap().lexical(), Some("-INF"));
+    assert_eq!(cells[2].typed_value().unwrap().lexical(), Some("NaN"));
+    assert_eq!(cells[2].typed_value().unwrap().currency(), Some("USD"));
 }
 
 #[test]
@@ -729,6 +774,373 @@ fn malformed_metadata_refuses_typed_projection_without_publishing_partial_values
             .changes()
             .is_err()
     );
+}
+
+#[test]
+fn changed_region_shape_rejects_extra_siblings_nonleading_info_and_payload() {
+    let cases = [
+        (
+            "changed-region extra sibling",
+            BODY.replace(
+                "</text:insertion></text:changed-region>",
+                "</text:insertion><text:p>illegal sibling</text:p></text:changed-region>",
+            ),
+        ),
+        (
+            "change-info not first",
+            BODY.replace(
+                r#"<text:deletion><office:change-info><dc:creator>Bob</dc:creator><dc:date>2026-09-03T04:05:06Z</dc:date></office:change-info><text:p>deleted body</text:p></text:deletion>"#,
+                r#"<text:deletion><text:p>deleted body</text:p><office:change-info><dc:creator>Bob</dc:creator><dc:date>2026-09-03T04:05:06Z</dc:date></office:change-info></text:deletion>"#,
+            ),
+        ),
+        (
+            "insertion payload",
+            BODY.replace(
+                "</office:change-info></text:insertion></text:changed-region>",
+                "</office:change-info><text:p>illegal insertion payload</text:p></text:insertion></text:changed-region>",
+            ),
+        ),
+        (
+            "format-change payload",
+            BODY.replace(
+                "</office:change-info></text:format-change></text:changed-region>",
+                "</office:change-info><text:p>illegal format payload</text:p></text:format-change></text:changed-region>",
+            ),
+        ),
+    ];
+    for (case, invalid_body) in cases {
+        assert!(
+            template(&invalid_body)
+                .text_body()
+                .unwrap()
+                .changes()
+                .is_err(),
+            "invalid changed-region shape: {case}"
+        );
+    }
+}
+
+#[test]
+fn cell_value_type_rejects_incompatible_companion_attributes() {
+    let cases = [
+        (
+            "float with date-value",
+            BODY.replace(
+                r#"office:value-type="float" office:value="1.2300""#,
+                r#"office:value-type="float" office:value="1.2300" office:date-value="2026-01-01""#,
+            ),
+        ),
+        (
+            "percentage with boolean-value",
+            BODY.replace(
+                r#"office:value-type="percentage" office:value="25.00""#,
+                r#"office:value-type="percentage" office:value="25.00" office:boolean-value="true""#,
+            ),
+        ),
+        (
+            "currency with time-value",
+            BODY.replace(
+                r#"office:value-type="currency" office:value="-7.500" office:currency="USD""#,
+                r#"office:value-type="currency" office:value="-7.500" office:currency="USD" office:time-value="PT1S""#,
+            ),
+        ),
+        (
+            "date with value",
+            BODY.replace(
+                r#"office:value-type="date" office:date-value="2024-02-03T04:05:06Z""#,
+                r#"office:value-type="date" office:date-value="2024-02-03T04:05:06Z" office:value="1""#,
+            ),
+        ),
+        (
+            "boolean with value",
+            BODY.replace(
+                r#"office:value-type="boolean" office:boolean-value="false""#,
+                r#"office:value-type="boolean" office:boolean-value="false" office:value="0""#,
+            ),
+        ),
+        (
+            "string with value",
+            BODY.replace(
+                r#"office:value-type="string" office:string-value="&amp;escaped""#,
+                r#"office:value-type="string" office:string-value="&amp;escaped" office:value="1""#,
+            ),
+        ),
+        (
+            "error with boolean-value",
+            BODY.replace(
+                r##"office:value-type="error" office:string-value="#N/A""##,
+                r##"office:value-type="error" office:string-value="#N/A" office:boolean-value="true""##,
+            ),
+        ),
+    ];
+    for (case, invalid_body) in cases {
+        assert!(
+            template(&invalid_body)
+                .text_body()
+                .unwrap()
+                .tables()
+                .is_err(),
+            "invalid cell value companion: {case}"
+        );
+    }
+}
+
+#[test]
+fn duplicate_expanded_attributes_refuse_projection() {
+    let duplicate = BODY.replace(
+        r#"<table:table table:name="Data""#,
+        r#"<table:table xmlns:tbl="urn:oasis:names:tc:opendocument:xmlns:table:1.0" table:name="Data" tbl:name="Duplicate""#,
+    );
+    assert!(template(&duplicate).text_body().unwrap().tables().is_err());
+}
+
+#[test]
+fn duplicate_table_and_index_metadata_children_refuse_projection() {
+    let duplicate_table_source = BODY.replace(
+        r#"table:refresh-delay="P1Y2M3DT4H5M6.789S"/><table:table-column-group"#,
+        r#"table:refresh-delay="P1Y2M3DT4H5M6.789S"/><table:table-source xlink:type="simple" xlink:href="https://example.test/second"/><table:table-column-group"#,
+    );
+    assert!(
+        template(&duplicate_table_source)
+            .text_body()
+            .unwrap()
+            .tables()
+            .is_err()
+    );
+
+    let duplicate_index_source = BODY.replace(
+        r#"<text:illustration-index-source text:use-caption="true" text:caption-sequence-name="Figure" text:caption-sequence-format="category-and-value" text:index-scope="document" text:relative-tab-stop-position="true"/><text:index-body>"#,
+        r#"<text:illustration-index-source text:use-caption="true" text:caption-sequence-name="Figure" text:caption-sequence-format="category-and-value" text:index-scope="document" text:relative-tab-stop-position="true"/><text:illustration-index-source/><text:index-body>"#,
+    );
+    assert!(
+        template(&duplicate_index_source)
+            .text_body()
+            .unwrap()
+            .indexes()
+            .is_err()
+    );
+
+    let duplicate_index_body = BODY.replace(
+        r#"<text:illustration-index-source text:use-caption="true" text:caption-sequence-name="Figure" text:caption-sequence-format="category-and-value" text:index-scope="document" text:relative-tab-stop-position="true"/><text:index-body><text:p>cached illustrations</text:p></text:index-body></text:illustration-index>"#,
+        r#"<text:illustration-index-source text:use-caption="true" text:caption-sequence-name="Figure" text:caption-sequence-format="category-and-value" text:index-scope="document" text:relative-tab-stop-position="true"/><text:index-body><text:p>cached illustrations</text:p></text:index-body><text:index-body/></text:illustration-index>"#,
+    );
+    assert!(
+        template(&duplicate_index_body)
+            .text_body()
+            .unwrap()
+            .indexes()
+            .is_err()
+    );
+}
+
+fn date_value_table_body(value: &str) -> String {
+    format!(
+        r#"<table:table table:name="Dates"><table:table-row><table:table-cell office:value-type="date" office:date-value="{value}"/></table:table-row></table:table>"#
+    )
+}
+
+#[test]
+fn xsd_date_and_datetime_lexicals_follow_the_odf_grammar() {
+    for (label, value) in [
+        ("date with UTC timezone", "2024-01-01Z"),
+        ("date-time at midnight boundary", "2024-01-01T24:00:00Z"),
+        (
+            "midnight with an all-zero fraction",
+            "2024-01-01T24:00:00.00000000000000000000Z",
+        ),
+        (
+            "date-time with arbitrary fractional precision",
+            "2024-01-01T00:00:00.12345678901234567890Z",
+        ),
+    ] {
+        let source = template(&date_value_table_body(value));
+        let body = source.text_body().unwrap();
+        let tables = body.tables().unwrap();
+        let cell = &tables[0].rows()[0].cells()[0];
+        assert_eq!(
+            cell.typed_value().unwrap().lexical(),
+            Some(value),
+            "valid date lexical rejected or normalized: {label}"
+        );
+    }
+
+    let change_date = "2024-01-01T00:00:00.12345678901234567890Z";
+    let source = template(&BODY.replace("2026-09-02T03:04:05Z", change_date));
+    let body = source.text_body().unwrap();
+    let insertion = body
+        .changes()
+        .unwrap()
+        .iter()
+        .find(|change| matches!(change.kind(), change::Kind::Insertion))
+        .unwrap();
+    assert_eq!(insertion.info().unwrap().date(), change_date);
+}
+
+#[test]
+fn xsd_date_and_datetime_lexicals_refuse_year_zero_bad_timezone_and_invalid_fraction() {
+    for (label, value) in [
+        ("year zero date", "0000-01-01Z"),
+        (
+            "date timezone beyond XML Schema boundary",
+            "2024-01-01+14:01",
+        ),
+        (
+            "nonzero fraction at 24:00:00",
+            "2024-01-01T24:00:00.00000000000000000001Z",
+        ),
+    ] {
+        let source = template(&date_value_table_body(value));
+        assert!(
+            source.text_body().unwrap().tables().is_err(),
+            "invalid date lexical was accepted: {label}"
+        );
+    }
+
+    for (label, value) in [
+        ("year zero date-time", "0000-01-01T00:00:00Z"),
+        (
+            "date-time timezone beyond XML Schema boundary",
+            "2024-01-01T00:00:00+14:01",
+        ),
+        (
+            "nonzero fraction at date-time midnight boundary",
+            "2024-01-01T24:00:00.1Z",
+        ),
+    ] {
+        let source = template(&BODY.replace("2026-09-02T03:04:05Z", value));
+        assert!(
+            source.text_body().unwrap().changes().is_err(),
+            "invalid change-info date lexical was accepted: {label}"
+        );
+    }
+}
+
+#[test]
+fn stray_direct_changed_region_is_rejected_outside_the_unique_tracking_prelude() {
+    const STRAY_AND_MARKER: &str = concat!(
+        r#"<text:changed-region xml:id="stray-direct"><text:insertion><office:change-info><dc:creator>Stray</dc:creator><dc:date>2024-01-01T00:00:00Z</dc:date></office:change-info></text:insertion></text:changed-region>"#,
+        r#"<text:change-start text:change-id="change-forward"/>"#,
+    );
+    let body = BODY.replace(
+        r#"<text:change-start text:change-id="change-forward"/>"#,
+        STRAY_AND_MARKER,
+    );
+    let source = template(&body);
+    let body = source.text_body().unwrap();
+    assert!(
+        body.changes().is_err(),
+        "a direct office:text region outside text:tracked-changes was projected"
+    );
+}
+
+#[test]
+fn tracked_change_declarations_require_one_direct_non_nested_owner() {
+    let duplicate_direct = BODY.replace(
+        r#"</text:tracked-changes><text:change-start"#,
+        r#"</text:tracked-changes><text:tracked-changes/><text:change-start"#,
+    );
+    let nested = BODY.replace(
+        r#"<text:tracked-changes text:track-changes="false">"#,
+        r#"<text:tracked-changes text:track-changes="false"><text:tracked-changes/>"#,
+    );
+
+    for (label, invalid_body) in [
+        ("duplicate direct declarations", duplicate_direct),
+        ("nested declaration", nested),
+    ] {
+        let source = template(&invalid_body);
+        let body = source.text_body().unwrap();
+        assert!(
+            body.change_tracking().is_err(),
+            "accepted invalid tracked-change ownership: {label}"
+        );
+        assert!(
+            body.changes().is_err(),
+            "projected changes from invalid tracked-change ownership: {label}"
+        );
+    }
+}
+
+#[test]
+fn office_forms_may_precede_the_tracking_prelude() {
+    let with_forms = BODY.replace(
+        r#"<text:tracked-changes text:track-changes="false">"#,
+        r#"<office:forms/><text:tracked-changes text:track-changes="false">"#,
+    );
+    let source = template(&with_forms);
+    let body = source.text_body().unwrap();
+    assert!(body.forms().is_empty());
+    assert_eq!(
+        body.change_tracking().unwrap().unwrap().track_changes(),
+        Some(false)
+    );
+    assert_eq!(body.changes().unwrap().len(), 6);
+}
+
+fn expanded_prelude_body() -> String {
+    let with_forms = BODY.replace(
+        r#"<text:tracked-changes text:track-changes="false">"#,
+        r#"<office:forms/><text:tracked-changes text:track-changes="false">"#,
+    );
+    with_forms.replace(
+        r#"</text:tracked-changes><text:change-start text:change-id="change-forward"/>"#,
+        r#"</text:tracked-changes><text:variable-decls/><text:sequence-decls/><text:user-field-decls/><text:dde-connection-decls/><text:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="concordance.sdi"/><table:calculation-settings/><table:content-validations/><table:label-ranges/><text:change-start text:change-id="change-forward"/>"#,
+    )
+}
+
+#[test]
+fn expanded_office_text_prelude_preserves_all_distinct_declarations() {
+    let source = template(&expanded_prelude_body());
+    let body = source.text_body().unwrap();
+    assert!(body.forms().is_empty());
+    assert_eq!(
+        body.change_tracking().unwrap().unwrap().track_changes(),
+        Some(false)
+    );
+    assert_eq!(body.changes().unwrap().len(), 6);
+    assert_eq!(body.tables().unwrap().len(), 2);
+    assert_eq!(body.indexes().unwrap().len(), 7);
+}
+
+#[test]
+fn expanded_office_text_prelude_rejects_reordering_and_duplicates() {
+    let expanded = expanded_prelude_body();
+    let cases = [
+        (
+            "reordered declaration pair",
+            expanded.replace(
+                "<text:sequence-decls/><text:user-field-decls/>",
+                "<text:user-field-decls/><text:sequence-decls/>",
+            ),
+        ),
+        (
+            "duplicate declaration",
+            expanded.replace(
+                "<text:sequence-decls/>",
+                "<text:sequence-decls/><text:sequence-decls/>",
+            ),
+        ),
+    ];
+    for (label, invalid_body) in cases {
+        let source = template(&invalid_body);
+        let body = source.text_body().unwrap();
+        assert!(
+            body.change_tracking().is_err(),
+            "accepted invalid expanded prelude: {label}"
+        );
+    }
+}
+
+#[test]
+fn late_tracking_declaration_after_body_content_is_refused() {
+    let late = BODY.replace(
+        r#"<text:tracked-changes text:track-changes="false">"#,
+        r#"<text:p>content before tracked changes</text:p><text:tracked-changes text:track-changes="false">"#,
+    );
+    let source = template(&late);
+    let body = source.text_body().unwrap();
+    assert!(body.change_tracking().is_err());
+    assert!(body.changes().is_err());
 }
 
 #[test]
