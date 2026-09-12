@@ -1,0 +1,189 @@
+{
+  "samples": 120,
+  "groups": 24,
+  "semantic_fixture_candidate_copy_fields_match": true,
+  "source_manifest_matches": true,
+  "fixture_manifest_matches": true,
+  "allocator_variations": [
+    {
+      "file": "mixedinsertremove_large.jsonl",
+      "sample": 0,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_large.jsonl",
+      "sample": 1,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_large.jsonl",
+      "sample": 2,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_large.jsonl",
+      "sample": 3,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_large.jsonl",
+      "sample": 4,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_medium.jsonl",
+      "sample": 0,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_medium.jsonl",
+      "sample": 1,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_medium.jsonl",
+      "sample": 2,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_medium.jsonl",
+      "sample": 3,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_medium.jsonl",
+      "sample": 4,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_small.jsonl",
+      "sample": 0,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_small.jsonl",
+      "sample": 1,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_small.jsonl",
+      "sample": 2,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_small.jsonl",
+      "sample": 3,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    },
+    {
+      "file": "mixedinsertremove_small.jsonl",
+      "sample": 4,
+      "allocator_fields": [
+        "allocation_calls",
+        "deallocation_calls",
+        "direct_allocated_bytes",
+        "released_alloc_bytes_operation",
+        "released_alloc_bytes_through_drop",
+        "requested_alloc_bytes"
+      ]
+    }
+  ]
+}

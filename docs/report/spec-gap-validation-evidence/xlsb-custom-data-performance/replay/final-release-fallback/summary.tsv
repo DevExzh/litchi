@@ -1,0 +1,30 @@
+schema=xlsb-custom-data-performance-v1
+samples=120
+candidate_only=true
+comparison_baseline=none
+native_producer_claim=false
+speedup_claim=false
+editpayload	large	median_ns=5058360	min_ns=5044840	max_ns=5063380
+editpayload	medium	median_ns=1688717	min_ns=1683057	max_ns=1725787
+editpayload	small	median_ns=1131905	min_ns=1120354	max_ns=1137834
+mixedinsertremove	large	median_ns=7088459	min_ns=7069108	max_ns=7100349
+mixedinsertremove	medium	median_ns=2534670	min_ns=2526670	max_ns=2543771
+mixedinsertremove	small	median_ns=1785258	min_ns=1776137	max_ns=1792698
+noop	large	median_ns=2707451	min_ns=2691661	max_ns=2721811
+noop	medium	median_ns=865624	min_ns=857614	max_ns=875923
+noop	small	median_ns=545903	min_ns=544122	max_ns=547592
+patchinverse	large	median_ns=8766515	min_ns=8739765	max_ns=8802206
+patchinverse	medium	median_ns=3044342	min_ns=3032403	max_ns=3048012
+patchinverse	small	median_ns=2004519	min_ns=1998158	max_ns=2014688
+publicapply	large	median_ns=3877376	min_ns=3865886	max_ns=3886816
+publicapply	medium	median_ns=1333845	min_ns=1330356	max_ns=1344555
+publicapply	small	median_ns=907463	min_ns=902164	max_ns=910223
+read	large	median_ns=1277646	min_ns=1270455	max_ns=1299345
+read	medium	median_ns=405551	min_ns=398692	max_ns=413812
+read	small	median_ns=254351	min_ns=249561	max_ns=262541
+rename-many-to-one	large	median_ns=5557193	min_ns=5506043	max_ns=5847083
+rename-many-to-one	medium	median_ns=1864328	min_ns=1853868	max_ns=1881957
+rename-many-to-one	small	median_ns=1239695	min_ns=1230155	max_ns=1242285
+snapshotclone	large	median_ns=40	min_ns=30	max_ns=50
+snapshotclone	medium	median_ns=40	min_ns=40	max_ns=50
+snapshotclone	small	median_ns=40	min_ns=40	max_ns=50
