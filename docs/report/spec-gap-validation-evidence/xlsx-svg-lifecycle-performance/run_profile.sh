@@ -212,9 +212,9 @@ sha256sum "$BIN" >"$RESULTS/binary.sha256"
     printf '%s\n' 'allocator=CountingAllocator (process-local GlobalAlloc observer)'
     printf '%s\n' 'api_binding=reviewed XLSX source-backed owner adapter (set by wiring change)'
     printf '%s\n' "os=$(uname -srm 2>/dev/null || printf unavailable)"
-    printf '%s\n' "cpu_model=$(awk -F: '/model name|Hardware/ {gsub(/^ +/, \"\", $2); print $2; exit}' /proc/cpuinfo 2>/dev/null || printf unavailable)"
+    printf '%s\n' "cpu_model=$(awk -F: '/model name|Hardware/ {gsub(/^ +/, "", $2); print $2; exit}' /proc/cpuinfo 2>/dev/null || printf unavailable)"
     printf '%s\n' "core_count=$(nproc 2>/dev/null || printf unavailable)"
-    printf '%s\n' "memory_total=$(awk '/MemTotal:/ {print $2 \" \" $3; exit}' /proc/meminfo 2>/dev/null || printf unavailable)"
+    printf '%s\n' "memory_total=$(awk '/MemTotal:/ {print $2 " " $3; exit}' /proc/meminfo 2>/dev/null || printf unavailable)"
     printf '%s\n' "storage=$(df -P "$ROOT" 2>/dev/null | tail -n 1 || printf unavailable)"
     printf '%s\n' "environment=CARGO_TARGET_DIR=$CARGO_TARGET_DIR CARGO_INCREMENTAL=$CARGO_INCREMENTAL"
 } >"$RESULTS/build-provenance.txt"
