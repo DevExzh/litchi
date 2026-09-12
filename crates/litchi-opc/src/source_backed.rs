@@ -1621,9 +1621,10 @@ impl SourceTopologyPlan {
     /// package, preserving its exact source lexical form or checked splice.
     ///
     /// The source content type is retained.  The destination publisher
-    /// rechecks source freshness, context, limits, and XML well-formedness;
-    /// only the ordinary authored compactness audit is skipped for this
-    /// source-authorized payload.
+    /// rechecks source freshness, context, and destination limits. XML validity
+    /// reuses the immutable proof under identical limits, or is fully checked
+    /// under different limits. The ordinary authored compactness audit is
+    /// skipped for this source-authorized payload.
     pub fn try_add_source_xml_part(
         &mut self,
         partname: PackURI,

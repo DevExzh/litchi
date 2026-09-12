@@ -1,0 +1,259 @@
+{
+  "equal_fields": [
+    "source_read_calls",
+    "source_requested_bytes",
+    "source_returned_bytes",
+    "output_bytes",
+    "output_sha256",
+    "budget_live_memory",
+    "budget_live_objects",
+    "budget_after_memory",
+    "budget_after_objects",
+    "budget_after_input",
+    "budget_after_output"
+  ],
+  "rows_checked": 3168,
+  "cases": [
+    {
+      "lane": "r1",
+      "case": "p128-k1-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k1-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k1-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k1-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k32-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k32-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k32-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k32-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k8-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k8-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k8-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p128-k8-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k1-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k1-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k1-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k1-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k32-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k32-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k32-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k32-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k8-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k8-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k8-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r1",
+      "case": "p512-k8-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k1-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k1-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k1-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k1-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k32-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k32-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k32-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k32-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k8-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k8-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k8-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p128-k8-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k1-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k1-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k1-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k1-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k32-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k32-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k32-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k32-owned-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k8-file-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k8-file-repeated",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k8-owned-batch",
+      "removed_work_bytes": 0
+    },
+    {
+      "lane": "r2",
+      "case": "p512-k8-owned-repeated",
+      "removed_work_bytes": 0
+    }
+  ],
+  "scope": "Owner gauges and source counters; not allocator metrics"
+}

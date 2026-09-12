@@ -1,0 +1,199 @@
+{
+  "schema": "managed_docx_callgrind_annotations_v1",
+  "profile_count": 6,
+  "profiles": [
+    {
+      "raw": "p128-k1-owned-batch.callgrind",
+      "raw_sha256": "6e29ee97a422badbe2a25c44397d958e5e137e6c250d3773484408ccbcfc283b",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p128-k1-owned-batch.callgrind"
+          ],
+          "path": "p128-k1-owned-batch-exclusive.txt",
+          "sha256": "14a7cfd6f5800dbea20993668e52a7edc6caccf2ddad33cb996a246a3ab09b25"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p128-k1-owned-batch.callgrind"
+          ],
+          "path": "p128-k1-owned-batch-inclusive.txt",
+          "sha256": "41829b69e0c0eabe97029839c3de720fd95baf924caa27a96a091d0b64b3c8a4"
+        }
+      }
+    },
+    {
+      "raw": "p128-k1-owned-repeated.callgrind",
+      "raw_sha256": "0e43f848b4cf04403c4fe4f3b5459aa1046ca9220b590fae066345299150c4ee",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p128-k1-owned-repeated.callgrind"
+          ],
+          "path": "p128-k1-owned-repeated-exclusive.txt",
+          "sha256": "e6009948bd0226c08fde687eae7f2c02f299e634acd66df5c98f3d9c7b4438f4"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p128-k1-owned-repeated.callgrind"
+          ],
+          "path": "p128-k1-owned-repeated-inclusive.txt",
+          "sha256": "7c4201463579974b1511c5cbb9b802954c3a3b656f3fb470a1e25f41ad375062"
+        }
+      }
+    },
+    {
+      "raw": "p512-k1-owned-batch.callgrind",
+      "raw_sha256": "8f3810fa5b04039c399c013687fe13479a59fd80708a06712a4d32f09992c82d",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k1-owned-batch.callgrind"
+          ],
+          "path": "p512-k1-owned-batch-exclusive.txt",
+          "sha256": "c3f982c964843fd5c4f2bdcf9f9463e518443be010d21db3ad43c6be40b7a61e"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k1-owned-batch.callgrind"
+          ],
+          "path": "p512-k1-owned-batch-inclusive.txt",
+          "sha256": "5aeb6fd40daa880a93fa450aa650b7dc1ff432882e95658c6109c232f2274e99"
+        }
+      }
+    },
+    {
+      "raw": "p512-k1-owned-repeated.callgrind",
+      "raw_sha256": "657c7c191fc7b995b1350d7d84648920847b908d27d64a5176c3686ae3bd33e0",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k1-owned-repeated.callgrind"
+          ],
+          "path": "p512-k1-owned-repeated-exclusive.txt",
+          "sha256": "45e1f193d2b8f8e906a65dc643859d96c470ff48c0c33441579b264d31433676"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k1-owned-repeated.callgrind"
+          ],
+          "path": "p512-k1-owned-repeated-inclusive.txt",
+          "sha256": "0d64e37097fe161a5b31f6baf3a6790c2d10d415346429c06de6fe4f6c3b350d"
+        }
+      }
+    },
+    {
+      "raw": "p512-k32-owned-batch.callgrind",
+      "raw_sha256": "8514666967950982cd21dcb1bcaa6f99265a57930df9b21d9f0000ca5b87dc1b",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k32-owned-batch.callgrind"
+          ],
+          "path": "p512-k32-owned-batch-exclusive.txt",
+          "sha256": "0fff65482d6c333a92c277477147fc8fea1b75ef3ba45e74e07228503f6b18df"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k32-owned-batch.callgrind"
+          ],
+          "path": "p512-k32-owned-batch-inclusive.txt",
+          "sha256": "680647ccf2cb029fc8de0a3b2f27170a845d9d972562db30d75cb4769c432a43"
+        }
+      }
+    },
+    {
+      "raw": "p512-k32-owned-repeated.callgrind",
+      "raw_sha256": "ed3139de64155c2d738676039da40fdd1a1fdf15f91d55b9c112ceb672c42f84",
+      "annotations": {
+        "exclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=no",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k32-owned-repeated.callgrind"
+          ],
+          "path": "p512-k32-owned-repeated-exclusive.txt",
+          "sha256": "22bec38d51b6185061aab4aa8b4d8cbe62e0bd897435ecf4b381d9c24e5aa575"
+        },
+        "inclusive": {
+          "command": [
+            "callgrind_annotate",
+            "--auto=no",
+            "--show-percs=no",
+            "--inclusive=yes",
+            "--tree=both",
+            "--threshold=100",
+            "docs/performance/results/change-0519/profile-after-r1/p512-k32-owned-repeated.callgrind"
+          ],
+          "path": "p512-k32-owned-repeated-inclusive.txt",
+          "sha256": "51402b8e04d9974c5edd631936f6e9b9fcbd7a8c049f4b8e913c01e3d3dfd8de"
+        }
+      }
+    }
+  ],
+  "scope": "Existing raw publication profiles; inclusive and exclusive callgrind_annotate tree=both views; no new capture"
+}

@@ -258,12 +258,20 @@ impl SourceXmlPart {
             self.payload.len() as u64,
             destination_limits.max_part_bytes(),
         )?;
-        validate_source_xml(
-            &self.source_partname,
-            self.payload.as_slice(),
-            destination_limits,
-            self.source.context_ref(),
-        )?;
+        if destination_limits == self.limits {
+            // Both capture and splice finish validate the immutable payload
+            // under these exact limits. Reuse that proof without allocating a
+            // second parser workspace; keep publication Work bounded even
+            // when the payload does not need to be scanned again.
+            consume_work_from_context(self.source.context_ref(), self.payload.len())?;
+        } else {
+            validate_source_xml(
+                &self.source_partname,
+                self.payload.as_slice(),
+                destination_limits,
+                self.source.context_ref(),
+            )?;
+        }
         self.check_source_state()?;
         Ok(())
     }
@@ -1654,3 +1662,7 @@ mod tests {
         assert_eq!(budget.used(Resource::Depth), 0);
     }
 }
+
+#[cfg(test)]
+#[path = "publication_proof_tests.rs"]
+mod publication_proof_tests;

@@ -1,0 +1,45 @@
+{
+  "archive_bytes": 4175373,
+  "archive_sha256": "141f56b2ab081bf82a8284ff501978fe1412f31ad009db7f9a134164e00c5453",
+  "buffer_bytes": 65536,
+  "entries": [
+    {
+      "compressed_bytes": 156,
+      "crc32": 1517392563,
+      "flags": 8,
+      "name": "[Content_Types].xml",
+      "sha256": "5a46eab16166aaeb2ef00dce8730b67c7f3bb9389cc458a1dd6a48c83087d4ec",
+      "uncompressed_bytes": 303,
+      "version_needed": 20
+    },
+    {
+      "compressed_bytes": 132,
+      "crc32": 3696663013,
+      "flags": 8,
+      "name": "_rels/.rels",
+      "sha256": "a99d3473da0842416e3f4a40a1355f04b4883d7ce044186dc4c83968211e1f60",
+      "uncompressed_bytes": 177,
+      "version_needed": 20
+    },
+    {
+      "compressed_bytes": 38,
+      "crc32": 956610985,
+      "flags": 8,
+      "name": "document.xml",
+      "sha256": "5ddc8e5fb871891c4dc3152b25f21831776c2244a0b2525674bd4122133babb0",
+      "uncompressed_bytes": 45,
+      "version_needed": 20
+    },
+    {
+      "compressed_bytes": 4174507,
+      "crc32": 3523407757,
+      "flags": 8,
+      "name": "large.bin",
+      "sha256": "8479e43911dc45e89f934fe48d01297e16f51d17aa561d4d1c216b1ae0fcddca",
+      "uncompressed_bytes": 4294967296,
+      "version_needed": 45
+    }
+  ],
+  "python": "3.14.4",
+  "zlib": "1.3.1"
+}

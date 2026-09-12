@@ -1,0 +1,10 @@
+{
+  "base": "45d71cb6f0cd5d003c544b61c748552a513b0245",
+  "previous_turn": "progress: committed 0518 production optimization, 5004 tests, complete evidence verification and cleanup",
+  "priority": "OLE2/OOXML; ODF deferred; iWork excluded",
+  "owned_paths": [
+    "/tmp/litchi-goal-0519",
+    "/home/zhuhe/litchi-goal-0519-target"
+  ],
+  "initial_tree_clean": true
+}

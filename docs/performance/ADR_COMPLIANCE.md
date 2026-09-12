@@ -1,5 +1,23 @@
 # Performance optimization ADR-compliance matrix
 
+## 0519: reuse a complete XML proof under identical destination limits
+
+The [0519 matrix](results/change-0519/adr-review.md) and
+[source review](results/change-0519/source-review.md) establish the immutable
+constructor/finish proof invariant. The private OPC publication owner reuses
+that proof only under exact full `ReadLimits` equality after its existing
+content-type, lineage, source/context, and PartBytes checks. It retains a
+payload-length Work charge and final source fence; different limits retain
+full validation. Replacement identity/original bytes, security, topology,
+transfer/output, and DOCX candidate semantic reparse/readback are unchanged.
+
+The intentional lower-memory success path eliminates an unused parser
+reservation while retaining all live proof/output reservations. Eight focused
+tests cover that distinction, unequal policy fallback, Work, source and
+identity guards. No public API, dependencies, unsafe code, mutable proof
+access, cache, or execution policy is added. The full OLE2/OOXML goal remains
+open, with ODF deferred and iWork excluded.
+
 ## 0518: reuse an opaque original-source proof and immutable DOCX layout
 
 The [0518 matrix](results/change-0518/adr-review.md) and

@@ -1,0 +1,20 @@
+{
+  "base_revision": "45d71cb6f0cd5d003c544b61c748552a513b0245",
+  "source_patch_sha256": "2736fee5f3a6a04b59d84196145eea2758db304e84fc0c45e805c15f0d39915b",
+  "files": {
+    "crates/litchi-opc/src/source_backed.rs": {
+      "before_sha256": "b71ecf3e030632f1317a4ba44301c294d0c566f06107b01cd5e3d6c163693958",
+      "after_sha256": "6f37f9a1e2ecd0435cc811b56a3e92d4bbdb0b41bcdf755478d04f2455f8ea48"
+    },
+    "crates/litchi-opc/src/xml_splice.rs": {
+      "before_sha256": "466e577c38b424e02ea9f104418c7052f8ee32ac4e4db4c0d411c984f18876f5",
+      "after_sha256": "9d629e4a56ed406a8c3db2346495fd4b787e79891a19b5c0ece576408a0e5b30"
+    },
+    "crates/litchi-opc/src/publication_proof_tests.rs": {
+      "before_sha256": null,
+      "after_sha256": "952747c865ad19c03086538c2e83100207fdfed682780f9367ab0404e2c89dad"
+    }
+  },
+  "exact_replay": true,
+  "temporary_removed": true
+}

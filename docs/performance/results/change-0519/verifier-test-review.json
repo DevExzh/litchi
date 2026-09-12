@@ -1,0 +1,14 @@
+{
+  "status": "assertions_completed",
+  "reported_by": "/root/docx_evidence_verify_0517",
+  "command": [
+    "python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0519/verify_test.py"
+  ],
+  "success_marker": "0519 verifier tamper checks passed",
+  "log_sha256": "8741dd00217e6ffdd8c9863952225618cca3d1b43fc132a6a24472197642c956",
+  "verifier_sha256": "5b2fc7c12754ddf74d5802d34b9427c882251ecf6612179af6dc037b5b12ffb8",
+  "test_sha256": "adeab7c7069744324a01e53e4929ea12c4ec291e7bd1b662235f77d5e6d9fe35",
+  "collector_note": "The collector wait was interrupted. Root later observed the success marker, found the process handle unavailable, and found no remaining verifier process. Exit status is not retained."
+}

@@ -1,0 +1,118 @@
+{
+  "base_revision": "45d71cb6f0cd5d003c544b61c748552a513b0245",
+  "builds": {
+    "baseline": {
+      "binary_path": "/tmp/litchi-goal-0519/managed-paragraph-baseline",
+      "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+      "build_manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0519/baseline/source-manifest.json",
+      "build_receipt_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0519/baseline/build-receipt.json",
+      "build_receipt_sha256": "f41022c9ccc64e73051cee3a3de0d3417bb49e2b645a83c37309f1c8bd111633",
+      "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+      "variant": "baseline"
+    },
+    "candidate": {
+      "binary_path": "/tmp/litchi-goal-0519/managed-paragraph-candidate",
+      "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+      "build_manifest_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0519/candidate/source-manifest.json",
+      "build_receipt_path": "/home/zhuhe/code/litchi/docs/performance/results/change-0519/candidate/build-receipt.json",
+      "build_receipt_sha256": "8ace5e4c190e20ecf9e1a9c8c7f30435e4c30748ade3db84d2a0b2594692ddeb",
+      "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+      "variant": "candidate"
+    }
+  },
+  "candidate_source_manifest_current_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+  "frozen_utc": "2026-09-12T04:05:00.561119+00:00",
+  "original_comparison": {
+    "adverse_flag_count": 107,
+    "path": "/home/zhuhe/code/litchi/docs/performance/results/change-0519/candidate-comparison.json",
+    "retention": "all original flags remain retained regardless of tail-guard outcome",
+    "sha256": "6e7ecb330e234546c0ca43fea69d603e6024f5498b1bdbebf6ffe82ff415ecbe"
+  },
+  "protocol": {
+    "bootstrap": {
+      "interpretation": "descriptive only",
+      "iterations": 4000,
+      "seed": 5347857,
+      "unit": "unpaired measured rows within this single internal repeat; candidate median / baseline median"
+    },
+    "cases": {
+      "1": "p128-k1-file-batch",
+      "2": "p128-k1-owned-batch"
+    },
+    "correction": "The uncaptured four-child draft conflated case and replication. Corrected before capture to eight children: each A1/B1/B2/A2 slot runs both cases, yielding two independent A/B pairs per case. No raw tail-guard artifacts existed before this correction.",
+    "cpu": 2,
+    "fresh_process_per_case": true,
+    "order": [
+      {
+        "case": "p128-k1-file-batch",
+        "case_id": "1",
+        "slot": "A1",
+        "variant": "baseline"
+      },
+      {
+        "case": "p128-k1-owned-batch",
+        "case_id": "2",
+        "slot": "A1",
+        "variant": "baseline"
+      },
+      {
+        "case": "p128-k1-file-batch",
+        "case_id": "1",
+        "slot": "B1",
+        "variant": "candidate"
+      },
+      {
+        "case": "p128-k1-owned-batch",
+        "case_id": "2",
+        "slot": "B1",
+        "variant": "candidate"
+      },
+      {
+        "case": "p128-k1-owned-batch",
+        "case_id": "2",
+        "slot": "B2",
+        "variant": "candidate"
+      },
+      {
+        "case": "p128-k1-file-batch",
+        "case_id": "1",
+        "slot": "B2",
+        "variant": "candidate"
+      },
+      {
+        "case": "p128-k1-owned-batch",
+        "case_id": "2",
+        "slot": "A2",
+        "variant": "baseline"
+      },
+      {
+        "case": "p128-k1-file-batch",
+        "case_id": "1",
+        "slot": "A2",
+        "variant": "baseline"
+      }
+    ],
+    "phase_metrics": [
+      "elapsed_ns",
+      "open_ns",
+      "edit_ns",
+      "commit_ns",
+      "publish_ns",
+      "drop_ns"
+    ],
+    "repeats": 1,
+    "rss": "whole-child Maximum resident set size from /usr/bin/time -v stderr",
+    "samples": 200,
+    "statistics": "nearest-rank p50/p95/p99 and arithmetic mean",
+    "thresholds_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0,
+      "rss": 5.0
+    },
+    "warmups": 10
+  },
+  "schema": "managed_paragraph_tail_guard_plan_0519_v2",
+  "scope": "Native DOCX tail guard for r2 p128-k1-file-batch and p128-k1-owned-batch; profile and hardware lanes excluded"
+}
