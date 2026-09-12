@@ -6,12 +6,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import zipfile
 from pathlib import Path
 
 
-SOURCE_COMMIT = "d687e38349e4348506a56dc4ae996298844d4091"
+SOURCE_COMMIT = "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119"
 MANIFEST_FORMAT = "docx-styles-effects-cargo-source-closure-v1"
 RECEIPT_SCHEMA = "docx-styles-effects-smoke-v1"
 U64_MAX = (1 << 64) - 1
@@ -78,6 +79,15 @@ EXPECTED_REFUSALS = {
     "malformed_root",
     "malformed_namespace",
     "malformed_opaque_xml",
+    "malformed_unbound_descendant",
+    "malformed_invalid_qname",
+    "malformed_raw_attribute",
+    "malformed_raw_text",
+    "malformed_control",
+    "malformed_invalid_char_ref",
+    "malformed_empty_prefix",
+    "malformed_reserved_xml_uri",
+    "malformed_xml_version",
     "malformed_xml_events",
     "malformed_xml_depth",
 }
@@ -92,6 +102,26 @@ EXPECTED_VARIANTS = {
 EXPECTED_RESOURCES = {
     "malformed_xml_events": "XmlEvents",
     "malformed_xml_depth": "XmlDepth",
+}
+SYNTHETIC_NATIVE_LANES = {
+    "malformed_duplicate_owner",
+    "malformed_third_orphan",
+    "malformed_external",
+    "malformed_wrong_content_type",
+    "malformed_outbound",
+    "malformed_shared_inbound",
+    "malformed_root",
+    "malformed_namespace",
+    "malformed_opaque_xml",
+    "malformed_unbound_descendant",
+    "malformed_invalid_qname",
+    "malformed_raw_attribute",
+    "malformed_raw_text",
+    "malformed_control",
+    "malformed_invalid_char_ref",
+    "malformed_empty_prefix",
+    "malformed_reserved_xml_uri",
+    "malformed_xml_version",
 }
 CAP_RESOURCES = {
     "cap_parts": "Parts",
@@ -188,6 +218,37 @@ def retained_input(root: Path, shown: str, evidence_root: str, retained_evidence
     return staged
 
 
+def is_evidence_path(shown: str, evidence_root: str) -> bool:
+    return shown.startswith(evidence_root + "/")
+
+
+def manifest_blob_commit(shown: str, evidence_root: str, manifest_head: str) -> str:
+    return manifest_head if is_evidence_path(shown, evidence_root) else SOURCE_COMMIT
+
+
+def verify_manifest_path(
+    root: Path,
+    shown: str,
+    expected: str,
+    evidence_root: str,
+    manifest_head: str,
+    retained_evidence: Path,
+    context: str,
+) -> None:
+    require(
+        not Path(shown).is_absolute()
+        and all(part not in ("", ".", "..") for part in Path(shown).parts),
+        f"unsafe source path: {shown}",
+    )
+    current = retained_input(root, shown, evidence_root, retained_evidence)
+    require(current.is_file(), f"{context} missing: {shown}")
+    require(sha256(current) == expected, f"{context} changed: {shown}")
+    commit = manifest_blob_commit(shown, evidence_root, manifest_head)
+    committed = git_blob_sha256(root, commit, shown)
+    require(committed is not None, f"{context} is absent at bound Git head: {shown}")
+    require(committed == expected, f"{context} Git blob changed: {shown}")
+
+
 def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: Path) -> dict[str, object]:
     lines = path.read_text().splitlines()
     require(lines and lines[0] == f"format={MANIFEST_FORMAT}", "source manifest format changed")
@@ -206,9 +267,19 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
             key, value = line.split("=", 1)
             fields[key] = value
     require(fields.get("source_commit") == SOURCE_COMMIT, "source commit changed")
-    require(fields.get("git_head") is not None, "manifest Git head is missing")
+    manifest_head = fields.get("git_head")
+    require(
+        manifest_head is not None
+        and len(manifest_head) == 40
+        and all(character in "0123456789abcdef" for character in manifest_head),
+        "manifest Git head is missing or malformed",
+    )
     evidence_root = fields.get("evidence_root")
-    require(evidence_root is not None and evidence_root.startswith("docs/"), "staged evidence root changed")
+    try:
+        expected_evidence_root = retained_evidence.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError as error:
+        raise AssertionError("retained evidence is outside the source checkout") from error
+    require(evidence_root == expected_evidence_root, "staged evidence root changed")
     require(fields.get("metadata_sha256") == sha256(metadata), "metadata receipt hash changed")
     require(files, "source manifest has no package files")
     require(packages, "source manifest has no local packages")
@@ -221,14 +292,15 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
         require(len(expected) == 64 and all(c in "0123456789abcdef" for c in expected), f"bad source hash: {shown}")
         require(shown not in seen, f"source path listed twice: {shown}")
         seen.add(shown)
-        current = retained_input(root, shown, evidence_root, retained_evidence)
-        require(current.is_file(), f"source input missing: {shown}")
-        require(sha256(current) == expected, f"source input changed: {shown}")
-        committed = git_blob_sha256(root, SOURCE_COMMIT, shown)
-        if committed is None:
-            require(shown.startswith(evidence_root + "/"), f"uncommitted source input outside evidence: {shown}")
-        else:
-            require(committed == expected, f"committed source blob changed: {shown}")
+        verify_manifest_path(
+            root,
+            shown,
+            expected,
+            evidence_root,
+            manifest_head,
+            retained_evidence,
+            "source input",
+        )
         grouped.setdefault((package_name, version, manifest), []).append((shown, expected))
 
     for record in extras:
@@ -236,14 +308,15 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
         _, shown, expected = record
         require(shown not in seen, f"source path listed twice: {shown}")
         seen.add(shown)
-        current = retained_input(root, shown, evidence_root, retained_evidence)
-        require(current.is_file(), f"source extra missing: {shown}")
-        require(sha256(current) == expected, f"source extra changed: {shown}")
-        committed = git_blob_sha256(root, SOURCE_COMMIT, shown)
-        if committed is None:
-            require(shown.startswith(evidence_root + "/"), f"uncommitted extra outside evidence: {shown}")
-        else:
-            require(committed == expected, f"committed extra blob changed: {shown}")
+        verify_manifest_path(
+            root,
+            shown,
+            expected,
+            evidence_root,
+            manifest_head,
+            retained_evidence,
+            "source extra",
+        )
 
     package_keys: set[tuple[str, str, str]] = set()
     for record in packages:
@@ -254,8 +327,15 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
         package_keys.add(key)
         require(source == "path", f"unexpected source kind: {source}")
         unsigned(int(count_text), f"source file count for {name}")
-        manifest_path = retained_input(root, manifest, evidence_root, retained_evidence)
-        require(manifest_path.is_file() and sha256(manifest_path) == manifest_sha, f"package manifest changed: {manifest}")
+        verify_manifest_path(
+            root,
+            manifest,
+            manifest_sha,
+            evidence_root,
+            manifest_head,
+            retained_evidence,
+            "package manifest",
+        )
         package_files = sorted(grouped.get(key, []))
         require(package_files, f"package has no file records: {name}")
         file_lines = [f"{shown}\t{digest}" for shown, digest in package_files]
@@ -271,6 +351,7 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
         f"{evidence_root}/harness/support.rs",
         f"{evidence_root}/source_manifest.py",
         f"{evidence_root}/test_source_snapshot.py",
+        f"{evidence_root}/test_verify.py",
         f"{evidence_root}/verify.py",
         f"{evidence_root}/requirements.md",
         f"{evidence_root}/corpus-manifest.json",
@@ -336,6 +417,117 @@ def verify_time_sidecar(path: Path, stderr: Path) -> None:
     require(value.isascii() and value.isdecimal() and int(value) > 0, f"RSS is not positive decimal: {path}")
 
 
+def receipt_key_values(path: Path, label: str, *, skip_hash_line: bool = False) -> dict[str, str]:
+    require(path.is_file(), f"{label} receipt is missing: {path}")
+    values: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        if skip_hash_line and re.fullmatch(r"[0-9a-f]{64}\s+\S+", line):
+            continue
+        require("=" in line, f"{label} receipt has an unkeyed line: {path}")
+        key, value = line.split("=", 1)
+        require(key and key not in values, f"{label} receipt has duplicate key: {path}:{key}")
+        values[key] = value
+    require(values, f"{label} receipt is empty: {path}")
+    return values
+
+
+def hash_receipt(path: Path, label: str) -> tuple[str, str]:
+    require(path.is_file(), f"{label} receipt is missing: {path}")
+    lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
+    require(len(lines) == 1, f"{label} receipt must contain one hash line: {path}")
+    fields = lines[0].split()
+    require(len(fields) == 2, f"{label} receipt shape changed: {path}")
+    digest, shown = fields
+    require(len(digest) == 64 and all(character in "0123456789abcdef" for character in digest), f"{label} hash malformed: {path}")
+    require(Path(shown).is_absolute(), f"{label} path is not absolute: {path}")
+    return digest, shown
+
+
+def verify_build_receipts(
+    results: Path,
+    current_head: str,
+    manifest_before: Path,
+    manifest_after: Path,
+    metadata_before: Path,
+    metadata_after: Path,
+    lanes: list[str],
+) -> None:
+    build_log = results / "smoke-build.log"
+    require(build_log.is_file() and build_log.read_text().strip(), f"build log is missing or empty: {build_log}")
+    require("Finished " in build_log.read_text(), f"build log has no successful cargo completion marker: {build_log}")
+
+    binary_digest, binary_path = hash_receipt(results / "smoke-binary.sha256", "binary")
+    after_digest, after_path = hash_receipt(results / "smoke-binary-after.sha256", "post-build binary")
+    require((binary_digest, binary_path) == (after_digest, after_path), "binary changed after lane execution")
+    binary = Path(binary_path)
+
+    provenance_path = results / "smoke-build-provenance.txt"
+    provenance_lines = provenance_path.read_text().splitlines() if provenance_path.is_file() else []
+    raw_hashes = [line.split() for line in provenance_lines if re.fullmatch(r"[0-9a-f]{64}\s+\S+", line)]
+    require(len(raw_hashes) == 1 and raw_hashes[0] == [binary_digest, binary_path], f"build provenance binary hash changed: {provenance_path}")
+    provenance = receipt_key_values(provenance_path, "build provenance", skip_hash_line=True)
+    required_provenance = {
+        "binary",
+        "source_commit",
+        "git_head",
+        "git_status",
+        "rustc",
+        "cargo",
+        "target",
+        "allocator",
+        "rss",
+        "mode",
+    }
+    require(set(provenance) == required_provenance, f"build provenance keys changed: {provenance_path}")
+    require(provenance["binary"] == binary_path, f"build provenance binary path changed: {provenance_path}")
+    require(provenance["source_commit"] == SOURCE_COMMIT, f"build provenance source changed: {provenance_path}")
+    require(provenance["git_head"] == current_head, f"build provenance Git head changed: {provenance_path}")
+    require(provenance["git_status"] == "clean", f"build provenance checkout was not clean: {provenance_path}")
+    require(provenance["rustc"] and provenance["cargo"] and provenance["target"], f"build tool provenance is incomplete: {provenance_path}")
+    target = Path(provenance["target"])
+    require(target.is_absolute(), f"build target path is not absolute: {provenance_path}")
+    if binary.is_file():
+        require(sha256(binary) == binary_digest, f"built binary hash changed: {binary}")
+    else:
+        require(not target.exists(), f"built binary is missing while its disposable target exists: {binary}")
+    require("CountingAllocator" in provenance["allocator"], f"allocator provenance is missing: {provenance_path}")
+    require("/usr/bin/time -v" in provenance["rss"], f"RSS provenance is missing: {provenance_path}")
+    require(provenance["mode"] == "smoke processes=1 warmup=0 samples=1", f"build mode changed: {provenance_path}")
+
+    source_provenance = receipt_key_values(results / "smoke-source-provenance.txt", "source provenance")
+    require(
+        set(source_provenance) == {"source_manifest_sha256", "metadata_before_sha256", "metadata_after_sha256", "git_head"},
+        "source provenance keys changed",
+    )
+    require(source_provenance["source_manifest_sha256"] == sha256(manifest_before), "source manifest provenance hash changed")
+    require(source_provenance["metadata_before_sha256"] == sha256(metadata_before), "metadata-before provenance hash changed")
+    require(source_provenance["metadata_after_sha256"] == sha256(metadata_after), "metadata-after provenance hash changed")
+    require(source_provenance["git_head"] == current_head, "source provenance Git head changed")
+
+    commands_path = results / "smoke-commands.txt"
+    require(commands_path.is_file(), f"command receipt is missing: {commands_path}")
+    command_lines = commands_path.read_text().splitlines()
+    require(any(line.startswith("command=cargo metadata ") for line in command_lines), "cargo metadata command is missing")
+    require(any(line.startswith("command=python3 ") for line in command_lines), "source manifest command is missing")
+    require(any(line.startswith("command=cargo build ") for line in command_lines), "cargo build command is missing")
+    environments = [line for line in command_lines if line.startswith("environment=")]
+    require(len(environments) == 1, "environment receipt is missing or duplicated")
+    environment = environments[0]
+    for marker in ("CARGO_TARGET_DIR=", "CARGO_INCREMENTAL=0", "LC_ALL=C", "RUSTFLAGS=unset", "CARGO_ENCODED_RUSTFLAGS=unset", "RUSTC_BOOTSTRAP=unset", "RUSTDOCFLAGS=unset"):
+        require(marker in environment, f"environment receipt is missing {marker}")
+    run_lines = [line for line in command_lines if line.startswith("run=")]
+    require(len(run_lines) == len(lanes), "lane command receipt count changed")
+    observed: list[str] = []
+    for line in run_lines:
+        match = re.search(r"(?:^|\s)--lane\s+([A-Za-z0-9_]+)(?:\s|$)", line)
+        require(match is not None, f"lane command has no lane name: {line}")
+        observed.append(match.group(1))
+        require("--warmup 0 --samples 1" in line and "fresh_process=1" in line, f"lane command settings changed: {line}")
+    require(set(observed) == set(lanes) and len(set(observed)) == len(lanes), "lane command set changed")
+
+
 def verify_error(value: object, path: str, expected_variant: str | None = None, resource: str | None = None) -> None:
     require(type(value) is dict, f"typed error missing: {path}")
     error = value
@@ -375,6 +567,9 @@ def verify_cap_evidence(value: object, path: str, lane: str) -> None:
             "source_metrics",
             "projected_metrics",
             "exact_fit_ok",
+            "exact_opaque_ok",
+            "source_unrelated_member_digest",
+            "exact_unrelated_member_digest",
             "under_refused_ok",
             "commit_stage_checked",
             "refusal",
@@ -386,6 +581,9 @@ def verify_cap_evidence(value: object, path: str, lane: str) -> None:
     verify_metrics(required(evidence, "source_metrics", path), f"{path}.source_metrics")
     verify_metrics(required(evidence, "projected_metrics", path), f"{path}.projected_metrics")
     exact = boolean(required(evidence, "exact_fit_ok", path), f"{path}.exact_fit_ok")
+    exact_opaque = boolean(required(evidence, "exact_opaque_ok", path), f"{path}.exact_opaque_ok")
+    source_unrelated_digest = required(evidence, "source_unrelated_member_digest", path)
+    exact_unrelated_digest = required(evidence, "exact_unrelated_member_digest", path)
     under = boolean(required(evidence, "under_refused_ok", path), f"{path}.under_refused_ok")
     commit_stage_checked = boolean(
         required(evidence, "commit_stage_checked", path),
@@ -395,6 +593,20 @@ def verify_cap_evidence(value: object, path: str, lane: str) -> None:
     commit_refusal = required(evidence, "commit_refusal", path)
     if applicable:
         require(exact and under, f"existing-owner cap boundary failed: {path}")
+        require(exact_opaque, f"existing-owner exact-fit opaque members changed: {path}")
+        source_digest = text(source_unrelated_digest, f"{path}.source_unrelated_member_digest")
+        exact_digest = text(exact_unrelated_digest, f"{path}.exact_unrelated_member_digest")
+        require(
+            len(source_digest) == 64
+            and all(character in "0123456789abcdef" for character in source_digest),
+            f"existing-owner source unrelated digest malformed: {path}",
+        )
+        require(
+            len(exact_digest) == 64
+            and all(character in "0123456789abcdef" for character in exact_digest),
+            f"existing-owner exact unrelated digest malformed: {path}",
+        )
+        require(source_digest == exact_digest, f"existing-owner unrelated members changed: {path}")
         require(commit_stage_checked, f"existing-owner cap lacked a commit-stage refusal: {path}")
         verify_error(refusal, f"{path}.refusal", "DocxError::Opc::ReadLimit", CAP_RESOURCES[lane])
         if commit_stage_checked:
@@ -405,7 +617,8 @@ def verify_cap_evidence(value: object, path: str, lane: str) -> None:
         source = evidence["source_metrics"]
         require(projected != source, f"existing-owner cap did not grow: {path}")
     else:
-        require(not exact and not under, f"inapplicable existing-owner cap was marked successful: {path}")
+        require(not exact and not exact_opaque and not under, f"inapplicable existing-owner cap was marked successful: {path}")
+        require(source_unrelated_digest is None and exact_unrelated_digest is None, f"inapplicable cap has exact opaque digests: {path}")
         require(refusal is None and commit_refusal is None, f"inapplicable cap has refusal receipts: {path}")
 
 
@@ -547,6 +760,11 @@ def verify_receipts(results: Path, lanes: list[str]) -> dict[str, int]:
             require(expected_package == NATIVE_FIXTURES[fixture_name]["sha256"], f"native package hash changed: {path}")
         samples = required(value, "samples", "receipt")
         require(type(samples) is list and len(samples) == 1, f"sample array changed: {path}")
+        if boolean(required(value, "fixture_native", "receipt"), "fixture_native") and lane not in SYNTHETIC_NATIVE_LANES:
+            require(
+                samples[0].get("input_sha256") == expected_package,
+                f"native input package hash changed: {path}",
+            )
         verify_sample(samples[0], lane, expected_success, str(path))
         verify_time_sidecar(results / f"smoke-{lane}-p1.time.txt", results / f"smoke-{lane}-p1.stderr.log")
         total_samples += 1
@@ -595,6 +813,15 @@ def main() -> None:
     require(sha256(args.metadata_before) == sha256(args.metadata_after), "Cargo metadata changed after smoke")
     corpus = verify_corpus(args.corpus, root, evidence)
     lanes = [str(lane) for lane in corpus["lanes"]]
+    verify_build_receipts(
+        results,
+        current_head,
+        args.manifest,
+        args.manifest_after,
+        args.metadata_before,
+        args.metadata_after,
+        lanes,
+    )
     receipt_summary = verify_receipts(results, lanes)
     output = {
         "schema": "docx-styles-effects-smoke-verification-v1",
