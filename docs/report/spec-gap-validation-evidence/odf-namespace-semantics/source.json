@@ -1,0 +1,15 @@
+{
+  "directory": "/var/tmp/litchi-namespace-root-sqzo73dc",
+  "checkout": "/var/tmp/litchi-namespace-root-sqzo73dc/worktree",
+  "base": "f5f816cfa888d9b33ea825e6dea9a4dfb3798b80",
+  "files": [
+    "crates/litchi-odf-common/src/namespace.rs",
+    "crates/litchi-odf-common/tests/namespace_semantics.rs"
+  ],
+  "sha256": {
+    "crates/litchi-odf-common/src/namespace.rs": "2d7be6707d6839f1f54daf93113c4d7995aeba1133a8abed72541f46b47aac1a",
+    "crates/litchi-odf-common/tests/namespace_semantics.rs": "16a4adc30c9b417065151f681caab050f77f391719ad18611752aef88659f52d"
+  },
+  "target": "/var/tmp/litchi-namespace-root-sqzo73dc/target",
+  "shared_target": false
+}
