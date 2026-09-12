@@ -1,0 +1,21 @@
+{
+  "schema": "litchi-0531-completed-verification-v1",
+  "status": "pass",
+  "components": {
+    "source": "pass",
+    "builds": "pass",
+    "captures": "pass",
+    "analysis": "pass",
+    "flags": "pass",
+    "quality": "pass",
+    "hardware": "pass",
+    "decision": "pass",
+    "cleanup": "pass",
+    "seal": "pass"
+  },
+  "production_change_retained": false,
+  "disposition": "rejected_and_reverted",
+  "successful_test_executions": 4757,
+  "owned_paths_absent": true,
+  "scope": "Full source, build, capture, independent arithmetic, all flag reviews, restored quality, hardware, rejected decision, cleanup and seal verification passed after cleanup. The seal is refreshed after adding this compact receipt and checked again."
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "litchi-0531-final-binary-mismatch-v1",
+  "candidate_binary": {
+    "path": "/tmp/litchi-goal-0531/candidate-normal",
+    "sha256": "6f52c6aef8d1c7f480054c9aa47d29874cc02044b2911ee8532e988a2c26fac9",
+    "bytes": 60122200,
+    "build_receipt_sha256": "6f9357bef65e4523d229ac004c67c9a13df2c8be271f6d023c9831c393014bd2",
+    "source_manifest_sha256": "1d4d1349f4c61567f12985b5b6e0af48c55a81bc58c74a9704c0f43dc401e252"
+  },
+  "rebuilt_candidate_binary": {
+    "path": "/tmp/litchi-goal-0531/final-normal",
+    "sha256": "0da73c5ab5f152bfa535a5259efe41c952e027f9fe31d70190400bf507c87ef1",
+    "bytes": 60132576,
+    "build_receipt_sha256": "6ecc8c3e28c6c039b5834b4afaee11be0957623b908ab050f3d4effdcca311cf",
+    "source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570"
+  },
+  "byte_identical": false,
+  "candidate_elf_sections_sha256": "b0117c523c62dbba77e50896ce6e97eea9a1e3825cb6cbeb491894a4bfec95fb",
+  "final_elf_sections_sha256": "9766ca5dc319f745a84511659fc7ad5209bc021202a513d3f3d16cab7c68c4a6",
+  "candidate_source_manifest_sha256": "1d4d1349f4c61567f12985b5b6e0af48c55a81bc58c74a9704c0f43dc401e252",
+  "final_candidate_source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "final_source_binding_sha256": "ec12d415cbb5501c6aa376be9ae04c37448e979787756ee2ec94e4dfd3baec8c",
+  "final_native_plan_sha256": "3655d564e42d79213374b16727f3709b9570b71d888e9d10e7fcca0a7a30139a",
+  "final_native_comparison_sha256": "92f098ff42ceee6c59f30f12558add73dc98fb7d540a1da77a681501f6f0d055",
+  "disposition": "rejected_and_reverted",
+  "review": "Runtime source was unchanged between candidate builds, but binary hashes and ELF text section sizes differ. Cause is not established. A fresh complete frozen native matrix measured the rebuilt candidate. Dense-sparse repeat 2 failed both total p50 and mean reduction gates. No production optimization is retained; original passing measurements do not override this failure."
+}

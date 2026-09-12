@@ -1,0 +1,47 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/final/final-native-r2-primary-medium.rss.json",
+    "/tmp/litchi-goal-0531/final-normal",
+    "--warmup",
+    "20",
+    "--samples",
+    "200",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/final/final-native-r2-primary-medium.json"
+  ],
+  "start_utc": "2026-09-12T14:42:23.115363+00:00",
+  "end_utc": "2026-09-12T14:42:36.174363+00:00",
+  "seconds": 13.059002180001698,
+  "exit_code": 0,
+  "binary_sha256": "0da73c5ab5f152bfa535a5259efe41c952e027f9fe31d70190400bf507c87ef1",
+  "source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "working_source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "script_sha256": "4baebdc3bc93c62da30994635cab66974b8dfd0a24cf2d2649abe45503af01e5",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0531-target/test-tmp"
+  },
+  "artifacts": {
+    "final-native-r2-primary-medium.host.json": "0a29257337dea64f2b0a1bda26838ed5553514116ed31ecb01df1e72bd3879d5",
+    "final-native-r2-primary-medium.json": "dd4164d88d097f937d2f7dffd17180080369ed860af2ee3ebd227f0d593ad511",
+    "final-native-r2-primary-medium.rss.json": "3807dbbced0a1951fca8c442e61fbde3708c761062c74cc157687b098a7d4e65",
+    "final-native-r2-primary-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-native-r2-primary-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "observed_utc": "2026-09-12T13:37:15.543973+00:00",
+  "processes": [
+    "2645715 2645698       00:23 cargo"
+  ],
+  "scope": "Pre-capture shared-host cargo/rustc observation; external jobs not controlled. Native pinned CPU2, drift reviewed."
+}

@@ -1,0 +1,94 @@
+    Checking crypto-common v0.2.2
+    Checking serde_core v1.0.229
+   Compiling zerocopy v0.8.56
+   Compiling der_derive v0.7.3
+    Checking der v0.7.10
+    Checking digest v0.11.3
+    Checking zerofrom v0.1.4
+    Checking yoke v0.7.4
+    Checking spki v0.7.3
+    Checking zerovec v0.10.4
+    Checking serde v1.0.229
+    Checking serde_json v1.0.149
+    Checking chrono v0.4.45
+    Checking thiserror v2.0.18
+    Checking pkcs8 v0.10.2
+    Checking sha2 v0.11.0
+    Checking tinystr v0.7.6
+    Checking icu_locid v1.5.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking sec1 v0.7.3
+    Checking icu_provider v1.5.0
+    Checking ppv-lite86 v0.2.21
+    Checking bitflags v2.13.1
+    Checking elliptic-curve v0.13.8
+    Checking rand_chacha v0.3.1
+    Checking icu_locid_transform v1.5.0
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking icu_collections v1.5.0
+    Checking num-integer v0.1.47
+    Checking zlib-rs v0.6.7
+    Checking flate2 v1.1.10
+    Checking num-iter v0.1.46
+    Checking icu_properties v1.5.1
+    Checking rand v0.8.8
+    Checking cipher v0.5.2
+    Checking num-bigint-dig v0.8.6
+    Checking ecdsa v0.16.9
+    Checking icu_normalizer v1.5.0
+    Checking primeorder v0.13.6
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking pkcs1 v0.7.5
+    Checking rustix v1.1.4
+    Checking rsa v0.9.10
+    Checking idna_adapter v1.2.0
+    Checking p256 v0.13.2
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking x509-cert v0.2.5
+    Checking tempfile v3.27.0
+    Checking aes v0.9.3
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking idna v1.1.0
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking rc4 v0.2.0
+    Checking cbc v0.2.1
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking sha1 v0.11.0
+    Checking hmac v0.13.0
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking url v2.5.8
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling proc-macro2-diagnostics v0.10.1
+    Checking log v0.4.29
+    Checking pathfinder_geometry v0.5.1
+   Compiling ouroboros_macro v0.18.5
+   Compiling enumflags2_derive v0.7.12
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking ouroboros v0.18.5
+    Checking enumflags2 v0.7.12
+    Checking bytemuck v1.25.2
+    Checking allsorts v0.17.0
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking font-kit v0.14.3
+    Checking roaring v0.11.1
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-sheet v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sheet)
+    Checking litchi-spreadsheet-drawing v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-spreadsheet-drawing)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+    Checking litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Checking litchi-docx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-docx)
+    Checking litchi-xlsb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsb)
+error: this `repeat().take()` can be written more concisely
+   --> crates/litchi-xlsx/src/raw/compact.rs:606:22
+    |
+606 |         input.extend(std::iter::repeat(b' ').take(16 * 1024 * 1024 + 1));
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `repeat_n()` instead: `std::iter::repeat_n(b' ', 16 * 1024 * 1024 + 1)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#manual_repeat_n
+    = note: `-D clippy::manual-repeat-n` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::manual_repeat_n)]`
+
+error: could not compile `litchi-xlsx` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

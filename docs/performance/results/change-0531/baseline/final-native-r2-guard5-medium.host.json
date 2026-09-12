@@ -1,0 +1,8 @@
+{
+  "observed_utc": "2026-09-12T14:44:35.365324+00:00",
+  "processes": [
+    "2835716  298594       00:02 cargo",
+    "2835727 2835716       00:02 rustc"
+  ],
+  "scope": "Pre-child observation; not proof of an idle host."
+}

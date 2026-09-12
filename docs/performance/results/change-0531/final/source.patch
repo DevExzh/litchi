@@ -1,0 +1,29 @@
+diff --git a/crates/litchi-ooxml-common/src/mce/codec.rs b/crates/litchi-ooxml-common/src/mce/codec.rs
+index 8d0a925a8..530b8ede4 100644
+--- a/crates/litchi-ooxml-common/src/mce/codec.rs
++++ b/crates/litchi-ooxml-common/src/mce/codec.rs
+@@ -535,10 +535,7 @@ pub fn process_markup_compatibility<'a>(
+     if xml.len() > lim.max_input_bytes {
+         return Err(limit("input bytes"));
+     }
+-    if !xml
+-        .windows(NAMESPACE.len())
+-        .any(|w| w == NAMESPACE.as_bytes())
+-    {
++    if memchr::memmem::find(xml, NAMESPACE.as_bytes()).is_none() {
+         if xml.len() > lim.max_output_bytes {
+             return Err(limit("output bytes"));
+         }
+diff --git a/crates/litchi-xlsx/src/raw/compact.rs b/crates/litchi-xlsx/src/raw/compact.rs
+index fc2acbf89..b72f2e780 100644
+--- a/crates/litchi-xlsx/src/raw/compact.rs
++++ b/crates/litchi-xlsx/src/raw/compact.rs
+@@ -603,7 +603,7 @@ mod tests {
+     #[test]
+     fn changed_worksheet_can_compact_an_oversized_whitespace_input() {
+         let mut input = format!(r#"<worksheet xmlns="{MAIN_NAMESPACE}">"#).into_bytes();
+-        input.extend(std::iter::repeat(b' ').take(16 * 1024 * 1024 + 1));
++        input.extend(std::iter::repeat_n(b' ', 16 * 1024 * 1024 + 1));
+         input.extend_from_slice(b"<sheetData/></worksheet>");
+         assert!(input.len() > 16 * 1024 * 1024);
+ 

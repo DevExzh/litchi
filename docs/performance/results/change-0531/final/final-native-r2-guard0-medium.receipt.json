@@ -1,0 +1,47 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/final/final-native-r2-guard0-medium.rss.json",
+    "/tmp/litchi-goal-0531/final-normal",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "xlsx_source_backed_cell_values_one_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/final/final-native-r2-guard0-medium.json"
+  ],
+  "start_utc": "2026-09-12T14:42:57.227229+00:00",
+  "end_utc": "2026-09-12T14:42:59.691731+00:00",
+  "seconds": 2.4645034819986904,
+  "exit_code": 0,
+  "binary_sha256": "0da73c5ab5f152bfa535a5259efe41c952e027f9fe31d70190400bf507c87ef1",
+  "source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "working_source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "script_sha256": "4baebdc3bc93c62da30994635cab66974b8dfd0a24cf2d2649abe45503af01e5",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0531-target/test-tmp"
+  },
+  "artifacts": {
+    "final-native-r2-guard0-medium.host.json": "0c5510bc4e123a399d1b9ead2fe4a2a64ce523b3415e9fc1fc4c3a9a839392fd",
+    "final-native-r2-guard0-medium.json": "86915589deb9d2e1e1418270388b8e1d3d6570977c0726bb4798079dbfaaad0f",
+    "final-native-r2-guard0-medium.rss.json": "85c1a11446890b9be84f97987f9d74e29791b0108bf7ce366bf5a21f77d46e3c",
+    "final-native-r2-guard0-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-native-r2-guard0-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

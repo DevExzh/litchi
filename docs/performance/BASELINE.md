@@ -1,5 +1,20 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0531: final MCE candidate fails the native gate
+
+[0531](changes/0531-ooxml-mce-namespace-search.md) retains the final native
+comparison at [final-native-comparison.json](results/change-0531/final-native-comparison.json)
+and the conditional mechanism profile at
+[final-profile-comparison.json](results/change-0531/final-profile-comparison.json).
+The final source differs from the initial measured candidate, so a fresh
+44-child ABBA run is authoritative. Three of four primary rows pass the 1%
+total p50/mean gates, but dense-sparse repeat 2 reaches only **0.8937% p50**
+and **0.6056% mean** reduction; the candidate is rejected and production is
+restored. The conditional planning profile still reduces planning Ir by
+5.0205–5.0844%, which is diagnostic only. No runtime speedup or allocator
+claim is retained; nine regression tests and a test-only lint fix remain.
+OLE2/OOXML stays first, ODF is deferred, and iWork is excluded.
+
 ## 0530: four source-bound planning profiles
 
 [0530](changes/0530-xlsx-planning-attribution.md) isolates edit_sheets with raw caller proof: three lifecycle dumps, one measured call and zero-Ir termination per child. Parsing is 59.881163% and value-only validation 37.589929% of aggregate planning Ir; historical planning time is 31.815642% of measured lifecycle sums. These are separate scopes, not a speedup estimate.

@@ -1,0 +1,2292 @@
+{
+  "schema": "0531-reopen-review-v1",
+  "comparison": "reopen-comparison.json",
+  "comparison_sha256": "5c24c4d57ccca251b883ef2516a1c57f80db0339f8e5f02490de826fabceac97",
+  "complete": true,
+  "all_adverse_metrics_retained": true,
+  "adverse_count": 8,
+  "same_build_drift_count": 57,
+  "guard_passed": true,
+  "scope": "Fresh supplemental reopen and edit/save regression guard; original adverse evidence retained. No speedup claim.",
+  "review_basis": {
+    "status": "pass",
+    "comparisons": 6,
+    "comparisons_passed": 6,
+    "adverse_threshold_percent": 5.0,
+    "same_build_drift_threshold_percent": 5.0,
+    "gate_rule": "elapsed_ns and reopen_ns p50/mean only; no speedup claim",
+    "comparison_summary": [
+      {
+        "format": "XLSX",
+        "description": "primary XLSX dense-sparse",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "fresh_guard": 0,
+        "repeat": 1,
+        "passed": true,
+        "gate_metrics": [
+          {
+            "phase": "elapsed_ns",
+            "stat": "p50",
+            "baseline": 43489730,
+            "candidate": 41516507,
+            "change_percent": -4.53721602778403
+          },
+          {
+            "phase": "elapsed_ns",
+            "stat": "mean",
+            "baseline": 43534974.61999998,
+            "candidate": 41593188.34999997,
+            "change_percent": -4.4602903457487075
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "p50",
+            "baseline": 41892734,
+            "candidate": 42048044,
+            "change_percent": 0.37073254755823903
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "mean",
+            "baseline": 41961590.87000003,
+            "candidate": 42143532.810000025,
+            "change_percent": 0.4335916161130937
+          }
+        ]
+      },
+      {
+        "format": "XLSX",
+        "description": "XLSX guard3 noncompact",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "fresh_guard": 1,
+        "repeat": 1,
+        "passed": true,
+        "gate_metrics": [
+          {
+            "phase": "elapsed_ns",
+            "stat": "p50",
+            "baseline": 24041778,
+            "candidate": 23549771,
+            "change_percent": -2.0464667796200375
+          },
+          {
+            "phase": "elapsed_ns",
+            "stat": "mean",
+            "baseline": 24055608.81,
+            "candidate": 23596259.179999996,
+            "change_percent": -1.9095323407863574
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "p50",
+            "baseline": 33497838,
+            "candidate": 31505765,
+            "change_percent": -5.946870362200684
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "mean",
+            "baseline": 33590698.95,
+            "candidate": 31712076.230000004,
+            "change_percent": -5.5926871983114745
+          }
+        ]
+      },
+      {
+        "format": "XLSX",
+        "description": "XLSX guard4 managed noncompact",
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "fresh_guard": 2,
+        "repeat": 1,
+        "passed": true,
+        "gate_metrics": [
+          {
+            "phase": "elapsed_ns",
+            "stat": "p50",
+            "baseline": 24593856,
+            "candidate": 24103408,
+            "change_percent": -1.9941891178024251
+          },
+          {
+            "phase": "elapsed_ns",
+            "stat": "mean",
+            "baseline": 24606867.669999998,
+            "candidate": 24106495.669999994,
+            "change_percent": -2.0334648306742586
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "p50",
+            "baseline": 28175097,
+            "candidate": 27941952,
+            "change_percent": -0.8274860597640488
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "mean",
+            "baseline": 28193722.37,
+            "candidate": 27955756.419999998,
+            "change_percent": -0.8440387788354431
+          }
+        ]
+      },
+      {
+        "format": "XLSX",
+        "description": "primary XLSX dense-sparse",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "fresh_guard": 0,
+        "repeat": 2,
+        "passed": true,
+        "gate_metrics": [
+          {
+            "phase": "elapsed_ns",
+            "stat": "p50",
+            "baseline": 42787819,
+            "candidate": 41958851,
+            "change_percent": -1.9373925088352784
+          },
+          {
+            "phase": "elapsed_ns",
+            "stat": "mean",
+            "baseline": 42807238.120000005,
+            "candidate": 41903871.39000001,
+            "change_percent": -2.1103130444146356
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "p50",
+            "baseline": 39753132,
+            "candidate": 38774789,
+            "change_percent": -2.4610463396946947
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "mean",
+            "baseline": 39807148.69,
+            "candidate": 38863022.589999996,
+            "change_percent": -2.371750127979344
+          }
+        ]
+      },
+      {
+        "format": "XLSX",
+        "description": "XLSX guard3 noncompact",
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "fresh_guard": 1,
+        "repeat": 2,
+        "passed": true,
+        "gate_metrics": [
+          {
+            "phase": "elapsed_ns",
+            "stat": "p50",
+            "baseline": 23930769,
+            "candidate": 24116920,
+            "change_percent": 0.7778730386808652
+          },
+          {
+            "phase": "elapsed_ns",
+            "stat": "mean",
+            "baseline": 23932408.06999999,
+            "candidate": 24128055.520000007,
+            "change_percent": 0.8175000586141179
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "p50",
+            "baseline": 30670002,
+            "candidate": 27673241,
+            "change_percent": -9.770984038409914
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "mean",
+            "baseline": 30853060.69,
+            "candidate": 27681054.220000006,
+            "change_percent": -10.28101069735391
+          }
+        ]
+      },
+      {
+        "format": "XLSX",
+        "description": "XLSX guard4 managed noncompact",
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "fresh_guard": 2,
+        "repeat": 2,
+        "passed": true,
+        "gate_metrics": [
+          {
+            "phase": "elapsed_ns",
+            "stat": "p50",
+            "baseline": 24038728,
+            "candidate": 23370650,
+            "change_percent": -2.779173673415669
+          },
+          {
+            "phase": "elapsed_ns",
+            "stat": "mean",
+            "baseline": 24049265.64999999,
+            "candidate": 23389442.830000006,
+            "change_percent": -2.7436298039311913
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "p50",
+            "baseline": 32150597,
+            "candidate": 29185496,
+            "change_percent": -9.222537920524465
+          },
+          {
+            "phase": "reopen_ns",
+            "stat": "mean",
+            "baseline": 32207222.530000005,
+            "candidate": 29514388.270000007,
+            "change_percent": -8.360963934383692
+          }
+        ]
+      }
+    ]
+  },
+  "original_trigger": {
+    "original_comparison": "docs/performance/results/change-0531/native-pilot-comparison.json",
+    "original_comparison_sha256": "66ac7faa7a37f013e0074113acef6e8a4668e7b7ed5825f520b9056788e5b60f",
+    "reopen_plan": "reopen-plan.json",
+    "reopen_plan_trigger_sha256": "66ac7faa7a37f013e0074113acef6e8a4668e7b7ed5825f520b9056788e5b60f",
+    "trigger_hash_matches": true,
+    "current_main_comparison": "docs/performance/results/change-0531/comparison.json",
+    "current_main_comparison_sha256": "99a8b1bb06d3d1e46e7b29882dad39baf4dc1bc4aa7aa1dab28c07299e26026b",
+    "selected_original_reopen_rows": 11,
+    "linkage": [
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "primary XLSX dense-sparse",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "dense-sparse",
+          "original_scope": "primary",
+          "original_guard": null,
+          "fresh_guard": 0,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p50"
+        },
+        "original_row": {
+          "baseline": 39852020,
+          "baseline_zero_adverse": false,
+          "candidate": 45022695,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 12.97468735587306,
+          "guard": null,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "dense-sparse",
+          "stat": "p50",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 39753132,
+          "candidate": 38774789,
+          "change_percent": -2.4610463396946947
+        },
+        "interpretation": "Fresh ABBA result -2.4610463396946947% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "primary XLSX dense-sparse",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "dense-sparse",
+          "original_scope": "primary",
+          "original_guard": null,
+          "fresh_guard": 0,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p95"
+        },
+        "original_row": {
+          "baseline": 40343083,
+          "baseline_zero_adverse": false,
+          "candidate": 45827777,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 13.595128562683234,
+          "guard": null,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "dense-sparse",
+          "stat": "p95",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 40243457,
+          "candidate": 39417826,
+          "change_percent": -2.0515906473939305
+        },
+        "interpretation": "Fresh ABBA result -2.0515906473939305% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "primary XLSX dense-sparse",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "dense-sparse",
+          "original_scope": "primary",
+          "original_guard": null,
+          "fresh_guard": 0,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p99"
+        },
+        "original_row": {
+          "baseline": 40533237,
+          "baseline_zero_adverse": false,
+          "candidate": 46047549,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 13.604420490769087,
+          "guard": null,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "dense-sparse",
+          "stat": "p99",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 40496378,
+          "candidate": 39724047,
+          "change_percent": -1.907160684839515
+        },
+        "interpretation": "Fresh ABBA result -1.907160684839515% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "primary XLSX dense-sparse",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "dense-sparse",
+          "original_scope": "primary",
+          "original_guard": null,
+          "fresh_guard": 0,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "mean"
+        },
+        "original_row": {
+          "baseline": 39851819.29,
+          "baseline_zero_adverse": false,
+          "candidate": 45111673.684999995,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 13.198530176813916,
+          "guard": null,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "dense-sparse",
+          "stat": "mean",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 39807148.69,
+          "candidate": 38863022.589999996,
+          "change_percent": -2.371750127979344
+        },
+        "interpretation": "Fresh ABBA result -2.371750127979344% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "XLSX guard3 noncompact",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "noncompact",
+          "original_scope": "guard3",
+          "original_guard": 3,
+          "fresh_guard": 1,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p50"
+        },
+        "original_row": {
+          "baseline": 28433373,
+          "baseline_zero_adverse": false,
+          "candidate": 31701110,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 11.492611165055933,
+          "guard": 3,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "noncompact",
+          "stat": "p50",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 30670002,
+          "candidate": 27673241,
+          "change_percent": -9.770984038409914
+        },
+        "interpretation": "Fresh ABBA result -9.770984038409914% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "XLSX guard3 noncompact",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "noncompact",
+          "original_scope": "guard3",
+          "original_guard": 3,
+          "fresh_guard": 1,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p95"
+        },
+        "original_row": {
+          "baseline": 28882675,
+          "baseline_zero_adverse": false,
+          "candidate": 31921376,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 10.520843377561118,
+          "guard": 3,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "noncompact",
+          "stat": "p95",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 32299383,
+          "candidate": 27878122,
+          "change_percent": -13.688376028730953
+        },
+        "interpretation": "Fresh ABBA result -13.688376028730953% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "XLSX guard3 noncompact",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "noncompact",
+          "original_scope": "guard3",
+          "original_guard": 3,
+          "fresh_guard": 1,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p99"
+        },
+        "original_row": {
+          "baseline": 29059575,
+          "baseline_zero_adverse": false,
+          "candidate": 31935055,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 9.89512062719431,
+          "guard": 3,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "noncompact",
+          "stat": "p99",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 32520404,
+          "candidate": 28027102,
+          "change_percent": -13.816870171723572
+        },
+        "interpretation": "Fresh ABBA result -13.816870171723572% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "XLSX guard3 noncompact",
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "shape": "noncompact",
+          "original_scope": "guard3",
+          "original_guard": 3,
+          "fresh_guard": 1,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "mean"
+        },
+        "original_row": {
+          "baseline": 28435546.200000003,
+          "baseline_zero_adverse": false,
+          "candidate": 31731119.76666667,
+          "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+          "change_percent": 11.589626390460062,
+          "guard": 3,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "noncompact",
+          "stat": "mean",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 30853060.69,
+          "candidate": 27681054.220000006,
+          "change_percent": -10.28101069735391
+        },
+        "interpretation": "Fresh ABBA result -10.28101069735391% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "XLSX guard4 managed noncompact",
+          "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+          "shape": "noncompact",
+          "original_scope": "guard4",
+          "original_guard": 4,
+          "fresh_guard": 2,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p50"
+        },
+        "original_row": {
+          "baseline": 29699148,
+          "baseline_zero_adverse": false,
+          "candidate": 31802670,
+          "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+          "change_percent": 7.082768839025277,
+          "guard": 4,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "noncompact",
+          "stat": "p50",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 32150597,
+          "candidate": 29185496,
+          "change_percent": -9.222537920524465
+        },
+        "interpretation": "Fresh ABBA result -9.222537920524465% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "XLSX guard4 managed noncompact",
+          "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+          "shape": "noncompact",
+          "original_scope": "guard4",
+          "original_guard": 4,
+          "fresh_guard": 2,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "p95"
+        },
+        "original_row": {
+          "baseline": 30388080,
+          "baseline_zero_adverse": false,
+          "candidate": 32131767,
+          "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+          "change_percent": 5.738062424476964,
+          "guard": 4,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "noncompact",
+          "stat": "p95",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 32519324,
+          "candidate": 31561235,
+          "change_percent": -2.946214380102119
+        },
+        "interpretation": "Fresh ABBA result -2.946214380102119% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      },
+      {
+        "scenario": {
+          "format": "XLSX",
+          "description": "XLSX guard4 managed noncompact",
+          "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+          "shape": "noncompact",
+          "original_scope": "guard4",
+          "original_guard": 4,
+          "fresh_guard": 2,
+          "repeat": 2,
+          "phase": "reopen_ns",
+          "stat": "mean"
+        },
+        "original_row": {
+          "baseline": 29766284.466666665,
+          "baseline_zero_adverse": false,
+          "candidate": 31842589.46666667,
+          "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+          "change_percent": 6.975358319662384,
+          "guard": 4,
+          "lane": "native",
+          "phase": "reopen_ns",
+          "repeat": 2,
+          "shape": "noncompact",
+          "stat": "mean",
+          "threshold_percent": 5.0
+        },
+        "fresh_row": {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 32207222.530000005,
+          "candidate": 29514388.270000007,
+          "change_percent": -8.360963934383692
+        },
+        "interpretation": "Fresh ABBA result -8.360963934383692% reverses the original positive direction. It is new evidence for this run; it does not prove the original observation was noise or remove the original row."
+      }
+    ]
+  },
+  "adverse": [
+    {
+      "repeat": 1,
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "baseline": 105890,
+      "candidate": 139711,
+      "change_percent": 31.9397487959203,
+      "review": "Retain this fresh material adverse flag for XLSX guard3 noncompact: open_ns p99 (workflow timing (ns)), repeat=1, baseline=105890, candidate=139711, change=+31.9397487959203% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 1",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    },
+    {
+      "repeat": 2,
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p99",
+      "baseline": 98661,
+      "candidate": 109711,
+      "change_percent": 11.199967565704782,
+      "review": "Retain this fresh material adverse flag for primary XLSX dense-sparse: open_ns p99 (workflow timing (ns)), repeat=2, baseline=98661, candidate=109711, change=+11.199967565704782% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 2",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p95",
+      "baseline": 94501,
+      "candidate": 99860,
+      "change_percent": 5.670839462016275,
+      "review": "Retain this fresh material adverse flag for XLSX guard3 noncompact: open_ns p95 (workflow timing (ns)), repeat=2, baseline=94501, candidate=99860, change=+5.670839462016275% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 2",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "baseline": 97610,
+      "candidate": 103350,
+      "change_percent": 5.880545026124362,
+      "review": "Retain this fresh material adverse flag for XLSX guard3 noncompact: open_ns p99 (workflow timing (ns)), repeat=2, baseline=97610, candidate=103350, change=+5.880545026124362% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 2",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "baseline": 6143776,
+      "candidate": 6681949,
+      "change_percent": 8.759645533951765,
+      "review": "Retain this fresh material adverse flag for XLSX guard3 noncompact: publication_ns p50 (workflow timing (ns)), repeat=2, baseline=6143776, candidate=6681949, change=+8.759645533951765% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 2",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "baseline": 6197622,
+      "candidate": 6746025,
+      "change_percent": 8.848603545037115,
+      "review": "Retain this fresh material adverse flag for XLSX guard3 noncompact: publication_ns p95 (workflow timing (ns)), repeat=2, baseline=6197622, candidate=6746025, change=+8.848603545037115% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 2",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "baseline": 6258342,
+      "candidate": 6851526,
+      "change_percent": 9.478293132590077,
+      "review": "Retain this fresh material adverse flag for XLSX guard3 noncompact: publication_ns p99 (workflow timing (ns)), repeat=2, baseline=6258342, candidate=6851526, change=+9.478293132590077% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 2",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "baseline": 6150145.94,
+      "candidate": 6687190.209999998,
+      "change_percent": 8.732219938182428,
+      "review": "Retain this fresh material adverse flag for XLSX guard3 noncompact: publication_ns mean (workflow timing (ns)), repeat=2, baseline=6150145.94, candidate=6687190.209999998, change=+8.732219938182428% (rose). The supplemental guard still passes elapsed/reopen p50 and mean gates, but this tail or phase observation remains material and is not dismissed; it does not erase the original trigger evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 2",
+        "review_outcome": "fresh-material-adverse",
+        "material_guard_regression": true
+      }
+    }
+  ],
+  "same_build_drift": [
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 104520,
+      "repeat2": 89770,
+      "change_percent": -14.11213164944508,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline open_ns p50 (workflow timing (ns)), repeat1=104520, repeat2=89770, change=-14.11213164944508% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 104520->89770",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 128471,
+      "repeat2": 97240,
+      "change_percent": -24.30976640642636,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline open_ns p95 (workflow timing (ns)), repeat1=128471, repeat2=97240, change=-24.30976640642636% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 128471->97240",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 135991,
+      "repeat2": 98661,
+      "change_percent": -27.450345978778014,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline open_ns p99 (workflow timing (ns)), repeat1=135991, repeat2=98661, change=-27.450345978778014% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 135991->98661",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 108316.89999999998,
+      "repeat2": 90576.13,
+      "change_percent": -16.37857988919548,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline open_ns mean (workflow timing (ns)), repeat1=108316.89999999998, repeat2=90576.13, change=-16.37857988919548% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 108316.89999999998->90576.13",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 14459538,
+      "repeat2": 13662549,
+      "change_percent": -5.511856602887311,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline publication_ns p50 (workflow timing (ns)), repeat1=14459538, repeat2=13662549, change=-5.511856602887311% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 14459538->13662549",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 14624593,
+      "repeat2": 13852060,
+      "change_percent": -5.282423927968461,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline publication_ns p95 (workflow timing (ns)), repeat1=14624593, repeat2=13852060, change=-5.282423927968461% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 14624593->13852060",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 14690784,
+      "repeat2": 13868019,
+      "change_percent": -5.600552019551852,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline publication_ns p99 (workflow timing (ns)), repeat1=14690784, repeat2=13868019, change=-5.600552019551852% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 14690784->13868019",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 14477372.550000004,
+      "repeat2": 13688744.909999998,
+      "change_percent": -5.447311915724695,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline publication_ns mean (workflow timing (ns)), repeat1=14477372.550000004, repeat2=13688744.909999998, change=-5.447311915724695% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 14477372.550000004->13688744.909999998",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 41892734,
+      "repeat2": 39753132,
+      "change_percent": -5.107334364952165,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline reopen_ns p50 (workflow timing (ns)), repeat1=41892734, repeat2=39753132, change=-5.107334364952165% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 41892734->39753132",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 42869487,
+      "repeat2": 40243457,
+      "change_percent": -6.125638965542091,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline reopen_ns p95 (workflow timing (ns)), repeat1=42869487, repeat2=40243457, change=-6.125638965542091% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 42869487->40243457",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 43501190,
+      "repeat2": 40496378,
+      "change_percent": -6.907424831366682,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline reopen_ns p99 (workflow timing (ns)), repeat1=43501190, repeat2=40496378, change=-6.907424831366682% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 43501190->40496378",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 41961590.87000003,
+      "repeat2": 39807148.69,
+      "change_percent": -5.1343195892516125,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline reopen_ns mean (workflow timing (ns)), repeat1=41961590.87000003, repeat2=39807148.69, change=-5.1343195892516125% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 41961590.87000003->39807148.69",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "rss",
+      "stat": "max_rss_kib",
+      "repeat1": 92784,
+      "repeat2": 86952,
+      "change_percent": -6.285566476978788,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: baseline whole-child max RSS max_rss_kib (whole-child max RSS (KiB)), repeat1=92784, repeat2=86952, change=-6.285566476978788% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "whole-child max RSS (KiB)",
+        "phase": "rss",
+        "repeat_scope": "repeat 92784->86952",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 91715,
+      "repeat2": 86095,
+      "change_percent": -6.127678133347869,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline open_ns p50 (workflow timing (ns)), repeat1=91715, repeat2=86095, change=-6.127678133347869% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 91715->86095",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 102001,
+      "repeat2": 94501,
+      "change_percent": -7.352869089518732,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline open_ns p95 (workflow timing (ns)), repeat1=102001, repeat2=94501, change=-7.352869089518732% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 102001->94501",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 105890,
+      "repeat2": 97610,
+      "change_percent": -7.819435263008778,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline open_ns p99 (workflow timing (ns)), repeat1=105890, repeat2=97610, change=-7.819435263008778% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 105890->97610",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 93202.78000000001,
+      "repeat2": 86889.44000000003,
+      "change_percent": -6.773767906922923,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline open_ns mean (workflow timing (ns)), repeat1=93202.78000000001, repeat2=86889.44000000003, change=-6.773767906922923% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 93202.78000000001->86889.44000000003",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 33497838,
+      "repeat2": 30670002,
+      "change_percent": -8.44184630661835,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline reopen_ns p50 (workflow timing (ns)), repeat1=33497838, repeat2=30670002, change=-8.44184630661835% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 33497838->30670002",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 34270876,
+      "repeat2": 32299383,
+      "change_percent": -5.752677579645182,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline reopen_ns p95 (workflow timing (ns)), repeat1=34270876, repeat2=32299383, change=-5.752677579645182% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 34270876->32299383",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 34660087,
+      "repeat2": 32520404,
+      "change_percent": -6.173334186956891,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline reopen_ns p99 (workflow timing (ns)), repeat1=34660087, repeat2=32520404, change=-6.173334186956891% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 34660087->32520404",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 33590698.95,
+      "repeat2": 30853060.69,
+      "change_percent": -8.149988971872823,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: baseline reopen_ns mean (workflow timing (ns)), repeat1=33590698.95, repeat2=30853060.69, change=-8.149988971872823% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 33590698.95->30853060.69",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 104470,
+      "repeat2": 96821,
+      "change_percent": -7.321719153824069,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline open_ns p95 (workflow timing (ns)), repeat1=104470, repeat2=96821, change=-7.321719153824069% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 104470->96821",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 107010,
+      "repeat2": 101221,
+      "change_percent": -5.409774787403043,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline open_ns p99 (workflow timing (ns)), repeat1=107010, repeat2=101221, change=-5.409774787403043% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 107010->101221",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 6731801,
+      "repeat2": 6131662,
+      "change_percent": -8.914984266468961,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline publication_ns p50 (workflow timing (ns)), repeat1=6731801, repeat2=6131662, change=-8.914984266468961% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6731801->6131662",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 6783221,
+      "repeat2": 6217772,
+      "change_percent": -8.335995539582154,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline publication_ns p95 (workflow timing (ns)), repeat1=6783221, repeat2=6217772, change=-8.335995539582154% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6783221->6217772",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 6800491,
+      "repeat2": 6229823,
+      "change_percent": -8.39157054983236,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline publication_ns p99 (workflow timing (ns)), repeat1=6800491, repeat2=6229823, change=-8.39157054983236% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6800491->6229823",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 6738171.31,
+      "repeat2": 6144436.469999999,
+      "change_percent": -8.811512986006298,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline publication_ns mean (workflow timing (ns)), repeat1=6738171.31, repeat2=6144436.469999999, change=-8.811512986006298% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6738171.31->6144436.469999999",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 28175097,
+      "repeat2": 32150597,
+      "change_percent": 14.109978041956705,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline reopen_ns p50 (workflow timing (ns)), repeat1=28175097, repeat2=32150597, change=+14.109978041956705% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 28175097->32150597",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 28399588,
+      "repeat2": 32519324,
+      "change_percent": 14.50632311989879,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline reopen_ns p95 (workflow timing (ns)), repeat1=28399588, repeat2=32519324, change=+14.50632311989879% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 28399588->32519324",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 28444268,
+      "repeat2": 33414877,
+      "change_percent": 17.4749056646492,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline reopen_ns p99 (workflow timing (ns)), repeat1=28444268, repeat2=33414877, change=+17.4749056646492% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 28444268->33414877",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 28193722.37,
+      "repeat2": 32207222.530000005,
+      "change_percent": 14.235439036140306,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: baseline reopen_ns mean (workflow timing (ns)), repeat1=28193722.37, repeat2=32207222.530000005, change=+14.235439036140306% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 28193722.37->32207222.530000005",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 101565,
+      "repeat2": 91020,
+      "change_percent": -10.382513661202186,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: candidate open_ns p50 (workflow timing (ns)), repeat1=101565, repeat2=91020, change=-10.382513661202186% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 101565->91020",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 108651,
+      "repeat2": 98601,
+      "change_percent": -9.249799817765137,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: candidate open_ns p95 (workflow timing (ns)), repeat1=108651, repeat2=98601, change=-9.249799817765137% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 108651->98601",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 102438.45999999998,
+      "repeat2": 91824.29000000002,
+      "change_percent": -10.36150875364581,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: candidate open_ns mean (workflow timing (ns)), repeat1=102438.45999999998, repeat2=91824.29000000002, change=-10.36150875364581% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 102438.45999999998->91824.29000000002",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 42048044,
+      "repeat2": 38774789,
+      "change_percent": -7.784559491043153,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: candidate reopen_ns p50 (workflow timing (ns)), repeat1=42048044, repeat2=38774789, change=-7.784559491043153% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 42048044->38774789",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 42711098,
+      "repeat2": 39417826,
+      "change_percent": -7.7105767685953674,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: candidate reopen_ns p95 (workflow timing (ns)), repeat1=42711098, repeat2=39417826, change=-7.7105767685953674% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 42711098->39417826",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 42859286,
+      "repeat2": 39724047,
+      "change_percent": -7.315191858305803,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: candidate reopen_ns p99 (workflow timing (ns)), repeat1=42859286, repeat2=39724047, change=-7.315191858305803% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 42859286->39724047",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 42143532.810000025,
+      "repeat2": 38863022.589999996,
+      "change_percent": -7.7841367376339505,
+      "review": "Retain this fresh same-build drift for primary XLSX dense-sparse: candidate reopen_ns mean (workflow timing (ns)), repeat1=42143532.810000025, repeat2=38863022.589999996, change=-7.7841367376339505% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 0,
+        "original_scope": "primary",
+        "original_guard": null,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 42143532.810000025->38863022.589999996",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 139711,
+      "repeat2": 103350,
+      "change_percent": -26.025867684004833,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate open_ns p99 (workflow timing (ns)), repeat1=139711, repeat2=103350, change=-26.025867684004833% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 139711->103350",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 6129152,
+      "repeat2": 6681949,
+      "change_percent": 9.019143268106266,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate publication_ns p50 (workflow timing (ns)), repeat1=6129152, repeat2=6681949, change=+9.019143268106266% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6129152->6681949",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 6221932,
+      "repeat2": 6746025,
+      "change_percent": 8.423316101815326,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate publication_ns p95 (workflow timing (ns)), repeat1=6221932, repeat2=6746025, change=+8.423316101815326% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6221932->6746025",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 6352203,
+      "repeat2": 6851526,
+      "change_percent": 7.86062725010519,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate publication_ns p99 (workflow timing (ns)), repeat1=6352203, repeat2=6851526, change=+7.86062725010519% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6352203->6851526",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 6141179.51,
+      "repeat2": 6687190.209999998,
+      "change_percent": 8.890974431066546,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate publication_ns mean (workflow timing (ns)), repeat1=6141179.51, repeat2=6687190.209999998, change=+8.890974431066546% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6141179.51->6687190.209999998",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 31505765,
+      "repeat2": 27673241,
+      "change_percent": -12.164516557525262,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate reopen_ns p50 (workflow timing (ns)), repeat1=31505765, repeat2=27673241, change=-12.164516557525262% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 31505765->27673241",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 32600409,
+      "repeat2": 27878122,
+      "change_percent": -14.48536121126579,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate reopen_ns p95 (workflow timing (ns)), repeat1=32600409, repeat2=27878122, change=-14.48536121126579% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 32600409->27878122",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 36182541,
+      "repeat2": 28027102,
+      "change_percent": -22.53970775573777,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate reopen_ns p99 (workflow timing (ns)), repeat1=36182541, repeat2=28027102, change=-22.53970775573777% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 36182541->28027102",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 31712076.230000004,
+      "repeat2": 27681054.220000006,
+      "change_percent": -12.711315338560524,
+      "review": "Retain this fresh same-build drift for XLSX guard3 noncompact: candidate reopen_ns mean (workflow timing (ns)), repeat1=31712076.230000004, repeat2=27681054.220000006, change=-12.711315338560524% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 1,
+        "original_scope": "guard3",
+        "original_guard": 3,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 31712076.230000004->27681054.220000006",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 94795,
+      "repeat2": 88655,
+      "change_percent": -6.477134869982592,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate open_ns p50 (workflow timing (ns)), repeat1=94795, repeat2=88655, change=-6.477134869982592% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 94795->88655",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 103160,
+      "repeat2": 96330,
+      "change_percent": -6.620783249321438,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate open_ns p95 (workflow timing (ns)), repeat1=103160, repeat2=96330, change=-6.620783249321438% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 103160->96330",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 95299.32999999994,
+      "repeat2": 89640.08999999997,
+      "change_percent": -5.938383827042626,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate open_ns mean (workflow timing (ns)), repeat1=95299.32999999994, repeat2=89640.08999999997, change=-5.938383827042626% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "open_ns",
+        "repeat_scope": "repeat 95299.32999999994->89640.08999999997",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 6661169,
+      "repeat2": 6152443,
+      "change_percent": -7.637188007090046,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate publication_ns p50 (workflow timing (ns)), repeat1=6661169, repeat2=6152443, change=-7.637188007090046% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6661169->6152443",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 6714635,
+      "repeat2": 6201032,
+      "change_percent": -7.649008471793328,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate publication_ns p95 (workflow timing (ns)), repeat1=6714635, repeat2=6201032, change=-7.649008471793328% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6714635->6201032",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 6871235,
+      "repeat2": 6291133,
+      "change_percent": -8.442470676668744,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate publication_ns p99 (workflow timing (ns)), repeat1=6871235, repeat2=6291133, change=-8.442470676668744% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6871235->6291133",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 6669554.86,
+      "repeat2": 6155266.4799999995,
+      "change_percent": -7.710985077645804,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate publication_ns mean (workflow timing (ns)), repeat1=6669554.86, repeat2=6155266.4799999995, change=-7.710985077645804% (fell). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "publication_ns",
+        "repeat_scope": "repeat 6669554.86->6155266.4799999995",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 28168432,
+      "repeat2": 31561235,
+      "change_percent": 12.044699541671333,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate reopen_ns p95 (workflow timing (ns)), repeat1=28168432, repeat2=31561235, change=+12.044699541671333% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 28168432->31561235",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 28249853,
+      "repeat2": 31851326,
+      "change_percent": 12.748643329223697,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate reopen_ns p99 (workflow timing (ns)), repeat1=28249853, repeat2=31851326, change=+12.748643329223697% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 28249853->31851326",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 27955756.419999998,
+      "repeat2": 29514388.270000007,
+      "change_percent": 5.57535209058031,
+      "review": "Retain this fresh same-build drift for XLSX guard4 managed noncompact: candidate reopen_ns mean (workflow timing (ns)), repeat1=27955756.419999998, repeat2=29514388.270000007, change=+5.57535209058031% (rose). This is within-stage repeat variability, not a candidate-versus-baseline effect; it is reviewed separately and does not erase the original trigger or fresh adverse evidence.",
+      "classification": {
+        "format": "XLSX",
+        "fresh_guard": 2,
+        "original_scope": "guard4",
+        "original_guard": 4,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "shape": "noncompact",
+        "metric": "workflow timing (ns)",
+        "phase": "reopen_ns",
+        "repeat_scope": "repeat 27955756.419999998->29514388.270000007",
+        "review_outcome": "fresh-same-build-drift",
+        "material_guard_regression": false
+      }
+    }
+  ],
+  "host_observations": [
+    {
+      "path": "docs/performance/results/change-0531/baseline/reopen-r1-guard0-dense-sparse.host.json",
+      "stage": "baseline",
+      "observed_utc": "2026-09-12T14:04:58.075402+00:00",
+      "process_count": 6,
+      "processes": [
+        "2726101 2726089       00:13 cargo",
+        "2726892 2726101       00:02 rustc",
+        "2727073 2726101       00:01 rustc",
+        "2728170 2726101       00:00 rustc",
+        "2728171 2726101       00:00 rustc",
+        "2728173 2726101       00:00 rustc"
+      ],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "Cargo/rustc was present; context only, with no causal or blanket noise attribution."
+    },
+    {
+      "path": "docs/performance/results/change-0531/baseline/reopen-r1-guard1-noncompact.host.json",
+      "stage": "baseline",
+      "observed_utc": "2026-09-12T14:05:09.406605+00:00",
+      "process_count": 1,
+      "processes": [
+        "2726101 2726089       00:24 cargo"
+      ],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "Cargo/rustc was present; context only, with no causal or blanket noise attribution."
+    },
+    {
+      "path": "docs/performance/results/change-0531/baseline/reopen-r1-guard2-noncompact.host.json",
+      "stage": "baseline",
+      "observed_utc": "2026-09-12T14:05:17.194778+00:00",
+      "process_count": 1,
+      "processes": [
+        "2726101 2726089       00:32 cargo"
+      ],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "Cargo/rustc was present; context only, with no causal or blanket noise attribution."
+    },
+    {
+      "path": "docs/performance/results/change-0531/baseline/reopen-r2-guard0-dense-sparse.host.json",
+      "stage": "baseline",
+      "observed_utc": "2026-09-12T14:06:15.406666+00:00",
+      "process_count": 0,
+      "processes": [],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "No Cargo/rustc matched; scope still says this is not proof of an idle host."
+    },
+    {
+      "path": "docs/performance/results/change-0531/baseline/reopen-r2-guard1-noncompact.host.json",
+      "stage": "baseline",
+      "observed_utc": "2026-09-12T14:06:26.254613+00:00",
+      "process_count": 0,
+      "processes": [],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "No Cargo/rustc matched; scope still says this is not proof of an idle host."
+    },
+    {
+      "path": "docs/performance/results/change-0531/baseline/reopen-r2-guard2-noncompact.host.json",
+      "stage": "baseline",
+      "observed_utc": "2026-09-12T14:06:33.723647+00:00",
+      "process_count": 0,
+      "processes": [],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "No Cargo/rustc matched; scope still says this is not proof of an idle host."
+    },
+    {
+      "path": "docs/performance/results/change-0531/candidate/reopen-r1-guard0-dense-sparse.host.json",
+      "stage": "candidate",
+      "observed_utc": "2026-09-12T14:05:24.567220+00:00",
+      "process_count": 1,
+      "processes": [
+        "2726101 2726089       00:39 cargo"
+      ],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "Cargo/rustc was present; context only, with no causal or blanket noise attribution."
+    },
+    {
+      "path": "docs/performance/results/change-0531/candidate/reopen-r1-guard1-noncompact.host.json",
+      "stage": "candidate",
+      "observed_utc": "2026-09-12T14:05:35.522480+00:00",
+      "process_count": 1,
+      "processes": [
+        "2726101 2726089       00:50 cargo"
+      ],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "Cargo/rustc was present; context only, with no causal or blanket noise attribution."
+    },
+    {
+      "path": "docs/performance/results/change-0531/candidate/reopen-r1-guard2-noncompact.host.json",
+      "stage": "candidate",
+      "observed_utc": "2026-09-12T14:05:43.013268+00:00",
+      "process_count": 1,
+      "processes": [
+        "2734184 2726089       00:01 cargo"
+      ],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "Cargo/rustc was present; context only, with no causal or blanket noise attribution."
+    },
+    {
+      "path": "docs/performance/results/change-0531/candidate/reopen-r2-guard0-dense-sparse.host.json",
+      "stage": "candidate",
+      "observed_utc": "2026-09-12T14:05:50.281569+00:00",
+      "process_count": 1,
+      "processes": [
+        "2734184 2726089       00:08 cargo"
+      ],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "Cargo/rustc was present; context only, with no causal or blanket noise attribution."
+    },
+    {
+      "path": "docs/performance/results/change-0531/candidate/reopen-r2-guard1-noncompact.host.json",
+      "stage": "candidate",
+      "observed_utc": "2026-09-12T14:06:00.908255+00:00",
+      "process_count": 0,
+      "processes": [],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "No Cargo/rustc matched; scope still says this is not proof of an idle host."
+    },
+    {
+      "path": "docs/performance/results/change-0531/candidate/reopen-r2-guard2-noncompact.host.json",
+      "stage": "candidate",
+      "observed_utc": "2026-09-12T14:06:08.100075+00:00",
+      "process_count": 0,
+      "processes": [],
+      "scope": "Pre-child snapshot, not proof of an idle host.",
+      "assessment": "No Cargo/rustc matched; scope still says this is not proof of an idle host."
+    }
+  ]
+}
+

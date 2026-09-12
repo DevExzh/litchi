@@ -1,0 +1,44 @@
+--- a/crates/litchi-ooxml-common/tests/mce_namespace_search.rs
++++ b/crates/litchi-ooxml-common/tests/mce_namespace_search.rs
+@@ -56,7 +56,7 @@
+ #[test]
+ fn exact_namespace_occurrences_in_xml_contexts_enter_the_parser() {
+     let cases = [
+-        (format!("<!--{NAMESPACE}--><r>comment</r>"), 4),
++        (format!("<r><!--{NAMESPACE}-->comment</r>"), 7),
+         (format!("<r>{NAMESPACE}</r>"), 3),
+         (format!(r#"<r a="{NAMESPACE}">attribute</r>"#), 6),
+         (format!("<r><![CDATA[{NAMESPACE}]]></r>"), 12),
+@@ -75,10 +75,10 @@
+ #[test]
+ fn exact_namespace_occurrences_cross_search_boundary_offsets() {
+     for offset in [31, 32, 63, 64, 127, 128] {
+-        let mut source = b"<!--".to_vec();
++        let mut source = b"<r><!--".to_vec();
+         source.resize(offset, b'a');
+         source.extend_from_slice(NAMESPACE.as_bytes());
+-        source.extend_from_slice(b"--><r>boundary</r>");
++        source.extend_from_slice(b"-->boundary</r>");
+ 
+         assert_eq!(
+             source.get(offset..offset + NAMESPACE.len()),
+@@ -217,7 +217,8 @@
+     };
+     let semantic = std::str::from_utf8(&bytes).expect("MCE output remains UTF-8");
+ 
+-    assert!(semantic.contains("<kept>yes</kept>"));
++    assert!(semantic.contains("<kept"));
++    assert!(semantic.contains(">yes</kept>"));
+     assert!(!semantic.contains("mc:AlternateContent"));
+     assert!(!semantic.contains("x:choice"));
+     assert_eq!(report.alternate_content_count, 1);
+@@ -238,7 +239,8 @@
+     );
+     match mce::process_str(&transformed).expect("MCE strings must remain processable") {
+         Cow::Owned(value) => {
+-            assert!(value.contains("<kept>yes</kept>"));
++            assert!(value.contains("<kept"));
++            assert!(value.contains(">yes</kept>"));
+             assert!(!value.contains("x:choice"));
+         },
+         Cow::Borrowed(_) => panic!("MCE strings must become owned after processing"),

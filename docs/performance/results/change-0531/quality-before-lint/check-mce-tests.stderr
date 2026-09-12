@@ -1,0 +1,9 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.98s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0531-target/debug/deps/litchi_ooxml_common-073708392aa10f26)
+     Running tests/core_properties.rs (/home/zhuhe/litchi-goal-0531-target/debug/deps/core_properties-7ddb1c7092414f16)
+     Running tests/markup_compatibility.rs (/home/zhuhe/litchi-goal-0531-target/debug/deps/markup_compatibility-5cb1dcb3d98f9533)
+     Running tests/mce_namespace_search.rs (/home/zhuhe/litchi-goal-0531-target/debug/deps/mce_namespace_search-d90d0dfc317e6d6c)
+     Running tests/ribbon.rs (/home/zhuhe/litchi-goal-0531-target/debug/deps/ribbon-448cfc18ead9b1ac)
+     Running tests/web_extension_packages.rs (/home/zhuhe/litchi-goal-0531-target/debug/deps/web_extension_packages-ae268ccb48cf77f9)
+   Doc-tests litchi_ooxml_common

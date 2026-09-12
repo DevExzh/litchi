@@ -1,0 +1,47 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/final/final-native-r2-guard6-medium.rss.json",
+    "/tmp/litchi-goal-0531/final-normal",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "pptx_source_backed_one_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0531/final/final-native-r2-guard6-medium.json"
+  ],
+  "start_utc": "2026-09-12T14:43:27.257017+00:00",
+  "end_utc": "2026-09-12T14:43:33.247945+00:00",
+  "seconds": 5.9909317049896345,
+  "exit_code": 0,
+  "binary_sha256": "0da73c5ab5f152bfa535a5259efe41c952e027f9fe31d70190400bf507c87ef1",
+  "source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "working_source_manifest_sha256": "b749ceb1a1a379a3495ba9e949dd88edc93a522ec3323124dbdff2c1662d7570",
+  "script_sha256": "4baebdc3bc93c62da30994635cab66974b8dfd0a24cf2d2649abe45503af01e5",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0531-target/test-tmp"
+  },
+  "artifacts": {
+    "final-native-r2-guard6-medium.host.json": "06ecdc4b6b9a256843231fc4e188da4b0cb8e16e077beac0b9312f26fe277808",
+    "final-native-r2-guard6-medium.json": "e858adecd7a5fc737b63e53bfba51271a3a49609242ffb3c22db240fdbd91f4e",
+    "final-native-r2-guard6-medium.rss.json": "8afb2e4497350ae323e134b3d375f20fe0e78e64e8be3fbee7f03b6f2f427a28",
+    "final-native-r2-guard6-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-native-r2-guard6-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

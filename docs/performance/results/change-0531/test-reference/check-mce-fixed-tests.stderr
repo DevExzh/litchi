@@ -1,0 +1,3 @@
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.61s
+     Running tests/mce_namespace_search.rs (/home/zhuhe/litchi-goal-0531-target/debug/deps/mce_namespace_search-d90d0dfc317e6d6c)

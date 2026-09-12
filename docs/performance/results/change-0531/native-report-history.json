@@ -1,0 +1,5 @@
+{
+  "original_native_report_sha256": "66ac7faa7a37f013e0074113acef6e8a4668e7b7ed5825f520b9056788e5b60f",
+  "final_report_sha256": "99a8b1bb06d3d1e46e7b29882dad39baf4dc1bc4aa7aa1dab28c07299e26026b",
+  "method": "Original report recovered by removing later optional allocation diagnostics from exact final native report; recovered SHA256 equals the trigger hash frozen in reopen-plan.json before confirmation. Native comparison arrays unchanged."
+}

@@ -1,0 +1,1016 @@
+{
+  "status": "pass",
+  "comparison_sha256": "99a8b1bb06d3d1e46e7b29882dad39baf4dc1bc4aa7aa1dab28c07299e26026b",
+  "rows": [
+    {
+      "repeat": 1,
+      "shape": "medium",
+      "region": "commit_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            91391,
+            91391,
+            91391,
+            91391,
+            91391
+          ],
+          "candidate": [
+            91391,
+            91391,
+            91391,
+            91391,
+            91391
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            10794,
+            10794,
+            10794,
+            10794,
+            10794
+          ],
+          "candidate": [
+            10794,
+            10794,
+            10794,
+            10794,
+            10794
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            12436307,
+            12436307,
+            12436307,
+            12436307,
+            12436307
+          ],
+          "candidate": [
+            12436307,
+            12436307,
+            12436307,
+            12436307,
+            12436307
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            10379106,
+            10379106,
+            10379106,
+            10379106,
+            10379106
+          ],
+          "candidate": [
+            10379106,
+            10379106,
+            10379106,
+            10379106,
+            10379106
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            26066011,
+            26070267,
+            26070523,
+            26070779,
+            26071035
+          ],
+          "candidate": [
+            26066014,
+            26070270,
+            26070526,
+            26070782,
+            26071038
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            2344427,
+            2344427,
+            2344427,
+            2344427,
+            2344427
+          ],
+          "candidate": [
+            2344427,
+            2344427,
+            2344427,
+            2344427,
+            2344427
+          ],
+          "equal": true
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "shape": "medium",
+      "region": "publication_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            19246,
+            19246,
+            19246,
+            19246,
+            19246
+          ],
+          "candidate": [
+            19246,
+            19246,
+            19246,
+            19246,
+            19246
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "candidate": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            4125769,
+            4125769,
+            4125769,
+            4125769,
+            4125769
+          ],
+          "candidate": [
+            4125769,
+            4125769,
+            4125769,
+            4125769,
+            4125769
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            4141234,
+            4141234,
+            4141234,
+            4141234,
+            4141234
+          ],
+          "candidate": [
+            4141234,
+            4141234,
+            4141234,
+            4141234,
+            4141234
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            26873076,
+            26877332,
+            26877588,
+            26877844,
+            26878100
+          ],
+          "candidate": [
+            26873079,
+            26877335,
+            26877591,
+            26877847,
+            26878103
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            1094291,
+            1094291,
+            1094291,
+            1094291,
+            1094291
+          ],
+          "candidate": [
+            1094291,
+            1094291,
+            1094291,
+            1094291,
+            1094291
+          ],
+          "equal": true
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "shape": "dense-sparse",
+      "region": "commit_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            172946,
+            172946,
+            172946,
+            172946,
+            172946
+          ],
+          "candidate": [
+            172946,
+            172946,
+            172946,
+            172946,
+            172946
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            19561,
+            19561,
+            19561,
+            19561,
+            19561
+          ],
+          "candidate": [
+            19561,
+            19561,
+            19561,
+            19561,
+            19561
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            18258492,
+            18258492,
+            18258492,
+            18258492,
+            18258492
+          ],
+          "candidate": [
+            18258492,
+            18258492,
+            18258492,
+            18258492,
+            18258492
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            14331059,
+            14331059,
+            14331059,
+            14331059,
+            14331059
+          ],
+          "candidate": [
+            14331059,
+            14331059,
+            14331059,
+            14331059,
+            14331059
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            34395831,
+            34400087,
+            34400343,
+            34400599,
+            34400855
+          ],
+          "candidate": [
+            34395834,
+            34400090,
+            34400346,
+            34400602,
+            34400858
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            4467508,
+            4467508,
+            4467508,
+            4467508,
+            4467508
+          ],
+          "candidate": [
+            4467508,
+            4467508,
+            4467508,
+            4467508,
+            4467508
+          ],
+          "equal": true
+        }
+      }
+    },
+    {
+      "repeat": 1,
+      "shape": "dense-sparse",
+      "region": "publication_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            36622,
+            36622,
+            36622,
+            36622,
+            36622
+          ],
+          "candidate": [
+            36622,
+            36622,
+            36622,
+            36622,
+            36622
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "candidate": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            5747144,
+            5747144,
+            5747144,
+            5747144,
+            5747144
+          ],
+          "candidate": [
+            5747144,
+            5747144,
+            5747144,
+            5747144,
+            5747144
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            5762609,
+            5762609,
+            5762609,
+            5762609,
+            5762609
+          ],
+          "candidate": [
+            5762609,
+            5762609,
+            5762609,
+            5762609,
+            5762609
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            35459358,
+            35463614,
+            35463870,
+            35464126,
+            35464382
+          ],
+          "candidate": [
+            35459361,
+            35463617,
+            35463873,
+            35464129,
+            35464385
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            1603602,
+            1603602,
+            1603602,
+            1603602,
+            1603602
+          ],
+          "candidate": [
+            1603602,
+            1603602,
+            1603602,
+            1603602,
+            1603602
+          ],
+          "equal": true
+        }
+      }
+    },
+    {
+      "repeat": 2,
+      "shape": "medium",
+      "region": "commit_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            91391,
+            91391,
+            91391,
+            91391,
+            91391
+          ],
+          "candidate": [
+            91391,
+            91391,
+            91391,
+            91391,
+            91391
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            10794,
+            10794,
+            10794,
+            10794,
+            10794
+          ],
+          "candidate": [
+            10794,
+            10794,
+            10794,
+            10794,
+            10794
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            12436307,
+            12436307,
+            12436307,
+            12436307,
+            12436307
+          ],
+          "candidate": [
+            12436307,
+            12436307,
+            12436307,
+            12436307,
+            12436307
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            10379106,
+            10379106,
+            10379106,
+            10379106,
+            10379106
+          ],
+          "candidate": [
+            10379106,
+            10379106,
+            10379106,
+            10379106,
+            10379106
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            26066011,
+            26070267,
+            26070523,
+            26070779,
+            26071035
+          ],
+          "candidate": [
+            26066014,
+            26070270,
+            26070526,
+            26070782,
+            26071038
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            2344427,
+            2344427,
+            2344427,
+            2344427,
+            2344427
+          ],
+          "candidate": [
+            2344427,
+            2344427,
+            2344427,
+            2344427,
+            2344427
+          ],
+          "equal": true
+        }
+      }
+    },
+    {
+      "repeat": 2,
+      "shape": "medium",
+      "region": "publication_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            19246,
+            19246,
+            19246,
+            19246,
+            19246
+          ],
+          "candidate": [
+            19246,
+            19246,
+            19246,
+            19246,
+            19246
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "candidate": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            4125769,
+            4125769,
+            4125769,
+            4125769,
+            4125769
+          ],
+          "candidate": [
+            4125769,
+            4125769,
+            4125769,
+            4125769,
+            4125769
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            4141234,
+            4141234,
+            4141234,
+            4141234,
+            4141234
+          ],
+          "candidate": [
+            4141234,
+            4141234,
+            4141234,
+            4141234,
+            4141234
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            26873076,
+            26877332,
+            26877588,
+            26877844,
+            26878100
+          ],
+          "candidate": [
+            26873079,
+            26877335,
+            26877591,
+            26877847,
+            26878103
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            1094291,
+            1094291,
+            1094291,
+            1094291,
+            1094291
+          ],
+          "candidate": [
+            1094291,
+            1094291,
+            1094291,
+            1094291,
+            1094291
+          ],
+          "equal": true
+        }
+      }
+    },
+    {
+      "repeat": 2,
+      "shape": "dense-sparse",
+      "region": "commit_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            172946,
+            172946,
+            172946,
+            172946,
+            172946
+          ],
+          "candidate": [
+            172946,
+            172946,
+            172946,
+            172946,
+            172946
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            19561,
+            19561,
+            19561,
+            19561,
+            19561
+          ],
+          "candidate": [
+            19561,
+            19561,
+            19561,
+            19561,
+            19561
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            18258492,
+            18258492,
+            18258492,
+            18258492,
+            18258492
+          ],
+          "candidate": [
+            18258492,
+            18258492,
+            18258492,
+            18258492,
+            18258492
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            14331059,
+            14331059,
+            14331059,
+            14331059,
+            14331059
+          ],
+          "candidate": [
+            14331059,
+            14331059,
+            14331059,
+            14331059,
+            14331059
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            34395831,
+            34400087,
+            34400343,
+            34400599,
+            34400855
+          ],
+          "candidate": [
+            34395834,
+            34400090,
+            34400346,
+            34400602,
+            34400858
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            4467508,
+            4467508,
+            4467508,
+            4467508,
+            4467508
+          ],
+          "candidate": [
+            4467508,
+            4467508,
+            4467508,
+            4467508,
+            4467508
+          ],
+          "equal": true
+        }
+      }
+    },
+    {
+      "repeat": 2,
+      "shape": "dense-sparse",
+      "region": "publication_allocation_metrics",
+      "metrics": {
+        "allocation_calls": {
+          "baseline": [
+            36622,
+            36622,
+            36622,
+            36622,
+            36622
+          ],
+          "candidate": [
+            36622,
+            36622,
+            36622,
+            36622,
+            36622
+          ],
+          "equal": true
+        },
+        "reallocation_calls": {
+          "baseline": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "candidate": [
+            40,
+            40,
+            40,
+            40,
+            40
+          ],
+          "equal": true
+        },
+        "allocated_bytes": {
+          "baseline": [
+            5747144,
+            5747144,
+            5747144,
+            5747144,
+            5747144
+          ],
+          "candidate": [
+            5747144,
+            5747144,
+            5747144,
+            5747144,
+            5747144
+          ],
+          "equal": true
+        },
+        "deallocated_bytes": {
+          "baseline": [
+            5762609,
+            5762609,
+            5762609,
+            5762609,
+            5762609
+          ],
+          "candidate": [
+            5762609,
+            5762609,
+            5762609,
+            5762609,
+            5762609
+          ],
+          "equal": true
+        },
+        "failed_allocation_calls": {
+          "baseline": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "candidate": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equal": true
+        },
+        "region_peak_live_bytes": {
+          "baseline": [
+            35459358,
+            35463614,
+            35463870,
+            35464126,
+            35464382
+          ],
+          "candidate": [
+            35459361,
+            35463617,
+            35463873,
+            35464129,
+            35464385
+          ],
+          "equal": false
+        },
+        "incremental_region_peak_live_bytes": {
+          "baseline": [
+            1603602,
+            1603602,
+            1603602,
+            1603602,
+            1603602
+          ],
+          "candidate": [
+            1603602,
+            1603602,
+            1603602,
+            1603602,
+            1603602
+          ],
+          "equal": true
+        }
+      }
+    }
+  ],
+  "scope": "Commit and publication counters are separate operation regions. Planning allocations are not isolated. No whole-process allocation or universal memory claim.",
+  "review": "Both measured regions retain unchanged allocation/reallocation calls and allocated bytes in all20pairedsamples perregion; incremental peaks separately checked. Absolute region peaks are3bytes higher in every candidate sample while incremental region peaks are unchanged; this is a retained pre-region live-byte offset, not an in-region allocation increase."
+}

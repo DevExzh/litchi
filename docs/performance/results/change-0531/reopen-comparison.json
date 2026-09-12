@@ -1,0 +1,1702 @@
+{
+  "status": "pass",
+  "guard_passed": true,
+  "plan_sha256": "01747f59da2b596f14915469b087ab33ab4d600b207ceef12c4bf898592a8a5c",
+  "script_sha256": "287fa7fcea9a007cbd2db1486dddc8afad0aeb09262f9a40e356b4a4648ccedc",
+  "comparisons": [
+    {
+      "repeat": 1,
+      "guard": 0,
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "dense-sparse",
+      "metrics": [
+        {
+          "phase": "elapsed_ns",
+          "stat": "p50",
+          "baseline": 43489730,
+          "candidate": 41516507,
+          "change_percent": -4.53721602778403
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p95",
+          "baseline": 43954242,
+          "candidate": 42053764,
+          "change_percent": -4.323764700572019
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p99",
+          "baseline": 44474384,
+          "candidate": 42164163,
+          "change_percent": -5.194498028348182
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "mean",
+          "baseline": 43534974.61999998,
+          "candidate": 41593188.34999997,
+          "change_percent": -4.4602903457487075
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p50",
+          "baseline": 104520,
+          "candidate": 101565,
+          "change_percent": -2.8272101033295027
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p95",
+          "baseline": 128471,
+          "candidate": 108651,
+          "change_percent": -15.427606230199808
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p99",
+          "baseline": 135991,
+          "candidate": 113291,
+          "change_percent": -16.692281106837946
+        },
+        {
+          "phase": "open_ns",
+          "stat": "mean",
+          "baseline": 108316.89999999998,
+          "candidate": 102438.45999999998,
+          "change_percent": -5.427075553307015
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p50",
+          "baseline": 13678675,
+          "candidate": 13013668,
+          "change_percent": -4.8616331625687454
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p95",
+          "baseline": 13917201,
+          "candidate": 13244018,
+          "change_percent": -4.837057393940059
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p99",
+          "baseline": 13995982,
+          "candidate": 13354339,
+          "change_percent": -4.584480031483318
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "mean",
+          "baseline": 13696075.85,
+          "candidate": 13039924.54,
+          "change_percent": -4.790797869303565
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p50",
+          "baseline": 15221411,
+          "candidate": 14803904,
+          "change_percent": -2.742892889496251
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p95",
+          "baseline": 15477547,
+          "candidate": 15051685,
+          "change_percent": -2.751482518515369
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p99",
+          "baseline": 15635277,
+          "candidate": 15209605,
+          "change_percent": -2.722510128857969
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "mean",
+          "baseline": 15253209.320000004,
+          "candidate": 14844350.76,
+          "change_percent": -2.6804756390768847
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p50",
+          "baseline": 14459538,
+          "candidate": 13599365,
+          "change_percent": -5.948827687302316
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p95",
+          "baseline": 14624593,
+          "candidate": 13668700,
+          "change_percent": -6.536202409188407
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p99",
+          "baseline": 14690784,
+          "candidate": 13708870,
+          "change_percent": -6.683877456778342
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "mean",
+          "baseline": 14477372.550000004,
+          "candidate": 13606474.589999994,
+          "change_percent": -6.015580223498562
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 41892734,
+          "candidate": 42048044,
+          "change_percent": 0.37073254755823903
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 42869487,
+          "candidate": 42711098,
+          "change_percent": -0.36946791548962965
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 43501190,
+          "candidate": 42859286,
+          "change_percent": -1.4756010122941476
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 41961590.87000003,
+          "candidate": 42143532.810000025,
+          "change_percent": 0.4335916161130937
+        },
+        {
+          "phase": "rss",
+          "stat": "max_rss_kib",
+          "baseline": 92784,
+          "candidate": 88076,
+          "change_percent": -5.074150715640624
+        }
+      ],
+      "passed": true
+    },
+    {
+      "repeat": 1,
+      "guard": 1,
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "noncompact",
+      "metrics": [
+        {
+          "phase": "elapsed_ns",
+          "stat": "p50",
+          "baseline": 24041778,
+          "candidate": 23549771,
+          "change_percent": -2.0464667796200375
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p95",
+          "baseline": 24221789,
+          "candidate": 23800987,
+          "change_percent": -1.7372870352392211
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p99",
+          "baseline": 24294660,
+          "candidate": 24732320,
+          "change_percent": 1.8014658365253844
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "mean",
+          "baseline": 24055608.81,
+          "candidate": 23596259.179999996,
+          "change_percent": -1.9095323407863574
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p50",
+          "baseline": 91715,
+          "candidate": 87510,
+          "change_percent": -4.584855258136622
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p95",
+          "baseline": 102001,
+          "candidate": 98441,
+          "change_percent": -3.4901618611582252
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p99",
+          "baseline": 105890,
+          "candidate": 139711,
+          "change_percent": 31.9397487959203
+        },
+        {
+          "phase": "open_ns",
+          "stat": "mean",
+          "baseline": 93202.78000000001,
+          "candidate": 90149.15000000001,
+          "change_percent": -3.276329311207249
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p50",
+          "baseline": 7789408,
+          "candidate": 7427287,
+          "change_percent": -4.64888987712545
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p95",
+          "baseline": 7857924,
+          "candidate": 7493677,
+          "change_percent": -4.6354100650502605
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p99",
+          "baseline": 7891259,
+          "candidate": 7710678,
+          "change_percent": -2.288367420205062
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "mean",
+          "baseline": 7795974.7700000005,
+          "candidate": 7438582.33,
+          "change_percent": -4.584320120882079
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p50",
+          "baseline": 10001282,
+          "candidate": 9900411,
+          "change_percent": -1.0085806999542646
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p95",
+          "baseline": 10082678,
+          "candidate": 10013007,
+          "change_percent": -0.6909969752083689
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p99",
+          "baseline": 10139017,
+          "candidate": 10535868,
+          "change_percent": 3.9140973922817235
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "mean",
+          "baseline": 10001082.600000003,
+          "candidate": 9926348.190000005,
+          "change_percent": -0.7472632012858083
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p50",
+          "baseline": 6159798,
+          "candidate": 6129152,
+          "change_percent": -0.497516314658375
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p95",
+          "baseline": 6230123,
+          "candidate": 6221932,
+          "change_percent": -0.13147412980449857
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p99",
+          "baseline": 6263013,
+          "candidate": 6352203,
+          "change_percent": 1.424074962003119
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "mean",
+          "baseline": 6165348.660000001,
+          "candidate": 6141179.51,
+          "change_percent": -0.3920159480486074
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 33497838,
+          "candidate": 31505765,
+          "change_percent": -5.946870362200684
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 34270876,
+          "candidate": 32600409,
+          "change_percent": -4.874304934603946
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 34660087,
+          "candidate": 36182541,
+          "change_percent": 4.392527924122058
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 33590698.95,
+          "candidate": 31712076.230000004,
+          "change_percent": -5.5926871983114745
+        },
+        {
+          "phase": "rss",
+          "stat": "max_rss_kib",
+          "baseline": 69644,
+          "candidate": 69212,
+          "change_percent": -0.6202975130664479
+        }
+      ],
+      "passed": true
+    },
+    {
+      "repeat": 1,
+      "guard": 2,
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shape": "noncompact",
+      "metrics": [
+        {
+          "phase": "elapsed_ns",
+          "stat": "p50",
+          "baseline": 24593856,
+          "candidate": 24103408,
+          "change_percent": -1.9941891178024251
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p95",
+          "baseline": 24784376,
+          "candidate": 24241881,
+          "change_percent": -2.1888588197661263
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p99",
+          "baseline": 24836886,
+          "candidate": 24272548,
+          "change_percent": -2.2721769548726845
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "mean",
+          "baseline": 24606867.669999998,
+          "candidate": 24106495.669999994,
+          "change_percent": -2.0334648306742586
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p50",
+          "baseline": 92680,
+          "candidate": 94795,
+          "change_percent": 2.282045748813122
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p95",
+          "baseline": 104470,
+          "candidate": 103160,
+          "change_percent": -1.2539485019622876
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p99",
+          "baseline": 107010,
+          "candidate": 105641,
+          "change_percent": -1.2793196897486259
+        },
+        {
+          "phase": "open_ns",
+          "stat": "mean",
+          "baseline": 93646.0,
+          "candidate": 95299.32999999994,
+          "change_percent": 1.7655105396919613
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p50",
+          "baseline": 7823469,
+          "candidate": 7434437,
+          "change_percent": -4.972627871344537
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p95",
+          "baseline": 7912775,
+          "candidate": 7480787,
+          "change_percent": -5.459374239757864
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p99",
+          "baseline": 7949484,
+          "candidate": 7503028,
+          "change_percent": -5.616163262923735
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "mean",
+          "baseline": 7830897.47,
+          "candidate": 7435898.8,
+          "change_percent": -5.044104734013333
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p50",
+          "baseline": 9941236,
+          "candidate": 9902856,
+          "change_percent": -0.38606869407386
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p95",
+          "baseline": 10044491,
+          "candidate": 9982866,
+          "change_percent": -0.6135203864486516
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p99",
+          "baseline": 10072181,
+          "candidate": 10001446,
+          "change_percent": -0.7022808664776781
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "mean",
+          "baseline": 9944152.889999997,
+          "candidate": 9905742.679999998,
+          "change_percent": -0.3862592462614334
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p50",
+          "baseline": 6731801,
+          "candidate": 6661169,
+          "change_percent": -1.0492288764923363
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p95",
+          "baseline": 6783221,
+          "candidate": 6714635,
+          "change_percent": -1.0111125673186838
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p99",
+          "baseline": 6800491,
+          "candidate": 6871235,
+          "change_percent": 1.0402778269980706
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "mean",
+          "baseline": 6738171.31,
+          "candidate": 6669554.86,
+          "change_percent": -1.018324510363322
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 28175097,
+          "candidate": 27941952,
+          "change_percent": -0.8274860597640488
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 28399588,
+          "candidate": 28168432,
+          "change_percent": -0.8139413853468613
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 28444268,
+          "candidate": 28249853,
+          "change_percent": -0.6834944741766602
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 28193722.37,
+          "candidate": 27955756.419999998,
+          "change_percent": -0.8440387788354431
+        },
+        {
+          "phase": "rss",
+          "stat": "max_rss_kib",
+          "baseline": 68396,
+          "candidate": 68620,
+          "change_percent": 0.32750453242880173
+        }
+      ],
+      "passed": true
+    },
+    {
+      "repeat": 2,
+      "guard": 0,
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "dense-sparse",
+      "metrics": [
+        {
+          "phase": "elapsed_ns",
+          "stat": "p50",
+          "baseline": 42787819,
+          "candidate": 41958851,
+          "change_percent": -1.9373925088352784
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p95",
+          "baseline": 43011510,
+          "candidate": 42337298,
+          "change_percent": -1.5675152999743536
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p99",
+          "baseline": 43279832,
+          "candidate": 42469668,
+          "change_percent": -1.8719203900791515
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "mean",
+          "baseline": 42807238.120000005,
+          "candidate": 41903871.39000001,
+          "change_percent": -2.1103130444146356
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p50",
+          "baseline": 89770,
+          "candidate": 91020,
+          "change_percent": 1.3924473654895797
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p95",
+          "baseline": 97240,
+          "candidate": 98601,
+          "change_percent": 1.3996297819827141
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p99",
+          "baseline": 98661,
+          "candidate": 109711,
+          "change_percent": 11.199967565704782
+        },
+        {
+          "phase": "open_ns",
+          "stat": "mean",
+          "baseline": 90576.13,
+          "candidate": 91824.29000000002,
+          "change_percent": 1.378023106087678
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p50",
+          "baseline": 13786333,
+          "candidate": 12908163,
+          "change_percent": -6.369859193158911
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p95",
+          "baseline": 13957549,
+          "candidate": 13030418,
+          "change_percent": -6.642505786653519
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p99",
+          "baseline": 14005909,
+          "candidate": 13069168,
+          "change_percent": -6.688184251375617
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "mean",
+          "baseline": 13794805.68,
+          "candidate": 12912001.8,
+          "change_percent": -6.399538351452872
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p50",
+          "baseline": 15229300,
+          "candidate": 14906455,
+          "change_percent": -2.11989388875391
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p95",
+          "baseline": 15372934,
+          "candidate": 15096176,
+          "change_percent": -1.800293945189646
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p99",
+          "baseline": 15464176,
+          "candidate": 15252126,
+          "change_percent": -1.3712337469516611
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "mean",
+          "baseline": 15233111.4,
+          "candidate": 14910943.720000003,
+          "change_percent": -2.114917114044068
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p50",
+          "baseline": 13662549,
+          "candidate": 14120473,
+          "change_percent": 3.3516732492597123
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p95",
+          "baseline": 13852060,
+          "candidate": 14219813,
+          "change_percent": 2.654861442991141
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p99",
+          "baseline": 13868019,
+          "candidate": 14287283,
+          "change_percent": 3.023243622611127
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "mean",
+          "baseline": 13688744.909999998,
+          "candidate": 13989101.580000006,
+          "change_percent": 2.194187063713837
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 39753132,
+          "candidate": 38774789,
+          "change_percent": -2.4610463396946947
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 40243457,
+          "candidate": 39417826,
+          "change_percent": -2.0515906473939305
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 40496378,
+          "candidate": 39724047,
+          "change_percent": -1.907160684839515
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 39807148.69,
+          "candidate": 38863022.589999996,
+          "change_percent": -2.371750127979344
+        },
+        {
+          "phase": "rss",
+          "stat": "max_rss_kib",
+          "baseline": 86952,
+          "candidate": 88356,
+          "change_percent": 1.6146839635660992
+        }
+      ],
+      "passed": true
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "noncompact",
+      "metrics": [
+        {
+          "phase": "elapsed_ns",
+          "stat": "p50",
+          "baseline": 23930769,
+          "candidate": 24116920,
+          "change_percent": 0.7778730386808652
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p95",
+          "baseline": 24070294,
+          "candidate": 24258301,
+          "change_percent": 0.7810747970091292
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p99",
+          "baseline": 24205614,
+          "candidate": 24327668,
+          "change_percent": 0.504238396927259
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "mean",
+          "baseline": 23932408.06999999,
+          "candidate": 24128055.520000007,
+          "change_percent": 0.8175000586141179
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p50",
+          "baseline": 86095,
+          "candidate": 89070,
+          "change_percent": 3.455485219815313
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p95",
+          "baseline": 94501,
+          "candidate": 99860,
+          "change_percent": 5.670839462016275
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p99",
+          "baseline": 97610,
+          "candidate": 103350,
+          "change_percent": 5.880545026124362
+        },
+        {
+          "phase": "open_ns",
+          "stat": "mean",
+          "baseline": 86889.44000000003,
+          "candidate": 90352.53000000001,
+          "change_percent": 3.985628172997746
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p50",
+          "baseline": 7799892,
+          "candidate": 7444122,
+          "change_percent": -4.5612170014661775
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p95",
+          "baseline": 7871237,
+          "candidate": 7495048,
+          "change_percent": -4.779286915131642
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p99",
+          "baseline": 7905078,
+          "candidate": 7518288,
+          "change_percent": -4.8929308477411615
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "mean",
+          "baseline": 7803415.869999998,
+          "candidate": 7449414.619999999,
+          "change_percent": -4.53649088934176
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p50",
+          "baseline": 9891570,
+          "candidate": 9889441,
+          "change_percent": -0.02152337798752013
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p95",
+          "baseline": 9963645,
+          "candidate": 9980397,
+          "change_percent": 0.16813124112711186
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p99",
+          "baseline": 9991415,
+          "candidate": 10024497,
+          "change_percent": 0.33110425300120205
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "mean",
+          "baseline": 9891956.82,
+          "candidate": 9901098.159999996,
+          "change_percent": 0.09241184698172145
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p50",
+          "baseline": 6143776,
+          "candidate": 6681949,
+          "change_percent": 8.759645533951765
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p95",
+          "baseline": 6197622,
+          "candidate": 6746025,
+          "change_percent": 8.848603545037115
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p99",
+          "baseline": 6258342,
+          "candidate": 6851526,
+          "change_percent": 9.478293132590077
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "mean",
+          "baseline": 6150145.94,
+          "candidate": 6687190.209999998,
+          "change_percent": 8.732219938182428
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 30670002,
+          "candidate": 27673241,
+          "change_percent": -9.770984038409914
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 32299383,
+          "candidate": 27878122,
+          "change_percent": -13.688376028730953
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 32520404,
+          "candidate": 28027102,
+          "change_percent": -13.816870171723572
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 30853060.69,
+          "candidate": 27681054.220000006,
+          "change_percent": -10.28101069735391
+        },
+        {
+          "phase": "rss",
+          "stat": "max_rss_kib",
+          "baseline": 68444,
+          "candidate": 69112,
+          "change_percent": 0.9759803635088549
+        }
+      ],
+      "passed": true
+    },
+    {
+      "repeat": 2,
+      "guard": 2,
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shape": "noncompact",
+      "metrics": [
+        {
+          "phase": "elapsed_ns",
+          "stat": "p50",
+          "baseline": 24038728,
+          "candidate": 23370650,
+          "change_percent": -2.779173673415669
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p95",
+          "baseline": 24176164,
+          "candidate": 23532036,
+          "change_percent": -2.6643101858508267
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "p99",
+          "baseline": 24301369,
+          "candidate": 23597666,
+          "change_percent": -2.895733981077364
+        },
+        {
+          "phase": "elapsed_ns",
+          "stat": "mean",
+          "baseline": 24049265.64999999,
+          "candidate": 23389442.830000006,
+          "change_percent": -2.7436298039311913
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p50",
+          "baseline": 89675,
+          "candidate": 88655,
+          "change_percent": -1.1374407582938395
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p95",
+          "baseline": 96821,
+          "candidate": 96330,
+          "change_percent": -0.5071213889548787
+        },
+        {
+          "phase": "open_ns",
+          "stat": "p99",
+          "baseline": 101221,
+          "candidate": 103270,
+          "change_percent": 2.0242834984835145
+        },
+        {
+          "phase": "open_ns",
+          "stat": "mean",
+          "baseline": 90404.03000000001,
+          "candidate": 89640.08999999997,
+          "change_percent": -0.8450287006011137
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p50",
+          "baseline": 7799683,
+          "candidate": 7356292,
+          "change_percent": -5.684731033299684
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p95",
+          "baseline": 7843359,
+          "candidate": 7427037,
+          "change_percent": -5.307955430830081
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "p99",
+          "baseline": 7861968,
+          "candidate": 7464368,
+          "change_percent": -5.057257928294801
+        },
+        {
+          "phase": "plan_ns",
+          "stat": "mean",
+          "baseline": 7805048.5600000005,
+          "candidate": 7366639.009999998,
+          "change_percent": -5.616999646188015
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p50",
+          "baseline": 10002046,
+          "candidate": 9766486,
+          "change_percent": -2.355118142827972
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p95",
+          "baseline": 10095407,
+          "candidate": 9847166,
+          "change_percent": -2.458949896720364
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "p99",
+          "baseline": 10124656,
+          "candidate": 9869096,
+          "change_percent": -2.5241351409865165
+        },
+        {
+          "phase": "commit_ns",
+          "stat": "mean",
+          "baseline": 10009376.590000002,
+          "candidate": 9777897.250000002,
+          "change_percent": -2.3126249464053728
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p50",
+          "baseline": 6131662,
+          "candidate": 6152443,
+          "change_percent": 0.3389130059680445
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p95",
+          "baseline": 6217772,
+          "candidate": 6201032,
+          "change_percent": -0.269228270190669
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "p99",
+          "baseline": 6229823,
+          "candidate": 6291133,
+          "change_percent": 0.9841371095133944
+        },
+        {
+          "phase": "publication_ns",
+          "stat": "mean",
+          "baseline": 6144436.469999999,
+          "candidate": 6155266.4799999995,
+          "change_percent": 0.17625717269400543
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p50",
+          "baseline": 32150597,
+          "candidate": 29185496,
+          "change_percent": -9.222537920524465
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p95",
+          "baseline": 32519324,
+          "candidate": 31561235,
+          "change_percent": -2.946214380102119
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "p99",
+          "baseline": 33414877,
+          "candidate": 31851326,
+          "change_percent": -4.679206211053833
+        },
+        {
+          "phase": "reopen_ns",
+          "stat": "mean",
+          "baseline": 32207222.530000005,
+          "candidate": 29514388.270000007,
+          "change_percent": -8.360963934383692
+        },
+        {
+          "phase": "rss",
+          "stat": "max_rss_kib",
+          "baseline": 68408,
+          "candidate": 69092,
+          "change_percent": 0.9998830546134929
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "adverse": [
+    {
+      "repeat": 1,
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "baseline": 105890,
+      "candidate": 139711,
+      "change_percent": 31.9397487959203
+    },
+    {
+      "repeat": 2,
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p99",
+      "baseline": 98661,
+      "candidate": 109711,
+      "change_percent": 11.199967565704782
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p95",
+      "baseline": 94501,
+      "candidate": 99860,
+      "change_percent": 5.670839462016275
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "baseline": 97610,
+      "candidate": 103350,
+      "change_percent": 5.880545026124362
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "baseline": 6143776,
+      "candidate": 6681949,
+      "change_percent": 8.759645533951765
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "baseline": 6197622,
+      "candidate": 6746025,
+      "change_percent": 8.848603545037115
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "baseline": 6258342,
+      "candidate": 6851526,
+      "change_percent": 9.478293132590077
+    },
+    {
+      "repeat": 2,
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "baseline": 6150145.94,
+      "candidate": 6687190.209999998,
+      "change_percent": 8.732219938182428
+    }
+  ],
+  "same_build_drift": [
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 104520,
+      "repeat2": 89770,
+      "change_percent": -14.11213164944508
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 128471,
+      "repeat2": 97240,
+      "change_percent": -24.30976640642636
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 135991,
+      "repeat2": 98661,
+      "change_percent": -27.450345978778014
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 108316.89999999998,
+      "repeat2": 90576.13,
+      "change_percent": -16.37857988919548
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 14459538,
+      "repeat2": 13662549,
+      "change_percent": -5.511856602887311
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 14624593,
+      "repeat2": 13852060,
+      "change_percent": -5.282423927968461
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 14690784,
+      "repeat2": 13868019,
+      "change_percent": -5.600552019551852
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 14477372.550000004,
+      "repeat2": 13688744.909999998,
+      "change_percent": -5.447311915724695
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 41892734,
+      "repeat2": 39753132,
+      "change_percent": -5.107334364952165
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 42869487,
+      "repeat2": 40243457,
+      "change_percent": -6.125638965542091
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 43501190,
+      "repeat2": 40496378,
+      "change_percent": -6.907424831366682
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 41961590.87000003,
+      "repeat2": 39807148.69,
+      "change_percent": -5.1343195892516125
+    },
+    {
+      "stage": "baseline",
+      "guard": 0,
+      "phase": "rss",
+      "stat": "max_rss_kib",
+      "repeat1": 92784,
+      "repeat2": 86952,
+      "change_percent": -6.285566476978788
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 91715,
+      "repeat2": 86095,
+      "change_percent": -6.127678133347869
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 102001,
+      "repeat2": 94501,
+      "change_percent": -7.352869089518732
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 105890,
+      "repeat2": 97610,
+      "change_percent": -7.819435263008778
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 93202.78000000001,
+      "repeat2": 86889.44000000003,
+      "change_percent": -6.773767906922923
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 33497838,
+      "repeat2": 30670002,
+      "change_percent": -8.44184630661835
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 34270876,
+      "repeat2": 32299383,
+      "change_percent": -5.752677579645182
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 34660087,
+      "repeat2": 32520404,
+      "change_percent": -6.173334186956891
+    },
+    {
+      "stage": "baseline",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 33590698.95,
+      "repeat2": 30853060.69,
+      "change_percent": -8.149988971872823
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 104470,
+      "repeat2": 96821,
+      "change_percent": -7.321719153824069
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 107010,
+      "repeat2": 101221,
+      "change_percent": -5.409774787403043
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 6731801,
+      "repeat2": 6131662,
+      "change_percent": -8.914984266468961
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 6783221,
+      "repeat2": 6217772,
+      "change_percent": -8.335995539582154
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 6800491,
+      "repeat2": 6229823,
+      "change_percent": -8.39157054983236
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 6738171.31,
+      "repeat2": 6144436.469999999,
+      "change_percent": -8.811512986006298
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 28175097,
+      "repeat2": 32150597,
+      "change_percent": 14.109978041956705
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 28399588,
+      "repeat2": 32519324,
+      "change_percent": 14.50632311989879
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 28444268,
+      "repeat2": 33414877,
+      "change_percent": 17.4749056646492
+    },
+    {
+      "stage": "baseline",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 28193722.37,
+      "repeat2": 32207222.530000005,
+      "change_percent": 14.235439036140306
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 101565,
+      "repeat2": 91020,
+      "change_percent": -10.382513661202186
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 108651,
+      "repeat2": 98601,
+      "change_percent": -9.249799817765137
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 102438.45999999998,
+      "repeat2": 91824.29000000002,
+      "change_percent": -10.36150875364581
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 42048044,
+      "repeat2": 38774789,
+      "change_percent": -7.784559491043153
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 42711098,
+      "repeat2": 39417826,
+      "change_percent": -7.7105767685953674
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 42859286,
+      "repeat2": 39724047,
+      "change_percent": -7.315191858305803
+    },
+    {
+      "stage": "candidate",
+      "guard": 0,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 42143532.810000025,
+      "repeat2": 38863022.589999996,
+      "change_percent": -7.7841367376339505
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "open_ns",
+      "stat": "p99",
+      "repeat1": 139711,
+      "repeat2": 103350,
+      "change_percent": -26.025867684004833
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 6129152,
+      "repeat2": 6681949,
+      "change_percent": 9.019143268106266
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 6221932,
+      "repeat2": 6746025,
+      "change_percent": 8.423316101815326
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 6352203,
+      "repeat2": 6851526,
+      "change_percent": 7.86062725010519
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 6141179.51,
+      "repeat2": 6687190.209999998,
+      "change_percent": 8.890974431066546
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p50",
+      "repeat1": 31505765,
+      "repeat2": 27673241,
+      "change_percent": -12.164516557525262
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 32600409,
+      "repeat2": 27878122,
+      "change_percent": -14.48536121126579
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 36182541,
+      "repeat2": 28027102,
+      "change_percent": -22.53970775573777
+    },
+    {
+      "stage": "candidate",
+      "guard": 1,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 31712076.230000004,
+      "repeat2": 27681054.220000006,
+      "change_percent": -12.711315338560524
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p50",
+      "repeat1": 94795,
+      "repeat2": 88655,
+      "change_percent": -6.477134869982592
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "p95",
+      "repeat1": 103160,
+      "repeat2": 96330,
+      "change_percent": -6.620783249321438
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "open_ns",
+      "stat": "mean",
+      "repeat1": 95299.32999999994,
+      "repeat2": 89640.08999999997,
+      "change_percent": -5.938383827042626
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p50",
+      "repeat1": 6661169,
+      "repeat2": 6152443,
+      "change_percent": -7.637188007090046
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p95",
+      "repeat1": 6714635,
+      "repeat2": 6201032,
+      "change_percent": -7.649008471793328
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "p99",
+      "repeat1": 6871235,
+      "repeat2": 6291133,
+      "change_percent": -8.442470676668744
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "publication_ns",
+      "stat": "mean",
+      "repeat1": 6669554.86,
+      "repeat2": 6155266.4799999995,
+      "change_percent": -7.710985077645804
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p95",
+      "repeat1": 28168432,
+      "repeat2": 31561235,
+      "change_percent": 12.044699541671333
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "p99",
+      "repeat1": 28249853,
+      "repeat2": 31851326,
+      "change_percent": 12.748643329223697
+    },
+    {
+      "stage": "candidate",
+      "guard": 2,
+      "phase": "reopen_ns",
+      "stat": "mean",
+      "repeat1": 27955756.419999998,
+      "repeat2": 29514388.270000007,
+      "change_percent": 5.57535209058031
+    }
+  ],
+  "scope": "Fresh supplemental reopen and edit/save regression guard; original adverse evidence retained. No speedup claim."
+}

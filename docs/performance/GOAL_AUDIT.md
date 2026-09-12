@@ -1,5 +1,19 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0531: final OOXML MCE candidate rejected; OLE2 remains next
+
+[0531](changes/0531-ooxml-mce-namespace-search.md) makes progress by completing
+the fresh final-binary native comparison, then rejecting the shared MCE
+namespace-search candidate. The authoritative [final native comparison](results/change-0531/final-native-comparison.json)
+fails the required dense-sparse repeat-2 total gates at 0.8937% p50 and
+0.6056% mean reduction; the final conditional profile is mechanism evidence,
+not a retained speedup. Production is restored, while nine MCE regression tests
+and a test-only lint correction remain. All eight restored-source quality gates pass, including 4,757 successful
+test executions. This batch does not complete the optimization goal.
+The next OLE2 measurement is the bounded CFB ownership/reconciliation
+attribution selected in [the OLE2 review](results/change-0531/next-ole2-review.md).
+The overall goal remains open; ODF is deferred and iWork is excluded.
+
 ## 0530: progress through planning attribution
 
 [0530](changes/0530-xlsx-planning-attribution.md) identifies a concrete namespace-search follow-up after the rejected 0529 probe. No runtime optimization is adopted. Broader OLE2/OOXML work remains incomplete; ODF stays deferred until that goal completes, with iWork excluded.

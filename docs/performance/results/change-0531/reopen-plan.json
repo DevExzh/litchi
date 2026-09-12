@@ -1,0 +1,43 @@
+{
+  "schema": "litchi-0531-reopen-confirmation-v1",
+  "created_utc": "2026-09-12T13:59:20.526857+00:00",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "trigger_comparison_sha256": "66ac7faa7a37f013e0074113acef6e8a4668e7b7ed5825f520b9056788e5b60f",
+  "reason": "Second-repeat reopen p50 regressions of7.08-12.97% require fresh confirmation, regardless of edit/save timer exclusion. Original adverse results remain retained.",
+  "cases": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "dense-sparse"
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shape": "noncompact"
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shape": "noncompact"
+    }
+  ],
+  "samples": 100,
+  "warmup": 10,
+  "repeats": 2,
+  "order": [
+    [
+      "baseline",
+      1
+    ],
+    [
+      "candidate",
+      1
+    ],
+    [
+      "candidate",
+      2
+    ],
+    [
+      "baseline",
+      2
+    ]
+  ],
+  "guard": "Every matched row must have reopen and total p50/mean regression <=5%. Review all >5% tail/RSS flags and absolute same-build drift; no independent speedup claim."
+}

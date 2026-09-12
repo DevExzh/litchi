@@ -1,0 +1,265 @@
+//! Public regression coverage for the MCE namespace-presence fast path.
+//!
+//! These checks exercise the public bounded processor and its observable
+//! ownership and error contracts; they do not depend on a particular
+//! substring-search routine.
+
+use std::{borrow::Cow, sync::Arc};
+
+use litchi_ooxml_common::mce::{self, Capabilities, Error, Limits, NAMESPACE, Report};
+use litchi_opc::{PackURI, XmlPart};
+
+fn assert_borrowed(input: &[u8], limits: &Limits) {
+    let output = mce::process_markup_compatibility(input, &Capabilities::new(), limits)
+        .expect("an absent MCE namespace must take the bounded no-op path");
+    match output.xml {
+        Cow::Borrowed(bytes) => {
+            assert_eq!(bytes, input);
+            assert!(std::ptr::eq(bytes, input));
+        },
+        Cow::Owned(_) => panic!("an absent MCE namespace must preserve the source borrow"),
+    }
+    assert_eq!(output.report, Report::default());
+}
+
+fn assert_owned_source(input: &[u8]) -> Report {
+    let output = mce::process_markup_compatibility(input, &Capabilities::new(), &Limits::default())
+        .expect("the well-formed MCE probe must parse");
+    match output.xml {
+        Cow::Owned(bytes) => assert_eq!(bytes, input),
+        Cow::Borrowed(_) => panic!("an exact MCE namespace occurrence must enter parsing"),
+    }
+    output.report
+}
+
+fn assert_limit(input: &[u8], limits: &Limits, expected: &str) {
+    match mce::process_markup_compatibility(input, &Capabilities::new(), limits) {
+        Err(Error::LimitExceeded(actual)) => assert_eq!(actual, expected),
+        _ => panic!("expected the {expected} limit error"),
+    }
+}
+
+#[test]
+fn absent_namespace_bytes_are_borrowed_without_xml_or_utf8_validation() {
+    let inputs: [&[u8]; 3] = [b"", b"\xff\0opaque bytes", b"<r>\0\xfe not parsed</r>"];
+
+    for input in inputs {
+        let limits = Limits {
+            max_input_bytes: input.len(),
+            max_output_bytes: input.len(),
+            ..Limits::default()
+        };
+        assert_borrowed(input, &limits);
+    }
+}
+
+#[test]
+fn exact_namespace_occurrences_in_xml_contexts_enter_the_parser() {
+    let cases = [
+        (format!("<!--{NAMESPACE}--><r>comment</r>"), 4),
+        (format!("<r>{NAMESPACE}</r>"), 3),
+        (format!(r#"<r a="{NAMESPACE}">attribute</r>"#), 6),
+        (format!("<r><![CDATA[{NAMESPACE}]]></r>"), 12),
+        (format!("<r>x{NAMESPACE}</r>"), 4),
+    ];
+
+    for (source, offset) in cases {
+        assert_eq!(
+            source.as_bytes().get(offset..offset + NAMESPACE.len()),
+            Some(NAMESPACE.as_bytes())
+        );
+        assert_owned_source(source.as_bytes());
+    }
+}
+
+#[test]
+fn exact_namespace_occurrences_cross_search_boundary_offsets() {
+    for offset in [31, 32, 63, 64, 127, 128] {
+        let mut source = b"<!--".to_vec();
+        source.resize(offset, b'a');
+        source.extend_from_slice(NAMESPACE.as_bytes());
+        source.extend_from_slice(b"--><r>boundary</r>");
+
+        assert_eq!(
+            source.get(offset..offset + NAMESPACE.len()),
+            Some(NAMESPACE.as_bytes())
+        );
+        assert_owned_source(&source);
+    }
+}
+
+#[test]
+fn repeated_namespace_occurrences_remain_owned_and_unmodified() {
+    let source = format!("<r>{NAMESPACE}<!--{NAMESPACE}-->{NAMESPACE}</r>");
+    assert_eq!(
+        source.matches(NAMESPACE).count(),
+        3,
+        "the fixture must retain all repeated namespace occurrences"
+    );
+    assert_owned_source(source.as_bytes());
+}
+
+#[test]
+fn every_namespace_byte_mutation_and_near_match_remain_borrowed() {
+    for position in 0..NAMESPACE.len() {
+        let mut body = NAMESPACE.as_bytes().to_vec();
+        body[position] = body[position].wrapping_add(1);
+
+        let mut source = b"<r>".to_vec();
+        source.extend_from_slice(&body);
+        source.extend_from_slice(b"</r>");
+        assert_borrowed(&source, &Limits::default());
+    }
+
+    for body in [
+        NAMESPACE.as_bytes()[..NAMESPACE.len() - 1].to_vec(),
+        NAMESPACE.as_bytes()[1..].to_vec(),
+    ] {
+        let mut source = b"<r>".to_vec();
+        source.extend_from_slice(&body);
+        source.extend_from_slice(b"</r>");
+        assert_borrowed(&source, &Limits::default());
+    }
+}
+
+#[test]
+fn exact_namespace_at_raw_boundaries_retains_parser_errors() {
+    let mut at_start = NAMESPACE.as_bytes().to_vec();
+    at_start.push(b'<');
+    assert_eq!(at_start.get(..NAMESPACE.len()), Some(NAMESPACE.as_bytes()));
+    match mce::process_markup_compatibility(&at_start, &Capabilities::new(), &Limits::default()) {
+        Err(Error::Xml(message)) => assert_eq!(
+            message,
+            "syntax error: tag not closed: `>` not found before end of input"
+        ),
+        _ => panic!("an exact URI at offset zero must retain the parser error"),
+    }
+
+    let at_end = format!("<r>{NAMESPACE}").into_bytes();
+    assert_eq!(
+        at_end.get(at_end.len() - NAMESPACE.len()..),
+        Some(NAMESPACE.as_bytes())
+    );
+    match mce::process_markup_compatibility(&at_end, &Capabilities::new(), &Limits::default()) {
+        Err(Error::NonConformant(message)) => assert_eq!(message, "unterminated XML"),
+        _ => panic!("an exact URI at the source end must retain the parser error"),
+    }
+}
+
+#[test]
+fn input_limit_precedes_output_limit_and_both_paths_report_exact_resources() {
+    let absent = b"<r/>";
+    let both_absent = Limits {
+        max_input_bytes: absent.len() - 1,
+        max_output_bytes: absent.len() - 1,
+        ..Limits::default()
+    };
+    assert_limit(absent, &both_absent, "input bytes");
+
+    let absent_output_over = Limits {
+        max_input_bytes: absent.len(),
+        max_output_bytes: absent.len() - 1,
+        ..Limits::default()
+    };
+    assert_limit(absent, &absent_output_over, "output bytes");
+
+    let absent_exact = Limits {
+        max_input_bytes: absent.len(),
+        max_output_bytes: absent.len(),
+        ..Limits::default()
+    };
+    assert_borrowed(absent, &absent_exact);
+
+    let present = format!("<r><!--{NAMESPACE}--></r>").into_bytes();
+    let both_present = Limits {
+        max_input_bytes: present.len() - 1,
+        max_output_bytes: present.len() - 1,
+        ..Limits::default()
+    };
+    assert_limit(&present, &both_present, "input bytes");
+
+    let present_output_over = Limits {
+        max_input_bytes: present.len(),
+        max_output_bytes: present.len() - 1,
+        ..Limits::default()
+    };
+    assert_limit(&present, &present_output_over, "output bytes");
+
+    let present_exact = Limits {
+        max_input_bytes: present.len(),
+        max_output_bytes: present.len(),
+        ..Limits::default()
+    };
+    let output = mce::process_markup_compatibility(&present, &Capabilities::new(), &present_exact)
+        .expect("exact input and output limits must be accepted");
+    match output.xml {
+        Cow::Owned(bytes) => assert_eq!(bytes, present),
+        Cow::Borrowed(_) => panic!("the exact namespace must use the parser path"),
+    }
+    assert_eq!(output.report, Report::default());
+}
+
+#[test]
+fn real_alternate_content_processing_still_selects_the_fallback() {
+    let source = format!(
+        r#"<r xmlns:mc="{NAMESPACE}" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><x:choice/></mc:Choice><mc:Fallback><kept>yes</kept></mc:Fallback></mc:AlternateContent></r>"#
+    );
+    let output = mce::process_markup_compatibility(
+        source.as_bytes(),
+        &Capabilities::new(),
+        &Limits::default(),
+    )
+    .expect("valid AlternateContent must remain processable");
+    let report = output.report;
+    let bytes = match output.xml {
+        Cow::Owned(bytes) => bytes,
+        Cow::Borrowed(_) => panic!("MCE processing must produce an owned semantic result"),
+    };
+    let semantic = std::str::from_utf8(&bytes).expect("MCE output remains UTF-8");
+
+    assert!(semantic.contains("<kept>yes</kept>"));
+    assert!(!semantic.contains("mc:AlternateContent"));
+    assert!(!semantic.contains("x:choice"));
+    assert_eq!(report.alternate_content_count, 1);
+    assert_eq!(report.selected_choices, 0);
+    assert_eq!(report.selected_fallbacks, 1);
+}
+
+#[test]
+fn string_and_part_arc_wrappers_preserve_ownership_contract() {
+    let plain = "<r/>";
+    match mce::process_str(plain).expect("MCE-free strings must remain valid") {
+        Cow::Borrowed(value) => assert!(std::ptr::eq(value, plain)),
+        Cow::Owned(_) => panic!("MCE-free strings must remain borrowed"),
+    }
+
+    let transformed = format!(
+        r#"<r xmlns:mc="{NAMESPACE}" xmlns:x="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="x"><x:choice/></mc:Choice><mc:Fallback><kept>yes</kept></mc:Fallback></mc:AlternateContent></r>"#
+    );
+    match mce::process_str(&transformed).expect("MCE strings must remain processable") {
+        Cow::Owned(value) => {
+            assert!(value.contains("<kept>yes</kept>"));
+            assert!(!value.contains("x:choice"));
+        },
+        Cow::Borrowed(_) => panic!("MCE strings must become owned after processing"),
+    }
+
+    let plain_source = Arc::new(b"<r/>".to_vec());
+    let plain_part = XmlPart::new_shared(
+        PackURI::new("/mce-plain.xml").expect("valid test part URI"),
+        "application/xml".to_owned(),
+        Arc::clone(&plain_source),
+    );
+    let shared = mce::process_part_arc(&plain_part).expect("MCE-free part must process");
+    assert!(Arc::ptr_eq(&shared, &plain_source));
+
+    let present_source = Arc::new(format!("<r><!--{NAMESPACE}--></r>").into_bytes());
+    let present_part = XmlPart::new_shared(
+        PackURI::new("/mce-present.xml").expect("valid test part URI"),
+        "application/xml".to_owned(),
+        Arc::clone(&present_source),
+    );
+    let processed = mce::process_part_arc(&present_part).expect("MCE part must process");
+    assert!(!Arc::ptr_eq(&processed, &present_source));
+    assert_eq!(processed.as_slice(), present_source.as_slice());
+}

@@ -1,0 +1,48 @@
+{
+  "status": "pass",
+  "stage": "final",
+  "quality_plan_sha256": "152e75c31be0cdfacf4348a65742cc9853fb54580c6f6a1d63b24d060b29c046",
+  "checks": [
+    {
+      "name": "check-mce-tests",
+      "receipt_sha256": "23ec37f721dbfaa9931f2d99110d293ea7a1af997d8d8ad1c3b3d1f4942d7038",
+      "executed_tests": 262
+    },
+    {
+      "name": "check-fmt",
+      "receipt_sha256": "0db98e299c25b2d663c83045ad0bed6d101b5dcd72775e7a412282a378b5cf90",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-boundaries",
+      "receipt_sha256": "ca5c2c586bcd7ee8adeb7825598fe9ea8899244da49b7fd688882a6846feb1b7",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-claims",
+      "receipt_sha256": "0fe4672b43dea5ec6ea101386a29d8fbbd6428da63ac9622c253e3f709cfa379",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-workspace",
+      "receipt_sha256": "b39272d468ed1b25e8592d5d313f55cff95734ef92e6b73d5d669e9323884793",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-clippy",
+      "receipt_sha256": "3c0ee4a9511410dfda00f87ac0d8a110e8462e79b71006c5a7a9c467adbc2eb8",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-rustdoc",
+      "receipt_sha256": "28950502a4cc343e8a7e1a9749d9dbde37021de74926e7c15cbe93e1bca23adf",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-tests",
+      "receipt_sha256": "3b44d497af6298d0aa85eed097e067ff50691fd5f1b01e8931eaa19b03e98680",
+      "executed_tests": 4495
+    }
+  ],
+  "successful_test_executions": 4757
+}

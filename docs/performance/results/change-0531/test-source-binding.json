@@ -1,0 +1,9 @@
+{
+  "file": "crates/litchi-ooxml-common/tests/mce_namespace_search.rs",
+  "sha256": "763f29d07975bb03c434a47e16c526ea96043db8b0a449afadbb3a88a33a02ce",
+  "draft": "mce_namespace_search.rs.draft",
+  "draft_sha256": "f17fd8e911aa9392c4f06173672e8160c25d595da860aafbc89d51d7b2495722",
+  "difference": "rustfmt formatting only on installed test",
+  "test_count": 9,
+  "purpose": "Public observable lexical-trigger, limits, parser and ownership regressions; no search implementation reference."
+}

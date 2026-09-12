@@ -1,0 +1,27 @@
+{
+  "status": "pass",
+  "complete": true,
+  "comparison_sha256": "6b35f1d53b7b8a523841d72eaf6f4c3bf6e9e0d3caf8911be7ecdbbb335181f5",
+  "matched": [],
+  "same_build": [
+    {
+      "baseline": 92652,
+      "candidate": 87900,
+      "change_percent": -5.128869317445927,
+      "kind": "same_build_drift",
+      "lane": "candidate",
+      "metric": "max_rss_kib",
+      "reason": "Metric increased by more than the frozen 5% review threshold; this guard has no automatic speedup admission gate.",
+      "repeat": "1-to-2",
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review_id": "same_build_drift:candidate:1-to-2:dense-sparse:max_rss_kib:peak",
+      "shape": "dense-sparse",
+      "stat": "peak",
+      "status": "individual-review-required",
+      "threshold_percent": 5.0,
+      "review": "Candidate dense-sparse whole-child peak RSS decreases92652to87900KiB (-5.128869%) across repeats. This is an absolute drift flag, not an adverse increase; the frozen guard generic reason string has the wrong direction. All matched eager timing and RSS changes staywithin5%. Retain the variability and make no universal eager gain or RSS stability claim."
+    }
+  ],
+  "review": "All4matched eager rows preserve exactidentity and have no >5%adverse metric. Candidate dense repeat2 totalp50+1.065626% andmean+0.950320% remain visible; other eager totalmedians improve. Guard supports retention but no standalone eager speedup claim."
+}

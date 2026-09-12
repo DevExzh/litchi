@@ -1,0 +1,129 @@
+{
+  "revision": "b2dffa3d75656f46b36091afcf1e7410a66a90f8",
+  "created_utc": "2026-09-12T13:29:42.580722+00:00",
+  "hypothesis": "Replace only the exact nonempty MCE namespace-presence byte-window search with existing memchr::memmem::find; avoid repeated comparisons while preserving all parser and resource-limit behavior.",
+  "harness_enabler": "None; harness unchanged.",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "docx_source_backed_one_edit_save",
+      "shapes": [
+        "medium"
+      ]
+    },
+    {
+      "case": "pptx_source_backed_one_edit_save",
+      "shapes": [
+        "medium"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "Unchanged harness commit and publication counters; namespace predicate has no allocations. Diagnostic only; planning allocations not isolated."
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "scope": "Exact-name method capture; uniquely identify measured caller edge, retain lifecycle and termination dumps. No latency conversion."
+  },
+  "cpu": 2,
+  "admission": "Require primary total p50 and mean reduction at least 1%, and planning p50 reduction at least 2%, in both repeats of both shapes. Require planning Ir reduction at least 1% in each profile if native pilot passes. Review every greater than 5% adverse metric and absolute same-build drift individually. Allocation diagnostics must show no unexplained regression. Shared DOCX/PPTX guards and full applicable quality gates required. Reject if native pilot fails. No cold/range/native-producer/scaling claim.",
+  "owned_paths": [
+    "/tmp/litchi-goal-0531",
+    "/home/zhuhe/litchi-goal-0531-target"
+  ],
+  "native_order": [
+    "baseline native-r1 before candidate application",
+    "candidate native-r1",
+    "candidate native-r2",
+    "retained baseline native-r2 under candidate source checkout"
+  ],
+  "retained_baseline_custody": "Retained baseline binary and build manifest remain hash-bound; candidate checkout source is independently bound during final A2 and differs only in the frozen candidate file inventory.",
+  "status": "frozen-before-build-and-capture",
+  "resource_scope": "Byte predicate only; same input/output limits, borrowed no-MCE result, raw presence semantics and full MCE parser.",
+  "hardware": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 100,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole fresh child including corpus/setup/publication/oracles; diagnostic only, not isolated commit counters."
+  },
+  "candidate_source_roots": [
+    "crates/litchi-ooxml-common/"
+  ],
+  "candidate_source_binding": "Exact source file inventory and SHA256 values captured independently for each stage; candidate diff must be nonempty and entirely within candidate_source_roots. Harness source is identical. Review exact production/test patch before application.",
+  "gates": {
+    "total_p50_reduction_percent": 1.0,
+    "total_mean_reduction_percent": 1.0,
+    "planning_p50_reduction_percent": 2.0,
+    "planning_ir_reduction_percent": 1.0,
+    "require_every_shape_repeat": true
+  },
+  "conditional_lanes": {
+    "profile": "Required for retention only after pilot gates pass; preserved baseline binaries may run under candidate checkout.",
+    "hardware": "Diagnostic only after pilot gates pass.",
+    "eager": "Required before retention; no primary gain claim."
+  },
+  "draft_patch_sha256": "a809d1e41f99451c66f4d751bc3c9368ca6f7be6b0a02f1e52f7d01090bb2c8b"
+}

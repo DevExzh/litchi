@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0531: final MCE binary fails native admission
+
+[0531](changes/0531-ooxml-mce-namespace-search.md) rejects the exact
+`memchr::memmem` namespace-presence candidate after a fresh 44-child ABBA run
+against the final rebuilt binary. Dense-sparse repeat 2 improves total p50 by
+only 0.8937% and mean by 0.6056%, below the 1% gate, although the conditional
+planning profile reduces planning Ir by 5.0205–5.0844%. The initial candidate's
+passing measurements cannot authorize the nonidentical final binary. Production
+is restored; the nine regression tests and test-only lint correction remain.
+No runtime speedup or allocator result is retained. The next OLE2 action is the
+fresh CFB ownership/reconciliation attribution in the
+[0531 OLE2 review](results/change-0531/next-ole2-review.md); do not revive the
+rejected MCE candidate. OLE2/OOXML remains ahead of deferred ODF, and iWork is
+excluded.
+
 ## 0530: MCE namespace search is a concrete planning follow-up
 
 [0530](changes/0530-xlsx-planning-attribution.md) demotes catalog reuse (0.250089% planning Ir) and identifies the naive namespace-presence scan within MCE preprocessing (5.179072%, nested in parsing). Evaluate exact memchr substring search under fresh native/consumer gates. Do not add nested costs or revive rejected scanner/arena/XML-attribute probes.

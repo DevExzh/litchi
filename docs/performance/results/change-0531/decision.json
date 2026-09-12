@@ -1,0 +1,102 @@
+{
+  "schema": "litchi-0531-rejected-decision-v1",
+  "disposition": "rejected_and_reverted",
+  "final_source": "restored",
+  "plan_sha256": "12de5c9a6d145e9d8ac6b905db0eb4df78614bf08041a8f99be84d5771067e15",
+  "comparison_sha256": "99a8b1bb06d3d1e46e7b29882dad39baf4dc1bc4aa7aa1dab28c07299e26026b",
+  "adverse_review_sha256": "c7606d7148a1873e25a1ae8e6fe1bb71681fff2a37ddd09cb3f614df6cf36867",
+  "quality_summary_sha256": "5f3447aa59b29d1f615301ce1ecc760b8487c8af3f4825d5789bc1749395e55c",
+  "final_source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "pilot_gates_passed": true,
+  "production_change_retained": false,
+  "conditional_lanes": {
+    "profile": {
+      "status": "pass",
+      "path": "profile-comparison.json",
+      "sha256": "50f416c94c60964574f53b984b6ba36efadcdfb8d56eb5f73b6e7c9102a5a127",
+      "analyzer_sha256": "fcbb30a67293114f070757b6deacce45674a6b68965226f456719f09f536498b",
+      "gate_passed": true,
+      "required_reduction_percent": 1.0,
+      "minimum_reduction_percent": 3.274363177888699,
+      "rows": 4,
+      "stages": [
+        "baseline",
+        "candidate"
+      ],
+      "report_sha256": "50f416c94c60964574f53b984b6ba36efadcdfb8d56eb5f73b6e7c9102a5a127"
+    },
+    "eager": {
+      "status": "pass",
+      "path": "eager-comparison.json",
+      "sha256": "6b35f1d53b7b8a523841d72eaf6f4c3bf6e9e0d3caf8911be7ecdbbb335181f5",
+      "analyzer_sha256": "74e603aff5e7c031ba8ed46e363aa6bf8059c40787ca9aa5fd9dddc7406e35bc",
+      "guard_passed": true,
+      "no_speedup_requirement": true,
+      "adverse_flags": 0,
+      "same_build_flags": 1,
+      "rows": 4,
+      "review": {
+        "flags": 1,
+        "reviews": 1,
+        "path": "eager-review.json",
+        "sha256": "3189f8b7336622e6cd77c9ef8313e7c7c3d26303ca32d0e53b3ba593c29376c0"
+      },
+      "report_sha256": "6b35f1d53b7b8a523841d72eaf6f4c3bf6e9e0d3caf8911be7ecdbbb335181f5"
+    },
+    "reopen": {
+      "status": "pass",
+      "path": "reopen-comparison.json",
+      "sha256": "5c24c4d57ccca251b883ef2516a1c57f80db0339f8e5f02490de826fabceac97",
+      "analyzer_sha256": "287fa7fcea9a007cbd2db1486dddc8afad0aeb09262f9a40e356b4a4648ccedc",
+      "guard_passed": true,
+      "adverse_flags": 8,
+      "same_build_flags": 57,
+      "comparisons": 6,
+      "review": {
+        "flags": 65,
+        "reviews": 65,
+        "path": "reopen-review.json",
+        "sha256": "cd853a82b44783c8f40c820f3d0b3d936186dfeb345271dfd79e339db485e715"
+      },
+      "report_sha256": "5c24c4d57ccca251b883ef2516a1c57f80db0339f8e5f02490de826fabceac97"
+    },
+    "hardware": {
+      "status": "pass",
+      "path": "hardware-analysis.json",
+      "sha256": "2867255164d6f82de5037381ddee515b5c6535440a25098e691e7be118e41eae",
+      "scope": "whole-child diagnostic only",
+      "exact_replay": true,
+      "report_sha256": "2867255164d6f82de5037381ddee515b5c6535440a25098e691e7be118e41eae"
+    }
+  },
+  "final_native": {
+    "report_sha256": "92f098ff42ceee6c59f30f12558add73dc98fb7d540a1da77a681501f6f0d055",
+    "review_sha256": "6b5885eff6d4a87bfa87665510856f02aa8b361d62dcd8e6d2b8fe34302884ad",
+    "gate_passed": false,
+    "failed_gates": [
+      {
+        "repeat": 2,
+        "shape": "dense-sparse",
+        "gate": "native_primary_total_p50",
+        "baseline": 42524801,
+        "candidate": 42144774,
+        "reduction_percent": 0.8936596787366506,
+        "required_reduction_percent": 1.0
+      },
+      {
+        "repeat": 2,
+        "shape": "dense-sparse",
+        "gate": "native_primary_total_mean",
+        "baseline": 42561618.155000016,
+        "candidate": 42303862.004999995,
+        "reduction_percent": 0.6056070261739811,
+        "required_reduction_percent": 1.0
+      }
+    ]
+  },
+  "final_profile": {
+    "report_sha256": "296f09ae26d438b8542d3c399e7a8b9fa2598e8d55fbe0d76006f0e1ae6df6be",
+    "diagnostic_only": true
+  },
+  "review": "Initial candidate pilot passed; the final rebuilt binary differed. Its fresh complete native matrix failed dense-sparse repeat 2 total p50 and mean reduction gates. Production is restored, retaining only reviewed tests and a test-only lint fix. All eight restored quality gates pass with 4757 successful test executions. Initial conditional lanes and final profiles are diagnostic evidence. No speedup is retained. OLE2/OOXML remains active; ODF is deferred and iWork excluded."
+}

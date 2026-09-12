@@ -1,0 +1,7 @@
+{
+  "observed_utc": "2026-09-12T14:05:17.194778+00:00",
+  "processes": [
+    "2726101 2726089       00:32 cargo"
+  ],
+  "scope": "Pre-child snapshot, not proof of an idle host."
+}

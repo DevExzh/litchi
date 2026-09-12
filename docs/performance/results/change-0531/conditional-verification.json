@@ -1,0 +1,115 @@
+{
+  "status": "pass",
+  "lanes": {
+    "profile": {
+      "status": "pass",
+      "path": "profile-comparison.json",
+      "sha256": "50f416c94c60964574f53b984b6ba36efadcdfb8d56eb5f73b6e7c9102a5a127",
+      "analyzer_sha256": "fcbb30a67293114f070757b6deacce45674a6b68965226f456719f09f536498b",
+      "gate_passed": true,
+      "required_reduction_percent": 1.0,
+      "minimum_reduction_percent": 3.274363177888699,
+      "rows": 4,
+      "stages": [
+        "baseline",
+        "candidate"
+      ]
+    },
+    "eager": {
+      "status": "pass",
+      "path": "eager-comparison.json",
+      "sha256": "6b35f1d53b7b8a523841d72eaf6f4c3bf6e9e0d3caf8911be7ecdbbb335181f5",
+      "analyzer_sha256": "74e603aff5e7c031ba8ed46e363aa6bf8059c40787ca9aa5fd9dddc7406e35bc",
+      "guard_passed": true,
+      "no_speedup_requirement": true,
+      "adverse_flags": 0,
+      "same_build_flags": 1,
+      "rows": 4,
+      "review": {
+        "flags": 1,
+        "reviews": 1,
+        "path": "eager-review.json",
+        "sha256": "3189f8b7336622e6cd77c9ef8313e7c7c3d26303ca32d0e53b3ba593c29376c0"
+      }
+    },
+    "reopen": {
+      "status": "pass",
+      "path": "reopen-comparison.json",
+      "sha256": "5c24c4d57ccca251b883ef2516a1c57f80db0339f8e5f02490de826fabceac97",
+      "analyzer_sha256": "287fa7fcea9a007cbd2db1486dddc8afad0aeb09262f9a40e356b4a4648ccedc",
+      "guard_passed": true,
+      "adverse_flags": 8,
+      "same_build_flags": 57,
+      "comparisons": 6,
+      "review": {
+        "flags": 65,
+        "reviews": 65,
+        "path": "reopen-review.json",
+        "sha256": "cd853a82b44783c8f40c820f3d0b3d936186dfeb345271dfd79e339db485e715"
+      }
+    },
+    "hardware": {
+      "status": "pass",
+      "path": "hardware-analysis.json",
+      "sha256": "2867255164d6f82de5037381ddee515b5c6535440a25098e691e7be118e41eae",
+      "scope": "whole-child diagnostic only",
+      "exact_replay": true
+    }
+  },
+  "final_native": {
+    "status": "pass",
+    "path": "final-native-comparison.json",
+    "sha256": "92f098ff42ceee6c59f30f12558add73dc98fb7d540a1da77a681501f6f0d055",
+    "analyzer_sha256": "0c42938416b116587a3dccf37c867969b3e58dfc9560ff2653962207897d508f",
+    "final_plan_sha256": "3655d564e42d79213374b16727f3709b9570b71d888e9d10e7fcca0a7a30139a",
+    "admission_status": "reject",
+    "gate_passed": false,
+    "rows": 4,
+    "failed_gates": [
+      {
+        "repeat": 2,
+        "shape": "dense-sparse",
+        "gate": "native_primary_total_p50",
+        "baseline": 42524801,
+        "candidate": 42144774,
+        "reduction_percent": 0.8936596787366506,
+        "required_reduction_percent": 1.0
+      },
+      {
+        "repeat": 2,
+        "shape": "dense-sparse",
+        "gate": "native_primary_total_mean",
+        "baseline": 42561618.155000016,
+        "candidate": 42303862.004999995,
+        "reduction_percent": 0.6056070261739811,
+        "required_reduction_percent": 1.0
+      }
+    ],
+    "baseline_binary_sha256": "44b70af7bc9e613770fd79902c4f20167ee25100c9a177299612e07130482456",
+    "final_binary_sha256": "0da73c5ab5f152bfa535a5259efe41c952e027f9fe31d70190400bf507c87ef1",
+    "review": {
+      "path": "final-native-review.json",
+      "sha256": "6b5885eff6d4a87bfa87665510856f02aa8b361d62dcd8e6d2b8fe34302884ad",
+      "adverse_flags": 57,
+      "same_build_flags": 101,
+      "flags": 158,
+      "material_guard_regressions": 40,
+      "complete": true
+    }
+  },
+  "final_profile": {
+    "status": "pass",
+    "path": "final-profile-comparison.json",
+    "sha256": "296f09ae26d438b8542d3c399e7a8b9fa2598e8d55fbe0d76006f0e1ae6df6be",
+    "analyzer_sha256": "10fdbdfc331e35c3686e97ba207b001bec213a04ba0a775ca46c47af2d852be9",
+    "gate_passed": true,
+    "diagnostic_only": true,
+    "required_reduction_percent": 1.0,
+    "minimum_reduction_percent": 5.020506797255702,
+    "rows": 4,
+    "stages": [
+      "baseline",
+      "final"
+    ]
+  }
+}
