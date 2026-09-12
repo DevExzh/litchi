@@ -1,12 +1,14 @@
 """Exercise smoke target ownership with disposable source and build fixtures."""
 
+import hashlib
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
+
+import profile_pins
 
 
 class SmokeTargetOwnership(unittest.TestCase):
@@ -19,7 +21,18 @@ class SmokeTargetOwnership(unittest.TestCase):
             evidence = root / here.relative_to(repository)
             evidence.mkdir(parents=True)
             (evidence / "smoke.sh").write_text(script)
-            for relative in re.findall(r'\["\$ROOT/([^"\n]+)"\]=[0-9a-f]{64}', script):
+            (evidence / "profile_pins.py").write_text((here / "profile_pins.py").read_text())
+
+            def digest(path: Path) -> str:
+                return hashlib.sha256(path.read_bytes()).hexdigest()
+
+            arm = next(
+                arm
+                for arm, hashes in profile_pins.SOURCE_HASHES.items()
+                if digest(repository / "crates/litchi-drawingml/src/ink/actions.rs")
+                == hashes["crates/litchi-drawingml/src/ink/actions.rs"]
+            )
+            for relative in profile_pins.SOURCE_HASHES[arm]:
                 destination = root / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(repository / relative, destination)
@@ -30,7 +43,7 @@ class SmokeTargetOwnership(unittest.TestCase):
                 "#!/bin/sh\n"
                 'if [ "$1" = -C ]; then shift 2; fi\n'
                 'case "$1" in\n'
-                "rev-parse) echo 079cbbcbfc00c8d2412a38586a9688ae7eb0009e ;;\n"
+                f"rev-parse) echo {profile_pins.SOURCE_PINS[arm]} ;;\n"
                 "merge-base|status) exit 0 ;;\n"
                 "*) exit 81 ;;\nesac\n"
             )
@@ -46,6 +59,7 @@ class SmokeTargetOwnership(unittest.TestCase):
                 environment.pop(key, None)
             environment.update(
                 PROFILE_FROZEN="1",
+                PROFILE_ARM=arm,
                 CLEAN_TARGET="1",
                 CARGO_TARGET_DIR=str(target / "missing-parent" / ".."),
                 TMPDIR=str(root),

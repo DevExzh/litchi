@@ -10,6 +10,7 @@ HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd -- "$HERE/../../../../" && pwd)
 HARNESS="$HERE/harness/Cargo.toml"
 MANIFEST_TOOL="$HERE/source_manifest.py"
+PROFILE_PINS="$HERE/profile_pins.py"
 RESULTS=$(realpath -m -- "${PROFILE_RESULTS_DIR:-$HERE/results}")
 REPORT_OUTPUT=$(realpath -m -- "${PROFILE_REPORT_OUTPUT:-$HERE/report.md}")
 TARGET_INPUT=${CARGO_TARGET_DIR:-/var/tmp/litchi-ink-action-edit-profile-target}
@@ -17,7 +18,7 @@ TARGET=$(realpath -m -- "$TARGET_INPUT")
 WARMUP=${WARMUP:-2}
 SAMPLES=${SAMPLES:-20}
 PROCESSES=${PROCESSES:-3}
-EXPECTED_COMMIT=079cbbcbfc00c8d2412a38586a9688ae7eb0009e
+PROFILE_ARM=${PROFILE_ARM:-baseline}
 CURRENT_COMMIT=$(git -C "$ROOT" rev-parse HEAD)
 
 LANES=(
@@ -36,13 +37,48 @@ LANES=(
     cap_refusal_small_8 cap_refusal_scaled_128 cap_refusal_near_1024
 )
 
-declare -A EXPECTED_SOURCE_HASHES=(
-    ["$ROOT/crates/litchi-drawingml/src/ink/mod.rs"]=a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7
-    ["$ROOT/crates/litchi-drawingml/src/ink/actions.rs"]=4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628
-    ["$ROOT/crates/litchi-drawingml/src/ink/actions_edit.rs"]=b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850
-    ["$ROOT/crates/litchi-drawingml/tests/ink_action_edit.rs"]=af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640
-    ["$ROOT/crates/litchi-drawingml/tests/ink_action_id_boundaries.rs"]=f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06
-)
+if [[ ! -f "$PROFILE_PINS" ]]; then
+    echo "profile source pin manifest is missing: $PROFILE_PINS" >&2
+    exit 1
+fi
+PROFILE_SOURCE_PIN=""
+APPROVED_BASE_COMMIT=""
+declare -A EXPECTED_SOURCE_HASHES=()
+while IFS=$'\t' read -r kind relative digest; do
+    case "$kind" in
+        base)
+            if [[ -n "$APPROVED_BASE_COMMIT" || -z "$relative" || -n "$digest" ]]; then
+                echo "malformed profile base pin manifest for arm $PROFILE_ARM" >&2
+                exit 2
+            fi
+            APPROVED_BASE_COMMIT="$relative"
+            ;;
+        pin)
+            if [[ -n "$PROFILE_SOURCE_PIN" || -z "$relative" || -n "$digest" ]]; then
+                echo "malformed profile source pin manifest for arm $PROFILE_ARM" >&2
+                exit 2
+            fi
+            PROFILE_SOURCE_PIN="$relative"
+            ;;
+        source)
+            if [[ -z "$relative" || -z "$digest" || -n "${EXPECTED_SOURCE_HASHES[$ROOT/$relative]:-}" ]]; then
+                echo "malformed profile source hash manifest for arm $PROFILE_ARM" >&2
+                exit 2
+            fi
+            EXPECTED_SOURCE_HASHES["$ROOT/$relative"]="$digest"
+            ;;
+        "")
+            ;;
+        *)
+            echo "unknown profile source pin manifest record: $kind" >&2
+            exit 2
+            ;;
+    esac
+done < <(python3 "$PROFILE_PINS" --arm "$PROFILE_ARM")
+if [[ -z "$APPROVED_BASE_COMMIT" || -z "$PROFILE_SOURCE_PIN" || "${#EXPECTED_SOURCE_HASHES[@]}" -ne 5 ]]; then
+    echo "incomplete profile source pin manifest for arm $PROFILE_ARM" >&2
+    exit 2
+fi
 
 for variable in RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP RUSTDOCFLAGS; do
     if [[ -n "${!variable:-}" ]]; then
@@ -60,8 +96,12 @@ if [[ ! -x /usr/bin/time ]]; then
     echo "refusing profile because /usr/bin/time -v is unavailable" >&2
     exit 2
 fi
-if ! git -C "$ROOT" merge-base --is-ancestor "$EXPECTED_COMMIT" "$CURRENT_COMMIT"; then
+if ! git -C "$ROOT" merge-base --is-ancestor "$APPROVED_BASE_COMMIT" "$CURRENT_COMMIT"; then
     echo "refusing profile without the approved InkAction source commit in history" >&2
+    exit 2
+fi
+if ! git -C "$ROOT" merge-base --is-ancestor "$PROFILE_SOURCE_PIN" "$CURRENT_COMMIT"; then
+    echo "refusing profile without the selected $PROFILE_ARM source pin in history: $PROFILE_SOURCE_PIN" >&2
     exit 2
 fi
 relevant_status=$(git -C "$ROOT" status --short -- \
@@ -151,6 +191,8 @@ unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP RUSTDOCFLAGS
     printf '%s\n' "root=$ROOT"
     printf '%s\n' "harness=$HARNESS"
     printf '%s\n' "target=$TARGET"
+    printf '%s\n' "profile_arm=$PROFILE_ARM"
+    printf '%s\n' "source_pin=$PROFILE_SOURCE_PIN"
     printf '%s\n' "warmup=$WARMUP"
     printf '%s\n' "samples_per_process=$SAMPLES"
     printf '%s\n' "fresh_processes_per_lane=$PROCESSES"
@@ -169,7 +211,7 @@ unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP RUSTDOCFLAGS
 
 metadata_args=(--metadata "$RESULTS/metadata-before.json" --root "$ROOT" --output "$RESULTS/source-manifest-before.txt" --git-commit "$CURRENT_COMMIT")
 for extra in "$ROOT/Cargo.toml" "$HARNESS" "$HERE/harness/Cargo.lock" \
-    "$MANIFEST_TOOL" "$HERE/run_profile.sh" "$HERE/smoke.sh" "$HERE/summarize.py" \
+    "$MANIFEST_TOOL" "$PROFILE_PINS" "$HERE/run_profile.sh" "$HERE/smoke.sh" "$HERE/summarize.py" \
     "$HERE/verify.py" "$HERE/test_verify.py" "$HERE/test_smoke_target.py" \
     "$HERE/test_source_snapshot.py" \
     "$HERE/README.md" "$HERE/requirements.md"; do
@@ -194,6 +236,8 @@ sha256sum "$BIN" >"$RESULTS/binary.sha256"
 {
     printf 'binary=%s\n' "$BIN"
     cat "$RESULTS/binary.sha256"
+    printf 'profile_arm=%s\n' "$PROFILE_ARM"
+    printf 'source_pin=%s\n' "$PROFILE_SOURCE_PIN"
     printf '%s\n' 'rustc -vV:'
     rustc -vV
     printf '%s\n' "cargo=$(cargo -V)"
@@ -223,7 +267,7 @@ cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS" 
     >"$RESULTS/metadata-after.json"
 metadata_args_after=(--metadata "$RESULTS/metadata-after.json" --root "$ROOT" --output "$RESULTS/source-manifest-after.txt" --git-commit "$CURRENT_COMMIT")
 for extra in "$ROOT/Cargo.toml" "$HARNESS" "$HERE/harness/Cargo.lock" \
-    "$MANIFEST_TOOL" "$HERE/run_profile.sh" "$HERE/smoke.sh" "$HERE/summarize.py" \
+    "$MANIFEST_TOOL" "$PROFILE_PINS" "$HERE/run_profile.sh" "$HERE/smoke.sh" "$HERE/summarize.py" \
     "$HERE/verify.py" "$HERE/test_verify.py" "$HERE/test_smoke_target.py" \
     "$HERE/test_source_snapshot.py" \
     "$HERE/README.md" "$HERE/requirements.md"; do
@@ -236,13 +280,17 @@ python3 "$MANIFEST_TOOL" "${metadata_args_after[@]}"
 cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt"
 
 {
+    printf 'profile_arm=%s\n' "$PROFILE_ARM"
+    printf 'source_pin=%s\n' "$PROFILE_SOURCE_PIN"
     printf 'source_manifest_before_sha256='
     sha256sum "$RESULTS/source-manifest-before.txt" | cut -d' ' -f1
     printf 'source_manifest_after_sha256='
     sha256sum "$RESULTS/source-manifest-after.txt" | cut -d' ' -f1
-    printf 'approved_base_commit=%s\n' "$EXPECTED_COMMIT"
+    printf 'approved_base_commit=%s\n' "$APPROVED_BASE_COMMIT"
     printf 'git_head=%s\n' "$CURRENT_COMMIT"
     printf 'git_status_relevant=%s\n' "$relevant_status"
+    printf 'profile_pins_sha256='
+    sha256sum "$PROFILE_PINS" | cut -d' ' -f1
     printf '%s\n' 'source_sha256:'
     for source in "${!EXPECTED_SOURCE_HASHES[@]}"; do sha256sum "$source"; done | sort -k2
     printf '%s\n' 'harness_sha256:'

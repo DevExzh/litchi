@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import source_manifest
+import profile_pins
 import verify
 
 
@@ -53,6 +54,20 @@ class ReceiptChecks(unittest.TestCase):
         self.directory = TemporaryDirectory(prefix="litchi-ink-profile-verifier-")
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
+
+    def test_profile_pins_separate_clean_baseline_and_candidate_arms(self) -> None:
+        baseline_pin, baseline_hashes = profile_pins.profile("baseline")
+        candidate_pin, candidate_hashes = profile_pins.profile("candidate")
+        self.assertEqual(baseline_pin, "f1cb119361af9ea2227d27050e41915a9a92ae04")
+        self.assertEqual(candidate_pin, "ab94a4d7a02053765bf4c70b4af5022273b821e5")
+        self.assertEqual(set(baseline_hashes), set(candidate_hashes))
+        self.assertNotEqual(baseline_hashes, candidate_hashes)
+        self.assertNotEqual(
+            baseline_hashes["crates/litchi-drawingml/src/ink/actions.rs"],
+            candidate_hashes["crates/litchi-drawingml/src/ink/actions.rs"],
+        )
+        with self.assertRaises(ValueError):
+            profile_pins.profile("unknown")
 
     def test_rejects_negative_allocator_counter(self) -> None:
         sample = valid_sample()
@@ -274,12 +289,20 @@ class ReceiptChecks(unittest.TestCase):
         cargo = bin_dir / "cargo"
         cargo.write_text("#!/bin/sh\nexit 81\n")
         cargo.chmod(0o755)
+        repository = Path(__file__).resolve().parents[4]
+        actions = repository / "crates/litchi-drawingml/src/ink/actions.rs"
+        actions_digest = hashlib.sha256(actions.read_bytes()).hexdigest()
+        arm = next(
+            arm
+            for arm, hashes in profile_pins.SOURCE_HASHES.items()
+            if hashes["crates/litchi-drawingml/src/ink/actions.rs"] == actions_digest
+        )
         git = bin_dir / "git"
         git.write_text(
             "#!/bin/sh\n"
             "if [ \"$1\" = -C ]; then shift 2; fi\n"
             "case \"$1\" in\n"
-            "  rev-parse) echo 079cbbcbfc00c8d2412a38586a9688ae7eb0009e ;;\n"
+            f"  rev-parse) echo {profile_pins.SOURCE_PINS[arm]} ;;\n"
             "  merge-base) exit 0 ;;\n"
             "  status) exit 0 ;;\n"
             "  *) exit 81 ;;\n"
@@ -296,6 +319,7 @@ class ReceiptChecks(unittest.TestCase):
         env.update(
             {
                 "PATH": str(bin_dir) + os.pathsep + env.get("PATH", ""),
+                "PROFILE_ARM": arm,
                 "PROFILE_FROZEN": "1",
                 "PROFILE_RESULTS_DIR": str(results),
                 "PROFILE_REPORT_OUTPUT": str(self.root / "report.md"),

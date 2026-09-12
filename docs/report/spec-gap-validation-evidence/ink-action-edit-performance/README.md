@@ -28,6 +28,32 @@ remain external dependencies. The isolated harness's committed
 `harness/Cargo.lock` is authoritative; the repository root `Cargo.lock` and
 `docs/GOAL.md` are not build inputs.
 
+`profile_pins.py` defines two matched source arms. `baseline` (the default)
+pins the clean `f1cb119361af9ea2227d27050e41915a9a92ae04` source, while
+`candidate` pins isolated child `ab94a4d7a02053765bf4c70b4af5022273b821e5`,
+created from that baseline by cherry-picking only the reviewed 28-line
+InkAction source change. Each arm has exact hashes for the five production
+source inputs. Guard commits may sit above an arm pin, but the selected pin
+must remain an ancestor and the selected hashes must still match.
+
+The matched candidate plan uses the same Rust/Cargo 1.95.0 toolchain, harness
+lockfile, fixtures, allocator, flags, lanes, process count, warm-ups, and
+sample count. Keep arm receipts in separate result directories. Select an arm
+explicitly for a run:
+
+```sh
+PROFILE_ARM=baseline PROFILE_FROZEN=1 \
+  RUSTUP_TOOLCHAIN=1.95.0 \
+  bash docs/report/spec-gap-validation-evidence/ink-action-edit-performance/run_profile.sh
+
+PROFILE_ARM=candidate PROFILE_FROZEN=1 \
+  RUSTUP_TOOLCHAIN=1.95.0 \
+  bash docs/report/spec-gap-validation-evidence/ink-action-edit-performance/run_profile.sh
+```
+
+The candidate timing run remains freeze-gated; its source pin and exact hash
+selection must pass independent review before capture.
+
 The frozen owner and semantic tests have already passed their repository gates:
 
 ```sh

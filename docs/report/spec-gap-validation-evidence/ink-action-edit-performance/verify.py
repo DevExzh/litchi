@@ -15,17 +15,11 @@ import math
 import subprocess
 from pathlib import Path
 
+import profile_pins
+
 
 SCHEMA = "ink-action-edit-profile-v2"
 SOURCE_MANIFEST_FORMAT = "ink-action-edit-build-source-v2"
-EXPECTED_COMMIT = "079cbbcbfc00c8d2412a38586a9688ae7eb0009e"
-SOURCE_HASHES = {
-    "crates/litchi-drawingml/src/ink/mod.rs": "a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7",
-    "crates/litchi-drawingml/src/ink/actions.rs": "4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628",
-    "crates/litchi-drawingml/src/ink/actions_edit.rs": "b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850",
-    "crates/litchi-drawingml/tests/ink_action_edit.rs": "af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640",
-    "crates/litchi-drawingml/tests/ink_action_id_boundaries.rs": "f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06",
-}
 
 LANES = (
     "draft_small_8",
@@ -556,9 +550,22 @@ def verify_binary_receipts(results: Path) -> str:
 def verify_provenance(results: Path, root: Path, manifest_commit: str) -> tuple[str, int]:
     provenance = (results / "source-provenance.txt").read_text()
     require(
-        f"approved_base_commit={EXPECTED_COMMIT}" in provenance,
+        f"approved_base_commit={profile_pins.APPROVED_BASE_COMMIT}" in provenance,
         "profile is not pinned to the approved commit",
     )
+    profile_arm = next(
+        (line.split("=", 1)[1] for line in provenance.splitlines() if line.startswith("profile_arm=")),
+        "",
+    )
+    try:
+        source_pin, expected_hashes = profile_pins.profile(profile_arm)
+    except ValueError as error:
+        raise AssertionError(f"unknown profile arm in provenance: {profile_arm}") from error
+    recorded_pin = next(
+        (line.split("=", 1)[1] for line in provenance.splitlines() if line.startswith("source_pin=")),
+        "",
+    )
+    require(recorded_pin == source_pin, "profile source pin does not match its arm")
     current_commit = next(
         (line.split("=", 1)[1] for line in provenance.splitlines() if line.startswith("git_head=")),
         "",
@@ -570,6 +577,16 @@ def verify_provenance(results: Path, root: Path, manifest_commit: str) -> tuple[
         "profile git head changed after capture",
     )
     require(current_commit == manifest_commit, "profile Git head differs from source manifest snapshot")
+    require(
+        subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", source_pin, current_commit],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0,
+        "profile source pin is not an ancestor of the captured head",
+    )
     require("git_status_relevant=\n" in provenance, "relevant source tree was dirty during profile")
     source_hashes: dict[str, str] = {}
     for line in provenance.splitlines():
@@ -582,13 +599,22 @@ def verify_provenance(results: Path, root: Path, manifest_commit: str) -> tuple[
             require(current.is_file(), f"source hash path missing: {shown}")
             require(sha256(current) == digest, f"source hash changed: {shown}")
             source_hashes[str(current)] = digest
-    for relative, expected in SOURCE_HASHES.items():
+    for relative, expected in expected_hashes.items():
         current = root / relative
         require(
             source_hashes.get(str(current)) == expected,
             f"approved source hash missing or changed: {relative}",
         )
     evidence_dir = root / "docs/report/spec-gap-validation-evidence/ink-action-edit-performance"
+    profile_pins_path = evidence_dir / "profile_pins.py"
+    profile_pins_receipt = next(
+        (line.split("=", 1)[1] for line in provenance.splitlines() if line.startswith("profile_pins_sha256=")),
+        "",
+    )
+    require(
+        profile_pins_receipt == sha256(profile_pins_path),
+        "profile pin manifest hash missing or changed",
+    )
     for test_name in ("test_verify.py", "test_smoke_target.py", "test_source_snapshot.py"):
         test_path = evidence_dir / test_name
         require(source_hashes.get(str(test_path)) == sha256(test_path), f"test manifest hash missing or changed: {test_name}")
@@ -601,6 +627,8 @@ def verify_host_and_commands(results: Path) -> None:
         require(marker in host, f"host provenance missing {marker}")
     commands = (results / "commands.txt").read_text()
     for marker in (
+        "profile_arm=",
+        "source_pin=",
         "cargo metadata --format-version=1 --locked --offline",
         "cargo build --release --locked --offline",
         "/usr/bin/time -v",
@@ -611,6 +639,8 @@ def verify_host_and_commands(results: Path) -> None:
     build = (results / "build-provenance.txt").read_text()
     for marker in (
         "binary=",
+        "profile_arm=",
+        "source_pin=",
         "rustc -vV:",
         "cargo=",
         "target=",
