@@ -1,0 +1,27 @@
+source=16102fe751d7c5492042330f1bd1f49c304495f0
+build=cargo build --release --locked --offline --manifest-path harness/Cargo.toml
+binary=/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane read --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane snapshotclone --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane noop --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane editpayload --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane rename-many-to-one --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane mixedinsertremove --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane patchinverse --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane publicapply --level small --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane read --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane snapshotclone --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane noop --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane editpayload --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane rename-many-to-one --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane mixedinsertremove --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane patchinverse --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane publicapply --level medium --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane read --level large --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane snapshotclone --level large --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane noop --level large --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane editpayload --level large --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane rename-many-to-one --level large --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane mixedinsertremove --level large --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane patchinverse --level large --samples 5 --warmups 1
+/var/tmp/litchi-xlsb-custom-data-root-final-map-replay/binary --lane publicapply --level large --samples 5 --warmups 1
