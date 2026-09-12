@@ -5,12 +5,15 @@ use super::{
     check_canonical_relationship_attribute_limits, check_canonical_relationship_structure,
     check_relationship_capture_limits,
 };
+use crate::rel::Relationships;
+use crate::source_backed::escaped_xml_attribute_len;
 use crate::{
     OpcError, OwnedElementEdit, OwnedElementUpdate, OwnedXmlPart, PackURI, ReadLimits,
     ReadResource, Result, TargetMode,
 };
 use quick_xml::{events::Event, reader::NsReader};
 use std::collections::HashSet;
+use std::ops::Range;
 use std::sync::Arc;
 
 /// Immutable relationship XML bound to its package or part owner.
@@ -26,6 +29,779 @@ pub struct OwnedRelationships {
     owner: PackURI,
     xml: OwnedXmlPart,
     member_present: bool,
+}
+
+/// One borrowed relationship edge to add during a source-bound edit plan.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RelationshipEdit<'a> {
+    /// Relationship identifier written to the `Id` attribute.
+    pub id: &'a str,
+    /// Relationship type URI.
+    pub reltype: &'a str,
+    /// Internal relative target or external target URI.
+    pub target: &'a str,
+    /// Whether the target is internal or external.
+    pub mode: TargetMode,
+}
+
+/// A borrowed dry-run for a newly authored relationship member.
+///
+/// This plan deliberately has no source token or owner provenance.  It is for
+/// graph operations that create a relationship owner during the current
+/// transaction, where no source `.rels` member exists to bind to.  The
+/// canonical XML length, relationship count, and event count are computed
+/// before any XML buffer is allocated.  Call [`Self::materialize`] only after
+/// the caller has admitted those exact metrics against its aggregate limits.
+#[derive(Debug)]
+pub struct CanonicalRelationshipsPlan<'source> {
+    relationships: &'source Relationships,
+    final_len: usize,
+    relationship_count: usize,
+    event_count: usize,
+}
+
+impl<'source> CanonicalRelationshipsPlan<'source> {
+    /// Exact canonical relationship-member byte length.
+    #[must_use]
+    pub const fn final_len(&self) -> usize {
+        self.final_len
+    }
+
+    /// Exact number of relationship edges in the canonical member.
+    #[must_use]
+    pub const fn relationship_count(&self) -> usize {
+        self.relationship_count
+    }
+
+    /// Exact quick-xml event count, including declaration, root, children,
+    /// root close, and EOF.
+    #[must_use]
+    pub const fn event_count(&self) -> usize {
+        self.event_count
+    }
+
+    /// Materialize the canonical XML member after rechecking the supplied
+    /// limits.  This performs the sole final XML allocation and returns raw
+    /// bytes without inventing source or owner provenance.
+    pub fn materialize(self, limits: ReadLimits) -> Result<Vec<u8>> {
+        check_canonical_relationship_plan_limits(
+            self.relationships,
+            self.final_len,
+            self.event_count,
+            limits,
+        )?;
+        let bytes = self.relationships.try_to_xml_bytes()?;
+        if bytes.len() != self.final_len {
+            return Err(invalid(
+                "canonical relationship plan length differs from output",
+            ));
+        }
+        Ok(bytes)
+    }
+}
+
+impl Relationships {
+    /// Plan a canonical relationship member without source XML or provenance.
+    ///
+    /// This is the neutral bridge for newly authored graph owners.  It shares
+    /// the canonical serializer, escaping, validation, and limits used by OPC
+    /// package capture, while keeping the final byte buffer deferred until
+    /// [`CanonicalRelationshipsPlan::materialize`].
+    pub fn plan_canonical<'source>(
+        &'source self,
+        limits: ReadLimits,
+    ) -> Result<CanonicalRelationshipsPlan<'source>> {
+        let final_len = crate::source_backed::canonical_relationship_xml_len(self)?;
+        let event_count = self
+            .len()
+            .checked_add(4)
+            .ok_or_else(|| invalid("canonical relationship event count overflows"))?;
+        validate_canonical_relationship_values(self, limits)?;
+        check_canonical_relationship_plan_limits(self, final_len, event_count, limits)?;
+        Ok(CanonicalRelationshipsPlan {
+            relationships: self,
+            final_len,
+            relationship_count: self.len(),
+            event_count,
+        })
+    }
+}
+
+fn validate_canonical_relationship_values(
+    relationships: &Relationships,
+    limits: ReadLimits,
+) -> Result<()> {
+    for relationship in relationships.iter() {
+        if relationship.r_id().is_empty()
+            || relationship.reltype().is_empty()
+            || relationship.target_ref().is_empty()
+        {
+            return Err(invalid("relationship fields must not be empty"));
+        }
+        if !crate::pkgreader::is_xml_id(relationship.r_id()) {
+            return Err(invalid("relationship Id is not an XML ID"));
+        }
+        if relationship.reltype().chars().any(char::is_whitespace)
+            || relationship.reltype().chars().any(char::is_control)
+            || relationship.target_ref().chars().any(char::is_control)
+        {
+            return Err(invalid(
+                "relationship Type or Target is not a valid URI reference",
+            ));
+        }
+        limits.check(
+            ReadResource::RelationshipTargetBytes,
+            relationship.target_ref().len() as u64,
+            limits.max_relationship_target_bytes() as u64,
+        )?;
+    }
+    Ok(())
+}
+
+fn check_canonical_relationship_plan_limits(
+    relationships: &Relationships,
+    final_len: usize,
+    event_count: usize,
+    limits: ReadLimits,
+) -> Result<()> {
+    check_relationship_capture_limits(relationships, limits)?;
+    check_canonical_relationship_attribute_limits(relationships, limits)?;
+    check_canonical_relationship_structure(relationships, final_len, limits)?;
+    limits.check(
+        ReadResource::RelationshipXmlBytes,
+        final_len as u64,
+        limits.max_relationship_xml_bytes() as u64,
+    )?;
+    limits.check(
+        ReadResource::PartBytes,
+        final_len as u64,
+        limits.max_part_bytes(),
+    )?;
+    limits.check(
+        ReadResource::ArchiveEntryBytes,
+        final_len as u64,
+        limits.max_archive_entry_bytes(),
+    )?;
+    limits.check(
+        ReadResource::XmlEvents,
+        event_count as u64,
+        limits.max_xml_events() as u64,
+    )?;
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+struct OwnedRelationshipEdit {
+    id: String,
+    reltype: String,
+    target: String,
+    mode: TargetMode,
+}
+
+#[derive(Debug)]
+struct RelationshipSourceScan {
+    root_name: Vec<u8>,
+    relationship_name: Vec<u8>,
+    root_tag: Range<usize>,
+    root_close: Option<usize>,
+    root_empty: bool,
+    removal_ranges: Vec<Range<usize>>,
+    removed_bytes: usize,
+    removed_events: usize,
+    relationship_count: usize,
+    event_count: usize,
+}
+
+/// A source-bound relationship edit admission.
+///
+/// The plan scans the source member and computes exact final XML bytes,
+/// relationship count, event count, and member presence without constructing
+/// the candidate XML.  `materialize` performs one bounded output allocation
+/// and reparses the result before returning a new source token.
+#[derive(Debug)]
+pub struct RelationshipsEditPlan<'source> {
+    source: &'source OwnedRelationships,
+    additions: Vec<OwnedRelationshipEdit>,
+    scan: RelationshipSourceScan,
+    final_len: usize,
+    relationship_count: usize,
+    event_count: usize,
+    member_present: bool,
+}
+
+impl<'source> RelationshipsEditPlan<'source> {
+    /// Exact final relationship-member byte length.
+    #[must_use]
+    pub const fn final_len(&self) -> usize {
+        self.final_len
+    }
+
+    /// Exact final number of relationship edges.
+    #[must_use]
+    pub const fn relationship_count(&self) -> usize {
+        self.relationship_count
+    }
+
+    /// Exact final quick-xml event count, including `Event::Eof`.
+    #[must_use]
+    pub const fn event_count(&self) -> usize {
+        self.event_count
+    }
+
+    /// Whether the final package publishes this relationship member.
+    #[must_use]
+    pub const fn member_present(&self) -> bool {
+        self.member_present
+    }
+
+    /// Source token used by the plan for exact no-op and provenance checks.
+    #[must_use]
+    pub fn source(&self) -> &'source OwnedRelationships {
+        self.source
+    }
+
+    /// Materialize one final relationship XML buffer after caller aggregate
+    /// limits have admitted the exact metrics.
+    pub fn materialize(self, limits: ReadLimits) -> Result<OwnedRelationships> {
+        limits.check(
+            ReadResource::RelationshipXmlBytes,
+            self.final_len as u64,
+            limits.max_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            ReadResource::PartBytes,
+            self.final_len as u64,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            ReadResource::ArchiveEntryBytes,
+            self.final_len as u64,
+            limits.max_archive_entry_bytes(),
+        )?;
+        limits.check(
+            ReadResource::XmlEvents,
+            self.event_count as u64,
+            limits.max_xml_events() as u64,
+        )?;
+        let source = self.source;
+        if self.additions.is_empty() && self.scan.removal_ranges.is_empty() {
+            return Ok(source.clone());
+        }
+
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(self.final_len)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship edit output",
+                source,
+            })?;
+        let insertion = if self.scan.root_empty {
+            self.scan
+                .root_tag
+                .end
+                .checked_sub(2)
+                .ok_or_else(|| invalid("empty relationships root is incomplete"))?
+        } else {
+            self.scan
+                .root_close
+                .ok_or_else(|| invalid("relationships root is unclosed"))?
+        };
+        let mut cursor = 0usize;
+        let mut inserted = false;
+        for range in &self.scan.removal_ranges {
+            if !inserted && !self.additions.is_empty() && insertion <= range.start {
+                output.extend_from_slice(&source.bytes()[cursor..insertion]);
+                if self.scan.root_empty {
+                    output.push(b'>');
+                }
+                append_owned_relationship_chunks(
+                    &mut output,
+                    &self.scan.relationship_name,
+                    &self.additions,
+                )?;
+                if self.scan.root_empty {
+                    output.extend_from_slice(b"</");
+                    output.extend_from_slice(&self.scan.root_name);
+                    output.push(b'>');
+                    cursor = self.scan.root_tag.end;
+                } else {
+                    cursor = insertion;
+                }
+                inserted = true;
+            }
+            output.extend_from_slice(&source.bytes()[cursor..range.start]);
+            cursor = range.end;
+        }
+        if !inserted && !self.additions.is_empty() {
+            output.extend_from_slice(&source.bytes()[cursor..insertion]);
+            if self.scan.root_empty {
+                output.push(b'>');
+            }
+            append_owned_relationship_chunks(
+                &mut output,
+                &self.scan.relationship_name,
+                &self.additions,
+            )?;
+            if self.scan.root_empty {
+                output.extend_from_slice(b"</");
+                output.extend_from_slice(&self.scan.root_name);
+                output.push(b'>');
+                cursor = self.scan.root_tag.end;
+            } else {
+                cursor = insertion;
+            }
+        }
+        output.extend_from_slice(&source.bytes()[cursor..]);
+        if output.len() != self.final_len {
+            return Err(invalid("relationship edit length differs from plan"));
+        }
+        let xml = OwnedXmlPart::capture_with_limits(
+            source.xml.name.clone(),
+            source.xml.content_type.clone(),
+            Arc::new(output),
+            limits,
+        )?;
+        crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
+            xml.bytes(),
+            &source.owner,
+            limits,
+        )?;
+        Ok(OwnedRelationships {
+            owner: source.owner.clone(),
+            xml,
+            member_present: self.member_present,
+        })
+    }
+}
+
+impl OwnedRelationships {
+    /// Plan source-preserving relationship additions and removals in one pass.
+    ///
+    /// Existing comments, declarations, namespace aliases, attribute order,
+    /// whitespace, and unrelated relationship elements remain byte-for-byte
+    /// intact.  Removal selectors that do not match are idempotent no-ops.
+    pub fn plan_edit<'source>(
+        &'source self,
+        additions: &[RelationshipEdit<'_>],
+        removals: &[&str],
+        limits: ReadLimits,
+    ) -> Result<RelationshipsEditPlan<'source>> {
+        limits.check(
+            ReadResource::RelationshipXmlBytes,
+            self.bytes().len() as u64,
+            limits.max_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            ReadResource::PartBytes,
+            self.bytes().len() as u64,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            ReadResource::ArchiveEntryBytes,
+            self.bytes().len() as u64,
+            limits.max_archive_entry_bytes(),
+        )?;
+        if additions.len() > limits.max_relationships_per_part() {
+            return Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipsPerPart,
+                actual: additions.len() as u64,
+                maximum: limits.max_relationships_per_part() as u64,
+            });
+        }
+        let mut raw_addition_bytes = 0usize;
+        let mut addition_ids = HashSet::<&str>::new();
+        addition_ids
+            .try_reserve(additions.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship edit addition IDs",
+                source,
+            })?;
+        for addition in additions {
+            if addition.id.is_empty() || addition.reltype.is_empty() || addition.target.is_empty() {
+                return Err(invalid("relationship fields must not be empty"));
+            }
+            if !crate::pkgreader::is_xml_id(addition.id) {
+                return Err(invalid("relationship Id is not an XML ID"));
+            }
+            if addition.reltype.chars().any(char::is_whitespace)
+                || addition.reltype.chars().any(char::is_control)
+                || addition.target.chars().any(char::is_control)
+            {
+                return Err(invalid(
+                    "relationship Type or Target is not a valid URI reference",
+                ));
+            }
+            let escaped_id_len = escaped_xml_attribute_len(addition.id)?;
+            let escaped_reltype_len = escaped_xml_attribute_len(addition.reltype)?;
+            let escaped_target_len = escaped_xml_attribute_len(addition.target)?;
+            limits.check(
+                ReadResource::XmlAttributeBytes,
+                escaped_id_len as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+            limits.check(
+                ReadResource::XmlAttributeBytes,
+                escaped_reltype_len as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+            limits.check(
+                ReadResource::XmlAttributeBytes,
+                escaped_target_len as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+            limits.check(
+                ReadResource::RelationshipTargetBytes,
+                addition.target.len() as u64,
+                limits.max_relationship_target_bytes() as u64,
+            )?;
+            if !addition_ids.insert(addition.id) {
+                return Err(invalid("relationship ID already exists"));
+            }
+            raw_addition_bytes = raw_addition_bytes
+                .checked_add(escaped_id_len)
+                .and_then(|size| size.checked_add(escaped_reltype_len))
+                .and_then(|size| size.checked_add(escaped_target_len))
+                .ok_or_else(|| invalid("relationship edit selector bytes overflow"))?;
+        }
+        for id in removals {
+            limits.check(
+                ReadResource::XmlAttributeBytes,
+                id.len() as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+            raw_addition_bytes = raw_addition_bytes
+                .checked_add(id.len())
+                .ok_or_else(|| invalid("relationship edit selector bytes overflow"))?;
+        }
+        limits.check(
+            ReadResource::RelationshipXmlBytes,
+            raw_addition_bytes as u64,
+            limits.max_relationship_xml_bytes() as u64,
+        )?;
+        let parsed = crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
+            self.bytes(),
+            &self.owner,
+            limits,
+        )?;
+        let maximum_relationships = limits.max_relationships_per_part();
+        let mut selected = HashSet::<&str>::new();
+        selected
+            .try_reserve(removals.len().min(maximum_relationships))
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship edit removal IDs",
+                source,
+            })?;
+        for id in removals {
+            if selected.contains(id) {
+                return Err(invalid("relationship removal IDs contain a duplicate"));
+            }
+            if selected.len() >= maximum_relationships {
+                return Err(invalid(
+                    "relationship removal batch exceeds the package limit",
+                ));
+            }
+            selected.insert(*id);
+        }
+        let mut owned_additions = Vec::new();
+        owned_additions
+            .try_reserve_exact(additions.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship edit additions",
+                source,
+            })?;
+        for addition in additions {
+            if parsed.get(addition.id).is_some() && !selected.contains(addition.id) {
+                return Err(invalid("relationship ID already exists"));
+            }
+            owned_additions.push(OwnedRelationshipEdit {
+                id: clone_string_bounded(addition.id, "OPC relationship edit IDs")?,
+                reltype: clone_string_bounded(addition.reltype, "OPC relationship edit types")?,
+                target: clone_string_bounded(addition.target, "OPC relationship edit targets")?,
+                mode: addition.mode,
+            });
+        }
+        let scan = scan_relationship_source(self.bytes(), &selected, limits)?;
+        let removed_count = scan.removal_ranges.len();
+        let relationship_count = scan
+            .relationship_count
+            .checked_sub(removed_count)
+            .and_then(|count| count.checked_add(owned_additions.len()))
+            .ok_or_else(|| invalid("relationship count overflows"))?;
+        if relationship_count > maximum_relationships {
+            return Err(invalid("relationship count exceeds the package limit"));
+        }
+        let fragment_len =
+            owned_relationship_fragment_len(&scan.relationship_name, &owned_additions)?;
+        let expansion = usize::from(scan.root_empty && !owned_additions.is_empty())
+            .checked_mul(
+                scan.root_name
+                    .len()
+                    .checked_add(2)
+                    .ok_or_else(|| invalid("relationship root expansion overflows"))?,
+            )
+            .ok_or_else(|| invalid("relationship root expansion overflows"))?;
+        let final_len = self
+            .bytes()
+            .len()
+            .checked_sub(scan.removed_bytes)
+            .and_then(|value| value.checked_add(fragment_len))
+            .and_then(|value| value.checked_add(expansion))
+            .ok_or_else(|| invalid("relationship XML output size overflows"))?;
+        let final_events = scan
+            .event_count
+            .checked_sub(scan.removed_events)
+            .and_then(|value| value.checked_add(owned_additions.len()))
+            .and_then(|value| {
+                value.checked_add(usize::from(scan.root_empty && !owned_additions.is_empty()))
+            })
+            .ok_or_else(|| invalid("relationship XML event count overflows"))?;
+        limits.check(
+            ReadResource::RelationshipXmlBytes,
+            final_len as u64,
+            limits.max_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            ReadResource::PartBytes,
+            final_len as u64,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            ReadResource::ArchiveEntryBytes,
+            final_len as u64,
+            limits.max_archive_entry_bytes(),
+        )?;
+        limits.check(
+            ReadResource::XmlEvents,
+            final_events as u64,
+            limits.max_xml_events() as u64,
+        )?;
+        let member_present = self.member_present || !owned_additions.is_empty();
+        Ok(RelationshipsEditPlan {
+            source: self,
+            additions: owned_additions,
+            scan,
+            final_len,
+            relationship_count,
+            event_count: final_events,
+            member_present,
+        })
+    }
+}
+
+fn clone_string_bounded(value: &str, resource: &'static str) -> Result<String> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|source| OpcError::Allocation { resource, source })?;
+    owned.push_str(value);
+    Ok(owned)
+}
+
+fn owned_relationship_fragment_len(
+    relationship_name: &[u8],
+    additions: &[OwnedRelationshipEdit],
+) -> Result<usize> {
+    let mut length = 0usize;
+    for addition in additions {
+        append_relationship_chunks(
+            relationship_name,
+            &[(
+                addition.reltype.as_str(),
+                addition.target.as_str(),
+                addition.id.as_str(),
+                addition.mode,
+            )],
+            |chunk| {
+                length = length
+                    .checked_add(chunk.len())
+                    .ok_or_else(|| invalid("relationship fragment size overflows"))?;
+                Ok(())
+            },
+        )?;
+    }
+    Ok(length)
+}
+
+fn append_owned_relationship_chunks(
+    output: &mut Vec<u8>,
+    relationship_name: &[u8],
+    additions: &[OwnedRelationshipEdit],
+) -> Result<()> {
+    for addition in additions {
+        append_relationship_chunks(
+            relationship_name,
+            &[(
+                addition.reltype.as_str(),
+                addition.target.as_str(),
+                addition.id.as_str(),
+                addition.mode,
+            )],
+            |chunk| {
+                output.extend_from_slice(chunk);
+                Ok(())
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn scan_relationship_source(
+    source: &[u8],
+    selected: &HashSet<&str>,
+    limits: ReadLimits,
+) -> Result<RelationshipSourceScan> {
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    let mut root_name = None;
+    let mut root_tag = None;
+    let mut root_close = None;
+    let mut root_empty = false;
+    let mut removal_ranges = Vec::new();
+    removal_ranges
+        .try_reserve(selected.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC relationship edit removal ranges",
+            source,
+        })?;
+    let mut removed_bytes = 0usize;
+    let mut removed_events = 0usize;
+    let mut relationship_count = 0usize;
+    let mut event_count = 0usize;
+    let mut open_selected: Option<(usize, usize, usize)> = None;
+    loop {
+        event_count = event_count
+            .checked_add(1)
+            .ok_or_else(|| invalid("relationship XML event count overflows"))?;
+        limits.check(
+            ReadResource::XmlEvents,
+            event_count as u64,
+            limits.max_xml_events() as u64,
+        )?;
+        let start = reader.buffer_position() as usize;
+        let event = reader.read_event()?;
+        let end = reader.buffer_position() as usize;
+        if end < start || end > source.len() {
+            return Err(invalid("relationship XML event range is invalid"));
+        }
+        match event {
+            Event::Start(element) if depth == 0 => {
+                if element.local_name().as_ref() != b"Relationships" {
+                    return Err(invalid("relationships root must be Relationships"));
+                }
+                root_name = Some(element.name().as_ref().to_vec());
+                root_tag = Some(start..end);
+                depth = 1;
+            },
+            Event::Empty(element) if depth == 0 => {
+                if element.local_name().as_ref() != b"Relationships" {
+                    return Err(invalid("relationships root must be Relationships"));
+                }
+                root_name = Some(element.name().as_ref().to_vec());
+                root_tag = Some(start..end);
+                root_empty = true;
+            },
+            Event::Start(element) if depth == 1 => {
+                if element.local_name().as_ref() == b"Relationship" {
+                    relationship_count = relationship_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("relationship count overflows"))?;
+                    let id = relationship_id(&element, reader.decoder())?;
+                    if selected.contains(id.as_str()) {
+                        open_selected = Some((start, end, event_count));
+                    }
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("relationship XML depth overflows"))?;
+            },
+            Event::Empty(element) if depth == 1 => {
+                if element.local_name().as_ref() == b"Relationship" {
+                    relationship_count = relationship_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("relationship count overflows"))?;
+                    let id = relationship_id(&element, reader.decoder())?;
+                    if selected.contains(id.as_str()) {
+                        let range = start..end;
+                        removed_bytes = removed_bytes
+                            .checked_add(range.len())
+                            .ok_or_else(|| invalid("relationship removal bytes overflow"))?;
+                        removed_events = removed_events
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("relationship removal events overflow"))?;
+                        removal_ranges.push(range);
+                    }
+                }
+            },
+            Event::End(_) => {
+                if depth == 1 {
+                    root_close = Some(start);
+                }
+                if depth == 2 {
+                    if let Some((open_start, _open_end, open_event_count)) = open_selected.take() {
+                        let range = open_start..end;
+                        removed_bytes = removed_bytes
+                            .checked_add(range.len())
+                            .ok_or_else(|| invalid("relationship removal bytes overflow"))?;
+                        removed_events = removed_events
+                            .checked_add(event_count - open_event_count + 1)
+                            .ok_or_else(|| invalid("relationship removal events overflow"))?;
+                        removal_ranges.push(range);
+                    }
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unbalanced relationship XML"))?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if depth != 0 || root_name.is_none() || root_tag.is_none() {
+        return Err(invalid("relationships root is missing or unclosed"));
+    }
+    removal_ranges.sort_unstable_by_key(|range| range.start);
+    if removal_ranges
+        .windows(2)
+        .any(|pair| pair[0].end > pair[1].start)
+    {
+        return Err(invalid("relationship removal ranges overlap"));
+    }
+    let root_name = root_name.expect("checked above");
+    let mut relationship_name = root_name
+        .iter()
+        .position(|byte| *byte == b':')
+        .map_or_else(Vec::new, |colon| root_name[..=colon].to_vec());
+    relationship_name.extend_from_slice(b"Relationship");
+    Ok(RelationshipSourceScan {
+        root_name,
+        relationship_name,
+        root_tag: root_tag.expect("checked above"),
+        root_close,
+        root_empty,
+        removal_ranges,
+        removed_bytes,
+        removed_events,
+        relationship_count,
+        event_count,
+    })
+}
+
+fn relationship_id(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+) -> Result<String> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        if attribute.key.as_ref() == b"Id" {
+            return attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map(|value| value.into_owned())
+                .map_err(|error| invalid(error.to_string()));
+        }
+    }
+    Err(invalid("relationship is missing Id"))
 }
 
 impl OwnedRelationships {
@@ -590,6 +1366,63 @@ mod tests {
     }
 
     #[test]
+    fn canonical_relationship_plan_defers_source_less_xml_and_honors_exact_caps() {
+        let mut relationships = Relationships::new("/xl/drawings".to_owned());
+        relationships
+            .try_add_relationship(
+                "urn:test&kind".to_owned(),
+                "../media/vector&1.svg".to_owned(),
+                "rId7".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        let plan = relationships.plan_canonical(ReadLimits::default()).unwrap();
+        assert_eq!(plan.relationship_count(), 1);
+        assert_eq!(plan.event_count(), 5);
+        let exact = plan.final_len();
+        let limits = ReadLimits::builder()
+            .max_relationship_xml_bytes(exact)
+            .unwrap()
+            .max_total_relationship_xml_bytes(exact)
+            .unwrap()
+            .max_part_bytes(exact as u64)
+            .unwrap()
+            .max_archive_entry_bytes(exact as u64)
+            .unwrap()
+            .max_xml_events(5)
+            .unwrap()
+            .max_total_relationship_xml_events(5)
+            .unwrap()
+            .build()
+            .unwrap();
+        let output = relationships
+            .plan_canonical(limits)
+            .unwrap()
+            .materialize(limits)
+            .unwrap();
+        assert_eq!(output, relationships.to_xml().as_bytes());
+
+        let under = ReadLimits::builder()
+            .max_relationship_xml_bytes(exact - 1)
+            .unwrap()
+            .max_part_bytes((exact - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(relationships.plan_canonical(under).is_err());
+        assert!(matches!(
+            relationships
+                .plan_canonical(ReadLimits::default())
+                .unwrap()
+                .materialize(under),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::RelationshipXmlBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn relationship_removal_round_trip_preserves_context_and_restores_source_xml() {
         let source = source(XML);
         for owned in [false, true] {
@@ -687,6 +1520,92 @@ mod tests {
         );
         package.try_replace_relationships(&before, &after).unwrap();
         assert_eq!(package.source_relationships(&owner).unwrap(), after);
+    }
+
+    #[test]
+    fn borrowed_relationship_plan_reports_exact_mixed_output_and_preserves_prefix() {
+        let package = OpcPackage::from_bytes(&source(XML)).unwrap();
+        let owner = PackURI::new("/").unwrap();
+        let before = package.source_relationships(&owner).unwrap();
+        let additions = [RelationshipEdit {
+            id: "rId7",
+            reltype: "urn:test&new",
+            target: "custom/new&item.bin",
+            mode: TargetMode::Internal,
+        }];
+        let plan = before
+            .plan_edit(&additions, &["rId1"], ReadLimits::default())
+            .unwrap();
+        assert!(plan.final_len() < before.bytes().len() + 256);
+        assert_eq!(plan.relationship_count(), 2);
+        let exact = plan.final_len().max(before.bytes().len());
+        let limits = ReadLimits::builder()
+            .max_relationship_xml_bytes(exact)
+            .unwrap()
+            .max_part_bytes(exact as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let after = before
+            .plan_edit(&additions, &["rId1"], limits)
+            .unwrap()
+            .materialize(limits)
+            .unwrap();
+        let text = std::str::from_utf8(after.bytes()).unwrap();
+        assert!(text.contains("<!-- before -->"));
+        assert!(text.contains("<r:Relationship Id=\"rId7\""));
+        assert!(!text.contains("Id='rId1'"));
+        assert_eq!(after.member_present(), before.member_present());
+    }
+
+    #[test]
+    fn borrowed_relationship_plan_expands_prefixed_empty_root_and_honors_exact_cap() {
+        let xml = br#"<r:Relationships xmlns:r='http://schemas.openxmlformats.org/package/2006/relationships'/>"#;
+        let package = OpcPackage::from_bytes(&source(xml)).unwrap();
+        let owner = PackURI::new("/").unwrap();
+        let before = package.source_relationships(&owner).unwrap();
+        let additions = [RelationshipEdit {
+            id: "rId1",
+            reltype: "urn:test",
+            target: "item.bin",
+            mode: TargetMode::Internal,
+        }];
+        let plan = before
+            .plan_edit(&additions, &[], ReadLimits::default())
+            .unwrap();
+        let exact = plan.final_len().max(before.bytes().len());
+        let limits = ReadLimits::builder()
+            .max_relationship_xml_bytes(exact)
+            .unwrap()
+            .max_part_bytes(exact as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let after = before
+            .plan_edit(&additions, &[], limits)
+            .unwrap()
+            .materialize(limits)
+            .unwrap();
+        assert!(
+            std::str::from_utf8(after.bytes())
+                .unwrap()
+                .contains("</r:Relationships>")
+        );
+        assert!(
+            before
+                .plan_edit(&additions, &[], limits)
+                .unwrap()
+                .materialize(
+                    ReadLimits::builder()
+                        .max_relationship_xml_bytes(exact - 1)
+                        .unwrap()
+                        .max_part_bytes((exact - 1) as u64)
+                        .unwrap()
+                        .build()
+                        .unwrap(),
+                )
+                .is_err()
+        );
     }
 
     #[test]
