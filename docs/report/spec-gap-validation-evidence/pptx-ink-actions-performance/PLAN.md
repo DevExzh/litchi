@@ -83,13 +83,15 @@ operation:
    receives an already-prepared public package and only applies the patch; no
    stale mutation or raw OPC edit is hidden inside the timer.
 
-Apply lanes retain a fresh baseline `Package` for the source-preservation
+Apply and inverse lanes retain a fresh baseline `Package` for the source-preservation
 receipt and construct a second fresh `Package::from_opc_package` working
 package during setup. The retained-baseline live snapshot is taken after the
 baseline package and manifest are ready but before that setup-only working
 package; the working package is released in the named drop phase. This keeps
-the timed apply call limited to patch publication while making the post-drop
-baseline equation explicit.
+the timed apply/inverse calls limited to patch publication while making the
+post-drop baseline equation explicit. Inverse publication may change internal
+capacities even when it restores exact source bytes; those working allocations
+belong to the operation package, not the retained baseline.
 
 The public routes under test are `Package::{ink_actions,
 ink_actions_with_limits, apply_ink_actions_patch, to_bytes,
@@ -251,10 +253,11 @@ Each sample has disjoint phases:
    `Package::from_opc_package`, retained `ReadLimits`, owner `Limits`, source
    snapshot/patch preparation, and expected-value construction. Setup is not
    attributed to the operation.
-2. **Operation:** only the named public call in the lane table. For apply,
+2. **Operation:** only the named public call in the lane table. For apply and inverse,
    this includes the current Litchi owner’s source revalidation, package-wide
    relationship index/XML validation, staged package clone, target install,
-   candidate inventory/reopen, and atomic publication. The profile may report
+   candidate inventory/reopen, and atomic publication. Inverse lanes execute
+   that publication scope for both the forward and inverse calls. The profile may report
    this observed host scope; it must not infer a parser-pass count by
    subtracting unrelated timers.
 3. **Validation:** typed readback, member/source manifests, semantic
@@ -267,7 +270,10 @@ Each sample has disjoint phases:
    `Package::from_vec_with_limits` under retained OPC limits, perform the
    public `Package::ink_actions()` read and expected-anchor check, verify the
    source manifest, then release the baseline after the receipt has been
-   serialized.
+   serialized. For stale fixtures, use the untouched generated source bytes
+   and source manifest for this check. The separately mutated candidate bytes
+   and manifest remain the evidence for refusal and candidate preservation;
+   an expected typed refusal is not a successful source-baseline reopen.
 
 The process allocator records cumulative counters at every boundary. For any
 phase `P`, with direct allocations `A_P`, realloc-new bytes `R+_P`,

@@ -298,6 +298,8 @@ struct GraphMetrics {
     retained_target_bytes: usize,
     retained_profile_bytes: usize,
     shared_pointer_observation: String,
+    same_target_pointer_consistent: bool,
+    distinct_target_pointer_isolated: bool,
     outbound_diagnostic_modes: Vec<String>,
     unknown_internal_outbound_preserved: bool,
     unknown_external_outbound_preserved: bool,
@@ -309,6 +311,26 @@ struct GraphMetrics {
     opaque_unknown_requires_preserved: bool,
     owner_xml_sha256: String,
     profile_source_sha256: String,
+}
+
+#[derive(Clone, Debug, Default)]
+struct TargetMetrics {
+    target_bytes: usize,
+    inbound_edges: usize,
+    outbound_edges: usize,
+    profile_bytes: usize,
+    target_modes: Vec<TargetMode>,
+    pointer: Option<usize>,
+    pointer_consistent: bool,
+    action_count: usize,
+    action_group_count: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PointerObservation {
+    same_target_pointer_consistent: bool,
+    distinct_target_pointer_isolated: bool,
+    label: &'static str,
 }
 
 #[derive(Clone, Debug)]
@@ -354,6 +376,8 @@ struct SampleReceipt {
     retained_target_bytes: usize,
     retained_profile_bytes: usize,
     shared_pointer_observation: String,
+    same_target_pointer_consistent: bool,
+    distinct_target_pointer_isolated: bool,
     outbound_diagnostic_modes: Vec<String>,
     unknown_internal_outbound_preserved: bool,
     unknown_external_outbound_preserved: bool,
@@ -454,6 +478,8 @@ struct CompactMetrics {
     retained_target_bytes: usize,
     retained_profile_bytes: usize,
     shared_pointer_observation: FixedText,
+    same_target_pointer_consistent: bool,
+    distinct_target_pointer_isolated: bool,
     diagnostic_modes: u8,
     unknown_internal_outbound_preserved: bool,
     unknown_external_outbound_preserved: bool,
@@ -981,7 +1007,7 @@ fn prepare(
     let (package_before_manifest, package_before_manifest_sha256) =
         package_manifest_from_bytes(&package_before_bytes, read_limits)?;
     let retained_baseline_live_bytes = AllocSnapshot::now().live_bytes();
-    let operation_package = if operation == OperationKind::Apply {
+    let operation_package = if matches!(operation, OperationKind::Apply | OperationKind::Inverse) {
         let operation_opc = target_opc_for_recipe(recipe)?;
         Some(
             Package::from_opc_package(operation_opc)
@@ -1662,6 +1688,8 @@ fn compact_metrics(metrics: &GraphMetrics) -> Result<CompactMetrics> {
         retained_target_bytes: metrics.retained_target_bytes,
         retained_profile_bytes: metrics.retained_profile_bytes,
         shared_pointer_observation: FixedText::from_str(&metrics.shared_pointer_observation),
+        same_target_pointer_consistent: metrics.same_target_pointer_consistent,
+        distinct_target_pointer_isolated: metrics.distinct_target_pointer_isolated,
         diagnostic_modes: diagnostic_bits(metrics),
         unknown_internal_outbound_preserved: metrics.unknown_internal_outbound_preserved,
         unknown_external_outbound_preserved: metrics.unknown_external_outbound_preserved,
@@ -1677,12 +1705,15 @@ fn compact_metrics(metrics: &GraphMetrics) -> Result<CompactMetrics> {
 }
 
 fn baseline_reopenable(prepared: &Prepared) -> bool {
-    let bytes = prepared.package_before_bytes.clone();
+    let bytes = prepared.facts.source_bytes.clone();
     let mut reopened = match Package::from_vec_with_limits(bytes, prepared.read_limits) {
         Ok(package) => package,
         Err(_) => return false,
     };
-    let snapshots = match reopened.ink_actions() {
+    // The retained baseline is the valid, untouched source profile.  Negative
+    // limit lanes deliberately use lower operation limits and must not make
+    // this independent baseline probe fail.
+    let snapshots = match reopened.ink_actions_with_limits(Limits::default()) {
         Ok(snapshots) => snapshots,
         Err(_) => return false,
     };
@@ -1698,7 +1729,7 @@ fn baseline_reopenable(prepared: &Prepared) -> bool {
         Err(_) => return false,
     };
     package_manifest_from_bytes(&serialized, prepared.read_limits)
-        .map(|(manifest, _)| manifest == prepared.package_before_manifest)
+        .map(|(manifest, _)| manifest == prepared.facts.package_manifest)
         .unwrap_or(false)
 }
 
@@ -1765,6 +1796,8 @@ fn receipt_from_compact(compact: CompactSample, expected_error: Option<&str>) ->
         retained_target_bytes: metrics.retained_target_bytes,
         retained_profile_bytes: metrics.retained_profile_bytes,
         shared_pointer_observation: metrics.shared_pointer_observation.to_string(),
+        same_target_pointer_consistent: metrics.same_target_pointer_consistent,
+        distinct_target_pointer_isolated: metrics.distinct_target_pointer_isolated,
         outbound_diagnostic_modes: diagnostic_modes(metrics.diagnostic_modes),
         unknown_internal_outbound_preserved: metrics.unknown_internal_outbound_preserved,
         unknown_external_outbound_preserved: metrics.unknown_external_outbound_preserved,
@@ -2264,6 +2297,8 @@ fn empty_metrics(facts: &FixtureFacts) -> GraphMetrics {
         retained_target_bytes: 0,
         retained_profile_bytes: 0,
         shared_pointer_observation: "none".to_owned(),
+        same_target_pointer_consistent: true,
+        distinct_target_pointer_isolated: true,
         outbound_diagnostic_modes: Vec::new(),
         unknown_internal_outbound_preserved: false,
         unknown_external_outbound_preserved: false,
@@ -2283,28 +2318,31 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
         .iter()
         .flat_map(Snapshot::anchors)
         .collect::<Vec<_>>();
-    let mut targets = HashMap::<String, (usize, usize, usize, usize, Vec<TargetMode>)>::new();
-    let mut pointer_by_target = HashMap::<String, *const u8>::new();
-    let mut shared = false;
+    let mut targets = HashMap::<String, TargetMetrics>::new();
     let mut owner_xml_bytes = 0usize;
     for anchor in &anchors {
         owner_xml_bytes = owner_xml_bytes.saturating_add(anchor.owner_xml().len());
         let target = anchor.target_part_name().as_str().to_owned();
-        let entry = targets.entry(target.clone()).or_insert((
-            anchor.target_bytes().len(),
-            anchor.inbound_references().len(),
-            anchor.outbound_references().len(),
-            anchor.profile().source().len(),
-            Vec::new(),
-        ));
-        entry.0 = anchor.target_bytes().len();
-        if let Some(previous) = pointer_by_target.insert(target, anchor.target_bytes().as_ptr()) {
-            shared |= previous == anchor.target_bytes().as_ptr();
-        }
+        let target_bytes = anchor.target_bytes();
+        let pointer = (!target_bytes.is_empty()).then(|| target_bytes.as_ptr() as usize);
+        let entry = targets.entry(target).or_insert_with(|| TargetMetrics {
+            target_bytes: target_bytes.len(),
+            inbound_edges: anchor.inbound_references().len(),
+            outbound_edges: anchor.outbound_references().len(),
+            profile_bytes: anchor.profile().source().len(),
+            target_modes: Vec::new(),
+            pointer,
+            pointer_consistent: pointer.is_some(),
+            action_count: anchor.profile().actions().count(),
+            action_group_count: anchor.profile().action_groups().count(),
+        });
+        entry.target_bytes = anchor.target_bytes().len();
+        entry.pointer_consistent &= entry.pointer == pointer && pointer.is_some();
         for reference in anchor.outbound_references() {
-            entry.4.push(reference.target_mode());
+            entry.target_modes.push(reference.target_mode());
         }
     }
+    let pointer_observation = classify_pointer_observations(&targets);
     let mut inbound_edges = 0usize;
     let mut outbound_edges = 0usize;
     let mut unique_target_bytes = 0usize;
@@ -2314,20 +2352,14 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
     let mut modes = BTreeSet::new();
     let mut owner_xml = Vec::new();
     let mut profile_source = Vec::new();
-    for (target_bytes, inbound, outbound, profile_bytes, target_modes) in targets.values() {
-        unique_target_bytes = unique_target_bytes.saturating_add(*target_bytes);
-        inbound_edges = inbound_edges.saturating_add(*inbound);
-        outbound_edges = outbound_edges.saturating_add(*outbound);
-        retained_profile_bytes = retained_profile_bytes.saturating_add(*profile_bytes);
-        if let Some(anchor) = anchors.iter().find(|anchor| {
-            anchor.target_bytes().len() == *target_bytes
-                && anchor.profile().source().len() == *profile_bytes
-        }) {
-            action_count = action_count.saturating_add(anchor.profile().actions().count());
-            action_group_count =
-                action_group_count.saturating_add(anchor.profile().action_groups().count());
-        }
-        for mode in target_modes {
+    for target in targets.values() {
+        unique_target_bytes = unique_target_bytes.saturating_add(target.target_bytes);
+        inbound_edges = inbound_edges.saturating_add(target.inbound_edges);
+        outbound_edges = outbound_edges.saturating_add(target.outbound_edges);
+        retained_profile_bytes = retained_profile_bytes.saturating_add(target.profile_bytes);
+        action_count = action_count.saturating_add(target.action_count);
+        action_group_count = action_group_count.saturating_add(target.action_group_count);
+        for mode in &target.target_modes {
             modes.insert(match mode {
                 TargetMode::Internal => "internal_unknown",
                 TargetMode::External => "external_unknown",
@@ -2356,11 +2388,6 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
     let opaque_unknown_requires_preserved = profile_source
         .windows(OPAQUE_UNKNOWN_REQUIRES_MARKER.len())
         .any(|window| window == OPAQUE_UNKNOWN_REQUIRES_MARKER);
-    let expected_pointer_observation = if targets.len() == 1 || shared {
-        "shared"
-    } else {
-        "distinct"
-    };
     let baseline_unique_target_bytes = facts
         .target_names
         .iter()
@@ -2388,7 +2415,9 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
         retained_owner_xml_bytes: owner_xml_bytes,
         retained_target_bytes: unique_target_bytes,
         retained_profile_bytes,
-        shared_pointer_observation: expected_pointer_observation.to_owned(),
+        shared_pointer_observation: pointer_observation.label.to_owned(),
+        same_target_pointer_consistent: pointer_observation.same_target_pointer_consistent,
+        distinct_target_pointer_isolated: pointer_observation.distinct_target_pointer_isolated,
         outbound_diagnostic_modes: modes.into_iter().map(str::to_owned).collect(),
         unknown_internal_outbound_preserved: anchors.iter().any(|anchor| {
             anchor
@@ -2410,6 +2439,45 @@ fn graph_metrics(facts: &FixtureFacts, snapshots: &[Snapshot]) -> GraphMetrics {
         opaque_unknown_requires_preserved,
         owner_xml_sha256: support::sha256_hex(&owner_xml),
         profile_source_sha256: support::sha256_hex(&profile_source),
+    }
+}
+
+fn classify_pointer_observations(targets: &HashMap<String, TargetMetrics>) -> PointerObservation {
+    if targets.is_empty() {
+        return PointerObservation {
+            same_target_pointer_consistent: true,
+            distinct_target_pointer_isolated: true,
+            label: "none",
+        };
+    }
+
+    let same_target_pointer_consistent = targets
+        .values()
+        .all(|target| target.pointer_consistent && target.pointer.is_some());
+    let mut pointer_targets = HashMap::<usize, &str>::new();
+    let mut distinct_target_pointer_isolated = true;
+    for (target_name, target) in targets {
+        let Some(pointer) = target.pointer else {
+            distinct_target_pointer_isolated = false;
+            continue;
+        };
+        if let Some(previous_target) = pointer_targets.insert(pointer, target_name.as_str()) {
+            if previous_target != target_name {
+                distinct_target_pointer_isolated = false;
+            }
+        }
+    }
+    let label = if !same_target_pointer_consistent || !distinct_target_pointer_isolated {
+        "inconsistent"
+    } else if targets.len() == 1 {
+        "shared"
+    } else {
+        "distinct"
+    };
+    PointerObservation {
+        same_target_pointer_consistent,
+        distinct_target_pointer_isolated,
+        label,
     }
 }
 
@@ -2438,8 +2506,16 @@ fn semantic_shape_ok(prepared: &Prepared, metrics: &GraphMetrics) -> bool {
 
 fn preservation_ok(prepared: &Prepared, metrics: &GraphMetrics) -> bool {
     let topology_ok = match prepared.recipe.topology.as_str() {
-        "shared" | "case_equivalent_shared" => metrics.shared_pointer_observation == "shared",
-        "distinct" => metrics.shared_pointer_observation == "distinct",
+        "shared" | "case_equivalent_shared" => {
+            metrics.same_target_pointer_consistent
+                && metrics.distinct_target_pointer_isolated
+                && metrics.shared_pointer_observation == "shared"
+        },
+        "distinct" => {
+            metrics.same_target_pointer_consistent
+                && metrics.distinct_target_pointer_isolated
+                && metrics.shared_pointer_observation == "distinct"
+        },
         _ => true,
     };
     let opaque_ok = !prepared.recipe.opaque_mce
@@ -2518,6 +2594,7 @@ fn read_limits_json(limits: ReadLimits) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn retained_prepared_metadata_is_charged_before_baseline_snapshot() {
@@ -2541,5 +2618,138 @@ mod tests {
             prepared.retained_baseline_live_bytes,
             "retained Prepared metadata must be included before the baseline snapshot",
         );
+    }
+
+    #[test]
+    fn repeated_inbound_edges_do_not_make_distinct_targets_shared() {
+        let targets = HashMap::from([
+            (
+                "/ppt/custom/action1.xml".to_owned(),
+                TargetMetrics {
+                    inbound_edges: 2,
+                    pointer: Some(0x10),
+                    pointer_consistent: true,
+                    ..TargetMetrics::default()
+                },
+            ),
+            (
+                "/ppt/custom/action2.xml".to_owned(),
+                TargetMetrics {
+                    inbound_edges: 3,
+                    pointer: Some(0x20),
+                    pointer_consistent: true,
+                    ..TargetMetrics::default()
+                },
+            ),
+        ]);
+
+        let observation = classify_pointer_observations(&targets);
+
+        assert!(observation.same_target_pointer_consistent);
+        assert!(observation.distinct_target_pointer_isolated);
+        assert_eq!(observation.label, "distinct");
+    }
+
+    #[test]
+    fn inconsistent_pointer_observations_are_not_accepted_as_topology() {
+        let targets = HashMap::from([
+            (
+                "/ppt/custom/action1.xml".to_owned(),
+                TargetMetrics {
+                    pointer: Some(0x10),
+                    pointer_consistent: false,
+                    ..TargetMetrics::default()
+                },
+            ),
+            (
+                "/ppt/custom/action2.xml".to_owned(),
+                TargetMetrics {
+                    pointer: Some(0x10),
+                    pointer_consistent: true,
+                    ..TargetMetrics::default()
+                },
+            ),
+        ]);
+
+        let observation = classify_pointer_observations(&targets);
+
+        assert!(!observation.same_target_pointer_consistent);
+        assert!(!observation.distinct_target_pointer_isolated);
+        assert_eq!(observation.label, "inconsistent");
+    }
+
+    #[test]
+    fn inverse_uses_working_package_outside_retained_baseline() {
+        let manifest = manifest();
+        let lane = manifest
+            .lanes
+            .iter()
+            .find(|lane| lane.id == "package_inverse_small_shared")
+            .expect("inverse lane is present");
+        let recipe = manifest
+            .recipes
+            .iter()
+            .find(|recipe| recipe.id == lane.recipe)
+            .expect("inverse recipe is present");
+        let limits = owner_limits_for(recipe, lane).expect("inverse limits are valid");
+        let (prepared, setup) =
+            prepare_with_phase(lane, recipe, limits, ReadLimits::default()).expect("setup");
+        assert!(prepared.operation_package.is_some());
+        let receipt =
+            run_sample(prepared, setup, false, lane.expected.as_deref()).expect("inverse sample");
+        assert!(receipt.inverse_ok);
+        assert!(receipt.baseline_reopenable);
+        assert!(receipt.retained_baseline_balance_ok);
+    }
+
+    #[test]
+    fn stale_content_type_checks_unmutated_source_baseline() {
+        let manifest = manifest();
+        let lane = manifest
+            .lanes
+            .iter()
+            .find(|lane| lane.id == "stale_content_type")
+            .expect("stale content-type lane is present");
+        let recipe = manifest
+            .recipes
+            .iter()
+            .find(|recipe| recipe.id == lane.recipe)
+            .expect("stale content-type recipe is present");
+        let limits = owner_limits_for(recipe, lane).expect("stale limits are valid");
+        let (prepared, setup) =
+            prepare_with_phase(lane, recipe, limits, ReadLimits::default()).expect("setup");
+        let receipt = run_sample(prepared, setup, false, lane.expected.as_deref())
+            .expect("stale content-type sample");
+        assert_eq!(
+            receipt.actual_error_type.as_deref(),
+            Some("Error::ContentType")
+        );
+        assert!(receipt.source_unchanged_on_refusal);
+        assert!(receipt.baseline_reopenable);
+        assert!(receipt.retained_baseline_balance_ok);
+    }
+
+    #[test]
+    fn refused_limit_lane_keeps_valid_source_baseline_reopenable() {
+        let manifest = manifest();
+        let lane = manifest
+            .lanes
+            .iter()
+            .find(|lane| lane.id == "limit_anchor_one_under")
+            .expect("negative limit lane is present");
+        let recipe = manifest
+            .recipes
+            .iter()
+            .find(|recipe| recipe.id == lane.recipe)
+            .expect("negative limit recipe is present");
+        let limits = owner_limits_for(recipe, lane).expect("negative limit is valid");
+        let (prepared, setup) =
+            prepare_with_phase(lane, recipe, limits, ReadLimits::default()).expect("setup");
+        let receipt = run_sample(prepared, setup, false, lane.expected.as_deref())
+            .expect("negative limit sample");
+        assert_eq!(receipt.actual_error_type.as_deref(), Some("Error::Limit"));
+        assert!(receipt.semantic_ok);
+        assert!(receipt.baseline_reopenable);
+        assert!(receipt.retained_baseline_balance_ok);
     }
 }
