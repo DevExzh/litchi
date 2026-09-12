@@ -1,0 +1,68 @@
+source_root=/var/tmp/litchi-form-owner-root-s450o_y9/worktree
+base_commit=047d14953b4b2e674abb7c0783367225258aa287
+snapshot_head=047d14953b4b2e674abb7c0783367225258aa287
+snapshot_status_begin
+ M crates/litchi-xlsx/src/form_control/mod.rs
+ M crates/litchi-xlsx/src/workbook/model.rs
+ M crates/litchi-xlsx/src/workbook/source.rs
+?? crates/litchi-xlsx/src/form_control/owner.rs
+?? crates/litchi-xlsx/tests/form_control_owner_read.rs
+snapshot_status_end
+source_hashes_begin
+aaf52b76c731e581f5855b40842a3d6ab360bdfcf4426d45258a123735715ac4  /var/tmp/litchi-form-owner-root-s450o_y9/worktree/crates/litchi-xlsx/src/form_control/owner.rs
+4dfa086c58654bd42ff9425bac03f871c99c4159f2a876b8793d0c920ba5dbec  /var/tmp/litchi-form-owner-root-s450o_y9/worktree/crates/litchi-xlsx/src/form_control/mod.rs
+77deff8bbc5c98fe64145ab494c0602e4d909d595a1703c19b4aa3c8caec5224  /var/tmp/litchi-form-owner-root-s450o_y9/worktree/crates/litchi-xlsx/src/workbook/model.rs
+740160b04b3b6e6f986c6e6449decb1b1bf3bf55446cabbbacac307bde312bfa  /var/tmp/litchi-form-owner-root-s450o_y9/worktree/crates/litchi-xlsx/src/workbook/source.rs
+c1a531396d07cfe492d59a2b415644e4313054cb8c7349e1b84ced837a87b8a2  /var/tmp/litchi-form-owner-root-s450o_y9/worktree/crates/litchi-xlsx/tests/form_control_owner_read.rs
+source_hashes_end
+toolchain_begin
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux
+toolchain_end
+cpu_begin
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  32
+On-line CPU(s) list:                     0-31
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD EPYC 9R45
+CPU family:                              26
+Model:                                   2
+Thread(s) per core:                      1
+Core(s) per socket:                      32
+Socket(s):                               1
+Stepping:                                1
+BogoMIPS:                                5200.00
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d
+Hypervisor vendor:                       KVM
+Virtualization type:                     full
+L1d cache:                               1.5 MiB (32 instances)
+L1i cache:                               1 MiB (32 instances)
+L2 cache:                                32 MiB (32 instances)
+L3 cache:                                128 MiB (4 instances)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-31
+cpu_end
+harness_command=TMPDIR=/var/tmp/litchi-form-owner-perf-temp \ LITCHI_FORM_OWNER_SOURCE_ROOT=/var/tmp/litchi-form-owner-root-s450o_y9/worktree \ LITCHI_FORM_OWNER_FIXTURE_ROOT=/var/tmp/litchi-form-owner-root-s450o_y9/worktree/crates/litchi-xlsx/tests/fixtures/form_control_properties \ docs/report/spec-gap-validation-evidence/xlsx-form-control-owner-performance/harness/run.sh
+
+harness_lock_sha256=5f0b89fff7b7f745eada3424a9d958a0a45fa302ef43b6eaf53edd7a25715c6f
+
+source_lock_sha256=9886ab7f4458ddcf4286fa686a420d9351f4cfc278552484c64791dd159fc282
+
+harness_binary_before=e8a2c0babe65811222bcc8bdd944259185df7bbe001e9f7253cbced1486796f1
+
+harness_binary_after=e8a2c0babe65811222bcc8bdd944259185df7bbe001e9f7253cbced1486796f1
+
+harness_source_sha256=6e063cfe21bc0eb4edc18c4bd8e390e7d7769ccdec931da5182884a667b04653
+
+raw_receipts_sha256=e83cc88afc4c3a327b75b028f122c55b8ff08fd6a9504ee0d5b590dd59e80939
+
