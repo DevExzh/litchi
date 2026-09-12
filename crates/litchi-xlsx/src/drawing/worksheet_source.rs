@@ -30,7 +30,6 @@ const STRICT_SPREADSHEETML: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/m
 const RELATIONSHIPS: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_RELATIONSHIPS: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const XML: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const XMLNS: &[u8] = b"http://www.w3.org/2000/xmlns/";
 
@@ -480,7 +479,7 @@ impl<'a> Scanner<'a> {
         self.depth = element_depth;
         if self.depth == 2
             && self.direct_alternate_content_depth.is_none()
-            && is_namespace(namespace.as_deref(), MCE, STRICT_MCE)
+            && namespace.as_deref().is_some_and(|value| value == MCE)
             && element.name().local_name().as_ref() == b"AlternateContent"
         {
             // `depth == 1` above denotes the root's direct children.  The
@@ -545,7 +544,7 @@ impl<'a> Scanner<'a> {
         namespace: Option<&[u8]>,
         decoder: Decoder,
     ) -> Result<()> {
-        if is_namespace(namespace, MCE, STRICT_MCE)
+        if namespace.is_some_and(|value| value == MCE)
             && element.name().local_name().as_ref() == b"AlternateContent"
             && self.depth == 1
         {
@@ -561,7 +560,7 @@ impl<'a> Scanner<'a> {
                 // not turn that foreign payload into a hidden owner refusal.
                 return Ok(());
             }
-            if !is_namespace(namespace, MCE, STRICT_MCE)
+            if !namespace.is_some_and(|value| value == MCE)
                 && !is_namespace(namespace, SPREADSHEETML, STRICT_SPREADSHEETML)
             {
                 // Choice/Fallback descendants in the MCE vocabulary and

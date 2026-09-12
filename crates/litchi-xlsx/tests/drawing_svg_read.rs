@@ -30,7 +30,7 @@ const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationship
 const SVG_NS: &str = "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
 const SVG_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE: &str = "http://purl.oclc.org/ooxml/markup-compatibility/2006";
+const FOREIGN_MCE: &str = "http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const SHEET: &str = "/xl/worksheets/sheet1.xml";
 const DRAWING: &str = "/xl/drawings/drawing1.xml";
 const RASTER: &str = "/xl/media/image1.png";
@@ -135,6 +135,20 @@ fn drawing_xml(strict: bool, picture_count: usize, svg: bool, opaque: bool) -> V
         })
         .collect::<String>();
     format!("{root}{body}</xdr:wsDr>").into_bytes()
+}
+
+fn drawing_with_mce_wrapped_svg(strict: bool, namespace: &str, prefix: &str) -> Vec<u8> {
+    let drawing = String::from_utf8(drawing_xml(strict, 1, true, false)).unwrap();
+    let svg_owner = if strict {
+        format!(r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip trans:embed="rIdSvg"/></a:ext>"#)
+    } else {
+        format!(r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#)
+    };
+    let wrapped = format!(
+        r#"<{prefix}:AlternateContent xmlns:{prefix}="{namespace}" xmlns:future="urn:litchi:future" {prefix}:Ignorable="future"><{prefix}:Choice Requires="future">{svg_owner}</{prefix}:Choice><{prefix}:Fallback/></{prefix}:AlternateContent>"#
+    );
+    assert!(drawing.contains(&svg_owner));
+    drawing.replace(&svg_owner, &wrapped).into_bytes()
 }
 
 fn worksheet_xml(strict: bool, direct: &str) -> Vec<u8> {
@@ -515,6 +529,32 @@ fn strict_core_with_transitional_svg_attribute_is_read_as_strict() {
 }
 
 #[test]
+fn strict_mce_is_canonical_and_foreign_purl_wrappers_stay_opaque() {
+    let canonical = drawing_with_mce_wrapped_svg(true, MCE, "mc");
+    let canonical_source = SourceDrawing::scan(&canonical).unwrap();
+    assert_eq!(canonical_source.dialect(), DrawingDialect::Strict);
+    assert_eq!(canonical_source.pictures().len(), 1);
+    assert!(matches!(
+        canonical_source.picture(0).unwrap().svg_owner(),
+        SvgOwnerState::Refused
+    ));
+
+    let foreign = drawing_with_mce_wrapped_svg(true, FOREIGN_MCE, "pmc");
+    let foreign_source = SourceDrawing::scan(&foreign).unwrap();
+    assert_eq!(foreign_source.dialect(), DrawingDialect::Strict);
+    assert_eq!(foreign_source.pictures().len(), 1);
+    let foreign_picture = foreign_source.picture(0).unwrap();
+    assert!(matches!(foreign_picture.svg_owner(), SvgOwnerState::None));
+    let picture_bytes = foreign_picture.picture_bytes(&foreign).unwrap();
+    assert!(picture_bytes
+        .windows(b"pmc:AlternateContent".len())
+        .any(|window| window == b"pmc:AlternateContent"));
+    assert!(picture_bytes
+        .windows(b"pmc:Ignorable=\"future\"".len())
+        .any(|window| window == b"pmc:Ignorable=\"future\""));
+}
+
+#[test]
 fn worksheet_namespace_aliases_and_opaque_lookalikes_keep_direct_ownership() {
     let alias = String::from(
         r#"<ws:worksheet xmlns:ws="http://schemas.openxmlformats.org/spreadsheetml/2006/mai&#110;" xmlns:rr="http://schemas.openxmlformats.org/officeDocument/2006/relationship&#115;"><ws:sheetData/><ws:drawing rr:id="rIdDrawing"/></ws:worksheet>"#,
@@ -602,15 +642,34 @@ fn duplicate_direct_and_hidden_mce_drawing_owners_are_refused() {
     let duplicate = worksheet_source(r#"<ws:drawing r:id="rIdOne"/><ws:drawing r:id="rIdTwo"/>"#);
     assert!(WorksheetSourceScan::scan(&duplicate).is_err());
 
-    for mce in [MCE, STRICT_MCE] {
-        let hidden = format!(
-            r#"<ws:worksheet xmlns:ws="{SML}" xmlns:r="{REL}" xmlns:mc="{mce}" xmlns:x="urn:litchi:choice"><ws:sheetData/><mc:AlternateContent><mc:Choice Requires="x"><ws:drawing r:id="rIdHidden"/></mc:Choice><mc:Fallback/></mc:AlternateContent><ws:drawing r:id="rIdDirect"/></ws:worksheet>"#
-        );
-        assert!(WorksheetSourceScan::scan(hidden.as_bytes()).is_err());
-        let bytes = rewrite_sheet(&synthetic_fixture(false, 1, true), hidden.into_bytes());
-        let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
-        assert!(worksheet.drawing(0).is_err());
-    }
+    let canonical = format!(
+        r#"<ws:worksheet xmlns:ws="{STRICT_SML}" xmlns:r="{STRICT_REL}" xmlns:mc="{MCE}" xmlns:x="urn:litchi:choice"><ws:sheetData/><mc:AlternateContent><mc:Choice Requires="x"><ws:drawing r:id="rIdHidden"/></mc:Choice><mc:Fallback/></mc:AlternateContent><ws:drawing r:id="rIdDirect"/></ws:worksheet>"#
+    );
+    assert!(WorksheetSourceScan::scan(canonical.as_bytes()).is_err());
+    let bytes = rewrite_sheet(&synthetic_fixture(true, 1, true), canonical.into_bytes());
+    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    assert!(worksheet.drawing(0).is_err());
+
+    let foreign = format!(
+        r#"<ws:worksheet xmlns:ws="{STRICT_SML}" xmlns:r="{STRICT_REL}" xmlns:pmc="{FOREIGN_MCE}" xmlns:x="urn:litchi:choice"><ws:sheetData/><pmc:AlternateContent pmc:Ignorable="x"><pmc:Choice Requires="x"><ws:drawing r:id="rIdHidden"/></pmc:Choice><pmc:Fallback/></pmc:AlternateContent><ws:drawing r:id="rIdDrawing"/></ws:worksheet>"#
+    );
+    let scan = WorksheetSourceScan::scan(foreign.as_bytes()).unwrap();
+    assert_eq!(scan.relationship_ids().collect::<Vec<_>>(), ["rIdDrawing"]);
+    let bytes = rewrite_sheet(&synthetic_fixture(true, 1, true), foreign.into_bytes());
+    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
+
+    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let retained = package
+        .get_part(&PackURI::new(SHEET).unwrap())
+        .unwrap()
+        .blob();
+    assert!(retained
+        .windows(b"pmc:AlternateContent".len())
+        .any(|window| window == b"pmc:AlternateContent"));
+    assert!(retained
+        .windows(b"pmc:Ignorable=\"x\"".len())
+        .any(|window| window == b"pmc:Ignorable=\"x\""));
 }
 
 #[test]
