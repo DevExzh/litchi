@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0524: reject insufficient performance; preserve test and validation authority
+
+[0524](changes/0524-cfb-visited-bit-evaluation.md) restores production after
+failed native admission, consistent with ADR 0005. The candidate preserved
+checked bounds, typed error order, fallible reservations and scratch reset;
+no ownership or physical validation was removed. The retained collector test
+uses the unchanged helper as its oracle. The filesystem test now guarantees
+a distinct replacement identity without changing production's best-effort
+cleanup or trusted-parent contract. All 30 previously read ADR/index hashes
+remain unchanged. No API, dependency, unsafe-code or resource-policy change
+is adopted. OLE2/OOXML remains active; ODF is deferred.
+
 ## 0523: preserve operation boundaries while adding allocation observations
 
 [0523](changes/0523-cfb-open-allocation-attribution.md) changes only the standalone

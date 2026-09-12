@@ -2090,6 +2090,7 @@ mod tests {
         // This is a best-effort identity regression, not a guarantee against
         // an adversary racing portable path-based replacement and cleanup.
         let destination = test_destination("hostile-temp");
+        let displaced = test_destination("displaced-temp");
         fs::write(&destination, b"old destination").unwrap();
         let writer = writer_with_payload("Saved", b"saved");
         let mut attacker_path = None;
@@ -2098,8 +2099,15 @@ mod tests {
                 &destination,
                 |staged, _target| {
                     attacker_path = Some(staged.to_path_buf());
-                    fs::remove_file(staged).unwrap();
+                    // Keep the original alive so the replacement cannot reuse
+                    // its native file identity after an unlink.
+                    assert!(!displaced.exists());
+                    fs::rename(staged, &displaced).unwrap();
                     fs::write(staged, b"attacker replacement").unwrap();
+                    assert_ne!(
+                        path_identity(staged).unwrap(),
+                        path_identity(&displaced).unwrap(),
+                    );
                     Err(io::Error::other("injected replacement failure"))
                 },
                 |_parent| Ok(()),
@@ -2110,6 +2118,7 @@ mod tests {
         assert_eq!(fs::read(&attacker_path).unwrap(), b"attacker replacement");
         assert_eq!(fs::read(&destination).unwrap(), b"old destination");
         fs::remove_file(attacker_path).unwrap();
+        fs::remove_file(displaced).unwrap();
         fs::remove_file(destination).unwrap();
     }
 

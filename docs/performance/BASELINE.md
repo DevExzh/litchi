@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0524: matched CFB chain-visitation evaluation
+
+[0524](changes/0524-cfb-visited-bit-evaluation.md) retains A1/B1/B2/A2 evidence:
+48,000 native durations, 1,440 separate allocator samples and 16 constructor
+profiles. Primary XLS p50 changes +1.46–4.87% in repeat 1 and −2.37–+0.28%
+in repeat 2; none reaches the 3% improvement gate in both. CFB few-large p50
+regresses 2.35–2.41%. Allocation-call, allocated-byte and incremental-peak
+vectors match exactly. The candidate is rejected and production restored.
+All 43 matched flag records and 60 same-build variations remain explicit.
+
 ## 0523: current direct-CFB and XLS source-open baseline
 
 [0523](changes/0523-cfb-open-allocation-attribution.md) retains 24,000 native

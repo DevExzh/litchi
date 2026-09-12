@@ -1,0 +1,51 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x",
+    ",",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0524/baseline/hardware-r1-xls-owned.csv",
+    "-e",
+    "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "--",
+    "/tmp/litchi-goal-0524/baseline/normal",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--warmup",
+    "0",
+    "--samples",
+    "1000",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0524/baseline/hardware-r1-xls-owned.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0524/baseline/hardware-r1-xls-owned.catalog.json"
+  ],
+  "start_utc": "2026-09-12T07:46:12.340195+00:00",
+  "end_utc": "2026-09-12T07:46:13.352767+00:00",
+  "seconds": 1.0125619750033366,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "de633055a8f19ef6d839a01ef716614287ebe910cb6cee2d440aa1668746bda1",
+  "binary_sha256": "e0a3448f126ae2c3fe9022afda10e1d9db4dcb0fbddb13b1a930be2765d53c29",
+  "source_manifest_sha256": "de633055a8f19ef6d839a01ef716614287ebe910cb6cee2d440aa1668746bda1",
+  "script_sha256": "62f01f31149603a2b9b03d7c0a779c68682ca6631dee7866e66532e8dccce48f",
+  "plan_sha256": "33c155f9560d96659c629dcc86f7d04625127e6c8c92dc037afb60e9a467466d",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "hardware-r1-xls-owned.catalog.json": "7068e5e78e0cba3ae695334149539393fcee6cae8293fcdff12b59d01d4ed4eb",
+    "hardware-r1-xls-owned.csv": "9a888e4eaf657b0b1cc409c07f8b1b1239ff5bceae61360f14ee4faa2ca6a12b",
+    "hardware-r1-xls-owned.json": "67a0e7d6626f320bbe18bbca676cd1bfca108a331c51b8a37f91d34237590a4c",
+    "hardware-r1-xls-owned.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hardware-r1-xls-owned.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

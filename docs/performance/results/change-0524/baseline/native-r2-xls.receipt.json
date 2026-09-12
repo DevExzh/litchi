@@ -1,0 +1,47 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0524/baseline/native-r2-xls.rss.json",
+    "/tmp/litchi-goal-0524/baseline/normal",
+    "--case",
+    "xls_semantic_open,xls_eager_open_list_worksheets,xls_eager_open_one_cell,xls_source_backed_open,xls_source_backed_open_list_worksheets,xls_source_backed_open_one_cell,xls_owned_source_open,xls_owned_source_open_list_worksheets,xls_owned_source_open_one_cell",
+    "--warmup",
+    "20",
+    "--samples",
+    "1000",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0524/baseline/native-r2-xls.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0524/baseline/native-r2-xls.catalog.json"
+  ],
+  "start_utc": "2026-09-12T07:58:31.133133+00:00",
+  "end_utc": "2026-09-12T07:58:37.684635+00:00",
+  "seconds": 6.551501274007023,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "7720b9dc1a135e411def3b9164f60b37695fbd73a46c69fb455c3c145d4f84ce",
+  "binary_sha256": "e0a3448f126ae2c3fe9022afda10e1d9db4dcb0fbddb13b1a930be2765d53c29",
+  "source_manifest_sha256": "de633055a8f19ef6d839a01ef716614287ebe910cb6cee2d440aa1668746bda1",
+  "script_sha256": "62f01f31149603a2b9b03d7c0a779c68682ca6631dee7866e66532e8dccce48f",
+  "plan_sha256": "33c155f9560d96659c629dcc86f7d04625127e6c8c92dc037afb60e9a467466d",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-r2-xls.catalog.json": "82ccb39bbb8282f2a839f3addd0097adac05930154e95b447cfeafbe7e057c12",
+    "native-r2-xls.json": "c0c4c0beaa95e06177e19067f0d1426def6db7e86c8ecaf95bd19a21cb120d05",
+    "native-r2-xls.rss.json": "79362bf2aae1e093a6855e5a71f6e9aa2b6901750dc4194dc4c50bcda80c11d3",
+    "native-r2-xls.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r2-xls.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -3237,6 +3237,77 @@ mod tests {
     }
 
     #[test]
+    fn scratch_differential_matches_owned_chain_helper_and_resets() {
+        let cases = [
+            ("valid", vec![2, 3, 1, ENDOFCHAIN], 0, 4usize),
+            ("empty", vec![], ENDOFCHAIN, 0),
+            ("cycle", vec![1, 0, ENDOFCHAIN], 0, 3),
+            ("invalid-start", vec![ENDOFCHAIN], MAXREGSECT, 1),
+            ("invalid-index", vec![2, ENDOFCHAIN], 0, 2),
+            ("early-end-marker", vec![ENDOFCHAIN, ENDOFCHAIN], 0, 2),
+            ("late-end-marker", vec![1, ENDOFCHAIN], 0, 1),
+            ("invalid-marker", vec![MAXREGSECT, ENDOFCHAIN], 0, 2),
+            ("table-too-short", vec![ENDOFCHAIN], 0, 2),
+            ("empty-non-end", vec![ENDOFCHAIN], 0, 0),
+        ];
+        let mut scratch = SectorChainScratch::default();
+        let mut reusable_layout = None;
+
+        for pass in 0..2 {
+            for (name, allocation_table, start_sector, expected_count) in &cases {
+                let expected = collect_sector_chain_exact(
+                    allocation_table.as_slice(),
+                    *start_sector,
+                    *expected_count,
+                    name,
+                )
+                .map_err(|error| error.to_string());
+                let actual_result = scratch.collect_exact(
+                    allocation_table.as_slice(),
+                    *start_sector,
+                    *expected_count,
+                    name,
+                );
+                let actual = match actual_result {
+                    Ok(()) => Ok(scratch.sectors().to_vec()),
+                    Err(error) => Err(error.to_string()),
+                };
+
+                assert_eq!(actual, expected, "pass {pass}, case {name}");
+                match &expected {
+                    Ok(sectors) => {
+                        assert_eq!(scratch.sectors(), sectors.as_slice());
+                        assert_eq!(scratch.visited.bit_len, allocation_table.len());
+                        if pass == 0 && *name == "valid" {
+                            reusable_layout = Some((
+                                scratch.sectors.as_ptr(),
+                                scratch.sectors.capacity(),
+                                scratch.visited.words.as_ptr(),
+                                scratch.visited.words.len(),
+                            ));
+                        } else if pass == 1 && *name == "valid" {
+                            assert_eq!(
+                                reusable_layout,
+                                Some((
+                                    scratch.sectors.as_ptr(),
+                                    scratch.sectors.capacity(),
+                                    scratch.visited.words.as_ptr(),
+                                    scratch.visited.words.len(),
+                                )),
+                                "successful collections must reuse the retained buffers",
+                            );
+                        }
+                    },
+                    Err(_) => {
+                        assert!(scratch.sectors.is_empty());
+                        assert_eq!(scratch.visited.bit_len, 0);
+                    },
+                }
+            }
+        }
+    }
+
+    #[test]
     fn malformed_large_declarations_do_not_unwind() {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut data = sample_file();

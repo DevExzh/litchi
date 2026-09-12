@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0524: reject CFB visited-bit fusion; retain validation guards
+
+[0524](changes/0524-cfb-visited-bit-evaluation.md) rejects the private visited-bit
+candidate: no primary XLS workflow reaches the frozen 3% p50 improvement in
+both repeats. Lower constructor Ir (1.17–1.19%) and unchanged allocations do
+not override the native gate. Production is restored; a collector differential
+and a stabilized temporary-substitution test remain. The bundle retains 48,000
+native samples, 1,440 allocator samples, 16 profile children, 43 matched flag
+records and 60 same-build variations. OLE2/OOXML stays active, ODF deferred.
+
 ## 0523: measure current CFB allocation and OLE2 constructor costs
 
 [0523](changes/0523-cfb-open-allocation-attribution.md) adds canonical allocation
