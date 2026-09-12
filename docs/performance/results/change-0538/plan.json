@@ -1,0 +1,22 @@
+{
+  "base_revision": "9862e92b0f307448c416522b83f050cfef19202f",
+  "build": "pinned toolchain, debug, debug info disabled, isolated owned target, serial commands",
+  "claims": "Schema, non-overlap, aligned vectors, semantic/preservation checks only; no latency/optimization claim",
+  "next": "Freeze fresh release baseline before applying 0537 transient Cow candidate",
+  "previous_turn": "progress: committed 0537 diagnostic and unapplied draft",
+  "priority": "OLE2 and OOXML first; ODF deferred; iWork excluded",
+  "scope": "Harness planning allocator measurement enabler; production parser remains unchanged",
+  "smoke": {
+    "binaries": [
+      "normal",
+      "allocator"
+    ],
+    "samples": 3,
+    "selectors": 8,
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "warmups": 1
+  }
+}

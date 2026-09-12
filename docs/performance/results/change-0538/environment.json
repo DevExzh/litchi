@@ -1,0 +1,15 @@
+{
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
+  "environment": {
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "GLIBC_TUNABLES": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "RUSTFLAGS": null
+  },
+  "logical_cpus": 32,
+  "machine": "x86_64",
+  "platform": "Linux-7.0.0-1012-aws-x86_64-with-glibc2.43",
+  "purpose": "Correctness-only debug captures, not native performance evidence",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n"
+}

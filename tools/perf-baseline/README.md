@@ -559,6 +559,31 @@ tables. It binds headings, headers, row order, labels, and digests for 167 rows
 no strict-claim links. This is report-integrity evidence only; it makes no
 latency or production claim.
 
+## XLSX cell-value planning allocations (change 0538)
+
+The eight unmanaged/managed source-backed cell-value publication selectors
+emit `source.xlsx_cell_values.plan_allocation_metrics` alongside `plan_ns`.
+Each allocation region starts after sheet selectors are constructed, immediately
+before the planning timer, and ends immediately after `edit_sheets` returns and
+the timer stops. It excludes open/setup, selector construction, subsequent
+cell updates, commit, publication, evidence aggregation, reopen and verification.
+The returned edit remains alive at the endpoint; this is a planning operation,
+not the edit's full lifetime. Commit and publication retain separate regions.
+
+Vectors contain only measured iterations in acquisition order. Use
+`elapsed_ns.sample_order` to align them with sorted elapsed samples. The normal
+binary emits explicit `unavailable` samples with no numeric fields. The isolated
+allocator binary emits checked allocation/reallocation calls, bytes, and live
+byte endpoints/region peaks under the existing process-global System allocator
+observer. Incremental region peak is `region_peak_live_bytes - live_bytes_before`;
+it is neither RSS nor allocator-internal peak usage. Lifecycle controls that do
+not observe planning allocations omit the field.
+
+The [0538 evidence](../../docs/performance/results/change-0538/README.md)
+validates this measurement prerequisite. Debug smoke elapsed values are not
+performance baselines. Freeze fresh matched release builds before using the
+new metric to evaluate the unapplied 0537 parser candidate.
+
 ## XLSX vendor-extension preservation shape (change 0262)
 
 The existing XLSX cell-value selectors also accept the explicit

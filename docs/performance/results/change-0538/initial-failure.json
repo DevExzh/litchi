@@ -1,0 +1,9 @@
+{
+  "cause": "OS error122 QuotaExceeded while writing fixture into default /tmp",
+  "failed_test": "filesystem::tests::padded_xlsx_archive_keeps_typed_semantics_and_reports_aligned_hash",
+  "initial_failed": 1,
+  "initial_passed": 42,
+  "recovery": "Use owned target/tmp for TMPDIR; rerun exact failed test, retain original log and receipt",
+  "removed": true,
+  "removed_empty_fixture": "/tmp/litchi-perf-xlsx-padding-4143259-1789240184879159266"
+}
