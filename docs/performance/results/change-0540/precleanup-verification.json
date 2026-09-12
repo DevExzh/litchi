@@ -1,0 +1,142 @@
+{
+  "components": {
+    "analysis": {
+      "result": {
+        "exact_replay": true,
+        "report": "planning-analysis.json",
+        "report_sha256": "2e0d45742bbed254538df858c8875b1ab778c3f9fe8f55189f1f62cd37c71a92",
+        "rows": 4
+      },
+      "status": "pass"
+    },
+    "boundary": {
+      "result": {
+        "exact_replay": true,
+        "report": "boundary-analysis.json",
+        "report_sha256": "7781f34b63be663b1b13d715a17545cd5ec8385af262ca6bf50f5386ba3015bf",
+        "rows": 4,
+        "status": "pass"
+      },
+      "status": "pass"
+    },
+    "cleanup": {
+      "reason": "/home/zhuhe/code/litchi/docs/performance/results/change-0540/cleanup.json is missing",
+      "status": "pending"
+    },
+    "environment": {
+      "result": {
+        "scope": "Process-visible environment only; no host-wide quiescence claim.",
+        "sha256": "966f9ce039b976098f7f780adfa9903b8955e98175fa23a7f4915064ed7a7c75"
+      },
+      "status": "pass"
+    },
+    "immutability": {
+      "files": 71,
+      "status": "pass"
+    },
+    "profiles": {
+      "result": {
+        "binary_sha256": "1864afec1066d6cfc0c0d9b215c1605fdca6d151391dbb6174f6d033548e2a70",
+        "helper_bindings": {
+          "files": 3,
+          "sha256": "e707b76dcf6e53a0956f3f369a54031d4227964384f2ac46974b535bf1cd617e"
+        },
+        "profile_receipts": 4,
+        "rows": [
+          {
+            "name": "profile-r1-medium",
+            "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+            "phases": {
+              "commit_ns": 441314951,
+              "elapsed_ns": 1297047286,
+              "open_ns": 6959077,
+              "phase_sum_matches_elapsed": true,
+              "plan_ns": 456418349,
+              "publication_ns": 392354909,
+              "sum_ns": 1297047286
+            },
+            "repeat": 1,
+            "shape": "medium"
+          },
+          {
+            "name": "profile-r1-dense-sparse",
+            "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+            "phases": {
+              "commit_ns": 826783201,
+              "elapsed_ns": 2261191174,
+              "open_ns": 6701846,
+              "phase_sum_matches_elapsed": true,
+              "plan_ns": 814937050,
+              "publication_ns": 612769077,
+              "sum_ns": 2261191174
+            },
+            "repeat": 1,
+            "shape": "dense-sparse"
+          },
+          {
+            "name": "profile-r2-medium",
+            "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+            "phases": {
+              "commit_ns": 436830490,
+              "elapsed_ns": 1280752000,
+              "open_ns": 6654286,
+              "phase_sum_matches_elapsed": true,
+              "plan_ns": 450438925,
+              "publication_ns": 386828299,
+              "sum_ns": 1280752000
+            },
+            "repeat": 2,
+            "shape": "medium"
+          },
+          {
+            "name": "profile-r2-dense-sparse",
+            "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+            "phases": {
+              "commit_ns": 840666957,
+              "elapsed_ns": 2289013243,
+              "open_ns": 6690446,
+              "phase_sum_matches_elapsed": true,
+              "plan_ns": 820949282,
+              "publication_ns": 620706558,
+              "sum_ns": 2289013243
+            },
+            "repeat": 2,
+            "shape": "dense-sparse"
+          }
+        ],
+        "serial_receipts": 6,
+        "symbol": {
+          "first_match": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+          "nm_sha256": "4df7e9d625c18ee7c069a577699fa683a3ba38743c61a65b38541000dd3fd937",
+          "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+          "receipt": "4361a5f3fe85f89f82efe25b426ba54a4375fdb0327d7b3b503a9cb6b19d3060"
+        }
+      },
+      "status": "pass"
+    },
+    "quality": {
+      "result": {
+        "checks": 6,
+        "prior_seal_entries": 283,
+        "successful_test_executions": 1292
+      },
+      "status": "pass"
+    },
+    "seal": {
+      "reason": "/home/zhuhe/code/litchi/docs/performance/results/change-0540/SHA256SUMS is missing",
+      "status": "pending"
+    },
+    "source": {
+      "result": {
+        "manifest_entries": 8586,
+        "manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+        "prior_sealed_baseline_equal": true,
+        "priority": "OLE2/OOXML active; ODF deferred; iWork excluded"
+      },
+      "status": "pass"
+    }
+  },
+  "performance_claim": "none",
+  "schema": "litchi-0540-attribution-verification-v1",
+  "status": "incomplete"
+}

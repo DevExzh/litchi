@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0540: XLSX validation/parser boundary attribution
+
+[0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.
+The unchanged restored 0539 runtime was freshly profiled in four planning captures. XML
+validation and raw parsing remain dominant. The evidence maps a future shared traversal
+and its error/source/resource constraints, and rules out a direct borrowed-name-stack
+substitution through the pinned public XML API. No native speedup is claimed.
+
 ## 0539: XLSX transient ownership candidate rejected
 
 [0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched

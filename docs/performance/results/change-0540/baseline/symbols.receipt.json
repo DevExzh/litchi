@@ -1,0 +1,28 @@
+{
+  "command": [
+    "nm",
+    "-C",
+    "/home/zhuhe/litchi-goal-0540-target/retained-binaries/baseline-normal"
+  ],
+  "start_utc": "2026-09-12T20:36:57.635471+00:00",
+  "end_utc": "2026-09-12T20:36:57.947547+00:00",
+  "seconds": 0.3120730660157278,
+  "exit_code": 0,
+  "binary_sha256": "1864afec1066d6cfc0c0d9b215c1605fdca6d151391dbb6174f6d033548e2a70",
+  "source_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+  "working_source_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+  "script_sha256": "3595628515f46c83235d0feb7bca200813ce225aec75b21dbee1982e166894a6",
+  "plan_sha256": "3fb7dd1cae344d4e6e7db353a97128899660d7b8c4b998a0f0dbf15ee4490f58",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0540-target/test-tmp"
+  },
+  "artifacts": {
+    "symbols.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "symbols.stdout": "4df7e9d625c18ee7c069a577699fa683a3ba38743c61a65b38541000dd3fd937"
+  }
+}

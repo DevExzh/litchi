@@ -1,0 +1,11 @@
+{
+  "removed": [
+    "/home/zhuhe/litchi-goal-0540-target"
+  ],
+  "owned_paths_absent": true,
+  "accessible_process_references": [],
+  "retained_binary_sha256_before_removal": {
+    "/home/zhuhe/litchi-goal-0540-target/retained-binaries/baseline-normal": "1864afec1066d6cfc0c0d9b215c1605fdca6d151391dbb6174f6d033548e2a70"
+  },
+  "completed_utc": "2026-09-12T20:42:35.197905+00:00"
+}

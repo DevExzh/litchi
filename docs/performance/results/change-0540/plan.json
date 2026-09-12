@@ -1,0 +1,43 @@
+{
+  "revision": "49ad30bcaf8d24fce024896ff355b04c786fd061",
+  "created_utc": "2026-09-12T20:29:26.588642+00:00",
+  "status": "frozen-before-build-and-capture",
+  "hypothesis": "Fresh attribution of worksheet validation/parser boundary after rejected0539; identify material reusable work without changing runtime or error order.",
+  "priority": "OLE2/OOXML active; ODF deferred; iWork excluded",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ]
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner_candidates": [
+      "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+      "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed"
+    ],
+    "selection": "Select first exact demangled symbol present in nm -C after build, before any capture; bind in symbol-observation.json. No other fallback without a new plan.",
+    "scope": "Preferred edit_sheets matches native planning method; fallback excludes wrapper execution check and empty staged map construction. Selector vector creation is outside native planning. Retain every lifecycle dump and prove unique measured-parent edge; do not assume dump count."
+  },
+  "cpu": 2,
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0540-target"
+  ],
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/"
+  ],
+  "capture_lanes": [
+    "build-normal",
+    "profile"
+  ],
+  "quality": "Reuse exact source-bound six final0539 checks and1292 final test executions; new release build and four profile oracle captures.",
+  "admission": "Attribution only; require exact raw owner/direct/self equations, repeat/corpus/source identity and custody. No Ir-to-latency or allocation claim.",
+  "native_reference": "No fresh native comparison in this attribution batch. Prior0539 native rows are historical context only."
+}
