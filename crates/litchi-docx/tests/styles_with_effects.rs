@@ -827,6 +827,91 @@ fn source_resource_replace_inverse_stale_and_save_reopen_are_owner_bound() {
 }
 
 #[test]
+fn public_patch_rejects_cross_owner_and_cross_package_snapshots_atomically() -> FixtureResult<()> {
+    let source = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
+    let mut package = Package::from_reader(Cursor::new(source.clone()))
+        .map_err(|error| FixtureError(format!("open cross-owner source: {error}")))?;
+    let main = package
+        .styles_with_effects(Owner::MainDocument)
+        .map_err(|error| FixtureError(format!("load cross-owner main: {error}")))?;
+    let glossary_before = archive_member(&source, "word/glossary/stylesWithEffects.xml")?;
+    let replacement = changed_resource(&main);
+    let mut edit = main.edit();
+    edit.replace_resource(Some(replacement.clone()))
+        .map_err(|error| FixtureError(format!("stage cross-owner replacement: {error}")))?;
+    let patch = edit
+        .commit()
+        .map_err(|error| FixtureError(format!("commit cross-owner replacement: {error}")))?
+        .into_patch();
+
+    let before_cross_owner = package_bytes(&mut package);
+    assert!(
+        package
+            .apply_styles_with_effects_patch(Owner::Glossary, &patch)
+            .is_err(),
+        "a main-owner patch must reject a glossary snapshot"
+    );
+    assert_eq!(
+        package_bytes(&mut package),
+        before_cross_owner,
+        "cross-owner rejection changed package bytes"
+    );
+    assert_eq!(
+        archive_member(&package_bytes(&mut package), "word/glossary/stylesWithEffects.xml")?,
+        glossary_before,
+        "cross-owner rejection changed the independent glossary part"
+    );
+
+    let other_source = fixture_bytes("libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx")?;
+    let mut other = Package::from_reader(Cursor::new(other_source.clone()))
+        .map_err(|error| FixtureError(format!("open cross-package source: {error}")))?;
+    let other_before = package_bytes(&mut other);
+    assert!(
+        other
+            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+            .is_err(),
+        "a patch from another package snapshot must be rejected"
+    );
+    assert_eq!(
+        package_bytes(&mut other),
+        other_before,
+        "cross-package rejection changed package bytes"
+    );
+    Ok(())
+}
+
+#[test]
+fn public_replace_inverse_restores_exact_package_bytes() -> FixtureResult<()> {
+    let original = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
+    let mut package = Package::from_reader(Cursor::new(original.clone()))
+        .map_err(|error| FixtureError(format!("open exact-inverse source: {error}")))?;
+    let snapshot = package
+        .styles_with_effects(Owner::MainDocument)
+        .map_err(|error| FixtureError(format!("load exact-inverse source: {error}")))?;
+    let mut edit = snapshot.edit();
+    edit.replace_resource(Some(changed_resource(&snapshot)))
+        .map_err(|error| FixtureError(format!("stage exact-inverse replacement: {error}")))?;
+    let patch = edit
+        .commit()
+        .map_err(|error| FixtureError(format!("commit exact-inverse replacement: {error}")))?
+        .into_patch();
+    package
+        .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        .map_err(|error| FixtureError(format!("publish exact-inverse replacement: {error}")))?;
+    assert_ne!(package_bytes(&mut package), original);
+
+    package
+        .apply_styles_with_effects_patch(Owner::MainDocument, &patch.inverse())
+        .map_err(|error| FixtureError(format!("publish exact-inverse restoration: {error}")))?;
+    assert_eq!(
+        package_bytes(&mut package),
+        original,
+        "inverse publication must restore every package byte"
+    );
+    Ok(())
+}
+
+#[test]
 fn source_bound_clear_and_inverse_restore_custom_target_and_relationship() -> FixtureResult<()> {
     let source = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
     let custom_member = "word/effects/stylesWithEffects-main.xml";
