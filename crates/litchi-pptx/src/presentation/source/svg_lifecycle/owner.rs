@@ -22,7 +22,6 @@ const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 const DRAWINGML: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const SVG_BLIP_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/drawing/2016/SVG/main";
 const SVG_EXTENSION_URI: &[u8] = b"{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
@@ -1251,7 +1250,7 @@ fn classify(
     selected_context: bool,
     frames: &[Frame],
 ) -> Kind {
-    if is_namespace(namespace, MCE, STRICT_MCE) {
+    if namespace.is_some_and(|value| value == MCE) {
         return Kind::Mce;
     }
     if is_name(namespace, name, b"sld", PML, STRICT_PML) && parent.is_none() {
@@ -1330,10 +1329,6 @@ fn is_name(
 ) -> bool {
     name.local_name().as_ref() == local
         && namespace.is_some_and(|value| value == expected || value == strict)
-}
-
-fn is_namespace(namespace: Option<&[u8]>, expected: &[u8], strict: &[u8]) -> bool {
-    namespace.is_some_and(|value| value == expected || value == strict)
 }
 
 fn extension_uri_is_supported(element: &BytesStart<'_>, decoder: Decoder) -> Result<bool> {
@@ -1659,4 +1654,21 @@ fn invalid(message: &str) -> Error {
 
 fn limit(resource: &'static str, limit: usize) -> Error {
     Error::Limit { resource, limit }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FOREIGN_MCE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
+
+    #[test]
+    fn only_canonical_mce_namespace_classifies_as_mce() {
+        let name = QName(b"AlternateContent");
+        assert_eq!(classify(Some(MCE), name, None, false, &[]), Kind::Mce);
+        assert_eq!(
+            classify(Some(FOREIGN_MCE), name, None, false, &[]),
+            Kind::Other
+        );
+    }
 }

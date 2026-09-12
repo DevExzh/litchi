@@ -3609,7 +3609,6 @@ enum PictureNode {
 }
 
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
-const STRICT_MCE_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 const SVG_BLIP_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/drawing/2016/SVG/main";
@@ -4762,7 +4761,7 @@ fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
 }
 
 fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE_NAMESPACE || *value == STRICT_MCE_NAMESPACE)
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE_NAMESPACE)
 }
 
 fn is_presentation_name(
@@ -6450,6 +6449,35 @@ mod tests {
         let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
         let result = presentation.slide(0).unwrap().images();
         assert!(matches!(result, Err(Error::Xml(_))));
+    }
+
+    #[test]
+    fn foreign_markup_compatibility_attribute_is_preserved_on_blip_inventory() {
+        let foreign = String::from_utf8(picture_slide(r#"<a:blip r:embed="rIdImage"/>"#))
+            .unwrap()
+            .replace(
+                "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"",
+                "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:foreign=\"http://purl.oclc.org/ooxml/markup-compatibility/2006\"",
+            )
+            .replace(
+                r#"<a:blip r:embed="rIdImage"/>"#,
+                r#"<a:blip foreign:Ignorable="keep" r:embed="rIdImage"/>"#,
+            )
+            .into_bytes();
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &foreign,
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/></Relationships>"#,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        assert_eq!(presentation.slide(0).unwrap().images().unwrap().len(), 1);
+        assert!(
+            source
+                .bytes
+                .windows(b"foreign:Ignorable=\"keep\"".len())
+                .any(|window| { window == b"foreign:Ignorable=\"keep\"" })
+        );
     }
 
     #[test]
