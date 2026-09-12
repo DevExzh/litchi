@@ -151,15 +151,21 @@ The ActiveX edge is dispatched by its complete URI, never by the local name
 
 | Edge | Canonical URI | Strict URI | Dispatch/refusal |
 | --- | --- | --- | --- |
-| ActiveX descriptor | `http://schemas.openxmlformats.org/officeDocument/2006/relationships/control` | `http://purl.oclc.org/ooxml/officeDocument/relationships/control` | An exact descriptor content type (`application/vnd.ms-office.activeX+xml`) dispatches to the inert `active_x` owner; the form-control owner refuses it as ActiveX, including the strict form |
+| ActiveX descriptor | `http://schemas.openxmlformats.org/officeDocument/2006/relationships/control` | `http://purl.oclc.org/ooxml/officeDocument/relationships/control` | Excluded from form-control selector ordinals; inspection belongs to the inert `active_x` owner, which validates the exact descriptor content type (`application/vnd.ms-office.activeX+xml`) and its closure |
 | ActiveX binary companion | `http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary` | no strict URI is admitted by the local evidence | Preserve/dispatch only under the existing ActiveX owner after its descriptor edge is proven; the form-control owner never treats it as `ctrlProp` |
 
 The form-control `ctrlProp` edge remains the canonical URI in the Decision
 table. No strict `ctrlProp` URI is guessed: a strict or unknown edge is a
 typed unsupported-relationship refusal, while the exact ActiveX URIs above
-are dispatched to `active_x` when their descriptor/content-type closure is
-valid. A mixed canonical/strict relationship graph is refused rather than
-coerced.
+are inspected by the separate `active_x` API when their descriptor/content-type
+closure is valid. The form-control owner does not invoke that loader.
+The selected form-control closure must use its admitted dialect;
+strict or mixed-dialect form-control ownership is refused. An unrelated
+ActiveX control with either exact descriptor URI does not invalidate a
+canonical form-control owner on the same worksheet. This permits the
+form-control projection to coexist with unrelated ActiveX edges
+without treating an ActiveX descriptor as form-control properties or claiming
+that form-control inspection validates the separate ActiveX payload.
 
 MS-XLSX §2.1.1 requires a control-properties part to be explicitly related
 from a SpreadsheetML control and says that a control with this relationship
