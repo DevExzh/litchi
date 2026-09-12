@@ -1,0 +1,21 @@
+git_head=0deae575dbecd3d5b351eadd51b87c39a6dc11df
+git_baseline=1b0d4864804d666aaf4ae5039bd6300996ca32a5
+neutral_baseline=4f53be2d31e14b215d6eeaee56d11eefeae94107
+rustc=rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target_dir=/var/tmp/litchi-xlsb-identity-target-parent.RiKzpd
+cargo_incremental=0
+uname=Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux
+metadata_before_sha256=5d1a8e246ddcfabc9ed22a0983bcb62fabd0828f31ee6db13161967b102ad12e
+metadata_after_sha256=5d1a8e246ddcfabc9ed22a0983bcb62fabd0828f31ee6db13161967b102ad12e
+source_manifest_before_sha256=a7c4e779ebc3ffe4562820ceb8dd07236c5e248ede5fca53d00316e7b92ebbf4
+source_manifest_after_sha256=a7c4e779ebc3ffe4562820ceb8dd07236c5e248ede5fca53d00316e7b92ebbf4
+binary_sha256=4648585a5f9f45f454d879e3cbdf5fe69de6c727755dd407f3b23ee4407b62cb
+binary_after_sha256=4648585a5f9f45f454d879e3cbdf5fe69de6c727755dd407f3b23ee4407b62cb
+git_status_relevant=
