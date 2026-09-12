@@ -74,7 +74,11 @@ and test files, with repository-relative paths and a hash in the manifest.
 In a disposable checkout of the base commit, overlay that archive, verify every
 file against `source_sha256`, and run the recorded commands with `TMPDIR=/var/tmp`
 and `RUSTFLAGS` unset. Set `RUSTDOCFLAGS=-D warnings` for the rustdoc command.
-Use the base checkout's pinned toolchain and lockfile. The checkpoint does not
-require the current dirty workspace, later resource fixes, or unrelated owned
+Use the base checkout's pinned toolchain. `Cargo.lock` is not tracked in this
+repository, and this intermediate checkpoint did not capture it. Resolve or
+supply a lockfile before the locked commands; exact historical dependency
+replay is therefore not established by this checkpoint. Final feature gates
+must retain their resolved lockfile as well as source and logs.
+The checkpoint does not require later resource fixes or unrelated owned
 temporary directories. The archive is retained review evidence, not generated
 production source to install into a working checkout automatically.
