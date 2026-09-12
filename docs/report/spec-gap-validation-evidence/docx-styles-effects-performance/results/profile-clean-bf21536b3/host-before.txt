@@ -1,0 +1,12 @@
+schema=docx-styles-effects-host-v1
+utc=2026-09-12T09:58:16Z
+pid=1924355
+kernel=Linux 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64
+os=Ubuntu 26.04.1 LTS
+cpu_model=AMD EPYC 9R45
+logical_cpus=32
+memory_total_kib=129447068
+memory_available_kib=65638808
+load_1m=0.46
+time_version=time (GNU Time) UNKNOWN
+affinity=pid 1924355's current affinity list: 0-31
