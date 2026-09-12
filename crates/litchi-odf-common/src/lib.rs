@@ -26,6 +26,7 @@ pub mod signature;
 pub mod style;
 pub mod validation;
 
+pub use core::ResolvedReader;
 pub use core::{
     ArchiveLimits, OwnedPackage, PreparedPackage, SourceBackedPackage, SourceMemberReaderError,
     SourcePackageLimits,

@@ -1,0 +1,17 @@
+{
+  "base": "2e023cbd253a9b46ec2582e5319cbcbcddac5433",
+  "files": [
+    "crates/litchi-odf-common/src/core/mod.rs",
+    "crates/litchi-odf-common/src/lib.rs",
+    "crates/litchi-odf-common/src/namespace.rs",
+    "crates/litchi-odf-common/src/core/resolved_reader.rs",
+    "crates/litchi-odf-common/tests/resolved_reader.rs"
+  ],
+  "sha256": {
+    "crates/litchi-odf-common/src/core/mod.rs": "ebf305ff2b1bd64262f07953649108183a980f3622d06d20a16f4b78733bc701",
+    "crates/litchi-odf-common/src/lib.rs": "16dae1c947260ca5a6c59c87666e9b02a38c03c1a666836175722fcbfbd6c00a",
+    "crates/litchi-odf-common/src/namespace.rs": "352cd311edcd140e7a549efd3945b23eac5aefbf14d4ec9885425d2a78023885",
+    "crates/litchi-odf-common/src/core/resolved_reader.rs": "3872bd0d9816e58976d5181f6da31840e8f9d4e4de7ac22d35cf109efab9aa5b",
+    "crates/litchi-odf-common/tests/resolved_reader.rs": "609b3df95d6d9e09ef2d1ccfee498583960bdbac87be423f33f5413e736d6a5d"
+  }
+}
