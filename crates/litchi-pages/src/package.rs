@@ -10,6 +10,7 @@ mod body_chart_metadata;
 mod body_footnote;
 pub(crate) mod body_table_appearance;
 mod body_table_catalog;
+mod body_table_deletion;
 pub(crate) mod body_table_dimension;
 pub(crate) mod body_table_headers;
 pub(crate) mod body_table_hidden_axes;
@@ -87,6 +88,10 @@ pub use body_table_appearance::{
 };
 pub use body_table_catalog::{
     BodyTableCatalog, BodyTableCatalogError, BodyTableCatalogLimitKind, BodyTableSnapshot,
+};
+pub use body_table_deletion::{
+    BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError,
+    BodyTableDeletionLimitKind, BodyTableDeletionPatch,
 };
 pub use body_table_dimension::{
     BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,

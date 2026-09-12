@@ -80,6 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_cell_custom_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_duration_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec/inbound.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec/removal.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
     // standalone copies do not contain these sibling sources, so the
@@ -112,6 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     println!("cargo:rerun-if-changed=src/package_metadata_codec.rs");
+    println!("cargo:rerun-if-changed=src/package_metadata_codec/component_removal.rs");
     println!("cargo:rerun-if-changed=src/package_metadata_media_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_formula_codec.rs");
     println!("cargo:rerun-if-changed=src/table_merge_formula_codec.rs");

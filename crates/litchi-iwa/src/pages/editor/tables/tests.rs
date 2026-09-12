@@ -341,6 +341,60 @@ fn native_body_table_discovery_preserves_the_source_package() {
 }
 
 #[test]
+fn native_body_table_deletion_delegates_to_focused_package() {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/pages/body-table-catalog-native.pages");
+    let source = std::fs::read(path).expect("native catalog fixture");
+    let mut editor = PagesEditor::from_bytes(&source).expect("native Pages editor");
+    let selected = editor
+        .tables()
+        .expect("native body-table discovery")
+        .into_iter()
+        .next()
+        .expect("catalog table");
+
+    let focused = PagesPackage::from_bytes(&source).expect("focused Pages package");
+    let focused_commit = focused
+        .remove_body_table(BodyTableSelector::index(0))
+        .expect("focused table deletion");
+    let mut expected = Vec::new();
+    focused_commit
+        .package()
+        .write_to(&mut expected)
+        .expect("focused deletion output");
+
+    let removed = editor
+        .remove_table(selected.model_object_id)
+        .expect("host table deletion");
+    assert_eq!(removed, selected);
+    assert_eq!(editor.to_bytes().expect("host deletion output"), expected);
+}
+
+#[test]
+fn native_body_table_deletion_preserves_focused_dependency_refusal() {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/pages/body-table-cross-reference-native.pages");
+    let source = std::fs::read(path).expect("native cross-reference fixture");
+    let mut editor = PagesEditor::from_bytes(&source).expect("native Pages editor");
+    let selected = editor
+        .tables()
+        .expect("native body-table discovery")
+        .into_iter()
+        .next()
+        .expect("cross-reference table");
+    let before = editor.to_bytes().expect("exact source output");
+
+    let error = editor
+        .remove_table(selected.model_object_id)
+        .expect_err("surviving formula dependency must refuse deletion");
+    assert!(matches!(
+        error,
+        Error::ParseError(message) if message.contains("surviving Pages formula dependency")
+    ));
+    assert_eq!(editor.to_bytes().expect("unchanged source output"), before);
+}
+
+#[test]
 fn table_info_ownership_preserves_typed_nesting_failure() {
     let mut source = vec![0x7b; 9];
     source.extend([0x7c; 9]);
@@ -2206,6 +2260,143 @@ fn source_built_table_deletion_removes_private_graph_and_anchor() {
     let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(reopened.tables().unwrap().is_empty());
     assert_eq!(reopened.body_text().unwrap(), body);
+}
+
+#[test]
+fn source_built_table_deletion_preserves_compatibility_provenance() {
+    let mut editor = PagesDocumentBuilder::new()
+        .body_text("Before 🙂 after")
+        .body_table("Disposable", 3, 2)
+        .build()
+        .unwrap();
+    let table = editor.tables().unwrap().remove(0);
+    assert!(editor.package().exact_source_owner().is_none());
+
+    let removed = editor.remove_table(table.model_object_id).unwrap();
+    assert_eq!(removed, table);
+    assert!(editor.tables().unwrap().is_empty());
+    assert!(editor.package().exact_source_owner().is_none());
+}
+
+#[test]
+fn source_built_popup_table_deletion_prunes_private_control_storage() {
+    let mut editor = PagesDocumentBuilder::new()
+        .body_text("Before 🙂 after")
+        .body_table("Menus", 3, 3)
+        .body_table("Retained", 3, 3)
+        .build()
+        .unwrap();
+    let tables = editor.tables().unwrap();
+    let removed = tables[0].clone();
+    let retained = tables[1].clone();
+    let removed_format = PopUpMenu::new(["Draft", "Published"])
+        .unwrap()
+        .with_initial_selection(PopUpMenuInitialSelection::Blank);
+    let retained_format = PopUpMenu::new(["Open", "Closed"])
+        .unwrap()
+        .with_initial_selection(PopUpMenuInitialSelection::Blank);
+    let object_ids = |editor: &PagesEditor| {
+        editor
+            .package()
+            .iwa_entry_names()
+            .flat_map(|name| {
+                editor
+                    .package()
+                    .archive(name)
+                    .expect("Pages archive")
+                    .objects
+                    .into_iter()
+                    .filter_map(|object| object.archive_info.identifier)
+            })
+            .collect::<Vec<_>>()
+    };
+    let object_ids_before_removed_popup = object_ids(&editor);
+    editor
+        .set_table_cell_pop_up_menu_format(removed.model_object_id, 1, 1, removed_format.clone())
+        .unwrap();
+    let removed_popup_object_ids = object_ids(&editor)
+        .into_iter()
+        .filter(|identifier| !object_ids_before_removed_popup.contains(identifier))
+        .collect::<Vec<_>>();
+    assert!(
+        !removed_popup_object_ids.is_empty(),
+        "popup setup must allocate a model object"
+    );
+    editor
+        .set_table_cell_pop_up_menu_format(retained.model_object_id, 1, 1, retained_format.clone())
+        .unwrap();
+
+    let removed = editor
+        .tables()
+        .unwrap()
+        .into_iter()
+        .find(|table| table.model_object_id == removed.model_object_id)
+        .expect("removed popup table");
+    let attachment = body_table_graphs(&editor)
+        .unwrap()
+        .into_iter()
+        .find(|graph| graph.info.model_object_id == removed.model_object_id)
+        .expect("removed popup attachment")
+        .attachment_object_id;
+    let mut removed_ids = crate::numbers::editor::table_owned_object_ids_in_package(
+        editor.package(),
+        removed.model_object_id,
+    )
+    .unwrap();
+    let retained_ids = crate::numbers::editor::table_owned_object_ids_in_package(
+        editor.package(),
+        retained.model_object_id,
+    )
+    .unwrap();
+    removed_ids.retain(|identifier| !retained_ids.contains(identifier));
+    removed_ids.extend([
+        attachment,
+        removed.drawable_object_id,
+        removed.model_object_id,
+    ]);
+    removed_ids.sort_unstable();
+    removed_ids.dedup();
+
+    assert_eq!(
+        editor
+            .table_cell_pop_up_menu_format(retained.model_object_id, 1, 1)
+            .unwrap(),
+        Some(retained_format.clone())
+    );
+    assert_eq!(
+        editor.remove_table(removed.model_object_id).unwrap(),
+        removed
+    );
+    assert_eq!(
+        editor
+            .table_cell_pop_up_menu_format(retained.model_object_id, 1, 1)
+            .unwrap(),
+        Some(retained_format)
+    );
+    let mut expected_retained = retained.clone();
+    expected_retained.anchor_character_index = expected_retained
+        .anchor_character_index
+        .checked_sub(1)
+        .expect("removed table anchor precedes retained table");
+    assert_eq!(editor.tables().unwrap(), vec![expected_retained]);
+    let object_ids_after_deletion = object_ids(&editor);
+    for identifier in removed_popup_object_ids {
+        assert!(
+            !object_ids_after_deletion.contains(&identifier),
+            "removed popup model {identifier} still exists"
+        );
+    }
+    for identifier in removed_ids {
+        assert!(
+            find_object_archive(editor.package(), identifier).is_err(),
+            "removed popup graph object {identifier} still exists"
+        );
+    }
+    assert!(
+        editor
+            .table_cell_pop_up_menu_format(removed.model_object_id, 1, 1)
+            .is_err()
+    );
 }
 
 #[test]

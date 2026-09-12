@@ -16,6 +16,14 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_package_metadata_generated::LitchiIwaPackageMetadataProjection as projection;
 
+mod component_removal;
+
+pub use component_removal::{
+    ComponentRemovalBatch, PreparedPackageMetadataComponentRemovalRewrite,
+    prepare_package_metadata_component_removals, rewrite_package_metadata_component_removal,
+    rewrite_package_metadata_component_removals,
+};
+
 const MAX_RECURSION: u32 = 64;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 

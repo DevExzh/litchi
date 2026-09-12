@@ -49888,6 +49888,385 @@ fn rewrite_movie_title_operation(
         self.assertIn("+ audit_iwa_chart_data_source_topology()", main_source)
         self.assertIn("+ audit_iwa_chart_data_write_source_topology()", main_source)
 
+    def _write_pages_body_table_deletion_fixture(self, root: Path) -> None:
+        owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+        owner.parent.mkdir(parents=True, exist_ok=True)
+        owner.write_text(
+            "mod graph;\n"
+            "mod archive;\n"
+            "mod metadata;\n"
+            "mod formula;\n"
+            "mod text;\n"
+            "pub enum BodyTableDeletionError { InvalidSource }\n"
+            "pub enum BodyTableDeletionLimitKind { Work }\n"
+            "pub struct BodyTableDeletionPatch { removed: BodyTableSnapshot }\n"
+            "pub struct BodyTableDeletionDiagnostics { changed: bool }\n"
+            "pub struct BodyTableDeletionCommit { patch: BodyTableDeletionPatch }\n"
+            "impl BodyTableDeletionCommit {\n"
+            "    pub fn package(&self) -> &Package { todo!() }\n"
+            "    pub fn into_package(self) -> Package { todo!() }\n"
+            "    pub fn patch(&self) -> &BodyTableDeletionPatch { todo!() }\n"
+            "    pub fn diagnostics(&self) -> &BodyTableDeletionDiagnostics { todo!() }\n"
+            "    pub fn removed_table(&self) -> &BodyTableSnapshot { todo!() }\n"
+            "}\n"
+            "impl Package {\n"
+            "    pub fn remove_body_table(\n"
+            "        &self, selector: impl Into<BodyTableSelector<'_>>\n"
+            "    ) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> {\n"
+            "        let selected = resolve_body_table(selector);\n"
+            "        let staged = BodyTableDeletionPatch { removed: BodyTableSnapshot };\n"
+            "        let candidate = reassemble(staged);\n"
+            "        let reopened = reopen(candidate);\n"
+            "        verify(reopened)\n"
+            "    }\n"
+            "    pub fn apply_body_table_deletion(\n"
+            "        &self, patch: &BodyTableDeletionPatch\n"
+            "    ) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> {\n"
+            "        if !patch.authorizes_source() { return Err(BodyTableDeletionError::PatchConflict); }\n"
+            "        validate_patch(patch);\n"
+            "        let candidate = reassemble(patch);\n"
+            "        reopen(candidate)\n"
+            "    }\n"
+            "}\n"
+            "fn resolve_body_table(selector: BodyTableSelector<'_>) { let _ = selector; }\n"
+            "fn reassemble(value: impl Sized) -> impl Sized { value }\n"
+            "fn reopen(value: impl Sized) -> impl Sized { value }\n"
+            "fn verify(value: impl Sized) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> { let _ = value; todo!() }\n"
+            "fn validate_patch(value: &BodyTableDeletionPatch) { let _ = value; }\n"
+            "fn exact_source() { let _ = (PatchConflict, source_fingerprint, inverse); }\n"
+            "fn bounded() { let _ = (Budget, Limits, limit, checked_add, checked_mul, try_reserve); }\n",
+            encoding="utf-8",
+        )
+        child_sources = {
+            "graph": (
+                "fn graph(selector: BodyTableSelector<'_>) {\n"
+                "    let _ = (selector, ownership, references, inbound, shared, private, checked_add, checked_mul, Budget);\n"
+                "}\n"
+            ),
+            "archive": (
+                "fn archive() {\n"
+                "    let _ = (Archive, archive, SourceCatalog, source_preserving, remove_object, candidate, verify, reopen, absence, checked);\n"
+                "}\n"
+            ),
+            "metadata": (
+                "fn metadata() {\n"
+                "    let _ = (package_metadata_codec, component_removal, ComponentRemoval, registration, uuid, external_reference, object_uuid);\n"
+                "}\n"
+            ),
+            "formula": (
+                "fn formula() {\n"
+                "    let _ = (numbers_table_cell_dependency_codec, dependency_wire, formula_engine, CalculationEngine, formula_owner, owner, tile, tiled, prune, remove_formula, number_of_formulas, checked_sub);\n"
+                "}\n"
+            ),
+            "text": (
+                "fn text() {\n"
+                "    let _ = (litchi_iwa_text_wire, text_wire, rewrite_storage_text, prepare_storage_text_rewrite, StorageText, utf16_index, UTF_16, anchor, character_index, selected_anchor, TextSpan, Position, try_reserve, checked_add, checked_sub, WireBudget, budget, limit, max);\n"
+                "}\n"
+            ),
+        }
+        for name, source in child_sources.items():
+            child = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_CHILD_ROOT / f"{name}.rs"
+            child.parent.mkdir(parents=True, exist_ok=True)
+            child.write_text(source, encoding="utf-8")
+
+        package = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            "mod body_table_deletion;\n"
+            "pub use body_table_deletion::{BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError, BodyTableDeletionLimitKind, BodyTableDeletionPatch};\n",
+            encoding="utf-8",
+        )
+        library = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE
+        library.parent.mkdir(parents=True, exist_ok=True)
+        library.write_text(
+            "pub use package::{BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError, BodyTableDeletionLimitKind, BodyTableDeletionPatch};\n",
+            encoding="utf-8",
+        )
+
+    def _write_component_removal_codec_fixture(
+        self, root: Path, *, dependency: bool = False
+    ) -> tuple[Path, Path]:
+        if dependency:
+            parent_path = boundaries.IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE
+            child_path = boundaries.IWA_NUMBERS_DEPENDENCY_REMOVAL_SOURCE
+            parent = (
+                "mod removal;\n"
+                "pub use removal::{CalculationEngineOwnerRemovalPlan, prepare_calculation_engine_owner_removal};\n"
+            )
+            child = (
+                "pub struct CalculationEngineOwnerRemovalPlan<'a> { source: &'a [u8] }\n"
+                "pub fn prepare_calculation_engine_owner_removal(source: &[u8]) {\n"
+                "    let _ = (source, CalculationEngine, calculation_engine, formula_engine, formula_owner, owner_id_map, number_of_formulas, cell_record_tile, range_precedents_tile, tiled, tile, prune, remove, checked_add, checked_sub, try_reserve, limit, budget, bounded);\n"
+                "    let _ = buffa.decode_lazy_view(source);\n"
+                "    let _ = candidate;\n"
+                "}\n"
+            )
+            build_marker = 'println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");'
+            guard_marker = 'include_str!("numbers_table_cell_dependency_codec/removal.rs")'
+        else:
+            parent_path = boundaries.IWA_PACKAGE_METADATA_CODEC_SOURCE
+            child_path = boundaries.IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_SOURCE
+            parent = (
+                "mod component_removal;\n"
+                "pub use component_removal::{PreparedPackageMetadataComponentRemovalRewrite, prepare_package_metadata_component_removals};\n"
+            )
+            child = (
+                "pub struct PreparedPackageMetadataComponentRemovalRewrite<'a> { source: &'a [u8] }\n"
+                "pub fn prepare_package_metadata_component_removals(source: &[u8]) {\n"
+                "    let _ = (source, ComponentRemovalBatch, component_registration, registration, component_header, prepared, execute, rewrite, unknown_fields, candidate, validate_candidate, RewriteExecutionRequirements, preflight_execution, try_reserve_exact, checked_add, Budget, max_output);\n"
+                "    let _ = buffa.decode_lazy_view(source);\n"
+                "}\n"
+            )
+            build_marker = boundaries.IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_BUILD_MARKER
+            guard_marker = 'include_str!("package_metadata_codec/component_removal.rs")'
+
+        parent_absolute = root / parent_path
+        parent_absolute.parent.mkdir(parents=True, exist_ok=True)
+        parent_absolute.write_text(parent, encoding="utf-8")
+        child_absolute = root / child_path
+        child_absolute.parent.mkdir(parents=True, exist_ok=True)
+        child_absolute.write_text(child, encoding="utf-8")
+        build = root / boundaries.IWA_CODEC_BUILD_SOURCE
+        build.parent.mkdir(parents=True, exist_ok=True)
+        build.write_text(build_marker + "\n", encoding="utf-8")
+        guard = root / boundaries.IWA_CODEC_PRODUCTION_GUARD_SOURCE
+        guard.parent.mkdir(parents=True, exist_ok=True)
+        guard.write_text(guard_marker + "\n", encoding="utf-8")
+        return parent_path, child_path
+
+    def _write_dependency_inbound_codec_fixture(self, root: Path) -> None:
+        parent = root / boundaries.IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE
+        parent.parent.mkdir(parents=True, exist_ok=True)
+        parent.write_text(
+            "mod inbound;\n"
+            "pub use inbound::{FormulaDependencyFact, FormulaOwnerInternalDependencyFact, FormulaOwnerInternalDependencyKind, FormulaOwnerUuidDependencyFact, FormulaOwnerUuidDependencyKind};\n"
+            "pub fn decode_formula_owner_dependency_facts_with_visitor() {}\n"
+            "pub fn decode_formula_owner_dependency_facts() {}\n"
+            "pub fn decode_formula_owner_dependency_facts_with_report() {}\n",
+            encoding="utf-8",
+        )
+        child = root / boundaries.IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE
+        child.parent.mkdir(parents=True, exist_ok=True)
+        child.write_text(
+            "pub enum FormulaOwnerInternalDependencyKind { VolatileGeometry, SpanningColumn, SpanningRow, WholeOwner }\n"
+            "pub struct FormulaOwnerInternalDependencyFact { kind: FormulaOwnerInternalDependencyKind, owner_id: u32 }\n"
+            "pub enum FormulaOwnerUuidDependencyKind { TableReference, TableUuidReference }\n"
+            "pub struct FormulaOwnerUuidDependencyFact { owner_uuid: UuidSnapshot }\n"
+            "pub enum FormulaDependencyFact { InternalOwner(FormulaOwnerInternalDependencyFact), OwnerUuid(FormulaOwnerUuidDependencyFact) }\n"
+            "fn decode_volatile_dependencies_in() { let _ = VolatileGeometry; }\n"
+            "fn decode_spanning_dependencies_in() { let _ = (SpanningColumn, SpanningRow); }\n"
+            "fn decode_whole_owner_dependencies_in() { let _ = WholeOwner; }\n"
+            "fn decode_uuid_references_in() { let _ = (TableReference, TableUuidReference, OwnerUuid); }\n"
+            "fn dispatch() { let _ = (visit_formula_owner_internal_dependency, visit_formula_owner_uuid_dependency, FormulaDependencyFact); }\n"
+            "fn coordinates() { let _ = (decode_cell_coordinate_in, decode_range_coordinate_in, coord_set, range_context); }\n"
+            "fn bounded() { let _ = (budget.message, child_depth, checked_add, set_once, DecodeError::invalid); }\n",
+            encoding="utf-8",
+        )
+        build = root / boundaries.IWA_CODEC_BUILD_SOURCE
+        build.parent.mkdir(parents=True, exist_ok=True)
+        build.write_text(
+            'println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec/inbound.rs");\n',
+            encoding="utf-8",
+        )
+        guard = root / boundaries.IWA_CODEC_PRODUCTION_GUARD_SOURCE
+        guard.parent.mkdir(parents=True, exist_ok=True)
+        guard.write_text(
+            'include_str!("numbers_table_cell_dependency_codec/inbound.rs")\n',
+            encoding="utf-8",
+        )
+
+    def test_pages_body_table_deletion_boundaries_accept_and_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            self.assertEqual(
+                boundaries.audit_pages_body_table_deletion_source_topology(root), []
+            )
+        main_source = inspect.getsource(boundaries.main)
+        for name in (
+            "audit_pages_body_table_deletion_source_topology",
+            "audit_iwa_package_metadata_component_removal_source_topology",
+            "audit_iwa_numbers_table_cell_dependency_removal_source_topology",
+            "audit_iwa_numbers_table_cell_dependency_inbound_source_topology",
+            "audit_iwa_pages_table_deletion_host_bridges_source_topology",
+        ):
+            self.assertIn(f"+ {name}()", main_source)
+
+    def test_pages_body_table_deletion_rejects_public_native_surface_and_bad_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "impl BodyTableDeletionCommit { pub fn leaked(&self, object_id: u64, bytes: &[u8]) -> Result<Archive, BodyTableDeletionError> { todo!() } }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+            self.assertTrue(any("raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("native, generated, or wire type Archive" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "let selected = resolve_body_table(selector);\n"
+                    "        let staged = BodyTableDeletionPatch",
+                    "let staged = BodyTableDeletionPatch"
+                    " { removed: BodyTableSnapshot };\n"
+                    "        let selected = resolve_body_table(selector);\n"
+                    "        let staged_again = BodyTableDeletionPatch",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("stages deletion before selector admission" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace("mod graph;", "pub mod graph;", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+    def test_pages_body_table_deletion_requires_all_private_children_and_semantic_removed_table(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            formula = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_CHILD_ROOT / "formula.rs"
+            formula.unlink()
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("missing child source" in item and "formula.rs" in item for item in violations), violations)
+
+            self._write_pages_body_table_deletion_fixture(root)
+            owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn removed_table(&self) -> &BodyTableSnapshot",
+                    "pub fn removed_table(&self) -> Vec<u8>",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("removed_table must return semantic BodyTableSnapshot" in item for item in violations), violations)
+            self.assertTrue(any("public method exposes raw bytes" in item for item in violations), violations)
+
+    def test_component_removal_codec_boundaries_require_private_buffa_children_and_inventory(self) -> None:
+        for dependency in (False, True):
+            with self.subTest(dependency=dependency), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                _parent_path, child_path = self._write_component_removal_codec_fixture(
+                    root, dependency=dependency
+                )
+                audit = (
+                    boundaries.audit_iwa_numbers_table_cell_dependency_removal_source_topology
+                    if dependency
+                    else boundaries.audit_iwa_package_metadata_component_removal_source_topology
+                )
+                self.assertEqual(audit(root), [])
+                child = root / child_path
+                child.write_text(
+                    child.read_text(encoding="utf-8") + "use prost::Message;\n",
+                    encoding="utf-8",
+                )
+                violations = audit(root)
+                self.assertTrue(any("must not use Prost" in item for item in violations), violations)
+
+                parent = root / _parent_path
+                parent.write_text(
+                    parent.read_text(encoding="utf-8").replace(
+                        "mod removal;" if dependency else "mod component_removal;",
+                        "pub mod removal;" if dependency else "pub mod component_removal;",
+                        1,
+                    ),
+                    encoding="utf-8",
+                )
+                violations = audit(root)
+                self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+                parent.write_text(
+                    parent.read_text(encoding="utf-8").replace(
+                        "pub mod removal;" if dependency else "pub mod component_removal;",
+                        "mod removal;" if dependency else "mod component_removal;",
+                        1,
+                    ),
+                    encoding="utf-8",
+                )
+                guard = root / boundaries.IWA_CODEC_PRODUCTION_GUARD_SOURCE
+                guard.write_text("", encoding="utf-8")
+                violations = audit(root)
+                self.assertTrue(any("production inventory registration" in item for item in violations), violations)
+
+    def test_dependency_inbound_codec_boundaries_require_typed_private_visitor_child(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_dependency_inbound_codec_fixture(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root),
+                [],
+            )
+            child = root / boundaries.IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE
+            child.unlink()
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("child is missing" in item for item in violations), violations)
+            self._write_dependency_inbound_codec_fixture(root)
+            child = root / boundaries.IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE
+            child.write_text(
+                child.read_text(encoding="utf-8") + "use prost::Message;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("must not use Prost" in item for item in violations), violations)
+
+            child.write_text(
+                child.read_text(encoding="utf-8")
+                + "pub fn leaked(source: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+
+            parent = root / boundaries.IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE
+            parent.write_text(
+                parent.read_text(encoding="utf-8").replace(
+                    "mod inbound;", "pub mod inbound;", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+    def test_pages_body_table_deletion_host_bridges_must_route_codec_operations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            for spec in boundaries.IWA_CODEC_BRIDGE_SPECS:
+                path = root / spec["path"]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if spec["label"] == "PackageMetadata":
+                    source = "use litchi_iwa_protos::package_metadata_codec::rewrite_package_metadata_component_removal;\n"
+                else:
+                    source = "use litchi_iwa_protos::numbers_table_cell_dependency_codec::execute_calculation_engine_owner_removal;\n"
+                path.write_text(source, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_deletion_host_bridges_source_topology(root), []
+            )
+            for spec in boundaries.IWA_CODEC_BRIDGE_SPECS[1:]:
+                path = root / spec["path"]
+                path.write_text(
+                    "use litchi_iwa_protos::numbers_table_cell_dependency_codec as dependency_codec;\n"
+                    "fn route() { dependency_codec::execute_calculation_engine_owner_removal(); }\n",
+                    encoding="utf-8",
+                )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_deletion_host_bridges_source_topology(root), []
+            )
+            formula_clone = root / boundaries.IWA_CODEC_BRIDGE_SPECS[1]["path"]
+            formula_clone.write_text("fn legacy_formula_clone() {}\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_pages_table_deletion_host_bridges_source_topology(root)
+            self.assertTrue(any("formula clone bridge must delegate" in item for item in violations), violations)
+
     def _copy_table_merge_transaction_fixture(
         self, root: Path, spec: dict
     ) -> None:

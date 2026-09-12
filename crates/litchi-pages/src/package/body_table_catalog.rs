@@ -123,7 +123,9 @@ pub struct BodyTableSnapshot {
 }
 
 impl BodyTableSnapshot {
-    fn from_target(entry: table_lock::BodyTableTarget) -> Result<Self, BodyTableCatalogError> {
+    pub(crate) fn from_target(
+        entry: table_lock::BodyTableTarget,
+    ) -> Result<Self, BodyTableCatalogError> {
         let name = Name::try_from(entry.table_name.into_string())
             .map_err(BodyTableCatalogError::InvalidName)?;
         Ok(Self {
@@ -194,7 +196,7 @@ pub struct BodyTableCatalog {
 }
 
 impl BodyTableCatalog {
-    fn from_targets(
+    pub(crate) fn from_targets(
         entries: Vec<table_lock::BodyTableTarget>,
         budget: &mut table_lock::WireBudget,
     ) -> Result<Self, BodyTableCatalogError> {
@@ -216,6 +218,15 @@ impl BodyTableCatalog {
             values.push(BodyTableSnapshot::from_target(entry)?);
         }
         Ok(Self { values })
+    }
+
+    /// Consume the catalog without cloning its validated snapshots.
+    ///
+    /// Package transactions use this when the catalog has already been
+    /// charged and verified.  Moving the vector keeps one allocation per
+    /// semantic snapshot and avoids an unbounded clone during publication.
+    pub(crate) fn into_values(self) -> Vec<BodyTableSnapshot> {
+        self.values
     }
 
     /// Return the number of rooted body tables.

@@ -814,8 +814,20 @@ mod tests {
             include_str!("numbers_table_cell_dependency_codec.rs"),
         ),
         (
+            "numbers_table_cell_dependency_inbound",
+            include_str!("numbers_table_cell_dependency_codec/inbound.rs"),
+        ),
+        (
+            "numbers_table_cell_dependency_removal",
+            include_str!("numbers_table_cell_dependency_codec/removal.rs"),
+        ),
+        (
             "package_metadata",
             include_str!("package_metadata_codec.rs"),
+        ),
+        (
+            "package_metadata_component_removal",
+            include_str!("package_metadata_codec/component_removal.rs"),
         ),
         ("numbers_formula", include_str!("numbers_formula_codec.rs")),
         ("table_info", include_str!("table_info_codec.rs")),
@@ -1244,6 +1256,15 @@ mod oracle {
                 "comment_storage_lifecycle" => "comment_storage_codec/lifecycle.rs".to_owned(),
                 "keynote_media_lifecycle_node_cache" => {
                     "keynote_media_lifecycle_codec/node_cache.rs".to_owned()
+                },
+                "numbers_table_cell_dependency_inbound" => {
+                    "numbers_table_cell_dependency_codec/inbound.rs".to_owned()
+                },
+                "numbers_table_cell_dependency_removal" => {
+                    "numbers_table_cell_dependency_codec/removal.rs".to_owned()
+                },
+                "package_metadata_component_removal" => {
+                    "package_metadata_codec/component_removal.rs".to_owned()
                 },
                 _ => format!("{name}_codec.rs"),
             };

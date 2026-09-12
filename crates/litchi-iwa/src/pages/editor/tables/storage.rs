@@ -597,26 +597,6 @@ pub(crate) fn expand_formula_contexts(
     Ok(())
 }
 
-pub(crate) fn remove_table_object(
-    package: &mut IWorkPackage,
-    archive_name: &str,
-    identifier: u64,
-) -> Result<bool> {
-    let mut archive = package.archive(archive_name)?;
-    archive.remove_object(identifier).ok_or_else(|| {
-        Error::InvalidFormat(format!("Pages table object {identifier} is missing"))
-    })?;
-    if archive.objects.is_empty() {
-        package.remove_entry(archive_name).ok_or_else(|| {
-            Error::InvalidFormat(format!("Pages table component {archive_name} is missing"))
-        })?;
-        Ok(true)
-    } else {
-        package.replace_archive(archive_name, &archive)?;
-        Ok(false)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::retain_object_replacement_offsets;

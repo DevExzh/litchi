@@ -130,6 +130,10 @@ pub use package::{
 };
 pub use package::{BodyTableCellsError, BodyTableCellsLimitKind};
 pub use package::{
+    BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError,
+    BodyTableDeletionLimitKind, BodyTableDeletionPatch,
+};
+pub use package::{
     BodyTableDimensionCommit, BodyTableDimensionDiagnostics, BodyTableDimensionEdit,
     BodyTableDimensionError, BodyTableDimensionLimitKind, BodyTableDimensionPatch,
 };

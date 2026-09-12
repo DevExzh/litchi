@@ -235,6 +235,37 @@ impl ReferenceSnapshot {
     }
 }
 
+/// Borrowed projection of the source-built rich-text payload envelope used by
+/// table-cell sidecar entries.
+///
+/// The cell-owner and optional range messages remain source-owned opaque
+/// payloads. Their presence and framing are part of this envelope's contract;
+/// the storage reference is the selected ownership edge needed by graph
+/// traversal.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RichTextPayloadSnapshot<'source> {
+    storage: ReferenceSnapshot,
+    range: Option<&'source [u8]>,
+    cell_owner: &'source [u8],
+}
+
+impl<'source> RichTextPayloadSnapshot<'source> {
+    #[must_use]
+    pub const fn storage(self) -> ReferenceSnapshot {
+        self.storage
+    }
+
+    #[must_use]
+    pub const fn range(self) -> Option<&'source [u8]> {
+        self.range
+    }
+
+    #[must_use]
+    pub const fn cell_owner(self) -> &'source [u8] {
+        self.cell_owner
+    }
+}
+
 /// One source-ordered tile-storage record.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TileReferenceRecord<'source> {
@@ -375,6 +406,8 @@ pub struct TableModelSnapshot<'source> {
     pivot_owner: Option<ReferenceSnapshot>,
     category_owner: Option<ReferenceSnapshot>,
     spill_owner: Option<&'source [u8]>,
+    base_column_row_uids: Option<ReferenceSnapshot>,
+    stroke_sidecar: Option<ReferenceSnapshot>,
 }
 
 /// Borrowed table-model root together with the exact nested DataStore
@@ -500,6 +533,16 @@ impl<'source> TableModelSnapshot<'source> {
     #[must_use]
     pub const fn spill_owner(self) -> Option<&'source [u8]> {
         self.spill_owner
+    }
+    /// Optional base column/row UID-map reference from field 46.
+    #[must_use]
+    pub const fn base_column_row_uids(self) -> Option<ReferenceSnapshot> {
+        self.base_column_row_uids
+    }
+    /// Optional stroke sidecar reference from field 49.
+    #[must_use]
+    pub const fn stroke_sidecar(self) -> Option<ReferenceSnapshot> {
+        self.stroke_sidecar
     }
 }
 
@@ -1994,10 +2037,34 @@ pub fn decode_table_model_compatibility_with_data_store_and_visitor<'source>(
     )
 }
 
+/// Decode a compatibility model while strictly traversing its header and tile
+/// storage containers.
+///
+/// Historical readers intentionally leave those two nested envelopes opaque
+/// so sparse compatibility payloads with arbitrary bytes remain admissible.
+/// Graph owners that need the physical header/tile references can opt into
+/// this route; model defaults and all DataStore reference defaults retain the
+/// compatibility projection, while the nested containers are validated and
+/// streamed through `visitor` in the same finite budget.
+pub fn decode_table_model_compatibility_with_strict_storage_and_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+) -> Result<(TableModelDataStoreSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_table_model_with_data_store_and_visitor_mode(
+        source,
+        options,
+        visitor,
+        true,
+        DataStoreProjection::CompatibilityWithStrictStorage,
+    )
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DataStoreProjection {
     Strict,
     Compatibility,
+    CompatibilityWithStrictStorage,
     DenseNative,
 }
 
@@ -2070,9 +2137,11 @@ fn decode_table_model_in<'source>(
     let mut pivot_owner = None;
     let mut category_owner = None;
     let mut spill_owner = None;
+    let mut base_column_row_uids = None;
+    let mut stroke_sidecar = None;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
-        if compatibility_defaults && !matches!(field.number, 4 | 6 | 7 | 8) {
+        if compatibility_defaults && !matches!(field.number, 4 | 6 | 7 | 8 | 46 | 49) {
             continue;
         }
         match field.number {
@@ -2166,6 +2235,24 @@ fn decode_table_model_in<'source>(
                     &mut table_name_shape_style,
                     decode_style_reference(raw, budget, child_depth, data_store_projection)?,
                 )?;
+            },
+            46 => {
+                let raw = field.bytes()?;
+                let reference = if compatibility_defaults {
+                    decode_reference_compatibility(raw, budget, child_depth)?
+                } else {
+                    decode_reference(raw, budget, child_depth)?
+                };
+                set_once(&mut base_column_row_uids, reference)?;
+            },
+            49 => {
+                let raw = field.bytes()?;
+                let reference = if compatibility_defaults {
+                    decode_reference_compatibility(raw, budget, child_depth)?
+                } else {
+                    decode_reference(raw, budget, child_depth)?
+                };
+                set_once(&mut stroke_sidecar, reference)?;
             },
             6 => set_once(&mut number_of_rows, canonical_u32(field.varint()?)?)?,
             7 => set_once(&mut number_of_columns, canonical_u32(field.varint()?)?)?,
@@ -2262,6 +2349,8 @@ fn decode_table_model_in<'source>(
         pivot_owner: pivot_owner.map(|(_raw, reference)| reference),
         category_owner: category_owner.map(|(_raw, reference)| reference),
         spill_owner,
+        base_column_row_uids,
+        stroke_sidecar,
     };
     if !compatibility_defaults {
         budget.message(source, depth)?;
@@ -2351,6 +2440,22 @@ pub fn decode_data_store_compatibility_with_visitor<'source>(
     )
 }
 
+/// Decode a compatibility DataStore while strictly traversing its nested
+/// header and tile storage containers. This is the standalone counterpart to
+/// [`decode_table_model_compatibility_with_strict_storage_and_visitor`].
+pub fn decode_data_store_compatibility_with_strict_storage_and_visitor<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    visitor: &mut dyn StorageVisitor,
+) -> Result<(DataStoreSnapshot<'source>, DecodeReport), DecodeError> {
+    decode_data_store_with_visitor_mode(
+        source,
+        options,
+        visitor,
+        DataStoreProjection::CompatibilityWithStrictStorage,
+    )
+}
+
 fn decode_data_store_with_visitor_mode<'source>(
     source: &'source [u8],
     options: DecodeOptions,
@@ -2369,7 +2474,12 @@ fn decode_data_store_in<'source>(
     visitor: &mut dyn StorageVisitor,
     data_store_projection: DataStoreProjection,
 ) -> Result<DataStoreSnapshot<'source>, DecodeError> {
-    let compatibility_defaults = data_store_projection == DataStoreProjection::Compatibility;
+    let compatibility_defaults = matches!(
+        data_store_projection,
+        DataStoreProjection::Compatibility | DataStoreProjection::CompatibilityWithStrictStorage
+    );
+    let strict_compatibility_storage =
+        data_store_projection == DataStoreProjection::CompatibilityWithStrictStorage;
     let dense_native = data_store_projection == DataStoreProjection::DenseNative;
     budget.message(source, depth)?;
     let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
@@ -2380,13 +2490,21 @@ fn decode_data_store_in<'source>(
     let mut storage_version_pre_bnc = None;
     let mut remaining = source;
     while let Some(field) = next_field(&mut remaining, budget, depth)? {
-        // Sparse compatibility routing only owns the tile and sidecar
-        // references consumed by semantic extraction. Every other DataStore
-        // field is opaque there, including fields required by the native
-        // proto2 schema. Dense-native routing still visits those fields so
-        // their presence, framing, and duplicate keys remain bounded, but it
-        // defers their nested metadata validation below.
-        if compatibility_defaults && !matches!(field.number, 3 | 4 | 6 | 12 | 17 | 19) {
+        // Sparse compatibility routing keeps the metadata-only HeaderStorage
+        // and TableRBTree envelopes opaque, but it still projects every
+        // DataStore reference root. The graph compatibility route opts into
+        // strict HeaderStorage/TileStorage traversal below while retaining
+        // generated proto2 defaults for omitted envelope fields. Dense-native
+        // routing still visits selected fields so their presence, framing,
+        // and duplicate keys remain bounded, but defers unselected metadata
+        // validation below.
+        if compatibility_defaults
+            && !matches!(
+                field.number,
+                2 | 3 | 4 | 5 | 6 | 7 | 8 | 11 | 12 | 13 | 14 | 15..=22
+            )
+            && !(strict_compatibility_storage && matches!(field.number, 1 | 3))
+        {
             continue;
         }
         let number = usize::try_from(field.number).map_err(|_conversion| DecodeError::invalid())?;
@@ -2396,7 +2514,11 @@ fn decode_data_store_in<'source>(
                 if raw_fields[0].is_some() {
                     return Err(DecodeError::invalid());
                 }
-                if data_store_projection == DataStoreProjection::Strict {
+                if matches!(
+                    data_store_projection,
+                    DataStoreProjection::Strict
+                        | DataStoreProjection::CompatibilityWithStrictStorage
+                ) {
                     let _ = decode_header_storage_in(
                         raw,
                         budget,
@@ -2418,14 +2540,11 @@ fn decode_data_store_in<'source>(
                 if raw_fields[2].is_some() {
                     return Err(DecodeError::invalid());
                 }
-                // The compatibility envelope keeps the tile-storage bytes
-                // borrowed and opaque.  TileStorage is a separate selected
-                // route whose strict decoder owns its own required fields,
-                // repeated references, and private Buffa parity check.  Do
-                // not enter that generated-backed route here: a sparse
-                // compatibility projection must stay generated-free and
-                // leave nested tile validation to the extractor after the
-                // envelope has been admitted.
+                // The ordinary compatibility envelope keeps the
+                // tile-storage bytes borrowed and opaque. Its graph variant
+                // opts into the strict nested route so tile ownership can be
+                // streamed before publication without changing the legacy
+                // reader's admission behavior.
                 if data_store_projection != DataStoreProjection::Compatibility {
                     let _ = decode_tile_storage_in(raw, budget, child_depth, visitor)?;
                 } else {
@@ -2441,7 +2560,7 @@ fn decode_data_store_in<'source>(
                     return Err(DecodeError::invalid());
                 }
                 let strict_route = matches!(field.number, 2 | 4 | 5 | 6 | 11 | 12 | 17 | 19);
-                if (!compatibility_defaults && !dense_native) || strict_route {
+                if !dense_native || strict_route {
                     refs[number - 1] = Some(if compatibility_defaults {
                         decode_reference_compatibility(raw, budget, child_depth)?
                     } else {
@@ -6049,6 +6168,71 @@ fn decode_range(source: &[u8], budget: &mut Budget, depth: u32) -> Result<(u32, 
     ))
 }
 
+/// Decode the source-built `RichTextPayloadArchive` envelope used by table
+/// cell rich-text sidecars and return its nested storage reference.
+pub fn decode_rich_text_payload(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<RichTextPayloadSnapshot<'_>, DecodeError> {
+    Ok(decode_rich_text_payload_with_report(source, options)?.0)
+}
+
+/// Decode a rich-text payload envelope and return its bounded resource report.
+pub fn decode_rich_text_payload_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(RichTextPayloadSnapshot<'_>, DecodeReport), DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let snapshot = decode_rich_text_payload_in(source, &mut budget, 1)?;
+    Ok((snapshot, budget.report()))
+}
+
+fn decode_rich_text_payload_in<'source>(
+    source: &'source [u8],
+    budget: &mut Budget,
+    depth: u32,
+) -> Result<RichTextPayloadSnapshot<'source>, DecodeError> {
+    budget.message(source, depth)?;
+    let child_depth = depth.checked_add(1).ok_or_else(DecodeError::invalid)?;
+    let mut storage = None;
+    let mut range = None;
+    let mut cell_owner = None;
+    let mut remaining = source;
+    while let Some(field) = next_field(&mut remaining, budget, depth)? {
+        match field.number {
+            1 => {
+                let raw = field.bytes()?;
+                set_once(
+                    &mut storage,
+                    decode_canonical_reference(raw, budget, child_depth)?,
+                )?;
+            },
+            2 => {
+                let raw = field.bytes()?;
+                set_once(&mut range, raw)?;
+                // Range is a known nested message, so charge its bounded
+                // source width and framing without materializing its values.
+                budget.message(raw, child_depth)?;
+            },
+            3 => {
+                let raw = field.bytes()?;
+                set_once(&mut cell_owner, raw)?;
+                // Historical readers require the cell-owner envelope to be
+                // present and length-delimited, but admit an empty CellID
+                // message as its generated default. Preserve that behavior
+                // while charging the nested source width.
+                budget.message(raw, child_depth)?;
+            },
+            _ => {},
+        }
+    }
+    Ok(RichTextPayloadSnapshot {
+        storage: storage.ok_or_else(DecodeError::invalid)?,
+        range,
+        cell_owner: cell_owner.ok_or_else(DecodeError::invalid)?,
+    })
+}
+
 pub(crate) struct Budget {
     pub(crate) options: DecodeOptions,
     source_bytes: usize,
@@ -6756,6 +6940,23 @@ mod tests {
         out
     }
 
+    fn append_optional_store_references(store: &mut Vec<u8>) {
+        for (field, identifier) in [
+            (12, 112),
+            (13, 113),
+            (15, 115),
+            (16, 116),
+            (17, 117),
+            (18, 118),
+            (19, 119),
+            (20, 120),
+            (21, 121),
+            (22, 122),
+        ] {
+            b(store, field, &reference(identifier));
+        }
+    }
+
     fn strict_model(table_name: Option<&[u8]>) -> Vec<u8> {
         let store = minimal_store();
         let mut out = Vec::new();
@@ -6766,6 +6967,13 @@ mod tests {
         if let Some(table_name) = table_name {
             b(&mut out, 8, table_name);
         }
+        out
+    }
+
+    fn rich_text_payload(storage_id: u64) -> Vec<u8> {
+        let mut out = Vec::new();
+        b(&mut out, 1, &reference(storage_id));
+        b(&mut out, 3, &[]);
         out
     }
 
@@ -6884,6 +7092,88 @@ mod tests {
     }
 
     #[test]
+    fn strict_projection_exposes_all_table_owned_storage_roots() {
+        let mut store = minimal_store();
+        append_optional_store_references(&mut store);
+        v(&mut store, 14, 4);
+
+        let mut model = Vec::new();
+        b(&mut model, 1, b"T-1");
+        b(&mut model, 4, &store);
+        v(&mut model, 6, 10);
+        v(&mut model, 7, 20);
+        b(&mut model, 8, b"Table");
+        b(&mut model, 46, &reference(146));
+        b(&mut model, 49, &reference(149));
+        let before = model.clone();
+
+        let (projection, _report) =
+            decode_table_model_with_data_store_and_visitor(&model, options(&model), &mut ())
+                .unwrap();
+        let model_snapshot = projection.model();
+        let store_snapshot = projection.data_store();
+
+        assert_eq!(
+            model_snapshot.base_column_row_uids().unwrap().identifier(),
+            146
+        );
+        assert_eq!(model_snapshot.stroke_sidecar().unwrap().identifier(), 149);
+        assert_eq!(store_snapshot.column_headers().identifier(), 7);
+        assert_eq!(store_snapshot.string_table().identifier(), 7);
+        assert_eq!(store_snapshot.style_table().identifier(), 7);
+        assert_eq!(store_snapshot.formula_table().identifier(), 7);
+        assert_eq!(store_snapshot.format_table_pre_bnc().identifier(), 7);
+        assert_eq!(store_snapshot.storage_version_pre_bnc(), Some(4));
+        assert_eq!(
+            store_snapshot.formula_error_table().unwrap().identifier(),
+            112
+        );
+        assert_eq!(store_snapshot.merge_region_map().unwrap().identifier(), 113);
+        assert_eq!(
+            store_snapshot
+                .deprecated_custom_format_table()
+                .unwrap()
+                .identifier(),
+            115
+        );
+        assert_eq!(
+            store_snapshot
+                .multiple_choice_list_format_table()
+                .unwrap()
+                .identifier(),
+            116
+        );
+        assert_eq!(store_snapshot.rich_text_table().unwrap().identifier(), 117);
+        assert_eq!(
+            store_snapshot
+                .conditional_style_table()
+                .unwrap()
+                .identifier(),
+            118
+        );
+        assert_eq!(
+            store_snapshot.comment_storage_table().unwrap().identifier(),
+            119
+        );
+        assert_eq!(
+            store_snapshot
+                .import_warning_set_table()
+                .unwrap()
+                .identifier(),
+            120
+        );
+        assert_eq!(
+            store_snapshot
+                .control_cell_spec_table()
+                .unwrap()
+                .identifier(),
+            121
+        );
+        assert_eq!(store_snapshot.format_table().unwrap().identifier(), 122);
+        assert_eq!(model, before);
+    }
+
+    #[test]
     fn strict_model_requires_table_name_but_keeps_unknown_wire_opaque() {
         let store = minimal_store();
         let mut valid = strict_model(Some(b"Table"));
@@ -6975,6 +7265,253 @@ mod tests {
         // contract and therefore does not silently become the compatibility
         // route.
         assert!(decode_table_model_with_report(&model, options(&model)).is_err());
+
+        // The graph-only compatibility route deliberately tightens the two
+        // nested ownership containers; arbitrary opaque bodies admitted by
+        // this legacy reader remain available only through this sparse API.
+        assert!(
+            decode_table_model_compatibility_with_strict_storage_and_visitor(
+                &model,
+                options(&model),
+                &mut (),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn compatibility_projection_exposes_optional_storage_roots_and_model_sidecars() {
+        let mut store = minimal_store();
+        append_optional_store_references(&mut store);
+        v(&mut store, 14, 4);
+
+        let mut model = Vec::new();
+        b(&mut model, 4, &store);
+        v(&mut model, 7, 20);
+        b(&mut model, 8, b"Compatibility");
+        b(&mut model, 46, &reference(246));
+        b(&mut model, 49, &reference(249));
+        let before = model.clone();
+
+        let (projection, _report) = decode_table_model_compatibility_with_data_store_and_visitor(
+            &model,
+            options(&model),
+            &mut (),
+        )
+        .unwrap();
+        let model_snapshot = projection.model();
+        let store_snapshot = projection.data_store();
+
+        assert_eq!(
+            model_snapshot.base_column_row_uids().unwrap().identifier(),
+            246
+        );
+        assert_eq!(model_snapshot.stroke_sidecar().unwrap().identifier(), 249);
+        assert_eq!(store_snapshot.column_headers().identifier(), 7);
+        assert_eq!(store_snapshot.string_table().identifier(), 7);
+        assert_eq!(store_snapshot.style_table().identifier(), 7);
+        assert_eq!(store_snapshot.formula_table().identifier(), 7);
+        assert_eq!(store_snapshot.format_table_pre_bnc().identifier(), 7);
+        assert_eq!(store_snapshot.storage_version_pre_bnc(), Some(4));
+        assert_eq!(
+            store_snapshot.formula_error_table().unwrap().identifier(),
+            112
+        );
+        assert_eq!(store_snapshot.merge_region_map().unwrap().identifier(), 113);
+        assert_eq!(
+            store_snapshot
+                .deprecated_custom_format_table()
+                .unwrap()
+                .identifier(),
+            115
+        );
+        assert_eq!(
+            store_snapshot
+                .multiple_choice_list_format_table()
+                .unwrap()
+                .identifier(),
+            116
+        );
+        assert_eq!(store_snapshot.rich_text_table().unwrap().identifier(), 117);
+        assert_eq!(
+            store_snapshot
+                .conditional_style_table()
+                .unwrap()
+                .identifier(),
+            118
+        );
+        assert_eq!(
+            store_snapshot.comment_storage_table().unwrap().identifier(),
+            119
+        );
+        assert_eq!(
+            store_snapshot
+                .import_warning_set_table()
+                .unwrap()
+                .identifier(),
+            120
+        );
+        assert_eq!(
+            store_snapshot
+                .control_cell_spec_table()
+                .unwrap()
+                .identifier(),
+            121
+        );
+        assert_eq!(store_snapshot.format_table().unwrap().identifier(), 122);
+        assert_eq!(model, before);
+    }
+
+    #[test]
+    fn compatibility_graph_projection_streams_header_and_tile_references() {
+        let mut headers = Vec::new();
+        v(&mut headers, 1, 3);
+        b(&mut headers, 2, &reference(707));
+
+        let mut tile_record = Vec::new();
+        v(&mut tile_record, 1, 3);
+        b(&mut tile_record, 2, &reference(777));
+        let mut tiles = Vec::new();
+        b(&mut tiles, 1, &tile_record);
+        v(&mut tiles, 2, 256);
+
+        let mut store = Vec::new();
+        b(&mut store, 1, &headers);
+        b(&mut store, 2, &reference(7));
+        b(&mut store, 3, &tiles);
+        for field in 4..=6 {
+            b(&mut store, field, &reference(7));
+        }
+        v(&mut store, 7, 1);
+        v(&mut store, 8, 2);
+        b(&mut store, 9, &[]);
+        b(&mut store, 10, &[]);
+        b(&mut store, 11, &reference(7));
+
+        let mut model = Vec::new();
+        b(&mut model, 4, &store);
+        v(&mut model, 6, 10);
+        v(&mut model, 7, 20);
+        b(&mut model, 8, b"Compatibility graph");
+        b(&mut model, 46, &reference(246));
+        b(&mut model, 49, &reference(249));
+        let before = model.clone();
+
+        #[derive(Default)]
+        struct Routes {
+            headers: Vec<u64>,
+            tiles: Vec<u64>,
+        }
+        impl StorageVisitor for Routes {
+            fn visit_header_bucket(
+                &mut self,
+                record: ReferenceRecord<'_>,
+            ) -> Result<(), DecodeError> {
+                self.headers.push(record.reference().identifier());
+                Ok(())
+            }
+
+            fn visit_tile_reference(
+                &mut self,
+                record: TileReferenceRecord<'_>,
+            ) -> Result<(), DecodeError> {
+                self.tiles.push(record.reference().identifier());
+                Ok(())
+            }
+        }
+
+        let mut routes = Routes::default();
+        let (projection, report) =
+            decode_table_model_compatibility_with_strict_storage_and_visitor(
+                &model,
+                options(&model),
+                &mut routes,
+            )
+            .unwrap();
+        assert_eq!(routes.headers, [707]);
+        assert_eq!(routes.tiles, [777]);
+        assert_eq!(
+            projection
+                .model()
+                .base_column_row_uids()
+                .unwrap()
+                .identifier(),
+            246
+        );
+        assert_eq!(
+            projection.model().stroke_sidecar().unwrap().identifier(),
+            249
+        );
+        assert!(report.references() >= 9);
+        assert_eq!(model, before);
+    }
+
+    #[test]
+    fn rich_text_payload_projection_exposes_nested_storage_reference() {
+        let mut source = rich_text_payload(707);
+        let mut range = Vec::new();
+        v(&mut range, 1, 8);
+        v(&mut range, 2, 2);
+        b(&mut source, 2, &range);
+        let before = source.clone();
+
+        let (snapshot, report) =
+            decode_rich_text_payload_with_report(&source, options(&source)).unwrap();
+        assert_eq!(snapshot.storage().identifier(), 707);
+        assert_eq!(snapshot.range(), Some(range.as_slice()));
+        assert_eq!(snapshot.cell_owner(), &[]);
+        assert_eq!(report.references(), 1);
+        assert_eq!(source, before);
+
+        let mut duplicate = source.clone();
+        b(&mut duplicate, 1, &reference(708));
+        assert!(decode_rich_text_payload(&duplicate, options(&duplicate)).is_err());
+
+        let mut wrong_wire = rich_text_payload(707);
+        v(&mut wrong_wire, 1, 707);
+        assert!(decode_rich_text_payload(&wrong_wire, options(&wrong_wire)).is_err());
+
+        let mut missing_cell = Vec::new();
+        b(&mut missing_cell, 1, &reference(707));
+        assert!(decode_rich_text_payload(&missing_cell, options(&missing_cell)).is_err());
+
+        let zero_storage = rich_text_payload(0);
+        assert!(decode_rich_text_payload(&zero_storage, options(&zero_storage)).is_err());
+    }
+
+    #[test]
+    fn newly_projected_storage_roots_keep_duplicate_and_wire_checks() {
+        let mut duplicate_model = strict_model(Some(b"Table"));
+        b(&mut duplicate_model, 46, &reference(146));
+        b(&mut duplicate_model, 46, &reference(147));
+        assert!(
+            decode_table_model_with_report(&duplicate_model, options(&duplicate_model)).is_err()
+        );
+
+        let mut wrong_model = strict_model(Some(b"Table"));
+        v(&mut wrong_model, 49, 1);
+        assert!(decode_table_model_with_report(&wrong_model, options(&wrong_model)).is_err());
+
+        let mut duplicate_store = minimal_store();
+        b(&mut duplicate_store, 13, &reference(113));
+        b(&mut duplicate_store, 13, &reference(114));
+        assert!(
+            decode_data_store_with_report(&duplicate_store, options(&duplicate_store)).is_err()
+        );
+
+        let mut wrong_store = minimal_store();
+        v(&mut wrong_store, 15, 1);
+        assert!(decode_data_store_with_report(&wrong_store, options(&wrong_store)).is_err());
+
+        let mut compatibility_wrong_store = Vec::new();
+        v(&mut compatibility_wrong_store, 13, 1);
+        assert!(
+            decode_data_store_compatibility_with_report(
+                &compatibility_wrong_store,
+                options(&compatibility_wrong_store)
+            )
+            .is_err()
+        );
     }
 
     #[test]
