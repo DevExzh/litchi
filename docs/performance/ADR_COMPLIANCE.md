@@ -1,5 +1,16 @@
 # Performance optimization ADR-compliance matrix
 
+## 0520: source-backed XLSX measurement only
+
+[0520](changes/0520-xlsx-source-edit-phase-attribution.md) changes evidence, Python capture/analysis helpers and documentation.
+All 30 previously read accepted ADR/index hashes match the retained manifest;
+production and Rust benchmark source are unchanged. ADR 0005 is addressed by
+source/build/corpus-bound native phase evidence and scoped instruction profiles,
+with missing memory/provider/scaling dimensions explicit. ADR 0006 preservation
+and ADR 0003 source/patch behavior remain exercised by existing harness oracles;
+no new semantic capability or full release-gate pass is claimed. No API,
+dependency, budget, unsafe-code, validation or architecture rule changes.
+
 ## 0519: reuse a complete XML proof under identical destination limits
 
 The [0519 matrix](results/change-0519/adr-review.md) and

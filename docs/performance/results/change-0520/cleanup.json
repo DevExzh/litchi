@@ -1,0 +1,11 @@
+{
+  "completed_utc": "2026-09-12T04:37:32.680370+00:00",
+  "removed": [
+    "/home/zhuhe/litchi-goal-0520-target"
+  ],
+  "accessible_process_references": [],
+  "unavailable_fd_directories": 434,
+  "owned_target_absent": true,
+  "python_cache_absent": true,
+  "scope": "Only the owned 0520 build target removed; verifier temporary directories use automatic cleanup."
+}

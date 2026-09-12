@@ -1,0 +1,49 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--zero-before=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--dump-after=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0520/profile-r2-medium.callgrind",
+    "/home/zhuhe/litchi-goal-0520-target/release/litchi-perf-baseline",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0520/profile-r2-medium.json"
+  ],
+  "start_utc": "2026-09-12T04:29:19.808859+00:00",
+  "end_utc": "2026-09-12T04:29:52.101023+00:00",
+  "seconds": 32.292168928994215,
+  "exit_code": 0,
+  "binary_sha256": "37b145ede063868ee21b3a3912b363f4ceb83b10ac1c625eaba18fc7f166f9a6",
+  "script_sha256": "be229a48ece54854112eb86fe0b533e8ef8a621a297f91cad5c47aec7af3002e",
+  "source_manifest_sha256": "ce60e85c5f9fe722ea2ced7f092a96779b732bffb584725c3a6e880f0cad0e98",
+  "plan_sha256": "9457eba1b49036debe6729fd459f8379ce507a4cf3e9195c4b4713e7e69fc92c",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "profile-r2-medium.json": "23e5c7b176b0cadc39f68891ee31891ae61dc29cccb92ac7c3f9884408ec2816",
+    "profile-r2-medium.callgrind.4": "48ad492427d2e7da6dc13fb712976d6a469a59dd73476070d14285806a10f677",
+    "profile-r2-medium.callgrind": "00d800eec4fa49f5cb3256ae4055e896ba5591b693979261af152a61ed8fc0fa",
+    "profile-r2-medium.callgrind.3": "f36403cd9f5fabf68ab6565a68fb58cdf1f60442195d566542eb29d75aefd82e",
+    "profile-r2-medium.stderr": "cb01483a3797ad6eee7b83017cbf06c7d43de86aa2238e2ec7aed53296a7072d",
+    "profile-r2-medium.callgrind.2": "4c9fc5715dd1eb2f6bb8ed1fa801607539eeb2476966ea5627ee955e786935b5",
+    "profile-r2-medium.callgrind.1": "f317cb95b142092a98685a24593f24333e18e6a7ac53ded2d5b03dd8d5fba32b",
+    "profile-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

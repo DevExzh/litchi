@@ -1,0 +1,34 @@
+{
+  "revision": "b776ccb2a55c7a2a22018d4498e78676c6648dde",
+  "created_utc": "2026-09-12T04:23:01.465248+00:00",
+  "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "native_repeats": 2,
+  "warmup": 20,
+  "samples": 100,
+  "cpu": 2,
+  "build": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline",
+    "--target-dir",
+    "/home/zhuhe/litchi-goal-0520-target"
+  ],
+  "performance_claim": "none; current phase attribution only",
+  "timing": "sum of open, plan, commit including staged set loop, publication including returned-value drop; excludes sink setup, editor/commit drop, reopen and oracles",
+  "profile": "Phase-specific Callgrind only if existing emitted owner is uniquely separable; otherwise label whole-process and defer isolated profile.",
+  "missing_metrics": [
+    "operation-local allocator",
+    "physical provider I/O",
+    "cold cache",
+    "scaling"
+  ]
+}

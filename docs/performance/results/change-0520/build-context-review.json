@@ -1,0 +1,15 @@
+{
+  "observed_utc": "2026-09-12T04:31:44.809417+00:00",
+  "files": {
+    ".cargo/config.toml": {
+      "sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
+      "text": "[alias]\n# Keep the local pre-commit gate and CI on exactly the same lint policy.\n#\n# Production libraries use the pinned workspace `clippy::all` baseline. Unit\n# and integration tests are compiled by the separate `cargo check` gate without\n# applying library-only style policy to assertion code. Examples are not part\n# of the release gate because some require consumer-owned fixtures and setup.\nlint = \"clippy --workspace --all-features --lib --no-deps -- -D warnings\"\n"
+    },
+    "rust-toolchain.toml": {
+      "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+      "text": "[toolchain]\nchannel = \"1.95.0\"\ncomponents = [\"clippy\", \"rustfmt\"]\nprofile = \"minimal\"\n"
+    }
+  },
+  "scope": "Post-capture review of toolchain/config bytes, confirmed equal to frozen base revision. Root Cargo config defines only a lint alias; no build flag. Original source manifest is unchanged.",
+  "user_cargo_config_present": false
+}

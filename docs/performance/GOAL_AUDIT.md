@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0520: current XLSX phase attribution complete; optimization remains open
+
+[0520](changes/0520-xlsx-source-edit-phase-attribution.md) closes the immediate current phase/commit-owner attribution task for
+the two synthetic source-backed one-percent edit/save shapes. It retains 400
+native samples, four isolated commit profiles and executable output/preservation
+oracles. It does not close operation-local allocation, physical FileSource/range,
+cold-cache, native producer, broader CRUD or scaling requirements, and does not
+promote the selector in the checked coverage catalog. The next work targets
+measured candidate reconstruction and source-layout costs. OLE2/OOXML remains
+active, ODF deferred until that optimization goal completes, and iWork excluded.
+
 ## 0519: reuse the immutable OPC publication XML proof
 
 [0519](changes/0519-opc-publication-xml-proof-reuse.md) reuses complete XML
@@ -72,7 +83,7 @@ production is restored. Two independent no-op fixture fixes remain, with
 1,263 tests passing on unchanged production. OLE2/OOXML work remains active;
 ODF is deferred and iWork excluded.
 
-## Current priority after 0519: OLE2 and OOXML
+## Current priority after 0520: OLE2 and OOXML
 
 Per the user's instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
@@ -83,9 +94,11 @@ changes remove repeated XML and current-snapshot construction work. Further
 publication investigation must distinguish required byte copying from
 removable work and compare its end-to-end value with broader OLE2/OOXML
 coverage. Required candidate validation and readback remain intact.
-The [next-priority review](results/change-0519/next-priority-review.md)
-selects current source-backed XLSX one-percent edit/save phase and resource
-attribution before another DOCX publication change. Retain the 0499/0500 review flags. This investigation queue is not a completion checklist. The broader requirements and
+The [0520 attribution](changes/0520-xlsx-source-edit-phase-attribution.md)
+now identifies source-backed XLSX candidate reconstruction and source-layout
+scanning as the next commit owners to investigate. Operation-local allocation
+and a distinct measured work-elimination design remain required; do not repeat
+the rejected fusion proposals. Retain the 0499/0500 review flags. This investigation queue is not a completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
 

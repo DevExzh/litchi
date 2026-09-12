@@ -1,5 +1,17 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0520: current source-backed XLSX edit/save baseline
+
+[0520](changes/0520-xlsx-source-edit-phase-attribution.md) retains 400 native samples across two fresh children per shape,
+plus four separately scoped commit profiles. Medium total p50 is 27.44–27.96 ms;
+dense-sparse is 52.80–53.70 ms. Commit accounts for 44.80–45.80% of measured
+time, planning 27.94–28.97%, and publication 24.89–26.79%. Source/harness are
+unchanged at `b776ccb2a`; this is attribution, not a speedup result.
+Twelve phase/metric repeat variations exceed 5% in either direction and remain
+visible. Logical counters, corpus/output hashes, and untouched-member checks
+match per shape. Allocation/RSS, physical I/O, cold/range and scaling remain
+unmeasured in this batch; default provider options do not activate those lanes.
+
 ## 0519: reuse the immutable OPC publication XML proof
 
 [0519](changes/0519-opc-publication-xml-proof-reuse.md) reuses complete XML
