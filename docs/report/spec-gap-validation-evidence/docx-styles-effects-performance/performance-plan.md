@@ -385,9 +385,13 @@ binary/source hash, or nonzero sidecar status fails the profile.
 
 The host-hygiene receipt is captured immediately before and after the process
 set. It records UTC time, load average, CPU model and online CPU count, memory
-availability, kernel/OS identity, requested and observed affinity when a
-runner uses one, and whether another profile/build process is present. The
-runner runs the three processes sequentially, does not run a concurrent build
+availability, kernel/OS identity, and requested and observed affinity when a
+runner uses one. `host_probe.sh` does not inspect concurrent processes. The
+operator must separately retain a visible-process census before and after
+the run, coordinate the prohibition on other agents' timing workloads, and
+report any observed build/profile contention. A census is an observation,
+not proof that unobserved host activity was absent. The runner runs the three
+processes sequentially and does not itself run a concurrent build
 or benchmark, and does not claim CPU isolation, frequency locking, cache
 flushing, thermal stability, or idle-host status unless the receipt proves
 that property. Unknown host fields are recorded as unavailable rather than

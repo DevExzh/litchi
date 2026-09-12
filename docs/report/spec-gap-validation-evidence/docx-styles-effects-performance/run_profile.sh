@@ -23,6 +23,9 @@ fi
 
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 ROOT=$(cd -- "$HERE/../../../.." && pwd -P)
+# Rustup and Cargo discover toolchain/config files from the working directory.
+# Anchor their execution to this frozen checkout, regardless of the caller.
+cd -- "$ROOT"
 SOURCE_COMMIT=8702fd4db8723acceb7deb51bcb40ff66604bf10
 # The profile's correctness prerequisite is the separately reviewed current
 # source smoke retained in fa927a8a9.  The historical d1/clean-46 smoke remains
