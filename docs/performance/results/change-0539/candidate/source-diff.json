@@ -1,0 +1,13 @@
+{
+  "baseline_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+  "candidate_manifest_sha256": "23d07d359e4d1404909bcab21e3833acedd14f34ac304ce029d1e512c7878306",
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/src/raw/worksheet/"
+  ],
+  "changed_files": {
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs": {
+      "baseline_sha256": "69719bc7a0aa0754ab4745f49baba077303ca7909f4e9adbc5243189e85fb9a7",
+      "candidate_sha256": "67f6891fb3d84ef37414e41cf614a7971e740eb82b44510a59b0552fa40fa6a5"
+    }
+  }
+}

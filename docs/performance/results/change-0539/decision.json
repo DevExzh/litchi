@@ -1,0 +1,16 @@
+{
+  "decision": "reject",
+  "reason": "Only one of four primary shape/repeat rows meets every frozen native gate; the allocation gate passes but cannot override native failure.",
+  "native_passed": false,
+  "allocation_passed": true,
+  "comparison_sha256": "9913dcc477662c49853dd137486bf046af17e836e2c72f9e7f21c48887f27362",
+  "allocation_analysis_sha256": "01d8f8f6d5428d38425f675c058897cbe75731ec5eb43e91df6abf0bc4c06be9",
+  "runtime_restored": true,
+  "codec_sha256": "69719bc7a0aa0754ab4745f49baba077303ca7909f4e9adbc5243189e85fb9a7",
+  "conditional_lanes": {
+    "profile": "not captured: native pilot failed",
+    "hardware": "not captured: native pilot failed",
+    "eager": "not captured: native pilot failed"
+  },
+  "baseline_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7"
+}

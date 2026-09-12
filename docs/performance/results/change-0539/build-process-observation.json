@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-12T19:40:03.429046+00:00",
+  "compiler_processes": [
+    {
+      "pid": 78880,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi"
+    },
+    {
+      "pid": 109891,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/code/litchi/tools/perf-baseline"
+    }
+  ],
+  "scope": "Accessible compiler processes during baseline build; no host-quiescence claim"
+}

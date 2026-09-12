@@ -1,0 +1,17 @@
+{
+  "allocator_samples_per_phase": 240,
+  "baseline_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+  "decision": "reject",
+  "matched_adverse": 28,
+  "native_samples": 2440,
+  "receipts": 56,
+  "runtime_restored": true,
+  "same_build_drift": 69,
+  "status": "pass",
+  "test_counts": {
+    "baseline/final-quality-tests": 1292,
+    "baseline/quality-tests": 1292,
+    "candidate/quality-tests": 1292
+  },
+  "total_tests": 3876
+}

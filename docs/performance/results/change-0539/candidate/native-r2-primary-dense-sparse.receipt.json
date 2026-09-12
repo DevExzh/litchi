@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0539/candidate/native-r2-primary-dense-sparse.rss.json",
+    "/home/zhuhe/litchi-goal-0539-target/retained-binaries/candidate-normal",
+    "--warmup",
+    "20",
+    "--samples",
+    "200",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0539/candidate/native-r2-primary-dense-sparse.json"
+  ],
+  "start_utc": "2026-09-12T19:50:11.152249+00:00",
+  "end_utc": "2026-09-12T19:50:32.035234+00:00",
+  "seconds": 20.882989620004082,
+  "exit_code": 0,
+  "binary_sha256": "efd9d64970fd4964fc2d55f619bd7d19fa9f624de5981f8e653c9dada0d2eefe",
+  "source_manifest_sha256": "23d07d359e4d1404909bcab21e3833acedd14f34ac304ce029d1e512c7878306",
+  "working_source_manifest_sha256": "23d07d359e4d1404909bcab21e3833acedd14f34ac304ce029d1e512c7878306",
+  "script_sha256": "1498d3041738305182450014c438ed712b27b520b61e4c01fc134de06085eefe",
+  "plan_sha256": "80d4bdbdf422a907793cb751d54aef048c8b7376a91c6a64d2378cdf38ab0577",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0539-target/test-tmp"
+  },
+  "artifacts": {
+    "native-r2-primary-dense-sparse.json": "4221e140f75b96bed6fe64a3f8b7c337ffddbd3fafbe355f6fc45d4aaf436607",
+    "native-r2-primary-dense-sparse.rss.json": "032c15321f5bd4d11f472c0d9d322a758afec4fdedf3346372bde37131207b96",
+    "native-r2-primary-dense-sparse.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r2-primary-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

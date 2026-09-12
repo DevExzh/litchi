@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0539: XLSX transient ownership candidate rejected
+
+[0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched
+experiment. The private attribute-borrowing candidate preserves checked scans and owned
+cell-type retention, but fails frozen native admission. The codec is restored; only the
+stronger plain/entity-encoded attribute test remains. No production optimization is
+admitted. All 30 ADR/index bindings are unchanged.
+
 ## 0538: XLSX planning allocation observation
 
 [0538](changes/0538-xlsx-planning-allocation-metrics.md) changes only the

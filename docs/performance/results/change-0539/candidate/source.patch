@@ -1,0 +1,80 @@
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/codec.rs b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+index b0274614c..441d90cca 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -1,5 +1,6 @@
+ //! Streaming `SpreadsheetML` event codec.
+ 
++use std::borrow::Cow;
+ use std::collections::HashSet;
+ 
+ use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
+@@ -174,7 +175,7 @@ pub(super) fn parse_processed_defaults(
+ // errors still follow coordinate, style, cell-metadata and value-metadata checks.
+ #[derive(Debug)]
+ struct CellAttributeView<'a> {
+-    reference: Option<String>,
++    reference: Option<Cow<'a, str>>,
+     style: Option<Attribute<'a>>,
+     cell_metadata: Option<Attribute<'a>>,
+     value_metadata: Option<Attribute<'a>>,
+@@ -212,13 +213,12 @@ fn scan_cell_attributes<'a>(
+     Ok(attributes)
+ }
+ 
+-fn decode_cell_attribute(
+-    attribute: Attribute<'_>,
++fn decode_cell_attribute<'a>(
++    attribute: Attribute<'a>,
+     decoder: Decoder,
+-) -> litchi_ooxml_common::xml::Result<String> {
++) -> litchi_ooxml_common::xml::Result<Cow<'a, str>> {
+     attribute
+         .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+-        .map(|value| value.into_owned())
+         .map_err(|error| litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+ }
+ 
+@@ -792,7 +792,7 @@ impl Parser {
+             cell_metadata,
+             value_metadata,
+             cell_type: cell_type
+-                .map(|attribute| decode_cell_attribute(attribute, decoder))
++                .map(|attribute| decode_cell_attribute(attribute, decoder).map(Cow::into_owned))
+                 .transpose()?,
+             value: String::new(),
+             value_bytes: 0,
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+index f32b1a6ff..7b25c0ff0 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+@@ -512,15 +512,24 @@ fn rejects_grid_escape_duplicates_and_broken_shared_groups() {
+ #[test]
+ fn eager_cell_attributes_keep_fixed_fields_and_entity_decoding() {
+     let xml = format!(
+-        r#"<worksheet xmlns="{S}" xmlns:future="urn:future"><sheetData><row r="1"><c r="A&#x31;" t="&#x73;" s="1" cm="2147483647" vm="2147483647" future:opaque="preserve"><v>0</v></c></row></sheetData></worksheet>"#
++        r#"<worksheet xmlns="{S}" xmlns:future="urn:future"><sheetData><row r="1"><c r="A&#x31;" t="&#x73;" s="1" cm="2147483647" vm="2147483647" future:opaque="preserve"><v>0</v></c><c r="B1" t="s" s="&#x31;" cm="&#x32;147483647" vm="21474836&#x34;7"><v>0</v></c></row></sheetData></worksheet>"#
+     );
+     let strings = [Text::from("shared")];
+     let store = parse(xml.as_bytes(), || Ok(Some(&strings)))
+         .expect("entity-encoded cell attributes should parse");
+-    assert!(matches!(
+-        store.get(Address::from_a1("A1").expect("address")),
+-        Some(Cell::Value(Value::Text(value))) if value.as_str() == "shared"
+-    ));
++    assert_eq!(store.entries().len(), 2);
++    for address in ["A1", "B1"] {
++        let entry = store
++            .entry(Address::from_a1(address).expect("address"))
++            .expect("stored cell");
++        assert_eq!(entry.style, Some(1));
++        assert_eq!(entry.cell_metadata, Some(2_147_483_647));
++        assert_eq!(entry.value_metadata, Some(2_147_483_647));
++        assert!(matches!(
++            &entry.cell,
++            Cell::Value(Value::Text(value)) if value.as_str() == "shared"
++        ));
++    }
+ }
+ 
+ #[test]

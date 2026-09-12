@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0539: XLSX transient ownership candidate rejected
+
+[0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched
+experiment. Transient attribute borrowing removes 13.6–13.7% of planning allocation
+calls but only 0.26–0.46% of bytes, with unchanged incremental peaks. Three of four
+primary native rows fail admission. The candidate is rejected. Next, audit the larger
+worksheet validation/parser boundary with fresh attribution and explicit error-order
+obligations before considering reuse or fusion.
+
 ## 0538: XLSX transient decoding candidate can now be measured locally
 
 [0538](changes/0538-xlsx-planning-allocation-metrics.md) adds planning-local

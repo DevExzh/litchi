@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0539: XLSX transient ownership candidate rejected
+
+[0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched
+experiment. The transient attribute candidate is rejected: only one of four primary
+shape/repeat rows passes frozen workflow and planning latency gates. Planning allocation
+savings do not override that result. The codec is restored, the stronger test is
+retained, and all 28 matched adverse and 69 same-build drift flags are individually
+recorded. Conditional profiling, hardware and eager-read lanes were skipped after native
+failure.
+
 ## 0538: XLSX planning allocation metrics, no optimization claim
 
 [0538](changes/0538-xlsx-planning-allocation-metrics.md) is a harness enabler:

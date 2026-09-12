@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0539: XLSX transient ownership candidate rejected
+
+[0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched
+experiment. Fresh serial ABBA release captures retain 2,440 native samples and 240
+allocator samples per phase. Only one of four primary rows passes all latency gates.
+Planning calls fall 13.6–13.7%, with unchanged incremental peaks; this does not
+establish workflow speedup. The candidate is rejected and the codec restored.
+
 ## 0538: planning allocation measurement enabler
 
 [0538](changes/0538-xlsx-planning-allocation-metrics.md) adds aligned planning

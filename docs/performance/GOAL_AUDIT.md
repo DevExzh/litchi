@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0539: XLSX transient ownership candidate rejected
+
+[0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched
+experiment. The 0537 candidate has now been measured using the 0538 planning observer
+and rejected under frozen native gates. Baseline, candidate and restored suites each
+pass 1,292 tests, with final quality checks passing. Next is a source and profiling
+audit of the worksheet validation/parser boundary. The broad goal remains active;
+OLE2/OOXML take priority, ODF is deferred, and iWork is excluded.
+
 ## 0538: close the XLSX planning allocation evidence gap
 
 [0538](changes/0538-xlsx-planning-allocation-metrics.md) implements the
