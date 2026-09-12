@@ -2847,7 +2847,7 @@ impl NumbersEditor {
 
     /// List every native merged-cell rectangle in one attached table.
     pub fn table_cell_merges(&self, table_id: u64) -> Result<Vec<Region>> {
-        cell_merge::regions_in_package(&self.package, table_id)
+        cell_merge::regions_in_editor(self, table_id)
     }
 
     /// Merge one non-overlapping rectangular cell region transactionally.

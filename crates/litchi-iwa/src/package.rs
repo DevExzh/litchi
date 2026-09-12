@@ -81,6 +81,7 @@ fn clone_error(error: &Error) -> Error {
         Error::IwaCore(error) => Error::IwaCore(error.clone()),
         Error::IwaCommon(error) => Error::IwaCommon(error.clone()),
         Error::PagesSemantic(error) => Error::PagesSemantic(error.clone()),
+        Error::NumbersTableMerges(error) => Error::NumbersTableMerges(*error),
         Error::TextHyperlink(error) => Error::TextHyperlink(*error),
         Error::TextHighlight(error) => Error::TextHighlight(*error),
         Error::TextNumberAttachment(error) => Error::TextNumberAttachment(*error),

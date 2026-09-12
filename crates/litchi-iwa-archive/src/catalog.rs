@@ -32,14 +32,21 @@ pub(crate) struct DirectoryIndexReport {
 #[derive(Debug)]
 pub struct Component {
     name: Box<str>,
-    archive: Archive,
+    archive: ComponentArchive,
+}
+
+#[derive(Debug)]
+enum ComponentArchive {
+    Owned(Archive),
+    #[cfg(feature = "internal-iwork-source")]
+    Shared(Arc<Archive>),
 }
 
 impl Component {
     pub(crate) fn new(name: &str, archive: Archive) -> Self {
         Self {
             name: name.into(),
-            archive,
+            archive: ComponentArchive::Owned(archive),
         }
     }
 
@@ -54,7 +61,7 @@ impl Component {
         owned.push_str(name);
         Ok(Self {
             name: owned.into_boxed_str(),
-            archive,
+            archive: ComponentArchive::Owned(archive),
         })
     }
 
@@ -81,7 +88,7 @@ impl Component {
         owned.push_str(basename);
         Ok(Self {
             name: owned.into_boxed_str(),
-            archive,
+            archive: ComponentArchive::Owned(archive),
         })
     }
 
@@ -93,14 +100,27 @@ impl Component {
 
     /// Borrow the neutral parsed IWA archive.
     #[must_use]
-    pub const fn archive(&self) -> &Archive {
-        &self.archive
+    pub fn archive(&self) -> &Archive {
+        match &self.archive {
+            ComponentArchive::Owned(archive) => archive,
+            #[cfg(feature = "internal-iwork-source")]
+            ComponentArchive::Shared(archive) => archive,
+        }
     }
 
     /// Consume the component and return its owned name and archive.
+    ///
+    /// Migration catalogs may retain a shared cache record. This owned-return
+    /// boundary takes that record when uniquely held and clones it otherwise;
+    /// [`Self::archive`] always borrows the retained record.
     #[must_use]
     pub fn into_parts(self) -> (String, Archive) {
-        (self.name.into(), self.archive)
+        let archive = match self.archive {
+            ComponentArchive::Owned(archive) => archive,
+            #[cfg(feature = "internal-iwork-source")]
+            ComponentArchive::Shared(archive) => Arc::unwrap_or_clone(archive),
+        };
+        (self.name.into(), archive)
     }
 }
 
@@ -113,6 +133,9 @@ impl Component {
 pub struct ComponentCatalog {
     components: Box<[Component]>,
 }
+
+#[cfg(feature = "internal-iwork-source")]
+mod shared;
 
 impl ComponentCatalog {
     pub(crate) fn from_semantic_components(mut components: Vec<Component>) -> Self {
