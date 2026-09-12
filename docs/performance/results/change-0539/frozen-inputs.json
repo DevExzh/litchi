@@ -1,0 +1,12 @@
+{
+  "created_utc": "2026-09-12T19:40:03.423574+00:00",
+  "stage": "baselinebuild underway; no capture started",
+  "files": {
+    "plan.json": "80d4bdbdf422a907793cb751d54aef048c8b7376a91c6a64d2378cdf38ab0577",
+    "allocation-gates.json": "8a994dcc3ba3c0990e987eeca45d94388f6f2502aa35c983b813baa9b19e5e3e",
+    "candidate.patch": "5615b3433d83b960167c442e7fb7c13fe3a295fc2ac78de859c049af12f396aa",
+    "guard.patch": "71af606ea6deb70da2e826ec851ba75b0b08ef530bbe38f872562525b47e473f",
+    "quality-plan.json": "5bfe603defdceb62bd16be77f819eb481d4a290d5b3db728ab17f9d1ee6d95bf",
+    "run.py": "1498d3041738305182450014c438ed712b27b520b61e4c01fc134de06085eefe"
+  }
+}

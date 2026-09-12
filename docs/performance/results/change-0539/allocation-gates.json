@@ -1,0 +1,8 @@
+{
+  "created_utc": "2026-09-12T19:38:22.365105+00:00",
+  "status": "frozen-before-first-allocation-capture",
+  "planning_allocation_calls_reduction_percent": 5.0,
+  "planning_allocated_bytes": "non-increasing in each shape/repeat; compare maximum candidate with minimum baseline",
+  "scope": "Every30-sample planning pair; report calls,bytes,reallocations,incrementalpeak for allthreephases; flag every>5% adverse field separately",
+  "note": "Native admission remains independently mandatory; instrumented timings not compared"
+}

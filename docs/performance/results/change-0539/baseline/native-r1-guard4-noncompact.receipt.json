@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0539/baseline/native-r1-guard4-noncompact.rss.json",
+    "/home/zhuhe/litchi-goal-0539-target/retained-binaries/baseline-normal",
+    "--warmup",
+    "10",
+    "--samples",
+    "30",
+    "--case",
+    "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "noncompact",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0539/baseline/native-r1-guard4-noncompact.json"
+  ],
+  "start_utc": "2026-09-12T19:43:29.447926+00:00",
+  "end_utc": "2026-09-12T19:43:32.832607+00:00",
+  "seconds": 3.384671990002971,
+  "exit_code": 0,
+  "binary_sha256": "c6f742b7d0bf8b9e24081d73117289078f99aff26de23fc76df28345e5e21e60",
+  "source_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+  "working_source_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+  "script_sha256": "1498d3041738305182450014c438ed712b27b520b61e4c01fc134de06085eefe",
+  "plan_sha256": "80d4bdbdf422a907793cb751d54aef048c8b7376a91c6a64d2378cdf38ab0577",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0539-target/test-tmp"
+  },
+  "artifacts": {
+    "native-r1-guard4-noncompact.json": "642b630be34350d83e38137d1fad2c0c614067dc95a31557e67eebc5ca36de5f",
+    "native-r1-guard4-noncompact.rss.json": "545c1ac134a224f01973f3e95e09d4249d40f9f97cb12d5b3850f7c56be61f07",
+    "native-r1-guard4-noncompact.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r1-guard4-noncompact.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

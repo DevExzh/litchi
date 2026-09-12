@@ -1,0 +1,14 @@
+{
+  "removed": [
+    "/home/zhuhe/litchi-goal-0539-target"
+  ],
+  "owned_paths_absent": true,
+  "accessible_process_references": [],
+  "retained_binary_sha256_before_removal": {
+    "/home/zhuhe/litchi-goal-0539-target/retained-binaries/candidate-normal": "efd9d64970fd4964fc2d55f619bd7d19fa9f624de5981f8e653c9dada0d2eefe",
+    "/home/zhuhe/litchi-goal-0539-target/retained-binaries/baseline-alloc": "3ed0ba8ead206f967564eb415a449686c83b28f5209d6bb79a05f144f9d8d92f",
+    "/home/zhuhe/litchi-goal-0539-target/retained-binaries/candidate-alloc": "6597e4c89c57a86bfbbbb2f134d218ac8b3d17219ffcdaae487232b1ae0c3742",
+    "/home/zhuhe/litchi-goal-0539-target/retained-binaries/baseline-normal": "c6f742b7d0bf8b9e24081d73117289078f99aff26de23fc76df28345e5e21e60"
+  },
+  "completed_utc": "2026-09-12T20:27:17.174636+00:00"
+}

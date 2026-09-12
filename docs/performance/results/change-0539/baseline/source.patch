@@ -1,0 +1,34 @@
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/tests.rs b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+index f32b1a6ff..7b25c0ff0 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/tests.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/tests.rs
+@@ -512,15 +512,24 @@ fn rejects_grid_escape_duplicates_and_broken_shared_groups() {
+ #[test]
+ fn eager_cell_attributes_keep_fixed_fields_and_entity_decoding() {
+     let xml = format!(
+-        r#"<worksheet xmlns="{S}" xmlns:future="urn:future"><sheetData><row r="1"><c r="A&#x31;" t="&#x73;" s="1" cm="2147483647" vm="2147483647" future:opaque="preserve"><v>0</v></c></row></sheetData></worksheet>"#
++        r#"<worksheet xmlns="{S}" xmlns:future="urn:future"><sheetData><row r="1"><c r="A&#x31;" t="&#x73;" s="1" cm="2147483647" vm="2147483647" future:opaque="preserve"><v>0</v></c><c r="B1" t="s" s="&#x31;" cm="&#x32;147483647" vm="21474836&#x34;7"><v>0</v></c></row></sheetData></worksheet>"#
+     );
+     let strings = [Text::from("shared")];
+     let store = parse(xml.as_bytes(), || Ok(Some(&strings)))
+         .expect("entity-encoded cell attributes should parse");
+-    assert!(matches!(
+-        store.get(Address::from_a1("A1").expect("address")),
+-        Some(Cell::Value(Value::Text(value))) if value.as_str() == "shared"
+-    ));
++    assert_eq!(store.entries().len(), 2);
++    for address in ["A1", "B1"] {
++        let entry = store
++            .entry(Address::from_a1(address).expect("address"))
++            .expect("stored cell");
++        assert_eq!(entry.style, Some(1));
++        assert_eq!(entry.cell_metadata, Some(2_147_483_647));
++        assert_eq!(entry.value_metadata, Some(2_147_483_647));
++        assert!(matches!(
++            &entry.cell,
++            Cell::Value(Value::Text(value)) if value.as_str() == "shared"
++        ));
++    }
+ }
+ 
+ #[test]

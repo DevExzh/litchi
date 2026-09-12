@@ -1,0 +1,2045 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "disposition": "reject",
+  "scope": "0539 native XLSX source-backed planning pilot; every retained >5% candidate adverse metric and same-build drift flag reviewed individually",
+  "comparison_sha256": "9913dcc477662c49853dd137486bf046af17e836e2c72f9e7f21c48887f27362",
+  "allocation_analysis_sha256": "01d8f8f6d5428d38425f675c058897cbe75731ec5eb43e91df6abf0bc4c06be9",
+  "plan_sha256": "80d4bdbdf422a907793cb751d54aef048c8b7376a91c6a64d2378cdf38ab0577",
+  "native_admission": {
+    "decision": "reject",
+    "passed": false,
+    "primary_rows": 4,
+    "passed_rows": 1,
+    "failed_rows": [
+      {
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "total_p50_reduction_percent": 0.26152544429674784,
+        "total_mean_reduction_percent": 0.695863257448531,
+        "planning_p50_reduction_percent": 2.0413419874856333,
+        "passed": false
+      },
+      {
+        "repeat": 2,
+        "shape": "dense-sparse",
+        "total_p50_reduction_percent": -1.1195212722272898,
+        "total_mean_reduction_percent": -1.0188849870618206,
+        "planning_p50_reduction_percent": 1.682057377918189,
+        "passed": false
+      },
+      {
+        "repeat": 2,
+        "shape": "medium",
+        "total_p50_reduction_percent": -0.20758065087284325,
+        "total_mean_reduction_percent": 0.09417263294376449,
+        "planning_p50_reduction_percent": 2.9516612725747624,
+        "passed": false
+      }
+    ],
+    "rule": "Every planned XLSX primary shape/repeat must meet measured workflow elapsed p50, total mean, and plan_ns p50 gates. Publication p50 and planning Ir are diagnostics/conditional evidence and do not enter native admission.",
+    "conditional_lanes_run": false,
+    "conditional_lane_reason": "Native admission failed; planning profile, hardware and eager-read lanes remain unmeasured and cannot override rejection."
+  },
+  "allocation_diagnostics": {
+    "planning_gate_passed": true,
+    "adverse_flags": [],
+    "decisions": [
+      {
+        "bytes_nonincreasing": true,
+        "name": "alloc-r1-medium",
+        "passed": true,
+        "worst_pair_calls_reduction_percent": 13.561516841532145
+      },
+      {
+        "bytes_nonincreasing": true,
+        "name": "alloc-r1-dense-sparse",
+        "passed": true,
+        "worst_pair_calls_reduction_percent": 13.734647717710995
+      },
+      {
+        "bytes_nonincreasing": true,
+        "name": "alloc-r2-medium",
+        "passed": true,
+        "worst_pair_calls_reduction_percent": 13.561516841532145
+      },
+      {
+        "bytes_nonincreasing": true,
+        "name": "alloc-r2-dense-sparse",
+        "passed": true,
+        "worst_pair_calls_reduction_percent": 13.734647717710995
+      }
+    ],
+    "scope": "Planning/commit/publication allocation vectors only; no instrumented latency comparison",
+    "interpretation": "Planning allocation calls reduced 13.561516841532145% in medium and 13.734647717710995% in dense-sparse for both repeats; bytes were non-increasing. This diagnostic passes its frozen gate but does not rehabilitate the failed native candidate."
+  },
+  "thresholds": {
+    "adverse_percent": 5,
+    "same_build_drift_absolute_percent": 5,
+    "native_total_p50_percent": 1,
+    "native_total_mean_percent": 1,
+    "native_planning_p50_percent": 2,
+    "planning_allocation_calls_percent": 5
+  },
+  "counts": {
+    "adverse_flags_over_five_percent": 28,
+    "same_build_drift_over_five_percent": 69,
+    "reviewed_flags": 97
+  },
+  "adverse_flags": [
+    {
+      "id": "A001",
+      "original": {
+        "baseline": 120871,
+        "baseline_zero_adverse": false,
+        "candidate": 138861,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 14.883636273382361,
+        "guard": 0,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 14.883636% in open_ns p95 for xlsx_source_backed_cell_values_one_edit_save (dense-sparse, guard0, repeat 1); the exact values 120871 -> 138861 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A002",
+      "original": {
+        "baseline": 124661,
+        "baseline_zero_adverse": false,
+        "candidate": 149441,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 19.877908888906724,
+        "guard": 0,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 19.877909% in open_ns p99 for xlsx_source_backed_cell_values_one_edit_save (dense-sparse, guard0, repeat 1); the exact values 124661 -> 149441 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A003",
+      "original": {
+        "baseline": 105468.70000000001,
+        "baseline_zero_adverse": false,
+        "candidate": 111560.76666666668,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 5.776184466734358,
+        "guard": 0,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 5.776184% in open_ns mean for xlsx_source_backed_cell_values_one_edit_save (dense-sparse, guard0, repeat 1); the exact values 105468.70000000001 -> 111560.76666666668 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A004",
+      "original": {
+        "baseline": 91091,
+        "baseline_zero_adverse": false,
+        "candidate": 96270,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 5.685523267940851,
+        "guard": 0,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 1,
+        "shape": "medium",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 5.685523% in open_ns p95 for xlsx_source_backed_cell_values_one_edit_save (medium, guard0, repeat 1); the exact values 91091 -> 96270 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A005",
+      "original": {
+        "baseline": 93970,
+        "baseline_zero_adverse": false,
+        "candidate": 106820,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 13.67457699265724,
+        "guard": 1,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 13.674577% in open_ns p50 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (dense-sparse, guard1, repeat 1); the exact values 93970 -> 106820 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A006",
+      "original": {
+        "baseline": 107331,
+        "baseline_zero_adverse": false,
+        "candidate": 117230,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 9.222871304655689,
+        "guard": 1,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 9.222871% in open_ns p95 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (dense-sparse, guard1, repeat 1); the exact values 107331 -> 117230 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A007",
+      "original": {
+        "baseline": 95515.60000000002,
+        "baseline_zero_adverse": false,
+        "candidate": 108304.86666666667,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 13.389715048292272,
+        "guard": 1,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 13.389715% in open_ns mean for xlsx_source_backed_managed_cell_values_one_percent_edit_save (dense-sparse, guard1, repeat 1); the exact values 95515.60000000002 -> 108304.86666666667 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A008",
+      "original": {
+        "baseline": 88440,
+        "baseline_zero_adverse": false,
+        "candidate": 92920,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 5.065581184984169,
+        "guard": 1,
+        "lane": "native",
+        "phase": "rss",
+        "repeat": 1,
+        "shape": "dense-sparse",
+        "stat": "max_rss_kib",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 5.065581% in rss max_rss_kib for xlsx_source_backed_managed_cell_values_one_percent_edit_save (dense-sparse, guard1, repeat 1); the exact values 88440 -> 92920 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A009",
+      "original": {
+        "baseline": 6792776,
+        "baseline_zero_adverse": false,
+        "candidate": 7324798,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.832173473702064,
+        "guard": 1,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "medium",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 7.832173% in publication_ns p50 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (medium, guard1, repeat 2); the exact values 6792776 -> 7324798 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A010",
+      "original": {
+        "baseline": 6883876,
+        "baseline_zero_adverse": false,
+        "candidate": 7371999,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.090816278503564,
+        "guard": 1,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "medium",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 7.090816% in publication_ns p95 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (medium, guard1, repeat 2); the exact values 6883876 -> 7371999 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A011",
+      "original": {
+        "baseline": 6884687,
+        "baseline_zero_adverse": false,
+        "candidate": 7376468,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.143113405155521,
+        "guard": 1,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "medium",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 7.143113% in publication_ns p99 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (medium, guard1, repeat 2); the exact values 6884687 -> 7376468 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A012",
+      "original": {
+        "baseline": 6803370.399999999,
+        "baseline_zero_adverse": false,
+        "candidate": 7308967.466666668,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.431567545795659,
+        "guard": 1,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "medium",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 7.431568% in publication_ns mean for xlsx_source_backed_managed_cell_values_one_percent_edit_save (medium, guard1, repeat 2); the exact values 6803370.399999999 -> 7308967.466666668 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A013",
+      "original": {
+        "baseline": 6197979,
+        "baseline_zero_adverse": false,
+        "candidate": 6702091,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.133489965035379,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 1,
+        "shape": "noncompact",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 8.133490% in publication_ns p50 for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 1); the exact values 6197979 -> 6702091 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A014",
+      "original": {
+        "baseline": 6288105,
+        "baseline_zero_adverse": false,
+        "candidate": 6792626,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.023418820137396,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 1,
+        "shape": "noncompact",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 8.023419% in publication_ns p95 for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 1); the exact values 6288105 -> 6792626 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A015",
+      "original": {
+        "baseline": 6288715,
+        "baseline_zero_adverse": false,
+        "candidate": 6801607,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.155752009750806,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 1,
+        "shape": "noncompact",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 8.155752% in publication_ns p99 for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 1); the exact values 6288715 -> 6801607 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A016",
+      "original": {
+        "baseline": 6203278.866666666,
+        "baseline_zero_adverse": false,
+        "candidate": 6710924.666666669,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.183507640255193,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 1,
+        "shape": "noncompact",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 8.183508% in publication_ns mean for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 1); the exact values 6203278.866666666 -> 6710924.666666669 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A017",
+      "original": {
+        "baseline": 87230,
+        "baseline_zero_adverse": false,
+        "candidate": 93130,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 6.76372807520349,
+        "guard": 3,
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 6.763728% in open_ns p50 for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 2); the exact values 87230 -> 93130 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A018",
+      "original": {
+        "baseline": 6185579,
+        "baseline_zero_adverse": false,
+        "candidate": 6689209,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.142002551418393,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 8.142003% in publication_ns p50 for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 2); the exact values 6185579 -> 6689209 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A019",
+      "original": {
+        "baseline": 6280814,
+        "baseline_zero_adverse": false,
+        "candidate": 6755694,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 7.560803424524276,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 7.560803% in publication_ns p95 for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 2); the exact values 6280814 -> 6755694 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A020",
+      "original": {
+        "baseline": 6291074,
+        "baseline_zero_adverse": false,
+        "candidate": 6850094,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.885923134905106,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 8.885923% in publication_ns p99 for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 2); the exact values 6291074 -> 6850094 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A021",
+      "original": {
+        "baseline": 6195355.966666667,
+        "baseline_zero_adverse": false,
+        "candidate": 6695428.866666664,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.071737970999205,
+        "guard": 3,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 8.071738% in publication_ns mean for xlsx_source_backed_cell_values_one_percent_edit_save (noncompact, guard3, repeat 2); the exact values 6195355.966666667 -> 6695428.866666664 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A022",
+      "original": {
+        "baseline": 28872244,
+        "baseline_zero_adverse": false,
+        "candidate": 33066823,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 14.528067163743842,
+        "guard": 4,
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 14.528067% in reopen_ns p50 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (noncompact, guard4, repeat 2); the exact values 28872244 -> 33066823 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A023",
+      "original": {
+        "baseline": 29074680,
+        "baseline_zero_adverse": false,
+        "candidate": 33459199,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 15.080196927360845,
+        "guard": 4,
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 15.080197% in reopen_ns p95 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (noncompact, guard4, repeat 2); the exact values 29074680 -> 33459199 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A024",
+      "original": {
+        "baseline": 29456251,
+        "baseline_zero_adverse": false,
+        "candidate": 33546720,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 13.886590659483456,
+        "guard": 4,
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 13.886591% in reopen_ns p99 for xlsx_source_backed_managed_cell_values_one_percent_edit_save (noncompact, guard4, repeat 2); the exact values 29456251 -> 33546720 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A025",
+      "original": {
+        "baseline": 28889566.633333333,
+        "baseline_zero_adverse": false,
+        "candidate": 33085772.7,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 14.524987930504318,
+        "guard": 4,
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat": 2,
+        "shape": "noncompact",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 14.524988% in reopen_ns mean for xlsx_source_backed_managed_cell_values_one_percent_edit_save (noncompact, guard4, repeat 2); the exact values 28889566.633333333 -> 33085772.7 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A026",
+      "original": {
+        "baseline": 88084,
+        "baseline_zero_adverse": false,
+        "candidate": 93012,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 5.5946596430679785,
+        "guard": null,
+        "lane": "native",
+        "phase": "rss",
+        "repeat": 2,
+        "shape": "dense-sparse",
+        "stat": "max_rss_kib",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 5.594660% in rss max_rss_kib for xlsx_source_backed_cell_values_one_percent_edit_save (dense-sparse, primary, repeat 2); the exact values 88084 -> 93012 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A027",
+      "original": {
+        "baseline": 7081137,
+        "baseline_zero_adverse": false,
+        "candidate": 7466899,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 5.447740948946467,
+        "guard": null,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "medium",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 5.447741% in publication_ns p95 for xlsx_source_backed_cell_values_one_percent_edit_save (medium, primary, repeat 2); the exact values 7081137 -> 7466899 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    },
+    {
+      "id": "A028",
+      "original": {
+        "baseline": 7113368,
+        "baseline_zero_adverse": false,
+        "candidate": 7519110,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 5.703936588125336,
+        "guard": null,
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat": 2,
+        "shape": "medium",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured native candidate-side increase of 5.703937% in publication_ns p99 for xlsx_source_backed_cell_values_one_percent_edit_save (medium, primary, repeat 2); the exact values 7113368 -> 7519110 are retained. Keep this as an individually reviewed adverse metric above the frozen 5% threshold; no other reduction offsets it and no cause is assigned from this record."
+    }
+  ],
+  "same_build_drift_flags": [
+    {
+      "id": "D001",
+      "original": {
+        "baseline": 13298144,
+        "baseline_zero_drift": false,
+        "candidate": 14003384,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 5.303296460017282,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in publication_ns p99: 13298144 -> 14003384 (+5.303296%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D002",
+      "original": {
+        "baseline": 42610097,
+        "baseline_zero_drift": false,
+        "candidate": 45470011,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 6.71182231760703,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in reopen_ns p50: 42610097 -> 45470011 (+6.711822%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D003",
+      "original": {
+        "baseline": 42959024.500000015,
+        "baseline_zero_drift": false,
+        "candidate": 45478180.70000001,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 5.864090791912635,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in reopen_ns mean: 42959024.500000015 -> 45478180.70000001 (+5.864091%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D004",
+      "original": {
+        "baseline": 1956498,
+        "baseline_zero_drift": false,
+        "candidate": 2059006,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 5.23936134869547,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (medium, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in publication_ns p99: 1956498 -> 2059006 (+5.239361%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D005",
+      "original": {
+        "baseline": 93970,
+        "baseline_zero_drift": false,
+        "candidate": 110980,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 18.10152176226456,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p50: 93970 -> 110980 (+18.101522%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D006",
+      "original": {
+        "baseline": 107331,
+        "baseline_zero_drift": false,
+        "candidate": 123371,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 14.944424257670196,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 107331 -> 123371 (+14.944424%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D007",
+      "original": {
+        "baseline": 116631,
+        "baseline_zero_drift": false,
+        "candidate": 124720,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 6.935548867796726,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 116631 -> 124720 (+6.935549%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D008",
+      "original": {
+        "baseline": 95515.60000000002,
+        "baseline_zero_drift": false,
+        "candidate": 112335,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 17.609060718877313,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns mean: 95515.60000000002 -> 112335.0 (+17.609061%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D009",
+      "original": {
+        "baseline": 40101074,
+        "baseline_zero_drift": false,
+        "candidate": 45620769,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 13.764456782379453,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p50: 40101074 -> 45620769 (+13.764457%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D010",
+      "original": {
+        "baseline": 40689851,
+        "baseline_zero_drift": false,
+        "candidate": 46572218,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 14.456595085590251,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p95: 40689851 -> 46572218 (+14.456595%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D011",
+      "original": {
+        "baseline": 41139312,
+        "baseline_zero_drift": false,
+        "candidate": 46672466,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 13.449797118629503,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p99: 41139312 -> 46672466 (+13.449797%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D012",
+      "original": {
+        "baseline": 40189278.36666666,
+        "baseline_zero_drift": false,
+        "candidate": 45755127.86666667,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 13.84909041963882,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns mean: 40189278.36666666 -> 45755127.86666667 (+13.849090%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D013",
+      "original": {
+        "baseline": 112601,
+        "baseline_zero_drift": false,
+        "candidate": 100750,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -10.524773314624202,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (medium, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 112601 -> 100750 (-10.524773%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D014",
+      "original": {
+        "baseline": 123380,
+        "baseline_zero_drift": false,
+        "candidate": 106040,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -14.054141676122544,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (medium, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 123380 -> 106040 (-14.054142%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D015",
+      "original": {
+        "baseline": 7368730,
+        "baseline_zero_drift": false,
+        "candidate": 6930596,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -5.94585498450887,
+        "guard": 2,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "vendor-extension",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (vendor-extension, guard2, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p95: 7368730 -> 6930596 (-5.945855%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D016",
+      "original": {
+        "baseline": 7496470,
+        "baseline_zero_drift": false,
+        "candidate": 6995716,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -6.679863989317636,
+        "guard": 2,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "vendor-extension",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (vendor-extension, guard2, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p99: 7496470 -> 6995716 (-6.679864%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D017",
+      "original": {
+        "baseline": 97321,
+        "baseline_zero_drift": false,
+        "candidate": 109761,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 12.782441610752038,
+        "guard": 3,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard3, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 97321 -> 109761 (+12.782442%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D018",
+      "original": {
+        "baseline": 102501,
+        "baseline_zero_drift": false,
+        "candidate": 113521,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 10.751114623271963,
+        "guard": 3,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard3, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 102501 -> 113521 (+10.751115%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D019",
+      "original": {
+        "baseline": 109700,
+        "baseline_zero_drift": false,
+        "candidate": 104200,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -5.013673655423878,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 109700 -> 104200 (-5.013674%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D020",
+      "original": {
+        "baseline": 6181799,
+        "baseline_zero_drift": false,
+        "candidate": 6779290,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 9.665325579172013,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p50: 6181799 -> 6779290 (+9.665326%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D021",
+      "original": {
+        "baseline": 6287185,
+        "baseline_zero_drift": false,
+        "candidate": 6834606,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 8.70693323005447,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p95: 6287185 -> 6834606 (+8.706933%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D022",
+      "original": {
+        "baseline": 6294945,
+        "baseline_zero_drift": false,
+        "candidate": 6844776,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 8.734484574527656,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p99: 6294945 -> 6844776 (+8.734485%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D023",
+      "original": {
+        "baseline": 6197198.633333334,
+        "baseline_zero_drift": false,
+        "candidate": 6780810.8999999985,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 9.41735615068955,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns mean: 6197198.633333334 -> 6780810.8999999985 (+9.417356%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D024",
+      "original": {
+        "baseline": 33477952,
+        "baseline_zero_drift": false,
+        "candidate": 28872244,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -13.757436536141753,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p50: 33477952 -> 28872244 (-13.757437%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D025",
+      "original": {
+        "baseline": 35049949,
+        "baseline_zero_drift": false,
+        "candidate": 29074680,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -17.047867887054558,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p95: 35049949 -> 29074680 (-17.047868%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D026",
+      "original": {
+        "baseline": 35211359,
+        "baseline_zero_drift": false,
+        "candidate": 29456251,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -16.34446429630847,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p99: 35211359 -> 29456251 (-16.344464%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D027",
+      "original": {
+        "baseline": 33690111.633333325,
+        "baseline_zero_drift": false,
+        "candidate": 28889566.633333333,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -14.249121677739662,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "baseline",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns mean: 33690111.633333325 -> 28889566.633333333 (-14.249122%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D028",
+      "original": {
+        "baseline": 108130,
+        "baseline_zero_drift": false,
+        "candidate": 102580,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -5.132710626098214,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p50: 108130 -> 102580 (-5.132711%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D029",
+      "original": {
+        "baseline": 134451,
+        "baseline_zero_drift": false,
+        "candidate": 125420,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -6.71694520680397,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 134451 -> 125420 (-6.716945%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D030",
+      "original": {
+        "baseline": 140881,
+        "baseline_zero_drift": false,
+        "candidate": 133070,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -5.544395624676146,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 140881 -> 133070 (-5.544396%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D031",
+      "original": {
+        "baseline": 113881.69499999993,
+        "baseline_zero_drift": false,
+        "candidate": 105598.61999999997,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": -7.273403333169548,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "baseline",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns mean: 113881.69499999993 -> 105598.61999999997 (-7.273403%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D032",
+      "original": {
+        "baseline": 104230,
+        "baseline_zero_drift": false,
+        "candidate": 112070,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 7.5218267293485574,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "baseline",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline primary repeat drift (medium, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p50: 104230 -> 112070 (+7.521827%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D033",
+      "original": {
+        "baseline": 121140,
+        "baseline_zero_drift": false,
+        "candidate": 131320,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.403500082549108,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "baseline",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build baseline primary repeat drift (medium, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 121140 -> 131320 (+8.403500%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D034",
+      "original": {
+        "baseline": 138861,
+        "baseline_zero_drift": false,
+        "candidate": 108901,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -21.575532366899274,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in open_ns p95: 138861 -> 108901 (-21.575532%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D035",
+      "original": {
+        "baseline": 149441,
+        "baseline_zero_drift": false,
+        "candidate": 110370,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -26.14476616189667,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in open_ns p99: 149441 -> 110370 (-26.144766%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D036",
+      "original": {
+        "baseline": 111560.76666666668,
+        "baseline_zero_drift": false,
+        "candidate": 103692.40000000001,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -7.052987265833899,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in open_ns mean: 111560.76666666668 -> 103692.40000000001 (-7.052987%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D037",
+      "original": {
+        "baseline": 13870025,
+        "baseline_zero_drift": false,
+        "candidate": 13077751,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -5.7121310163464,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in publication_ns p95: 13870025 -> 13077751 (-5.712131%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D038",
+      "original": {
+        "baseline": 39989587,
+        "baseline_zero_drift": false,
+        "candidate": 42086718,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": 5.24419269446319,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in reopen_ns p50: 39989587 -> 42086718 (+5.244193%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D039",
+      "original": {
+        "baseline": 93184,
+        "candidate": 88208,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -5.339972527472526,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "rss",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "max_rss_kib",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in rss max_rss_kib: 93184 -> 88208 (-5.339973%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D040",
+      "original": {
+        "baseline": 96270,
+        "baseline_zero_drift": false,
+        "candidate": 90550,
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "change_percent": -5.941622519995848,
+        "guard": 0,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (medium, guard0, xlsx_source_backed_cell_values_one_edit_save) from repeat 1 to 2 in open_ns p95: 96270 -> 90550 (-5.941623%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D041",
+      "original": {
+        "baseline": 106820,
+        "baseline_zero_drift": false,
+        "candidate": 101340,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -5.130125444673284,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p50: 106820 -> 101340 (-5.130125%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D042",
+      "original": {
+        "baseline": 117230,
+        "baseline_zero_drift": false,
+        "candidate": 125730,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.250703744775233,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 117230 -> 125730 (+7.250704%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D043",
+      "original": {
+        "baseline": 120561,
+        "baseline_zero_drift": false,
+        "candidate": 127551,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 5.7978948416154585,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 120561 -> 127551 (+5.797895%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D044",
+      "original": {
+        "baseline": 42083600,
+        "baseline_zero_drift": false,
+        "candidate": 39783299,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -5.466027145966601,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p50: 42083600 -> 39783299 (-5.466027%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D045",
+      "original": {
+        "baseline": 42087731.33333333,
+        "baseline_zero_drift": false,
+        "candidate": 39932649.66666667,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -5.120451015994387,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (dense-sparse, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns mean: 42087731.33333333 -> 39932649.66666667 (-5.120451%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D046",
+      "original": {
+        "baseline": 6766761,
+        "baseline_zero_drift": false,
+        "candidate": 7324798,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 8.246737249919134,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (medium, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p50: 6766761 -> 7324798 (+8.246737%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D047",
+      "original": {
+        "baseline": 6826576,
+        "baseline_zero_drift": false,
+        "candidate": 7371999,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.98970083977677,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (medium, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p95: 6826576 -> 7371999 (+7.989701%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D048",
+      "original": {
+        "baseline": 6835177,
+        "baseline_zero_drift": false,
+        "candidate": 7376468,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.91919506985701,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (medium, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p99: 6835177 -> 7376468 (+7.919195%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D049",
+      "original": {
+        "baseline": 6772492.533333335,
+        "baseline_zero_drift": false,
+        "candidate": 7308967.466666668,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": 7.921380949375312,
+        "guard": 1,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (medium, guard1, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns mean: 6772492.533333335 -> 7308967.466666668 (+7.921381%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D050",
+      "original": {
+        "baseline": 99051,
+        "baseline_zero_drift": false,
+        "candidate": 105660,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 6.672320319835245,
+        "guard": 3,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (noncompact, guard3, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 99051 -> 105660 (+6.672320%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D051",
+      "original": {
+        "baseline": 113360,
+        "baseline_zero_drift": false,
+        "candidate": 105011,
+        "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+        "change_percent": -7.365031757233586,
+        "guard": 4,
+        "kind": "guard",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "noncompact",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate guard repeat drift (noncompact, guard4, xlsx_source_backed_managed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 113360 -> 105011 (-7.365032%, decrease). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D052",
+      "original": {
+        "baseline": 91860,
+        "baseline_zero_drift": false,
+        "candidate": 104425,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 13.678423688221208,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p50: 91860 -> 104425 (+13.678424%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D053",
+      "original": {
+        "baseline": 101211,
+        "baseline_zero_drift": false,
+        "candidate": 122340,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 20.876189347007745,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 101211 -> 122340 (+20.876189%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D054",
+      "original": {
+        "baseline": 105830,
+        "baseline_zero_drift": false,
+        "candidate": 129730,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 22.58338845317962,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 105830 -> 129730 (+22.583388%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D055",
+      "original": {
+        "baseline": 92356.57500000006,
+        "baseline_zero_drift": false,
+        "candidate": 107341.45,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 16.22502241989803,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns mean: 92356.57500000006 -> 107341.45 (+16.225022%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D056",
+      "original": {
+        "baseline": 13629128,
+        "baseline_zero_drift": false,
+        "candidate": 14402230,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 5.672424530755005,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p50: 13629128 -> 14402230 (+5.672425%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D057",
+      "original": {
+        "baseline": 13711734,
+        "baseline_zero_drift": false,
+        "candidate": 14569245,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 6.253847981590077,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p95: 13711734 -> 14569245 (+6.253848%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D058",
+      "original": {
+        "baseline": 13825384,
+        "baseline_zero_drift": false,
+        "candidate": 14615215,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 5.7129046108231,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p99: 13825384 -> 14615215 (+5.712905%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D059",
+      "original": {
+        "baseline": 13637643.699999996,
+        "baseline_zero_drift": false,
+        "candidate": 14425804.574999996,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 5.779303905703292,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns mean: 13637643.699999996 -> 14425804.574999996 (+5.779304%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D060",
+      "original": {
+        "baseline": 39437070,
+        "baseline_zero_drift": false,
+        "candidate": 42116302,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 6.793689287769089,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p50: 39437070 -> 42116302 (+6.793689%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D061",
+      "original": {
+        "baseline": 40185217,
+        "baseline_zero_drift": false,
+        "candidate": 43199411,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 7.5007533242883895,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p95: 40185217 -> 43199411 (+7.500753%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D062",
+      "original": {
+        "baseline": 40345408,
+        "baseline_zero_drift": false,
+        "candidate": 43776724,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.504848928532338,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns p99: 40345408 -> 43776724 (+8.504849%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D063",
+      "original": {
+        "baseline": 39575334.690000005,
+        "baseline_zero_drift": false,
+        "candidate": 42234815.37500006,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 6.72004597265492,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "reopen_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in reopen_ns mean: 39575334.690000005 -> 42234815.37500006 (+6.720046%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D064",
+      "original": {
+        "baseline": 88484,
+        "candidate": 93012,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 5.117309344062204,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "rss",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "dense-sparse",
+        "stage": "candidate",
+        "stat": "max_rss_kib",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (dense-sparse, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in rss max_rss_kib: 88484 -> 93012 (+5.117309%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D065",
+      "original": {
+        "baseline": 85261,
+        "baseline_zero_drift": false,
+        "candidate": 91985,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 7.886372432882571,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (medium, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p50: 85261 -> 91985 (+7.886372%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D066",
+      "original": {
+        "baseline": 93620,
+        "baseline_zero_drift": false,
+        "candidate": 105070,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 12.230292672505882,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p95",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (medium, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p95: 93620 -> 105070 (+12.230293%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D067",
+      "original": {
+        "baseline": 98581,
+        "baseline_zero_drift": false,
+        "candidate": 112980,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 14.606262870127097,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p99",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (medium, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns p99: 98581 -> 112980 (+14.606263%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D068",
+      "original": {
+        "baseline": 85928.44000000002,
+        "baseline_zero_drift": false,
+        "candidate": 92363.81000000003,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 7.489220099887772,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "open_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "mean",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (medium, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in open_ns mean: 85928.44000000002 -> 92363.81000000003 (+7.489220%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    },
+    {
+      "id": "D069",
+      "original": {
+        "baseline": 6734051,
+        "baseline_zero_drift": false,
+        "candidate": 7316943,
+        "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+        "change_percent": 8.655889300511689,
+        "guard": null,
+        "kind": "primary",
+        "lane": "native",
+        "phase": "publication_ns",
+        "repeat_first": 1,
+        "repeat_second": 2,
+        "shape": "medium",
+        "stage": "candidate",
+        "stat": "p50",
+        "threshold_percent": 5
+      },
+      "interpretation": "Measured same-build candidate primary repeat drift (medium, primary, xlsx_source_backed_cell_values_one_percent_edit_save) from repeat 1 to 2 in publication_ns p50: 6734051 -> 7316943 (+8.655889%, increase). Retain this exact greater-than-5% drift for individual review; its direction does not cancel the candidate-side adverse records or the failed native decision."
+    }
+  ]
+}
+

@@ -1,0 +1,121 @@
+{
+  "revision": "59982bdaceb8d97769e5b2fcb78160056d8dd1e9",
+  "created_utc": "2026-09-12T19:31:33.127968+00:00",
+  "hypothesis": "Avoid forced String ownership for transient raw XLSX r/s/cm/vm attributes while retaining owned t across events; unchanged checked scans, normalization, validation and error order.",
+  "harness_enabler": "0538 planning allocator metric is now in the frozen baseline; no harness modifications this campaign.",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30,
+    "scope": "Operation-local planning,commit,publication global System allocation counters; two repeats eachshape eachbuild; no latency interpretation"
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "scope": "Exact-name method capture; uniquely identify measured caller edge, retain lifecycle and termination dumps. No latency conversion."
+  },
+  "cpu": 2,
+  "admission": "Require total p50 and mean reduction>=1%, planning p50>=2% in both repeats of both primaryshapes; planning allocation calls>=5% reduction everypair. Ifnativepilotpasses, require planningIr>=1% reduction everyprofile, eager-read guards and applicable quality. Review every>5% adverse metric and samebuilddrift individually. No cold/range/native-producer/scaling claim. Reject if native or allocation pilot fails.",
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0539-target"
+  ],
+  "native_order": [
+    "baseline native-r1 before candidate application",
+    "candidate native-r1",
+    "candidate native-r2",
+    "retained baseline native-r2 under candidate source checkout"
+  ],
+  "retained_baseline_custody": "Retained baseline binary and build manifest remain hash-bound; candidate checkout source is independently bound during final A2 and differs only in the frozen candidate file inventory.",
+  "status": "frozen-before-build-and-capture",
+  "resource_scope": "Transient ownership only; unchanged input limits, full checked attribute iterator, decoded lexical values, error precedence and retained owned cell type.",
+  "hardware": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 100,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole fresh child including corpus/setup/publication/oracles; diagnostic only, not isolated commit counters."
+  },
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/src/raw/worksheet/"
+  ],
+  "candidate_source_binding": "Exact source file inventory and SHA256 values captured independently for each stage; candidate diff must be nonempty and entirely within candidate_source_roots. Harness source is identical. Review exact production/test patch before application.",
+  "gates": {
+    "total_p50_reduction_percent": 1.0,
+    "total_mean_reduction_percent": 1.0,
+    "planning_p50_reduction_percent": 2.0,
+    "planning_ir_reduction_percent": 1.0,
+    "require_every_shape_repeat": true,
+    "planning_allocation_calls_reduction_percent": 5.0
+  },
+  "conditional_lanes": {
+    "profile": "Required for retention only after pilot gates pass; preserved baseline binaries may run under candidate checkout.",
+    "hardware": "Diagnostic only after pilot gates pass.",
+    "eager": "Required before retention: xlsx_open_owned and xlsx_first_cell, same fresh baseline/candidate binaries and both corpusshapes; ordinary XLSX medium/dense-wide read controls; separate frozen lane."
+  },
+  "draft_patch_sha256": "5615b3433d83b960167c442e7fb7c13fe3a295fc2ac78de859c049af12f396aa",
+  "previous_turn": "Progress:0538 committed planning allocator enabler with69verified tests and96schema samples",
+  "candidate_files": [
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs"
+  ]
+}
