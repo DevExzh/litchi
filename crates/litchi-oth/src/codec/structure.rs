@@ -2080,15 +2080,10 @@ fn collect_indexes(node: &Node, output: &mut BodyStructures, tracked_scope: bool
     if node.namespace == Ns::Text && index_kind(&node.local).is_some() {
         let source_node = elements(node)
             .find(|child| child.namespace == Ns::Text && child.local.ends_with("-source"));
-        let name = attr(node, Ns::Text, b"name");
+        let name = required_attr(node, Ns::Text, b"name", "text:name")?;
         let Some(source_node) = source_node else {
             return invalid("OTH index requires its matching source element");
         };
-        if name.is_none()
-            && (!source_node.attributes.is_empty() || elements(source_node).next().is_some())
-        {
-            return invalid("OTH index requires text:name");
-        }
         output.ensure(measure_index_node(node, source_node)?)?;
         let source = Some(plain_text(source_node)?);
         let body = elements(node)
@@ -2099,7 +2094,7 @@ fn collect_indexes(node: &Node, output: &mut BodyStructures, tracked_scope: bool
         let index = crate::index::Index::projected(
             index_kind(&node.local)
                 .unwrap_or_else(|| crate::index::Kind::Other(node.local.clone())),
-            name.map(str::to_owned),
+            Some(name.to_owned()),
             bool_attr(node, Ns::Text, b"protected")?,
             optional_schema_bool_attr(node, Ns::Text, b"protected")?,
             attr(node, Ns::Text, b"protection-key").map(str::to_owned),
