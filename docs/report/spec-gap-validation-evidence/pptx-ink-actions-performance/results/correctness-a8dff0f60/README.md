@@ -40,9 +40,12 @@ command provenance.
 
 This is a correctness capture only. It used no `/usr/bin/time` wrapper and
 makes no latency, allocation-performance, native PowerPoint, or speedup claim.
-The compiled regression and capture targets remain outside this Git tree at
-the paths recorded above for root byte audit. They are intentionally excluded
-from this retained directory.
+Root verified all 138 retained files against Git bytes in `8343e7489`,
+checked the binary hash and both target inventories, then removed the owned
+external receipts, worktree setup log, and compiled targets (710,158,528
+bytes). The clean source worktree remains. A timing capture must use fresh
+results and targets; none of the deleted build artifacts is required for
+replaying the retained receipt audit.
 
 Key provenance values:
 
