@@ -12,8 +12,9 @@ The external run produced 167 raw files totaling 1,765,619 bytes: 52 JSON
 receipts, 52 `/usr/bin/time -v` sidecars, 52 empty stderr logs, and build,
 source, metadata, command, and provenance receipts. The raw copy is recorded
 in `retained-files.json`; every retained raw file currently matches the
-external result byte-for-byte. The external raw directory remains available
-until independent Git-blob verification. The disposable Cargo target was
+external result byte-for-byte. Root verified all 171 retained files against their committed Git bytes, then
+removed the duplicate external raw directory. The clean source worktree remains
+available; `REPLAY.md` describes restoration of the raw receipts. The disposable Cargo target was
 removed only after the successful sentinel; its binary provenance remains in
 `smoke-build-provenance.txt`.
 

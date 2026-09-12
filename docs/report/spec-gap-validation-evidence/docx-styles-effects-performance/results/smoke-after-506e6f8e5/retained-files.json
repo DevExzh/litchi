@@ -27,7 +27,7 @@
   "raw_files_count": 167,
   "raw_bytes": 1765619,
   "raw_files_byte_identical_to_external": true,
-  "external_raw_retained_pending_independent_git_verification": true,
+  "external_raw_retained_pending_independent_git_verification": false,
   "target_path": "/var/tmp/litchi-docx-styles-effects-after-smoke-target-506e6f8e5-20260912-a",
   "target_removed_after_successful_sentinel": true,
   "raw_files": [
@@ -885,5 +885,12 @@
     "smoke-binary-after.sha256": "ca689f0e4f78defd3ad2f16d03dd3816b2401b6af1a6115953658191fa4caeea",
     "smoke-build-provenance.txt": "de16716f37faa2c16b9e35924d553b9be030792661b343b1c50feda2f25cbbee",
     "smoke-source-provenance.txt": "b318e09d5df37184a227d680bc63ec322b35144c9205202636fb91bb6125a081"
+  },
+  "root_git_byte_verification": {
+    "retention_commit": "421ff35ce710ab73777a8b260b5a4e26f3eef912",
+    "files": 171,
+    "passed": true,
+    "external_duplicate_removed": true,
+    "source_worktree_retained": true
   }
 }
