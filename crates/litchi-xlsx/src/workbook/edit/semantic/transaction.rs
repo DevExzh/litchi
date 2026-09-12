@@ -264,6 +264,31 @@ impl Edit {
         selector: PictureSelector,
         input: SvgInput<'_>,
     ) -> Result<()> {
+        self.stage_svg_attach_with_admission(position, selector, input, || Ok(()))
+    }
+
+    #[cfg(test)]
+    pub(in crate::workbook::edit) fn stage_svg_attach_after_preflight_failure_for_test(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+        input: SvgInput<'_>,
+    ) -> Result<()> {
+        self.stage_svg_attach_with_admission(position, selector, input, || {
+            Err(invalid("deterministic SVG staging admission failure"))
+        })
+    }
+
+    fn stage_svg_attach_with_admission<F>(
+        &mut self,
+        position: usize,
+        selector: PictureSelector,
+        input: SvgInput<'_>,
+        admit: F,
+    ) -> Result<()>
+    where
+        F: FnOnce() -> Result<()>,
+    {
         guard::no_removal(self, "SVG lifecycle")?;
         if self.svg_lifecycle.len() >= svg_plan::MAX_SVG_LIFECYCLE_INTENTS {
             return Err(invalid(format!(
@@ -288,7 +313,7 @@ impl Edit {
             self.svg_staged_payload_bytes,
             bytes.len(),
         )?;
-        svg_plan::preflight_with_pending(
+        let prepared = svg_plan::preflight_with_pending(
             &self.base,
             position,
             selector,
@@ -303,17 +328,21 @@ impl Edit {
         owned
             .try_reserve_exact(bytes.len())
             .map_err(|source| allocation("SVG attachment input", source))?;
+        admit()?;
         owned.extend_from_slice(bytes);
-        self.svg_lifecycle.push(SvgLifecycleIntent {
+        let staged_payload_bytes = self
+            .svg_staged_payload_bytes
+            .checked_add(bytes.len())
+            .ok_or_else(|| invalid("SVG lifecycle staged payload bytes overflow"))?;
+        let intent = SvgLifecycleIntent {
             position,
             selector,
             attach: true,
             payload: Some(Arc::new(owned)),
-        });
-        self.svg_staged_payload_bytes = self
-            .svg_staged_payload_bytes
-            .checked_add(bytes.len())
-            .ok_or_else(|| invalid("SVG lifecycle staged payload bytes overflow"))?;
+        };
+        prepared.commit(&mut self.svg_preflight, &mut self.svg_projected_owners);
+        self.svg_lifecycle.push(intent);
+        self.svg_staged_payload_bytes = staged_payload_bytes;
         Ok(())
     }
 
@@ -329,25 +358,29 @@ impl Edit {
                 svg_plan::MAX_SVG_LIFECYCLE_INTENTS
             )));
         }
-        if !svg_plan::preflight_with_pending(
+        let prepared = svg_plan::preflight_with_pending(
             &self.base,
             position,
             selector,
             false,
             &mut self.svg_preflight,
             &mut self.svg_projected_owners,
-        )? {
+        )?;
+        if !prepared.is_effective() {
+            prepared.commit(&mut self.svg_preflight, &mut self.svg_projected_owners);
             return Ok(false);
         }
         self.svg_lifecycle
             .try_reserve(1)
             .map_err(|source| allocation("SVG lifecycle intents", source))?;
-        self.svg_lifecycle.push(SvgLifecycleIntent {
+        let intent = SvgLifecycleIntent {
             position,
             selector,
             attach: false,
             payload: None,
-        });
+        };
+        prepared.commit(&mut self.svg_preflight, &mut self.svg_projected_owners);
+        self.svg_lifecycle.push(intent);
         Ok(true)
     }
 
