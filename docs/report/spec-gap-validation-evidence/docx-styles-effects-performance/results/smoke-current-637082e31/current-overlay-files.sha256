@@ -1,0 +1,5 @@
+aa85b766405a896fd1a050a5ab30e2269e1c081b876b5510301ed7f31367110e  docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/README.md
+953e049f785d8540a07607e8f38848057bbee140bd80876d3c46388ef960fa46  docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/current-corpus-manifest.json
+4b46b0f24cf950e46367e54a10559fcb82c2d0adb5b78e384c3caa3047e50a33  docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/harness/main.rs
+2442ad8a2f33fbfa7e8ab8dfed8ce26ee727a81ff4f64b500fb427ddfe74dbe6  docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/run_current_smoke.sh
+0c95c23d2c5f1018fcafc2c770df24c1a48580362a9e189e8cf25b3becca71fa  docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/verify_current_smoke.py
