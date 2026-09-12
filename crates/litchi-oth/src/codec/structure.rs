@@ -3,6 +3,7 @@
 //! semantic read values and never serializes or rewrites a structure.
 
 use litchi_core::{Error, Result};
+use litchi_odf_common::datatype::{Boolean, Date, DateTime, Duration};
 use quick_xml::{
     XmlVersion,
     events::Event,
@@ -25,6 +26,9 @@ const SVG_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:svg-compati
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const DC_NAMESPACE: &[u8] = b"http://purl.org/dc/elements/1.1/";
 const META_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:meta:1.0";
+const XHTML_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xhtml";
+const FO_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
+const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Ns {
@@ -37,6 +41,9 @@ enum Ns {
     Xml,
     Dc,
     Meta,
+    Xhtml,
+    Fo,
+    Style,
     Other,
     None,
 }
@@ -52,6 +59,9 @@ fn resolve_namespace(value: Option<&[u8]>) -> Ns {
         Some(value) if value == XML_NAMESPACE => Ns::Xml,
         Some(value) if value == DC_NAMESPACE => Ns::Dc,
         Some(value) if value == META_NAMESPACE => Ns::Meta,
+        Some(value) if value == XHTML_NAMESPACE => Ns::Xhtml,
+        Some(value) if value == FO_NAMESPACE => Ns::Fo,
+        Some(value) if value == STYLE_NAMESPACE => Ns::Style,
         Some(_) => Ns::Other,
         None => Ns::None,
     }
@@ -160,6 +170,7 @@ impl ContextKind {
 pub(crate) struct BodyStructures {
     pub(crate) annotations: Vec<crate::annotation::Annotation>,
     pub(crate) changes: Vec<crate::change::Change>,
+    pub(crate) change_tracking: Option<crate::change::ChangeTracking>,
     pub(crate) frames: Vec<crate::frame::Frame>,
     pub(crate) indexes: Vec<crate::index::Index>,
     pub(crate) notes: Vec<crate::note::Note>,
@@ -197,6 +208,7 @@ impl BodyStructures {
         Self {
             annotations: Vec::new(),
             changes: Vec::new(),
+            change_tracking: None,
             frames: Vec::new(),
             indexes: Vec::new(),
             notes: Vec::new(),
@@ -208,33 +220,305 @@ impl BodyStructures {
     }
 
     fn account(&mut self, bytes: usize) -> Result<()> {
-        self.retained_bytes = self
+        self.retained_bytes = self.checked_total(bytes)?;
+        Ok(())
+    }
+
+    fn ensure(&self, bytes: usize) -> Result<()> {
+        self.checked_total(bytes).map(|_| ())
+    }
+
+    fn checked_total(&self, bytes: usize) -> Result<usize> {
+        let total = self
             .retained_bytes
             .checked_add(bytes)
             .ok_or_else(|| Error::InvalidFormat("OTH projected body size overflow".to_string()))?;
-        if self.retained_bytes > MAX_STRUCTURE_TEXT {
+        if total > MAX_STRUCTURE_TEXT {
             return invalid("OTH projected body structures exceed the aggregate text limit");
         }
-        Ok(())
+        Ok(total)
     }
+}
+
+fn measure_table_node(node: &Node) -> Result<usize> {
+    let mut total = 0usize;
+    add_string(&mut total, attr(node, Ns::Table, b"name"))?;
+    add_string(&mut total, attr(node, Ns::Table, b"style-name"))?;
+    add_string(&mut total, attr(node, Ns::Table, b"template-name"))?;
+    add_string(&mut total, attr(node, Ns::Table, b"protection-key"))?;
+    add_string(
+        &mut total,
+        attr(node, Ns::Table, b"protection-key-digest-algorithm"),
+    )?;
+    add_string(&mut total, attr(node, Ns::Table, b"print-ranges"))?;
+    add_string(&mut total, attr(node, Ns::Xml, b"id"))?;
+    if let Some(source) = direct_child(node, Ns::Table, "table-source") {
+        measure_table_source(source, &mut total)?;
+    }
+    for child in elements(node) {
+        if child.namespace != Ns::Table {
+            continue;
+        }
+        match child.local.as_str() {
+            "table-column" | "table-columns" | "table-column-group" | "table-header-columns" => {
+                measure_table_columns(child, &mut total)?;
+            },
+            "table-row" | "table-rows" | "table-row-group" | "table-header-rows" => {
+                measure_table_rows(child, &mut total)?;
+            },
+            _ => {},
+        }
+    }
+    Ok(total)
+}
+
+fn measure_table_source(source: &Node, total: &mut usize) -> Result<()> {
+    if elements(source).next().is_some() {
+        return invalid("OTH table-source must be empty");
+    }
+    let source_type = required_attr(source, Ns::Xlink, b"type", "xlink:type")?;
+    if source_type != "simple" {
+        return invalid("OTH table-source xlink:type must be 'simple'");
+    }
+    let href = required_attr(source, Ns::Xlink, b"href", "xlink:href")?;
+    validate_any_iri(href, "xlink:href")?;
+    add_string(total, Some(href))?;
+    add_string(total, attr(source, Ns::Table, b"table-name"))?;
+    add_string(total, attr(source, Ns::Table, b"filter-name"))?;
+    add_string(total, attr(source, Ns::Table, b"filter-options"))?;
+    if let Some(value) = attr(source, Ns::Table, b"refresh-delay") {
+        let duration = Duration::decode_exact(value).map_err(|_| {
+            Error::InvalidFormat("OTH table-source refresh-delay is invalid".to_string())
+        })?;
+        add_duration_bytes(total, &duration)?;
+    }
+    Ok(())
+}
+
+fn measure_table_columns(node: &Node, total: &mut usize) -> Result<()> {
+    if node.namespace == Ns::Table && node.local == "table-column" {
+        add_string(total, attr(node, Ns::Table, b"style-name"))?;
+        add_string(total, attr(node, Ns::Table, b"default-cell-style-name"))?;
+        add_string(total, attr(node, Ns::Xml, b"id"))?;
+        return Ok(());
+    }
+    for child in elements(node) {
+        if child.namespace == Ns::Table
+            && matches!(
+                child.local.as_str(),
+                "table-column" | "table-columns" | "table-column-group" | "table-header-columns"
+            )
+        {
+            measure_table_columns(child, total)?;
+        }
+    }
+    Ok(())
+}
+
+fn measure_table_rows(node: &Node, total: &mut usize) -> Result<()> {
+    if node.namespace == Ns::Table && node.local == "table-row" {
+        add_string(total, attr(node, Ns::Table, b"style-name"))?;
+        add_string(total, attr(node, Ns::Table, b"default-cell-style-name"))?;
+        add_string(total, attr(node, Ns::Xml, b"id"))?;
+        for child in elements(node) {
+            if child.namespace == Ns::Table
+                && matches!(child.local.as_str(), "table-cell" | "covered-table-cell")
+            {
+                measure_table_cell(child, total)?;
+            }
+        }
+        return Ok(());
+    }
+    for child in elements(node) {
+        if child.namespace == Ns::Table
+            && matches!(
+                child.local.as_str(),
+                "table-row" | "table-rows" | "table-row-group" | "table-header-rows"
+            )
+        {
+            measure_table_rows(child, total)?;
+        }
+    }
+    Ok(())
+}
+
+fn measure_table_cell(node: &Node, total: &mut usize) -> Result<()> {
+    add_string(total, attr(node, Ns::Table, b"style-name"))?;
+    add_string(total, attr(node, Ns::Table, b"formula"))?;
+    add_string(total, attr(node, Ns::Table, b"content-validation-name"))?;
+    add_string(total, attr(node, Ns::Office, b"value-type"))?;
+    add_string(total, attr(node, Ns::Office, b"value"))?;
+    add_string(total, attr(node, Ns::Xml, b"id"))?;
+    add_string(total, Some(&plain_text(node)?))?;
+    if let Some(meta) = project_in_content_meta(node)? {
+        add_string(total, Some(meta.about()))?;
+        add_string(total, Some(meta.property()))?;
+        add_string(total, meta.datatype())?;
+        add_string(total, meta.content())?;
+    }
+    if let Some(value) = project_cell_value(node)? {
+        *total = (*total)
+            .checked_add(value.retained_bytes())
+            .ok_or_else(|| Error::InvalidFormat("OTH projected body size overflow".to_string()))?;
+    }
+    for child in elements(node) {
+        if child.namespace == Ns::Text && matches!(child.local.as_str(), "p" | "h") {
+            add_string(total, Some(&plain_text(child)?))?;
+        }
+    }
+    Ok(())
+}
+
+fn add_duration_bytes(
+    total: &mut usize,
+    duration: &litchi_odf_common::datatype::DurationValue,
+) -> Result<()> {
+    add_string(total, Some(duration.as_str()))?;
+    add_string(total, duration.years())?;
+    add_string(total, duration.months())?;
+    add_string(total, duration.days())?;
+    add_string(total, duration.hours())?;
+    add_string(total, duration.minutes())?;
+    add_string(total, duration.seconds())?;
+    Ok(())
+}
+
+fn measure_index_node(node: &Node, source: &Node) -> Result<usize> {
+    let mut total = 0usize;
+    add_string(
+        &mut total,
+        Some(
+            index_kind(&node.local)
+                .unwrap_or_else(|| crate::index::Kind::Other(node.local.clone()))
+                .as_str(),
+        ),
+    )?;
+    add_string(&mut total, attr(node, Ns::Text, b"name"))?;
+    add_string(&mut total, attr(node, Ns::Text, b"style-name"))?;
+    add_string(&mut total, attr(node, Ns::Text, b"protection-key"))?;
+    add_string(
+        &mut total,
+        attr(node, Ns::Text, b"protection-key-digest-algorithm"),
+    )?;
+    add_string(&mut total, attr(node, Ns::Xml, b"id"))?;
+    add_string(&mut total, Some(&plain_text(source)?))?;
+    if let Some(body) =
+        elements(node).find(|child| child.namespace == Ns::Text && child.local == "index-body")
+    {
+        add_string(&mut total, Some(&plain_text(body)?))?;
+    }
+    let source_options = project_index_source(node, Some(source))?;
+    if let Some(source_options) = source_options {
+        match source_options.options() {
+            crate::index::IndexSourceOptions::TableOfContents { .. }
+            | crate::index::IndexSourceOptions::Object { .. }
+            | crate::index::IndexSourceOptions::Bibliography => {},
+            crate::index::IndexSourceOptions::Illustration {
+                caption_sequence_name,
+                ..
+            } => add_string(&mut total, caption_sequence_name.as_deref())?,
+            crate::index::IndexSourceOptions::User { index_name, .. } => {
+                add_string(&mut total, Some(index_name))?;
+            },
+            crate::index::IndexSourceOptions::Alphabetical {
+                main_entry_style_name,
+                language,
+                country,
+                script,
+                rfc_language_tag,
+                sort_algorithm,
+                ..
+            } => {
+                add_string(&mut total, main_entry_style_name.as_deref())?;
+                add_string(&mut total, language.as_deref())?;
+                add_string(&mut total, country.as_deref())?;
+                add_string(&mut total, script.as_deref())?;
+                add_string(&mut total, rfc_language_tag.as_deref())?;
+                add_string(&mut total, sort_algorithm.as_deref())?;
+            },
+        }
+    }
+    Ok(total)
+}
+
+fn measure_change_node(node: &Node, kind: &crate::change::Kind) -> Result<usize> {
+    let (xml_id, region_id, marker_change_id, info) = project_change_metadata(node, kind)?;
+    let mut total = 0usize;
+    add_string(&mut total, Some(kind.as_str()))?;
+    let id = xml_id
+        .as_deref()
+        .or(region_id.as_deref())
+        .or(marker_change_id.as_deref());
+    add_string(&mut total, id)?;
+    if let Some(info) = info.as_ref() {
+        add_string(&mut total, Some(info.creator()))?;
+        add_string(&mut total, Some(info.date()))?;
+        add_string(&mut total, Some(info.creator()))?;
+        add_string(&mut total, Some(info.date()))?;
+        for paragraph in info.paragraphs() {
+            add_string(&mut total, Some(paragraph.text()))?;
+        }
+    }
+    add_string(&mut total, xml_id.as_deref())?;
+    add_string(&mut total, region_id.as_deref())?;
+    add_string(&mut total, marker_change_id.as_deref())?;
+    add_string(&mut total, Some(&change_text(node)?))?;
+    Ok(total)
 }
 
 fn table_bytes(table: &crate::table::Table) -> Result<usize> {
     let mut total = 0usize;
     add_string(&mut total, table.name())?;
     add_string(&mut total, table.style_name())?;
+    let properties = table.properties();
+    add_string(&mut total, properties.template_name())?;
+    add_string(&mut total, properties.protection_key())?;
+    add_string(&mut total, properties.protection_key_digest_algorithm())?;
+    add_string(&mut total, properties.print_ranges())?;
+    add_string(&mut total, properties.xml_id())?;
+    if let Some(source) = table.source() {
+        add_string(&mut total, source.table_name())?;
+        add_string(&mut total, Some(source.href()))?;
+        add_string(&mut total, source.filter_name())?;
+        add_string(&mut total, source.filter_options())?;
+        if let Some(delay) = source.refresh_delay() {
+            add_string(&mut total, Some(delay.as_str()))?;
+            add_string(&mut total, delay.years())?;
+            add_string(&mut total, delay.months())?;
+            add_string(&mut total, delay.days())?;
+            add_string(&mut total, delay.hours())?;
+            add_string(&mut total, delay.minutes())?;
+            add_string(&mut total, delay.seconds())?;
+        }
+    }
     for column in table.columns() {
         add_string(&mut total, column.style_name())?;
         add_string(&mut total, column.default_cell_style_name())?;
+        add_string(&mut total, column.xml_id())?;
     }
     for row in table.rows() {
         add_string(&mut total, row.style_name())?;
+        add_string(&mut total, row.default_cell_style_name())?;
+        add_string(&mut total, row.xml_id())?;
         for cell in row.cells() {
             add_string(&mut total, cell.style_name())?;
             add_string(&mut total, cell.formula())?;
+            add_string(&mut total, cell.content_validation_name())?;
             add_string(&mut total, cell.value_type())?;
             add_string(&mut total, cell.value())?;
             add_string(&mut total, Some(cell.text()))?;
+            add_string(&mut total, cell.xml_id())?;
+            if let Some(meta) = cell.in_content_meta() {
+                add_string(&mut total, Some(meta.about()))?;
+                add_string(&mut total, Some(meta.property()))?;
+                add_string(&mut total, meta.datatype())?;
+                add_string(&mut total, meta.content())?;
+            }
+            if let Some(value) = cell.typed_value() {
+                total = total.checked_add(value.retained_bytes()).ok_or_else(|| {
+                    Error::InvalidFormat("OTH projected body size overflow".to_string())
+                })?;
+            }
             for paragraph in cell.paragraphs() {
                 add_string(&mut total, Some(paragraph.text()))?;
             }
@@ -285,7 +569,17 @@ fn change_bytes(change: &crate::change::Change) -> Result<usize> {
     add_string(&mut total, change.id())?;
     add_string(&mut total, change.author())?;
     add_string(&mut total, change.date())?;
+    add_string(&mut total, change.xml_id())?;
+    add_string(&mut total, change.region_id())?;
+    add_string(&mut total, change.marker_change_id())?;
     add_string(&mut total, Some(change.text()))?;
+    if let Some(info) = change.info() {
+        add_string(&mut total, Some(info.creator()))?;
+        add_string(&mut total, Some(info.date()))?;
+        for paragraph in info.paragraphs() {
+            add_string(&mut total, Some(paragraph.text()))?;
+        }
+    }
     Ok(total)
 }
 
@@ -294,7 +588,43 @@ fn index_bytes(index: &crate::index::Index) -> Result<usize> {
     add_string(&mut total, Some(index.kind().as_str()))?;
     add_string(&mut total, index.name())?;
     add_string(&mut total, index.source())?;
+    add_string(&mut total, index.style_name())?;
+    add_string(&mut total, index.protection_key())?;
+    add_string(&mut total, index.protection_key_digest_algorithm())?;
+    add_string(&mut total, index.xml_id())?;
     add_string(&mut total, Some(index.body()))?;
+    if let Some(source) = index.source_options() {
+        match source.options() {
+            crate::index::IndexSourceOptions::TableOfContents { .. }
+            | crate::index::IndexSourceOptions::Object { .. }
+            | crate::index::IndexSourceOptions::Bibliography => {},
+            crate::index::IndexSourceOptions::Illustration {
+                caption_sequence_name,
+                ..
+            } => {
+                add_string(&mut total, caption_sequence_name.as_deref())?;
+            },
+            crate::index::IndexSourceOptions::User { index_name, .. } => {
+                add_string(&mut total, Some(index_name))?;
+            },
+            crate::index::IndexSourceOptions::Alphabetical {
+                main_entry_style_name,
+                language,
+                country,
+                script,
+                rfc_language_tag,
+                sort_algorithm,
+                ..
+            } => {
+                add_string(&mut total, main_entry_style_name.as_deref())?;
+                add_string(&mut total, language.as_deref())?;
+                add_string(&mut total, country.as_deref())?;
+                add_string(&mut total, script.as_deref())?;
+                add_string(&mut total, rfc_language_tag.as_deref())?;
+                add_string(&mut total, sort_algorithm.as_deref())?;
+            },
+        }
+    }
     Ok(total)
 }
 
@@ -328,23 +658,29 @@ struct Budget {
 
 impl Budget {
     fn node(&mut self) -> Result<()> {
-        self.nodes = self.nodes.checked_add(1).ok_or_else(|| {
+        let nodes = self.nodes.checked_add(1).ok_or_else(|| {
             Error::InvalidFormat("OTH body structure node count overflow".to_string())
         })?;
-        if self.nodes > MAX_STRUCTURE_NODES {
+        if nodes > MAX_STRUCTURE_NODES {
             return invalid("OTH body structure node count exceeds the limit");
         }
+        self.nodes = nodes;
         Ok(())
     }
 
     fn text(&mut self, bytes: usize) -> Result<()> {
-        self.text_bytes = self.text_bytes.checked_add(bytes).ok_or_else(|| {
+        let text_bytes = self.text_bytes.checked_add(bytes).ok_or_else(|| {
             Error::InvalidFormat("OTH body structure text size overflow".to_string())
         })?;
-        if self.text_bytes > MAX_STRUCTURE_TEXT {
+        if text_bytes > MAX_STRUCTURE_TEXT {
             return invalid("OTH body structure text exceeds the limit");
         }
+        self.text_bytes = text_bytes;
         Ok(())
+    }
+
+    fn text_after_raw(&mut self, raw: usize, decoded: usize) -> Result<()> {
+        self.text(decoded.saturating_sub(raw))
     }
 }
 
@@ -353,11 +689,13 @@ impl Budget {
 pub(crate) fn project_structures(xml: &str) -> Result<BodyStructures> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
-    let tracked_changes_present = document_has_tracked_changes(xml)?;
+    let tracked_changes = document_tracked_changes(xml)?;
+    validate_xml_id_and_change_references(xml, tracked_changes.is_some())?;
     let mut stack = Vec::<Node>::new();
     let mut contexts = Vec::<ContextKind>::new();
     let mut body_text_depth = 0usize;
     let mut output = BodyStructures::new();
+    output.change_tracking = tracked_changes.clone();
     let mut budget = Budget {
         nodes: 0,
         text_bytes: 0,
@@ -373,7 +711,7 @@ pub(crate) fn project_structures(xml: &str) -> Result<BodyStructures> {
                     && body_text_depth > 0
                     && owns_structure_root(&contexts)
                     && root.is_some_and(|root| {
-                        !root_requires_tracked_changes(root) || tracked_changes_present
+                        !root_requires_tracked_changes(root) || tracked_changes.is_some()
                     });
                 if !stack.is_empty() || capture_root {
                     let node = parse_node(&reader, &start, &mut budget)?;
@@ -397,7 +735,7 @@ pub(crate) fn project_structures(xml: &str) -> Result<BodyStructures> {
                     && body_text_depth > 0
                     && owns_structure_root(&contexts)
                     && root.is_some_and(|root| {
-                        !root_requires_tracked_changes(root) || tracked_changes_present
+                        !root_requires_tracked_changes(root) || tracked_changes.is_some()
                     });
                 if !stack.is_empty() || capture_root {
                     let node = parse_node(&reader, &start, &mut budget)?;
@@ -471,7 +809,7 @@ pub(crate) fn project_structures(xml: &str) -> Result<BodyStructures> {
     }
 }
 
-fn document_has_tracked_changes(xml: &str) -> Result<bool> {
+fn document_tracked_changes(xml: &str) -> Result<Option<crate::change::ChangeTracking>> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut contexts = Vec::new();
@@ -480,7 +818,13 @@ fn document_has_tracked_changes(xml: &str) -> Result<bool> {
             Event::Start(start) => {
                 let (_namespace, _context, root) = classify_element(&reader, start.name());
                 if root == Some(RootKind::TrackedChanges) && owns_structure_root(&contexts) {
-                    return Ok(true);
+                    let track_changes =
+                        optional_attr_from_start(&reader, &start, Ns::Text, b"track-changes")?
+                            .map(|value| parse_odf_bool(&value, "text:track-changes"))
+                            .transpose()?;
+                    return Ok(Some(crate::change::ChangeTracking::projected(
+                        track_changes,
+                    )));
                 }
                 if contexts.len() >= MAX_STRUCTURE_SITE_DEPTH {
                     return invalid("OTH tracked-change context scan exceeds the depth limit");
@@ -496,7 +840,13 @@ fn document_has_tracked_changes(xml: &str) -> Result<bool> {
             Event::Empty(start) => {
                 let (_namespace, _context, root) = classify_element(&reader, start.name());
                 if root == Some(RootKind::TrackedChanges) && owns_structure_root(&contexts) {
-                    return Ok(true);
+                    let track_changes =
+                        optional_attr_from_start(&reader, &start, Ns::Text, b"track-changes")?
+                            .map(|value| parse_odf_bool(&value, "text:track-changes"))
+                            .transpose()?;
+                    return Ok(Some(crate::change::ChangeTracking::projected(
+                        track_changes,
+                    )));
                 }
             },
             Event::End(end) => {
@@ -509,10 +859,188 @@ fn document_has_tracked_changes(xml: &str) -> Result<bool> {
                 }
             },
             Event::DocType(_) => return invalid("OTH content.xml cannot contain a DTD"),
-            Event::Eof => return Ok(false),
+            Event::Eof => return Ok(None),
             _ => {},
         }
     }
+}
+
+fn validate_xml_id_and_change_references(xml: &str, tracking_present: bool) -> Result<()> {
+    use std::collections::BTreeSet;
+
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut contexts = Vec::<ContextKind>::new();
+    let mut ids = BTreeSet::<String>::new();
+    let mut regions = BTreeSet::<String>::new();
+    let mut marker_references = Vec::<String>::new();
+    let mut identity_bytes = 0usize;
+
+    loop {
+        let event = reader.read_event().map_err(|error| xml_error(&error))?;
+        match event {
+            Event::Start(start) => {
+                scan_identity_element(
+                    &reader,
+                    &start,
+                    true,
+                    tracking_present,
+                    &mut contexts,
+                    &mut ids,
+                    &mut regions,
+                    &mut marker_references,
+                    &mut identity_bytes,
+                )?;
+            },
+            Event::Empty(start) => {
+                scan_identity_element(
+                    &reader,
+                    &start,
+                    false,
+                    tracking_present,
+                    &mut contexts,
+                    &mut ids,
+                    &mut regions,
+                    &mut marker_references,
+                    &mut identity_bytes,
+                )?;
+            },
+            Event::End(end) => {
+                let (_namespace, context, _root) = classify_element(&reader, end.name());
+                let Some(open) = contexts.pop() else {
+                    return invalid("OTH change identity scan has an unmatched end tag");
+                };
+                if open != context {
+                    return invalid("OTH change identity scan has mismatched tags");
+                }
+            },
+            Event::DocType(_) => return invalid("OTH content.xml cannot contain a DTD"),
+            Event::Eof => {
+                if marker_references
+                    .iter()
+                    .any(|reference| !regions.contains(reference))
+                {
+                    return invalid("OTH change marker references an unresolved changed-region");
+                }
+                return Ok(());
+            },
+            _ => {},
+        }
+    }
+}
+
+fn scan_identity_element(
+    reader: &NsReader<&[u8]>,
+    start: &quick_xml::events::BytesStart<'_>,
+    push_context: bool,
+    tracking_present: bool,
+    contexts: &mut Vec<ContextKind>,
+    ids: &mut std::collections::BTreeSet<String>,
+    regions: &mut std::collections::BTreeSet<String>,
+    marker_references: &mut Vec<String>,
+    identity_bytes: &mut usize,
+) -> Result<()> {
+    let (namespace, context, root) = classify_element(reader, start.name());
+    let owns_body = owns_structure_root(contexts);
+    let is_region = tracking_present
+        && owns_body
+        && namespace == Ns::Text
+        && root == Some(RootKind::ChangedRegion);
+    let is_marker = tracking_present
+        && owns_body
+        && namespace == Ns::Text
+        && matches!(
+            root,
+            Some(RootKind::ChangeStart | RootKind::ChangeEnd | RootKind::Change)
+        );
+    let xml_id = optional_attr_from_start(reader, start, Ns::Xml, b"id")?;
+    if let Some(xml_id) = xml_id.as_deref() {
+        validate_ncname(xml_id, "xml:id")?;
+        account_identity_bytes(identity_bytes, xml_id.len())?;
+        if !ids.insert(xml_id.to_owned()) {
+            return invalid("duplicate OTH xml:id value");
+        }
+        if is_region {
+            regions.insert(xml_id.to_owned());
+        }
+    }
+    if is_region {
+        let Some(xml_id) = xml_id.as_deref() else {
+            return invalid("OTH changed-region requires xml:id");
+        };
+        let region_id = optional_attr_from_start(reader, start, Ns::Text, b"id")?;
+        if let Some(region_id) = region_id.as_deref() {
+            validate_ncname(region_id, "text:id")?;
+            account_identity_bytes(identity_bytes, region_id.len())?;
+            if region_id != xml_id {
+                return invalid("OTH changed-region text:id must equal xml:id");
+            }
+        }
+        if !regions.contains(xml_id) {
+            regions.insert(xml_id.to_owned());
+        }
+    }
+    if is_marker {
+        let Some(change_id) = optional_attr_from_start(reader, start, Ns::Text, b"change-id")?
+        else {
+            return invalid("OTH change marker requires text:change-id");
+        };
+        validate_ncname(&change_id, "text:change-id")?;
+        account_identity_bytes(identity_bytes, change_id.len())?;
+        marker_references
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH change marker references",
+                source,
+            })?;
+        marker_references.push(change_id);
+    }
+    if push_context {
+        if contexts.len() >= MAX_STRUCTURE_SITE_DEPTH {
+            return invalid("OTH change identity scan exceeds the depth limit");
+        }
+        contexts
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "OTH change identity context scan",
+                source,
+            })?;
+        contexts.push(context);
+    }
+    Ok(())
+}
+
+fn account_identity_bytes(total: &mut usize, bytes: usize) -> Result<()> {
+    *total = total
+        .checked_add(bytes)
+        .ok_or_else(|| Error::InvalidFormat("OTH change identity size overflow".to_string()))?;
+    if *total > MAX_STRUCTURE_TEXT {
+        return invalid("OTH change identity metadata exceeds the limit");
+    }
+    Ok(())
+}
+
+fn validate_ncname(value: &str, field: &str) -> Result<()> {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return Err(Error::InvalidFormat(format!(
+            "invalid OTH {field} lexical value"
+        )));
+    };
+    if !(first == '_' || first.is_ascii_alphabetic() || first.is_alphabetic())
+        || chars.any(|character| {
+            !(character == '_'
+                || character == '-'
+                || character == '.'
+                || character.is_ascii_alphanumeric()
+                || character.is_alphanumeric())
+        })
+    {
+        return Err(Error::InvalidFormat(format!(
+            "invalid OTH {field} lexical value"
+        )));
+    }
+    Ok(())
 }
 
 fn classify_element(
@@ -685,6 +1213,7 @@ fn parse_node(
         ResolveResult::Bound(Namespace(value)) => resolve_namespace(Some(value)),
         ResolveResult::Unbound | ResolveResult::Unknown(_) => Ns::None,
     };
+    budget.text(start.name().as_ref().len())?;
     budget.text(local.len())?;
     if let Some(namespace_uri) = namespace_uri {
         budget.text(namespace_uri.len())?;
@@ -701,6 +1230,15 @@ fn parse_node(
         let local = std::str::from_utf8(local.as_ref()).map_err(|error| {
             Error::InvalidFormat(format!("invalid OTH structure attribute name: {error}"))
         })?;
+        let raw_attribute_bytes = attribute
+            .key
+            .as_ref()
+            .len()
+            .checked_add(attribute.value.len())
+            .ok_or_else(|| {
+                Error::InvalidFormat("OTH structure attribute size overflow".to_string())
+            })?;
+        budget.text(raw_attribute_bytes)?;
         let namespace_uri = match resolved {
             ResolveResult::Bound(Namespace(value)) => {
                 (resolve_namespace(Some(value)) == Ns::Other).then_some(value)
@@ -716,7 +1254,7 @@ fn parse_node(
                 Error::InvalidFormat(format!("invalid OTH structure attribute value: {error}"))
             })?;
         budget.text(local.len())?;
-        budget.text(value.len())?;
+        budget.text_after_raw(raw_attribute_bytes, value.len())?;
         attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
             Error::InvalidFormat("OTH body structure attribute count overflow".to_string())
         })?;
@@ -839,6 +1377,7 @@ fn finish_root(node: Node, kind: RootKind, output: &mut BodyStructures) -> Resul
 
 fn collect_tables(node: &Node, output: &mut BodyStructures, tracked_scope: bool) -> Result<()> {
     if node.namespace == Ns::Table && node.local == "table" {
+        output.ensure(measure_table_node(node)?)?;
         let table = project_table(node)?;
         let bytes = table_bytes(&table)?;
         output.account(bytes)?;
@@ -896,7 +1435,10 @@ fn collect_table_columns(
         columns.push(crate::table::Column::projected(
             attr(node, Ns::Table, b"style-name").map(str::to_owned),
             attr(node, Ns::Table, b"default-cell-style-name").map(str::to_owned),
+            optional_count_attr(node, b"number-columns-repeated")?,
             repeated,
+            optional_visibility_attr(node)?,
+            attr(node, Ns::Xml, b"id").map(str::to_owned),
         ));
         return Ok(());
     }
@@ -966,11 +1508,171 @@ fn project_table(node: &Node) -> Result<crate::table::Table> {
     Ok(crate::table::Table::projected(
         attr(node, Ns::Table, b"name").map(str::to_owned),
         attr(node, Ns::Table, b"style-name").map(str::to_owned),
+        project_table_properties(node)?,
+        project_table_source(node)?,
         columns,
         rows,
         declared_columns,
         checked_dimension_max(declared_columns, logical_columns)?,
     ))
+}
+
+fn project_table_properties(node: &Node) -> Result<crate::table::TableProperties> {
+    Ok(crate::table::TableProperties::projected(
+        attr(node, Ns::Table, b"template-name").map(str::to_owned),
+        optional_schema_bool_attr(node, Ns::Table, b"use-first-row-styles")?,
+        optional_schema_bool_attr(node, Ns::Table, b"use-last-row-styles")?,
+        optional_schema_bool_attr(node, Ns::Table, b"use-first-column-styles")?,
+        optional_schema_bool_attr(node, Ns::Table, b"use-last-column-styles")?,
+        optional_schema_bool_attr(node, Ns::Table, b"use-banding-rows-styles")?,
+        optional_schema_bool_attr(node, Ns::Table, b"use-banding-columns-styles")?,
+        optional_schema_bool_attr(node, Ns::Table, b"protected")?,
+        attr(node, Ns::Table, b"protection-key").map(str::to_owned),
+        optional_any_iri_attr(node, Ns::Table, b"protection-key-digest-algorithm")?,
+        optional_schema_bool_attr(node, Ns::Table, b"print")?,
+        attr(node, Ns::Table, b"print-ranges").map(str::to_owned),
+        attr(node, Ns::Xml, b"id").map(str::to_owned),
+        optional_schema_bool_attr(node, Ns::Table, b"is-sub-table")?,
+    ))
+}
+
+fn project_table_source(node: &Node) -> Result<Option<crate::table::TableSource>> {
+    let Some(source) = direct_child(node, Ns::Table, "table-source") else {
+        return Ok(None);
+    };
+    if elements(source).next().is_some() {
+        return invalid("OTH table-source must be empty");
+    }
+    let source_type = attr(source, Ns::Xlink, b"type")
+        .ok_or_else(|| Error::InvalidFormat("OTH table-source requires xlink:type".to_string()))?;
+    if source_type != "simple" {
+        return invalid("OTH table-source xlink:type must be 'simple'");
+    }
+    let href = attr(source, Ns::Xlink, b"href")
+        .ok_or_else(|| Error::InvalidFormat("OTH table-source requires xlink:href".to_string()))?;
+    validate_any_iri(href, "xlink:href")?;
+    let mode = attr(source, Ns::Table, b"mode")
+        .map(|value| match value {
+            "copy-all" => Ok(crate::table::TableSourceMode::CopyAll),
+            "copy-results-only" => Ok(crate::table::TableSourceMode::CopyResultsOnly),
+            _ => invalid("OTH table-source mode is invalid"),
+        })
+        .transpose()?;
+    let actuate = attr(source, Ns::Xlink, b"actuate")
+        .map(|value| {
+            if value == "onRequest" {
+                Ok(crate::table::TableSourceActuate::OnRequest)
+            } else {
+                invalid("OTH table-source xlink:actuate is invalid")
+            }
+        })
+        .transpose()?;
+    let refresh_delay = attr(source, Ns::Table, b"refresh-delay")
+        .map(|value| {
+            Duration::decode_exact(value).map_err(|_| {
+                Error::InvalidFormat("OTH table-source refresh-delay is invalid".to_string())
+            })
+        })
+        .transpose()?;
+    Ok(Some(crate::table::TableSource::projected(
+        mode,
+        attr(source, Ns::Table, b"table-name").map(str::to_owned),
+        href.to_owned(),
+        actuate,
+        attr(source, Ns::Table, b"filter-name").map(str::to_owned),
+        attr(source, Ns::Table, b"filter-options").map(str::to_owned),
+        refresh_delay,
+    )))
+}
+
+fn project_in_content_meta(node: &Node) -> Result<Option<crate::table::InContentMeta>> {
+    let about = attr(node, Ns::Xhtml, b"about");
+    let property = attr(node, Ns::Xhtml, b"property");
+    if about.is_none() && property.is_none() {
+        if attr(node, Ns::Xhtml, b"datatype").is_some()
+            || attr(node, Ns::Xhtml, b"content").is_some()
+        {
+            return invalid("OTH RDFa metadata requires xhtml:about and xhtml:property");
+        }
+        return Ok(None);
+    }
+    let about = about.ok_or_else(|| {
+        Error::InvalidFormat("OTH RDFa metadata requires xhtml:about".to_string())
+    })?;
+    let property = property.ok_or_else(|| {
+        Error::InvalidFormat("OTH RDFa metadata requires xhtml:property".to_string())
+    })?;
+    validate_uri_or_safe_curie(about, "xhtml:about")?;
+    validate_curies(property, "xhtml:property")?;
+    if let Some(datatype) = attr(node, Ns::Xhtml, b"datatype") {
+        validate_curie(datatype, "xhtml:datatype")?;
+    }
+    Ok(Some(crate::table::InContentMeta::projected(
+        about.to_owned(),
+        property.to_owned(),
+        attr(node, Ns::Xhtml, b"datatype").map(str::to_owned),
+        attr(node, Ns::Xhtml, b"content").map(str::to_owned),
+    )))
+}
+
+fn project_cell_value(node: &Node) -> Result<Option<crate::table::CellValue>> {
+    let Some(value_type) = attr(node, Ns::Office, b"value-type") else {
+        return Ok(None);
+    };
+    match value_type {
+        "float" => {
+            let lexical = required_attr(node, Ns::Office, b"value", "office:value")?;
+            validate_finite_number(lexical, "office:value")?;
+            Ok(Some(crate::table::CellValue::Float {
+                lexical: lexical.to_owned(),
+            }))
+        },
+        "percentage" => {
+            let lexical = required_attr(node, Ns::Office, b"value", "office:value")?;
+            validate_finite_number(lexical, "office:value")?;
+            Ok(Some(crate::table::CellValue::Percentage {
+                lexical: lexical.to_owned(),
+            }))
+        },
+        "currency" => {
+            let lexical = required_attr(node, Ns::Office, b"value", "office:value")?;
+            validate_finite_number(lexical, "office:value")?;
+            Ok(Some(crate::table::CellValue::Currency {
+                lexical: lexical.to_owned(),
+                currency: attr(node, Ns::Office, b"currency").map(str::to_owned),
+            }))
+        },
+        "date" => {
+            let lexical = required_attr(node, Ns::Office, b"date-value", "office:date-value")?;
+            validate_date_or_datetime(lexical)?;
+            Ok(Some(crate::table::CellValue::Date {
+                lexical: lexical.to_owned(),
+            }))
+        },
+        "time" => {
+            let lexical = required_attr(node, Ns::Office, b"time-value", "office:time-value")?;
+            let value = Duration::decode_exact(lexical).map_err(|_| {
+                Error::InvalidFormat("OTH office:time-value is invalid".to_string())
+            })?;
+            Ok(Some(crate::table::CellValue::Time { value }))
+        },
+        "boolean" => {
+            let lexical =
+                required_attr(node, Ns::Office, b"boolean-value", "office:boolean-value")?;
+            let value = parse_odf_bool(lexical, "office:boolean-value")?;
+            Ok(Some(crate::table::CellValue::Boolean {
+                lexical: lexical.to_owned(),
+                value,
+            }))
+        },
+        "string" => Ok(Some(crate::table::CellValue::String {
+            value: attr(node, Ns::Office, b"string-value").map(str::to_owned),
+        })),
+        "error" => Ok(Some(crate::table::CellValue::Error {
+            value: attr(node, Ns::Office, b"string-value").map(str::to_owned),
+        })),
+        _ => invalid("OTH office:value-type value is invalid"),
+    }
 }
 
 fn row_width(row: &crate::table::Row) -> Result<usize> {
@@ -1015,7 +1717,11 @@ fn project_row(node: &Node) -> Result<crate::table::Row> {
     }
     Ok(crate::table::Row::projected(
         attr(node, Ns::Table, b"style-name").map(str::to_owned),
+        attr(node, Ns::Table, b"default-cell-style-name").map(str::to_owned),
+        optional_count_attr(node, b"number-rows-repeated")?,
         count_attr(node, b"number-rows-repeated")?,
+        optional_visibility_attr(node)?,
+        attr(node, Ns::Xml, b"id").map(str::to_owned),
         cells,
     ))
 }
@@ -1036,10 +1742,21 @@ fn project_cell(node: &Node) -> Result<crate::table::Cell> {
             crate::table::CellKind::Cell
         },
         attr(node, Ns::Table, b"style-name").map(str::to_owned),
+        optional_count_attr(node, b"number-columns-repeated")?,
         count_attr(node, b"number-columns-repeated")?,
+        optional_count_attr(node, b"number-columns-spanned")?,
         count_attr_default(node, b"number-columns-spanned", 1)?,
+        optional_count_attr(node, b"number-rows-spanned")?,
         count_attr_default(node, b"number-rows-spanned", 1)?,
+        optional_count_attr(node, b"number-matrix-columns-spanned")?,
+        optional_count_attr(node, b"number-matrix-rows-spanned")?,
         attr(node, Ns::Table, b"formula").map(str::to_owned),
+        attr(node, Ns::Table, b"content-validation-name").map(str::to_owned),
+        optional_schema_bool_attr(node, Ns::Table, b"protect")?,
+        optional_schema_bool_attr(node, Ns::Table, b"protected")?,
+        attr(node, Ns::Xml, b"id").map(str::to_owned),
+        project_in_content_meta(node)?,
+        project_cell_value(node)?,
         attr(node, Ns::Office, b"value-type").map(str::to_owned),
         attr(node, Ns::Office, b"value").map(str::to_owned),
         plain_text(node)?,
@@ -1189,23 +1906,24 @@ fn collect_changes(node: &Node, output: &mut BodyStructures, tracked_scope: bool
     };
     if tracked_scope {
         if let Some(kind) = kind {
-            let info = find_descendant(node, Ns::Office, "change-info");
-            let author = info
-                .and_then(|value| descendant(value, Ns::Dc, "creator"))
-                .map(plain_text)
-                .transpose()?;
-            let date = info
-                .and_then(|value| descendant(value, Ns::Dc, "date"))
-                .map(plain_text)
-                .transpose()?;
+            output.ensure(measure_change_node(node, &kind)?)?;
+            let (xml_id, region_id, marker_change_id, info) = project_change_metadata(node, &kind)?;
+            let author = info.as_ref().map(|value| value.creator().to_owned());
+            let date = info.as_ref().map(|value| value.date().to_owned());
+            let id = xml_id
+                .as_deref()
+                .or(region_id.as_deref())
+                .or(marker_change_id.as_deref())
+                .map(str::to_owned);
             let change = crate::change::Change::projected(
-                attr(node, Ns::Text, b"change-id")
-                    .or_else(|| attr(node, Ns::Text, b"id"))
-                    .or_else(|| attr(node, Ns::Xml, b"id"))
-                    .map(str::to_owned),
+                id,
                 kind,
                 author,
                 date,
+                xml_id,
+                region_id,
+                marker_change_id,
+                info,
                 change_text(node)?,
             );
             let bytes = change_bytes(&change)?;
@@ -1216,6 +1934,111 @@ fn collect_changes(node: &Node, output: &mut BodyStructures, tracked_scope: bool
     }
     collect_descendant_roots(node, 1, output, tracked_scope)?;
     Ok(())
+}
+
+fn project_change_metadata(
+    node: &Node,
+    kind: &crate::change::Kind,
+) -> Result<(
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<crate::change::ChangeInfo>,
+)> {
+    let is_region = matches!(
+        kind,
+        crate::change::Kind::Insertion
+            | crate::change::Kind::Deletion
+            | crate::change::Kind::Format
+            | crate::change::Kind::Move
+            | crate::change::Kind::Other(_)
+    ) && node.namespace == Ns::Text
+        && node.local == "changed-region";
+    if is_region {
+        let xml_id = attr(node, Ns::Xml, b"id").map(str::to_owned);
+        if let Some(xml_id) = xml_id.as_deref() {
+            validate_ncname(xml_id, "xml:id")?;
+        }
+        let region_id = attr(node, Ns::Text, b"id").map(str::to_owned);
+        if let Some(region_id) = region_id.as_deref() {
+            validate_ncname(region_id, "text:id")?;
+            if let Some(xml_id) = xml_id.as_deref() {
+                if region_id != xml_id {
+                    return invalid("OTH changed-region text:id must equal xml:id");
+                }
+            }
+        } else if xml_id.is_none() {
+            return invalid("OTH changed-region requires xml:id");
+        }
+        let children = direct_change_children(node);
+        if children.len() != 1 {
+            return invalid("OTH changed-region requires exactly one change kind");
+        }
+        let content = children[0];
+        let info = direct_elements_named(content, Ns::Office, "change-info");
+        if info.len() != 1 {
+            return invalid("OTH changed-region requires exactly one office:change-info");
+        }
+        let info = project_change_info(info[0])?;
+        return Ok((xml_id, region_id, None, Some(info)));
+    }
+
+    let marker_change_id = attr(node, Ns::Text, b"change-id")
+        .ok_or_else(|| {
+            Error::InvalidFormat("OTH change marker requires text:change-id".to_string())
+        })?
+        .to_owned();
+    validate_ncname(&marker_change_id, "text:change-id")?;
+    Ok((None, None, Some(marker_change_id), None))
+}
+
+fn direct_change_children(node: &Node) -> Vec<&Node> {
+    elements(node)
+        .filter(|child| {
+            child.namespace == Ns::Text
+                && matches!(
+                    child.local.as_str(),
+                    "insertion" | "deletion" | "format-change"
+                )
+        })
+        .collect()
+}
+
+fn direct_elements_named<'a>(node: &'a Node, namespace: Ns, local: &str) -> Vec<&'a Node> {
+    elements(node)
+        .filter(|child| child.namespace == namespace && child.local == local)
+        .collect()
+}
+
+fn project_change_info(node: &Node) -> Result<crate::change::ChangeInfo> {
+    let children = elements(node).collect::<Vec<_>>();
+    if children.len() < 2
+        || children[0].namespace != Ns::Dc
+        || children[0].local != "creator"
+        || children[1].namespace != Ns::Dc
+        || children[1].local != "date"
+        || children[2..]
+            .iter()
+            .any(|child| child.namespace != Ns::Text || child.local != "p")
+    {
+        return invalid("OTH office:change-info children have invalid order");
+    }
+    let creator = plain_text(children[0])?;
+    let date = plain_text(children[1])?;
+    validate_date_or_datetime(&date)?;
+    let mut paragraphs = Vec::new();
+    paragraphs
+        .try_reserve(children.len().saturating_sub(2))
+        .map_err(|source| Error::Allocation {
+            resource: "OTH change-info paragraphs",
+            source,
+        })?;
+    for paragraph in &children[2..] {
+        paragraphs.push(crate::paragraph::Paragraph::new(plain_text(paragraph)?));
+    }
+    Ok(crate::change::ChangeInfo::projected(
+        creator, date, paragraphs,
+    ))
 }
 
 fn change_text(node: &Node) -> Result<String> {
@@ -1241,26 +2064,33 @@ fn change_text(node: &Node) -> Result<String> {
 }
 
 fn change_kind(node: &Node) -> crate::change::Kind {
-    for child in elements(node) {
-        if child.namespace == Ns::Text {
-            return match child.local.as_str() {
-                "insertion" => crate::change::Kind::Insertion,
-                "deletion" => crate::change::Kind::Deletion,
-                "format-change" => crate::change::Kind::Format,
-                "change" | "move" => crate::change::Kind::Move,
-                other => crate::change::Kind::Other(other.to_owned()),
-            };
-        }
+    if let Some(child) = direct_change_children(node).into_iter().next() {
+        return match child.local.as_str() {
+            "insertion" => crate::change::Kind::Insertion,
+            "deletion" => crate::change::Kind::Deletion,
+            "format-change" => crate::change::Kind::Format,
+            "change" | "move" => crate::change::Kind::Move,
+            other => crate::change::Kind::Other(other.to_owned()),
+        };
     }
     crate::change::Kind::Other("changed-region".to_string())
 }
 
 fn collect_indexes(node: &Node, output: &mut BodyStructures, tracked_scope: bool) -> Result<()> {
     if node.namespace == Ns::Text && index_kind(&node.local).is_some() {
-        let source = elements(node)
-            .find(|child| child.namespace == Ns::Text && child.local.ends_with("-source"))
-            .map(plain_text)
-            .transpose()?;
+        let source_node = elements(node)
+            .find(|child| child.namespace == Ns::Text && child.local.ends_with("-source"));
+        let name = attr(node, Ns::Text, b"name");
+        let Some(source_node) = source_node else {
+            return invalid("OTH index requires its matching source element");
+        };
+        if name.is_none()
+            && (!source_node.attributes.is_empty() || elements(source_node).next().is_some())
+        {
+            return invalid("OTH index requires text:name");
+        }
+        output.ensure(measure_index_node(node, source_node)?)?;
+        let source = Some(plain_text(source_node)?);
         let body = elements(node)
             .find(|child| child.namespace == Ns::Text && child.local == "index-body")
             .map(plain_text)
@@ -1269,9 +2099,15 @@ fn collect_indexes(node: &Node, output: &mut BodyStructures, tracked_scope: bool
         let index = crate::index::Index::projected(
             index_kind(&node.local)
                 .unwrap_or_else(|| crate::index::Kind::Other(node.local.clone())),
-            attr(node, Ns::Text, b"name").map(str::to_owned),
+            name.map(str::to_owned),
             bool_attr(node, Ns::Text, b"protected")?,
+            optional_schema_bool_attr(node, Ns::Text, b"protected")?,
+            attr(node, Ns::Text, b"protection-key").map(str::to_owned),
+            optional_any_iri_attr(node, Ns::Text, b"protection-key-digest-algorithm")?,
             source,
+            project_index_source(node, Some(source_node))?,
+            attr(node, Ns::Text, b"style-name").map(str::to_owned),
+            attr(node, Ns::Xml, b"id").map(str::to_owned),
             body,
         );
         let bytes = index_bytes(&index)?;
@@ -1281,6 +2117,130 @@ fn collect_indexes(node: &Node, output: &mut BodyStructures, tracked_scope: bool
     }
     collect_descendant_roots(node, 1, output, tracked_scope)?;
     Ok(())
+}
+
+fn project_index_source(
+    node: &Node,
+    source: Option<&Node>,
+) -> Result<Option<crate::index::IndexSource>> {
+    let Some(source) = source else {
+        return Ok(None);
+    };
+    let scope = attr(source, Ns::Text, b"index-scope")
+        .map(|value| match value {
+            "document" => Ok(crate::index::IndexScope::Document),
+            "chapter" => Ok(crate::index::IndexScope::Chapter),
+            _ => invalid("OTH index-scope value is invalid"),
+        })
+        .transpose()?;
+    let relative = optional_schema_bool_attr(source, Ns::Text, b"relative-tab-stop-position")?;
+    let options = match node.local.as_str() {
+        "table-of-content" => crate::index::IndexSourceOptions::TableOfContents {
+            outline_level: optional_positive_attr(source, b"outline-level")?,
+            use_outline_level: optional_schema_bool_attr(source, Ns::Text, b"use-outline-level")?,
+            use_index_marks: optional_schema_bool_attr(source, Ns::Text, b"use-index-marks")?,
+            use_index_source_styles: optional_schema_bool_attr(
+                source,
+                Ns::Text,
+                b"use-index-source-styles",
+            )?,
+        },
+        "illustration-index" | "table-index" => {
+            let caption_sequence_format = attr(source, Ns::Text, b"caption-sequence-format")
+                .map(|value| match value {
+                    "text" => Ok(crate::index::CaptionSequenceFormat::Text),
+                    "category-and-value" => {
+                        Ok(crate::index::CaptionSequenceFormat::CategoryAndValue)
+                    },
+                    "caption" => Ok(crate::index::CaptionSequenceFormat::Caption),
+                    _ => invalid("OTH caption-sequence-format value is invalid"),
+                })
+                .transpose()?;
+            crate::index::IndexSourceOptions::Illustration {
+                use_caption: optional_schema_bool_attr(source, Ns::Text, b"use-caption")?,
+                caption_sequence_name: attr(source, Ns::Text, b"caption-sequence-name")
+                    .map(str::to_owned),
+                caption_sequence_format,
+            }
+        },
+        "object-index" => crate::index::IndexSourceOptions::Object {
+            use_spreadsheet_objects: optional_schema_bool_attr(
+                source,
+                Ns::Text,
+                b"use-spreadsheet-objects",
+            )?,
+            use_math_objects: optional_schema_bool_attr(source, Ns::Text, b"use-math-objects")?,
+            use_draw_objects: optional_schema_bool_attr(source, Ns::Text, b"use-draw-objects")?,
+            use_chart_objects: optional_schema_bool_attr(source, Ns::Text, b"use-chart-objects")?,
+            use_other_objects: optional_schema_bool_attr(source, Ns::Text, b"use-other-objects")?,
+        },
+        "user-index" => {
+            let index_name = required_attr(source, Ns::Text, b"index-name", "text:index-name")?;
+            if index_name.is_empty() {
+                return invalid("OTH text:index-name must not be empty");
+            }
+            crate::index::IndexSourceOptions::User {
+                use_index_marks: optional_schema_bool_attr(source, Ns::Text, b"use-index-marks")?,
+                use_index_source_styles: optional_schema_bool_attr(
+                    source,
+                    Ns::Text,
+                    b"use-index-source-styles",
+                )?,
+                use_graphics: optional_schema_bool_attr(source, Ns::Text, b"use-graphics")?,
+                use_tables: optional_schema_bool_attr(source, Ns::Text, b"use-tables")?,
+                use_floating_frames: optional_schema_bool_attr(
+                    source,
+                    Ns::Text,
+                    b"use-floating-frames",
+                )?,
+                use_objects: optional_schema_bool_attr(source, Ns::Text, b"use-objects")?,
+                copy_outline_levels: optional_schema_bool_attr(
+                    source,
+                    Ns::Text,
+                    b"copy-outline-levels",
+                )?,
+                index_name: index_name.to_owned(),
+            }
+        },
+        "alphabetical-index" => crate::index::IndexSourceOptions::Alphabetical {
+            ignore_case: optional_schema_bool_attr(source, Ns::Text, b"ignore-case")?,
+            main_entry_style_name: attr(source, Ns::Text, b"main-entry-style-name")
+                .map(str::to_owned),
+            alphabetical_separators: optional_schema_bool_attr(
+                source,
+                Ns::Text,
+                b"alphabetical-separators",
+            )?,
+            combine_entries: optional_schema_bool_attr(source, Ns::Text, b"combine-entries")?,
+            combine_entries_with_dash: optional_schema_bool_attr(
+                source,
+                Ns::Text,
+                b"combine-entries-with-dash",
+            )?,
+            combine_entries_with_pp: optional_schema_bool_attr(
+                source,
+                Ns::Text,
+                b"combine-entries-with-pp",
+            )?,
+            use_keys_as_entries: optional_schema_bool_attr(
+                source,
+                Ns::Text,
+                b"use-keys-as-entries",
+            )?,
+            capitalize_entries: optional_schema_bool_attr(source, Ns::Text, b"capitalize-entries")?,
+            comma_separated: optional_schema_bool_attr(source, Ns::Text, b"comma-separated")?,
+            language: attr(source, Ns::Fo, b"language").map(str::to_owned),
+            country: attr(source, Ns::Fo, b"country").map(str::to_owned),
+            script: attr(source, Ns::Fo, b"script").map(str::to_owned),
+            rfc_language_tag: attr(source, Ns::Style, b"rfc-language-tag").map(str::to_owned),
+            sort_algorithm: attr(source, Ns::Text, b"sort-algorithm").map(str::to_owned),
+        },
+        "bibliography" | "bibliography-index" => crate::index::IndexSourceOptions::Bibliography,
+        _ => return Ok(None),
+    };
+    Ok(Some(crate::index::IndexSource::projected(
+        scope, relative, options,
+    )))
 }
 
 fn index_kind(local: &str) -> Option<crate::index::Kind> {
@@ -1403,8 +2363,50 @@ fn attr<'a>(node: &'a Node, namespace: Ns, local: &[u8]) -> Option<&'a str> {
     node.attribute(namespace, local)
 }
 
+fn optional_attr_from_start<'a>(
+    reader: &NsReader<&[u8]>,
+    start: &'a quick_xml::events::BytesStart<'a>,
+    namespace: Ns,
+    local: &[u8],
+) -> Result<Option<String>> {
+    for raw in start.attributes() {
+        let attribute = raw.map_err(|error| {
+            Error::InvalidFormat(format!("invalid OTH metadata attribute: {error}"))
+        })?;
+        if attribute.key.as_ref().starts_with(b"xmlns") {
+            continue;
+        }
+        let (resolved, attribute_local) = reader.resolver().resolve_attribute(attribute.key);
+        let resolved = match resolved {
+            ResolveResult::Bound(Namespace(value)) => resolve_namespace(Some(value)),
+            ResolveResult::Unbound | ResolveResult::Unknown(_) => Ns::None,
+        };
+        if resolved != namespace || attribute_local.as_ref() != local {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(|error| {
+                Error::InvalidFormat(format!("invalid OTH metadata attribute value: {error}"))
+            })?;
+        return Ok(Some(value.into_owned()));
+    }
+    Ok(None)
+}
+
+fn parse_odf_bool(value: &str, field: &str) -> Result<bool> {
+    Boolean::decode(value)
+        .map_err(|_| Error::InvalidFormat(format!("invalid OTH {field} boolean lexical value")))
+}
+
 fn bool_attr(node: &Node, namespace: Ns, local: &[u8]) -> Result<bool> {
     Ok(optional_bool_attr(node, namespace, local)?.unwrap_or(false))
+}
+
+fn optional_schema_bool_attr(node: &Node, namespace: Ns, local: &[u8]) -> Result<Option<bool>> {
+    attr(node, namespace, local)
+        .map(|value| parse_odf_bool(value, "schema boolean"))
+        .transpose()
 }
 
 fn optional_bool_attr(node: &Node, namespace: Ns, local: &[u8]) -> Result<Option<bool>> {
@@ -1422,9 +2424,9 @@ fn count_attr(node: &Node, local: &[u8]) -> Result<usize> {
     count_attr_default(node, local, 1)
 }
 
-fn count_attr_default(node: &Node, local: &[u8], default: usize) -> Result<usize> {
+fn optional_count_attr(node: &Node, local: &[u8]) -> Result<Option<usize>> {
     let Some(value) = attr(node, Ns::Table, local) else {
-        return Ok(default);
+        return Ok(None);
     };
     let parsed = value.parse::<usize>().map_err(|_| {
         Error::InvalidFormat("OTH table repetition attribute is invalid".to_string())
@@ -1432,7 +2434,140 @@ fn count_attr_default(node: &Node, local: &[u8], default: usize) -> Result<usize
     if parsed == 0 || parsed > MAX_REPEAT {
         return invalid("OTH table repetition attribute is outside the supported range");
     }
-    Ok(parsed)
+    Ok(Some(parsed))
+}
+
+fn optional_positive_attr(node: &Node, local: &[u8]) -> Result<Option<usize>> {
+    let Some(value) = attr(node, Ns::Text, local) else {
+        return Ok(None);
+    };
+    let parsed = value
+        .parse::<usize>()
+        .map_err(|_| Error::InvalidFormat("OTH positive index attribute is invalid".to_string()))?;
+    if parsed == 0 || parsed > MAX_REPEAT {
+        return invalid("OTH positive index attribute is outside the supported range");
+    }
+    Ok(Some(parsed))
+}
+
+fn count_attr_default(node: &Node, local: &[u8], default: usize) -> Result<usize> {
+    Ok(optional_count_attr(node, local)?.unwrap_or(default))
+}
+
+fn optional_visibility_attr(node: &Node) -> Result<Option<crate::table::Visibility>> {
+    attr(node, Ns::Table, b"visibility")
+        .map(|value| match value {
+            "visible" => Ok(crate::table::Visibility::Visible),
+            "collapse" => Ok(crate::table::Visibility::Collapse),
+            "filter" => Ok(crate::table::Visibility::Filter),
+            _ => invalid("OTH table:visibility value is invalid"),
+        })
+        .transpose()
+}
+
+fn required_attr<'a>(node: &'a Node, namespace: Ns, local: &[u8], field: &str) -> Result<&'a str> {
+    attr(node, namespace, local)
+        .ok_or_else(|| Error::InvalidFormat(format!("OTH {field} is required")))
+}
+
+fn optional_any_iri_attr(node: &Node, namespace: Ns, local: &[u8]) -> Result<Option<String>> {
+    attr(node, namespace, local)
+        .map(|value| {
+            validate_any_iri(value, "IRI")?;
+            Ok(value.to_owned())
+        })
+        .transpose()
+}
+
+fn validate_finite_number(value: &str, field: &str) -> Result<()> {
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| Error::InvalidFormat(format!("OTH {field} numeric value is invalid")))?;
+    if !parsed.is_finite() {
+        return invalid("OTH numeric value must be finite");
+    }
+    Ok(())
+}
+
+fn validate_date_or_datetime(value: &str) -> Result<()> {
+    if Date::decode(value).is_ok() || DateTime::decode(value).is_ok() {
+        Ok(())
+    } else {
+        invalid("OTH office:date-value is invalid")
+    }
+}
+
+fn validate_any_iri(value: &str, field: &str) -> Result<()> {
+    if value.chars().any(char::is_control) || value.chars().any(char::is_whitespace) {
+        return Err(Error::InvalidFormat(format!(
+            "OTH {field} anyIRI value is invalid"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_uri_or_safe_curie(value: &str, field: &str) -> Result<()> {
+    if let Some(inner) = value
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'))
+    {
+        if inner.is_empty() {
+            return Err(Error::InvalidFormat(format!(
+                "OTH {field} value is invalid"
+            )));
+        }
+        if inner.chars().any(char::is_whitespace) || inner.chars().any(char::is_control) {
+            return Err(Error::InvalidFormat(format!(
+                "OTH {field} value is invalid"
+            )));
+        }
+        if inner.contains(':') {
+            validate_curie(inner, field)
+        } else {
+            validate_any_iri(inner, field)
+        }
+    } else {
+        validate_any_iri(value, field)
+    }
+}
+
+fn validate_curies(value: &str, field: &str) -> Result<()> {
+    let mut count = 0usize;
+    for token in value.split_whitespace() {
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat(format!("OTH {field} CURIE count overflow")))?;
+        validate_curie(token, field)?;
+    }
+    if count == 0 {
+        return Err(Error::InvalidFormat(format!(
+            "OTH {field} must not be empty"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_curie(value: &str, field: &str) -> Result<()> {
+    let (prefix, suffix) = value.split_once(':').unwrap_or(("", value));
+    if suffix.is_empty() {
+        return Err(Error::InvalidFormat(format!(
+            "OTH {field} CURIE is invalid"
+        )));
+    }
+    if !prefix.is_empty() {
+        validate_ncname(prefix, field)?;
+    }
+    if suffix.chars().any(char::is_control)
+        || suffix.chars().any(char::is_whitespace)
+        || suffix
+            .chars()
+            .any(|character| matches!(character, '^' | '"' | '<' | '>' | '`'))
+    {
+        return Err(Error::InvalidFormat(format!(
+            "OTH {field} CURIE is invalid"
+        )));
+    }
+    Ok(())
 }
 
 fn append_plain_text(output: &mut String, node: &Node) -> Result<()> {
@@ -2029,4 +3164,36 @@ fn xml_error(error: &quick_xml::Error) -> Error {
 
 fn invalid<T>(message: &str) -> Result<T> {
     Err(Error::InvalidFormat(message.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retained_budget_checks_one_under_and_one_over_without_partial_accounting() {
+        let mut structures = BodyStructures::new();
+        assert!(structures.ensure(MAX_STRUCTURE_TEXT - 1).is_ok());
+        assert_eq!(structures.retained_bytes, 0);
+        assert!(structures.account(MAX_STRUCTURE_TEXT - 1).is_ok());
+        assert_eq!(structures.retained_bytes, MAX_STRUCTURE_TEXT - 1);
+        assert!(structures.ensure(1).is_ok());
+        assert!(structures.account(1).is_ok());
+        assert_eq!(structures.retained_bytes, MAX_STRUCTURE_TEXT);
+        assert!(structures.ensure(1).is_err());
+        assert!(structures.account(1).is_err());
+        assert_eq!(structures.retained_bytes, MAX_STRUCTURE_TEXT);
+    }
+
+    #[test]
+    fn temporary_budget_refuses_the_first_byte_over_the_limit() {
+        let mut budget = Budget {
+            nodes: 0,
+            text_bytes: 0,
+        };
+        assert!(budget.text(MAX_STRUCTURE_TEXT - 1).is_ok());
+        assert!(budget.text(1).is_ok());
+        assert!(budget.text(1).is_err());
+        assert_eq!(budget.text_bytes, MAX_STRUCTURE_TEXT);
+    }
 }
