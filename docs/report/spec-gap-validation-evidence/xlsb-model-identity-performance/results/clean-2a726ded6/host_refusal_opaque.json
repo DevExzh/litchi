@@ -1,0 +1,72 @@
+{
+  "baseline_commit": "1b0d4864804d666aaf4ae5039bd6300996ca32a5",
+  "expected_success": false,
+  "fixture_kind": "synthetic_complete_xldm140",
+  "input_bytes": 5589,
+  "input_hash_fnv1a64": 5245789002673370585,
+  "input_sha256": "15d71f0baf0e860b5b0c87b14174b43cdde973e37fd5e7cbacede81456390e40",
+  "lane": "host_refusal_opaque",
+  "native_acceptance_claim": false,
+  "neutral_baseline_commit": "4f53be2d31e14b215d6eeaee56d11eefeae94107",
+  "relationship_count": 0,
+  "sample_count": 1,
+  "samples": [
+    {
+      "actual_success": false,
+      "alloc_balance_ok": true,
+      "alloc_invalid": false,
+      "allocation_calls": 2616,
+      "allocation_failed": 0,
+      "candidate_bytes": null,
+      "deallocated_bytes": 588973,
+      "deallocation_calls": 2614,
+      "direct_allocated_bytes": 580284,
+      "elapsed_ns": 2770241,
+      "error": {
+        "class": "invalid_format",
+        "message": "Invalid format: XLDM outer identity proof failed: MS-XLDM storage must contain at least three complete 4096-byte pages",
+        "typed_match": true
+      },
+      "exact_cap_ok": null,
+      "exact_inverse_ok": null,
+      "live_after": 10266,
+      "live_before": 10134,
+      "one_under_cap_refused": null,
+      "opaque_ok": true,
+      "output_bytes": null,
+      "peak_live_delta": 138755,
+      "phases": {
+        "commit_ns": null,
+        "inverse_ns": null,
+        "open_ns": null,
+        "reopen_ns": null,
+        "save_ns": null,
+        "stage_ns": 1004434,
+        "validation_ns": 996384
+      },
+      "preservation": {
+        "all_parts_equal": true,
+        "content_types_bytes": 1230,
+        "content_types_equal": true,
+        "inner_all_equal": true,
+        "inner_member_count": 0,
+        "inner_unchanged_equal": true,
+        "relationship_owner_count": 10,
+        "relationships_equal": true,
+        "unchanged_parts_equal": true
+      },
+      "realloc_new_bytes": 16581,
+      "realloc_old_bytes": 7760,
+      "reallocation_calls": 349,
+      "requested_alloc_bytes": 596865,
+      "semantic_ok": true,
+      "source_bytes": 5589,
+      "source_unchanged": true
+    }
+  ],
+  "scale": "tiny",
+  "schema": "xlsb-model-identity-profile-v1-smoke",
+  "source_backed_api": true,
+  "table_count": 1,
+  "warmup": 0
+}

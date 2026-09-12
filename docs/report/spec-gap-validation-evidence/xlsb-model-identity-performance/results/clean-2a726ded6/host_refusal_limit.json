@@ -1,0 +1,72 @@
+{
+  "baseline_commit": "1b0d4864804d666aaf4ae5039bd6300996ca32a5",
+  "expected_success": false,
+  "fixture_kind": "synthetic_complete_xldm140",
+  "input_bytes": 8851,
+  "input_hash_fnv1a64": 8860411088468348232,
+  "input_sha256": "66a7cbc4e76234dbe13a658e2aa1f5f6fdf1d5e2b6e5f700c81197e5f740e1e2",
+  "lane": "host_refusal_limit",
+  "native_acceptance_claim": false,
+  "neutral_baseline_commit": "4f53be2d31e14b215d6eeaee56d11eefeae94107",
+  "relationship_count": 0,
+  "sample_count": 1,
+  "samples": [
+    {
+      "actual_success": false,
+      "alloc_balance_ok": true,
+      "alloc_invalid": false,
+      "allocation_calls": 15527,
+      "allocation_failed": 0,
+      "candidate_bytes": null,
+      "deallocated_bytes": 1717660,
+      "deallocation_calls": 15525,
+      "direct_allocated_bytes": 1540580,
+      "elapsed_ns": 19758153,
+      "error": {
+        "class": "invalid_format",
+        "message": "Invalid format: Data Model rewritten workbook bytes limit exceeded",
+        "typed_match": true
+      },
+      "exact_cap_ok": null,
+      "exact_inverse_ok": null,
+      "live_after": 19869,
+      "live_before": 19789,
+      "one_under_cap_refused": null,
+      "opaque_ok": true,
+      "output_bytes": null,
+      "peak_live_delta": 291485,
+      "phases": {
+        "commit_ns": 4171487,
+        "inverse_ns": null,
+        "open_ns": null,
+        "reopen_ns": null,
+        "save_ns": null,
+        "stage_ns": null,
+        "validation_ns": 4081767
+      },
+      "preservation": {
+        "all_parts_equal": true,
+        "content_types_bytes": 1230,
+        "content_types_equal": true,
+        "inner_all_equal": true,
+        "inner_member_count": 15,
+        "inner_unchanged_equal": true,
+        "relationship_owner_count": 10,
+        "relationships_equal": true,
+        "unchanged_parts_equal": true
+      },
+      "realloc_new_bytes": 352854,
+      "realloc_old_bytes": 175694,
+      "reallocation_calls": 1214,
+      "requested_alloc_bytes": 1893434,
+      "semantic_ok": true,
+      "source_bytes": 8851,
+      "source_unchanged": true
+    }
+  ],
+  "scale": "tiny",
+  "schema": "xlsb-model-identity-profile-v1-smoke",
+  "source_backed_api": true,
+  "table_count": 1,
+  "warmup": 0
+}

@@ -6,7 +6,9 @@ import subprocess
 import tempfile
 import unittest
 import hashlib
+import json
 from pathlib import Path
+from unittest.mock import patch
 
 import source_manifest
 import verify
@@ -137,6 +139,85 @@ class GitBlobSnapshotTests(unittest.TestCase):
         (results / "build-provenance.txt").write_text(f"binary={binary}\n{receipt}")
         with self.assertRaisesRegex(SystemExit, "changed during smoke"):
             verify.verify_binary_receipts(results)
+
+    def test_full_manifest_parser_binds_local_cargo_files_to_git_blobs(self) -> None:
+        package_root = self.root / "fixture"
+        source_dir = package_root / "src"
+        source_dir.mkdir(parents=True)
+        manifest = package_root / "Cargo.toml"
+        source = source_dir / "lib.rs"
+        manifest.write_text(
+            "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n"
+        )
+        source.write_text("pub fn identity() -> &'static str { \"source\" }\n")
+        subprocess.run(
+            ["git", "-C", str(self.root), "add", "fixture"], check=True
+        )
+        subprocess.run(
+            ["git", "-C", str(self.root), "commit", "-qm", "fixture"], check=True
+        )
+        commit = subprocess.check_output(
+            ["git", "-C", str(self.root), "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+        metadata = self.root / "metadata.json"
+        metadata.write_text(
+            json.dumps(
+                {
+                    "packages": [
+                        {
+                            "name": "fixture",
+                            "version": "0.1.0",
+                            "source": None,
+                            "manifest_path": str(manifest),
+                            "targets": [{"src_path": str(source)}],
+                        }
+                    ]
+                }
+            )
+        )
+        output = self.root / "source-manifest.txt"
+        with patch(
+            "sys.argv",
+            [
+                "source_manifest.py",
+                "--metadata",
+                str(metadata),
+                "--root",
+                str(self.root),
+                "--output",
+                str(output),
+                "--git-commit",
+                commit,
+            ],
+        ):
+            source_manifest.main()
+
+        source.write_text("pub fn identity() -> &'static str { \"dirty\" }\n")
+        lines = output.read_text().splitlines()
+        entries = []
+        rewritten = []
+        for line in lines:
+            parts = line.split("\t")
+            if line.startswith("file=") and parts[3] == "fixture/src/lib.rs":
+                parts[4] = source_manifest.sha256(source)
+                line = "\t".join(parts)
+            if line.startswith("file="):
+                entries.append((parts[3], parts[4]))
+            rewritten.append(line)
+        tree_hash = hashlib.sha256(
+            "\n".join(f"{shown}\t{digest}" for shown, digest in entries).encode()
+        ).hexdigest()
+        for index, line in enumerate(rewritten):
+            if line.startswith("package="):
+                parts = line.split("\t")
+                parts[6] = tree_hash
+                rewritten[index] = "\t".join(parts)
+                break
+        output.write_text("\n".join(rewritten) + "\n")
+
+        with self.assertRaisesRegex(SystemExit, "committed snapshot"):
+            verify.verify_source_manifest(output, self.root, require_transitive=False)
 
 
 if __name__ == "__main__":

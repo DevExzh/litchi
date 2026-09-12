@@ -1,0 +1,21 @@
+git_head=2a726ded6feb79f36b23980ed89c350aafd3cb55
+git_baseline=1b0d4864804d666aaf4ae5039bd6300996ca32a5
+neutral_baseline=4f53be2d31e14b215d6eeaee56d11eefeae94107
+rustc=rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo=cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+target_dir=/var/tmp/litchi-xlsb-model-identity-profile.oUglWd
+cargo_incremental=0
+uname=Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux
+metadata_before_sha256=f0344104682b455b636b852af4e95a289f08bfedbe2c4abf71c02aebcb05a040
+metadata_after_sha256=f0344104682b455b636b852af4e95a289f08bfedbe2c4abf71c02aebcb05a040
+source_manifest_before_sha256=95d40c1527a255035d8dd925e2951dfba78606475203e18de8537e5892730eba
+source_manifest_after_sha256=95d40c1527a255035d8dd925e2951dfba78606475203e18de8537e5892730eba
+binary_sha256=ee1f5c4df6ecc56567f58cf6073940317bba7559cea4f90026c705eec9119ccc
+binary_after_sha256=ee1f5c4df6ecc56567f58cf6073940317bba7559cea4f90026c705eec9119ccc
+git_status_relevant=

@@ -20,7 +20,10 @@ receipt.
 
 The smoke runner requires the host implementation commit
 1b0d4864804d666aaf4ae5039bd6300996ca32a5 and the neutral XLDM baseline
-4f53be2d31e14b215d6eeaee56d11eefeae94107. The source manifest and provenance
+4f53be2d31e14b215d6eeaee56d11eefeae94107. The sealed correctness smoke was
+built from descendant commit 2a726ded6feb79f36b23980ed89c350aafd3cb55;
+1b0d48648 is the host API anchor recorded in the corpus, while 2a726ded6 is
+the source and build receipt commit. The source manifest and provenance
 file bind the actual build inputs to a clean committed checkout. The isolated
 harness uses its own committed `harness/Cargo.lock`; the repository root
 lockfile is not an input. The committed toolchain file is included in the
