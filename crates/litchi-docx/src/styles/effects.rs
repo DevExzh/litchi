@@ -553,6 +553,10 @@ impl Commit {
 }
 
 /// A source-checked reversible replacement/removal patch.
+///
+/// Package-bound patches retain the originating package's [`ReadLimits`]. Applying
+/// one to a package opened with a different limit profile fails its source
+/// precondition; create a fresh edit from that package instead.
 #[derive(Debug, Clone)]
 pub struct Patch {
     owner: Owner,
