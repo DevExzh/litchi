@@ -961,6 +961,7 @@ fn scan_identity_element(
             return invalid("duplicate OTH xml:id value");
         }
         if is_region {
+            account_identity_bytes(identity_bytes, xml_id.len())?;
             regions.insert(xml_id.to_owned());
         }
     }
