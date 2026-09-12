@@ -1565,5 +1565,17 @@
     "prerequisite_commit": "35d069e62a2b9a72e59f6a4aa73444b928ff6195",
     "head": "96958498f88e263b3bc7f0a9e544f2144ff156c5",
     "git_bundle_verify_passed": true
-  }
+  },
+  "git_restore_replay": {
+    "raw_commit": "470bbf2882601499a8ad2bafa892e659df41121d",
+    "raw_files": 307,
+    "all_raw_git_blobs_equal_original": true,
+    "restored_at_recorded_external_path": true,
+    "verifier_replay_passed": true,
+    "replay_verification_byte_identical": true,
+    "raw_bytes_unchanged_by_replay": true,
+    "external_raw_copy_removed_after_verification": true,
+    "captured_source_worktree_retained": "/var/tmp/litchi-docx-styles-effects-profile-capture-20260912-a"
+  },
+  "superseded_preparation_directory_removed": "/var/tmp/litchi-docx-styles-effects-profile-results-53f646223-20260912-a"
 }
