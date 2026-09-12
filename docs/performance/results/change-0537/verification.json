@@ -1,0 +1,11 @@
+{
+  "analysis_sha256": "affb2bc67f7794cdb898ab54982fabae0732aeca0a1a669d994dc2746d596121",
+  "candidate_patch_sha256": "5615b3433d83b960167c442e7fb7c13fe3a295fc2ac78de859c049af12f396aa",
+  "draft_applies": true,
+  "fresh_rust_tests_or_measurements": false,
+  "historical_rows": 4,
+  "relevant_source_files": 13,
+  "runtime_changed": false,
+  "status": "pass",
+  "verifier_sha256": "29a58bb778b55eb0ec71756fafdb561df19ab433a4f850c854239100922a845d"
+}

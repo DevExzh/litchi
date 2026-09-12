@@ -1,5 +1,20 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0537: raw XLSX attribute ownership and planning allocation gap
+
+[0537](changes/0537-xlsx-transient-attribute-attribution.md) replays four sealed
+historical planning profiles and binds 13 relevant current source/lockfile
+inputs. Raw attribute decoding forces temporary strings to become owned; its
+direct allocation-child instruction costs are retained separately from nested
+decoder/scan totals. A draft keeps transient references and numeric metadata
+borrowed while preserving owned cell-type retention, normalization and complete
+checked scans. No runtime optimization or fresh performance claim is accepted.
+
+The next measurement must first cover planning allocations: the current region
+starts at commit. Fresh matched native, phase/profile, allocation and eager
+readback guards remain required. OLE2/OOXML stays first; ODF is deferred and
+iWork is excluded. This diagnostic does not complete the broader goal.
+
 ## 0536: reject collector cold-error helpers after matched measurement
 
 [0536](changes/0536-cfb-collector-cold-error-layout-rejected.md) restores the

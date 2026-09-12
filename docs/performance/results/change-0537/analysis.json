@@ -1,0 +1,146 @@
+{
+  "plan_sha256": "261becdadcaa34373d5619f508fec4daffbdc924d61a595533aafd02fdb153b2",
+  "rows": [
+    {
+      "owners": {
+        "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 155592,
+            "__rustc::__rust_alloc": 1584480,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 9216,
+            "quick_xml::events::attributes::Attribute::decoded_and_normalized_value": 1606335
+          },
+          "inclusive_ir": 3871719,
+          "planning_share_percent": 3.081508316462005,
+          "self_ir": 516096
+        },
+        "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 3701376,
+            "__memcpy_avx_unaligned_erms": 276480,
+            "__rustc::__rust_dealloc": 322560,
+            "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": 3871719,
+            "quick_xml::name::QName::local_name": 534528,
+            "quick_xml::name::QName::prefix": 497664
+          },
+          "inclusive_ir": 10273383,
+          "planning_share_percent": 8.176604539921255,
+          "self_ir": 1069056
+        }
+      },
+      "planning_ir": 125643633,
+      "raw_sha256": "b989cf46cbd1f8831739867798cfa964478a1d59a0e93c6a63d2a57719e03a66",
+      "repeat": 1,
+      "shape": "medium"
+    },
+    {
+      "owners": {
+        "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 278412,
+            "__rustc::__rust_alloc": 3031751,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 17792,
+            "quick_xml::events::attributes::Attribute::decoded_and_normalized_value": 3277470
+          },
+          "inclusive_ir": 7601777,
+          "planning_share_percent": 3.2064755293606875,
+          "self_ir": 996352
+        },
+        "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 7218044,
+            "__memcpy_avx_unaligned_erms": 533760,
+            "__rustc::__rust_dealloc": 622720,
+            "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": 7601777,
+            "quick_xml::name::QName::local_name": 1031936,
+            "quick_xml::name::QName::prefix": 960768
+          },
+          "inclusive_ir": 20032877,
+          "planning_share_percent": 8.449988717531774,
+          "self_ir": 2063872
+        }
+      },
+      "planning_ir": 237075784,
+      "raw_sha256": "b7d37b9d07243590d8a94dc0c91a4bec8881ec60749ffc650ab8099ea195c233",
+      "repeat": 1,
+      "shape": "dense-sparse"
+    },
+    {
+      "owners": {
+        "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 155592,
+            "__rustc::__rust_alloc": 1584668,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 9216,
+            "quick_xml::events::attributes::Attribute::decoded_and_normalized_value": 1606335
+          },
+          "inclusive_ir": 3871907,
+          "planning_share_percent": 3.0813770396736904,
+          "self_ir": 516096
+        },
+        "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 3701376,
+            "__memcpy_avx_unaligned_erms": 276480,
+            "__rustc::__rust_dealloc": 322560,
+            "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": 3871907,
+            "quick_xml::name::QName::local_name": 534528,
+            "quick_xml::name::QName::prefix": 497664
+          },
+          "inclusive_ir": 10273571,
+          "planning_share_percent": 8.176008823263956,
+          "self_ir": 1069056
+        }
+      },
+      "planning_ir": 125655087,
+      "raw_sha256": "68ec33d94b8e5ae368d0513d9d00abad53e33771f2cebf782e81a59a05b8dfba",
+      "repeat": 2,
+      "shape": "medium"
+    },
+    {
+      "owners": {
+        "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 278412,
+            "__rustc::__rust_alloc": 3033657,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 17792,
+            "quick_xml::events::attributes::Attribute::decoded_and_normalized_value": 3277470
+          },
+          "inclusive_ir": 7603683,
+          "planning_share_percent": 3.206917266461254,
+          "self_ir": 996352
+        },
+        "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 7218044,
+            "__memcpy_avx_unaligned_erms": 533760,
+            "__rustc::__rust_dealloc": 622720,
+            "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute": 7603683,
+            "quick_xml::name::QName::local_name": 1031936,
+            "quick_xml::name::QName::prefix": 960768
+          },
+          "inclusive_ir": 20034783,
+          "planning_share_percent": 8.44983826028839,
+          "self_ir": 2063872
+        }
+      },
+      "planning_ir": 237102562,
+      "raw_sha256": "0b099ee3103cdd802e9b467ccc4fb4f577e7cf49982e9ff92ead5f6a4d05e9f3",
+      "repeat": 2,
+      "shape": "dense-sparse"
+    }
+  ],
+  "scope": "Historical0530 selected planning dumps; current relevant source matches. Nested owner totals overlap. Callee Ir is not operation-local allocation counts. No fresh timings or accepted optimization.",
+  "seals": {
+    "change-0530": {
+      "entries": 76,
+      "sha256": "a2932644f9647619b03206792b7c92ad3cdf667c12bb8fea25da79139f85e0b8"
+    },
+    "change-0531": {
+      "entries": 998,
+      "sha256": "f178a86d44ceeacc4c1fc9ab1c23fb9d25f018146959b38cba80a07997389168"
+    }
+  },
+  "source_binding_sha256": "ae8983fdaf023fbf1145a468a468c15d54f48ea98d70ecaa57f7d5c260d76416",
+  "status": "pass"
+}

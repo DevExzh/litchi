@@ -1,0 +1,19 @@
+{
+  "created_utc": "2026-09-12T18:55:38.500228+00:00",
+  "fresh_builds_or_captures": false,
+  "no_candidate_admission": "Draftonly; fresh native/allocation/quality gatesrequired beforeproductionretention",
+  "performance_claim": null,
+  "previous_turn": "progress:0536 measured/rejected collector coldhelpers, restoredruntime, verifiedcommittedandcleaned",
+  "prior_seals": {
+    "change-0530": "a2932644f9647619b03206792b7c92ad3cdf667c12bb8fea25da79139f85e0b8",
+    "change-0531": "f178a86d44ceeacc4c1fc9ab1c23fb9d25f018146959b38cba80a07997389168"
+  },
+  "priority": "OLE2/OOXML first;ODFdeferred;iWorkexcluded",
+  "revision": "97b75c24c4a92098458972ca94f183ff6d256bac",
+  "scope": "Historical0530planningprofile descendant attribution for rawworksheet transientattributeownership; current relevant source exactbinding",
+  "selected_owners": [
+    "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes",
+    "litchi_xlsx::raw::worksheet::codec::decode_cell_attribute"
+  ],
+  "source_binding_sha256": "ae8983fdaf023fbf1145a468a468c15d54f48ea98d70ecaa57f7d5c260d76416"
+}

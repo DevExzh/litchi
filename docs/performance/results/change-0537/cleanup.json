@@ -1,0 +1,7 @@
+{
+  "path": "/home/zhuhe/litchi-0537-draft",
+  "draft_source_sha256": "67f6891fb3d84ef37414e41cf614a7971e740eb82b44510a59b0552fa40fa6a5",
+  "candidate_patch_sha256": "5615b3433d83b960167c442e7fb7c13fe3a295fc2ac78de859c049af12f396aa",
+  "removed": true,
+  "formatting": "Explicit repository rustfmt.toml used; no unrelated formatting changes retained"
+}
