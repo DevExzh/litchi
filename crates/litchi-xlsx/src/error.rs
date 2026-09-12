@@ -64,6 +64,15 @@ pub enum Error {
     /// A host-neutral OOXML package service failed.
     #[error("shared OOXML service error: {0}")]
     Common(#[from] litchi_ooxml_common::Error),
+    /// A caller-owned resource budget refused an operation.
+    ///
+    /// Retains the resource, observed amount, limit, and budget scope so callers
+    /// can distinguish resource exhaustion from malformed document input.
+    #[error(transparent)]
+    ResourceLimit(#[from] litchi_core::ResourceLimit),
+    /// The bounded form-control properties codec refused a payload or edit.
+    #[error(transparent)]
+    FormControl(#[from] crate::form_control::FormControlError),
     /// A spreadsheet coordinate lies outside its typed domain.
     #[error(transparent)]
     Coordinate(#[from] litchi_sheet::CoordinateError),
@@ -470,6 +479,40 @@ mod tests {
     use std::error::Error as _;
 
     use super::{Error, allocation};
+
+    #[test]
+    fn resource_refusal_retains_typed_budget_details() {
+        let error = Error::from(litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::Memory,
+            observed: 65,
+            limit: 64,
+            scope: "pivot table retained cells".into(),
+        });
+        let Error::ResourceLimit(limit) = error else {
+            panic!("budget refusal must remain distinguishable from invalid XML");
+        };
+        assert_eq!(limit.resource, litchi_core::Resource::Memory);
+        assert_eq!(limit.observed, 65);
+        assert_eq!(limit.limit, 64);
+        assert_eq!(&*limit.scope, "pivot table retained cells");
+    }
+
+    #[test]
+    fn form_control_refusal_retains_leaf_limit_details() {
+        let error = Error::from(crate::form_control::FormControlError::Limit {
+            resource: "items",
+            observed: 3,
+            maximum: 2,
+        });
+        assert!(matches!(
+            error,
+            Error::FormControl(crate::form_control::FormControlError::Limit {
+                resource: "items",
+                observed: 3,
+                maximum: 2,
+            })
+        ));
+    }
 
     #[test]
     fn allocation_preserves_resource_and_source() {
