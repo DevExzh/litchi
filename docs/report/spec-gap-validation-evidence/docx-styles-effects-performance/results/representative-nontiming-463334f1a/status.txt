@@ -1,0 +1,6 @@
+status=passed
+profile_mode=representative_non_timing
+latency_claim=false
+rss_claim=false
+validation=receipt_samples_checked_after_initial_shape_validator_failure
+target_removed_after_receipt_validation=true
