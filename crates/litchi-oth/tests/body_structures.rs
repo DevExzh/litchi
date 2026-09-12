@@ -12,10 +12,10 @@ const CONTENT: &str = concat!(
     r#"xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" "#,
     r#"xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:foreign="urn:example:foreign" office:version="1.4">"#,
     r#"<office:body><office:text>"#,
+    r#"<text:tracked-changes><text:changed-region xml:id="r1" text:id="r1"><text:insertion><office:change-info><dc:creator>Ada</dc:creator><dc:date>2026-09-02T03:04:05Z</dc:date><text:p>inserted</text:p></office:change-info></text:insertion></text:changed-region></text:tracked-changes>"#,
     r#"<text:section text:name="Intro" text:protected="true"><text:p>section text</text:p></text:section>"#,
     r#"<text:note text:note-class="footnote" text:id="fn1"><text:note-citation text:label="1">1</text:note-citation><text:note-body><text:p>note text</text:p></text:note-body></text:note>"#,
     r#"<office:annotation office:name="comment"><dc:creator>Ada</dc:creator><text:p>review text</text:p></office:annotation>"#,
-    r#"<text:tracked-changes><text:changed-region xml:id="r1" text:id="r1"><text:insertion><office:change-info><dc:creator>Ada</dc:creator><dc:date>2026-09-02T03:04:05Z</dc:date><text:p>inserted</text:p></office:change-info></text:insertion></text:changed-region></text:tracked-changes>"#,
     r#"<text:change-start text:change-id="r1"/><text:change-end text:change-id="r1"/>"#,
     r#"<text:table-of-content text:name="Contents" text:protected="true"><text:table-of-content-source/><text:index-body><text:p>cached entry</text:p></text:index-body></text:table-of-content>"#,
     r#"<draw:frame draw:name="Box" text:anchor-type="paragraph" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:text-box><text:p>frame text</text:p></draw:text-box></draw:frame>"#,
@@ -75,6 +75,20 @@ fn projects_all_oth_body_structure_families() {
 }
 
 #[test]
+fn office_forms_may_precede_tracking_prelude() {
+    let content = CONTENT.replace(
+        r#"<office:body><office:text><text:tracked-changes>"#,
+        r#"<office:body><office:text><office:forms/><text:tracked-changes>"#,
+    );
+    let template =
+        Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
+    let body = template.text_body().unwrap();
+    assert!(body.forms().is_empty());
+    assert!(body.change_tracking().unwrap().is_some());
+    assert_eq!(body.changes().unwrap().len(), 3);
+}
+
+#[test]
 fn structure_projection_ignores_same_named_foreign_content() {
     let content = CONTENT
         .replace(
@@ -82,8 +96,8 @@ fn structure_projection_ignores_same_named_foreign_content() {
             r#"<office:styles><table:table table:name="styles-spoof"/></office:styles><office:body>"#,
         )
         .replace(
-            r#"<office:body><office:text>"#,
-            r#"<office:body><office:text><foreign:wrapper><table:table table:name="foreign-spoof"/></foreign:wrapper>"#,
+            r#"</text:tracked-changes>"#,
+            r#"</text:tracked-changes><foreign:wrapper><table:table table:name="foreign-spoof"/></foreign:wrapper>"#,
         );
     let content = content.replace(
         r#"<text:p>section text</text:p>"#,
@@ -217,8 +231,8 @@ fn change_markers_are_inert_without_tracked_changes_and_text_change_is_projected
 #[test]
 fn foreign_wrappers_keep_typed_descendants_inert() {
     let content = CONTENT.replace(
-        r#"<office:body><office:text>"#,
-        r#"<office:body><office:text><foreign:wrapper><text:section text:name="foreign-section"><text:p>foreign</text:p></text:section><text:change text:change-id="foreign"/></foreign:wrapper>"#,
+        r#"</text:tracked-changes>"#,
+        r#"</text:tracked-changes><foreign:wrapper><text:section text:name="foreign-section"><text:p>foreign</text:p></text:section><text:change text:change-id="foreign"/></foreign:wrapper>"#,
     );
     let template =
         Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();

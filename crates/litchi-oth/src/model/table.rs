@@ -304,28 +304,6 @@ pub enum CellValue {
 }
 
 impl CellValue {
-    pub(crate) fn retained_bytes(&self) -> usize {
-        match self {
-            Self::Float { lexical } | Self::Percentage { lexical } | Self::Date { lexical } => {
-                lexical.len()
-            },
-            Self::Currency { lexical, currency } => {
-                lexical.len() + currency.as_deref().map_or(0, str::len)
-            },
-            Self::Time { value } => {
-                value.as_str().len()
-                    + value.years().map_or(0, str::len)
-                    + value.months().map_or(0, str::len)
-                    + value.days().map_or(0, str::len)
-                    + value.hours().map_or(0, str::len)
-                    + value.minutes().map_or(0, str::len)
-                    + value.seconds().map_or(0, str::len)
-            },
-            Self::Boolean { lexical, .. } => lexical.len(),
-            Self::String { value } | Self::Error { value } => value.as_deref().map_or(0, str::len),
-        }
-    }
-
     /// Lexical scalar value, when this value family has one.
     #[must_use]
     pub fn lexical(&self) -> Option<&str> {
