@@ -1,0 +1,11 @@
+{
+  "retention_commit": "c4ac516353591f88a9b797349002d05737614e78",
+  "git_byte_verified_files": 174,
+  "raw_external_files_verified": 167,
+  "removed_external_results": "/var/tmp/litchi-docx-styles-effects-projection-reuse-smoke-results-16cf1e3c6-20260912-b",
+  "external_results_bytes": 1771665,
+  "target_removed_by_runner_before_root_audit": true,
+  "preserved_source_checkout": "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000d977b",
+  "independent_verifier_passed": true,
+  "timing_claim": false
+}
