@@ -52,9 +52,14 @@ fail-closed verifier because existing-owner replacement in
 the one-unit-under limit was 110,150 and the transaction commit-stage refusal
 was not observed. The exact cap receipt, source manifest, build/provenance
 receipts, commands, and hashes are retained in that directory. The complete
-byte-exact raw bundle and its per-file SHA manifest remain outside the checkout
-at `/var/tmp/litchi-docx-styles-effects-first-failed-raw-20260912-b`.
+byte-exact raw bundle remains outside the checkout at
+`/var/tmp/litchi-docx-styles-effects-first-failed-raw-20260912-b`; its per-file
+SHA manifest is retained as `historical-first-failed-20260912/raw-bundle-sha256.txt`.
 
 Production commit `d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119` projects replacement
-aggregate bytes at commit and adds the focused regression. A fresh clean 52-lane
-smoke must validate that sealed source pin before any timing run.
+aggregate bytes at commit and adds the focused regression. The fresh
+[clean 46c456848 capture](results/clean-46c456848/) passes all 52 lanes,
+including the existing-owner commit-time cap and opaque-member checks. The
+runner and root verifier replays agree. This closes the correctness-smoke
+gate for that recorded source; a measurement harness and matched runtime
+evidence remain necessary before making performance claims.
