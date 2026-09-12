@@ -854,6 +854,28 @@ impl Workbook {
         &self.inner.pivot_caches
     }
 
+    /// Return a semantic handle for one workbook PivotCache.  Cache and field
+    /// resolution remains fallible at the typed read boundary; no OPC
+    /// relationship or Part identity is accepted here.
+    #[must_use]
+    pub fn pivot_cache(
+        &self,
+        selector: impl Into<crate::pivot::PivotCacheSelector>,
+    ) -> crate::pivot::PivotCacheHandle {
+        crate::pivot::cached_unique_names::workbook_cache(self, selector)
+    }
+
+    /// Begin an ordinary semantic edit handle for one workbook PivotCache.
+    /// Select the cache field with [`crate::pivot::PivotCacheEdit::field`]
+    /// before staging an existing-name replacement.
+    #[must_use]
+    pub fn edit_pivot_cache(
+        &self,
+        selector: impl Into<crate::pivot::PivotCacheSelector>,
+    ) -> crate::pivot::PivotCacheEdit {
+        crate::pivot::cached_unique_names::edit_workbook(self, selector)
+    }
+
     /// Resolve the typed `pivotTableServerFormats` metadata for one semantic
     /// workbook PivotTable.  XML source ranges and package identities remain
     /// behind the low-level `pivot_table_server_formats_source` method.
