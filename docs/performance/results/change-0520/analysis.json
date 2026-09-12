@@ -1,0 +1,618 @@
+{
+  "status": "pass",
+  "claim": "current phase attribution; no speedup claim",
+  "total_samples": 400,
+  "rows": [
+    {
+      "name": "native-r1-medium",
+      "shape": "medium",
+      "repeat": 1,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 27964511,
+        "p95": 28243882,
+        "p99": 28296042,
+        "mean": 27975455.33,
+        "min": 27683779,
+        "max": 28664225
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 91115,
+          "p95": 102410,
+          "p99": 104810,
+          "mean": 92447.66,
+          "min": 86610,
+          "max": 108951
+        },
+        "plan_ns": {
+          "p50": 7933125,
+          "p95": 8122631,
+          "p99": 8326982,
+          "mean": 7950217.65,
+          "min": 7780079,
+          "max": 8481393
+        },
+        "commit_ns": {
+          "p50": 12547348,
+          "p95": 12682274,
+          "p99": 12757464,
+          "mean": 12555833.84,
+          "min": 12435432,
+          "max": 12757834
+        },
+        "publication_ns": {
+          "p50": 7363502,
+          "p95": 7489718,
+          "p99": 7535298,
+          "mean": 7376956.18,
+          "min": 7316607,
+          "max": 7537468
+        },
+        "reopen_ns": {
+          "p50": 30831375,
+          "p95": 31944321,
+          "p99": 32264053,
+          "mean": 30937260.58,
+          "min": 30635184,
+          "max": 32480584
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.0033045989389442407,
+        "plan_ns": 0.2841854602979218,
+        "commit_ns": 0.44881606722359646,
+        "publication_ns": 0.2636938735395375
+      }
+    },
+    {
+      "name": "native-r1-dense-sparse",
+      "shape": "dense-sparse",
+      "repeat": 1,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 53698925,
+        "p95": 54372415,
+        "p99": 54761663,
+        "mean": 53708339.79,
+        "min": 53121595,
+        "max": 54948463
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 101165,
+          "p95": 118690,
+          "p99": 131611,
+          "mean": 103575.58,
+          "min": 95841,
+          "max": 134071
+        },
+        "plan_ns": {
+          "p50": 14940466,
+          "p95": 15485083,
+          "p99": 16061297,
+          "mean": 15008091.48,
+          "min": 14678261,
+          "max": 16152098
+        },
+        "commit_ns": {
+          "p50": 24184599,
+          "p95": 24538148,
+          "p99": 24778079,
+          "mean": 24206207.23,
+          "min": 23897784,
+          "max": 24832980
+        },
+        "publication_ns": {
+          "p50": 14359248,
+          "p95": 14576300,
+          "p99": 14638740,
+          "mean": 14390465.5,
+          "min": 14267447,
+          "max": 14722081
+        },
+        "reopen_ns": {
+          "p50": 44725426,
+          "p95": 45371818,
+          "p99": 45616249,
+          "mean": 44778013.18,
+          "min": 43980561,
+          "max": 45677150
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.001928482250707828,
+        "plan_ns": 0.27943689078235795,
+        "commit_ns": 0.45069736515123066,
+        "publication_ns": 0.2679372618157036
+      }
+    },
+    {
+      "name": "native-r2-medium",
+      "shape": "medium",
+      "repeat": 2,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 27438486,
+        "p95": 27731319,
+        "p99": 27945939,
+        "mean": 27443836.99,
+        "min": 27141755,
+        "max": 28024299
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 91325,
+          "p95": 110101,
+          "p99": 130390,
+          "mean": 95154.79,
+          "min": 85301,
+          "max": 133681
+        },
+        "plan_ns": {
+          "p50": 7936271,
+          "p95": 8130607,
+          "p99": 8175698,
+          "mean": 7949416.95,
+          "min": 7776956,
+          "max": 8226248
+        },
+        "commit_ns": {
+          "p50": 12560943,
+          "p95": 12746539,
+          "p99": 12772179,
+          "mean": 12569126.72,
+          "min": 12403207,
+          "max": 12880410
+        },
+        "publication_ns": {
+          "p50": 6817567,
+          "p95": 6902952,
+          "p99": 6926672,
+          "mean": 6830138.53,
+          "min": 6756921,
+          "max": 6926862
+        },
+        "reopen_ns": {
+          "p50": 32298969,
+          "p95": 33753646,
+          "p99": 34699050,
+          "mean": 32592539.42,
+          "min": 31750897,
+          "max": 34760881
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.003467255327113062,
+        "plan_ns": 0.289661279976871,
+        "commit_ns": 0.45799451164864247,
+        "publication_ns": 0.24887695304737342
+      }
+    },
+    {
+      "name": "native-r2-dense-sparse",
+      "shape": "dense-sparse",
+      "repeat": 2,
+      "samples": 100,
+      "elapsed_ns": {
+        "p50": 52799284,
+        "p95": 53715969,
+        "p99": 53933429,
+        "mean": 52848531.88,
+        "min": 52216241,
+        "max": 54034650
+      },
+      "phases": {
+        "open_ns": {
+          "p50": 102195,
+          "p95": 112991,
+          "p99": 115311,
+          "mean": 103437.46,
+          "min": 97530,
+          "max": 118420
+        },
+        "plan_ns": {
+          "p50": 15248145,
+          "p95": 15503111,
+          "p99": 16295468,
+          "mean": 15282804.37,
+          "min": 14963021,
+          "max": 16503296
+        },
+        "commit_ns": {
+          "p50": 23635903,
+          "p95": 24476447,
+          "p99": 24649924,
+          "mean": 23674007.54,
+          "min": 23331907,
+          "max": 24673458
+        },
+        "publication_ns": {
+          "p50": 13787623,
+          "p95": 13844184,
+          "p99": 13869135,
+          "mean": 13788282.51,
+          "min": 13690896,
+          "max": 13898265
+        },
+        "reopen_ns": {
+          "p50": 43846036,
+          "p95": 45781872,
+          "p99": 46411325,
+          "mean": 44151064.75,
+          "min": 42966319,
+          "max": 47173858
+        }
+      },
+      "aggregate_time_share": {
+        "open_ns": 0.0019572437742427593,
+        "plan_ns": 0.28918124735615647,
+        "commit_ns": 0.44795960640411264,
+        "publication_ns": 0.2609019024654881
+      }
+    }
+  ],
+  "repeat_variation_over_five_percent": [
+    {
+      "shape": "medium",
+      "phase": "open_ns",
+      "metric": "p95",
+      "repeat1": 102410,
+      "repeat2": 110101,
+      "change_percent": 7.51000878820427
+    },
+    {
+      "shape": "medium",
+      "phase": "open_ns",
+      "metric": "p99",
+      "repeat1": 104810,
+      "repeat2": 130390,
+      "change_percent": 24.406068123270686
+    },
+    {
+      "shape": "medium",
+      "phase": "publication_ns",
+      "metric": "p50",
+      "repeat1": 7363502,
+      "repeat2": 6817567,
+      "change_percent": -7.414067382612243
+    },
+    {
+      "shape": "medium",
+      "phase": "publication_ns",
+      "metric": "p95",
+      "repeat1": 7489718,
+      "repeat2": 6902952,
+      "change_percent": -7.83428695179178
+    },
+    {
+      "shape": "medium",
+      "phase": "publication_ns",
+      "metric": "p99",
+      "repeat1": 7535298,
+      "repeat2": 6926672,
+      "change_percent": -8.07699974174877
+    },
+    {
+      "shape": "medium",
+      "phase": "publication_ns",
+      "metric": "mean",
+      "repeat1": 7376956.18,
+      "repeat2": 6830138.53,
+      "change_percent": -7.412510480711565
+    },
+    {
+      "shape": "medium",
+      "phase": "reopen_ns",
+      "metric": "p95",
+      "repeat1": 31944321,
+      "repeat2": 33753646,
+      "change_percent": 5.663995800693344
+    },
+    {
+      "shape": "medium",
+      "phase": "reopen_ns",
+      "metric": "p99",
+      "repeat1": 32264053,
+      "repeat2": 34699050,
+      "change_percent": 7.547089635638771
+    },
+    {
+      "shape": "medium",
+      "phase": "reopen_ns",
+      "metric": "mean",
+      "repeat1": 30937260.58,
+      "repeat2": 32592539.42,
+      "change_percent": 5.35043765662333
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "open_ns",
+      "metric": "p99",
+      "repeat1": 131611,
+      "repeat2": 115311,
+      "change_percent": -12.384983018136786
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "publication_ns",
+      "metric": "p95",
+      "repeat1": 14576300,
+      "repeat2": 13844184,
+      "change_percent": -5.022646350582793
+    },
+    {
+      "shape": "dense-sparse",
+      "phase": "publication_ns",
+      "metric": "p99",
+      "repeat1": 14638740,
+      "repeat2": 13869135,
+      "change_percent": -5.257317228122094
+    }
+  ],
+  "identities": {
+    "medium": {
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4226788,
+        "write_calls": 143,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 75,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 4,
+          "bytes_16385_to_65536": 64,
+          "bytes_over_65536": 0
+        }
+      },
+      "constants": {
+        "implementation": "source-backed",
+        "cache_mode": "unmanaged-control",
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "update_count": 93,
+        "selected_worksheet_count": 4,
+        "source_read_calls": 205,
+        "source_read_bytes": 4233109,
+        "workbook_read_calls": 1,
+        "workbook_read_bytes": 226,
+        "selected_worksheet_read_calls": 4,
+        "selected_worksheet_read_bytes": 27146,
+        "unselected_worksheet_read_calls": 0,
+        "unselected_worksheet_read_bytes": 0,
+        "payload_materializations": 6,
+        "cache_hits": 0,
+        "cache_cold_loads": 6,
+        "cache_waiter_joins": 0,
+        "cache_successful_loads": 6,
+        "cache_failed_loads": 0,
+        "cache_evictions": 0,
+        "cache_bypasses": 0,
+        "cache_oversized_bypasses": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_in_flight_loads": 0,
+        "cache_retained_entries": 6,
+        "cache_retained_bytes": 269785,
+        "cache_budget_managed": false,
+        "payload_memory_limit": null,
+        "publication_planning_memory_headroom": null,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_budget_reservation_failures": 0,
+        "pre_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": 0,
+          "cache_reserved_objects": 0
+        },
+        "post_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": null,
+          "cache_reserved_objects": null
+        },
+        "budget_used_after_package_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_objects_used_after_handles_drop": 0,
+        "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+        "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "output_budget_refusal": {
+          "successful_output_ceiling": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "accepted_output_bytes": 0,
+          "source_read_calls": 0,
+          "source_read_bytes": 0,
+          "output_bytes_used": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false,
+          "source_identity_preserved": false
+        }
+      }
+    },
+    "dense-sparse": {
+      "corpus": {
+        "name": "xlsx-cell-values-dense-sparse",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "dense-sparse",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 17792,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4265472,
+        "archive_bytes": 4251863,
+        "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 128,
+          "columns_per_sheet": 128,
+          "one_percent_update_count": 178,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4252436,
+        "write_calls": 143,
+        "largest_write": 65536,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 75,
+          "bytes_513_to_4096": 3,
+          "bytes_4097_to_16384": 0,
+          "bytes_16385_to_65536": 65,
+          "bytes_over_65536": 0
+        }
+      },
+      "constants": {
+        "implementation": "source-backed",
+        "cache_mode": "unmanaged-control",
+        "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+        "update_count": 178,
+        "selected_worksheet_count": 4,
+        "source_read_calls": 206,
+        "source_read_bytes": 4258543,
+        "workbook_read_calls": 1,
+        "workbook_read_bytes": 226,
+        "selected_worksheet_read_calls": 5,
+        "selected_worksheet_read_bytes": 52580,
+        "unselected_worksheet_read_calls": 0,
+        "unselected_worksheet_read_bytes": 0,
+        "payload_materializations": 6,
+        "cache_hits": 0,
+        "cache_cold_loads": 6,
+        "cache_waiter_joins": 0,
+        "cache_successful_loads": 6,
+        "cache_failed_loads": 0,
+        "cache_evictions": 0,
+        "cache_bypasses": 0,
+        "cache_oversized_bypasses": 0,
+        "cache_allocation_bypasses": 0,
+        "cache_in_flight_loads": 0,
+        "cache_retained_entries": 6,
+        "cache_retained_bytes": 509460,
+        "cache_budget_managed": false,
+        "payload_memory_limit": null,
+        "publication_planning_memory_headroom": null,
+        "cache_budget_memory_limit": null,
+        "cache_budget_memory_used": 0,
+        "cache_budget_reserved_bytes": 0,
+        "cache_budget_reservation_failures": 0,
+        "pre_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": 0,
+          "cache_reserved_objects": 0
+        },
+        "post_publication_budget": {
+          "input_bytes_used": 0,
+          "input_bytes_limit": null,
+          "output_bytes_used": 0,
+          "output_bytes_limit": null,
+          "work_used": 0,
+          "work_limit": null,
+          "objects_used": 0,
+          "objects_limit": null,
+          "catalog_reserved_objects": null,
+          "cache_reserved_objects": null
+        },
+        "budget_used_after_package_drop": 0,
+        "budget_used_after_handles_drop": 0,
+        "budget_objects_used_after_handles_drop": 0,
+        "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+        "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+        "untouched_member_count": 12,
+        "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+        "output_budget_refusal": {
+          "successful_output_ceiling": 0,
+          "first_output_request_bytes": 0,
+          "one_under_output_limit": 0,
+          "accepted_output_bytes": 0,
+          "source_read_calls": 0,
+          "source_read_bytes": 0,
+          "output_bytes_used": 0,
+          "typed_output_resource_refusal": false,
+          "zero_output_verified": false,
+          "source_identity_preserved": false
+        }
+      }
+    }
+  },
+  "uncertainty": "Two fresh children per shape; phase percentiles are descriptive. Within-child samples are not independent host repetitions. Existing raw total-time t intervals are retained, not treated as cross-host confidence.",
+  "unavailable": [
+    "operation-local allocations",
+    "peak RSS",
+    "physical I/O",
+    "cold cache",
+    "parallel scaling",
+    "native Office producer"
+  ]
+}

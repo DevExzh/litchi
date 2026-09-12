@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## 0520: attribute current source-backed XLSX edit/save
+
+[0520](changes/0520-xlsx-source-edit-phase-attribution.md) adds a current 400-sample phase baseline and four isolated commit
+profiles without changing production or the Rust harness. Medium p50 spans
+27.44–27.96 ms and dense-sparse 52.80–53.70 ms. Commit is about 45% of elapsed
+time; candidate snapshot reconstruction and rewrite dominate its instruction
+profile. All raw phase sums, output/counter identities and scoped call-accounting
+checks pass. Twelve same-build phase variations over 5% are retained. This
+supplies the next OOXML optimization target; it establishes no speedup,
+allocation/RSS, physical-provider, cold-cache or scaling result.
+
 ## 0519: reuse the immutable OPC publication XML proof
 
 [0519](changes/0519-opc-publication-xml-proof-reuse.md) reuses complete XML

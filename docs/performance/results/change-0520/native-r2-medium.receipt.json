@@ -1,0 +1,37 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/litchi-goal-0520-target/release/litchi-perf-baseline",
+    "--warmup",
+    "20",
+    "--samples",
+    "100",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0520/native-r2-medium.json"
+  ],
+  "start_utc": "2026-09-12T04:25:23.107303+00:00",
+  "end_utc": "2026-09-12T04:25:31.439204+00:00",
+  "seconds": 8.331905465995078,
+  "exit_code": 0,
+  "binary_sha256": "37b145ede063868ee21b3a3912b363f4ceb83b10ac1c625eaba18fc7f166f9a6",
+  "script_sha256": "be229a48ece54854112eb86fe0b533e8ef8a621a297f91cad5c47aec7af3002e",
+  "source_manifest_sha256": "ce60e85c5f9fe722ea2ced7f092a96779b732bffb584725c3a6e880f0cad0e98",
+  "plan_sha256": "9457eba1b49036debe6729fd459f8379ce507a4cf3e9195c4b4713e7e69fc92c",
+  "environment": {
+    "RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "native-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r2-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-r2-medium.json": "ba5451e974c3b3647b639aeababf3f55a461e159b2bbbadb107eeaae708b1a68"
+  }
+}

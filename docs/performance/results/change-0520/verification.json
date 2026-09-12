@@ -1,0 +1,27 @@
+{
+  "status": "pass",
+  "native_samples": 400,
+  "profile_samples": 4,
+  "serialized_build_and_capture_intervals": 9,
+  "exact_report_replays": [
+    {
+      "script": "analyze.py",
+      "sha256": "18ecd730274194f182eb1cfe1966b7143c8db341e84062f0d8f330b71a143d3a",
+      "report": "analysis.json",
+      "report_sha256": "c5d7da6c38442775dceee9e5239b00d5cb44fcbadb2af92c121e2311760224f7",
+      "exact_replay": true
+    },
+    {
+      "script": "analyze_profiles.py",
+      "sha256": "3a91d876b73121afe564b819754fbd76fcf08dd070e8e07a05eb17363ddfa772",
+      "report": "profile-analysis.json",
+      "report_sha256": "1aec744157df5afed9c5226d576d57ed7de62d5939cbb66f38750fe5f0380097",
+      "exact_replay": true
+    }
+  ],
+  "annotations_exact": true,
+  "owned_target_absent": true,
+  "negative_vectors_rejected": 4,
+  "seal_entries": 85,
+  "limitations": "No new full-workspace tests, physical I/O, allocator/RSS, native Office, cold/range or scaling claim."
+}

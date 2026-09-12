@@ -1,0 +1,28 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline",
+    "--target-dir",
+    "/home/zhuhe/litchi-goal-0520-target"
+  ],
+  "start_utc": "2026-09-12T04:23:15.320093+00:00",
+  "end_utc": "2026-09-12T04:24:30.510960+00:00",
+  "seconds": 75.19087116599258,
+  "exit_code": 0,
+  "binary_sha256": "37b145ede063868ee21b3a3912b363f4ceb83b10ac1c625eaba18fc7f166f9a6",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "CARGO_BUILD_JOBS": null,
+    "RUSTC_WRAPPER": null,
+    "CARGO_PROFILE_RELEASE_DEBUG": null,
+    "CARGO_PROFILE_RELEASE_LTO": null
+  },
+  "source_manifest_sha256": "ce60e85c5f9fe722ea2ced7f092a96779b732bffb584725c3a6e880f0cad0e98"
+}

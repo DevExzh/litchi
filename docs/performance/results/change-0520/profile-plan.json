@@ -1,0 +1,21 @@
+{
+  "created_utc": "2026-09-12T04:27:54.027801+00:00",
+  "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+  "reason": "Native commit accounts for 44.8\u201345.8% of measured interval; this function excludes staged set loop.",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "repeats": 2,
+  "warmup": 0,
+  "samples": 1,
+  "options": [
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--zero-before=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--dump-after=litchi_xlsx::cell_values::source::MultiSourceEdit::commit"
+  ],
+  "expected_calls": "Three untimed lifecycle commits (no-op, clear, remove), then one timed one-percent commit. Retain every dump; admit only after matching trigger/call counts and final direct runner call. Final process dump is not an operation.",
+  "scope": "Callgrind guest instructions; no native latency or hardware cycle claim. Existing harness oracles execute outside the collection bracket."
+}

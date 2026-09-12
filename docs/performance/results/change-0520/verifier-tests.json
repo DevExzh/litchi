@@ -1,0 +1,23 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "case": "phase_alignment",
+      "rejected": true
+    },
+    {
+      "case": "generic_counter",
+      "rejected": true
+    },
+    {
+      "case": "unmanaged_budget",
+      "rejected": true
+    },
+    {
+      "case": "repeat_output",
+      "rejected": true
+    }
+  ],
+  "valid_control_and_restoration_pass": true,
+  "temporary_directory_removed": true
+}
