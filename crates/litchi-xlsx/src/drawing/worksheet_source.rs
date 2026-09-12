@@ -560,7 +560,7 @@ impl<'a> Scanner<'a> {
                 // not turn that foreign payload into a hidden owner refusal.
                 return Ok(());
             }
-            if !namespace.is_some_and(|value| value == MCE)
+            if namespace.is_none_or(|value| value != MCE)
                 && !is_namespace(namespace, SPREADSHEETML, STRICT_SPREADSHEETML)
             {
                 // Choice/Fallback descendants in the MCE vocabulary and
