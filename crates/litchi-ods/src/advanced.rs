@@ -554,6 +554,12 @@ struct Span {
     parent: Option<usize>,
 }
 
+#[derive(Clone, Debug)]
+struct ResolvedAttribute {
+    namespace: Option<String>,
+    local: String,
+}
+
 struct CellLocation<'a> {
     cell: &'a Cell,
     range: Range<usize>,
@@ -4358,11 +4364,12 @@ pub(crate) fn replace_style_graph(
             ));
         }
         let index = matches[0];
-        if automatic_style_kind(&xml, &spans[index])? != Some(expected_kind) {
+        if automatic_style_kind(&xml, &spans, index)? != Some(expected_kind) {
             return invalid(format!(
                 "ODS automatic style '{name}' has a different family"
             ));
         }
+        admit_style_replacement_source(&xml, &spans, index, expected_kind)?;
         edits.push((spans[index].start..spans[index].end, markup.into_bytes()));
     }
     splice_content_edits(source, edits, max_output)
@@ -4465,7 +4472,7 @@ fn direct_named_styles(
     let mut matches = Vec::new();
     for (index, span) in spans.iter().enumerate() {
         if span.parent == Some(automatic)
-            && attribute(xml, span, b"style:name")?.as_deref() == Some(name)
+            && resolved_attribute(xml, spans, index, STYLE, "name")?.as_deref() == Some(name)
         {
             matches.push(index);
         }
@@ -4473,7 +4480,10 @@ fn direct_named_styles(
     Ok(matches)
 }
 
-fn automatic_style_kind(xml: &str, span: &Span) -> Result<Option<StyleNodeKind>> {
+fn automatic_style_kind(xml: &str, spans: &[Span], index: usize) -> Result<Option<StyleNodeKind>> {
+    let span = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS automatic style span is missing"))?;
     if span.namespace.as_deref() == Some(NUMBER) {
         return Ok(match span.local.as_str() {
             "number-style" => Some(StyleNodeKind::Number),
@@ -4488,11 +4498,397 @@ fn automatic_style_kind(xml: &str, span: &Span) -> Result<Option<StyleNodeKind>>
     if span.namespace.as_deref() != Some(STYLE) || span.local != "style" {
         return Ok(None);
     }
-    Ok(match attribute(xml, span, b"style:family")?.as_deref() {
-        Some("text") => Some(StyleNodeKind::Text),
-        Some("table-cell") => Some(StyleNodeKind::Cell),
-        _ => None,
-    })
+    Ok(
+        match resolved_attribute(xml, spans, index, STYLE, "family")?.as_deref() {
+            Some("text") => Some(StyleNodeKind::Text),
+            Some("table-cell") => Some(StyleNodeKind::Cell),
+            _ => None,
+        },
+    )
+}
+
+fn admit_style_replacement_source(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    kind: StyleNodeKind,
+) -> Result<()> {
+    match kind {
+        StyleNodeKind::Number => {
+            admit_style_source_events(xml, spans, index)?;
+            admit_number_style_source(xml, spans, index)
+        },
+        StyleNodeKind::Date
+        | StyleNodeKind::Time
+        | StyleNodeKind::Currency
+        | StyleNodeKind::Percentage
+        | StyleNodeKind::Boolean => {
+            admit_style_source_events(xml, spans, index)?;
+            admit_closed_data_style_source(xml, spans, index, kind)
+        },
+        StyleNodeKind::Text | StyleNodeKind::Cell => Ok(()),
+    }
+}
+
+fn admit_style_source_events(xml: &str, spans: &[Span], index: usize) -> Result<()> {
+    let (wrapped, target_depth) = resolved_element_fragment(xml, spans, index)?;
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS style event target is missing"))?;
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut target_started = false;
+    let mut stack = Vec::<(Option<String>, String)>::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| invalid_error(format!("invalid ODS style source XML: {error}")))?;
+        let event_is_empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let element_namespace = resolve_namespace(&namespace)?;
+                let local = decode(element.local_name().as_ref(), "style source local name")?;
+                let is_target = !target_started
+                    && depth == target_depth
+                    && element_namespace.as_deref() == target.namespace.as_deref()
+                    && local == target.local;
+                if is_target {
+                    if event_is_empty {
+                        return Ok(());
+                    }
+                    target_started = true;
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth overflows"))?;
+                    if stack.len() >= MAX_SHEET_COPY_DEPTH {
+                        return invalid(format!(
+                            "ODS style source depth exceeds the {MAX_SHEET_COPY_DEPTH} limit"
+                        ));
+                    }
+                    stack.try_reserve(1).map_err(|_error| {
+                        invalid_error("ODS style source stack allocation failed")
+                    })?;
+                    stack.push((element_namespace, local));
+                    continue;
+                }
+                if target_started {
+                    if !event_is_empty {
+                        depth = depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid_error("ODS style source depth overflows"))?;
+                        if stack.len() >= MAX_SHEET_COPY_DEPTH {
+                            return invalid(format!(
+                                "ODS style source depth exceeds the {MAX_SHEET_COPY_DEPTH} limit"
+                            ));
+                        }
+                        stack.try_reserve(1).map_err(|_error| {
+                            invalid_error("ODS style source stack allocation failed")
+                        })?;
+                        stack.push((element_namespace, local));
+                    }
+                } else if !event_is_empty {
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth overflows"))?;
+                }
+            },
+            Event::End(_) => {
+                if target_started {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth underflows"))?;
+                    stack
+                        .pop()
+                        .ok_or_else(|| invalid_error("ODS style source stack underflows"))?;
+                    if stack.is_empty() {
+                        return Ok(());
+                    }
+                } else {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid_error("ODS style source depth underflows"))?;
+                }
+            },
+            Event::Text(text) => {
+                if target_started {
+                    let Some((namespace, local)) = stack.last() else {
+                        return invalid("ODS style source text owner is missing");
+                    };
+                    let whitespace = text.iter().all(u8::is_ascii_whitespace);
+                    if style_character_data_element(namespace.as_deref(), local) {
+                        continue;
+                    }
+                    if style_empty_particle(namespace.as_deref(), local) {
+                        return refuse_style_replacement(
+                            "text inside an empty data-style particle",
+                        );
+                    }
+                    if !whitespace {
+                        return refuse_style_replacement(
+                            "non-whitespace text outside data-style character content",
+                        );
+                    }
+                }
+            },
+            Event::CData(_) => {
+                if target_started {
+                    let Some((namespace, local)) = stack.last() else {
+                        return invalid("ODS style source CDATA owner is missing");
+                    };
+                    if !style_character_data_element(namespace.as_deref(), local) {
+                        return refuse_style_replacement(
+                            "CDATA outside data-style character content",
+                        );
+                    }
+                }
+            },
+            Event::GeneralRef(_) => {
+                if target_started {
+                    let Some((namespace, local)) = stack.last() else {
+                        return invalid("ODS style source reference owner is missing");
+                    };
+                    if !style_character_data_element(namespace.as_deref(), local) {
+                        return refuse_style_replacement(
+                            "general reference outside data-style character content",
+                        );
+                    }
+                }
+            },
+            Event::Comment(_) | Event::PI(_) | Event::DocType(_) => {
+                if target_started {
+                    return refuse_style_replacement("opaque XML event in a data-style source");
+                }
+            },
+            Event::Decl(_) => {},
+            Event::Eof => return invalid("ODS style source ended before its selected owner"),
+        }
+        buffer.clear();
+    }
+}
+
+fn style_character_data_element(namespace: Option<&str>, local: &str) -> bool {
+    namespace == Some(NUMBER) && matches!(local, "text" | "currency-symbol")
+}
+
+fn style_empty_particle(namespace: Option<&str>, local: &str) -> bool {
+    namespace == Some(NUMBER)
+        && matches!(
+            local,
+            "number" | "year" | "month" | "day" | "hours" | "minutes" | "seconds" | "boolean"
+        )
+}
+
+fn admit_number_style_source(xml: &str, spans: &[Span], index: usize) -> Result<()> {
+    admit_style_root_attributes(xml, spans, index)?;
+    let mut number_seen = false;
+    let mut text_before_number = 0usize;
+    let mut text_after_number = 0usize;
+    for child in direct_children(spans, index) {
+        if is_element(&spans[child], NUMBER, "number") {
+            if number_seen {
+                return refuse_style_replacement("duplicate number:number children");
+            }
+            number_seen = true;
+            admit_style_attributes(
+                xml,
+                spans,
+                child,
+                &[(NUMBER, "decimal-places"), (NUMBER, "min-integer-digits")],
+            )?;
+            refuse_nested_style_children(spans, child)?;
+        } else if is_element(&spans[child], NUMBER, "text") {
+            if direct_children(spans, child).next().is_some() {
+                return refuse_style_replacement("nested number:text content");
+            }
+            admit_style_attributes(xml, spans, child, &[])?;
+            if number_seen {
+                text_after_number = text_after_number.saturating_add(1);
+                if text_after_number > 1 {
+                    return refuse_style_replacement("more than one trailing number:text child");
+                }
+            } else {
+                text_before_number = text_before_number.saturating_add(1);
+                if text_before_number > 1 {
+                    return refuse_style_replacement("more than one leading number:text child");
+                }
+            }
+        } else {
+            return refuse_style_replacement(format!(
+                "number-style child '{}:{}'",
+                spans[child].namespace.as_deref().unwrap_or(""),
+                spans[child].local
+            ));
+        }
+    }
+    if !number_seen {
+        return refuse_style_replacement("number-style without number:number");
+    }
+    Ok(())
+}
+
+fn admit_closed_data_style_source(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    kind: StyleNodeKind,
+) -> Result<()> {
+    admit_style_root_attributes(xml, spans, index)?;
+    let expected = match kind {
+        StyleNodeKind::Date => &[
+            (NUMBER, "year"),
+            (NUMBER, "text"),
+            (NUMBER, "month"),
+            (NUMBER, "text"),
+            (NUMBER, "day"),
+        ][..],
+        StyleNodeKind::Time => &[
+            (NUMBER, "hours"),
+            (NUMBER, "text"),
+            (NUMBER, "minutes"),
+            (NUMBER, "text"),
+            (NUMBER, "seconds"),
+        ][..],
+        StyleNodeKind::Currency => &[(NUMBER, "currency-symbol"), (NUMBER, "number")][..],
+        StyleNodeKind::Percentage => &[(NUMBER, "number"), (NUMBER, "text")][..],
+        StyleNodeKind::Boolean => &[(NUMBER, "boolean")][..],
+        StyleNodeKind::Number | StyleNodeKind::Text | StyleNodeKind::Cell => {
+            return invalid("ODS closed data-style family is invalid");
+        },
+    };
+    let mut child_count = 0usize;
+    for child in direct_children(spans, index) {
+        let Some((namespace, local)) = expected.get(child_count) else {
+            return refuse_style_replacement(format!(
+                "unsupported {} data-style child envelope",
+                style_node_kind_name(kind)
+            ));
+        };
+        if !is_element(&spans[child], namespace, local) {
+            return refuse_style_replacement(format!(
+                "unsupported {} data-style child envelope",
+                style_node_kind_name(kind)
+            ));
+        }
+        child_count = child_count.saturating_add(1);
+        let allowed = if is_element(&spans[child], NUMBER, "number") {
+            &[(NUMBER, "decimal-places"), (NUMBER, "min-integer-digits")][..]
+        } else if matches!(
+            spans[child].local.as_str(),
+            "year" | "month" | "day" | "hours" | "minutes"
+        ) {
+            &[(NUMBER, "style")][..]
+        } else if is_element(&spans[child], NUMBER, "seconds") {
+            &[(NUMBER, "style"), (NUMBER, "decimal-places")][..]
+        } else {
+            &[][..]
+        };
+        admit_style_attributes(xml, spans, child, allowed)?;
+        refuse_nested_style_children(spans, child)?;
+    }
+    if child_count != expected.len() {
+        return refuse_style_replacement(format!(
+            "unsupported {} data-style child envelope",
+            style_node_kind_name(kind)
+        ));
+    }
+    Ok(())
+}
+
+fn admit_style_root_attributes(xml: &str, spans: &[Span], index: usize) -> Result<()> {
+    let attributes = resolved_attributes(xml, spans, index)?;
+    admit_resolved_style_attributes(&attributes, &[(STYLE, "name")])?;
+    let has_name = attributes.iter().any(|attribute| {
+        attribute.namespace.as_deref() == Some(STYLE) && attribute.local == "name"
+    });
+    if has_name {
+        Ok(())
+    } else {
+        invalid("ODS automatic style replacement source has no style:name")
+    }
+}
+
+fn admit_style_attributes(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    allowed: &[(&str, &str)],
+) -> Result<()> {
+    let attributes = resolved_attributes(xml, spans, index)?;
+    admit_resolved_style_attributes(&attributes, allowed)
+}
+
+fn admit_resolved_style_attributes(
+    attributes: &[ResolvedAttribute],
+    allowed: &[(&str, &str)],
+) -> Result<()> {
+    let mut seen = Vec::<(String, String)>::new();
+    for attribute in attributes {
+        let Some(namespace) = attribute.namespace.as_deref() else {
+            return refuse_style_replacement(format!(
+                "unqualified attribute '{}'",
+                attribute.local
+            ));
+        };
+        if !allowed.iter().any(|(expected_namespace, expected_local)| {
+            *expected_namespace == namespace && *expected_local == attribute.local
+        }) {
+            return refuse_style_replacement(format!(
+                "attribute '{}:{}'",
+                namespace, attribute.local
+            ));
+        }
+        if seen.iter().any(|(seen_namespace, seen_local)| {
+            seen_namespace == namespace && seen_local == &attribute.local
+        }) {
+            return invalid(format!(
+                "ODS automatic style replacement source duplicates attribute '{}:{}'",
+                namespace, attribute.local
+            ));
+        }
+        seen.push((namespace.to_string(), attribute.local.clone()));
+    }
+    Ok(())
+}
+
+fn refuse_nested_style_children(spans: &[Span], index: usize) -> Result<()> {
+    if direct_children(spans, index).next().is_none() {
+        Ok(())
+    } else {
+        refuse_style_replacement("nested data-style child")
+    }
+}
+
+fn direct_children<'a>(spans: &'a [Span], parent: usize) -> impl Iterator<Item = usize> + 'a {
+    let end = spans[parent].end;
+    spans
+        .iter()
+        .enumerate()
+        .skip(parent.saturating_add(1))
+        .take_while(move |(_, span)| span.start < end)
+        .filter_map(move |(index, span)| (span.parent == Some(parent)).then_some(index))
+}
+
+fn style_node_kind_name(kind: StyleNodeKind) -> &'static str {
+    match kind {
+        StyleNodeKind::Number => "number",
+        StyleNodeKind::Date => "date",
+        StyleNodeKind::Time => "time",
+        StyleNodeKind::Currency => "currency",
+        StyleNodeKind::Percentage => "percentage",
+        StyleNodeKind::Boolean => "boolean",
+        StyleNodeKind::Text => "text",
+        StyleNodeKind::Cell => "cell",
+    }
+}
+
+fn refuse_style_replacement<T>(reason: impl Into<String>) -> Result<T> {
+    Err(Error::Unsupported(format!(
+        "ODS automatic style replacement refuses unsupported source {}",
+        reason.into()
+    )))
 }
 
 fn style_names(markup: &str) -> Result<Vec<String>> {
@@ -5773,6 +6169,148 @@ fn resolved_attribute(
         }
         buffer.clear();
     }
+}
+
+fn resolved_attributes(xml: &str, spans: &[Span], index: usize) -> Result<Vec<ResolvedAttribute>> {
+    let (wrapped, target_depth) = resolved_element_openings(xml, spans, index)?;
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved attributes element is missing"))?;
+    let mut reader = NsReader::from_str(&wrapped);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                invalid_error(format!("invalid ODS resolved attributes XML: {error}"))
+            })?;
+        let event_is_empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let element_namespace = resolve_namespace(&namespace)?;
+                let is_target = depth == target_depth
+                    && element_namespace.as_deref() == target.namespace.as_deref()
+                    && element.local_name().as_ref() == target.local.as_bytes();
+                if is_target {
+                    let mut attributes = Vec::new();
+                    for raw in element.attributes().with_checks(true) {
+                        let raw = raw.map_err(|error| {
+                            invalid_error(format!("invalid ODS resolved attribute: {error}"))
+                        })?;
+                        if is_namespace_declaration(raw.key.as_ref()) {
+                            continue;
+                        }
+                        let (attribute_namespace, local) =
+                            reader.resolver().resolve_attribute(raw.key);
+                        let namespace = match attribute_namespace {
+                            ResolveResult::Bound(Namespace(uri)) => {
+                                Some(decode(uri, "resolved attribute namespace")?)
+                            },
+                            ResolveResult::Unbound => None,
+                            ResolveResult::Unknown(prefix) => {
+                                return invalid(format!(
+                                    "ODS resolved attribute has unbound prefix '{}'",
+                                    String::from_utf8_lossy(prefix.as_ref())
+                                ));
+                            },
+                        };
+                        attributes.try_reserve(1).map_err(|_error| {
+                            invalid_error("ODS resolved attribute allocation failed")
+                        })?;
+                        attributes.push(ResolvedAttribute {
+                            namespace,
+                            local: decode(local.as_ref(), "resolved attribute local name")?,
+                        });
+                    }
+                    return Ok(attributes);
+                }
+                if !event_is_empty {
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid_error("ODS resolved attribute depth overflows"))?;
+                }
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid_error("ODS resolved attribute depth underflows"))?;
+            },
+            Event::Eof => return invalid("ODS resolved attributes element was not found"),
+            Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::Comment(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_) => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn resolved_element_openings(xml: &str, spans: &[Span], index: usize) -> Result<(String, usize)> {
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved element is missing"))?;
+    resolved_element_prefix(xml, spans, index, target.tag_end)
+}
+
+fn resolved_element_fragment(xml: &str, spans: &[Span], index: usize) -> Result<(String, usize)> {
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved element is missing"))?;
+    resolved_element_prefix(xml, spans, index, target.end)
+}
+
+fn resolved_element_prefix(
+    xml: &str,
+    spans: &[Span],
+    index: usize,
+    target_end: usize,
+) -> Result<(String, usize)> {
+    let target = spans
+        .get(index)
+        .ok_or_else(|| invalid_error("ODS resolved element is missing"))?;
+    let mut ancestors = Vec::new();
+    let mut parent = target.parent;
+    while let Some(parent_index) = parent {
+        if ancestors.len() >= MAX_SHEET_COPY_DEPTH {
+            return invalid(format!(
+                "ODS resolved element ancestor depth exceeds the {MAX_SHEET_COPY_DEPTH} limit"
+            ));
+        }
+        ancestors
+            .try_reserve(1)
+            .map_err(|_error| invalid_error("ODS resolved element ancestor allocation failed"))?;
+        let ancestor = spans
+            .get(parent_index)
+            .ok_or_else(|| invalid_error("ODS resolved element ancestor is missing"))?;
+        ancestors.push(ancestor);
+        parent = ancestor.parent;
+    }
+    let mut wrapped = String::new();
+    for ancestor in ancestors.iter().rev() {
+        bounded_append(
+            &mut wrapped,
+            xml.get(ancestor.start..ancestor.tag_end)
+                .ok_or_else(|| invalid_error("ODS resolved element ancestor tag is invalid"))?,
+            crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+        )?;
+    }
+    bounded_append(
+        &mut wrapped,
+        xml.get(target.start..target_end)
+            .ok_or_else(|| invalid_error("ODS resolved element source range is invalid"))?,
+        crate::worksheet::validation::MAX_CONTENT_XML_BYTES,
+    )?;
+    Ok((wrapped, ancestors.len()))
+}
+
+fn is_namespace_declaration(name: &[u8]) -> bool {
+    name == b"xmlns" || name.starts_with(b"xmlns:")
 }
 
 fn attribute(xml: &str, span: &Span, name: &[u8]) -> Result<Option<String>> {
