@@ -1,0 +1,12 @@
+{
+  "scope": "Historical pre-correction source only; no current production approval or speedup claim",
+  "run": "runs/root-replay",
+  "restored_source_files": 5840,
+  "source_before_after_equal": true,
+  "binary_before_after_equal": true,
+  "fixture_and_member_hashes_match_profiler_replay": true,
+  "correctness_records": 8,
+  "measurement_receipts": 560,
+  "restore_and_replay_exit": 0,
+  "owned_restore_cleanup": "completed"
+}

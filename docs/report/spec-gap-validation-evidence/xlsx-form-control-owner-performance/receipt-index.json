@@ -1,0 +1,31 @@
+{
+  "status": "pass",
+  "receipt_count": 560,
+  "correctness_record_count": 8,
+  "iterations_per_fixture": 7,
+  "fixtures": [
+    "button-form-control",
+    "checkbox-form-control",
+    "singlecontrol",
+    "tdf120301_xmlSpaceParsing",
+    "tdf134769",
+    "tdf161365",
+    "tdf60673",
+    "unrelated-opaque-1MiB"
+  ],
+  "lanes": [
+    "eager_cheap_clone",
+    "eager_many_query",
+    "eager_owner_projection",
+    "eager_package_open",
+    "eager_single_query",
+    "source_cheap_clone",
+    "source_many_query",
+    "source_owner_projection",
+    "source_package_open",
+    "source_single_query"
+  ],
+  "allocator_metric_definition": "global allocator requested event bytes; peak is cumulative requested-event high-water, not physical live heap",
+  "speedup_claim": false,
+  "baseline_claim": false
+}
