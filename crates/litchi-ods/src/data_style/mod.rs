@@ -44,8 +44,10 @@ const STYLE_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 pub enum Owner {
     /// Automatic styles in the mutable `content.xml` owner.
     ContentAutomatic,
-    /// Common styles in `styles.xml`, which are read-only in this batch.
+    /// Direct common styles in `styles.xml`, which are read-only in this batch.
     CommonStyles,
+    /// Automatic styles in `styles.xml`, which are read-only in this batch.
+    StylesAutomatic,
 }
 
 impl Owner {
@@ -109,6 +111,16 @@ impl<'a> Selector<'a> {
     pub const fn common(name: &'a str, family: Family) -> Self {
         Self {
             owner: Owner::CommonStyles,
+            family,
+            name,
+        }
+    }
+
+    /// Select an automatic style in the read-only `styles.xml` owner.
+    #[must_use]
+    pub const fn styles_automatic(name: &'a str, family: Family) -> Self {
+        Self {
+            owner: Owner::StylesAutomatic,
             family,
             name,
         }
@@ -2283,12 +2295,14 @@ impl Patch {
         if let Op::Set(value) = &self.transliteration_format {
             validate_transliteration_format(value)?;
         }
+        validate_patch_metadata_size(self)?;
         Ok(())
     }
 
     /// Apply the patch after borrowed preflight, leaving the target untouched on error.
     pub fn apply(&self, target: &mut Attributes) -> Result<()> {
         self.validate()?;
+        validate_patched_metadata_size(target, self)?;
         let mut candidate = target.clone();
         apply_patch(&mut candidate.display_name, &self.display_name);
         apply_patch(&mut candidate.language, &self.language);
@@ -2691,13 +2705,22 @@ pub fn parse_boolean(value: &str, label: &str) -> Result<bool> {
 }
 
 fn validate_text(value: &str, label: &str) -> Result<()> {
-    if value.len() > MAX_STYLE_TEXT_BYTES || value.chars().any(char::is_control) {
+    if value.len() > MAX_STYLE_TEXT_BYTES || value.chars().any(|character| !is_xml_char(character))
+    {
         invalid(format!(
-            "{label} exceeds its text limit or contains a control character"
+            "{label} exceeds its text limit or contains an XML-illegal character"
         ))
     } else {
         Ok(())
     }
+}
+
+/// XML 1.0 fifth-edition character domain used by ODF text content.
+const fn is_xml_char(character: char) -> bool {
+    matches!(
+        character as u32,
+        0x0009 | 0x000A | 0x000D | 0x0020..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+    )
 }
 
 fn validate_optional_code(
@@ -2919,8 +2942,78 @@ fn validate_metadata_size(values: [Option<&str>; 9]) -> Result<()> {
     Ok(())
 }
 
+fn validate_patch_metadata_size(patch: &Patch) -> Result<()> {
+    let values = [
+        patch_text_bytes(&patch.display_name),
+        patch_text_bytes(&patch.language),
+        patch_text_bytes(&patch.country),
+        patch_text_bytes(&patch.script),
+        patch_text_bytes(&patch.rfc_language_tag),
+        patch_text_bytes(&patch.title),
+        patch_text_bytes(&patch.transliteration_format),
+        patch_text_bytes(&patch.transliteration_language),
+        patch_text_bytes(&patch.transliteration_country),
+    ];
+    let bytes = values.into_iter().try_fold(0usize, |total, value| {
+        total
+            .checked_add(value)
+            .ok_or_else(|| invalid_error("ODF data-style patch metadata size overflow"))
+    })?;
+    if bytes > MAX_STYLE_METADATA_BYTES {
+        return invalid("ODF data-style patch metadata exceeds its aggregate byte limit");
+    }
+    Ok(())
+}
+
+fn validate_patched_metadata_size(target: &Attributes, patch: &Patch) -> Result<()> {
+    let values = [
+        patched_text_bytes(target.display_name.as_deref(), &patch.display_name),
+        patched_text_bytes(target.language.as_deref(), &patch.language),
+        patched_text_bytes(target.country.as_deref(), &patch.country),
+        patched_text_bytes(target.script.as_deref(), &patch.script),
+        patched_text_bytes(target.rfc_language_tag.as_deref(), &patch.rfc_language_tag),
+        patched_text_bytes(target.title.as_deref(), &patch.title),
+        patched_text_bytes(
+            target.transliteration.format.as_deref(),
+            &patch.transliteration_format,
+        ),
+        patched_text_bytes(
+            target.transliteration.language.as_deref(),
+            &patch.transliteration_language,
+        ),
+        patched_text_bytes(
+            target.transliteration.country.as_deref(),
+            &patch.transliteration_country,
+        ),
+    ];
+    let bytes = values.into_iter().try_fold(0usize, |total, value| {
+        total
+            .checked_add(value)
+            .ok_or_else(|| invalid_error("ODF patched metadata size overflow"))
+    })?;
+    if bytes > MAX_STYLE_METADATA_BYTES {
+        return invalid("ODF patched data-style metadata exceeds its aggregate byte limit");
+    }
+    Ok(())
+}
+
+fn patch_text_bytes(value: &Op<String>) -> usize {
+    match value {
+        Op::Set(value) => value.len(),
+        Op::Keep | Op::Clear => 0,
+    }
+}
+
+fn patched_text_bytes(current: Option<&str>, patch: &Op<String>) -> usize {
+    match patch {
+        Op::Keep => current.map_or(0, str::len),
+        Op::Set(value) => value.len(),
+        Op::Clear => 0,
+    }
+}
+
 fn decimal_replacement_is_empty(value: Option<&str>) -> bool {
-    value.is_none_or(str::is_empty)
+    value.is_some_and(str::is_empty)
 }
 
 fn validate_transliteration_format(value: &str) -> Result<()> {
@@ -3800,6 +3893,24 @@ mod tests {
     }
 
     #[test]
+    fn typed_text_uses_the_xml_character_domain() {
+        for value in ["\t", "\n", "\r", "label\tline\n"] {
+            assert!(Affix::text(value).is_ok(), "valid XML text {value:?}");
+            assert!(
+                EmbeddedText::new(1, value).is_ok(),
+                "valid XML text {value:?}"
+            );
+        }
+        for value in ["\0", "\u{000B}", "\u{000C}", "\u{000E}"] {
+            assert!(Affix::text(value).is_err(), "illegal XML text {value:?}");
+            assert!(
+                EmbeddedText::new(1, value).is_err(),
+                "illegal XML text {value:?}"
+            );
+        }
+    }
+
+    #[test]
     fn metadata_code_domains_match_odf_schema_types() {
         let attributes = Attributes::try_from_borrowed(
             None,
@@ -3899,6 +4010,18 @@ mod tests {
         );
         assert_eq!(
             decimal.resolve_min_decimal_places(Some(4)),
+            Resolution::Inherited(4)
+        );
+        assert_eq!(
+            decimal.resolve_min_decimal_places(None),
+            Resolution::Unresolved
+        );
+        let empty_replacement = Decimal {
+            decimal_replacement: Some(String::new()),
+            ..Decimal::new()
+        };
+        assert_eq!(
+            empty_replacement.resolve_min_decimal_places(Some(4)),
             Resolution::Explicit(0)
         );
         let replacement = Decimal {
@@ -4091,6 +4214,16 @@ mod tests {
         let entry = Entry::number_at(Owner::CommonStyles, number);
         assert_eq!(entry.owner(), Owner::CommonStyles);
         assert_eq!(entry.selector().family, Family::Number);
+        let automatic = Entry::number_at(
+            Owner::StylesAutomatic,
+            Number::new("StylesAutomaticNumber").expect("number"),
+        );
+        assert_eq!(automatic.owner(), Owner::StylesAutomatic);
+        assert!(!automatic.owner().is_mutable());
+        assert_eq!(
+            Selector::styles_automatic("StylesAutomaticNumber", Family::Number).owner,
+            Owner::StylesAutomatic
+        );
         let automatic = Entry::number_at(
             Owner::ContentAutomatic,
             Number::new("AutomaticNumber").expect("number"),
@@ -4363,5 +4496,33 @@ mod tests {
         };
         assert!(attrs.apply_patch(&invalid_patch).is_err());
         assert_eq!(attrs.display_name.as_deref(), Some("Shown"));
+
+        let empty = Patch::default()
+            .set_display_name("")
+            .expect("empty display name is a distinct set");
+        attrs.apply_patch(&empty).expect("empty display name patch");
+        assert_eq!(attrs.display_name.as_deref(), Some(""));
+        attrs
+            .apply_patch(&Patch::default().clear_display_name())
+            .expect("clear display name patch");
+        assert_eq!(attrs.display_name, None);
+    }
+
+    #[test]
+    fn metadata_patch_precharges_aggregate_set_values_and_target() {
+        let half = "x".repeat(MAX_STYLE_METADATA_BYTES / 2 + 1);
+        let oversized_patch = Patch {
+            display_name: Op::Set(half.clone()),
+            title: Op::Set(half),
+            ..Patch::default()
+        };
+        assert!(oversized_patch.validate().is_err());
+
+        let mut attrs = Attributes::new();
+        attrs.display_name = Some("x".repeat(MAX_STYLE_METADATA_BYTES));
+        let target_before = attrs.clone();
+        let patch = Patch::default().set_title("x").expect("small title patch");
+        assert!(attrs.apply_patch(&patch).is_err());
+        assert_eq!(attrs, target_before);
     }
 }
