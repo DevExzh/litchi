@@ -62,7 +62,14 @@ BrtBeginExtConn14.payload :=
 ```
 
 `FRTBlank.reserved` is a four-byte value that MUST be zero and MUST be
-ignored. `XLWideString` is a four-byte unsigned character count followed by
+ignored. The binding reader ignores the reserved value on ingress, including
+nonzero values, and a source-bound UID rewrite preserves those four bytes
+verbatim. This preservation policy does not authorize generating nonzero
+reserved values: any future fresh-record author must emit zero. The current
+binding helper edits existing records and does not author a new ExtConn14
+collection.
+
+`XLWideString` is a four-byte unsigned character count followed by
 that many Unicode characters, with `rgchData` occupying `cchCharacters * 2`
 bytes. In the repository's little-endian BIFF12 implementation this is a
 `u32` count followed by UTF-16LE `u16` code units. The §2.4.78 prose limits
