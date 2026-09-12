@@ -1,0 +1,40 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/litchi-goal-0543-target/retained-binaries/baseline-guard-normal",
+    "--shape",
+    "dense-sparse",
+    "--case",
+    "late-validator",
+    "--warmup",
+    "5",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0543/baseline/guard-native-r2-dense-sparse-late-validator.json"
+  ],
+  "start_utc": "2026-09-12T22:59:57.008388+00:00",
+  "end_utc": "2026-09-12T22:59:57.650723+00:00",
+  "seconds": 0.6423350480035879,
+  "exit_code": 0,
+  "binary_sha256": "fb927af443a7dc9160dde952ab173fba82df2f9cf29e81e472530827bec1eab9",
+  "source_manifest_sha256": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+  "working_source_manifest_sha256": "e8ef70b14231083e2e28a7a10bb6cfd0c72e590b186091c265617df1655cda3a",
+  "script_sha256": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+  "plan_sha256": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0543-target/test-tmp"
+  },
+  "artifacts": {
+    "guard-native-r2-dense-sparse-late-validator.json": "31be2e860f7c257bb1720f738ec5c7c4279a4437f07393bd9ff657e475a4876c",
+    "guard-native-r2-dense-sparse-late-validator.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-native-r2-dense-sparse-late-validator.stdout": "e2ac3ae7ec5a01ddda1876ce8cd03895a883100c56b501b948a0e680e0ba6254"
+  }
+}

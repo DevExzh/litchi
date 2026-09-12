@@ -1,0 +1,14 @@
+{
+  "created_utc": "2026-09-12T23:35:19.671303+00:00",
+  "final_stage": "baseline",
+  "candidate_files_restored": [
+    "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+    "crates/litchi-xlsx/src/cell_values/validation.rs",
+    "crates/litchi-xlsx/src/cell_values/shared_traversal_tests.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+    "crates/litchi-xlsx/src/raw/worksheet/mod.rs"
+  ],
+  "temporary_cap_example_removed": true,
+  "final_source_manifest_sha256": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+  "reason": "Candidate Clippy failure; cap captures completed on the exact frozen candidate. Supplemental numeric review pending."
+}

@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0543: candidate rejected despite pilot gains
+
+[0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) rejects the shared-traversal revision. Original workflow p50 improves
+5.9–11.9% and planning Ir falls 24.9–25.4%, but valid input just above its event
+cap becomes 59.0–61.4% slower in planning; candidate Clippy also fails. Production
+is restored and the public post-EOF error test retained. Same-invalid validator
+latency/memory regressions remain explicit despite passing baseline-valid
+refusal envelopes. No retained runtime speedup is claimed.
+
 ## 0542: no retained runtime speedup
 
 [0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) rejects the shared XLSX traversal candidate despite 6.9–9.1% measured

@@ -1,0 +1,18 @@
+{
+  "created_utc": "2026-09-12T23:02:48.904988+00:00",
+  "stage": "before first conditional capture",
+  "files": {
+    "plan.json": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+    "run.py": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+    "eager-plan.json": "ec91de8dfd717891c1f3f4f66a5150f200c7d6b086c01b04522e64048b5e76b5",
+    "eager_run.py": "6568d21543d453655300e8e3442d57074fa07fbd1ed88ef482c860db6208bde2",
+    "analyze_eager.py": "f97d8a4821a0202a81afa07dedc92e3e41dd57feddf2bc96cd5570ded6c49232",
+    "analyze_planning.py": "bba2b60fa755723bce476b31203907114c40a6d3446b88f221feb9c916554a89",
+    "analyze_hardware.py": "d4d490378e88397ff4e74c9a253672589a45db89eb71bed21bd42b5a49f809c4",
+    "conditional_phase.py": "1ac3dc25bb79fafddc1389e51262a49dac825f20cef98f7d451121367e92a359",
+    "comparison.json": "a1eecddb1a6a9a745a60b5f167b05351daaffc816a106935fb18a6055f493283",
+    "allocation-analysis.json": "be5184a16cc4e97b265d0a73c3a42e8b4fe7fe29a97a391a19399e5e02c5c491",
+    "guard-analysis.json": "38227cc4e49546bb29b55b2ff129da3f32a3a6d0390ddcdf9dac5a9d1e279dab",
+    "symbol-observation.json": "a161bdd3710bab0f459963dd6e69c65e49a68b48c32d3a5fe062e5078869bfec"
+  }
+}

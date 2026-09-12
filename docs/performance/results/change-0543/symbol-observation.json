@@ -1,0 +1,35 @@
+{
+  "created_utc": "2026-09-12T23:02:48.904767+00:00",
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+  "plan_sha256": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+  "stages": {
+    "baseline": {
+      "command": [
+        "nm",
+        "-C",
+        "--defined-only",
+        "/home/zhuhe/litchi-goal-0543-target/retained-binaries/baseline-normal"
+      ],
+      "binary_sha256": "8a9d17a72221cb1c25ef8fa21eeb752db433db60e46120b736e0e2e6d3187323",
+      "source_manifest_sha256": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+      "matching_lines": [
+        "00000000011d5ec0 t litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+        "00000000011d6090 t litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+      ]
+    },
+    "candidate": {
+      "command": [
+        "nm",
+        "-C",
+        "--defined-only",
+        "/home/zhuhe/litchi-goal-0543-target/retained-binaries/candidate-normal"
+      ],
+      "binary_sha256": "cf31d73f49ae6787682b368cbd51c729cc70d58e1e5ae478c223458a0cfbcb05",
+      "source_manifest_sha256": "e8ef70b14231083e2e28a7a10bb6cfd0c72e590b186091c265617df1655cda3a",
+      "matching_lines": [
+        "00000000011d47b0 t litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+        "00000000011d4980 t litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+      ]
+    }
+  }
+}

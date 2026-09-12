@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0543: above-cap fallback repeats valid worksheet work
+
+[0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) shows that forwarding validated EOF errors fixes the measured late-raw
+refusal envelope, but a valid worksheet just above the provisional event cap
+still discards parser work and repeats both passes. Planning p50 regresses
+59.0–61.4% there. Next is a proven cheap preflight plus fresh matched evidence;
+then obtain commit-path attribution for total workflow impact. OLE2/OOXML remain
+first, with ODF deferred.
+
 ## 0542: validated raw-error fallback repeats worksheet work
 
 [0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) demonstrates a substantial valid-path opportunity in shared worksheet

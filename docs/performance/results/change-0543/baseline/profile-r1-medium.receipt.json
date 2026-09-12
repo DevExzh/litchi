@@ -1,0 +1,52 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "--zero-before=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "--dump-after=litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0543/baseline/profile-r1-medium.callgrind",
+    "/home/zhuhe/litchi-goal-0543-target/retained-binaries/baseline-normal",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0543/baseline/profile-r1-medium.json"
+  ],
+  "start_utc": "2026-09-12T23:02:49.185006+00:00",
+  "end_utc": "2026-09-12T23:03:20.509502+00:00",
+  "seconds": 31.324498051020782,
+  "exit_code": 0,
+  "binary_sha256": "8a9d17a72221cb1c25ef8fa21eeb752db433db60e46120b736e0e2e6d3187323",
+  "source_manifest_sha256": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+  "working_source_manifest_sha256": "e8ef70b14231083e2e28a7a10bb6cfd0c72e590b186091c265617df1655cda3a",
+  "script_sha256": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+  "plan_sha256": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0543-target/test-tmp"
+  },
+  "artifacts": {
+    "profile-r1-medium.callgrind": "14a245cf4ec2b63e468b15b2faed31d151684f18b54910df2d4a0dedbfa432bb",
+    "profile-r1-medium.callgrind.1": "224c4896ca511c461aef12cfe2a718118d6a56482759cc0e03b31f86924bbcfb",
+    "profile-r1-medium.callgrind.2": "0b26592fad3a31d4de33abf90b720e4e1f417dbd02137911d2202c53115f0595",
+    "profile-r1-medium.callgrind.3": "b723b59e9db7516203ece515058209a3de21aa6f5babc5406b8ffa410bf91a04",
+    "profile-r1-medium.callgrind.4": "09c0448239014d82aaccd862232fbef4e671685ac2c80e085233b3ccefda5d7a",
+    "profile-r1-medium.json": "5363474c4ad5f9ddedef4b597c03557e0c7ba153daca2188cc5f0ab948cb0c92",
+    "profile-r1-medium.stderr": "300c19fd310c12476bc96941801e56d26c2a8f77a23ca91f6968b7d8f87a11f1",
+    "profile-r1-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

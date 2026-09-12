@@ -1,0 +1,23 @@
+{
+  "analyzer_script_sha256": "f97d8a4821a0202a81afa07dedc92e3e41dd57feddf2bc96cd5570ded6c49232",
+  "binary_sha256": "8a9d17a72221cb1c25ef8fa21eeb752db433db60e46120b736e0e2e6d3187323",
+  "case": "xlsx_first_cell",
+  "command_sha256": "65773ec46aae1ab85e95c8639fc4913a124d05147b6666cdb6b6bbcca82de02f",
+  "eager_plan_sha256": "ec91de8dfd717891c1f3f4f66a5150f200c7d6b086c01b04522e64048b5e76b5",
+  "eager_run_script_sha256": "6568d21543d453655300e8e3442d57074fa07fbd1ed88ef482c860db6208bde2",
+  "group": "baseline-r2",
+  "name": "eager-r2-xlsx_first_cell-medium",
+  "output": "baseline/eager-r2-xlsx_first_cell-medium.json",
+  "primary_plan_sha256": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+  "receipt_sha256": "b68bf0269c80b0e8fadf64471fff20324698c6df0f41fd94575de7ba33b4fec9",
+  "repeat": 2,
+  "retained_baseline": true,
+  "rss": "baseline/eager-r2-xlsx_first_cell-medium.rss.json",
+  "run_script_sha256": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+  "schema": "litchi-0543-eager-guard-binding-v1",
+  "shape": "medium",
+  "source_checkout": "retained baseline binary under candidate source checkout",
+  "source_manifest_sha256": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+  "stage": "baseline",
+  "working_source_manifest_sha256": "e8ef70b14231083e2e28a7a10bb6cfd0c72e590b186091c265617df1655cda3a"
+}

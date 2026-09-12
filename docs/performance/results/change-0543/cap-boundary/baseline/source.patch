@@ -1,0 +1,13 @@
+diff --git a/crates/litchi-xlsx/tests/source_backed_cell_values.rs b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+index 0bb4dd92a..b764469b0 100644
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+@@ -22,6 +22,8 @@ use soapberry_zip::office::ArchiveReader;
+ 
+ #[path = "source_backed_cell_values/planning_error_order.rs"]
+ mod planning_error_order;
++#[path = "source_backed_cell_values/post_eof_raw_differential.rs"]
++mod post_eof_raw_differential;
+ 
+ const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+ const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";

@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0543: shared traversal remains unadmitted
+
+[0543](changes/0543-xlsx-shared-traversal-cap-rejected.md) restores production after a valid event-cap regression and candidate
+Clippy failure. The retained public post-EOF error test pins typed refusal,
+source identity, retry and byte exact no-op publication. The measured candidate
+keeps independent validation and historical x14ac retry; its bounded provisional
+state does not establish OOM safety or unchanged invalid-input memory. A future
+preflight requires its own proof and fresh measurements.
+
 ## 0542: shared XLSX traversal candidate and refusal evidence
 
 [0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) retains a benchmark enabler, with no production optimization admitted.

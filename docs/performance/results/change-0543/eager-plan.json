@@ -1,0 +1,268 @@
+{
+  "adverse_threshold_percent": 5.0,
+  "analyzer_script_sha256": "f97d8a4821a0202a81afa07dedc92e3e41dd57feddf2bc96cd5570ded6c49232",
+  "binary_sha256": {
+    "baseline": "8a9d17a72221cb1c25ef8fa21eeb752db433db60e46120b736e0e2e6d3187323",
+    "candidate": "cf31d73f49ae6787682b368cbd51c729cc70d58e1e5ae478c223458a0cfbcb05"
+  },
+  "case_matrix": [
+    "xlsx_open_owned",
+    "xlsx_first_cell"
+  ],
+  "cases": [
+    "xlsx_open_owned",
+    "xlsx_first_cell"
+  ],
+  "cpu": 2,
+  "eager_run_script_sha256": "6568d21543d453655300e8e3442d57074fa07fbd1ed88ef482c860db6208bde2",
+  "gate": "No speedup threshold. Validate exact report/corpus identity, elapsed p50/p95/p99/mean, whole-child peak RSS, ABBA custody, and individually review every adverse or repeat-drift change over 5%.",
+  "jobs": [
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_open_owned",
+      "group": "baseline-r1",
+      "name": "eager-r1-xlsx_open_owned-medium",
+      "repeat": 1,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_open_owned",
+      "group": "baseline-r1",
+      "name": "eager-r1-xlsx_open_owned-dense-wide",
+      "repeat": 1,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_first_cell",
+      "group": "baseline-r1",
+      "name": "eager-r1-xlsx_first_cell-medium",
+      "repeat": 1,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_first_cell",
+      "group": "baseline-r1",
+      "name": "eager-r1-xlsx_first_cell-dense-wide",
+      "repeat": 1,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_open_owned",
+      "group": "candidate-r1",
+      "name": "eager-r1-xlsx_open_owned-medium",
+      "repeat": 1,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_open_owned",
+      "group": "candidate-r1",
+      "name": "eager-r1-xlsx_open_owned-dense-wide",
+      "repeat": 1,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_first_cell",
+      "group": "candidate-r1",
+      "name": "eager-r1-xlsx_first_cell-medium",
+      "repeat": 1,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_first_cell",
+      "group": "candidate-r1",
+      "name": "eager-r1-xlsx_first_cell-dense-wide",
+      "repeat": 1,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_open_owned",
+      "group": "candidate-r2",
+      "name": "eager-r2-xlsx_open_owned-medium",
+      "repeat": 2,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_open_owned",
+      "group": "candidate-r2",
+      "name": "eager-r2-xlsx_open_owned-dense-wide",
+      "repeat": 2,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_first_cell",
+      "group": "candidate-r2",
+      "name": "eager-r2-xlsx_first_cell-medium",
+      "repeat": 2,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "candidate",
+      "case": "xlsx_first_cell",
+      "group": "candidate-r2",
+      "name": "eager-r2-xlsx_first_cell-dense-wide",
+      "repeat": 2,
+      "retained_baseline": false,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "candidate binary under candidate source checkout",
+      "stage": "candidate",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_open_owned",
+      "group": "baseline-r2",
+      "name": "eager-r2-xlsx_open_owned-medium",
+      "repeat": 2,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_open_owned",
+      "group": "baseline-r2",
+      "name": "eager-r2-xlsx_open_owned-dense-wide",
+      "repeat": 2,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_first_cell",
+      "group": "baseline-r2",
+      "name": "eager-r2-xlsx_first_cell-medium",
+      "repeat": 2,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "medium",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    },
+    {
+      "binary_stage": "baseline",
+      "case": "xlsx_first_cell",
+      "group": "baseline-r2",
+      "name": "eager-r2-xlsx_first_cell-dense-wide",
+      "repeat": 2,
+      "retained_baseline": true,
+      "samples": 30,
+      "shape": "dense-wide",
+      "source_checkout": "retained baseline binary under candidate source checkout",
+      "stage": "baseline",
+      "warmup": 10
+    }
+  ],
+  "native_order": [
+    "baseline-r1",
+    "candidate-r1",
+    "candidate-r2",
+    "baseline-r2"
+  ],
+  "no_speedup_requirement": true,
+  "primary_plan_sha256": "91532f97396a98f5fc0693117126db9819de647ddcad4989a936b5fd82db4fcd",
+  "purpose": "Conditional ordinary eager XLSX read controls for the 0543 raw worksheet codec extraction; this lane supplies no speedup claim.",
+  "repeats": 2,
+  "result_identity_contract": {
+    "output": "ordinary read controls omit result.output_sha256",
+    "phases": "ordinary read controls omit operation_metrics and phase evidence",
+    "sink": "ordinary read controls serialize sink as null",
+    "source": "ordinary eager read cases omit result.source"
+  },
+  "run_script_sha256": "15f423a0f396664c4ed3f2c40cc7bd8a92fe1baf4014aad1c1964794a2db0d74",
+  "samples": 30,
+  "schema": "litchi-0543-eager-guard-plan-v1",
+  "shape_matrix": [
+    "medium",
+    "dense-wide"
+  ],
+  "shapes": [
+    "medium",
+    "dense-wide"
+  ],
+  "source_manifest_sha256": {
+    "baseline": "5677c025b26d42c01e28d57c900d25405204b5c027b222bbef8d18a7331523f6",
+    "candidate": "e8ef70b14231083e2e28a7a10bb6cfd0c72e590b186091c265617df1655cda3a"
+  },
+  "stage_source_protocol": {
+    "baseline-r1": "retained baseline binary under candidate source checkout",
+    "baseline-r2": "retained baseline binary under candidate source checkout",
+    "candidate-r1": "candidate binary under candidate source checkout",
+    "candidate-r2": "candidate binary under candidate source checkout"
+  },
+  "status": "frozen-before-capture",
+  "warmup": 10
+}
