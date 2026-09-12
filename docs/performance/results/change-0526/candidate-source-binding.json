@@ -1,0 +1,10 @@
+{
+  "files": {
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs": "fea4369470a24600451bc96e7992e8a346b1c61a689ebc57d8e400da001ce736",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs": "883ee4dcd9d848185401278665c631970712453bb6b5a73010228da3204a96a1",
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": "4d9841a90d7b76f946bc33f394abb9f35586179952873e9447c19c7d79a64064"
+  },
+  "patch_sha256": "28269e6051f9ee9453ccfd590a0f89269c400529d973a84f0ac908eb6730c5e9",
+  "revision": "67028ab6037ae6eef15af92a0d540285c3c5362c",
+  "scope": "Draft candidate reconstructed only in a private Git index; no repository Rust changes or builds."
+}

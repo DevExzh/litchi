@@ -1,0 +1,8 @@
+{
+  "status": "pass",
+  "prior_batch": "0525",
+  "seal_sha256": "ae8834847914ef936b6206f621d0e19c02960f407b27f3e2db797177e0a8b1ab",
+  "exact_inventory_entries": 550,
+  "all_bound_files_match": true,
+  "scope": "Exact retained550-file inventory/hash verification, not a new performance capture or full semantic test run."
+}

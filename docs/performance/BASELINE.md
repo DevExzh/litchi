@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0526: retained-profile scanner investigation
+
+[0526](changes/0526-xlsx-primary-span-layout-audit.md) Revalidated the accepted 0525 evidence seal and current source before decomposing the remaining XLSX scanner cost. This is a retained-profile audit, not a fresh native or allocator baseline. The row-owned primary-span draft must receive a new matched baseline/candidate campaign before any production retention or speedup claim.
+
 ## 0525: matched XLSX unchanged-cell reconstruction (accepted)
 
 [0525](changes/0525-xlsx-unchanged-cell-readback.md) retains the complete

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0526: row-owned primary spans selected for a bounded pilot
+
+[0526](changes/0526-xlsx-primary-span-layout-audit.md) The 0525 scanner owner remains the first XLSX lead. A row-owned arena can replace per-cell span vectors while preserving all spans and both writer paths. Keep the 0522 combined cell-reference/tag scan rejected; do not aggregate nested costs or infer allocation counts from Callgrind call metadata. End-tag namespace lookup is a separate source observation, not part of the arena candidate. Native usefulness remains unproven.
+
 ## 0525: source-bound cell omission removes measured XLSX parser work (accepted)
 
 [0525](changes/0525-xlsx-unchanged-cell-readback.md) targets the reconstruction

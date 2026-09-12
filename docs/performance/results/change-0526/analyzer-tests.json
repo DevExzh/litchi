@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "valid_control_pass": true,
+  "checks": [
+    {
+      "case": "raw_edge_cost_mismatch",
+      "rejected": true,
+      "reason": "raw direct edge differs: litchi_xlsx::cell_values::source::MultiSourceEdit::commit -> litchi_xlsx::raw::worksheet::edit::package::rewrite_value_only_with_provenance"
+    },
+    {
+      "case": "owner_self_cost_mismatch",
+      "rejected": true,
+      "reason": "self plus direct costs differ: litchi_xlsx::cell_values::source::MultiSourceEdit::commit"
+    }
+  ],
+  "scope": "In-memory parser-result corruption only; no raw evidence mutation or new capture."
+}

@@ -1,5 +1,9 @@
 # Performance optimization ADR-compliance matrix
 
+## 0526: private scanner storage audit
+
+[0526](changes/0526-xlsx-primary-span-layout-audit.md) All 30 accepted ADR/index hashes are unchanged. The unapplied row-span draft preserves full XML validation, independent actual-output readback, source/execution fences, resource limits and arbitrary primary-span ordering. It changes no public contract. Source/design review does not establish runtime correctness or performance; those gates remain required before adoption.
+
 ## 0525: preserve validation authority while retaining the XLSX work-elimination candidate (accepted)
 
 [0525](changes/0525-xlsx-unchanged-cell-readback.md) keeps complete emitted

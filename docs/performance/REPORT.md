@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0526: primary-span representation investigated
+
+[0526](changes/0526-xlsx-primary-span-layout-audit.md) The scanner stores per-cell payload-span vectors that are boxed at cell close. The reviewed draft moves identical spans into row-owned storage and keeps per-cell ranges, covering ordinary and provenance writers. This is a measured-hotspot investigation and unapplied draft, with no new speedup, allocation or RSS claim. A fresh pilot must demonstrate practical end-to-end benefit before production retention.
+
 ## 0525: XLSX unchanged-cell readback candidate meets measured admission (accepted)
 
 [0525](changes/0525-xlsx-unchanged-cell-readback.md) completes the matched

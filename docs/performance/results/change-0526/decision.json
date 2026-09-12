@@ -1,0 +1,20 @@
+{
+  "bindings": {
+    "analyzer-tests.json": "c6fd357b5d0e78b9e61bc5911c9d062a713e43cc43190025747609f99a32f32b",
+    "candidate-review.md": "e127a3fc8d8fb6c3ae27ecda98b8ec723ba11baa0ce7e08743bd81c93f5df73c",
+    "candidate-source-binding.json": "910334c61d1f83903825bc2480bda5dd7429aedfe7ef91e0f084f220198ec1ee",
+    "profile-analysis.json": "9a7afead3b6ae723d75926f778289e834450837d8e606bd22553bef2a1cf29bd",
+    "profile-review.md": "754b70ba84cf02198d70177906a1cf57b2d7fa93203f1fc1eb4174def706b3e3",
+    "row-primary-arena.patch": "28269e6051f9ee9453ccfd590a0f89269c400529d973a84f0ac908eb6730c5e9",
+    "scan-design-review.md": "60c0b28bbbd732883284f5b04b989cbf7c2042fc8353d9ec3c3aaee22657964c",
+    "source-binding.json": "11927890dbc7d6b02d64cae9c86a1b337e5a44472ca9d85b026cb2d053957b66",
+    "test-plan.md": "58a0ca02912885f0f134c5dcc632d1e08da4bd5cd214614780be5a8b3a49c6d9",
+    "verification.json": "e6931c0dfdd9cfa46792e09a476e6c499b25bbda0356a9bd58e44b8382da979d"
+  },
+  "new_performance_capture": false,
+  "next_action": "Freeze and capture a fresh baseline, then validate and measure the row-owned primary-span draft in an independent pilot. Retain only if correctness and practical end-to-end gates pass.",
+  "overall_goal_complete": false,
+  "priority": "OLE2/OOXML; ODF deferred; iWork excluded",
+  "production_change_retained": false,
+  "status": "audit_complete_draft_ready"
+}
