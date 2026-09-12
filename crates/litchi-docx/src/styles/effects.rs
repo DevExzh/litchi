@@ -32,6 +32,7 @@ mod test_trace {
         pub(super) candidate_clones: usize,
         pub(super) projection_builds: usize,
         pub(super) readbacks: usize,
+        pub(super) graph_validations: usize,
     }
 
     thread_local! {
@@ -41,6 +42,7 @@ mod test_trace {
                 candidate_clones: 0,
                 projection_builds: 0,
                 readbacks: 0,
+                graph_validations: 0,
             })
         };
     }
@@ -81,6 +83,14 @@ mod test_trace {
         COUNTS.with(|counts| {
             let mut value = counts.get();
             value.readbacks = value.readbacks.saturating_add(1);
+            counts.set(value);
+        });
+    }
+
+    pub(super) fn record_graph_validation() {
+        COUNTS.with(|counts| {
+            let mut value = counts.get();
+            value.graph_validations = value.graph_validations.saturating_add(1);
             counts.set(value);
         });
     }
@@ -2068,7 +2078,18 @@ fn validate_effects_part_for_graph(
         }
         return Ok(());
     }
-    Resource::from_part(part, conformance, limits).map(|_| ())
+
+    // Graph inspection needs the same typed MCE/style-parser refusal as a
+    // normal resource load, but it does not need to retain a projection for
+    // an unselected owner. Keep the package-level XML and caller-limit check
+    // first, then consume the established lazy Styles parser to force all
+    // events through its validation path without cloning every Style.
+    validate_effects_part_for_package(part, conformance, limits)?;
+    #[cfg(test)]
+    test_trace::record_graph_validation();
+    let mut styles = Styles::from_part(part);
+    styles.iter()?.count();
+    Ok(())
 }
 
 fn preflight_package_limits(
@@ -3095,8 +3116,9 @@ mod tests {
 
         assert_eq!(counts.loads, 1);
         assert_eq!(counts.candidate_clones, 0);
-        assert_eq!(counts.projection_builds, 5);
+        assert_eq!(counts.projection_builds, 1);
         assert_eq!(counts.readbacks, 1);
+        assert_eq!(counts.graph_validations, 4);
         assert_eq!(
             applied
                 .resource()
@@ -3120,8 +3142,9 @@ mod tests {
 
         assert_eq!(counts.loads, 1);
         assert_eq!(counts.candidate_clones, 1);
-        assert_eq!(counts.projection_builds, 5);
+        assert_eq!(counts.projection_builds, 1);
         assert_eq!(counts.readbacks, 1);
+        assert_eq!(counts.graph_validations, 4);
         assert_eq!(
             applied
                 .resource()

@@ -1,0 +1,13 @@
+{
+  "directory": "/var/tmp/litchi-docx-effects-root-mavgeovs",
+  "checkout": "/var/tmp/litchi-docx-effects-root-mavgeovs/worktree",
+  "base": "4d01e69d4f9e8a6a87d3445e2b0e1f136236239e",
+  "files": [
+    "crates/litchi-docx/src/styles/effects.rs"
+  ],
+  "sha256": {
+    "crates/litchi-docx/src/styles/effects.rs": "9a1f99b15a572de5366b4470d7bbbc63f4567d057fed38468379678604224346"
+  },
+  "target": "/var/tmp/litchi-xlsx-pivot-final-uwchw4qr/target",
+  "shared_target": true
+}
