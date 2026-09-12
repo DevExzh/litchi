@@ -2127,6 +2127,275 @@ fn execute_multi_picture_attach(fixture: &Fixture) -> Result<Execution> {
     })
 }
 
+fn validate_multi_picture_attach_output(
+    fixture: &Fixture,
+    output: &[u8],
+    reopened_bytes: &[u8],
+) -> Result<bool> {
+    let drawing = drawing_part(output)?;
+    let source = SourceDrawing::scan(&drawing)?;
+    let pictures_ok = source.pictures().len() == fixture.picture_count
+        && source.pictures().iter().all(|picture| {
+            picture.is_direct_embedded_svg() && picture.raster_relationship_id() == "rIdRaster"
+        });
+    let relationship_ids = source
+        .pictures()
+        .iter()
+        .filter_map(|picture| picture.svg_owner().owner()?.embedded_relationship_id())
+        .collect::<Vec<_>>();
+    let relationships_ok = relationship_ids.len() == fixture.picture_count
+        && relationship_ids.iter().enumerate().all(|(index, id)| {
+            relationship_ids[..index]
+                .iter()
+                .all(|previous| previous != id)
+        });
+    let svg_parts = svg_parts(output);
+    let svg_parts_ok = svg_parts.len() == fixture.picture_count
+        && svg_parts
+            .iter()
+            .all(|part| part.as_slice() == fixture.payload.as_ref());
+    Ok(output != fixture.package.as_ref()
+        && reopened_bytes == output
+        && pictures_ok
+        && relationships_ok
+        && svg_parts_ok
+        && validate_graph_closure(output, fixture.picture_count).is_ok()
+        && (0..fixture.picture_count)
+            .all(|picture| validate_picture_closure(output, picture, true).is_ok())
+        && validate_opaque_fragments(output, fixture).is_ok())
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PhaseMeasurement {
+    elapsed_ns: u64,
+    allocation: AllocDelta,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PhaseSample {
+    open: PhaseMeasurement,
+    stages: PhaseMeasurement,
+    commit: PhaseMeasurement,
+    firstsave: PhaseMeasurement,
+    reopen_secondsave: PhaseMeasurement,
+    validation: PhaseMeasurement,
+    semantic_ok: bool,
+    output_exact: bool,
+}
+
+fn measure_phase<T>(
+    name: &str,
+    operation: impl FnOnce() -> Result<T>,
+) -> Result<(T, PhaseMeasurement)> {
+    support::reset_counters();
+    let before = AllocSnapshot::now();
+    let started = Instant::now();
+    let result = operation();
+    let elapsed_ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+    let after = AllocSnapshot::now();
+    let measurement = PhaseMeasurement {
+        elapsed_ns,
+        allocation: before.delta(after),
+    };
+    if !measurement.allocation.balanced()
+        || measurement.allocation.invalid
+        || measurement.allocation.failed != 0
+    {
+        return Err(format!(
+            "{name} allocator accounting failed: balanced={} invalid={} failed={}",
+            measurement.allocation.balanced(),
+            measurement.allocation.invalid,
+            measurement.allocation.failed,
+        )
+        .into());
+    }
+    Ok((result?, measurement))
+}
+
+fn signed_live_delta(allocation: AllocDelta) -> i128 {
+    i128::from(allocation.live_after) - i128::from(allocation.live_before)
+}
+
+fn phase_measurement_json(measurement: PhaseMeasurement) -> String {
+    let allocation = measurement.allocation;
+    format!(
+        concat!(
+            "{{\"elapsed_ns\":{},\"requested_alloc_bytes\":{},",
+            "\"direct_allocated_bytes\":{},\"realloc_new_bytes\":{},",
+            "\"realloc_old_bytes\":{},\"deallocated_bytes\":{},",
+            "\"live_before_bytes\":{},\"live_after_bytes\":{},",
+            "\"live_delta_bytes\":{},\"retained_live_bytes_after\":{},",
+            "\"peak_live_delta_bytes\":{},\"alloc_balance_ok\":{},",
+            "\"alloc_invalid\":{},\"alloc_failed\":{}}}"
+        ),
+        measurement.elapsed_ns,
+        allocation.requested(),
+        allocation.direct,
+        allocation.realloc_new,
+        allocation.realloc_old,
+        allocation.deallocated,
+        allocation.live_before,
+        allocation.live_after,
+        signed_live_delta(allocation),
+        allocation.live_after,
+        allocation.peak_delta,
+        allocation.balanced(),
+        allocation.invalid,
+        allocation.failed,
+    )
+}
+
+fn phase_sample_json(sample: PhaseSample) -> String {
+    format!(
+        concat!(
+            "{{\"semantic_ok\":{},\"output_exact\":{},\"phases\":{{",
+            "\"open\":{},\"stages\":{},\"commit\":{},",
+            "\"firstsave\":{},\"reopen_secondsave\":{},\"validation\":{}",
+            "}}}}"
+        ),
+        sample.semantic_ok,
+        sample.output_exact,
+        phase_measurement_json(sample.open),
+        phase_measurement_json(sample.stages),
+        phase_measurement_json(sample.commit),
+        phase_measurement_json(sample.firstsave),
+        phase_measurement_json(sample.reopen_secondsave),
+        phase_measurement_json(sample.validation),
+    )
+}
+
+fn phase_decomposition_sample(fixture: &Fixture) -> Result<PhaseSample> {
+    let (source_workbook, open) = measure_phase("open", || {
+        Ok(Workbook::from_bytes(fixture.package.to_vec())?)
+    })?;
+    let (edit, stages) = measure_phase("stages", || {
+        let mut edit = source_workbook.edit()?;
+        for picture in 0..fixture.picture_count {
+            let mut sheet = edit.sheet("Sheet1")?.ok_or("Sheet1 is missing")?;
+            sheet.attach_svg(
+                PictureSelector::new(0, picture),
+                SvgInput::borrowed(fixture.payload.as_ref()),
+            )?;
+        }
+        Ok(edit)
+    })?;
+    let (committed, commit) = measure_phase("commit", || Ok(edit.commit()?.into_workbook()))?;
+    let (first_saved, firstsave) = measure_phase("firstsave", || Ok(committed.to_plain_bytes()?))?;
+    // The acceptance path drops the committed workbook as the chained
+    // first-save temporary ends. Keep this boundary outside both phase clocks;
+    // the resulting live set matches that lifecycle before reopen.
+    drop(committed);
+    let ((reopened, second_saved), reopen_secondsave) = measure_phase("reopen_secondsave", || {
+        let reopened = Workbook::from_bytes(first_saved.clone())?;
+        let second_saved = reopened.to_plain_bytes()?;
+        Ok((reopened, second_saved))
+    })?;
+    let (semantic_ok, validation) = measure_phase("validation", || {
+        validate_multi_picture_attach_output(fixture, &first_saved, &second_saved)
+    })?;
+    let sample = PhaseSample {
+        open,
+        stages,
+        commit,
+        firstsave,
+        reopen_secondsave,
+        validation,
+        semantic_ok,
+        output_exact: semantic_ok,
+    };
+    drop(reopened);
+    drop(source_workbook);
+    Ok(sample)
+}
+
+fn phase_receipt_json(
+    lane: &str,
+    fixture: &Fixture,
+    warmup: usize,
+    samples: &[PhaseSample],
+) -> String {
+    let mut output = String::new();
+    write!(
+        output,
+        concat!(
+            "{{\n",
+            "  \"schema\":\"xlsx-svg-lifecycle-phase-profile-v1\",\n",
+            "  \"lane\":\"{}\",\n",
+            "  \"picture_count\":{},\n",
+            "  \"input_bytes\":{},\n",
+            "  \"input_hash_fnv1a64\":{},\n",
+            "  \"input_sha256\":\"{}\",\n",
+            "  \"warmup\":{},\n",
+            "  \"sample_count\":{},\n",
+            "  \"expected_success\":true,\n",
+            "  \"phase_order\":[\"open\",\"stages\",\"commit\",\"firstsave\",\"reopen_secondsave\",\"validation\"],\n",
+            "  \"allocation_note\":\"requested_alloc_bytes is phase-local; live_after includes objects retained for later phases; phase values must not be summed or subtracted across unlike retained live sets\",\n",
+            "  \"semantic_checks\":[\"drawing_picture_inventory\",\"anchor_and_raster_relationships\",\"unique_svg_relationships\",\"svg_media_bytes\",\"reopen_byte_identity\",\"graph_closure\",\"picture_closure\",\"opaque_fragments\"],\n",
+            "  \"samples\":[\n"
+        ),
+        support::json_escape(lane),
+        fixture.picture_count,
+        fixture.input_bytes,
+        fixture.input_hash,
+        support::json_escape(&fixture.input_sha256),
+        warmup,
+        samples.len(),
+    )
+    .expect("String cannot fail");
+    for (index, sample) in samples.iter().enumerate() {
+        let comma = if index + 1 == samples.len() { "" } else { "," };
+        writeln!(output, "    {}{comma}", phase_sample_json(*sample)).expect("String cannot fail");
+    }
+    output.push_str("  ]\n}\n");
+    output
+}
+
+pub fn run_phase_decomposition(
+    picture_count: usize,
+    warmup: usize,
+    samples: usize,
+) -> Result<String> {
+    if !matches!(picture_count, 16 | 64 | 256) {
+        return Err("phase decomposition picture count must be 16, 64, or 256".into());
+    }
+    if warmup < 2 || samples < 20 {
+        return Err("phase decomposition requires at least 2 warmups and 20 samples".into());
+    }
+    let lane = format!("multi_picture_same_drawing_{picture_count}");
+    let fixture = fixture_for_lane(&lane)?;
+    for _ in 0..warmup {
+        let live_before = AllocSnapshot::now().live;
+        let sample = phase_decomposition_sample(&fixture)?;
+        if !sample.semantic_ok || !sample.output_exact {
+            return Err("phase decomposition warm-up semantic validation failed".into());
+        }
+        assert_sample_dropped(live_before)?;
+    }
+    let mut receipts = Vec::with_capacity(samples);
+    let live_before_samples = AllocSnapshot::now().live;
+    for _ in 0..samples {
+        let sample = phase_decomposition_sample(&fixture)?;
+        if !sample.semantic_ok || !sample.output_exact {
+            return Err("phase decomposition semantic validation failed".into());
+        }
+        assert_sample_dropped(live_before_samples)?;
+        receipts.push(sample);
+    }
+    Ok(phase_receipt_json(&lane, &fixture, warmup, &receipts))
+}
+
+fn assert_sample_dropped(live_before: u64) -> Result<()> {
+    let after = AllocSnapshot::now();
+    if after.live != live_before || after.invalid || after.failed != 0 {
+        return Err(format!(
+            "phase sample did not return to its live boundary: before={live_before} after={} invalid={} failed={}",
+            after.live, after.invalid, after.failed
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn execute_multi_picture_detach(fixture: &Fixture) -> Result<Execution> {
     let before_drawing = drawing_part(&fixture.package)?;
     let before_source = SourceDrawing::scan(&before_drawing)?;
@@ -2871,5 +3140,23 @@ mod tests {
         assert!(refusal.contains("\"semantic_ok\":true"));
         assert!(refusal.contains("\"output_exact\":true"));
         assert!(refusal.contains("\"class\":\"caller_limit\""));
+    }
+
+    #[test]
+    fn exploratory_attach_validation_matches_acceptance_predicate() {
+        for picture_count in [16, 64, 256] {
+            let lane = format!("multi_picture_same_drawing_{picture_count}");
+            let fixture = fixture_for_lane(&lane).expect("deterministic decomposition fixture");
+            let execution = execute_multi_picture_attach(&fixture).expect("acceptance attach");
+            let expected = execution.semantic_ok;
+            let output = execution.output.expect("acceptance output");
+            let reopened = Workbook::from_bytes(output.clone())
+                .expect("reopen acceptance output")
+                .to_plain_bytes()
+                .expect("second serialization");
+            let exploratory = validate_multi_picture_attach_output(&fixture, &output, &reopened)
+                .expect("exploratory validation");
+            assert_eq!(exploratory, expected, "picture count {picture_count}");
+        }
     }
 }
