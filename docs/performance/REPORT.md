@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0530: unchanged XLSX planning costs attributed
+
+[0530](changes/0530-xlsx-planning-attribution.md) completes four fresh edit_sheets profiles and identifies raw worksheet parsing plus full validation as the dominant instruction owners. Source and harness remain unchanged. An exact namespace-search draft is the next pilot; no native gain is claimed.
+
 ## 0529: XML attribute probe rejected
 
 [0529](changes/0529-xml-attribute-probe-pilot.md) retains a complete repeated pilot with all output oracles passing. Publication allocation calls fall about 98–99%, but total mean reductions stay below 2% in every pair and first-repeat publication p50 is flat. Production is restored; instrumentation, four compatible tests and adverse/drift evidence remain. No runtime speedup is retained or claimed.

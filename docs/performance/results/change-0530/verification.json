@@ -1,0 +1,75 @@
+{
+  "status": "pass",
+  "scope": "postcleanup; seal verified separately after writing this record",
+  "performance_claim": "none",
+  "components": {
+    "source": {
+      "status": "pass",
+      "result": {
+        "manifest_sha256": "c5a7cfbd0d7da965c7d945aea3355d24e34685b91f9dbbb25baedbed97140a08",
+        "manifest_entries": 8584,
+        "prior_final_equal": true,
+        "source_patch": "empty"
+      }
+    },
+    "prior": {
+      "status": "pass",
+      "result": {
+        "checks": 14,
+        "successful_test_executions": 2024,
+        "prior_seal_entries": 366
+      }
+    },
+    "build": {
+      "status": "pass",
+      "result": {
+        "receipt": "baseline/build-normal.receipt.json"
+      }
+    },
+    "profiles": {
+      "status": "pass",
+      "result": {
+        "profile_receipts": 4,
+        "serial_receipts": 6,
+        "binary_sha256": "e9e77be0dbc9ea4f75666e7db0814b943bdfa6fa7958102b15bad6c7be1a6729",
+        "symbol": {
+          "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+          "first_match": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+          "nm_sha256": "490a373dc447f9737dc7d2cf36a8b38010e3143d71350e5102bbae54786f68b1"
+        }
+      }
+    },
+    "analysis": {
+      "status": "pass",
+      "result": {
+        "report": "planning-analysis.json",
+        "report_sha256": "a160d478f7b1e00a472d8ce907e2a404118bf754f97a35839b2363ff6308593c",
+        "exact_replay": true,
+        "performance_claim": "none"
+      }
+    },
+    "context": {
+      "status": "pass",
+      "result": {
+        "json_sha256": "d1c1ad8fca4e63636fd68411767e35f980438350b0ffc4352ae131aed9e7442d",
+        "script_sha256": "d9387a991729a3a382c8f1e038d2951f444854eecf83940591ac2b58149f43e0",
+        "exact_replay": true
+      }
+    },
+    "draft": {
+      "status": "pass",
+      "result": {
+        "status": "unapplied-unmeasured-draft",
+        "patch_sha256": "a809d1e41f99451c66f4d751bc3c9368ca6f7be6b0a02f1e52f7d01090bb2c8b",
+        "exact_predicate_substitution": true
+      }
+    },
+    "cleanup": {
+      "status": "pass",
+      "result": {
+        "owned_paths_absent": true,
+        "python_cache_absent": true
+      }
+    }
+  }
+}

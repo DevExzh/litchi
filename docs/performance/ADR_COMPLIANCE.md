@@ -1,5 +1,9 @@
 # Performance optimization ADR-compliance matrix
 
+## 0530: unchanged planning attribution and exact-search follow-up
+
+[0530](changes/0530-xlsx-planning-attribution.md) preserves all runtime source and reuses the exact 0529 final quality binding. The next draft replaces a namespace substring predicate without bypassing MCE processing, changing limits or weakening validation. Fresh performance and correctness gates remain required before adoption.
+
 ## 0529: restore the auditor after a failed performance pilot
 
 [0529](changes/0529-xml-attribute-probe-pilot.md) The candidate preserved checked fallback, aggregate limits, xml:space and exact errors across slice/stream auditing, but native gates failed. The production auditor is restored exactly. Separate publication counters and compatible public tests remain; no public API, dependency, unsafe code or validation policy changes.

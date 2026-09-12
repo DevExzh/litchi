@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "reason": "Complete source manifest equals the previously tested0529final; no Rust/harness source changes.",
+  "source_manifest_sha256": "c5a7cfbd0d7da965c7d945aea3355d24e34685b91f9dbbb25baedbed97140a08",
+  "prior_quality_summary": "docs/performance/results/change-0529/quality-summary.json",
+  "prior_quality_summary_sha256": "704a3b4bfcec601ae9d76c3cdb440d86e57612e4206d4f44418a48117af99316",
+  "prior_seal_sha256": "7a48f0b193630782b1a752475dbb9efaa60176c92c0c8d9005a951adacc03c06",
+  "checks": 14,
+  "successful_test_executions": 2024,
+  "new_validation": "Fresh release build, all profile output/lifecycle oracles and source-bound raw profile analysis required separately."
+}

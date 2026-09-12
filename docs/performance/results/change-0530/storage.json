@@ -1,0 +1,5 @@
+{
+  "scratch_symlink": "/tmp/litchi-goal-0530",
+  "target": "/home/zhuhe/litchi-goal-0530-target/retained-binaries",
+  "reason": "Disk-backed storage selected before build/capture; exact owned paths only."
+}

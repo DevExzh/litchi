@@ -1,5 +1,9 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0530: progress through planning attribution
+
+[0530](changes/0530-xlsx-planning-attribution.md) identifies a concrete namespace-search follow-up after the rejected 0529 probe. No runtime optimization is adopted. Broader OLE2/OOXML work remains incomplete; ODF stays deferred until that goal completes, with iWork excluded.
+
 ## 0529: progress through measured rejection and reusable instrumentation
 
 [0529](changes/0529-xml-attribute-probe-pilot.md) rejects the zero/one-attribute probe after native gates fail, retaining publication counters, four public regression tests and all evidence. OLE2/OOXML remains the active priority; ODF is deferred until that optimization goal completes and iWork stays excluded. The full goal remains incomplete.

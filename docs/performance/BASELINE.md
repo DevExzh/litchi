@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0530: four source-bound planning profiles
+
+[0530](changes/0530-xlsx-planning-attribution.md) isolates edit_sheets with raw caller proof: three lifecycle dumps, one measured call and zero-Ir termination per child. Parsing is 59.881163% and value-only validation 37.589929% of aggregate planning Ir; historical planning time is 31.815642% of measured lifecycle sums. These are separate scopes, not a speedup estimate.
+
 ## 0529: source-bound publication allocation and native comparison
 
 [0529](changes/0529-xml-attribute-probe-pilot.md) retains 2,440 native durations and 40 publication allocation samples, plus 40 separate commit diagnostics, under identical harness builds. Allocation calls drop 97.8489–98.8695% in the rejected candidate, but total mean fails the 2% gate in every pair. Conditional profiles/hardware/eager remain unmeasured.
