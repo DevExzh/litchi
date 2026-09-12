@@ -3,6 +3,7 @@
 use super::{
     Body, Declaration, Group, Kind, Part, Scope, ValueType, parse_parts, remove_xml, set_xml,
 };
+use litchi_core::Error;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -55,4 +56,15 @@ fn model_keeps_sequence_ergonomics() {
         separation_character: None,
     };
     assert_eq!(declaration.effective_separation_character(), Some('.'));
+}
+
+#[test]
+fn group_limit_accepts_exact_output_and_rejects_one_byte_under() {
+    let group = simple("counter");
+    let expected = group.to_xml().unwrap();
+    assert_eq!(group.to_xml_with_limit(expected.len()).unwrap(), expected);
+    assert!(matches!(
+        group.to_xml_with_limit(expected.len() - 1),
+        Err(Error::ResourceLimit(_))
+    ));
 }

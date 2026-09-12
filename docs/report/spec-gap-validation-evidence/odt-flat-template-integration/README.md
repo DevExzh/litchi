@@ -1,0 +1,7 @@
+# ODT flat-template integration
+
+This batch adds flat text-template recognition and authoring through generic and specialized flat-document APIs. Execution-context paths precharge input and temporary/retained buffers, bound work/depth, and preserve source bytes for no-ops. Atomic publication checks cancellation before publication and reports post-publication failures according to the committed-state contract. Auxiliary XML owners and generic metadata routes compare decoded namespace URIs while retaining lexical source markup.
+
+Independent resource and final namespace-integration reviews approved the captured scope. Root isolated validation passed 1,586 ODT/common tests across 86 targets, with one ignored test, strict all-target Clippy, and warning-denied rustdoc. Exact source hashes, commands, exits, compressed logs and the resolved lockfile are retained. Validation used a dedicated target, TMPDIR=/var/tmp, and no inherited warning suppressions.
+
+The namespace helper and its tests were already committed in 452131aa5. They are included in the capture as dependencies, not restaged here. Subsequent shared namespace-reader adapter changes are not part of this revision. In particular, escaped reserved xml-prefix declarations can still be rejected by NsReader before semantic comparison; that separate admission fix remains open. Legacy consumers outside the captured paths are not covered by this namespace migration. No allocator-portability, full XML acceptance, or runtime speedup claim is made.

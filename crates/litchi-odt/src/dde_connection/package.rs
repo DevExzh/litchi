@@ -1,12 +1,19 @@
 //! Package-wide aggregation for ODF DDE metadata.
 
 use super::{MAX_XML_BYTES, codec, model::Connections};
+use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Part, Scope};
 use litchi_core::Result;
 use std::collections::HashSet;
 
 /// Parse all supplied ODF XML parts and validate cross-part DDE references.
-pub(crate) fn parse_dde_connection_parts(parts: &[(&str, Part)]) -> Result<Connections> {
+pub(crate) fn parse_dde_connection_parts_with_budget(
+    parts: &[(&str, Part)],
+    budget: Option<&FlatMutationBudget>,
+) -> Result<Connections> {
+    if let Some(budget) = budget {
+        budget.check()?;
+    }
     let total = parts.iter().try_fold(0usize, |total, (xml, _)| {
         total
             .checked_add(xml.len())
@@ -28,9 +35,14 @@ pub(crate) fn parse_dde_connection_parts(parts: &[(&str, Part)]) -> Result<Conne
             &mut names,
             &mut containers,
             &mut aggregate,
+            budget,
         )?;
     }
     for usage in &parsed.uses {
+        if let Some(budget) = budget {
+            budget.check()?;
+            budget.consume_objects(1)?;
+        }
         if !names.contains(&usage.connection_name) {
             return codec::invalid(format!(
                 "DDE connection '{}' is used without a declaration",

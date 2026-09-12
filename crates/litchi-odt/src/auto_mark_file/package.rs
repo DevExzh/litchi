@@ -3,13 +3,25 @@
 use super::codec::parse_part;
 use super::model::AlphabeticalIndexAutoMarkFile;
 use super::{MAX_XML_BYTES, make_error};
+use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Part, Scope};
 use litchi_core::Result;
 use std::collections::HashSet;
 
+#[cfg(test)]
 pub(crate) fn parse_auto_mark_file_parts(
     parts: &[(&str, Part)],
 ) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
+    parse_auto_mark_file_parts_with_budget(parts, None)
+}
+
+pub(crate) fn parse_auto_mark_file_parts_with_budget(
+    parts: &[(&str, Part)],
+    budget: Option<&FlatMutationBudget>,
+) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
+    if let Some(budget) = budget {
+        budget.check()?;
+    }
     let total = parts.iter().try_fold(0usize, |total, (xml, _)| {
         total
             .checked_add(xml.len())
@@ -23,7 +35,14 @@ pub(crate) fn parse_auto_mark_file_parts(
     let mut scopes = HashSet::<(Part, Scope)>::new();
     let mut aggregate = 0usize;
     for (xml, part) in parts {
-        parse_part(xml, *part, &mut references, &mut scopes, &mut aggregate)?;
+        parse_part(
+            xml,
+            *part,
+            &mut references,
+            &mut scopes,
+            &mut aggregate,
+            budget,
+        )?;
     }
     Ok(references)
 }

@@ -43,12 +43,17 @@ pub struct Package {
 /// Validated flat `OpenDocument` XML file.
 ///
 /// Flat documents combine content, styles, settings, and metadata under one
-/// `office:document` root and are conventionally stored as `.fodt`, `.fods`,
-/// `.fodp`, `.fodg`, `.fodc`, or `.fodi`. The `.fodf` extension is also
-/// accepted for compatibility with odfdo's non-standard `office:formula`
-/// convention; conforming packaged `.odf` formulas use a direct `MathML` root.
+/// `office:document` root and are conventionally stored as `.fodt`, `.fott`,
+/// `.fods`, `.fodp`, `.fodg`, `.fodc`, or `.fodi`. The `.fodf` extension is
+/// also accepted for compatibility with odfdo's non-standard
+/// `office:formula` convention; conforming packaged `.odf` formulas use a
+/// direct `MathML` root.
 pub struct FlatDocument {
     pub(super) xml: String,
     pub(super) family: Family,
+    pub(super) template: bool,
     pub(super) mimetype: String,
+    pub(super) max_document_bytes: usize,
+    pub(super) execution_context: litchi_core::ExecutionContext,
+    pub(super) source_memory: super::flat::MemoryLease,
 }

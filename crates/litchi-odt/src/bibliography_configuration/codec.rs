@@ -5,11 +5,12 @@ use super::{
     FO, MAX_AGGREGATE_BYTES, MAX_DEPTH, MAX_SORT_KEYS, MAX_VALUE_BYTES, MAX_XML_BYTES, OFFICE,
     STYLE, TEXT,
 };
+use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::Part;
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 use std::collections::HashMap;
 
@@ -122,12 +123,23 @@ struct ActiveConfiguration {
 type Attributes = HashMap<(String, String), String>;
 
 pub(crate) fn parse_bibliography_configuration(xml: &str) -> Result<Option<Configuration>> {
-    parse_bibliography_configuration_parts(&[(xml, Part::Styles)])
+    parse_bibliography_configuration_parts_with_budget(&[(xml, Part::Styles)], None)
 }
 
+#[cfg(test)]
 pub(crate) fn parse_bibliography_configuration_parts(
     parts: &[(&str, Part)],
 ) -> Result<Option<Configuration>> {
+    parse_bibliography_configuration_parts_with_budget(parts, None)
+}
+
+pub(crate) fn parse_bibliography_configuration_parts_with_budget(
+    parts: &[(&str, Part)],
+    budget: Option<&FlatMutationBudget>,
+) -> Result<Option<Configuration>> {
+    if let Some(budget) = budget {
+        budget.check()?;
+    }
     if !parts
         .iter()
         .any(|(xml, _)| xml.contains("bibliography-configuration"))
@@ -146,7 +158,7 @@ pub(crate) fn parse_bibliography_configuration_parts(
     let mut result = None;
     let mut aggregate = 0usize;
     for (xml, part) in parts {
-        parse_part(xml, *part, &mut result, &mut aggregate)?;
+        parse_part(xml, *part, &mut result, &mut aggregate, budget)?;
     }
     Ok(result)
 }
@@ -156,6 +168,7 @@ fn parse_part(
     part: Part,
     result: &mut Option<Configuration>,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
@@ -166,6 +179,10 @@ fn parse_part(
     let mut pending_sort_key: Option<usize> = None;
 
     loop {
+        if let Some(budget) = budget {
+            budget.event(depth)?;
+        }
+        let decoder = reader.decoder();
         let (namespace, event) =
             reader
                 .read_resolved_event_into(&mut buffer)
@@ -177,7 +194,7 @@ fn parse_part(
                 if pending_sort_key.is_some() {
                     return invalid("text:sort-key cannot contain elements");
                 }
-                let namespace = namespace_uri(&namespace)?;
+                let namespace = namespace_uri(&namespace, decoder)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if let Some(configuration) = active.as_mut() {
@@ -189,7 +206,7 @@ fn parse_part(
                             "bibliography configuration may contain only text:sort-key elements",
                         );
                     }
-                    add_sort_key(&reader, element, configuration, aggregate)?;
+                    add_sort_key(&reader, element, configuration, aggregate, budget)?;
                     pending_sort_key = Some(depth + 1);
                 } else if namespace.as_deref() == Some(TEXT)
                     && local == "bibliography-configuration"
@@ -203,12 +220,22 @@ fn parse_part(
                         result,
                         aggregate,
                         &mut active,
+                        budget,
                     )?;
                 }
+                stack
+                    .try_reserve_exact(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT bibliography parser frame stack",
+                        source,
+                    })?;
                 stack.push(Frame { namespace, local });
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| make_error("bibliography configuration depth overflow"))?;
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth)?;
+                }
                 if depth > MAX_DEPTH {
                     return invalid(format!(
                         "bibliography configuration exceeds {MAX_DEPTH} XML levels"
@@ -216,10 +243,13 @@ fn parse_part(
                 }
             },
             Event::Empty(ref element) => {
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth.saturating_add(1))?;
+                }
                 if pending_sort_key.is_some() {
                     return invalid("text:sort-key cannot contain elements");
                 }
-                let namespace = namespace_uri(&namespace)?;
+                let namespace = namespace_uri(&namespace, decoder)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if let Some(configuration) = active.as_mut() {
@@ -231,7 +261,7 @@ fn parse_part(
                             "bibliography configuration may contain only text:sort-key elements",
                         );
                     }
-                    add_sort_key(&reader, element, configuration, aggregate)?;
+                    add_sort_key(&reader, element, configuration, aggregate, budget)?;
                 } else if namespace.as_deref() == Some(TEXT)
                     && local == "bibliography-configuration"
                 {
@@ -245,6 +275,7 @@ fn parse_part(
                         result,
                         aggregate,
                         &mut temporary,
+                        budget,
                     )?;
                     let configuration = temporary
                         .ok_or_else(|| make_error("missing bibliography configuration"))?
@@ -341,6 +372,7 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
     let mut styles_site = None;
 
     loop {
+        let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|source| {
@@ -348,7 +380,7 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
                     "invalid bibliography configuration XML while locating mutation site: {source}"
                 ))
             })?;
-        let namespace = namespace_uri(&resolved)?;
+        let namespace = namespace_uri(&resolved, decoder)?;
         match event {
             Event::Start(ref element) => {
                 let end = reader.buffer_position() as usize;
@@ -501,6 +533,7 @@ fn start_configuration(
     result: &Option<Configuration>,
     aggregate: &mut usize,
     active: &mut Option<ActiveConfiguration>,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
     if result.is_some() {
         return invalid("duplicate document bibliography configuration");
@@ -514,7 +547,7 @@ fn start_configuration(
     if parent.namespace.as_deref() != Some(OFFICE) || parent.local != "styles" {
         return invalid("bibliography configuration must be a direct office:styles child");
     }
-    let attributes = collect_attributes(reader, element, aggregate)?;
+    let attributes = collect_attributes(reader, element, aggregate, budget)?;
     reject_unexpected(
         &attributes,
         &[
@@ -557,13 +590,14 @@ fn add_sort_key(
     element: &BytesStart<'_>,
     configuration: &mut ActiveConfiguration,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
     if configuration.value.sort_keys.len() >= MAX_SORT_KEYS {
         return invalid(format!(
             "bibliography configuration exceeds {MAX_SORT_KEYS} sort keys"
         ));
     }
-    let attributes = collect_attributes(reader, element, aggregate)?;
+    let attributes = collect_attributes(reader, element, aggregate, budget)?;
     reject_unexpected(&attributes, &[(TEXT, "key"), (TEXT, "sort-ascending")])?;
     let field = Field::parse(
         get(&attributes, TEXT, "key")
@@ -572,6 +606,18 @@ fn add_sort_key(
     let ascending = get(&attributes, TEXT, "sort-ascending")
         .map(parse_bool)
         .transpose()?;
+    if let Some(budget) = budget {
+        budget.check()?;
+        budget.consume_objects(1)?;
+    }
+    configuration
+        .value
+        .sort_keys
+        .try_reserve_exact(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT bibliography sort keys",
+            source,
+        })?;
     configuration
         .value
         .sort_keys
@@ -583,16 +629,23 @@ fn collect_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<Attributes> {
     let mut attributes = HashMap::new();
     for attribute in element.attributes().with_checks(true) {
+        if let Some(budget) = budget {
+            budget.check()?;
+        }
         let attribute = attribute.map_err(|source| {
             make_error(format!(
                 "invalid bibliography configuration attribute: {source}"
             ))
         })?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace = namespace_uri(&namespace)?.unwrap_or_default();
+        let namespace = namespace_uri(&namespace, reader.decoder())?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
@@ -611,6 +664,12 @@ fn collect_attributes(
         if *aggregate > MAX_AGGREGATE_BYTES {
             return invalid("bibliography configuration metadata exceeds 4 MiB");
         }
+        attributes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODT bibliography attribute map",
+                source,
+            })?;
         if attributes.insert((namespace, local), value).is_some() {
             return invalid("duplicate expanded bibliography configuration attribute");
         }
@@ -657,15 +716,12 @@ fn reject_spoofed_name(namespace: Option<&str>, local: &str) -> Result<()> {
     Ok(())
 }
 
-fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
-    match result {
-        ResolveResult::Bound(Namespace(value)) => Ok(Some(decode(value, "namespace URI")?)),
-        ResolveResult::Unbound => Ok(None),
-        ResolveResult::Unknown(prefix) => invalid(format!(
-            "unbound namespace prefix '{}'",
-            String::from_utf8_lossy(prefix)
-        )),
-    }
+fn namespace_uri(
+    result: &ResolveResult<'_>,
+    decoder: quick_xml::Decoder,
+) -> Result<Option<String>> {
+    crate::namespace::resolved_namespace_uri(result, decoder, "bibliography configuration")
+        .map(|namespace| namespace.map(|uri| uri.into_owned()))
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {
@@ -680,4 +736,20 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 
 fn make_error(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+#[cfg(test)]
+mod namespace_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_entity_escaped_odf_namespace_uris() {
+        let xml = r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office&#58;1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text&#58;1.0" xmlns:f="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible&#58;1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:style&#58;1.0"><o:styles><t:bibliography-configuration t:prefix="["/></o:styles><o:automatic-styles/><o:master-styles/></o:document-styles>"#;
+        let configuration =
+            parse_bibliography_configuration_parts_with_budget(&[(xml, Part::Styles)], None)
+                .expect("entity-escaped ODF namespace URIs should resolve semantically")
+                .expect("bibliography configuration should be discovered");
+
+        assert_eq!(configuration.prefix.as_deref(), Some("["));
+    }
 }
