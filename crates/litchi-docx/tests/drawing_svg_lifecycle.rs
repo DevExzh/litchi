@@ -10,7 +10,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
     SourceVersion,
 };
-use litchi_docx::drawing::DrawingPlacement;
+use litchi_docx::drawing::{DrawingPlacement, SourceDrawing};
 use litchi_docx::source_backed::{
     self, PictureSelector, StorySelector, SvgInput, SvgPictureOwnerState,
 };
@@ -1474,4 +1474,224 @@ fn source_picture_inventory_reads_svg_only_on_explicit_data_request() {
     assert_eq!(pictures[0].svg().unwrap().data().unwrap().as_bytes(), svg);
     assert!(observed.unrelated_reads() > 0);
     assert_eq!(observed.selected_reads(), 0);
+}
+
+#[test]
+fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit() {
+    let opaque = r#"<a:ext uri="urn:future-picture" xmlns:future="urn:future-picture" future:flag="keep"><!--opaque sibling--><future:payload keep="yes"/></a:ext>"#;
+    let pictures = format!(
+        "{}{}",
+        picture("inline", "1", "rIdRaster0", opaque),
+        picture("anchor", "2", "rIdRaster1", opaque),
+    );
+    let source = package_with_two_rasters(document(&pictures, "reverse-order"));
+    let package = open(&source);
+    let mut edit = package
+        .edit_svg_attachments([1usize, 0usize])
+        .expect("select pictures in reverse source order");
+    let first_payload =
+        br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="reverse-first"/></svg>"#;
+    let second_payload =
+        br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="reverse-second"/></svg>"#;
+
+    assert!(
+        edit.attach_svg(1, SvgInput::borrowed(first_payload))
+            .unwrap()
+    );
+    let projected_after_first = edit.projected().story_xml().unwrap().to_vec();
+    let scanned_first = SourceDrawing::scan(&projected_after_first).unwrap();
+    assert_eq!(scanned_first.pictures().len(), 2);
+    assert!(
+        scanned_first
+            .picture(0)
+            .unwrap()
+            .svg_owner()
+            .owner()
+            .is_none()
+    );
+    assert!(
+        scanned_first
+            .picture(1)
+            .unwrap()
+            .svg_owner()
+            .owner()
+            .is_some()
+    );
+    assert_eq!(
+        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        first_payload
+    );
+    assert!(edit.projected().picture(0).unwrap().svg().is_none());
+    assert_eq!(
+        projected_after_first
+            .windows(opaque.len())
+            .filter(|window| *window == opaque.as_bytes())
+            .count(),
+        2,
+        "the first projection must preserve both opaque extension siblings"
+    );
+
+    assert!(
+        edit.attach_svg(1, SvgInput::borrowed(second_payload))
+            .is_err(),
+        "a picture may be staged at most once in one batch"
+    );
+    assert_eq!(
+        edit.projected().story_xml().unwrap(),
+        projected_after_first.as_slice(),
+        "a rejected same-picture operation must leave the projection unchanged"
+    );
+
+    assert!(
+        edit.attach_svg(0, SvgInput::borrowed(second_payload))
+            .unwrap()
+    );
+    let projected_final = edit.projected().story_xml().unwrap().to_vec();
+    let scanned_final = SourceDrawing::scan(&projected_final).unwrap();
+    assert_eq!(scanned_final.pictures().len(), 2);
+    assert!(
+        scanned_final
+            .pictures()
+            .iter()
+            .all(|picture| picture.svg_owner().owner().is_some())
+    );
+    assert_eq!(
+        edit.projected().picture(0).unwrap().svg().unwrap().bytes(),
+        second_payload
+    );
+    assert_eq!(
+        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        first_payload
+    );
+    assert_eq!(
+        projected_final
+            .windows(opaque.len())
+            .filter(|window| *window == opaque.as_bytes())
+            .count(),
+        2,
+        "the final projection must retain both namespace-bound opaque siblings"
+    );
+
+    let commit = edit.commit().expect("commit reverse-order batch");
+    assert_eq!(commit.diagnostics().operations(), 2);
+    assert_eq!(commit.diagnostics().selected_pictures(), 2);
+    assert_eq!(
+        commit.snapshot().story_xml().unwrap(),
+        projected_final.as_slice(),
+        "commit must retain the exact projection produced after each staged step"
+    );
+
+    let mut output = Vec::new();
+    package
+        .publish_svg_attachment_batch_commit_to_stream(&mut output, &commit)
+        .expect("publish reverse-order batch");
+    assert_eq!(part_bytes(&output, "/word/document.xml"), projected_final);
+    let views = open(&output).svg_pictures(StorySelector::Main).unwrap();
+    assert_eq!(views.len(), 2);
+    assert_eq!(views[0].svg().unwrap().bytes(), second_payload);
+    assert_eq!(views[1].svg().unwrap().bytes(), first_payload);
+    let output_document = part_bytes(&output, "/word/document.xml");
+    assert!(
+        output_document
+            .windows(b"xmlns:future=\"urn:future-picture\"".len())
+            .any(|window| window == b"xmlns:future=\"urn:future-picture\""),
+        "the generated document must retain the opaque namespace declaration"
+    );
+}
+
+#[test]
+fn batch_failed_aggregate_admission_leaves_projection_unchanged() {
+    let opaque = r#"<a:ext uri="urn:aggregate-future" xmlns:future="urn:aggregate-future"><future:payload/></a:ext>"#;
+    let pictures = format!(
+        "{}{}",
+        picture("inline", "1", "rIdRaster0", opaque),
+        picture("anchor", "2", "rIdRaster1", opaque),
+    );
+    let source = package_with_two_rasters(document(&pictures, "aggregate-failure"));
+    let limits = ReadLimits::builder()
+        .max_total_relationships(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    let package = source_backed::Package::from_reader_with_limits(Cursor::new(source), limits)
+        .expect("open source within aggregate relationship limit");
+    let mut edit = package.edit_svg_attachments([1usize, 0usize]).unwrap();
+    let first_payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="admitted"/></svg>"#;
+    let rejected_payload =
+        br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="rejected"/></svg>"#;
+
+    assert!(
+        edit.attach_svg(1, SvgInput::borrowed(first_payload))
+            .unwrap()
+    );
+    let projected_before_rejection = edit.projected().story_xml().unwrap().to_vec();
+    assert!(
+        edit.attach_svg(0, SvgInput::borrowed(rejected_payload))
+            .is_err(),
+        "aggregate admission must reject the second attachment"
+    );
+    assert_eq!(
+        edit.projected().story_xml().unwrap(),
+        projected_before_rejection.as_slice(),
+        "failed aggregate admission must leave the existing projection unchanged"
+    );
+    assert!(edit.projected().picture(0).unwrap().svg().is_none());
+    assert_eq!(
+        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        first_payload
+    );
+    assert!(
+        projected_before_rejection
+            .windows(opaque.len())
+            .any(|window| window == opaque.as_bytes())
+    );
+
+    let commit = edit
+        .commit()
+        .expect("the admitted operation must remain committable");
+    assert_eq!(commit.diagnostics().operations(), 1);
+    assert_eq!(commit.diagnostics().selected_pictures(), 2);
+}
+
+#[test]
+fn batch_source_stale_between_operations_refuses_commit() {
+    let pictures = format!(
+        "{}{}",
+        picture("inline", "1", "rIdRaster0", ""),
+        picture("anchor", "2", "rIdRaster1", ""),
+    );
+    let source_bytes = package_with_two_rasters(document(&pictures, "stale-between-operations"));
+    let source = MutableArchiveSource::new(source_bytes.clone());
+    let source_handle = source.clone();
+    let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
+    let mut edit = package.edit_svg_attachments([1usize, 0usize]).unwrap();
+    assert!(
+        edit.attach_svg(
+            1,
+            SvgInput::borrowed(
+                br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="before-stale"/></svg>"#
+            )
+        )
+        .unwrap()
+    );
+    let projected_before_stale = edit.projected().story_xml().unwrap().to_vec();
+
+    source_handle.replace_and_bump(source_bytes);
+    let second_result = edit.attach_svg(
+        0,
+        SvgInput::borrowed(
+            br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="after-stale"/></svg>"#,
+        ),
+    );
+    if second_result.is_err() {
+        assert_eq!(
+            edit.projected().story_xml().unwrap(),
+            projected_before_stale.as_slice(),
+            "an immediately rejected stale operation must preserve the prior projection"
+        );
+    }
+    assert!(
+        edit.commit().is_err(),
+        "a source revision change between staged operations must refuse publication"
+    );
 }
