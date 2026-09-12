@@ -1,0 +1,12 @@
+{
+  "observed_utc": "2026-09-12T18:48:55.250024+00:00",
+  "plan_sha256": "06299b4b64b2956103ff7f8fba6ddbe788d3bbc1c694ec4af7f304302270a6f4",
+  "removed": [
+    "/tmp/litchi-goal-0536",
+    "/home/zhuhe/litchi-goal-0536-target"
+  ],
+  "accessible_process_references": [],
+  "owned_paths_absent": true,
+  "python_cache_absent": true,
+  "scope": "Accessible process cwd/exe, arguments, mappings, and file descriptors checked before removal."
+}

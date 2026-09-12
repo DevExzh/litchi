@@ -1,0 +1,30 @@
+
+/tmp/litchi-goal-0536/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f29950 <_ZN10litchi_cfb4file18SectorChainScratch17chain_error_empty17h8aa0ce82c553a165E>:
+ 2f29950:	53                   	push   %rbx
+ 2f29951:	48 83 ec 20          	sub    $0x20,%rsp
+ 2f29955:	48 89 fb             	mov    %rdi,%rbx
+ 2f29958:	48 89 34 24          	mov    %rsi,(%rsp)
+ 2f2995c:	48 89 54 24 08       	mov    %rdx,0x8(%rsp)
+ 2f29961:	48 89 e0             	mov    %rsp,%rax
+ 2f29964:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 2f29969:	48 8d 05 20 3f 02 00 	lea    0x23f20(%rip),%rax        # 2f4d890 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f29970:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f29975:	48 83 c7 08          	add    $0x8,%rdi
+ 2f29979:	48 8d 35 93 a4 1c fd 	lea    -0x2e35b6d(%rip),%rsi        # f3e13 <anon.e0572dd12dce1d6d78420bf0a335603a.2.llvm.17154920839617733857+0xb4>
+ 2f29980:	48 8d 54 24 10       	lea    0x10(%rsp),%rdx
+ 2f29985:	ff 15 15 af 19 00    	call   *0x19af15(%rip)        # 30c48a0 <_DYNAMIC+0x608>
+ 2f2998b:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f29992:	48 83 c4 20          	add    $0x20,%rsp
+ 2f29996:	5b                   	pop    %rbx
+ 2f29997:	c3                   	ret
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "module": "analyze_profiles",
+      "external_exact_replay": "pass",
+      "nonidentical_overwrite_refused": true,
+      "sealed_internal_creation_refused": true
+    },
+    {
+      "module": "instruction_analysis",
+      "external_exact_replay": "pass",
+      "nonidentical_overwrite_refused": true,
+      "sealed_internal_creation_refused": true
+    }
+  ]
+}

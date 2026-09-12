@@ -1,0 +1,41 @@
+{
+  "observed_utc": "2026-09-12T18:38:44.764079+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3977455,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3978814,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3979027,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3979491,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229"
+    },
+    {
+      "pid": 3979496,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/num-bigint-dig-0.8.6"
+    },
+    {
+      "pid": 3979504,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/der-0.7.10"
+    },
+    {
+      "pid": 3979511,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps/crates/soapberry-zip"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

@@ -1,0 +1,39 @@
+{
+  "checks": [
+    {
+      "name": "omitted-host-artifact",
+      "observed_refusal": "omitted-host-artifact raw artifact inventory differs",
+      "status": "pass"
+    },
+    {
+      "name": "forged-raw-vector-hash",
+      "observed_refusal": "forged-raw-vector-hash raw artifact custody differs: native-r1-xls.json",
+      "status": "pass"
+    },
+    {
+      "name": "unexpected-extra-artifact",
+      "observed_refusal": "unexpected-extra-artifact raw artifact inventory differs",
+      "status": "pass"
+    },
+    {
+      "name": "overlapping-capture-intervals",
+      "observed_refusal": "probe receipt intervals overlap",
+      "status": "pass"
+    },
+    {
+      "name": "silently-narrowed-primary-gate",
+      "observed_refusal": "review plan differs",
+      "status": "pass"
+    }
+  ],
+  "collector_gate_rows": 4,
+  "constructor_gate_rows": 2,
+  "instruction_reports": 2,
+  "optional_quality_intervals": 14,
+  "quality_checks": 14,
+  "quality_executed_tests": 4382,
+  "receipt_inventory": 96,
+  "scope": "In-memory receipt/plan probes plus constructor/collector-Ir, quality, inventory and ABBA positive controls; no Rust execution or evidence writes.",
+  "serial_intervals": 96,
+  "status": "pass"
+}

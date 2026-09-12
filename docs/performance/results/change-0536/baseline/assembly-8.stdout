@@ -1,0 +1,32 @@
+
+/tmp/litchi-goal-0536/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000001fd35e0 <_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17hf57b5842bcd2d7fdE>:
+ 1fd35e0:	53                   	push   %rbx
+ 1fd35e1:	48 89 fb             	mov    %rdi,%rbx
+ 1fd35e4:	48 8b 37             	mov    (%rdi),%rsi
+ 1fd35e7:	48 85 f6             	test   %rsi,%rsi
+ 1fd35ea:	74 13                	je     1fd35ff <_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17hf57b5842bcd2d7fdE+0x1f>
+ 1fd35ec:	48 8b 7b 08          	mov    0x8(%rbx),%rdi
+ 1fd35f0:	48 c1 e6 02          	shl    $0x2,%rsi
+ 1fd35f4:	ba 04 00 00 00       	mov    $0x4,%edx
+ 1fd35f9:	ff 15 81 0b 0f 01    	call   *0x10f0b81(%rip)        # 30c4180 <_DYNAMIC+0x248>
+ 1fd35ff:	48 8b 73 18          	mov    0x18(%rbx),%rsi
+ 1fd3603:	48 85 f6             	test   %rsi,%rsi
+ 1fd3606:	74 14                	je     1fd361c <_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17hf57b5842bcd2d7fdE+0x3c>
+ 1fd3608:	48 8b 7b 20          	mov    0x20(%rbx),%rdi
+ 1fd360c:	48 c1 e6 03          	shl    $0x3,%rsi
+ 1fd3610:	ba 08 00 00 00       	mov    $0x8,%edx
+ 1fd3615:	5b                   	pop    %rbx
+ 1fd3616:	ff 25 64 0b 0f 01    	jmp    *0x10f0b64(%rip)        # 30c4180 <_DYNAMIC+0x248>
+ 1fd361c:	5b                   	pop    %rbx
+ 1fd361d:	c3                   	ret
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

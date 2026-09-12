@@ -1,0 +1,9 @@
+{
+  "created_utc": "2026-09-12T18:14:19.379563+00:00",
+  "files": {
+    "candidate.patch": "29f96e9a19d8eb34508b84a84d1ac535bc970ace3e91d78f41d9a791ec05d9ec",
+    "checks.py": "6490587a7f4ea98205251d98c76cd5691869d5e7a74c70828fec51b74245478d"
+  },
+  "reviewed_preformat_patch_sha256": "7e3cb8011f97a945692dff7b6f2f10a50782e802f160f3d4d0cb9fac53a79585",
+  "formatting": "root rustfmt edition2024 applied beforecandidatefreeze; finaldiffreviewrequired"
+}

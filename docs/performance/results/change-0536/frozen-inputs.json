@@ -1,0 +1,11 @@
+{
+  "created_utc": "2026-09-12T18:03:32.783952+00:00",
+  "files": {
+    "plan.json": "06299b4b64b2956103ff7f8fba6ddbe788d3bbc1c694ec4af7f304302270a6f4",
+    "run.py": "23393f226d91f08c5682127380eb4eedba28f6598f4c3de3b9918dca58befa2b",
+    "capture_baseline.py": "a938feab48f1947da395360836e896716f2b25f6690fc57cd59d958ea80e8481",
+    "capture_candidate.py": "c3296952d479d2937c9a19a76a90d20c5d7a17fc258a48012f82d73f24baaf5d",
+    "inspect_assembly.py": "56fa593cfbb2763d9adc5384890e26e949c9d1b5120693d582f3fd3641fc916b",
+    "adr-manifest.json": "8aed97d378425650f3b355a3bd0ec5d2eb8000b9d28ba2a900cd8f35585e541f"
+  }
+}

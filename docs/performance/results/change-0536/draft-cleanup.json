@@ -1,0 +1,9 @@
+{
+  "path": "/home/zhuhe/litchi-0536-candidate-draft",
+  "removed": true,
+  "files_sha256": {
+    "formatted.rs": "aecd26eab6d1c3b3e79cb7dfbac9e4e60b4f1bae7272bedbd9a54f0c44052532",
+    "file.rs": "13c50d0797f730fc885fd507b6cac7bc2a5b9c37b021e2516ff34113ec07a872"
+  },
+  "scope": "Only coder-owned draft copies; active measurements use separate frozen campaign paths"
+}

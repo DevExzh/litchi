@@ -1,0 +1,11 @@
+==3925788== Callgrind, a call-graph generating cache profiler
+==3925788== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==3925788== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==3925788== Command: /tmp/litchi-goal-0536/candidate/normal --case cfb_open --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0536/candidate/profile-r1-cfb-many-small.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0536/candidate/profile-r1-cfb-many-small.catalog.json --shape many-small --payload incompressible
+==3925788== 
+==3925788== For interactive control, run 'callgrind_control -h'.
+==3925788== 
+==3925788== Events    : Ir
+==3925788== Collected : 16771393
+==3925788== 
+==3925788== I   refs:      16,771,393

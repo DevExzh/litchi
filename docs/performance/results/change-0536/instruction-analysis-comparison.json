@@ -1,0 +1,71 @@
+{
+  "job_matrix": [
+    "profile-r1-cfb-few-large",
+    "profile-r1-cfb-many-small",
+    "profile-r1-cfb-tiny",
+    "profile-r1-xls-owned",
+    "profile-r2-cfb-few-large",
+    "profile-r2-cfb-many-small",
+    "profile-r2-cfb-tiny",
+    "profile-r2-xls-owned"
+  ],
+  "performance_claim": null,
+  "plan_sha256": "06299b4b64b2956103ff7f8fba6ddbe788d3bbc1c694ec4af7f304302270a6f4",
+  "schema": "litchi-ole2-change-0536-instruction-comparison-v1",
+  "scope": "Matched stage instruction mapping for collect_exact and optional chain_error helper code shape; Ir and call metadata remain diagnostic",
+  "stages": {
+    "baseline": {
+      "assembly": {
+        "chain_error_rows": 0,
+        "chain_error_symbols": [],
+        "collector_instruction_count": 313,
+        "collector_rows": 1,
+        "collector_symbols": [
+          "_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E"
+        ],
+        "insert_rows": 1,
+        "insert_symbols": [
+          "_ZN10litchi_cfb4file13CheckedBitSet6insert17hd0819a41161dc860E"
+        ],
+        "rows": 9
+      },
+      "binary_sha256": "9989ed63418b17fef7f0d73bf87af2c20e070864679478a68fedeabb254a4b5a",
+      "report_stage": "baseline",
+      "source_manifest_sha256": "9d6a53738f299107582b71e5ddab03922b9646771df4d77b639b3fdc7fd6ff75"
+    },
+    "candidate": {
+      "assembly": {
+        "chain_error_rows": 8,
+        "chain_error_symbols": [
+          "_ZN10litchi_cfb4file18SectorChainScratch17chain_error_cycle17h80c62f088f0e9e7bE",
+          "_ZN10litchi_cfb4file18SectorChainScratch17chain_error_empty17h8aa0ce82c553a165E",
+          "_ZN10litchi_cfb4file18SectorChainScratch17chain_error_index17hb07d082958ce4b0bE",
+          "_ZN10litchi_cfb4file18SectorChainScratch18chain_error_length17h8a5db7b2b81047b0E",
+          "_ZN10litchi_cfb4file18SectorChainScratch18chain_error_marker17h3f6a856726f4741cE",
+          "_ZN10litchi_cfb4file18SectorChainScratch19chain_error_exceeds17h8b9009c3f6284d58E",
+          "_ZN10litchi_cfb4file18SectorChainScratch21chain_error_early_end17he26263f0f83f8fffE",
+          "_ZN10litchi_cfb4file18SectorChainScratch25chain_error_invalid_start17ha173b4d64089c69bE"
+        ],
+        "collector_instruction_count": 277,
+        "collector_rows": 1,
+        "collector_symbols": [
+          "_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E"
+        ],
+        "insert_rows": 1,
+        "insert_symbols": [
+          "_ZN10litchi_cfb4file13CheckedBitSet6insert17hd0819a41161dc860E"
+        ],
+        "rows": 17
+      },
+      "binary_sha256": "b0fafc61ea1c24bcb850d9824e2962daa4fa7d1081530aee787daf945cba1d6b",
+      "report_stage": "candidate",
+      "source_manifest_sha256": "2f2f96fa4168e44b459167fbf5a85bea20beb25f3d6af62e157ec0e89573a40f"
+    }
+  },
+  "validation": {
+    "dynamic_chain_error_symbols_retained": true,
+    "matched_job_matrix": true,
+    "no_static_instruction_latency_claim": true,
+    "stage_reports_valid": true
+  }
+}

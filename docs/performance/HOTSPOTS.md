@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## 0536: reject collector cold-error helpers after matched measurement
+
+[0536](changes/0536-cfb-collector-cold-error-layout-rejected.md) restores the
+baseline runtime after testing eight private CFB diagnostic helpers. All eight
+primary XLS p50 comparisons improve, but only four reach the frozen 3% gate;
+XLS constructor inclusive Ir also increases slightly in both repeats. The
+collector shrinks from 1,436 to 1,238 bytes while self Ir changes by less than
+0.005%. No runtime optimization or speedup is retained.
+
+All 24 allocation pairs retain identical allocation-call, reallocation-call,
+allocated-byte and incremental-peak vectors. Evidence retains 48,000 native
+and 1,440 allocator samples, 80 timed and 12 setup profile dumps, 32 matched
+adverse flags and 60 same-build variations. Candidate and restored-final
+quality each pass 14 gates and 4,382 test executions (8,764 new executions).
+All 96 receipts pass serial/ABBA verification. Full postcleanup replay passes,
+owned temporary files are removed, and the evidence is sealed. OLE2/OOXML
+remains active, ODF is deferred until that goal completes, and iWork is excluded.
+
 ## 0535: CFB collector instruction attribution remains diagnostic
 
 [0535](changes/0535-cfb-collector-instruction-attribution.md) completes a

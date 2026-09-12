@@ -1,0 +1,11 @@
+{
+  "observed_utc": "2026-09-12T18:20:00.213804+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3843805,
+      "comm": "cargo",
+      "cwd": "/var/tmp/litchi-odt-flat-root-dy0eswd2/worktree"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

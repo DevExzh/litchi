@@ -1,0 +1,16 @@
+{
+  "reason": "Permit external temporary replay output after sealing; continue refusing missing outputs inside sealed evidence and non-identical overwrites",
+  "files": [
+    {
+      "file": "analyze_profiles.py",
+      "before": "5a1a3ce3d05ab1e7c7b693385181787d58304f9b8cee0b54bf9e343758425bb9",
+      "after": "5ce0d3a0c9f9246f207b9be063791cf6ccf014f6582da47562de42c7e0d364a5"
+    },
+    {
+      "file": "instruction_analysis.py",
+      "before": "39168fbe7896d36e411704afa8fcbc7e592d30d0fded19cdfbc4dc190d98d937",
+      "after": "6f3385d673076e3d687ef84e57537fe8f7157c1c1d7ccd65a63dfe84a7ac8b29"
+    }
+  ],
+  "measurement_changes": false
+}

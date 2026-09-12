@@ -1,0 +1,26 @@
+{
+  "observed_utc": "2026-09-12T18:31:44.014213+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3914999,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3915873,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3915942,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3919000,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-ods-source-root-wpza2cec/worktree/crates/litchi-ods"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

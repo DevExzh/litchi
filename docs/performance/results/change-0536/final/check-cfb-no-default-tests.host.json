@@ -1,0 +1,61 @@
+{
+  "observed_utc": "2026-09-12T18:35:44.270573+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3933049,
+      "comm": "cargo",
+      "cwd": "/var/tmp/litchi-form-leaf-root-9xq8fk9_/worktree"
+    },
+    {
+      "pid": 3936965,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-form-leaf-root-9xq8fk9_/worktree"
+    },
+    {
+      "pid": 3937303,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-form-leaf-root-9xq8fk9_/worktree"
+    },
+    {
+      "pid": 3939574,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3940555,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-0.8.56"
+    },
+    {
+      "pid": 3940748,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-2.0.114"
+    },
+    {
+      "pid": 3940751,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/syn-3.0.5"
+    },
+    {
+      "pid": 3941211,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rayon-1.12.0"
+    },
+    {
+      "pid": 3941456,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/sha2-0.11.0"
+    },
+    {
+      "pid": 3941464,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.149"
+    },
+    {
+      "pid": 3941552,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aes-gcm-0.11.1"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

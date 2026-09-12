@@ -1,0 +1,67 @@
+{
+  "disposition": "rejected",
+  "native_primary_gate": false,
+  "memory_gate": true,
+  "profile_gate": false,
+  "collector_profile_gate": true,
+  "adoption_allowed": false,
+  "constructor_ir": [
+    {
+      "repeat": 1,
+      "baseline": 11316236,
+      "candidate": 11316310,
+      "change_percent": 0.0006539276840911157
+    },
+    {
+      "repeat": 2,
+      "baseline": 11318721,
+      "candidate": 11321634,
+      "change_percent": 0.0257361233658715
+    }
+  ],
+  "collector_ir": [
+    {
+      "repeat": 1,
+      "group": "xls-owned",
+      "shape": null,
+      "baseline": 5601140,
+      "candidate": 5600880,
+      "change_percent": -0.004641912182168362
+    },
+    {
+      "repeat": 1,
+      "group": "cfb-few-large",
+      "shape": "few-large",
+      "baseline": 5571945,
+      "candidate": 5571845,
+      "change_percent": -0.0017947054394840123
+    },
+    {
+      "repeat": 2,
+      "group": "xls-owned",
+      "shape": null,
+      "baseline": 5601140,
+      "candidate": 5600880,
+      "change_percent": -0.004641912182168362
+    },
+    {
+      "repeat": 2,
+      "group": "cfb-few-large",
+      "shape": "few-large",
+      "baseline": 5571945,
+      "candidate": 5571845,
+      "change_percent": -0.0017947054394840123
+    }
+  ],
+  "adverse_review_complete": true,
+  "quality_gates": 14,
+  "other_rejection_reason": "Native primary p50 gate failed: only 4 of 8 primary rows met the frozen >=3% improvement requirement; all four cases must pass in both paired repeats.",
+  "comparison_sha256": "23be52646fe9da2d533ffc51d4e6c57eb3bb9a2b5f3696b5c7d4004c59fcfd9f",
+  "profiles_sha256": {
+    "baseline": "ed69fa8397afda220a5865427c4fb468d7cfba4c300d9fd2e6616dea2ea06b66",
+    "candidate": "44ec5ce2ea508c3c5469d8f24e30c2c6c832657b9ede098f73f06cf52ba90452"
+  },
+  "quality_summary_sha256": "b3fcec72f1b1c79113aaf76d61edbda6c5d03a4d1e3477efa9aafbcb4791b26c",
+  "adverse_review_sha256": "c99c6def51d1d64768a0c20e68df6cdb5193913cd1b36cd9dc92c7c21e37928f",
+  "scope": "Matched CFB collector cold-error-layout experiment; OLE2/OOXML active, ODF deferred, iWork excluded"
+}
