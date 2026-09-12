@@ -29,11 +29,12 @@ The retained copy contains 38 capture files,
 bytes. The exact source paths, retained paths, sizes, and SHA-256 values are
 in retention-manifest.json.
 
-The release binary remains external at the path recorded in the manifest with
-SHA-256 54463a17367957e8ee6c7a9acfcce27943ba4b480b8cc1196e3da4ae652c004f. The capture target and separate
-regression target also remain external for root byte audit. No /usr/bin/time,
+The captured release binary had SHA-256
+54463a17367957e8ee6c7a9acfcce27943ba4b480b8cc1196e3da4ae652c004f.
+Its original path and both target inventories remain in the manifest. No /usr/bin/time,
 timed lane, native PowerPoint acceptance, or speedup claim was produced.
 
-Keep the clean source worktree, raw results, diagnostics, binaries, both target
-directories, and this retained copy until root completes the Git byte audit.
-Do not reuse either target for a post-fix capture.
+Root audited all 59 raw files against Git bytes committed in `2e6140b69`,
+verified the binary hash and both target inventories, then removed the owned
+external receipts and targets (709,872,828 target bytes). The clean source
+worktree remains. A post-fix capture requires fresh targets and results.
