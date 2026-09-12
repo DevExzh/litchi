@@ -147,7 +147,10 @@ pub use package::{
     BodyTableLockCommit, BodyTableLockDiagnostics, BodyTableLockEdit, BodyTableLockError,
     BodyTableLockLimitKind, BodyTableLockPatch,
 };
-pub use package::{BodyTableMergesError, BodyTableMergesLimitKind, MergeReader};
+pub use package::{
+    BodyTableMergesCommit, BodyTableMergesDiagnostics, BodyTableMergesEdit, BodyTableMergesError,
+    BodyTableMergesLimitKind, BodyTableMergesPatch, MergeReader,
+};
 pub use package::{
     BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,
     BodyTableNameLimitKind, BodyTableNamePatch, BodyTableNamePath,
@@ -192,4 +195,5 @@ pub use selector::{BodyChartSelector, BodyTableSelector, ImageSelector};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
 pub use table::headers::Settings as BodyTableHeaderSettings;
 pub use table::lock::BodyTableLockState;
+pub use table::merge::Region;
 pub use table::name::{Error as BodyTableNameValueError, Name as BodyTableName};

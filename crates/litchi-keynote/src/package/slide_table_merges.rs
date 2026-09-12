@@ -7,8 +7,13 @@
 //! the source package.
 
 mod reader;
+mod transaction;
 
 pub use reader::MergeReader;
+pub use transaction::{
+    SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
+    SlideTableMergesPatch,
+};
 
 use std::fmt;
 
@@ -114,7 +119,7 @@ impl fmt::Display for SlideTableMergesPath {
     }
 }
 
-/// Failure from a focused Keynote merged-cell read.
+/// Failure from a focused Keynote merged-cell read or transaction.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum SlideTableMergesError {
@@ -134,6 +139,8 @@ pub enum SlideTableMergesError {
     SlidePositionNotFound { position: Position },
     #[error("the selected Keynote slide has no table at position {position:?}")]
     TablePositionNotFound { position: Position },
+    #[error("the requested Keynote slide-table merge region is invalid")]
+    InvalidRegion,
     #[error("the selected Keynote slide-table merge source is invalid")]
     InvalidSource,
     #[error(
@@ -144,8 +151,12 @@ pub enum SlideTableMergesError {
         observed: u64,
         maximum: u64,
     },
-    #[error("could not allocate {amount} units for the Keynote slide-table merge read")]
+    #[error("could not allocate {amount} units for the Keynote slide-table merge operation")]
     Allocation { amount: usize },
+    #[error("the edited Keynote slide-table merges failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table merge patch does not match the exact source package")]
+    PatchConflict,
 }
 
 impl Package {

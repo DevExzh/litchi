@@ -7,8 +7,12 @@
 //! never cross this module's public boundary.
 
 mod reader;
+mod transaction;
 
 pub use reader::MergeReader;
+pub use transaction::{
+    TableMergesCommit, TableMergesDiagnostics, TableMergesEdit, TableMergesPatch,
+};
 
 use std::fmt;
 
@@ -156,6 +160,18 @@ pub enum TableMergesError {
         /// Requested elements or bytes.
         amount: usize,
     },
+    /// A staged merge intersects another selected merged region.
+    #[error("the requested Numbers merged-cell region overlaps an existing region")]
+    OverlappingRegion,
+    /// A staged region extends outside the selected table dimensions.
+    #[error("the requested Numbers merged-cell region is outside the selected table")]
+    InvalidRegion,
+    /// Candidate reopening or exact-locality verification failed.
+    #[error("the edited Numbers table merges failed semantic verification")]
+    Verification,
+    /// The patch was created from a different exact package artifact.
+    #[error("the Numbers table-merges patch does not match the exact source package")]
+    PatchConflict,
 }
 
 impl Package {

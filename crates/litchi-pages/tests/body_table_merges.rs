@@ -208,3 +208,152 @@ fn empty_merge_owner_is_a_valid_rooted_empty_result() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn merge_transaction_rewrites_one_component_and_inverse_restores_exact_source() -> TestResult {
+    let package = Package::from_bytes(NATIVE)?;
+    let baseline = exact_bytes(&package)?;
+    let existing = Region::new(3, 2, 1, 2)?;
+    let replacement = Region::new(0, 0, 1, 2)?;
+
+    let mut edit = package.edit_body_table_merges(BodyTableSelector::name("Table 1"))?;
+    assert_eq!(edit.unmerge(existing)?, true);
+    assert_eq!(edit.merge(replacement)?.regions(), &[replacement]);
+    let commit = edit.commit()?;
+
+    assert_eq!(
+        commit
+            .package()
+            .body_table_merges(BodyTableSelector::name("Table 1"))?,
+        vec![replacement]
+    );
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().touched_components(), 1);
+    assert!(commit.diagnostics().full_reparse_performed());
+    assert!(!commit.patch().is_noop());
+
+    let restored = commit
+        .package()
+        .apply_body_table_merges(&commit.patch().inverse())?;
+    assert_eq!(
+        restored
+            .package()
+            .body_table_merges(BodyTableSelector::name("Table 1"))?,
+        vec![existing]
+    );
+    assert_eq!(exact_bytes(restored.package())?, baseline);
+    Ok(())
+}
+
+#[test]
+fn merge_transaction_removes_one_of_multiple_staged_regions() -> TestResult {
+    let package = Package::from_bytes(NATIVE)?;
+    let first = Region::new(0, 0, 1, 2)?;
+    let second = Region::new(0, 2, 1, 2)?;
+
+    let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
+    assert!(edit.unmerge(Region::new(3, 2, 1, 2)?)?);
+    edit.merge(first)?.merge(second)?;
+    let added = edit.commit()?;
+    assert_eq!(
+        added
+            .package()
+            .body_table_merges(BodyTableSelector::index(0))?,
+        vec![first, second]
+    );
+
+    let mut edit = added
+        .package()
+        .edit_body_table_merges(BodyTableSelector::index(0))?;
+    assert!(edit.unmerge(second)?);
+    let removed = edit.commit()?;
+    assert_eq!(
+        removed
+            .package()
+            .body_table_merges(BodyTableSelector::index(0))?,
+        vec![first]
+    );
+    assert!(removed.diagnostics().changed());
+
+    let restored = removed
+        .package()
+        .apply_body_table_merges(&removed.patch().inverse())?;
+    assert_eq!(
+        restored
+            .package()
+            .body_table_merges(BodyTableSelector::index(0))?,
+        vec![first, second]
+    );
+    assert_eq!(
+        exact_bytes(restored.package())?,
+        exact_bytes(added.package())?
+    );
+    Ok(())
+}
+
+#[test]
+fn merge_transaction_limit_failure_is_atomic() -> TestResult {
+    let existing = Region::new(3, 2, 1, 2)?;
+    let replacement = Region::new(0, 0, 1, 2)?;
+    let mut found_boundary = false;
+
+    for fields in 1..=4_096 {
+        let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
+        let limits = Limits::default().with_archive_limits(archive_limits)?;
+        let Ok(package) = Package::from_bytes_with_limits(NATIVE, limits) else {
+            continue;
+        };
+        let before = exact_bytes(&package)?;
+        let result = package
+            .edit_body_table_merges(BodyTableSelector::index(0))
+            .and_then(|mut edit| {
+                edit.unmerge(existing)?;
+                edit.merge(replacement)?;
+                edit.commit()
+            });
+        if matches!(result, Err(BodyTableMergesError::LimitExceeded { .. })) {
+            assert_eq!(exact_bytes(&package)?, before);
+            found_boundary = true;
+            break;
+        }
+    }
+    assert!(found_boundary, "no merge transaction limit boundary found");
+    Ok(())
+}
+
+#[test]
+fn merge_transaction_noop_and_missing_unmerge_are_byte_exact() -> TestResult {
+    let package = Package::from_bytes(NATIVE)?;
+    let baseline = exact_bytes(&package)?;
+    let existing = Region::new(3, 2, 1, 2)?;
+    let missing = Region::new(0, 0, 1, 2)?;
+
+    let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
+    assert_eq!(edit.unmerge(missing)?, false);
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(exact_bytes(commit.package())?, baseline);
+
+    let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
+    assert!(matches!(
+        edit.merge(existing),
+        Err(BodyTableMergesError::OverlappingRegion)
+    ));
+    Ok(())
+}
+
+#[test]
+fn merge_transaction_rejects_out_of_bounds_regions_before_mutation() -> TestResult {
+    let package = Package::from_bytes(NATIVE)?;
+    let region = Region::new(u32::MAX, 0, 1, 2)?;
+    let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
+    assert!(matches!(
+        edit.merge(region),
+        Err(BodyTableMergesError::InvalidRegion)
+    ));
+    assert!(!edit.unmerge(region)?);
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    Ok(())
+}

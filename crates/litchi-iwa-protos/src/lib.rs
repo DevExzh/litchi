@@ -2512,6 +2512,12 @@ pub mod package_metadata_media_codec;
 #[doc(hidden)]
 pub mod numbers_formula_codec;
 
+/// Bounded Buffa writer for the canonical native Numbers table-merge formula.
+/// Generated schema types remain private; consumers receive only the typed
+/// request, bounded policy, and exact resource report.
+#[doc(hidden)]
+pub mod table_merge_formula_codec;
+
 /// Internal Keynote slide-transition projection and opaque color/path
 /// validator implemented around a private Buffa lazy-view sidecar. Generated
 /// types remain inaccessible downstream.

@@ -102,7 +102,10 @@ pub use body_table_hidden_axes::{
     BodyTableHiddenAxesError, BodyTableHiddenAxesLimitKind, BodyTableHiddenAxesPatch,
     BodyTableHiddenAxesPath,
 };
-pub use body_table_merges::{BodyTableMergesError, BodyTableMergesLimitKind, MergeReader};
+pub use body_table_merges::{
+    BodyTableMergesCommit, BodyTableMergesDiagnostics, BodyTableMergesEdit, BodyTableMergesError,
+    BodyTableMergesLimitKind, BodyTableMergesPatch, MergeReader,
+};
 pub use body_table_name::{
     BodyTableNameCommit, BodyTableNameDiagnostics, BodyTableNameEdit, BodyTableNameError,
     BodyTableNameLimitKind, BodyTableNamePatch, BodyTableNamePath,

@@ -4,9 +4,8 @@ use prost::Message;
 
 use super::*;
 use crate::numbers::editor::selectors;
-use crate::numbers::formula_owner::{formula_owner_uuid_for_table, uuid_as_cfuuid};
 use litchi_numbers::table::merge::{self, Deletion as MergeDeletion, Region};
-use litchi_numbers_wire::table_merges::{self, ReadLimits};
+use litchi_numbers_wire::table_merges::{self, MergeWrite, ReadLimits};
 
 mod formula;
 mod reader;
@@ -15,13 +14,11 @@ pub(crate) use reader::regions_in_editor;
 mod wire;
 
 #[cfg(test)]
-use formula::parse_merge_formula;
-use formula::{
-    merge_formula, parse_regions, parse_table_uuid, rewrite_formula_region, validate_region_bounds,
-};
+use formula::{merge_formula, parse_merge_formula};
+use formula::{parse_regions, rewrite_formula_region, validate_region_bounds};
 use wire::{
-    add_formula_store, add_merge_owner, append_formula, mutate_formulas, patch_table_model,
-    remove_formula, remove_merge_owner, transform_formula_store, transform_merge_owner,
+    mutate_formulas, patch_table_model, patch_table_model_wire, remove_merge_owner,
+    transform_formula_store, transform_merge_owner,
 };
 
 pub(crate) use litchi_numbers::table::merge::{
@@ -43,13 +40,143 @@ pub(crate) fn regions_in_package(package: &IWorkPackage, table_id: u64) -> Resul
     })
 }
 
+/// Rewrite one table's merge set through the source-preserving shared writer.
+///
+/// The editor has already proved that `table_id` is rooted in the owning
+/// document graph through [`with_attached_table_model_source`].  The writer
+/// then scans the borrowed model bytes, retains all unrelated fields, and
+/// returns a bounded replacement for just the merge-owner path.
+fn rewrite_merge_set_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    regions: &[Region],
+    current_region_count: usize,
+) -> Result<bool> {
+    let MergeWrite {
+        data,
+        changed,
+        report: _,
+    } = with_attached_table_model_source(package, table_id, |source| {
+        let owner_uuid = fresh_merge_owner_uuid();
+        let limits = merge_write_limits(package, source, current_region_count, regions.len())?;
+        table_merges::rewrite_table_merges(source, regions, owner_uuid, limits)
+            .map_err(|error| Error::IwaCommon(error.error().clone()))
+    })?;
+    if changed {
+        patch_table_model_wire(package, table_id, move |_source| Ok(data))?;
+    }
+    Ok(changed)
+}
+
+/// Generate the candidate merge-owner UUID supplied to the shared writer.
+///
+/// Existing owners retain their original identifier and the writer ignores
+/// this candidate for those sources. New owners receive the raw 16-byte UUID
+/// in the same little-endian CFUUID word order as the generated archive type.
+fn fresh_merge_owner_uuid() -> [u8; 16] {
+    litchi_core::id::generate_guid_bytes()
+}
+
+fn merge_write_limits(
+    package: &IWorkPackage,
+    source: &[u8],
+    current_region_count: usize,
+    region_count: usize,
+) -> Result<ReadLimits> {
+    let archive_limits = package.limits().archive_limits();
+    let source_bytes = source.len().max(1);
+    let max_input_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(package.limits().max_iwa_stream_bytes())
+        .min(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES);
+    let max_output_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(package.limits().max_iwa_stream_bytes())
+        .min(litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES);
+    let output = source_bytes
+        .saturating_add(region_count.saturating_mul(1_024))
+        .min(max_output_bytes)
+        .max(1);
+    // The wire reader charges every borrowed nested payload and every
+    // validation pass against one aggregate input ledger.  A rewrite then
+    // performs the source gather, emits the replacement in two passes, and
+    // reads the candidate again.  Size the ledger from the physical source
+    // and candidate profiles before entering the writer; keeping this
+    // allowance separate from the package's physical input ceiling prevents
+    // a small source from accidentally reducing a valid multi-pass rewrite
+    // to a one-scan budget.
+    let candidate = output;
+    let aggregate_input_bytes = source_bytes
+        .saturating_mul(64)
+        .saturating_add(candidate.saturating_mul(16))
+        .saturating_add(current_region_count.saturating_mul(4_096))
+        .saturating_add(region_count.saturating_mul(4_096))
+        .min(max_input_bytes)
+        .max(source_bytes.min(max_input_bytes));
+    let fields = source_bytes
+        .saturating_mul(16)
+        .saturating_add(current_region_count.saturating_mul(32))
+        .saturating_add(region_count.saturating_mul(128))
+        .clamp(1, litchi_iwa_common::WireLimits::MAX_FIELDS);
+    let work = source_bytes
+        .saturating_mul(32)
+        .saturating_add(
+            current_region_count
+                .saturating_mul(region_count)
+                .saturating_mul(8),
+        )
+        .saturating_add(region_count.saturating_mul(4_096))
+        .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK);
+    let overlap_checks = pair_count(current_region_count)
+        .saturating_add(pair_count(region_count).saturating_mul(2))
+        .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK);
+    let wire = litchi_iwa_common::WireLimits::default()
+        .with_input_bytes(aggregate_input_bytes)
+        .and_then(|limits| limits.with_output_bytes(output))
+        .and_then(|limits| limits.with_fields(fields))
+        .and_then(|limits| limits.with_rewrite_work(work))
+        .map_err(|error| {
+            Error::InvalidFormat(format!("invalid iWork merge writer limits: {error}"))
+        })?;
+    Ok(ReadLimits {
+        wire,
+        max_regions: litchi_numbers::PackageSemanticLimits::MAX_MATERIALIZED_CELLS
+            .min(litchi_iwa_common::WireLimits::MAX_FIELDS),
+        max_overlap_checks: overlap_checks,
+    })
+}
+
+const fn pair_count(length: usize) -> usize {
+    length.saturating_mul(length.saturating_sub(1)) / 2
+}
+
+fn clone_regions(regions: &[Region], additional: usize) -> Result<Vec<Region>> {
+    let amount = regions.len().checked_add(additional).ok_or({
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "iWork table merge regions",
+            amount: usize::MAX,
+        })
+    })?;
+    let mut cloned = Vec::new();
+    cloned.try_reserve_exact(amount).map_err(|_| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "iWork table merge regions",
+            amount,
+        })
+    })?;
+    cloned.extend_from_slice(regions);
+    Ok(cloned)
+}
+
 /// Run a read-only projection against the selected table-model wire payload.
 ///
-/// The mutation paths below still use [`model::attached_table_descriptor`]
-/// because they need the owned generated model.  Merge reads need only the
-/// source bytes, so keep candidate selection and table-info ownership checks
-/// on the bounded generated-free projections and never decode a
-/// `TableModelArchive` here.
+/// Axis and formula mutation paths still use
+/// [`model::attached_table_descriptor`] because they need the owned generated
+/// model. Merge reads and merge-set rewrites need only source bytes, so keep
+/// candidate selection and table-info ownership checks on the bounded
+/// generated-free projections and never decode a `TableModelArchive` here.
 fn with_attached_table_model_source<T>(
     package: &IWorkPackage,
     table_id: u64,
@@ -280,69 +407,31 @@ pub(crate) fn merge_in_package(
     table_id: u64,
     region: Region,
 ) -> Result<()> {
-    let descriptor = model::attached_table_descriptor(package, table_id)?;
-    validate_region_bounds(&descriptor.model, region)?;
-    let existing = parse_regions(&descriptor.model)?;
+    let existing = regions_in_package(package, table_id)?;
     if let Some(overlap) = existing.iter().find(|candidate| candidate.overlaps(region)) {
         return Err(Error::ParseError(format!(
             "Table-cell region {region:?} overlaps existing merge {overlap:?}"
         )));
     }
-
-    let table_uuid = parse_table_uuid(&descriptor.model.table_id)?;
-    let table_reference = uuid_as_cfuuid(&formula_owner_uuid_for_table(&table_uuid));
-    let formula = merge_formula(region, table_reference)?;
-    let store = descriptor
-        .model
-        .merge_owner
-        .as_ref()
-        .and_then(|owner| owner.formula_store.as_ref());
-    let formula_index = store.map_or(0, |store| store.next_formula_index);
-    if store.is_some_and(|store| {
-        store
-            .formulas
-            .iter()
-            .any(|pair| pair.formula_index == formula_index)
-    }) {
-        return Err(Error::InvalidFormat(format!(
-            "iWork merge formula index {formula_index} is already occupied"
-        )));
+    let maximum = litchi_numbers::PackageSemanticLimits::MAX_MATERIALIZED_CELLS
+        .min(litchi_iwa_common::WireLimits::MAX_FIELDS);
+    let observed = existing.len().checked_add(1).ok_or({
+        Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableCells,
+            observed: usize::MAX,
+            limit: maximum,
+        })
+    })?;
+    if observed > maximum {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: litchi_iwa_common::LimitKind::TableCells,
+            observed,
+            limit: maximum,
+        }));
     }
-    let next_formula_index = formula_index.checked_add(1).ok_or_else(|| {
-        Error::InvalidFormat("iWork merge formula index space is exhausted".to_owned())
-    })?;
-    let pair = tst::formula_store_archive::FormulaStorePair {
-        formula_index,
-        formula,
-    };
-    let pair_data = pair.encode_to_vec();
-
-    patch_table_model(package, table_id, |original| {
-        if descriptor.model.merge_owner.is_some() {
-            transform_merge_owner(original, |owner_data| {
-                if store.is_some() {
-                    transform_formula_store(owner_data, |store_data| {
-                        append_formula(store_data, next_formula_index, pair_data)
-                    })
-                } else {
-                    let formula_store = tst::FormulaStoreArchive {
-                        next_formula_index,
-                        formulas: vec![pair.clone()],
-                    };
-                    add_formula_store(owner_data, &formula_store)
-                }
-            })
-        } else {
-            let owner = tst::MergeOwnerArchive {
-                owner_id: fresh_merge_owner_id(),
-                formula_store: Some(tst::FormulaStoreArchive {
-                    next_formula_index,
-                    formulas: vec![pair.clone()],
-                }),
-            };
-            add_merge_owner(original, &owner)
-        }
-    })?;
+    let mut desired = clone_regions(&existing, 1)?;
+    desired.push(region);
+    rewrite_merge_set_in_package(package, table_id, &desired, existing.len())?;
 
     let verified = regions_in_package(package, table_id)?;
     if verified.len() != existing.len() + 1 || !verified.contains(&region) {
@@ -358,30 +447,13 @@ pub(crate) fn unmerge_in_package(
     table_id: u64,
     region: Region,
 ) -> Result<bool> {
-    let descriptor = model::attached_table_descriptor(package, table_id)?;
-    let existing = parse_regions(&descriptor.model)?;
+    let existing = regions_in_package(package, table_id)?;
     let Some(remove_position) = existing.iter().position(|candidate| *candidate == region) else {
         return Ok(false);
     };
-    let owner =
-        descriptor.model.merge_owner.as_ref().ok_or_else(|| {
-            Error::InvalidFormat("iWork merge region has no merge owner".to_owned())
-        })?;
-    let store = owner.formula_store.as_ref().ok_or_else(|| {
-        Error::InvalidFormat("iWork merge region has no formula store".to_owned())
-    })?;
-    let remove_index = store.formulas[remove_position].formula_index;
-
-    patch_table_model(package, table_id, |original| {
-        if store.formulas.len() == 1 {
-            return remove_merge_owner(original);
-        }
-        transform_merge_owner(original, |owner_data| {
-            transform_formula_store(owner_data, |store_data| {
-                remove_formula(store_data, remove_index)
-            })
-        })
-    })?;
+    let mut desired = clone_regions(&existing, 0)?;
+    desired.remove(remove_position);
+    rewrite_merge_set_in_package(package, table_id, &desired, existing.len())?;
 
     let verified = regions_in_package(package, table_id)?;
     if verified.len() + 1 != existing.len() || verified.contains(&region) {
@@ -390,18 +462,6 @@ pub(crate) fn unmerge_in_package(
         ));
     }
     Ok(true)
-}
-
-fn fresh_merge_owner_id() -> tsp::CfuuidArchive {
-    let bytes = litchi_core::id::generate_guid_bytes();
-    let mut lower = [0; 8];
-    lower.copy_from_slice(&bytes[..8]);
-    let mut upper = [0; 8];
-    upper.copy_from_slice(&bytes[8..]);
-    uuid_as_cfuuid(&tsp::Uuid {
-        lower: u64::from_le_bytes(lower),
-        upper: u64::from_le_bytes(upper),
-    })
 }
 
 #[cfg(test)]

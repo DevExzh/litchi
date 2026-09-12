@@ -69934,6 +69934,172 @@ PAGES_TABLE_MERGE_FORBIDDEN_MODULES = re.compile(
 )
 KEYNOTE_TABLE_MERGE_FORBIDDEN_MODULES = PAGES_TABLE_MERGE_FORBIDDEN_MODULES
 
+# Focused merge edits keep the public lifecycle semantic and selector-first;
+# their private transaction children may own archive/source proof and the
+# candidate reassembly machinery.  Keep the three paths explicit so a future
+# inline helper cannot silently become a second transaction owner.
+IWA_TABLE_MERGE_TRANSACTION_SPECS = (
+    {
+        "format_name": "Numbers",
+        "owner_path": NUMBERS_TABLE_MERGE_SOURCE,
+        "transaction_path": Path(
+            "crates/litchi-numbers/src/package/table_merges/transaction.rs"
+        ),
+        "package_path": NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+        "library_path": Path("crates/litchi-numbers/src/lib.rs"),
+        "module_name": "table_merges",
+        "transaction_module": "transaction",
+        "prefix": "TableMerges",
+        "edit_method": "edit_table_merges",
+        "apply_method": "apply_table_merges",
+        "selector_types": frozenset({"SheetSelector", "TableSelector"}),
+        "admission_markers": ("select_semantic_positions", "select_table"),
+    },
+    {
+        "format_name": "Pages",
+        "owner_path": PAGES_TABLE_MERGE_SOURCE,
+        "transaction_path": Path(
+            "crates/litchi-pages/src/package/body_table_merges/transaction.rs"
+        ),
+        "package_path": PAGES_TABLE_MERGE_PACKAGE_SOURCE,
+        "library_path": Path("crates/litchi-pages/src/lib.rs"),
+        "module_name": "body_table_merges",
+        "transaction_module": "transaction",
+        "prefix": "BodyTableMerges",
+        "edit_method": "edit_body_table_merges",
+        "apply_method": "apply_body_table_merges",
+        "selector_types": frozenset({"BodyTableSelector"}),
+        "admission_markers": (
+            "resolve_body_table_with_budget",
+            "select_body_table",
+            "resolve_body_table",
+        ),
+    },
+    {
+        "format_name": "Keynote",
+        "owner_path": KEYNOTE_TABLE_MERGE_SOURCE,
+        "transaction_path": Path(
+            "crates/litchi-keynote/src/package/slide_table_merges/transaction.rs"
+        ),
+        "package_path": KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
+        "library_path": Path("crates/litchi-keynote/src/lib.rs"),
+        "module_name": "slide_table_merges",
+        "transaction_module": "transaction",
+        "prefix": "SlideTableMerges",
+        "edit_method": "edit_slide_table_merges",
+        "apply_method": "apply_slide_table_merges",
+        "selector_types": frozenset({"SlideSelector", "TableSelector"}),
+        "admission_markers": ("select_merges", "select_table", "select_slide"),
+    },
+)
+IWA_TABLE_MERGE_TRANSACTION_CANONICAL_SUFFIXES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+)
+IWA_TABLE_MERGE_TRANSACTION_PUBLIC_FIELD = re.compile(
+    r"(?m)^[ \t]*pub(?![ \t]*\([^()\r\n]*\))[ \t]+"
+    r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*:"
+)
+IWA_TABLE_MERGE_TRANSACTION_PUBLIC_RAW_ID = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|table_id|table_identifier|"
+    r"model_id|model_identifier|native_id|object_id|drawable_id|"
+    r"component_id|archive_id|message_id|sheet_id|sheet_identifier|"
+    r"slide_id|slide_identifier|source_bytes|package_bytes|raw_bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:Option[ \t\r\n]*<[ \t\r\n]*)?"
+    r"(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)\b"
+)
+IWA_TABLE_MERGE_TRANSACTION_PUBLIC_BYTE_RETURN = re.compile(
+    r"(?:Vec|Box|Arc)[ \t\r\n]*<[ \t\r\n]*(?:u8|\[[ \t\r\n]*u8\s*\])"
+    r"|\b(?:Bytes|ByteString)\b"
+)
+IWA_TABLE_MERGE_TRANSACTION_FORBIDDEN_PUBLIC_TYPES = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"Archive|ArchiveObject|ComponentCatalog|EntryEdit|ExactArtifacts|"
+    r"OwnedExactArtifacts|RawMessage|SnappyStream|SourceCatalog|SharedBytes|"
+    r"PhysicalSource|Document|Body|Show|Slide|Sheet|TableModelArchive|"
+    r"TableInfoArchive|FormulaArchive|AstNodeArchive|AstNodeType|"
+    r"MergeRegionMapArchive|litchi_iwa_protos|prost|prost_types|buffa|"
+    r"BncCell|BncCellView|PreBncCellView|StoredValue|CachedScalar|"
+    r"numbers_formula_codec|numbers_table_cell_storage_codec"
+    r")(?![A-Za-z0-9_])"
+)
+IWA_TABLE_MERGE_TRANSACTION_LEGACY_MUTATION = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"merge_table_cells_in_package|unmerge_table_cells_in_package|"
+    r"table_cell_merges_in_package|regions_in_package|"
+    r"legacy_table_merge|fallback_table_merge"
+    r")(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+
+# The Numbers wire writer is the only raw-byte merge rewrite surface.  Its
+# byte-returning result is deliberately allowed here; this audit instead
+# keeps the writer source-preserving, bounded, and format-neutral.
+IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_SOURCE = Path(
+    "crates/litchi-numbers-wire/src/table_merges/writer.rs"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_MODULE = re.compile(
+    r"(?m)^[ \t]*mod[ \t]+(?:r#)?writer[ \t]*;"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_EXPORT = re.compile(
+    r"(?ms)^[ \t]*pub[ \t]+use[ \t]+writer[ \t]*::[ \t]*\{"
+    r"[^{};]*\bMergeWrite\b[^{};]*\brewrite_table_merges\b[^{};]*\}[ \t]*;"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_PROTO_IMPORT = re.compile(
+    r"(?m)^[ \t]*use[ \t]+litchi_iwa_protos[ \t]*::[ \t]*"
+    r"table_merge_formula_codec[ \t]*"
+    r"(?:::[ \t]*\{[^{};]*\})?[ \t]*;"
+)
+IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_CODEC_CALL = re.compile(
+    r"\b(?:merge_formula_codec|table_merge_formula_codec)[ \t\r\n]*::"
+    r"[ \t\r\n]*encode_merge_formula[ \t\r\n]*\("
+)
+IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_FORBIDDEN_IMPORT = re.compile(
+    r"(?<![A-Za-z0-9_])(?:prost|prost_types|"
+    r"litchi_numbers|litchi_pages|litchi_keynote|litchi_iwa)(?![A-Za-z0-9_])"
+)
+
+# The narrow Buffa formula encoder is optional while its source migration is
+# in flight.  Once either the module or its writer import appears, the audit
+# becomes strict and prevents a handwritten TSCE schema from returning.
+IWA_TABLE_MERGE_FORMULA_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/table_merge_formula_codec.rs"
+)
+IWA_TABLE_MERGE_FORMULA_CODEC_MODULE = "table_merge_formula_codec"
+IWA_TABLE_MERGE_FORMULA_CODEC_REQUIRED_TYPES = (
+    "EncodeOptions",
+    "EncodeReport",
+    "EncodeLimit",
+    "EncodeError",
+)
+IWA_TABLE_MERGE_FORMULA_CODEC_REQUIRED_FUNCTIONS = (
+    "encode_merge_formula",
+)
+IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_SOURCE = Path(
+    "crates/litchi-iwa-protos/build.rs"
+)
+IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_RERUN_MARKER = (
+    'println!("cargo:rerun-if-changed=src/table_merge_formula_codec.rs");'
+)
+IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_INVENTORY = re.compile(
+    r"(?s)\(\s*"
+    r'"src/table_merge_formula_codec\.rs"\s*,\s*'
+    r'"crate::buffa_formula_generated::"\s*,\s*'
+    r'"mod buffa_formula_generated \{"\s*,?\s*\)'
+)
+IWA_TABLE_MERGE_FORMULA_CODEC_HIDDEN_MODULE = re.compile(
+    rf"(?m)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+    rf"pub\s+mod\s+{re.escape(IWA_TABLE_MERGE_FORMULA_CODEC_MODULE)}\b"
+)
+IWA_TABLE_MERGE_FORMULA_CODEC_ENCODER = re.compile(
+    r"(?m)^\s*pub\s+fn\s+(?:[A-Za-z_][A-Za-z0-9_]*_)?"
+    r"(?:merge|table_merge|formula)[A-Za-z0-9_]*encode[A-Za-z0-9_]*\b|"
+    r"^\s*pub\s+fn\s+encode[A-Za-z0-9_]*(?:merge|table_merge|formula)"
+    r"[A-Za-z0-9_]*\b"
+)
+
 # The compatibility editors retain their raw-ID table methods for callers that
 # have not moved yet, but merged-cell reads have a complete focused owner. Keep
 # this ratchet scoped to the two read methods: Numbers still owns the shared
@@ -72215,6 +72381,787 @@ def _audit_numbers_cached_merge_handoff(root: Path) -> list[str]:
         if "strict_attached_table_info_model_identifier" not in body or re.search(r"\b(?:table_models|find_table_owner|focused_table_location|numbers_sheet)\s*\(", body):
             violations.append(f"Numbers cached merge selectors must avoid complete model decoding: {selectors_path}")
     return violations
+
+
+def _table_merge_transaction_sources(
+    root: Path, spec: dict
+) -> tuple[list[tuple[Path, str]], list[str]]:
+    """Load one focused merge transaction owner and its private child."""
+
+    owner_path = spec["owner_path"]
+    transaction_path = spec["transaction_path"]
+    owner_absolute = root / owner_path
+    transaction_absolute = root / transaction_path
+    violations: list[str] = []
+    sources: list[tuple[Path, str]] = []
+
+    if not owner_absolute.is_file():
+        violations.append(
+            f"focused {spec['format_name']} table-merge owner is missing: "
+            f"{owner_path}"
+        )
+        return sources, violations
+
+    owner_source = _mask_rust_cfg_test_items(
+        owner_absolute.read_text(encoding="utf-8")
+    )
+    sources.append((owner_path, owner_source))
+    declarations = _rust_root_level_module_declarations(
+        owner_source, frozenset({spec["transaction_module"]})
+    )
+    if not declarations:
+        violations.append(
+            f"focused {spec['format_name']} table-merge transaction child is not "
+            f"wired from its private owner: {owner_path}"
+        )
+    else:
+        for _name, visibility, shape, _body, line_number in declarations:
+            if visibility is not None and visibility.strip() == "pub":
+                violations.append(
+                    f"focused {spec['format_name']} table-merge transaction child "
+                    f"module must remain private: {owner_path}:{line_number}"
+                )
+            if shape == "inline":
+                violations.append(
+                    f"focused {spec['format_name']} table-merge transaction must "
+                    f"use a dedicated child source: {owner_path}:{line_number}"
+                )
+
+    if not transaction_absolute.is_file():
+        violations.append(
+            f"focused {spec['format_name']} table-merge transaction child is "
+            f"missing: {transaction_path}"
+        )
+    else:
+        transaction_source = _mask_rust_cfg_test_items(
+            transaction_absolute.read_text(encoding="utf-8")
+        )
+        sources.append((transaction_path, transaction_source))
+
+    return sources, violations
+
+
+def _table_merge_transaction_has_marker(
+    code: str, markers: tuple[str, ...] | frozenset[str]
+) -> bool:
+    """Return whether one semantic marker or any allowed alternative exists."""
+
+    return any(
+        re.search(rf"(?<![A-Za-z0-9_]){re.escape(marker)}(?![A-Za-z0-9_])", code)
+        is not None
+        for marker in markers
+    )
+
+
+def _audit_table_merge_transaction_source_topology(
+    root: Path, spec: dict
+) -> list[str]:
+    """Audit a focused merge transaction without inspecting private wire fields."""
+
+    sources, violations = _table_merge_transaction_sources(root, spec)
+    if not sources:
+        return sorted(set(violations))
+
+    format_name = spec["format_name"]
+    prefix = spec["prefix"]
+    canonical_names = frozenset(
+        f"{prefix}{suffix}"
+        for suffix in IWA_TABLE_MERGE_TRANSACTION_CANONICAL_SUFFIXES
+    )
+    owner_path = spec["owner_path"]
+    owner_source = sources[0][1]
+    owner_code = _mask_rust_non_code(owner_source)
+
+    # Keep the transaction child private at the package seam. ``pub(crate)``
+    # remains an internal implementation visibility; an unrestricted ``pub``
+    # module would make the physical child a supported API by accident.
+    package_path = spec["package_path"]
+    package_absolute = root / package_path
+    package_source = (
+        _mask_rust_cfg_test_items(package_absolute.read_text(encoding="utf-8"))
+        if package_absolute.is_file()
+        else ""
+    )
+    if not package_source:
+        violations.append(
+            f"focused {format_name} table-merge package export source is missing: "
+            f"{package_path}"
+        )
+    else:
+        package_modules = _rust_root_level_module_declarations(
+            package_source, frozenset({spec["module_name"]})
+        )
+        if not package_modules:
+            violations.append(
+                f"focused {format_name} table-merge package module is missing: "
+                f"{package_path}"
+            )
+        elif any(
+            visibility is not None and visibility.strip() == "pub"
+            for _name, visibility, _shape, _body, _line in package_modules
+        ):
+            violations.append(
+                f"focused {format_name} table-merge package module must remain "
+                f"private: {package_path}"
+            )
+
+    library_path = spec["library_path"]
+    library_absolute = root / library_path
+    library_source = (
+        _mask_rust_cfg_test_items(library_absolute.read_text(encoding="utf-8"))
+        if library_absolute.is_file()
+        else ""
+    )
+    if not library_source:
+        violations.append(
+            f"focused {format_name} table-merge public facade source is missing: "
+            f"{library_path}"
+        )
+
+    transaction_source = "\n".join(source for _path, source in sources)
+    transaction_code = _mask_rust_non_code(transaction_source)
+
+    # The owner must publish the four semantic lifecycle types through its
+    # private child. Package and crate-root facades repeat that exact set.
+    owner_exports = _rust_canonical_exports(owner_source, canonical_names)
+    for name in sorted(canonical_names - owner_exports):
+        violations.append(
+            f"focused {format_name} table-merge owner is missing canonical "
+            f"transaction type {name}: {owner_path}"
+        )
+    if sources:
+        child_path, child_source = sources[-1]
+        child_exports = _rust_canonical_exports(child_source, canonical_names)
+        for name in sorted(canonical_names - child_exports):
+            violations.append(
+                f"focused {format_name} table-merge transaction child is missing "
+                f"canonical type {name}: {child_path}"
+            )
+    if package_source:
+        package_exports = _rust_canonical_exports(package_source, canonical_names)
+        for name in sorted(canonical_names - package_exports):
+            violations.append(
+                f"focused {format_name} table-merge package facade is missing "
+                f"canonical export {name}: {package_path}"
+            )
+    if library_source:
+        library_exports = _rust_canonical_exports(library_source, canonical_names)
+        for name in sorted(canonical_names - library_exports):
+            violations.append(
+                f"focused {format_name} table-merge crate facade is missing "
+                f"canonical export {name}: {library_path}"
+            )
+
+    # A public field would expose proof state or an owned native representation
+    # and make the semantic lifecycle impossible to evolve safely.
+    for path, source in sources:
+        production = _mask_rust_cfg_test_items(source)
+        for name in sorted(canonical_names):
+            struct = _rust_named_struct_body(production, name)
+            if struct is None:
+                continue
+            body, offset = struct
+            for match in IWA_TABLE_MERGE_TRANSACTION_PUBLIC_FIELD.finditer(body):
+                line_number = production.count(
+                    "\n", 0, offset + match.start()
+                ) + 1
+                violations.append(
+                    f"focused {format_name} table-merge transaction exposes a "
+                    f"public field: {path}:{line_number}"
+                )
+
+    # Only public declarations cross this check. Private fields and helpers
+    # may retain archive/source objects, while public signatures stay semantic.
+    public_methods: list[tuple[Path, str, str, int]] = []
+    for path, source in sources:
+        production = _mask_rust_cfg_test_items(source)
+        for type_name in (*canonical_names, "Package"):
+            for method_name, declaration, line_number in _rust_public_methods_in_impl(
+                production, type_name
+            ):
+                public_methods.append((path, method_name, declaration, line_number))
+
+    for path, method_name, declaration, line_number in public_methods:
+        raw_id = IWA_TABLE_MERGE_TRANSACTION_PUBLIC_RAW_ID.search(declaration)
+        if raw_id is not None:
+            violations.append(
+                f"focused {format_name} table-merge transaction public method "
+                f"{method_name} exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: {path}:{line_number}"
+            )
+        if RUST_BYTE_SLICE.search(declaration) is not None:
+            violations.append(
+                f"focused {format_name} table-merge transaction public method "
+                f"{method_name} exposes raw bytes: {path}:{line_number}"
+            )
+        arrow = declaration.find("->")
+        return_type = declaration[arrow + 2 :] if arrow >= 0 else ""
+        if IWA_TABLE_MERGE_TRANSACTION_PUBLIC_BYTE_RETURN.search(return_type):
+            violations.append(
+                f"focused {format_name} table-merge transaction public method "
+                f"{method_name} returns raw bytes: {path}:{line_number}"
+            )
+        physical = IWA_TABLE_MERGE_TRANSACTION_FORBIDDEN_PUBLIC_TYPES.search(
+            declaration
+        )
+        if physical is not None:
+            violations.append(
+                f"focused {format_name} table-merge transaction public method "
+                f"{method_name} exposes a private physical/model type "
+                f"{physical.group()}: {path}:{line_number}"
+            )
+
+    # Facade re-exports are public declarations too. Restrict this scan to
+    # declarations carrying one of the canonical names so unrelated package
+    # APIs remain outside the merge ratchet.
+    for path, source in (
+        (package_path, package_source),
+        (library_path, library_source),
+    ):
+        if not source:
+            continue
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not identifiers & canonical_names:
+                continue
+            physical = IWA_TABLE_MERGE_TRANSACTION_FORBIDDEN_PUBLIC_TYPES.search(
+                declaration
+            )
+            if physical is not None:
+                violations.append(
+                    f"focused {format_name} table-merge public facade exposes a "
+                    f"private physical/model type {physical.group()}: "
+                    f"{path}:{line_number}"
+                )
+            if RUST_BYTE_SLICE.search(declaration) is not None:
+                violations.append(
+                    f"focused {format_name} table-merge public facade exposes raw "
+                    f"bytes: {path}:{line_number}"
+                )
+            raw_id = IWA_TABLE_MERGE_TRANSACTION_PUBLIC_RAW_ID.search(declaration)
+            if raw_id is not None:
+                violations.append(
+                    f"focused {format_name} table-merge public facade exposes a raw "
+                    f"ID parameter {raw_id.group(0).strip()}: {path}:{line_number}"
+                )
+
+    # Package operations are intentionally checked by their owning impl, so a
+    # free helper with the same name cannot satisfy the public contract.
+    package_methods = {
+        method_name: (declaration, line_number, path)
+        for path, method_name, declaration, line_number in public_methods
+        if method_name in {spec["edit_method"], spec["apply_method"]}
+    }
+    edit_evidence: list[tuple[str, str, int, Path]] = []
+    apply_evidence: list[tuple[str, str, int, Path]] = []
+    for path, source in sources:
+        for evidence_declaration, body, line_number in _rust_public_method_bodies(
+            source, spec["edit_method"], type_name="Package"
+        ):
+            edit_evidence.append((evidence_declaration, body, line_number, path))
+        for evidence_declaration, body, line_number in _rust_public_method_bodies(
+            source, spec["apply_method"], type_name="Package"
+        ):
+            apply_evidence.append((evidence_declaration, body, line_number, path))
+
+    if spec["edit_method"] not in package_methods:
+        violations.append(
+            f"focused {format_name} table-merge Package method is missing "
+            f"{spec['edit_method']}: {owner_path}"
+        )
+    else:
+        declaration, _line_number, path = package_methods[spec["edit_method"]]
+        if re.search(rf"\b{re.escape(prefix + 'Edit')}\b", declaration) is None:
+            violations.append(
+                f"focused {format_name} {spec['edit_method']} must return the "
+                f"typed {prefix}Edit: {path}"
+            )
+        for selector in sorted(spec["selector_types"]):
+            if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                violations.append(
+                    f"focused {format_name} {spec['edit_method']} must accept "
+                    f"typed {selector}: {path}"
+                )
+        if not edit_evidence:
+            violations.append(
+                f"focused {format_name} {spec['edit_method']} has no public Package "
+                f"body: {path}"
+            )
+        else:
+            for _declaration, body, line_number, body_path in edit_evidence:
+                body_code = _mask_rust_non_code(body)
+                if not _table_merge_transaction_has_marker(
+                    body_code, spec["admission_markers"]
+                ):
+                    violations.append(
+                        f"focused {format_name} {spec['edit_method']} must resolve "
+                        f"its typed selector before staging: {body_path}:{line_number}"
+                    )
+                if IWA_TABLE_MERGE_TRANSACTION_LEGACY_MUTATION.search(body_code):
+                    violations.append(
+                        f"focused {format_name} {spec['edit_method']} retains a "
+                        f"legacy/catchall mutation fallback: {body_path}:{line_number}"
+                    )
+                if re.search(r"\bErr\s*\(\s*_\s*\)\s*=>", body_code):
+                    violations.append(
+                        f"focused {format_name} {spec['edit_method']} uses a "
+                        f"post-admission catchall error arm: {body_path}:{line_number}"
+                    )
+
+    if spec["apply_method"] not in package_methods:
+        violations.append(
+            f"focused {format_name} table-merge Package method is missing "
+            f"{spec['apply_method']}: {owner_path}"
+        )
+    else:
+        declaration, _line_number, path = package_methods[spec["apply_method"]]
+        if re.search(rf"\b{re.escape(prefix + 'Patch')}\b", declaration) is None:
+            violations.append(
+                f"focused {format_name} {spec['apply_method']} must accept the "
+                f"typed {prefix}Patch: {path}"
+            )
+        if re.search(rf"\b{re.escape(prefix + 'Commit')}\b", declaration) is None:
+            violations.append(
+                f"focused {format_name} {spec['apply_method']} must return the "
+                f"typed {prefix}Commit: {path}"
+            )
+        if not apply_evidence:
+            violations.append(
+                f"focused {format_name} {spec['apply_method']} has no public Package "
+                f"body: {path}"
+            )
+        else:
+            for _declaration, body, line_number, body_path in apply_evidence:
+                body_code = _mask_rust_non_code(body)
+                if IWA_TABLE_MERGE_TRANSACTION_LEGACY_MUTATION.search(body_code):
+                    violations.append(
+                        f"focused {format_name} {spec['apply_method']} retains a "
+                        f"legacy/catchall mutation fallback: {body_path}:{line_number}"
+                    )
+                if re.search(r"\bErr\s*\(\s*_\s*\)\s*=>", body_code):
+                    violations.append(
+                        f"focused {format_name} {spec['apply_method']} uses a "
+                        f"post-admission catchall error arm: {body_path}:{line_number}"
+                    )
+
+    edit_methods = {
+        method_name for method_name, _declaration, _line in sum(
+            [
+                _rust_public_methods_in_impl(
+                    _mask_rust_cfg_test_items(source), f"{prefix}Edit"
+                )
+                for _path, source in sources
+            ],
+            [],
+        )
+    }
+    edit_signatures = {
+        method_name: declaration
+        for _path, source in sources
+        for method_name, declaration, _line in _rust_public_methods_in_impl(
+            _mask_rust_cfg_test_items(source), f"{prefix}Edit"
+        )
+    }
+    for required in ("merge", "unmerge", "commit"):
+        if required not in edit_methods:
+            violations.append(
+                f"focused {format_name} {prefix}Edit is missing public {required}: "
+                f"{spec['transaction_path']}"
+            )
+        elif required in {"merge", "unmerge"} and re.search(
+            r"\bRegion\b", edit_signatures[required]
+        ) is None:
+            violations.append(
+                f"focused {format_name} {prefix}Edit::{required} must use common "
+                f"Region values: {spec['transaction_path']}"
+            )
+    patch_methods = {
+        method_name for method_name, _declaration, _line in sum(
+            [
+                _rust_public_methods_in_impl(
+                    _mask_rust_cfg_test_items(source), f"{prefix}Patch"
+                )
+                for _path, source in sources
+            ],
+            [],
+        )
+    }
+    for required in ("before", "after", "is_noop", "inverse"):
+        if required not in patch_methods:
+            violations.append(
+                f"focused {format_name} {prefix}Patch is missing public {required}: "
+                f"{spec['transaction_path']}"
+            )
+    commit_methods = {
+        method_name for method_name, _declaration, _line in sum(
+            [
+                _rust_public_methods_in_impl(
+                    _mask_rust_cfg_test_items(source), f"{prefix}Commit"
+                )
+                for _path, source in sources
+            ],
+            [],
+        )
+    }
+    for required in ("package", "into_package", "patch", "diagnostics"):
+        if required not in commit_methods:
+            violations.append(
+                f"focused {format_name} {prefix}Commit is missing public {required}: "
+                f"{spec['transaction_path']}"
+            )
+    diagnostics_methods = {
+        method_name for method_name, _declaration, _line in sum(
+            [
+                _rust_public_methods_in_impl(
+                    _mask_rust_cfg_test_items(source), f"{prefix}Diagnostics"
+                )
+                for _path, source in sources
+            ],
+            [],
+        )
+    }
+    if "changed" not in diagnostics_methods:
+        violations.append(
+            f"focused {format_name} {prefix}Diagnostics is missing public changed: "
+            f"{spec['transaction_path']}"
+        )
+
+    marker_groups = {
+        "source-preserving writer": (
+            ("rewrite_table_merges",),
+            (
+                "replace_message_preserving_header_with_limits",
+                "rewrite_model",
+                "rewrite_merges",
+            ),
+        ),
+        "bounded accounting": (
+            ("Budget", "WireBudget", "transaction_budget", "ReadLimits", "WireLimits"),
+            ("try_reserve", "try_reserve_exact"),
+            ("checked_add", "checked_mul"),
+        ),
+        "candidate verification": (
+            (
+                "reopen_candidate",
+                "reopen_patch",
+                "parse_candidate",
+                "from_source_owner_with_options",
+                "from_source_catalog",
+            ),
+            ("read_regions", "read_regions_at", "read_table_merges", "select_merges"),
+            ("verify_locality", "verify_exact_locality"),
+        ),
+        "exact-source patch semantics": (
+            ("source_is_exact", "authorizes_source", "authorizes_owner"),
+            ("is_noop", "unchanged", "changed: false"),
+            ("inverse", "PatchConflict"),
+        ),
+        "strict semantic validation": (
+            ("validate_region", "end_row", "end_column"),
+            ("normalize_regions",),
+            ("OverlappingRegion", "overlaps"),
+        ),
+        "bounded reassembly": (
+            (
+                "prepare_reassembly",
+                "reassemble_to_bytes",
+                "execution_requirements",
+                "reassembly",
+            ),
+        ),
+    }
+    for label, groups in marker_groups.items():
+        if not all(_table_merge_transaction_has_marker(transaction_code, group) for group in groups):
+            violations.append(
+                f"focused {format_name} table-merge transaction is missing "
+                f"{label} marker: {spec['transaction_path']}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_merge_transaction_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    return _audit_table_merge_transaction_source_topology(root, IWA_TABLE_MERGE_TRANSACTION_SPECS[0])
+
+
+def audit_pages_table_merge_transaction_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    return _audit_table_merge_transaction_source_topology(root, IWA_TABLE_MERGE_TRANSACTION_SPECS[1])
+
+
+def audit_keynote_table_merge_transaction_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    return _audit_table_merge_transaction_source_topology(root, IWA_TABLE_MERGE_TRANSACTION_SPECS[2])
+
+
+def audit_iwa_numbers_wire_table_merge_writer_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the shared merge writer bounded, source-preserving, and neutral."""
+
+    writer_path = IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_SOURCE
+    writer_absolute = root / writer_path
+    owner_path = IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE
+    owner_absolute = root / owner_path
+    if not writer_absolute.is_file():
+        if owner_absolute.is_file() and re.search(
+            r"(?m)^\s*mod\s+writer\s*;|\brewrite_table_merges\b",
+            _mask_rust_non_code(owner_absolute.read_text(encoding="utf-8")),
+        ):
+            return [f"Numbers wire table-merge writer is missing: {writer_path}"]
+        return []
+
+    violations: list[str] = []
+    writer_source = _mask_rust_cfg_test_items(
+        writer_absolute.read_text(encoding="utf-8")
+    )
+    code = _mask_rust_non_code(writer_source)
+    if not re.search(r"(?m)^\s*pub\s+struct\s+MergeWrite\b", code):
+        violations.append(f"Numbers wire table-merge writer is missing public MergeWrite: {writer_path}")
+    if not re.search(r"(?m)^\s*pub\s+fn\s+rewrite_table_merges\b", code):
+        violations.append(f"Numbers wire table-merge writer is missing public rewrite_table_merges: {writer_path}")
+
+    merge_write = _rust_named_struct_body(writer_source, "MergeWrite")
+    if merge_write is not None:
+        body, _offset = merge_write
+        for field in ("data", "report", "changed"):
+            if re.search(rf"(?m)^\s*pub\s+{re.escape(field)}\s*:", body) is None:
+                violations.append(
+                    f"Numbers wire table-merge writer MergeWrite is missing public field "
+                    f"{field}: {writer_path}"
+                )
+
+    marker_groups = {
+        "strict readback": ("read_table_merges", "finish_candidate"),
+        "source-preserving walk": ("gather_source", "gather_owner", "gather_store", "sink.raw"),
+        "desired-state validation": (
+            "validate_desired_regions",
+            "validate_bounds_and_set",
+            "same_region_set",
+        ),
+        "owner lifecycle": (
+            ("RemoveOwner", "RootAction::Remove"),
+            ("ReplaceOwner", "RootAction::Replace"),
+            ("AppendOwner", "RootAction::Append"),
+            ("next_index",),
+        ),
+        "bounded output": (
+            "Sink",
+            "try_reserve_exact",
+            "checked_add",
+            "max_output",
+            "LimitKind::OutputBytes",
+        ),
+        "formula-pair encoding": ("encode_merge_formula", "encode_pair", "encode_owner_id"),
+    }
+    for label, markers in marker_groups.items():
+        if not all(
+            _table_merge_transaction_has_marker(
+                code,
+                marker if isinstance(marker, tuple) else (marker,),
+            )
+            for marker in markers
+        ):
+            violations.append(
+                f"Numbers wire table-merge writer is missing {label} marker: "
+                f"{writer_path}"
+            )
+
+    if owner_absolute.is_file():
+        owner_source = _mask_rust_cfg_test_items(
+            owner_absolute.read_text(encoding="utf-8")
+        )
+        owner_code = _mask_rust_non_code(owner_source)
+        if IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_MODULE.search(owner_code) is None:
+            violations.append(
+                f"Numbers wire table-merge writer is missing its private module wiring: "
+                f"{owner_path}"
+            )
+        if re.search(r"(?m)^\s*pub\s+mod\s+writer\b", owner_code):
+            violations.append(
+                f"Numbers wire table-merge writer module must remain private: {owner_path}"
+            )
+        if not IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_EXPORT.search(owner_code):
+            violations.append(
+                f"Numbers wire table-merge writer is missing its checked re-export: {owner_path}"
+            )
+    else:
+        violations.append(f"Numbers wire table-merge owner is missing: {owner_path}")
+
+    use_statement = re.compile(
+        r"(?ms)^[ \t]*(?:pub(?:\([^()\r\n]*\))?[ \t]+)?use\b.*?;"
+    )
+    for statement in use_statement.finditer(code):
+        text = statement.group(0)
+        if IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_FORBIDDEN_IMPORT.search(text):
+            line_number = code.count("\n", 0, statement.start()) + 1
+            violations.append(
+                f"Numbers wire table-merge writer imports a concrete format/protobuf "
+                f"owner: {writer_path}:{line_number}"
+            )
+        if "litchi_iwa_protos" in text and not IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_PROTO_IMPORT.fullmatch(text.strip()):
+            line_number = code.count("\n", 0, statement.start()) + 1
+            violations.append(
+                f"Numbers wire table-merge writer may import only the narrow formula "
+                f"codec: {writer_path}:{line_number}"
+            )
+
+    for pattern, label in (
+        (re.compile(r"\b(?:prost|prost_types|encode_to_vec|Message::decode)\b"), "eager/prost codec"),
+        (re.compile(r"\b(?:TableModelArchive|TableInfoArchive|FormulaArchive|AstNodeArchive)\b"), "generated schema type"),
+    ):
+        match = pattern.search(code)
+        if match is not None:
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"Numbers wire table-merge writer retains a {label}: "
+                f"{writer_path}:{line_number}"
+            )
+
+    # The writer may account for the codec's report and translate its errors,
+    # but formula bytes must be produced by the narrow Buffa owner.  Check the
+    # call itself so a local helper with the same name cannot silently restore
+    # the handwritten TSCE builder.
+    codec_call = IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_CODEC_CALL.search(code)
+    if codec_call is None:
+        violations.append(
+            "Numbers wire table-merge writer must delegate formula encoding to "
+            f"{IWA_TABLE_MERGE_FORMULA_CODEC_MODULE}: {writer_path}"
+        )
+    else:
+        formula_helper = _rust_top_level_function_bodies(code).get(
+            "encode_merge_formula"
+        )
+        if formula_helper is not None and IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_CODEC_CALL.search(
+            formula_helper[0]
+        ) is None:
+            line_number = code.count("\n", 0, formula_helper[1]) + 1
+            violations.append(
+                "Numbers wire table-merge writer's formula helper must delegate "
+                f"to {IWA_TABLE_MERGE_FORMULA_CODEC_MODULE}: "
+                f"{writer_path}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_table_merge_formula_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Guard the optional narrow Buffa formula encoder once it is wired."""
+
+    codec_path = IWA_TABLE_MERGE_FORMULA_CODEC_SOURCE
+    codec_absolute = root / codec_path
+    facade_absolute = root / IWA_PROTOS_FACADE_SOURCE
+    writer_absolute = root / IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_SOURCE
+    facade_source = (
+        _mask_rust_cfg_test_items(facade_absolute.read_text(encoding="utf-8"))
+        if facade_absolute.is_file()
+        else ""
+    )
+    writer_source = (
+        _mask_rust_cfg_test_items(writer_absolute.read_text(encoding="utf-8"))
+        if writer_absolute.is_file()
+        else ""
+    )
+    wired = bool(
+        codec_absolute.is_file()
+        or IWA_TABLE_MERGE_FORMULA_CODEC_MODULE in _mask_rust_non_code(facade_source)
+        or IWA_TABLE_MERGE_FORMULA_CODEC_MODULE in _mask_rust_non_code(writer_source)
+    )
+    if not wired:
+        return []
+
+    violations: list[str] = []
+    if not codec_absolute.is_file():
+        violations.append(
+            f"table-merge formula codec source is missing: {codec_path}"
+        )
+        return violations
+
+    build_absolute = root / IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_SOURCE
+    if not build_absolute.is_file():
+        violations.append(
+            "table-merge formula codec build inventory source is missing: "
+            f"{IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_SOURCE}"
+        )
+    else:
+        build_source = build_absolute.read_text(encoding="utf-8")
+        if IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_RERUN_MARKER not in build_source:
+            violations.append(
+                "table-merge formula codec build is missing its rerun inventory "
+                f"marker: {IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_SOURCE}"
+            )
+        if IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_INVENTORY.search(build_source) is None:
+            violations.append(
+                "table-merge formula codec build is missing its private Buffa "
+                "production-ingress inventory entry: "
+                f"{IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_SOURCE}"
+            )
+
+    codec_source = _mask_rust_cfg_test_items(
+        codec_absolute.read_text(encoding="utf-8")
+    )
+    code = _mask_rust_non_code(codec_source)
+    if not re.search(r"\bbuffa\b", code):
+        violations.append(f"table-merge formula codec must use Buffa: {codec_path}")
+    if re.search(r"\b(?:prost|prost_types)\b", code):
+        violations.append(f"table-merge formula codec must not use Prost: {codec_path}")
+    for type_name in IWA_TABLE_MERGE_FORMULA_CODEC_REQUIRED_TYPES:
+        if re.search(
+            rf"(?m)^\s*pub\s+(?:struct|enum|type)\s+"
+            rf"{re.escape(type_name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                f"table-merge formula codec is missing public {type_name}: "
+                f"{codec_path}"
+            )
+    for function_name in IWA_TABLE_MERGE_FORMULA_CODEC_REQUIRED_FUNCTIONS:
+        if re.search(
+            rf"(?m)^\s*pub\s+fn\s+{re.escape(function_name)}\b",
+            code,
+        ) is None:
+            violations.append(
+                f"table-merge formula codec is missing narrow public encoder "
+                f"{function_name}: {codec_path}"
+            )
+    for marker_group in (
+        ("decode_lazy_view", "LazyMessageView"),
+        ("try_encode_to_vec", "try_encoded_len", "ViewEncode", "encode_bounded"),
+        ("preflight", "DecodeOptions", "EncodeOptions"),
+    ):
+        if not _table_merge_transaction_has_marker(code, marker_group):
+            violations.append(
+                f"table-merge formula codec is missing Buffa/lazy marker "
+                f"{marker_group[0]}: {codec_path}"
+            )
+    if re.search(r"\b(?:FormulaArchive|AstNodeArchive|ASTNodeArrayArchive)\b", code):
+        # The codec may mention schema names in private comments/tests, but
+        # production source must not expose generated values as its API.
+        for declaration, line_number in _rust_public_declarations(codec_source):
+            if re.search(r"\b(?:FormulaArchive|AstNodeArchive|ASTNodeArrayArchive)\b", declaration):
+                violations.append(
+                    f"table-merge formula codec exposes a generated TSCE value: "
+                    f"{codec_path}:{line_number}"
+                )
+    if IWA_TABLE_MERGE_FORMULA_CODEC_HIDDEN_MODULE.search(facade_source) is None:
+        violations.append(
+            f"table-merge formula codec module must be doc(hidden): "
+            f"{IWA_PROTOS_FACADE_SOURCE}"
+        )
+    if re.search(r"(?m)^\s*pub\s+mod\s+(?:buffa_)?[A-Za-z0-9_]*generated\b", facade_source):
+        violations.append(
+            f"table-merge formula codec must keep generated Buffa modules private: "
+            f"{IWA_PROTOS_FACADE_SOURCE}"
+        )
+    return sorted(set(violations))
 
 
 def audit_iwa_common_table_read_source_topology(root: Path = ROOT) -> list[str]:
@@ -74711,6 +75658,11 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_table_merge_source_topology()
         + audit_keynote_table_merge_reader_source_topology()
         + audit_numbers_table_merge_source_topology()
+        + audit_iwa_numbers_wire_table_merge_writer_source_topology()
+        + audit_numbers_table_merge_transaction_source_topology()
+        + audit_pages_table_merge_transaction_source_topology()
+        + audit_keynote_table_merge_transaction_source_topology()
+        + audit_iwa_table_merge_formula_codec_source_topology()
         + audit_iwa_table_merge_host_read_delegation_source_topology()
         + audit_pages_table_cells_source_topology()
         + audit_keynote_table_cells_source_topology()

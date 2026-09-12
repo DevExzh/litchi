@@ -485,10 +485,48 @@ impl KeynoteEditor {
         model_object_id: u64,
         region: Region,
     ) -> Result<()> {
+        let package_limits = self.package().limits();
+        if self.package().exact_source_owner().is_some()
+            && let Some(table_position) =
+                reader::focused_table_position_for_mutation(self, slide_index, model_object_id)?
+        {
+            let focused = focused_table_package(self)?;
+            let mut edit = focused
+                .edit_slide_table_merges(
+                    litchi_keynote::SlideSelector::index(slide_index),
+                    litchi_keynote::TableSelector::index(table_position),
+                )
+                .map_err(Error::from)?;
+            edit.merge(region).map_err(Error::from)?;
+            let commit = edit.commit().map_err(Error::from)?;
+            if commit.patch().is_noop() {
+                return Ok(());
+            }
+            let mut bytes = Vec::new();
+            commit
+                .package()
+                .write_to(&mut bytes)
+                .map_err(|error| Error::Io(error.into_io_error()))?;
+            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
+                &bytes,
+                package_limits,
+            )?)?;
+            if !verified
+                .slide_table_cell_merges(slide_index, model_object_id)?
+                .contains(&region)
+            {
+                return Err(Error::InvalidFormat(
+                    "focused Keynote table-cell merge failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+            return Ok(());
+        }
+
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         crate::numbers::editor::merge_table_cells_in_package(&mut staged, model_object_id, region)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_package(staged)?;
         require_table_model(&verified, slide_index, model_object_id)?;
         if !verified
             .slide_table_cell_merges(slide_index, model_object_id)?
@@ -509,6 +547,47 @@ impl KeynoteEditor {
         model_object_id: u64,
         region: Region,
     ) -> Result<bool> {
+        let package_limits = self.package().limits();
+        if self.package().exact_source_owner().is_some()
+            && let Some(table_position) =
+                reader::focused_table_position_for_mutation(self, slide_index, model_object_id)?
+        {
+            let focused = focused_table_package(self)?;
+            let mut edit = focused
+                .edit_slide_table_merges(
+                    litchi_keynote::SlideSelector::index(slide_index),
+                    litchi_keynote::TableSelector::index(table_position),
+                )
+                .map_err(Error::from)?;
+            let changed = edit.unmerge(region).map_err(Error::from)?;
+            if !changed {
+                return Ok(false);
+            }
+            let commit = edit.commit().map_err(Error::from)?;
+            if commit.patch().is_noop() {
+                return Ok(false);
+            }
+            let mut bytes = Vec::new();
+            commit
+                .package()
+                .write_to(&mut bytes)
+                .map_err(|error| Error::Io(error.into_io_error()))?;
+            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
+                &bytes,
+                package_limits,
+            )?)?;
+            if verified
+                .slide_table_cell_merges(slide_index, model_object_id)?
+                .contains(&region)
+            {
+                return Err(Error::InvalidFormat(
+                    "focused Keynote table-cell unmerge failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+            return Ok(true);
+        }
+
         require_table_model(self, slide_index, model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::unmerge_table_cells_in_package(
@@ -519,7 +598,7 @@ impl KeynoteEditor {
         if !changed {
             return Ok(false);
         }
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_package(staged)?;
         require_table_model(&verified, slide_index, model_object_id)?;
         if verified
             .slide_table_cell_merges(slide_index, model_object_id)?

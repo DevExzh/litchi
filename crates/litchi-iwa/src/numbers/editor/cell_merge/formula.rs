@@ -111,6 +111,7 @@ pub(super) fn parse_merge_formula(
     .map_err(|_| unsupported_merge_formula())
 }
 
+#[cfg(test)]
 pub(super) fn merge_formula(
     region: Region,
     table_id: tsp::CfuuidArchive,

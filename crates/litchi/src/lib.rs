@@ -555,7 +555,8 @@ pub mod numbers {
         TableCellCommentEdit, TableCellCommentError, TableCellCommentLimitKind,
         TableCellCommentPatch, TableCellCommentPath, TableError, TableLockCommit,
         TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
-        TableMergesError, TableMergesLimitKind, TableSelector, TableSelectorError, View,
+        TableMergesCommit, TableMergesDiagnostics, TableMergesEdit, TableMergesError,
+        TableMergesLimitKind, TableMergesPatch, TableSelector, TableSelectorError, View,
         WriteError, compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
     };
     pub use litchi_numbers::{cell, document, formula, names, package, selector, sheet, table};

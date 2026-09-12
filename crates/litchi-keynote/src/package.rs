@@ -232,7 +232,8 @@ pub use slide_table_lock_state::{
     SlideTableLockStatePath,
 };
 pub use slide_table_merges::{
-    MergeReader, SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPath,
+    MergeReader, SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
+    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPatch, SlideTableMergesPath,
 };
 pub use slide_table_name::{
     SlideTableNameCommit, SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError,

@@ -208,6 +208,26 @@ pub(super) fn focused_body_table_source(
     Ok((focused, table_position, info))
 }
 
+fn focused_body_table_package(editor: &PagesEditor) -> Result<FocusedPagesPackage> {
+    let source = editor.package().exact_source_bytes().ok_or_else(|| {
+        Error::InvalidFormat("focused Pages table source is not exact".to_owned())
+    })?;
+    let package_limits = editor.package().limits();
+    let archive_limits = package_limits.effective_archive_limits()?;
+    let focused_limits = litchi_pages::Limits::new(
+        package_limits.max_input_bytes(),
+        package_limits.max_entries(),
+        package_limits.max_entry_bytes(),
+        package_limits.max_total_bytes(),
+        package_limits.max_iwa_stream_bytes(),
+    )
+    .map_err(|error| Error::InvalidFormat(format!("Pages table limits: {error}")))?
+    .with_archive_limits(archive_limits)
+    .map_err(|error| Error::InvalidFormat(format!("Pages table archive limits: {error}")))?;
+    FocusedPagesPackage::from_bytes_with_limits(source, focused_limits)
+        .map_err(|error| Error::InvalidFormat(format!("focused Pages table source: {error}")))
+}
+
 impl PagesEditor {
     /// List native tables anchored in the main body in document order.
     pub fn tables(&self) -> Result<Vec<PagesTableInfo>> {
@@ -3390,10 +3410,48 @@ impl PagesEditor {
 
     /// Merge one non-overlapping body-table rectangle transactionally.
     pub fn merge_table_cells(&mut self, model_object_id: u64, region: Region) -> Result<()> {
+        // Exact package sources are admitted by the metadata-only rooted
+        // selector. Legacy aliases, detached models, and source-built
+        // snapshots stay on the bounded compatibility writer below.
+        if self.package().exact_source_owner().is_some()
+            && let Some(table_position) =
+                super::reader::focused_table_position_for_mutation(self, model_object_id)?
+        {
+            let focused = focused_body_table_package(self)?;
+            let mut edit = focused
+                .edit_body_table_merges(BodyTableSelector::index(table_position))
+                .map_err(Error::from)?;
+            edit.merge(region).map_err(Error::from)?;
+            let commit = edit.commit().map_err(Error::from)?;
+            if commit.patch().is_noop() {
+                return Ok(());
+            }
+            let mut bytes = Vec::new();
+            commit
+                .package()
+                .write_to(&mut bytes)
+                .map_err(|error| Error::Io(error.into_io_error()))?;
+            let package_limits = self.package().limits();
+            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
+                &bytes,
+                package_limits,
+            )?)?;
+            if !verified
+                .table_cell_merges(model_object_id)?
+                .contains(&region)
+            {
+                return Err(Error::InvalidFormat(
+                    "focused Pages table-cell merge failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+            return Ok(());
+        }
+
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         crate::numbers::editor::merge_table_cells_in_package(&mut staged, model_object_id, region)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_package(staged)?;
         verified.require_body_table(model_object_id)?;
         if !verified
             .table_cell_merges(model_object_id)?
@@ -3409,6 +3467,44 @@ impl PagesEditor {
 
     /// Remove one exact body-table merge, returning whether it existed.
     pub fn unmerge_table_cells(&mut self, model_object_id: u64, region: Region) -> Result<bool> {
+        if self.package().exact_source_owner().is_some()
+            && let Some(table_position) =
+                super::reader::focused_table_position_for_mutation(self, model_object_id)?
+        {
+            let focused = focused_body_table_package(self)?;
+            let mut edit = focused
+                .edit_body_table_merges(BodyTableSelector::index(table_position))
+                .map_err(Error::from)?;
+            let changed = edit.unmerge(region).map_err(Error::from)?;
+            if !changed {
+                return Ok(false);
+            }
+            let commit = edit.commit().map_err(Error::from)?;
+            if commit.patch().is_noop() {
+                return Ok(false);
+            }
+            let mut bytes = Vec::new();
+            commit
+                .package()
+                .write_to(&mut bytes)
+                .map_err(|error| Error::Io(error.into_io_error()))?;
+            let package_limits = self.package().limits();
+            let verified = Self::from_package(IWorkPackage::from_bytes_with_limits(
+                &bytes,
+                package_limits,
+            )?)?;
+            if verified
+                .table_cell_merges(model_object_id)?
+                .contains(&region)
+            {
+                return Err(Error::InvalidFormat(
+                    "focused Pages table-cell unmerge failed package validation".to_owned(),
+                ));
+            }
+            *self = verified;
+            return Ok(true);
+        }
+
         self.require_body_table(model_object_id)?;
         let mut staged = self.package().clone();
         let changed = crate::numbers::editor::unmerge_table_cells_in_package(
@@ -3419,7 +3515,7 @@ impl PagesEditor {
         if !changed {
             return Ok(false);
         }
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        let verified = Self::from_package(staged)?;
         verified.require_body_table(model_object_id)?;
         if verified
             .table_cell_merges(model_object_id)?
