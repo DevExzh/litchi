@@ -182,6 +182,12 @@ cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS" 
 
 EXTRAS=(
     "$ROOT/Cargo.toml" "$ROOT/rust-toolchain.toml" "$ROOT/.cargo/config.toml"
+    "$ROOT/docs/GOAL.md"
+    "$ROOT/docs/adr/0001-priorities-and-api-layers.md"
+    "$ROOT/docs/adr/0003-snapshots-edits-and-patches.md"
+    "$ROOT/docs/adr/0005-io-memory-and-performance.md"
+    "$ROOT/docs/adr/0006-validation-security-and-compatibility.md"
+    "$ROOT/docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md"
     "$HARNESS" "$LOCKFILE" "$HERE/harness/main.rs" "$HERE/harness/adapter.rs"
     "$HERE/harness/support.rs" "$SOURCE_MANIFEST" "$COMMITTED_INPUTS"
     "$VERIFIER" "$HERE/run_profile.sh" "$HERE/README.md" "$HERE/PLAN.md"
