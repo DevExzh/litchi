@@ -1,0 +1,18 @@
+timestamp_start_utc=2026-09-12T17:09:59Z
+git_head=463334f1a32de687ffb2b3357e55816dcfd3102e
+git_status=production_source=d000d977b99e03f8542c7dae74acf767a91b1feb
+current_smoke_commit=c4ac516353591f88a9b797349002d05737614e78
+results=/var/tmp/litchi-docx-styles-effects-profile-representative-results-463334f1a-20260912-a
+target=/var/tmp/litchi-docx-styles-effects-profile-representative-target-463334f1a-20260912-a
+cpus=32
+loadavg=5.69 15.03 10.38 3/1300 3356009
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+env=CARGO_INCREMENTAL=0 TMPDIR=/var/tmp RUSTFLAGS=unset CARGO_ENCODED_RUSTFLAGS=unset RUSTC_BOOTSTRAP=unset RUSTDOCFLAGS=unset
+binary=/var/tmp/litchi-docx-styles-effects-profile-representative-target-463334f1a-20260912-a/debug/docx-styles-effects-profile

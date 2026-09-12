@@ -1,0 +1,3 @@
+cargo build --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/docx-styles-effects-performance/profile-harness/Cargo.toml
+run=/var/tmp/litchi-docx-styles-effects-profile-representative-target-463334f1a-20260912-a/debug/docx-styles-effects-profile --lane replace_main --scale native --warmup 0 --samples 1
+run=/var/tmp/litchi-docx-styles-effects-profile-representative-target-463334f1a-20260912-a/debug/docx-styles-effects-profile --lane replace_glossary --scale native --warmup 0 --samples 1
