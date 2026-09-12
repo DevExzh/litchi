@@ -182,6 +182,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$COMMITTED_INPUTS" \
     --extra "$HERE/run_profile.sh" \
     --extra "$HERE/summarize.py" \
+    --extra "$HERE/uncertainty.py" \
     --extra "$HERE/verify.py" \
     --extra "$HERE/README.md" \
     --extra "$HERE/requirements.md" \
@@ -255,6 +256,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$COMMITTED_INPUTS" \
     --extra "$HERE/run_profile.sh" \
     --extra "$HERE/summarize.py" \
+    --extra "$HERE/uncertainty.py" \
     --extra "$HERE/verify.py" \
     --extra "$HERE/README.md" \
     --extra "$HERE/requirements.md" \
@@ -295,3 +297,5 @@ cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt
 python3 "$HERE/summarize.py" --results "$RESULTS" --output "$RESULTS/report.md"
 python3 "$HERE/verify.py" --root "$ROOT" --results "$RESULTS" \
     --report "$RESULTS/report.md" --output "$RESULTS/verification.json"
+python3 "$HERE/uncertainty.py" --results "$RESULTS" \
+    --output "$RESULTS/uncertainty.md" --json-output "$RESULTS/uncertainty.json"
