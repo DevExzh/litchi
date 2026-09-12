@@ -1,0 +1,15 @@
+{
+  "schema": "litchi-0525-eager-guard-binding-v1",
+  "stage": "baseline",
+  "name": "eager-r2-medium",
+  "primary_plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "eager_plan_sha256": "aff0ed66c6bca6ff6a16ef99f8e5c460d8e5c396f24700626f89cdff090a1650",
+  "run_script_sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d",
+  "guard_script_sha256": "6b1b8d10db40e838394a862c5a7527a12278a5e11f6c519b8cb3cdde15d43431",
+  "source_manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+  "binary_sha256": "29477b1270773fa43a4e264a131d91e04fdd32899b7e4e2b430751c26b3670a8",
+  "receipt_sha256": "98754bff90cd419cea061b83c3fefd12f4a98ea8b6902fcde9620f26ff69c90a",
+  "command_sha256": "fa60206f83f5f5363f5178b5a549c8a70f5e0e87c5a9e77103f8a06d009c7923",
+  "output": "baseline/eager-r2-medium.json",
+  "rss": "baseline/eager-r2-medium.rss.json"
+}

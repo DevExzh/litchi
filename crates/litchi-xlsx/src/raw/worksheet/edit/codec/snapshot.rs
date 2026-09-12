@@ -16,5 +16,5 @@ pub(crate) use scan::scan;
 pub(crate) use scan::scan_with_event_limit;
 pub(crate) use write::{
     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
-    write_sheet_data,
+    write_sheet_data, write_sheet_data_with_provenance,
 };

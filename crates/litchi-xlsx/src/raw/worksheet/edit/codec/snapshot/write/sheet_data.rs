@@ -13,6 +13,7 @@ use crate::cell::{Content, Value};
 use crate::error::{Result, invalid};
 use crate::outline::Outline;
 use crate::raw::strings::encode_spreadsheet_text;
+use crate::raw::worksheet::edit::OmittedCells;
 use crate::raw::worksheet::edit::model::{
     Action, DescentEffect, HeightEffect, Payload, RowAction, StyleEffect,
 };
@@ -77,6 +78,221 @@ pub(crate) fn write_sheet_data(
         write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
     }
     output.extend_from_slice(&source[data.close_start..data.span.end]);
+    Ok(())
+}
+
+/// Write the complete ordinary output and retain the actual output spans of
+/// cell bodies that a reduced semantic readback may omit. This is a separate
+/// value-only route; callers that need row, column, or default effects keep
+/// using [`write_sheet_data`].
+pub(crate) fn write_sheet_data_with_provenance(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    data: &SheetData,
+    cells: BTreeMap<Address, Action>,
+    rows: BTreeMap<Row, RowAction>,
+    descent_name: &str,
+) -> Result<Box<[OmittedCells]>> {
+    let mut by_row = BTreeMap::<u32, RowEdits>::new();
+    for (address, action) in cells {
+        let number = address
+            .row()
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
+        by_row
+            .entry(number)
+            .or_default()
+            .cells
+            .insert(address, action);
+    }
+    for (row, action) in rows {
+        let number = row
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
+        by_row.entry(number).or_default().row = Some(action);
+    }
+    let mut omitted = Vec::new();
+    let mut recording = omitted.try_reserve(data.rows.len()).is_ok();
+    if !recording {
+        omitted.clear();
+    }
+
+    if data.empty {
+        write_tag(output, &data.tag, false, &[], &[]);
+        for (number, edits) in by_row {
+            write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+        }
+        write_close(output, &data.tag.name);
+        return Ok(if recording {
+            omitted.into_boxed_slice()
+        } else {
+            Box::new([])
+        });
+    }
+
+    output.extend_from_slice(&source[data.span.start..data.tag_end]);
+    let mut cursor = data.tag_end;
+    let mut pending = by_row.into_iter().peekable();
+    for row in &data.rows {
+        output.extend_from_slice(&source[cursor..row.span.start]);
+        while pending
+            .peek()
+            .is_some_and(|(number, _)| *number < row.number)
+        {
+            if let Some((number, edits)) = pending.next() {
+                write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+            }
+        }
+        if pending
+            .peek()
+            .is_some_and(|(number, _)| *number == row.number)
+        {
+            let (_, edits) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet row edit ordering was lost"))?;
+            let membership_changed = edits.cells.iter().any(|(address, action)| {
+                let exists = row
+                    .cells
+                    .binary_search_by_key(address, |cell| cell.address)
+                    .is_ok();
+                !exists || matches!(action, Action::Remove)
+            });
+            if membership_changed || edits.row.is_some() || row.empty {
+                write_row(output, source, row, &edits, descent_name)?;
+            } else {
+                write_replacement_row(output, source, row, &edits, &mut omitted, &mut recording)?;
+            }
+        } else {
+            output.extend_from_slice(&source[row.span.start..row.tag_end]);
+            let body_start = output.len();
+            output.extend_from_slice(&source[row.tag_end..row.close_start]);
+            let body_end = output.len();
+            record_omitted_row(&mut omitted, &mut recording, row, body_start, body_end)?;
+            output.extend_from_slice(&source[row.close_start..row.span.end]);
+        }
+        cursor = row.span.end;
+    }
+    output.extend_from_slice(&source[cursor..data.close_start]);
+    for (number, edits) in pending {
+        write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+    }
+    output.extend_from_slice(&source[data.close_start..data.span.end]);
+    Ok(if recording {
+        omitted.into_boxed_slice()
+    } else {
+        Box::new([])
+    })
+}
+
+fn write_replacement_row(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    row: &RowSlot,
+    edits: &RowEdits,
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+) -> Result<()> {
+    output.extend_from_slice(&source[row.span.start..row.tag_end]);
+    let mut cursor = row.tag_end;
+    let mut pending = edits.cells.iter().peekable();
+    let mut run = None::<(usize, Address, Address)>;
+    for cell in &row.cells {
+        output.extend_from_slice(&source[cursor..cell.span.start]);
+        let cell_start = output.len();
+        while pending
+            .peek()
+            .is_some_and(|(address, _)| **address < cell.address)
+        {
+            let (address, action) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+            if let Some((start, first, last)) = run.take() {
+                record_omitted(omitted, recording, first, last, start, cell_start)?;
+            }
+            write_new_action(output, &row.tag.name, *address, action)?;
+        }
+        if pending
+            .peek()
+            .is_some_and(|(address, _)| **address == cell.address)
+        {
+            let (_, action) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+            if let Some((start, first, last)) = run.take() {
+                record_omitted(omitted, recording, first, last, start, cell_start)?;
+            }
+            match action {
+                Action::Update { .. } => write_cell(output, source, cell, action)?,
+                Action::Remove => {
+                    return Err(invalid("replacement row unexpectedly removes a cell"));
+                },
+            }
+        } else {
+            let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
+            let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
+            run = Some((start, first, cell.address));
+            output.extend_from_slice(&source[cell.span.start..cell.span.end]);
+        }
+        cursor = cell.span.end;
+    }
+    output.extend_from_slice(&source[cursor..row.close_start]);
+    if let Some((start, first, last)) = run {
+        record_omitted(omitted, recording, first, last, start, output.len())?;
+    }
+    output.extend_from_slice(&source[row.close_start..row.span.end]);
+    Ok(())
+}
+
+fn record_omitted_row(
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    row: &RowSlot,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    let Some(first) = row.cells.first() else {
+        return Ok(());
+    };
+    let last = row
+        .cells
+        .last()
+        .ok_or_else(|| invalid("worksheet row cell provenance lost its last cell"))?;
+    record_omitted(omitted, recording, first.address, last.address, start, end)
+}
+
+fn record_omitted(
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    first: Address,
+    last: Address,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    if start >= end {
+        return Ok(());
+    }
+    if first.row() != last.row() || first.column() > last.column() {
+        return Err(invalid(
+            "worksheet cell provenance has an invalid address range",
+        ));
+    }
+    if !*recording {
+        return Ok(());
+    }
+    if omitted.try_reserve(1).is_err() {
+        *recording = false;
+        omitted.clear();
+        return Ok(());
+    }
+    omitted.push(OmittedCells {
+        row: first.row().get(),
+        first_column: first.column().get(),
+        last_column: last.column().get(),
+        start,
+        end,
+    });
     Ok(())
 }
 

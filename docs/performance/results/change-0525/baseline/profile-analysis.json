@@ -1,0 +1,2210 @@
+{
+  "schema": "xlsx_callgrind_reconstruction_profile_analysis_v1",
+  "status": "pass",
+  "selected_function": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+  "plan": "plan.json",
+  "plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "stage_selection": [
+    "baseline"
+  ],
+  "stages": {
+    "baseline": {
+      "stage": "baseline",
+      "metadata": {
+        "source_manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+        "source_manifest": "baseline/source-manifest.json",
+        "plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+        "run_script_sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d",
+        "build_receipt": "baseline/build-normal.receipt.json",
+        "build_receipt_sha256": "b248e13ed239c74691594bfd2f50c8e3053eb92bb5bf0a2c3f1816b81282ba71",
+        "binary_identity": "baseline/binary-normal.json",
+        "binary_sha256": "29477b1270773fa43a4e264a131d91e04fdd32899b7e4e2b430751c26b3670a8",
+        "binary_path": "/tmp/litchi-goal-0525/baseline-normal",
+        "build_command": [
+          "env",
+          "CARGO_BUILD_JOBS=2",
+          "CARGO_INCREMENTAL=0",
+          "cargo",
+          "build",
+          "--release",
+          "--locked",
+          "--manifest-path",
+          "tools/perf-baseline/Cargo.toml",
+          "--bin",
+          "litchi-perf-baseline",
+          "--target-dir",
+          "/home/zhuhe/litchi-goal-0525-target"
+        ]
+      },
+      "profile_count": 4,
+      "profiles": [
+        {
+          "name": "profile-r1-medium",
+          "repeat": 1,
+          "shape": "medium",
+          "receipt": "baseline/profile-r1-medium.receipt.json",
+          "receipt_sha256": "8073ae428d00146e196f153b1f8babab834d30ea8d1ddc321260a59e3f903d0d",
+          "profile_result": "baseline/profile-r1-medium.json",
+          "profile_result_sha256": "5e75f8ba242d55ecede1e1f0d4e86e8b500f1902b73e91e169b3f8b87e0fefde",
+          "native": {
+            "file": "baseline/native-r1-primary-medium.json",
+            "receipt": "baseline/native-r1-primary-medium.receipt.json",
+            "output_sha256": "29d8b8efe8a6bb0249631f48da9c50d3426355f097705d3433c65e60b0d29831",
+            "receipt_sha256": "6b6fd2e509128d238340ee8cb1a155e9dc015152e204829b3d0fea51218c165a"
+          },
+          "native_result_identity": {
+            "corpus": {
+              "name": "xlsx-cell-values-medium",
+              "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+              "package_format": "XLSX/OPC/ZIP",
+              "shape": "medium",
+              "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+              "compression": "deflate",
+              "entry_count": 9216,
+              "archive_member_count": 17,
+              "entry_bytes": 4,
+              "uncompressed_payload_bytes": 4231168,
+              "archive_bytes": 4226429,
+              "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+              "target_entry": "Sheet1!A1",
+              "target_payload_bytes": 1,
+              "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+              "xlsx": {
+                "sheet_count": 4,
+                "rows_per_sheet": 48,
+                "columns_per_sheet": 48,
+                "one_percent_update_count": 93,
+                "source_members": {
+                  "workbook": "xl/workbook.xml",
+                  "worksheets": [
+                    "xl/worksheets/sheet1.xml",
+                    "xl/worksheets/sheet2.xml",
+                    "xl/worksheets/sheet3.xml",
+                    "xl/worksheets/sheet4.xml"
+                  ],
+                  "shared_strings": null,
+                  "styles": "xl/styles.xml"
+                }
+              }
+            },
+            "sink": {
+              "accepted_bytes": 4226788,
+              "write_calls": 143,
+              "largest_write": 65536,
+              "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_1_to_512": 75,
+                "bytes_513_to_4096": 0,
+                "bytes_4097_to_16384": 4,
+                "bytes_16385_to_65536": 64,
+                "bytes_over_65536": 0
+              }
+            },
+            "source_counters": {
+              "max_in_flight_reads": 1,
+              "ordinary_payload_materializations": 6,
+              "ordinary_payload_read_bytes": 4223551,
+              "ordinary_payload_read_calls": 79,
+              "read_bytes": 4233109,
+              "read_calls": 205,
+              "xlsx_cell_values": {
+                "budget_objects_used_after_handles_drop": 0,
+                "budget_used_after_handles_drop": 0,
+                "budget_used_after_package_drop": 0,
+                "cache_allocation_bypasses": 0,
+                "cache_budget_managed": false,
+                "cache_budget_memory_limit": null,
+                "cache_budget_memory_used": 0,
+                "cache_budget_reservation_failures": 0,
+                "cache_budget_reserved_bytes": 0,
+                "cache_bypasses": 0,
+                "cache_cold_loads": 6,
+                "cache_evictions": 0,
+                "cache_failed_loads": 0,
+                "cache_hits": 0,
+                "cache_in_flight_loads": 0,
+                "cache_mode": "unmanaged-control",
+                "cache_oversized_bypasses": 0,
+                "cache_retained_bytes": 269785,
+                "cache_retained_entries": 6,
+                "cache_successful_loads": 6,
+                "cache_waiter_joins": 0,
+                "implementation": "source-backed",
+                "output_budget_refusal": {
+                  "accepted_output_bytes": 0,
+                  "first_output_request_bytes": 0,
+                  "one_under_output_limit": 0,
+                  "output_bytes_used": 0,
+                  "source_identity_preserved": false,
+                  "source_read_bytes": 0,
+                  "source_read_calls": 0,
+                  "successful_output_ceiling": 0,
+                  "typed_output_resource_refusal": false,
+                  "zero_output_verified": false
+                },
+                "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+                "payload_materializations": 6,
+                "payload_memory_limit": null,
+                "post_publication_budget": {
+                  "cache_reserved_objects": null,
+                  "catalog_reserved_objects": null,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "pre_publication_budget": {
+                  "cache_reserved_objects": 0,
+                  "catalog_reserved_objects": 0,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "publication_planning_memory_headroom": null,
+                "selected_worksheet_count": 4,
+                "selected_worksheet_read_bytes": 27146,
+                "selected_worksheet_read_calls": 4,
+                "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+                "source_read_bytes": 4233109,
+                "source_read_calls": 205,
+                "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+                "unselected_worksheet_read_bytes": 0,
+                "unselected_worksheet_read_calls": 0,
+                "untouched_member_count": 12,
+                "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+                "update_count": 93,
+                "workbook_read_bytes": 226,
+                "workbook_read_calls": 1
+              }
+            },
+            "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+          },
+          "raw_dumps": [
+            {
+              "part": 1,
+              "file": "baseline/profile-r1-medium.callgrind.1",
+              "sha256": "c604041d447429bbcb99ff2b161152b9e6d2a65aa76df36572f0d117d5ae50b6",
+              "summary_ir": 21703,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 21703
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 2,
+              "file": "baseline/profile-r1-medium.callgrind.2",
+              "sha256": "2469aca69c7e4e5dceacdbef01c1dc4bd641c928473c29b995f4fb3687b62f90",
+              "summary_ir": 48901742,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 48901742
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 3,
+              "file": "baseline/profile-r1-medium.callgrind.3",
+              "sha256": "3ebbc3b33dbf39b069260c16e67ca706a69afa3ac34c62b77e794e551eddd2e4",
+              "summary_ir": 48938316,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 48938316
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 4,
+              "file": "baseline/profile-r1-medium.callgrind.4",
+              "sha256": "abc00ce9825660d32ef60753ec3f74e8ad295c2f7a47fc155c2d3a821565d47e",
+              "summary_ir": 197188676,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 197188676
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            }
+          ],
+          "final_process_dump": {
+            "file": "baseline/profile-r1-medium.callgrind",
+            "sha256": "22c50526154b6c87b59840fa5c55d97f322071afd25ac412ac07d4f621d6cfec",
+            "part": 5,
+            "trigger": "Program termination",
+            "summary_ir": 0,
+            "validation": {
+              "final_process_dump_zero_ir": true
+            }
+          },
+          "annotations": {
+            "environment": {
+              "PERL_HASH_SEED": "0",
+              "PERL_PERTURB_KEYS": "0"
+            },
+            "command": {
+              "inclusive": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=yes",
+                "--tree=both",
+                "baseline/profile-r1-medium.callgrind.4"
+              ],
+              "self": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=no",
+                "--tree=both",
+                "baseline/profile-r1-medium.callgrind.4"
+              ]
+            },
+            "files": {
+              "inclusive": "baseline/profile-r1-medium.inclusive.txt",
+              "inclusive_sha256": "1d6937d159e80435bb209c5a0f593a94c0ef75e0e90a0880df276433611c44f4",
+              "self": "baseline/profile-r1-medium.self.txt",
+              "self_sha256": "ba6b7f442cade6f526327a3333b5b365dc8ddff8873ed69aa50aba2e3436e3e6"
+            },
+            "owner": {
+              "inclusive_ir": 197188676,
+              "self_ir": 5692,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                  "inclusive_ir": 121445145,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::edit::package::rewrite",
+                  "inclusive_ir": 75197164,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                  "inclusive_ir": 135992,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                  "inclusive_ir": 135272,
+                  "calls": 1
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::append_actions",
+                  "inclusive_ir": 117487,
+                  "calls": 93
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::effective_action_count",
+                  "inclusive_ir": 46345,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell::Store::entry",
+                  "inclusive_ir": 21855,
+                  "calls": 93
+                },
+                {
+                  "name": "litchi_xlsx::cell::Content::as_cell",
+                  "inclusive_ir": 21391,
+                  "calls": 93
+                },
+                {
+                  "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+                  "inclusive_ir": 17329,
+                  "calls": 1
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>",
+                  "inclusive_ir": 16285,
+                  "calls": 93
+                },
+                {
+                  "name": "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone",
+                  "inclusive_ir": 9173,
+                  "calls": 1
+                },
+                {
+                  "name": "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq",
+                  "inclusive_ir": 6860,
+                  "calls": 93
+                },
+                {
+                  "name": "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone",
+                  "inclusive_ir": 6318,
+                  "calls": 4
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>",
+                  "inclusive_ir": 3914,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 1280,
+                  "calls": 16
+                },
+                {
+                  "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "inclusive_ir": 435,
+                  "calls": 1
+                },
+                {
+                  "name": "alloc::vec::Vec<T,A>::push_mut",
+                  "inclusive_ir": 408,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets",
+                  "inclusive_ir": 191,
+                  "calls": 1
+                },
+                {
+                  "name": "__rustc::__rust_dealloc",
+                  "inclusive_ir": 140,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 121445145,
+                "litchi_xlsx::raw::worksheet::edit::package::rewrite": 75197164,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 135992,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 135272,
+                "litchi_xlsx::cell_values::source::append_actions": 117487,
+                "litchi_xlsx::cell_values::source::effective_action_count": 46345,
+                "litchi_xlsx::cell::Store::entry": 21855,
+                "litchi_xlsx::cell::Content::as_cell": 21391,
+                "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 17329,
+                "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 16285,
+                "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9173,
+                "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 6860,
+                "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6318,
+                "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 3914,
+                "__memcpy_avx_unaligned_erms": 1280,
+                "alloc::raw_vec::RawVecInner<A>::finish_grow": 435,
+                "alloc::vec::Vec<T,A>::push_mut": 408,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+                "__rustc::__rust_dealloc": 140
+              }
+            },
+            "validator": {
+              "inclusive_ir": 46793386,
+              "source": "callgrind_annotate --inclusive=yes --tree=both",
+              "caveat": "This is an inclusive Ir row. It includes child calls; child-call metadata in the annotation can include calls attributable outside the selected direct edge, so it is a mechanism diagnostic."
+            },
+            "validation": {
+              "inclusive_owner_matches_raw": true,
+              "self_plus_direct_equals_inclusive": true,
+              "inclusive_and_self_direct_children_match": true,
+              "validator_row_present": true,
+              "raw_worksheet_parse_row_present": true
+            },
+            "raw_worksheet_parse": {
+              "inclusive_ir": 74811873,
+              "self_ir": 304,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse",
+                  "inclusive_ir": 68043905,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "inclusive_ir": 6521259,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent",
+                  "inclusive_ir": 128374,
+                  "calls": 4
+                },
+                {
+                  "name": "core::str::converts::from_utf8",
+                  "inclusive_ir": 117911,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 120,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 68043905,
+                "litchi_ooxml_common::mce::codec::process_ooxml": 6521259,
+                "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 128374,
+                "core::str::converts::from_utf8": 117911,
+                "__memcpy_avx_unaligned_erms": 120
+              },
+              "source": "callgrind_annotate --inclusive=yes/no --tree=both"
+            }
+          },
+          "validator_raw_incoming": {
+            "target": "litchi_xlsx::cell_values::validation::validate_xml",
+            "caller": null,
+            "positive_edge_count": 3,
+            "calls": 9,
+            "inclusive_ir": 46793386,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 46624650
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 135480
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 1,
+                "inclusive_ir": 33256
+              }
+            ]
+          },
+          "raw_worksheet_parse_incoming": {
+            "target": "litchi_xlsx::raw::worksheet::parse",
+            "caller": null,
+            "positive_edge_count": 1,
+            "calls": 4,
+            "inclusive_ir": 74811873,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::raw::worksheet::parse",
+                "calls": 4,
+                "inclusive_ir": 74811873
+              }
+            ]
+          },
+          "raw_worksheet_parse_inclusive_ir": 74811873,
+          "raw_worksheet_parse_self_ir": 304,
+          "validator_event_into_owned_edge": {
+            "target": "quick_xml::events::Event::into_owned",
+            "caller": "litchi_xlsx::cell_values::validation::validate_xml",
+            "positive_edge_count": 0,
+            "calls": 0,
+            "inclusive_ir": 0,
+            "edges": [],
+            "present": false,
+            "policy": "absent-both-stages",
+            "stage": "baseline",
+            "interpretation": "This edge is retained only as a diagnostic invariant from 0521; it is not a 0525 improvement claim."
+          },
+          "total_ir": 197188676,
+          "self_ir": 5692,
+          "direct_ir": 197182984,
+          "direct_callee_ir": {
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 121445145,
+            "litchi_xlsx::raw::worksheet::edit::package::rewrite": 75197164,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 135992,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 135272,
+            "litchi_xlsx::cell_values::source::append_actions": 117487,
+            "litchi_xlsx::cell_values::source::effective_action_count": 46345,
+            "litchi_xlsx::cell::Store::entry": 21855,
+            "litchi_xlsx::cell::Content::as_cell": 21391,
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 17329,
+            "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 16285,
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9173,
+            "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 6860,
+            "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6318,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 3914,
+            "__memcpy_avx_unaligned_erms": 1280,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 435,
+            "alloc::vec::Vec<T,A>::push_mut": 408,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+            "__rustc::__rust_dealloc": 140
+          },
+          "validator_inclusive_ir": 46793386,
+          "validation": {
+            "receipt_and_command": true,
+            "profile_native_identity_parity": true,
+            "all_numbered_raw_dumps_valid": true,
+            "final_process_dump_zero_ir": true,
+            "raw_worksheet_parse_row_present": true,
+            "event_edge_absent_in_both_stage_policy": true,
+            "validator_inclusive_row_diagnostic": true,
+            "inclusive_owner_matches_raw": true,
+            "self_plus_direct_equals_inclusive": true,
+            "inclusive_and_self_direct_children_match": true,
+            "validator_row_present": true
+          }
+        },
+        {
+          "name": "profile-r1-dense-sparse",
+          "repeat": 1,
+          "shape": "dense-sparse",
+          "receipt": "baseline/profile-r1-dense-sparse.receipt.json",
+          "receipt_sha256": "949247f8e207e0596677c742c1a002228603abb5e0bfc8aaeec0d16c376f39a3",
+          "profile_result": "baseline/profile-r1-dense-sparse.json",
+          "profile_result_sha256": "42e09e977b4a0ef6a0cab3df46975af649f00129c5b284f424bca0e6e994a151",
+          "native": {
+            "file": "baseline/native-r1-primary-dense-sparse.json",
+            "receipt": "baseline/native-r1-primary-dense-sparse.receipt.json",
+            "output_sha256": "a6ba306d8cd875bdcbb402b64845c47dc636eec084dee954ed9c7b010b3f461a",
+            "receipt_sha256": "c8aa255e2e2129475ca796382ddfafc83aa0ae643cacc04953ef730674cde37e"
+          },
+          "native_result_identity": {
+            "corpus": {
+              "name": "xlsx-cell-values-dense-sparse",
+              "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+              "package_format": "XLSX/OPC/ZIP",
+              "shape": "dense-sparse",
+              "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+              "compression": "deflate",
+              "entry_count": 17792,
+              "archive_member_count": 17,
+              "entry_bytes": 4,
+              "uncompressed_payload_bytes": 4265472,
+              "archive_bytes": 4251863,
+              "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+              "target_entry": "Sheet1!A1",
+              "target_payload_bytes": 1,
+              "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+              "xlsx": {
+                "sheet_count": 4,
+                "rows_per_sheet": 128,
+                "columns_per_sheet": 128,
+                "one_percent_update_count": 178,
+                "source_members": {
+                  "workbook": "xl/workbook.xml",
+                  "worksheets": [
+                    "xl/worksheets/sheet1.xml",
+                    "xl/worksheets/sheet2.xml",
+                    "xl/worksheets/sheet3.xml",
+                    "xl/worksheets/sheet4.xml"
+                  ],
+                  "shared_strings": null,
+                  "styles": "xl/styles.xml"
+                }
+              }
+            },
+            "sink": {
+              "accepted_bytes": 4252436,
+              "write_calls": 143,
+              "largest_write": 65536,
+              "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_1_to_512": 75,
+                "bytes_513_to_4096": 3,
+                "bytes_4097_to_16384": 0,
+                "bytes_16385_to_65536": 65,
+                "bytes_over_65536": 0
+              }
+            },
+            "source_counters": {
+              "max_in_flight_reads": 1,
+              "ordinary_payload_materializations": 6,
+              "ordinary_payload_read_bytes": 4248985,
+              "ordinary_payload_read_calls": 80,
+              "read_bytes": 4258543,
+              "read_calls": 206,
+              "xlsx_cell_values": {
+                "budget_objects_used_after_handles_drop": 0,
+                "budget_used_after_handles_drop": 0,
+                "budget_used_after_package_drop": 0,
+                "cache_allocation_bypasses": 0,
+                "cache_budget_managed": false,
+                "cache_budget_memory_limit": null,
+                "cache_budget_memory_used": 0,
+                "cache_budget_reservation_failures": 0,
+                "cache_budget_reserved_bytes": 0,
+                "cache_bypasses": 0,
+                "cache_cold_loads": 6,
+                "cache_evictions": 0,
+                "cache_failed_loads": 0,
+                "cache_hits": 0,
+                "cache_in_flight_loads": 0,
+                "cache_mode": "unmanaged-control",
+                "cache_oversized_bypasses": 0,
+                "cache_retained_bytes": 509460,
+                "cache_retained_entries": 6,
+                "cache_successful_loads": 6,
+                "cache_waiter_joins": 0,
+                "implementation": "source-backed",
+                "output_budget_refusal": {
+                  "accepted_output_bytes": 0,
+                  "first_output_request_bytes": 0,
+                  "one_under_output_limit": 0,
+                  "output_bytes_used": 0,
+                  "source_identity_preserved": false,
+                  "source_read_bytes": 0,
+                  "source_read_calls": 0,
+                  "successful_output_ceiling": 0,
+                  "typed_output_resource_refusal": false,
+                  "zero_output_verified": false
+                },
+                "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+                "payload_materializations": 6,
+                "payload_memory_limit": null,
+                "post_publication_budget": {
+                  "cache_reserved_objects": null,
+                  "catalog_reserved_objects": null,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "pre_publication_budget": {
+                  "cache_reserved_objects": 0,
+                  "catalog_reserved_objects": 0,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "publication_planning_memory_headroom": null,
+                "selected_worksheet_count": 4,
+                "selected_worksheet_read_bytes": 52580,
+                "selected_worksheet_read_calls": 5,
+                "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+                "source_read_bytes": 4258543,
+                "source_read_calls": 206,
+                "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+                "unselected_worksheet_read_bytes": 0,
+                "unselected_worksheet_read_calls": 0,
+                "untouched_member_count": 12,
+                "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+                "update_count": 178,
+                "workbook_read_bytes": 226,
+                "workbook_read_calls": 1
+              }
+            },
+            "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+          },
+          "raw_dumps": [
+            {
+              "part": 1,
+              "file": "baseline/profile-r1-dense-sparse.callgrind.1",
+              "sha256": "b3ce0ad904a2d392e361aff7445af404afa14113e81d6a0e4af7624c7d42fc75",
+              "summary_ir": 21857,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 21857
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 2,
+              "file": "baseline/profile-r1-dense-sparse.callgrind.2",
+              "sha256": "ceae26f7645ef974527f33670b1f468762d6e391250705819b93771902aeb912",
+              "summary_ir": 339309885,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 339309885
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 3,
+              "file": "baseline/profile-r1-dense-sparse.callgrind.3",
+              "sha256": "531bd448cea755677a9a7584ffef777eb6882a5f1e231aea338919bf1d48898d",
+              "summary_ir": 339347653,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 339347653
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 4,
+              "file": "baseline/profile-r1-dense-sparse.callgrind.4",
+              "sha256": "58be69578408101acc46fd5dfda01608509a4ebcab222163abdec2ac58fbecde",
+              "summary_ir": 377140022,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 377140022
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            }
+          ],
+          "final_process_dump": {
+            "file": "baseline/profile-r1-dense-sparse.callgrind",
+            "sha256": "4f878c6c4f4ec9df6dc670634043cddf3f2e78199daa4aca9cfbc09d14b91af6",
+            "part": 5,
+            "trigger": "Program termination",
+            "summary_ir": 0,
+            "validation": {
+              "final_process_dump_zero_ir": true
+            }
+          },
+          "annotations": {
+            "environment": {
+              "PERL_HASH_SEED": "0",
+              "PERL_PERTURB_KEYS": "0"
+            },
+            "command": {
+              "inclusive": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=yes",
+                "--tree=both",
+                "baseline/profile-r1-dense-sparse.callgrind.4"
+              ],
+              "self": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=no",
+                "--tree=both",
+                "baseline/profile-r1-dense-sparse.callgrind.4"
+              ]
+            },
+            "files": {
+              "inclusive": "baseline/profile-r1-dense-sparse.inclusive.txt",
+              "inclusive_sha256": "8ee3f8c15775540d3a018f141d89572d18f304943921865f02c23ffd703e0052",
+              "self": "baseline/profile-r1-dense-sparse.self.txt",
+              "self_sha256": "e2d241d5fd48e52c2ed9c881cd119c26e36c85e368417507877e6589f97dd821"
+            },
+            "owner": {
+              "inclusive_ir": 377140022,
+              "self_ir": 9772,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                  "inclusive_ir": 229721950,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::edit::package::rewrite",
+                  "inclusive_ir": 146628261,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::append_actions",
+                  "inclusive_ir": 225667,
+                  "calls": 178
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                  "inclusive_ir": 135514,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                  "inclusive_ir": 135261,
+                  "calls": 1
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::effective_action_count",
+                  "inclusive_ir": 93597,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell::Store::entry",
+                  "inclusive_ir": 46811,
+                  "calls": 178
+                },
+                {
+                  "name": "litchi_xlsx::cell::Content::as_cell",
+                  "inclusive_ir": 40944,
+                  "calls": 178
+                },
+                {
+                  "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+                  "inclusive_ir": 34607,
+                  "calls": 1
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>",
+                  "inclusive_ir": 32125,
+                  "calls": 178
+                },
+                {
+                  "name": "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq",
+                  "inclusive_ir": 13041,
+                  "calls": 178
+                },
+                {
+                  "name": "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone",
+                  "inclusive_ir": 9029,
+                  "calls": 1
+                },
+                {
+                  "name": "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone",
+                  "inclusive_ir": 6867,
+                  "calls": 4
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>",
+                  "inclusive_ir": 4144,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 1232,
+                  "calls": 16
+                },
+                {
+                  "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "inclusive_ir": 461,
+                  "calls": 1
+                },
+                {
+                  "name": "alloc::vec::Vec<T,A>::push_mut",
+                  "inclusive_ir": 408,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets",
+                  "inclusive_ir": 191,
+                  "calls": 1
+                },
+                {
+                  "name": "__rustc::__rust_dealloc",
+                  "inclusive_ir": 140,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 229721950,
+                "litchi_xlsx::raw::worksheet::edit::package::rewrite": 146628261,
+                "litchi_xlsx::cell_values::source::append_actions": 225667,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 135514,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 135261,
+                "litchi_xlsx::cell_values::source::effective_action_count": 93597,
+                "litchi_xlsx::cell::Store::entry": 46811,
+                "litchi_xlsx::cell::Content::as_cell": 40944,
+                "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 34607,
+                "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 32125,
+                "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 13041,
+                "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9029,
+                "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6867,
+                "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 4144,
+                "__memcpy_avx_unaligned_erms": 1232,
+                "alloc::raw_vec::RawVecInner<A>::finish_grow": 461,
+                "alloc::vec::Vec<T,A>::push_mut": 408,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+                "__rustc::__rust_dealloc": 140
+              }
+            },
+            "validator": {
+              "inclusive_ir": 89950905,
+              "source": "callgrind_annotate --inclusive=yes --tree=both",
+              "caveat": "This is an inclusive Ir row. It includes child calls; child-call metadata in the annotation can include calls attributable outside the selected direct edge, so it is a mechanism diagnostic."
+            },
+            "validation": {
+              "inclusive_owner_matches_raw": true,
+              "self_plus_direct_equals_inclusive": true,
+              "inclusive_and_self_direct_children_match": true,
+              "validator_row_present": true,
+              "raw_worksheet_parse_row_present": true
+            },
+            "raw_worksheet_parse": {
+              "inclusive_ir": 139930365,
+              "self_ir": 304,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse",
+                  "inclusive_ir": 127196876,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "inclusive_ir": 12269641,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent",
+                  "inclusive_ir": 240746,
+                  "calls": 4
+                },
+                {
+                  "name": "core::str::converts::from_utf8",
+                  "inclusive_ir": 222678,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 120,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 127196876,
+                "litchi_ooxml_common::mce::codec::process_ooxml": 12269641,
+                "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 240746,
+                "core::str::converts::from_utf8": 222678,
+                "__memcpy_avx_unaligned_erms": 120
+              },
+              "source": "callgrind_annotate --inclusive=yes/no --tree=both"
+            }
+          },
+          "validator_raw_incoming": {
+            "target": "litchi_xlsx::cell_values::validation::validate_xml",
+            "caller": null,
+            "positive_edge_count": 3,
+            "calls": 9,
+            "inclusive_ir": 89950905,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 1,
+                "inclusive_ir": 33060
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 89782891
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 134954
+              }
+            ]
+          },
+          "raw_worksheet_parse_incoming": {
+            "target": "litchi_xlsx::raw::worksheet::parse",
+            "caller": null,
+            "positive_edge_count": 1,
+            "calls": 4,
+            "inclusive_ir": 139930365,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::raw::worksheet::parse",
+                "calls": 4,
+                "inclusive_ir": 139930365
+              }
+            ]
+          },
+          "raw_worksheet_parse_inclusive_ir": 139930365,
+          "raw_worksheet_parse_self_ir": 304,
+          "validator_event_into_owned_edge": {
+            "target": "quick_xml::events::Event::into_owned",
+            "caller": "litchi_xlsx::cell_values::validation::validate_xml",
+            "positive_edge_count": 0,
+            "calls": 0,
+            "inclusive_ir": 0,
+            "edges": [],
+            "present": false,
+            "policy": "absent-both-stages",
+            "stage": "baseline",
+            "interpretation": "This edge is retained only as a diagnostic invariant from 0521; it is not a 0525 improvement claim."
+          },
+          "total_ir": 377140022,
+          "self_ir": 9772,
+          "direct_ir": 377130250,
+          "direct_callee_ir": {
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 229721950,
+            "litchi_xlsx::raw::worksheet::edit::package::rewrite": 146628261,
+            "litchi_xlsx::cell_values::source::append_actions": 225667,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 135514,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 135261,
+            "litchi_xlsx::cell_values::source::effective_action_count": 93597,
+            "litchi_xlsx::cell::Store::entry": 46811,
+            "litchi_xlsx::cell::Content::as_cell": 40944,
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 34607,
+            "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 32125,
+            "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 13041,
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9029,
+            "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6867,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 4144,
+            "__memcpy_avx_unaligned_erms": 1232,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 461,
+            "alloc::vec::Vec<T,A>::push_mut": 408,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+            "__rustc::__rust_dealloc": 140
+          },
+          "validator_inclusive_ir": 89950905,
+          "validation": {
+            "receipt_and_command": true,
+            "profile_native_identity_parity": true,
+            "all_numbered_raw_dumps_valid": true,
+            "final_process_dump_zero_ir": true,
+            "raw_worksheet_parse_row_present": true,
+            "event_edge_absent_in_both_stage_policy": true,
+            "validator_inclusive_row_diagnostic": true,
+            "inclusive_owner_matches_raw": true,
+            "self_plus_direct_equals_inclusive": true,
+            "inclusive_and_self_direct_children_match": true,
+            "validator_row_present": true
+          }
+        },
+        {
+          "name": "profile-r2-medium",
+          "repeat": 2,
+          "shape": "medium",
+          "receipt": "baseline/profile-r2-medium.receipt.json",
+          "receipt_sha256": "8803d11798e592495ea19b57db31c15902454a3c354ef958346e53cdd518ff94",
+          "profile_result": "baseline/profile-r2-medium.json",
+          "profile_result_sha256": "d6a69bd59c52cbfb7b6a135ab035e0e33b7a7a303195ad9da446720874f4528c",
+          "native": {
+            "file": "baseline/native-r2-primary-medium.json",
+            "receipt": "baseline/native-r2-primary-medium.receipt.json",
+            "output_sha256": "2bfce71afee1cd8974eb7afd243f4900f8b1d21a6a60bbac738f3a1ef63e5cbe",
+            "receipt_sha256": "f8a4dfc49893bb1e5775500ba1f5223b0338090c70e91a9f35e491e137878539"
+          },
+          "native_result_identity": {
+            "corpus": {
+              "name": "xlsx-cell-values-medium",
+              "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+              "package_format": "XLSX/OPC/ZIP",
+              "shape": "medium",
+              "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+              "compression": "deflate",
+              "entry_count": 9216,
+              "archive_member_count": 17,
+              "entry_bytes": 4,
+              "uncompressed_payload_bytes": 4231168,
+              "archive_bytes": 4226429,
+              "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+              "target_entry": "Sheet1!A1",
+              "target_payload_bytes": 1,
+              "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+              "xlsx": {
+                "sheet_count": 4,
+                "rows_per_sheet": 48,
+                "columns_per_sheet": 48,
+                "one_percent_update_count": 93,
+                "source_members": {
+                  "workbook": "xl/workbook.xml",
+                  "worksheets": [
+                    "xl/worksheets/sheet1.xml",
+                    "xl/worksheets/sheet2.xml",
+                    "xl/worksheets/sheet3.xml",
+                    "xl/worksheets/sheet4.xml"
+                  ],
+                  "shared_strings": null,
+                  "styles": "xl/styles.xml"
+                }
+              }
+            },
+            "sink": {
+              "accepted_bytes": 4226788,
+              "write_calls": 143,
+              "largest_write": 65536,
+              "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_1_to_512": 75,
+                "bytes_513_to_4096": 0,
+                "bytes_4097_to_16384": 4,
+                "bytes_16385_to_65536": 64,
+                "bytes_over_65536": 0
+              }
+            },
+            "source_counters": {
+              "max_in_flight_reads": 1,
+              "ordinary_payload_materializations": 6,
+              "ordinary_payload_read_bytes": 4223551,
+              "ordinary_payload_read_calls": 79,
+              "read_bytes": 4233109,
+              "read_calls": 205,
+              "xlsx_cell_values": {
+                "budget_objects_used_after_handles_drop": 0,
+                "budget_used_after_handles_drop": 0,
+                "budget_used_after_package_drop": 0,
+                "cache_allocation_bypasses": 0,
+                "cache_budget_managed": false,
+                "cache_budget_memory_limit": null,
+                "cache_budget_memory_used": 0,
+                "cache_budget_reservation_failures": 0,
+                "cache_budget_reserved_bytes": 0,
+                "cache_bypasses": 0,
+                "cache_cold_loads": 6,
+                "cache_evictions": 0,
+                "cache_failed_loads": 0,
+                "cache_hits": 0,
+                "cache_in_flight_loads": 0,
+                "cache_mode": "unmanaged-control",
+                "cache_oversized_bypasses": 0,
+                "cache_retained_bytes": 269785,
+                "cache_retained_entries": 6,
+                "cache_successful_loads": 6,
+                "cache_waiter_joins": 0,
+                "implementation": "source-backed",
+                "output_budget_refusal": {
+                  "accepted_output_bytes": 0,
+                  "first_output_request_bytes": 0,
+                  "one_under_output_limit": 0,
+                  "output_bytes_used": 0,
+                  "source_identity_preserved": false,
+                  "source_read_bytes": 0,
+                  "source_read_calls": 0,
+                  "successful_output_ceiling": 0,
+                  "typed_output_resource_refusal": false,
+                  "zero_output_verified": false
+                },
+                "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c",
+                "payload_materializations": 6,
+                "payload_memory_limit": null,
+                "post_publication_budget": {
+                  "cache_reserved_objects": null,
+                  "catalog_reserved_objects": null,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "pre_publication_budget": {
+                  "cache_reserved_objects": 0,
+                  "catalog_reserved_objects": 0,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "publication_planning_memory_headroom": null,
+                "selected_worksheet_count": 4,
+                "selected_worksheet_read_bytes": 27146,
+                "selected_worksheet_read_calls": 4,
+                "semantic_sha256": "f705d4200e8bbe840abb16ff7d17da887cbe1d0fb53a649c69279451ff5d829c",
+                "source_read_bytes": 4233109,
+                "source_read_calls": 205,
+                "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+                "unselected_worksheet_read_bytes": 0,
+                "unselected_worksheet_read_calls": 0,
+                "untouched_member_count": 12,
+                "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+                "update_count": 93,
+                "workbook_read_bytes": 226,
+                "workbook_read_calls": 1
+              }
+            },
+            "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+          },
+          "raw_dumps": [
+            {
+              "part": 1,
+              "file": "baseline/profile-r2-medium.callgrind.1",
+              "sha256": "7cdbf3e3629bc35393cd8f877a8c2f0cda8401a8aff1f8a94dc787c842239324",
+              "summary_ir": 21765,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 21765
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 2,
+              "file": "baseline/profile-r2-medium.callgrind.2",
+              "sha256": "f44caf6aa5bfa9e605c37f84bbab33d7708027f44f518d335b43cd143edb852d",
+              "summary_ir": 48903417,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 48903417
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 3,
+              "file": "baseline/profile-r2-medium.callgrind.3",
+              "sha256": "6b0737902cd4bd158a66ffff32096b93eff97d9378a28375e07d0f4b5382265c",
+              "summary_ir": 48949222,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 48949222
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 4,
+              "file": "baseline/profile-r2-medium.callgrind.4",
+              "sha256": "91afbf982e71294cb329e81933890df6bf64e3bd75294eaa4f49596c385cd657",
+              "summary_ir": 197130975,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 197130975
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            }
+          ],
+          "final_process_dump": {
+            "file": "baseline/profile-r2-medium.callgrind",
+            "sha256": "6ba9ecc86e2fb8cacc05ced0a01b46223adb03b445c31285f5d8d3e2dd9f57ce",
+            "part": 5,
+            "trigger": "Program termination",
+            "summary_ir": 0,
+            "validation": {
+              "final_process_dump_zero_ir": true
+            }
+          },
+          "annotations": {
+            "environment": {
+              "PERL_HASH_SEED": "0",
+              "PERL_PERTURB_KEYS": "0"
+            },
+            "command": {
+              "inclusive": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=yes",
+                "--tree=both",
+                "baseline/profile-r2-medium.callgrind.4"
+              ],
+              "self": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=no",
+                "--tree=both",
+                "baseline/profile-r2-medium.callgrind.4"
+              ]
+            },
+            "files": {
+              "inclusive": "baseline/profile-r2-medium.inclusive.txt",
+              "inclusive_sha256": "c7b01bc846e22313055e598c2a543e79bcea121cf6e46479d5eba13a31741be8",
+              "self": "baseline/profile-r2-medium.self.txt",
+              "self_sha256": "0b5b271083fb5d258c1531f78c3fe7ecbe5215ab662a36dabda47bd214239f18"
+            },
+            "owner": {
+              "inclusive_ir": 197130975,
+              "self_ir": 5692,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                  "inclusive_ir": 121431406,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::edit::package::rewrite",
+                  "inclusive_ir": 75155261,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                  "inclusive_ir": 136336,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                  "inclusive_ir": 134477,
+                  "calls": 1
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::append_actions",
+                  "inclusive_ir": 116375,
+                  "calls": 93
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::effective_action_count",
+                  "inclusive_ir": 46373,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell::Store::entry",
+                  "inclusive_ir": 21855,
+                  "calls": 93
+                },
+                {
+                  "name": "litchi_xlsx::cell::Content::as_cell",
+                  "inclusive_ir": 21391,
+                  "calls": 93
+                },
+                {
+                  "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+                  "inclusive_ir": 16397,
+                  "calls": 1
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>",
+                  "inclusive_ir": 16285,
+                  "calls": 93
+                },
+                {
+                  "name": "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone",
+                  "inclusive_ir": 9046,
+                  "calls": 1
+                },
+                {
+                  "name": "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq",
+                  "inclusive_ir": 6852,
+                  "calls": 93
+                },
+                {
+                  "name": "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone",
+                  "inclusive_ir": 6567,
+                  "calls": 4
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>",
+                  "inclusive_ir": 4144,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 1280,
+                  "calls": 16
+                },
+                {
+                  "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "inclusive_ir": 499,
+                  "calls": 1
+                },
+                {
+                  "name": "alloc::vec::Vec<T,A>::push_mut",
+                  "inclusive_ir": 408,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets",
+                  "inclusive_ir": 191,
+                  "calls": 1
+                },
+                {
+                  "name": "__rustc::__rust_dealloc",
+                  "inclusive_ir": 140,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 121431406,
+                "litchi_xlsx::raw::worksheet::edit::package::rewrite": 75155261,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 136336,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 134477,
+                "litchi_xlsx::cell_values::source::append_actions": 116375,
+                "litchi_xlsx::cell_values::source::effective_action_count": 46373,
+                "litchi_xlsx::cell::Store::entry": 21855,
+                "litchi_xlsx::cell::Content::as_cell": 21391,
+                "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 16397,
+                "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 16285,
+                "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9046,
+                "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 6852,
+                "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6567,
+                "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 4144,
+                "__memcpy_avx_unaligned_erms": 1280,
+                "alloc::raw_vec::RawVecInner<A>::finish_grow": 499,
+                "alloc::vec::Vec<T,A>::push_mut": 408,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+                "__rustc::__rust_dealloc": 140
+              }
+            },
+            "validator": {
+              "inclusive_ir": 46795275,
+              "source": "callgrind_annotate --inclusive=yes --tree=both",
+              "caveat": "This is an inclusive Ir row. It includes child calls; child-call metadata in the annotation can include calls attributable outside the selected direct edge, so it is a mechanism diagnostic."
+            },
+            "validation": {
+              "inclusive_owner_matches_raw": true,
+              "self_plus_direct_equals_inclusive": true,
+              "inclusive_and_self_direct_children_match": true,
+              "validator_row_present": true,
+              "raw_worksheet_parse_row_present": true
+            },
+            "raw_worksheet_parse": {
+              "inclusive_ir": 74795981,
+              "self_ir": 304,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse",
+                  "inclusive_ir": 68031791,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "inclusive_ir": 6517481,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent",
+                  "inclusive_ir": 128374,
+                  "calls": 4
+                },
+                {
+                  "name": "core::str::converts::from_utf8",
+                  "inclusive_ir": 117911,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 120,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 68031791,
+                "litchi_ooxml_common::mce::codec::process_ooxml": 6517481,
+                "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 128374,
+                "core::str::converts::from_utf8": 117911,
+                "__memcpy_avx_unaligned_erms": 120
+              },
+              "source": "callgrind_annotate --inclusive=yes/no --tree=both"
+            }
+          },
+          "validator_raw_incoming": {
+            "target": "litchi_xlsx::cell_values::validation::validate_xml",
+            "caller": null,
+            "positive_edge_count": 3,
+            "calls": 9,
+            "inclusive_ir": 46795275,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 46626721
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 1,
+                "inclusive_ir": 32730
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 135824
+              }
+            ]
+          },
+          "raw_worksheet_parse_incoming": {
+            "target": "litchi_xlsx::raw::worksheet::parse",
+            "caller": null,
+            "positive_edge_count": 1,
+            "calls": 4,
+            "inclusive_ir": 74795981,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::raw::worksheet::parse",
+                "calls": 4,
+                "inclusive_ir": 74795981
+              }
+            ]
+          },
+          "raw_worksheet_parse_inclusive_ir": 74795981,
+          "raw_worksheet_parse_self_ir": 304,
+          "validator_event_into_owned_edge": {
+            "target": "quick_xml::events::Event::into_owned",
+            "caller": "litchi_xlsx::cell_values::validation::validate_xml",
+            "positive_edge_count": 0,
+            "calls": 0,
+            "inclusive_ir": 0,
+            "edges": [],
+            "present": false,
+            "policy": "absent-both-stages",
+            "stage": "baseline",
+            "interpretation": "This edge is retained only as a diagnostic invariant from 0521; it is not a 0525 improvement claim."
+          },
+          "total_ir": 197130975,
+          "self_ir": 5692,
+          "direct_ir": 197125283,
+          "direct_callee_ir": {
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 121431406,
+            "litchi_xlsx::raw::worksheet::edit::package::rewrite": 75155261,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 136336,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 134477,
+            "litchi_xlsx::cell_values::source::append_actions": 116375,
+            "litchi_xlsx::cell_values::source::effective_action_count": 46373,
+            "litchi_xlsx::cell::Store::entry": 21855,
+            "litchi_xlsx::cell::Content::as_cell": 21391,
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 16397,
+            "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 16285,
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9046,
+            "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 6852,
+            "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6567,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 4144,
+            "__memcpy_avx_unaligned_erms": 1280,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 499,
+            "alloc::vec::Vec<T,A>::push_mut": 408,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+            "__rustc::__rust_dealloc": 140
+          },
+          "validator_inclusive_ir": 46795275,
+          "validation": {
+            "receipt_and_command": true,
+            "profile_native_identity_parity": true,
+            "all_numbered_raw_dumps_valid": true,
+            "final_process_dump_zero_ir": true,
+            "raw_worksheet_parse_row_present": true,
+            "event_edge_absent_in_both_stage_policy": true,
+            "validator_inclusive_row_diagnostic": true,
+            "inclusive_owner_matches_raw": true,
+            "self_plus_direct_equals_inclusive": true,
+            "inclusive_and_self_direct_children_match": true,
+            "validator_row_present": true
+          }
+        },
+        {
+          "name": "profile-r2-dense-sparse",
+          "repeat": 2,
+          "shape": "dense-sparse",
+          "receipt": "baseline/profile-r2-dense-sparse.receipt.json",
+          "receipt_sha256": "ab5a66c2da21ec2407c1d40e4edc418206ea43a70273d5bb36445cf06966074a",
+          "profile_result": "baseline/profile-r2-dense-sparse.json",
+          "profile_result_sha256": "905a253a0928e1a9f35ef2cced7b6cac526316747a43545994592aea84576de9",
+          "native": {
+            "file": "baseline/native-r2-primary-dense-sparse.json",
+            "receipt": "baseline/native-r2-primary-dense-sparse.receipt.json",
+            "output_sha256": "a8e9b8ee2346cd46f560bc3d17b3d9e0f8a7e50b1e47c1c23568b7d00db84f1c",
+            "receipt_sha256": "e1a91f2e8f89c67162d6b38613924228c454ce18a847ab3a10e3b01bb9356682"
+          },
+          "native_result_identity": {
+            "corpus": {
+              "name": "xlsx-cell-values-dense-sparse",
+              "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+              "package_format": "XLSX/OPC/ZIP",
+              "shape": "dense-sparse",
+              "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+              "compression": "deflate",
+              "entry_count": 17792,
+              "archive_member_count": 17,
+              "entry_bytes": 4,
+              "uncompressed_payload_bytes": 4265472,
+              "archive_bytes": 4251863,
+              "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+              "target_entry": "Sheet1!A1",
+              "target_payload_bytes": 1,
+              "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+              "xlsx": {
+                "sheet_count": 4,
+                "rows_per_sheet": 128,
+                "columns_per_sheet": 128,
+                "one_percent_update_count": 178,
+                "source_members": {
+                  "workbook": "xl/workbook.xml",
+                  "worksheets": [
+                    "xl/worksheets/sheet1.xml",
+                    "xl/worksheets/sheet2.xml",
+                    "xl/worksheets/sheet3.xml",
+                    "xl/worksheets/sheet4.xml"
+                  ],
+                  "shared_strings": null,
+                  "styles": "xl/styles.xml"
+                }
+              }
+            },
+            "sink": {
+              "accepted_bytes": 4252436,
+              "write_calls": 143,
+              "largest_write": 65536,
+              "write_size_buckets": {
+                "bytes_0": 0,
+                "bytes_1_to_512": 75,
+                "bytes_513_to_4096": 3,
+                "bytes_4097_to_16384": 0,
+                "bytes_16385_to_65536": 65,
+                "bytes_over_65536": 0
+              }
+            },
+            "source_counters": {
+              "max_in_flight_reads": 1,
+              "ordinary_payload_materializations": 6,
+              "ordinary_payload_read_bytes": 4248985,
+              "ordinary_payload_read_calls": 80,
+              "read_bytes": 4258543,
+              "read_calls": 206,
+              "xlsx_cell_values": {
+                "budget_objects_used_after_handles_drop": 0,
+                "budget_used_after_handles_drop": 0,
+                "budget_used_after_package_drop": 0,
+                "cache_allocation_bypasses": 0,
+                "cache_budget_managed": false,
+                "cache_budget_memory_limit": null,
+                "cache_budget_memory_used": 0,
+                "cache_budget_reservation_failures": 0,
+                "cache_budget_reserved_bytes": 0,
+                "cache_bypasses": 0,
+                "cache_cold_loads": 6,
+                "cache_evictions": 0,
+                "cache_failed_loads": 0,
+                "cache_hits": 0,
+                "cache_in_flight_loads": 0,
+                "cache_mode": "unmanaged-control",
+                "cache_oversized_bypasses": 0,
+                "cache_retained_bytes": 509460,
+                "cache_retained_entries": 6,
+                "cache_successful_loads": 6,
+                "cache_waiter_joins": 0,
+                "implementation": "source-backed",
+                "output_budget_refusal": {
+                  "accepted_output_bytes": 0,
+                  "first_output_request_bytes": 0,
+                  "one_under_output_limit": 0,
+                  "output_bytes_used": 0,
+                  "source_identity_preserved": false,
+                  "source_read_bytes": 0,
+                  "source_read_calls": 0,
+                  "successful_output_ceiling": 0,
+                  "typed_output_resource_refusal": false,
+                  "zero_output_verified": false
+                },
+                "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d",
+                "payload_materializations": 6,
+                "payload_memory_limit": null,
+                "post_publication_budget": {
+                  "cache_reserved_objects": null,
+                  "catalog_reserved_objects": null,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "pre_publication_budget": {
+                  "cache_reserved_objects": 0,
+                  "catalog_reserved_objects": 0,
+                  "input_bytes_limit": null,
+                  "input_bytes_used": 0,
+                  "objects_limit": null,
+                  "objects_used": 0,
+                  "output_bytes_limit": null,
+                  "output_bytes_used": 0,
+                  "work_limit": null,
+                  "work_used": 0
+                },
+                "publication_planning_memory_headroom": null,
+                "selected_worksheet_count": 4,
+                "selected_worksheet_read_bytes": 52580,
+                "selected_worksheet_read_calls": 5,
+                "semantic_sha256": "d8bbafac4c31288eb48a773df88b6b2add2a51b9ad6fb652ab1aeb801c5dfa8c",
+                "source_read_bytes": 4258543,
+                "source_read_calls": 206,
+                "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+                "unselected_worksheet_read_bytes": 0,
+                "unselected_worksheet_read_calls": 0,
+                "untouched_member_count": 12,
+                "untouched_member_sha256": "5a8fb8c260e604efc7d8bdf9212854ec63c99f0a78dccb2405eb0089d48e0e19",
+                "update_count": 178,
+                "workbook_read_bytes": 226,
+                "workbook_read_calls": 1
+              }
+            },
+            "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+          },
+          "raw_dumps": [
+            {
+              "part": 1,
+              "file": "baseline/profile-r2-dense-sparse.callgrind.1",
+              "sha256": "b6b8916b01c185f4e5da59eca55b4a441f1ce2b09cd21165db7952c514460ac6",
+              "summary_ir": 21626,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 21626
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 2,
+              "file": "baseline/profile-r2-dense-sparse.callgrind.2",
+              "sha256": "d11e153250c8c2d01293d5c8ac0a4fb215590e3cc09dfb12875b3f57387a0f4c",
+              "summary_ir": 339275621,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 339275621
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 3,
+              "file": "baseline/profile-r2-dense-sparse.callgrind.3",
+              "sha256": "64ab7ee991ed976110f834ae2923d4179b4dc0cef346b8496a9b81d49e7d9b8b",
+              "summary_ir": 339330083,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 339330083
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            },
+            {
+              "part": 4,
+              "file": "baseline/profile-r2-dense-sparse.callgrind.4",
+              "sha256": "a07f5694846567eb301be4bd59b6d3a79ee1a489aa70045b8d79d3bddb064a17",
+              "summary_ir": 377135732,
+              "incoming": {
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "callee": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+                "calls": 1,
+                "inclusive_ir": 377135732
+              },
+              "expected_parent": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+              "validation": {
+                "part_matches_suffix": true,
+                "exact_trigger": true,
+                "one_positive_owner_call": true,
+                "incoming_owner_ir_matches_summary": true
+              }
+            }
+          ],
+          "final_process_dump": {
+            "file": "baseline/profile-r2-dense-sparse.callgrind",
+            "sha256": "91a6d2999c841ed9fa8496f8df87235c1b601b9ed5a8f39418f8df023e5d8a5b",
+            "part": 5,
+            "trigger": "Program termination",
+            "summary_ir": 0,
+            "validation": {
+              "final_process_dump_zero_ir": true
+            }
+          },
+          "annotations": {
+            "environment": {
+              "PERL_HASH_SEED": "0",
+              "PERL_PERTURB_KEYS": "0"
+            },
+            "command": {
+              "inclusive": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=yes",
+                "--tree=both",
+                "baseline/profile-r2-dense-sparse.callgrind.4"
+              ],
+              "self": [
+                "callgrind_annotate",
+                "--auto=no",
+                "--threshold=100",
+                "--show-percs=no",
+                "--inclusive=no",
+                "--tree=both",
+                "baseline/profile-r2-dense-sparse.callgrind.4"
+              ]
+            },
+            "files": {
+              "inclusive": "baseline/profile-r2-dense-sparse.inclusive.txt",
+              "inclusive_sha256": "42cf8bb1c16d7e5b15582fee5dd299aa816fd9800eb858825b4d0e93e91468d5",
+              "self": "baseline/profile-r2-dense-sparse.self.txt",
+              "self_sha256": "15a9dc10bd375f05bccd12d499e1731209a0c33a13c5f825d143650967d63d76"
+            },
+            "owner": {
+              "inclusive_ir": 377135732,
+              "self_ir": 9772,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                  "inclusive_ir": 229751898,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::edit::package::rewrite",
+                  "inclusive_ir": 146594592,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::append_actions",
+                  "inclusive_ir": 225938,
+                  "calls": 178
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                  "inclusive_ir": 135704,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                  "inclusive_ir": 134872,
+                  "calls": 1
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::source::effective_action_count",
+                  "inclusive_ir": 93590,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell::Store::entry",
+                  "inclusive_ir": 46811,
+                  "calls": 178
+                },
+                {
+                  "name": "litchi_xlsx::cell::Content::as_cell",
+                  "inclusive_ir": 40944,
+                  "calls": 178
+                },
+                {
+                  "name": "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop",
+                  "inclusive_ir": 34669,
+                  "calls": 1
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>",
+                  "inclusive_ir": 32125,
+                  "calls": 178
+                },
+                {
+                  "name": "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq",
+                  "inclusive_ir": 13105,
+                  "calls": 178
+                },
+                {
+                  "name": "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone",
+                  "inclusive_ir": 8624,
+                  "calls": 1
+                },
+                {
+                  "name": "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone",
+                  "inclusive_ir": 6274,
+                  "calls": 4
+                },
+                {
+                  "name": "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>",
+                  "inclusive_ir": 4172,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 1230,
+                  "calls": 16
+                },
+                {
+                  "name": "alloc::raw_vec::RawVecInner<A>::finish_grow",
+                  "inclusive_ir": 673,
+                  "calls": 1
+                },
+                {
+                  "name": "alloc::vec::Vec<T,A>::push_mut",
+                  "inclusive_ir": 408,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets",
+                  "inclusive_ir": 191,
+                  "calls": 1
+                },
+                {
+                  "name": "__rustc::__rust_dealloc",
+                  "inclusive_ir": 140,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 229751898,
+                "litchi_xlsx::raw::worksheet::edit::package::rewrite": 146594592,
+                "litchi_xlsx::cell_values::source::append_actions": 225938,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 135704,
+                "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 134872,
+                "litchi_xlsx::cell_values::source::effective_action_count": 93590,
+                "litchi_xlsx::cell::Store::entry": 46811,
+                "litchi_xlsx::cell::Content::as_cell": 40944,
+                "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 34669,
+                "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 32125,
+                "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 13105,
+                "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 8624,
+                "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6274,
+                "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 4172,
+                "__memcpy_avx_unaligned_erms": 1230,
+                "alloc::raw_vec::RawVecInner<A>::finish_grow": 673,
+                "alloc::vec::Vec<T,A>::push_mut": 408,
+                "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+                "__rustc::__rust_dealloc": 140
+              }
+            },
+            "validator": {
+              "inclusive_ir": 89951776,
+              "source": "callgrind_annotate --inclusive=yes --tree=both",
+              "caveat": "This is an inclusive Ir row. It includes child calls; child-call metadata in the annotation can include calls attributable outside the selected direct edge, so it is a mechanism diagnostic."
+            },
+            "validation": {
+              "inclusive_owner_matches_raw": true,
+              "self_plus_direct_equals_inclusive": true,
+              "inclusive_and_self_direct_children_match": true,
+              "validator_row_present": true,
+              "raw_worksheet_parse_row_present": true
+            },
+            "raw_worksheet_parse": {
+              "inclusive_ir": 139959208,
+              "self_ir": 304,
+              "direct_callees": [
+                {
+                  "name": "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse",
+                  "inclusive_ir": 127225432,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_ooxml_common::mce::codec::process_ooxml",
+                  "inclusive_ir": 12269928,
+                  "calls": 4
+                },
+                {
+                  "name": "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent",
+                  "inclusive_ir": 240746,
+                  "calls": 4
+                },
+                {
+                  "name": "core::str::converts::from_utf8",
+                  "inclusive_ir": 222678,
+                  "calls": 4
+                },
+                {
+                  "name": "__memcpy_avx_unaligned_erms",
+                  "inclusive_ir": 120,
+                  "calls": 4
+                }
+              ],
+              "direct_callee_ir": {
+                "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 127225432,
+                "litchi_ooxml_common::mce::codec::process_ooxml": 12269928,
+                "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 240746,
+                "core::str::converts::from_utf8": 222678,
+                "__memcpy_avx_unaligned_erms": 120
+              },
+              "source": "callgrind_annotate --inclusive=yes/no --tree=both"
+            }
+          },
+          "validator_raw_incoming": {
+            "target": "litchi_xlsx::cell_values::validation::validate_xml",
+            "caller": null,
+            "positive_edge_count": 3,
+            "calls": 9,
+            "inclusive_ir": 89951776,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 89784076
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 4,
+                "inclusive_ir": 135144
+              },
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml",
+                "callee": "litchi_xlsx::cell_values::validation::validate_xml",
+                "calls": 1,
+                "inclusive_ir": 32556
+              }
+            ]
+          },
+          "raw_worksheet_parse_incoming": {
+            "target": "litchi_xlsx::raw::worksheet::parse",
+            "caller": null,
+            "positive_edge_count": 1,
+            "calls": 4,
+            "inclusive_ir": 139959208,
+            "edges": [
+              {
+                "caller": "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source",
+                "callee": "litchi_xlsx::raw::worksheet::parse",
+                "calls": 4,
+                "inclusive_ir": 139959208
+              }
+            ]
+          },
+          "raw_worksheet_parse_inclusive_ir": 139959208,
+          "raw_worksheet_parse_self_ir": 304,
+          "validator_event_into_owned_edge": {
+            "target": "quick_xml::events::Event::into_owned",
+            "caller": "litchi_xlsx::cell_values::validation::validate_xml",
+            "positive_edge_count": 0,
+            "calls": 0,
+            "inclusive_ir": 0,
+            "edges": [],
+            "present": false,
+            "policy": "absent-both-stages",
+            "stage": "baseline",
+            "interpretation": "This edge is retained only as a diagnostic invariant from 0521; it is not a 0525 improvement claim."
+          },
+          "total_ir": 377135732,
+          "self_ir": 9772,
+          "direct_ir": 377125960,
+          "direct_callee_ir": {
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_rewritten_source": 229751898,
+            "litchi_xlsx::raw::worksheet::edit::package::rewrite": 146594592,
+            "litchi_xlsx::cell_values::source::append_actions": 225938,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::with_invalidated_workbook": 135704,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::invalidated_workbook_xml": 134872,
+            "litchi_xlsx::cell_values::source::effective_action_count": 93590,
+            "litchi_xlsx::cell::Store::entry": 46811,
+            "litchi_xlsx::cell::Content::as_cell": 40944,
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 34669,
+            "core::ptr::drop_in_place<litchi_xlsx::cell::Cell>": 32125,
+            "<litchi_xlsx::cell::Cell as core::cmp::PartialEq>::eq": 13105,
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 8624,
+            "<litchi_xlsx::cell_values::snapshot::Snapshot as core::clone::Clone>::clone": 6274,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceState>": 4172,
+            "__memcpy_avx_unaligned_erms": 1230,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 673,
+            "alloc::vec::Vec<T,A>::push_mut": 408,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 191,
+            "__rustc::__rust_dealloc": 140
+          },
+          "validator_inclusive_ir": 89951776,
+          "validation": {
+            "receipt_and_command": true,
+            "profile_native_identity_parity": true,
+            "all_numbered_raw_dumps_valid": true,
+            "final_process_dump_zero_ir": true,
+            "raw_worksheet_parse_row_present": true,
+            "event_edge_absent_in_both_stage_policy": true,
+            "validator_inclusive_row_diagnostic": true,
+            "inclusive_owner_matches_raw": true,
+            "self_plus_direct_equals_inclusive": true,
+            "inclusive_and_self_direct_children_match": true,
+            "validator_row_present": true
+          }
+        }
+      ],
+      "validation": {
+        "expected_profile_matrix": true,
+        "receipts_and_bindings": true,
+        "native_output_parity": true,
+        "raw_parts_and_final_dump": true,
+        "raw_worksheet_parse_row_policy": true
+      }
+    }
+  },
+  "comparison": null,
+  "helpers": {
+    "change-0521/analyze_profiles.py": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7",
+    "change-0519/analyze_profiles.py": "9587f5a776b55d423b720a98cd228708c79af0956100fd164d81713e0c90488e",
+    "change-0519/compare_profile_lanes.py": "a817bb19e1f6d1b5989e41a72dbcf3166b9d0178099781e5ed78c9e5f19f3c74"
+  },
+  "limitations": "Callgrind Ir and inclusive rows are mechanism diagnostics, not native latencies, hardware cycles, allocation counts, cold-cache, range, scaling, or native Office-producer measurements."
+}

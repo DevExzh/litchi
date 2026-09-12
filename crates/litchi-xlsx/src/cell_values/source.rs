@@ -18,7 +18,7 @@ use crate::Selector;
 use crate::cell::{Cell, Content, Number, Value};
 use crate::error::{Error, Result, invalid};
 use crate::formula::Formula;
-use crate::raw::worksheet::edit::{Action, rewrite};
+use crate::raw::worksheet::edit::{Action, rewrite_value_only_with_provenance};
 
 /// Maximum unique cells in one atomic value transaction.
 pub const MAX_BATCH_EDITS: usize = 256;
@@ -833,8 +833,12 @@ impl SourceEdit {
             return Ok(Commit::new(self.before, patch, 0));
         }
         let changed = actions.len();
-        let output = rewrite(self.before.source_xml(), self.before.sheet_name(), actions)?;
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?
+        let output = rewrite_value_only_with_provenance(
+            self.before.source_xml(),
+            self.before.sheet_name(),
+            actions,
+        )?;
+        let snapshot = Snapshot::from_rewritten_value_source(&self.before, output)?
             .with_invalidated_calculation()?;
         for (address, expected) in &self.staged {
             let matches = match expected {
@@ -1170,13 +1174,17 @@ impl MultiSourceEdit {
             }
             changed_cells += actions.len();
             touched_worksheets += 1;
-            let output = rewrite(snapshot.source_xml(), snapshot.sheet_name(), actions)?;
+            let output = rewrite_value_only_with_provenance(
+                snapshot.source_xml(),
+                snapshot.sheet_name(),
+                actions,
+            )?;
             aggregate_bytes = super::snapshot::checked_multi_bytes(
                 aggregate_bytes,
-                output.len(),
+                output.bytes.len(),
                 super::snapshot::MAX_MULTI_WORKSHEET_BYTES,
             )?;
-            let candidate = Snapshot::from_rewritten_source(snapshot, output)?;
+            let candidate = Snapshot::from_rewritten_value_source(snapshot, output)?;
             for (address, expected) in staged {
                 let matches = match expected {
                     StagedValueEdit::Set(content) => {

@@ -627,7 +627,7 @@ impl Unknown {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Stored {
     pub(crate) address: Address,
     pub(crate) cell: Cell,
@@ -799,6 +799,59 @@ impl Store {
         })
     }
 
+    /// Merge source cell records named by reduced-readback provenance into a
+    /// parsed candidate. The parsed store remains authoritative for worksheet
+    /// structure; indexes and extents are rebuilt for the combined cells.
+    pub(crate) fn merge_omitted_cells(
+        parsed: Self,
+        source: &Self,
+        omitted: &[Rect],
+    ) -> Result<Option<Self>> {
+        if omitted.is_empty() || !omitted_ranges_are_ordered(omitted) {
+            return Ok(None);
+        }
+        let source_count = omitted_entries(&source.cells, omitted).count();
+        if source_count == 0 || omitted_entries(&parsed.cells, omitted).next().is_some() {
+            return Ok(None);
+        }
+        let total = parsed
+            .cells
+            .len()
+            .checked_add(source_count)
+            .ok_or_else(|| invalid("merged worksheet cell count overflows usize"))?;
+        let mut cells = Vec::new();
+        cells
+            .try_reserve_exact(total)
+            .map_err(|source| allocation("merged worksheet cells", source))?;
+        let Store {
+            cells: parsed_cells,
+            rows,
+            columns,
+            defaults,
+            merges,
+            extents,
+            ..
+        } = parsed;
+        cells.extend(parsed_cells.into_vec());
+        for entry in omitted_entries(&source.cells, omitted) {
+            cells.push(entry.clone());
+        }
+        let mut merge_ranges = Vec::new();
+        merge_ranges
+            .try_reserve_exact(merges.as_slice().len())
+            .map_err(|source| allocation("merged worksheet ranges", source))?;
+        merge_ranges.extend_from_slice(merges.as_slice());
+        Self::from_unsorted(
+            cells,
+            rows.into_vec(),
+            columns,
+            defaults,
+            merge_ranges,
+            extents.declared,
+        )
+        .map(Some)
+    }
+
     pub(crate) fn view(&self, address: Address) -> View<'_> {
         if let Some(range) = self.merges.containing(address)
             && range.start() != address
@@ -887,6 +940,45 @@ impl Store {
     pub(crate) const fn extents(&self) -> &Extents {
         &self.extents
     }
+}
+
+fn omitted_ranges_are_ordered(ranges: &[Rect]) -> bool {
+    let mut previous_end = None::<(u32, u32)>;
+    for range in ranges {
+        let start = range.start();
+        let row = start.row().get();
+        if row.checked_add(1) != Some(range.end().0) {
+            return false;
+        }
+        let start = (row, start.column().get());
+        if previous_end.is_some_and(|end| start < end) {
+            return false;
+        }
+        // Rect::end() is a two-dimensional exclusive bound. A single-row
+        // omission ends at this column in its own row, not in the next row.
+        previous_end = Some((row, range.end().1));
+    }
+    true
+}
+
+fn omitted_entries<'a>(
+    entries: &'a [Stored],
+    ranges: &'a [Rect],
+) -> impl Iterator<Item = &'a Stored> {
+    let mut range_index = 0usize;
+    entries.iter().filter(move |entry| {
+        let row = entry.address.row().get();
+        let column = entry.address.column().get();
+        while let Some(range) = ranges.get(range_index) {
+            let range_row = range.start().row().get();
+            if row > range_row || (row == range_row && column >= range.end().1) {
+                range_index += 1;
+                continue;
+            }
+            return range.contains(entry.address);
+        }
+        false
+    })
 }
 
 #[derive(Debug, Default)]

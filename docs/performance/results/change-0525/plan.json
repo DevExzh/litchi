@@ -1,0 +1,104 @@
+{
+  "revision": "f08daf3976714dffebe37e40bd895d87266aaf8d",
+  "created_utc": "2026-09-12T08:32:13.479262+00:00",
+  "hypothesis": "Keep independent full-output XML validation; parse actual changed cells while omitting writer-proven unchanged cell spans and reusing their immutable semantics. Fully parse membership-changing existing rows; fallback for new rows or shared-formula worksheets.",
+  "harness_enabler": null,
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 100
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "staged sets and MultiSourceEdit::commit; no publication/reopen/oracles"
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "scope": "Separate zero-before/dump-after/toggle exact-name; fourth call only, preceding3lifecyclecalls retained"
+  },
+  "cpu": 2,
+  "admission": "Require at least 5% p50 improvement in primary total and commit phase in both paired repeats for both medium and dense-sparse, with exact output/semantic/provider oracles. Require at least 15% commit Ir reduction in both shapes/repeats as independent mechanism confirmation. Flag every >5% adverse latency, mean, RSS or incremental allocation peak by individual row; review all flags. Reject if meaningful primary gate fails. No cold/range/native-producer/scaling claim.",
+  "owned_paths": [
+    "/tmp/litchi-goal-0525",
+    "/home/zhuhe/litchi-goal-0525-target"
+  ],
+  "native_order": [
+    "baseline native-r1 before candidate application",
+    "candidate native-r1",
+    "candidate native-r2",
+    "retained baseline native-r2 under candidate source checkout"
+  ],
+  "retained_baseline_custody": "Retained baseline binary and build manifest remain hash-bound; candidate checkout source is independently bound during final A2 and differs only in the frozen candidate file inventory.",
+  "status": "frozen-before-build-and-capture",
+  "resource_scope": "Existing source/Part budgets, output byte bounds, execution checks and publication charges retained. New reconstruction scratch is operation-local and fallibly reserved. Allocation measurements report calls/bytes and incremental region peak separately.",
+  "hardware": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 100,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole fresh child including corpus/setup/publication/oracles; diagnostic only, not isolated commit counters."
+  },
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/"
+  ],
+  "candidate_source_binding": "Exact source file inventory and SHA256 values captured independently for each stage; candidate diff must be nonempty and entirely within candidate_source_roots. Harness source is identical. Review exact production/test patch before application."
+}

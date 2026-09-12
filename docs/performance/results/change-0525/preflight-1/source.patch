@@ -1,0 +1,1380 @@
+diff --git a/crates/litchi-xlsx/src/cell.rs b/crates/litchi-xlsx/src/cell.rs
+index 1bd45a72c..25bf94719 100644
+--- a/crates/litchi-xlsx/src/cell.rs
++++ b/crates/litchi-xlsx/src/cell.rs
+@@ -627,7 +627,7 @@ impl Unknown {
+     }
+ }
+ 
+-#[derive(Debug)]
++#[derive(Debug, Clone)]
+ pub(crate) struct Stored {
+     pub(crate) address: Address,
+     pub(crate) cell: Cell,
+@@ -799,6 +799,59 @@ impl Store {
+         })
+     }
+ 
++    /// Merge source cell records named by reduced-readback provenance into a
++    /// parsed candidate. The parsed store remains authoritative for worksheet
++    /// structure; indexes and extents are rebuilt for the combined cells.
++    pub(crate) fn merge_omitted_cells(
++        parsed: Self,
++        source: &Self,
++        omitted: &[Rect],
++    ) -> Result<Option<Self>> {
++        if omitted.is_empty() || !omitted_ranges_are_ordered(omitted) {
++            return Ok(None);
++        }
++        let source_count = omitted_entries(&source.cells, omitted).count();
++        if source_count == 0 || omitted_entries(&parsed.cells, omitted).next().is_some() {
++            return Ok(None);
++        }
++        let total = parsed
++            .cells
++            .len()
++            .checked_add(source_count)
++            .ok_or_else(|| invalid("merged worksheet cell count overflows usize"))?;
++        let mut cells = Vec::new();
++        cells
++            .try_reserve_exact(total)
++            .map_err(|source| allocation("merged worksheet cells", source))?;
++        let Store {
++            cells: parsed_cells,
++            rows,
++            columns,
++            defaults,
++            merges,
++            extents,
++            ..
++        } = parsed;
++        cells.extend(parsed_cells.into_vec());
++        for entry in omitted_entries(&source.cells, omitted) {
++            cells.push(entry.clone());
++        }
++        let mut merge_ranges = Vec::new();
++        merge_ranges
++            .try_reserve_exact(merges.as_slice().len())
++            .map_err(|source| allocation("merged worksheet ranges", source))?;
++        merge_ranges.extend_from_slice(merges.as_slice());
++        Self::from_unsorted(
++            cells,
++            rows.into_vec(),
++            columns,
++            defaults,
++            merge_ranges,
++            extents.declared,
++        )
++        .map(Some)
++    }
++
+     pub(crate) fn view(&self, address: Address) -> View<'_> {
+         if let Some(range) = self.merges.containing(address)
+             && range.start() != address
+@@ -889,6 +942,45 @@ impl Store {
+     }
+ }
+ 
++fn omitted_ranges_are_ordered(ranges: &[Rect]) -> bool {
++    let mut previous_end = None::<(u32, u32)>;
++    for range in ranges {
++        let start = range.start();
++        let row = start.row().get();
++        if row.checked_add(1) != Some(range.end().0) {
++            return false;
++        }
++        let start = (row, start.column().get());
++        if previous_end.is_some_and(|end| start < end) {
++            return false;
++        }
++        // Rect::end() is a two-dimensional exclusive bound. A single-row
++        // omission ends at this column in its own row, not in the next row.
++        previous_end = Some((row, range.end().1));
++    }
++    true
++}
++
++fn omitted_entries<'a>(
++    entries: &'a [Stored],
++    ranges: &'a [Rect],
++) -> impl Iterator<Item = &'a Stored> {
++    let mut range_index = 0usize;
++    entries.iter().filter(move |entry| {
++        let row = entry.address.row().get();
++        let column = entry.address.column().get();
++        while let Some(range) = ranges.get(range_index) {
++            let range_row = range.start().row().get();
++            if row > range_row || (row == range_row && column >= range.end().1) {
++                range_index += 1;
++                continue;
++            }
++            return range.contains(entry.address);
++        }
++        false
++    })
++}
++
+ #[derive(Debug, Default)]
+ struct Bounds {
+     value: Option<(u32, u32, u32, u32)>,
+diff --git a/crates/litchi-xlsx/src/cell_values/snapshot.rs b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+index eb3cd1f2a..30926434f 100644
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -9,9 +9,9 @@ use litchi_opc::{
+     BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships,
+     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
+ };
+-use litchi_sheet::Cell as Address;
++use litchi_sheet::{Cell as Address, Rect};
+ 
+-use crate::cell::{Cell, SharedFormulaStorage, Store, Value};
++use crate::cell::{Cell, SharedFormulaStorage, Store, Stored, Value};
+ use crate::error::{EditBlock, Error, Result, allocation, invalid};
+ use crate::formula::Kind;
+ use crate::source_payload::SourcePayload;
+@@ -362,6 +362,13 @@ impl MultiSnapshot {
+     }
+ }
+ 
++fn stored_entry_is_supported(entry: &Stored) -> bool {
++    entry.shared_string.is_none()
++        && !entry.inline_rich
++        && entry.cell_metadata.is_none()
++        && entry.value_metadata.is_none()
++}
++
+ impl Snapshot {
+     fn from_owned_selected(
+         package: &OpcPackage,
+@@ -694,6 +701,59 @@ impl Snapshot {
+         Ok(result)
+     }
+ 
++    /// Rebind a value-only rewrite after validating its complete output.
++    ///
++    /// The independent parser sees the full worksheet envelope and all
++    /// changed cell records, while provenance-selected source records fill
++    /// only the omitted cell spans. Any provenance mismatch, reduced-parser
++    /// refusal, or unexpected collision falls back to the ordinary complete
++    /// parse so the public error and preservation authority remain unchanged.
++    pub(crate) fn from_rewritten_value_source(
++        source: &Self,
++        rewrite: raw::worksheet::edit::ValueOnlyRewrite<'_>,
++    ) -> Result<Self> {
++        if rewrite.omitted.is_empty() || !std::ptr::eq(rewrite.source, source.source_xml()) {
++            return Self::from_rewritten_source(source, rewrite.bytes);
++        }
++        source.source.check_execution()?;
++        validation::worksheet_xml(&rewrite.bytes)?;
++        // Speculative buffers are dropped before the complete parser fallback.
++        let cells = match Self::try_rewritten_value_cells(source, &rewrite) {
++            Some(cells) => cells,
++            None => raw::worksheet::parse(&rewrite.bytes, || Ok(None))?,
++        };
++        let mut result = source.clone();
++        result.cells = Arc::new(cells);
++        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(rewrite.bytes));
++        result.source.check_execution()?;
++        Ok(result)
++    }
++
++    fn try_rewritten_value_cells(
++        source: &Self,
++        rewrite: &raw::worksheet::edit::ValueOnlyRewrite<'_>,
++    ) -> Option<Store> {
++        let reduced =
++            raw::worksheet::edit::reduced_readback(&rewrite.bytes, &rewrite.omitted).ok()?;
++        let parsed = raw::worksheet::parse(&reduced, || Ok(None)).ok()?;
++        let mut omitted = Vec::new();
++        omitted.try_reserve_exact(rewrite.omitted.len()).ok()?;
++        for span in &rewrite.omitted {
++            let end_column = span.last_column.checked_add(1)?;
++            let end_row = span.row.checked_add(1)?;
++            let start = Address::at(span.row, span.first_column).ok()?;
++            omitted.push(Rect::new(start, end_row, end_column).ok()?);
++        }
++        if !source.cells.entries().iter().all(stored_entry_is_supported)
++            || !parsed.entries().iter().all(stored_entry_is_supported)
++        {
++            return None;
++        }
++        Store::merge_omitted_cells(parsed, &source.cells, &omitted)
++            .ok()
++            .flatten()
++    }
++
+     pub(super) fn invalidated_workbook_xml(&self) -> Result<Arc<Vec<u8>>> {
+         self.source.check_execution()?;
+         let bytes = raw::recalc::invalidate(self.source.workbook.bytes.as_bytes())?;
+@@ -2077,3 +2137,586 @@ mod tests {
+         assert!(checked_multi_bytes(4, 1, 4).is_err());
+     }
+ }
++
++#[cfg(test)]
++mod row_reuse_tests {
++    use std::collections::BTreeMap;
++
++    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
++    use litchi_opc::{
++        BlobPart, OpcPackage, PackURI, PackageWriter, SourceBackedPackage, TargetMode,
++    };
++    use litchi_sheet::{Cell as Address, Rect};
++
++    use super::Snapshot;
++    use crate::cell::{Cell, Store, Value};
++    use crate::cell_values::{CellValueEdit, SourceBackedEditor, SourceEdit};
++    use crate::formula::Formula;
++    use crate::raw;
++    use crate::raw::worksheet::edit::{
++        Action, ValueOnlyRewrite, rewrite, rewrite_value_only_with_provenance,
++    };
++    use crate::{ErrorValue, Number};
++
++    const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
++    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
++    const OUTER: &str = "urn:litchi:outer-scope";
++    const SHEET: &str = "/xl/worksheets/sheet1.xml";
++    const MAIN: &str = "/xl/workbook.xml";
++    const STYLES: &str = "/xl/styles.xml";
++
++    fn fixture_package(worksheet: &str) -> OpcPackage {
++        let mut package = OpcPackage::new();
++        package
++            .try_add_part(Box::new(BlobPart::new(
++                PackURI::new(MAIN).unwrap(),
++                ct::SML_SHEET_MAIN.to_owned(),
++                format!(
++                    r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><bookViews><workbookView/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/></sheets></workbook>"#
++                )
++                .into_bytes(),
++            )))
++            .unwrap();
++        package
++            .try_add_part(Box::new(BlobPart::new(
++                PackURI::new(SHEET).unwrap(),
++                ct::SML_WORKSHEET.to_owned(),
++                worksheet.as_bytes().to_vec(),
++            )))
++            .unwrap();
++        package
++            .try_add_part(Box::new(BlobPart::new(
++                PackURI::new(STYLES).unwrap(),
++                ct::SML_STYLES.to_owned(),
++                format!(
++                    r#"<styleSheet xmlns="{SML}"><cellXfs count="2"><xf/><xf numFmtId="1"/></cellXfs></styleSheet>"#
++                )
++                .into_bytes(),
++            )))
++            .unwrap();
++        package
++            .get_part_mut(&PackURI::new(MAIN).unwrap())
++            .unwrap()
++            .rels_mut()
++            .try_add_relationship(
++                rt::WORKSHEET.to_owned(),
++                "worksheets/sheet1.xml".to_owned(),
++                "rIdSheet".to_owned(),
++                TargetMode::Internal,
++            )
++            .unwrap();
++        package
++            .get_part_mut(&PackURI::new(MAIN).unwrap())
++            .unwrap()
++            .rels_mut()
++            .try_add_relationship(
++                rt::STYLES.to_owned(),
++                "styles.xml".to_owned(),
++                "rIdStyles".to_owned(),
++                TargetMode::Internal,
++            )
++            .unwrap();
++        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
++        package
++    }
++
++    fn source_backed_editor(worksheet: &str) -> SourceBackedEditor {
++        let bytes = PackageWriter::to_bytes(&fixture_package(worksheet)).unwrap();
++        SourceBackedEditor::from_source_backed_package(
++            SourceBackedPackage::from_vec(bytes).unwrap(),
++        )
++        .unwrap()
++    }
++
++    fn scalar_fixture() -> String {
++        format!(
++            r#"<x:worksheet xmlns:x="{SML}" xmlns="{OUTER}">
++                <x:dimension ref="A1"/>
++                <x:sheetFormatPr baseColWidth="10" defaultColWidth="12.5" defaultRowHeight="15" customHeight="1" zeroHeight="1" thickTop="1" thickBottom="1" outlineLevelRow="2" outlineLevelCol="1"/>
++                <x:cols><x:col min="2" max="3" width="20" style="1" hidden="1" bestFit="1" customWidth="1" phonetic="1" outlineLevel="2" collapsed="1"/></x:cols>
++                <x:sheetData xmlns="{SML}">
++                    <x:row r="1" s="1" customFormat="1" ht="20" customHeight="1" hidden="1" outlineLevel="2" collapsed="1" thickTop="1" thickBot="1" ph="1">
++                        <c r="A1" s="1"><v>1</v></c>
++                        <!-- sentinel comment before the inferred owner -->
++                        <c><v>2</v></c>
++                        <!-- a second sentinel between omitted owners -->
++                        <c r="C1" t="b"><v>1</v></c>
++                        <!-- preserve escaped text while neighboring cells are omitted -->
++                        <c r="D1" t="inlineStr"><is><t xml:space="preserve">old &amp; &lt; escaped</t></is></c>
++                        <c r="E1" t="d"><v>2025-01-01</v></c>
++                        <c r="F1" t="e"><v>#N/A</v></c>
++                        <x:c xmlns:x="{SML}" r="G1"><x:f>SUM(A1:B1)</x:f><x:v>3</x:v></x:c>
++                        <c r="H1" s="1"/>
++                    </x:row>
++                    <x:row>
++                        <q:c xmlns:q="{SML}" r="A2"><q:v>4</q:v></q:c>
++                        <q:c xmlns:q="{SML}"><q:v>5</q:v></q:c>
++                    </x:row>
++                    <x:row r="3"/>
++                    <x:row r="4"><x:c r="H4"><x:v>8</x:v></x:c></x:row>
++                </x:sheetData>
++            </x:worksheet>"#
++        )
++    }
++
++    fn full_store(bytes: &[u8]) -> Store {
++        raw::worksheet::parse(bytes, || Ok(None)).expect("complete candidate worksheet parse")
++    }
++
++    fn assert_store_matches(actual: &Store, expected: &Store) {
++        assert_eq!(
++            actual.entries().len(),
++            expected.entries().len(),
++            "stored cell count"
++        );
++        for (index, (actual, expected)) in
++            actual.entries().iter().zip(expected.entries()).enumerate()
++        {
++            assert_eq!(
++                actual.address, expected.address,
++                "cell address at entry {index}"
++            );
++            assert_eq!(actual.cell, expected.cell, "cell value at entry {index}");
++            assert_eq!(actual.style, expected.style, "cell style at entry {index}");
++            assert_eq!(
++                actual.shared_string, expected.shared_string,
++                "shared string at entry {index}"
++            );
++            assert_eq!(
++                actual.inline_rich, expected.inline_rich,
++                "inline provenance at entry {index}"
++            );
++            assert_eq!(
++                actual.formula_range, expected.formula_range,
++                "formula range at entry {index}"
++            );
++            assert_eq!(
++                actual.shared_formula, expected.shared_formula,
++                "shared formula at entry {index}"
++            );
++            assert_eq!(
++                actual.cell_metadata, expected.cell_metadata,
++                "cell metadata at entry {index}"
++            );
++            assert_eq!(
++                actual.value_metadata, expected.value_metadata,
++                "value metadata at entry {index}"
++            );
++        }
++        assert_eq!(actual.row_entries(), expected.row_entries(), "row records");
++        assert_eq!(
++            actual.column_entries(),
++            expected.column_entries(),
++            "column records"
++        );
++        assert_eq!(actual.defaults(), expected.defaults(), "worksheet defaults");
++        assert_eq!(
++            actual.merge_ranges(),
++            expected.merge_ranges(),
++            "merge records"
++        );
++        assert_eq!(actual.extents(), expected.extents(), "worksheet extents");
++    }
++
++    fn commit_with(
++        worksheet: &str,
++        stage: impl FnOnce(&mut SourceEdit) -> crate::Result<()>,
++    ) -> crate::Result<Snapshot> {
++        let editor = source_backed_editor(worksheet);
++        let mut edit = editor.edit("Sheet1")?;
++        stage(&mut edit)?;
++        Ok(edit.commit()?.into_parts().0)
++    }
++
++    fn actions_for_sets(values: &[(&str, u32)]) -> BTreeMap<Address, Action> {
++        let mut actions = BTreeMap::new();
++        for (address, value) in values {
++            actions.insert(
++                Address::from_a1(address).unwrap(),
++                Action::set((*value).into()),
++            );
++        }
++        actions
++    }
++
++    fn proof_for_sets<'source>(
++        source: &'source Snapshot,
++        values: &[(&str, u32)],
++    ) -> ValueOnlyRewrite<'source> {
++        rewrite_value_only_with_provenance(source.source_xml(), "Sheet1", actions_for_sets(values))
++            .unwrap()
++    }
++
++    fn proof_for_set<'source>(
++        source: &'source Snapshot,
++        address: &str,
++        value: u32,
++    ) -> ValueOnlyRewrite<'source> {
++        proof_for_sets(source, &[(address, value)])
++    }
++
++    fn omission_shapes(proof: &ValueOnlyRewrite<'_>) -> Vec<(u32, u32, u32)> {
++        proof
++            .omitted
++            .iter()
++            .map(|span| (span.row, span.first_column, span.last_column))
++            .collect()
++    }
++
++    fn bytes_between<'a>(bytes: &'a [u8], start: &[u8], end: &[u8]) -> &'a [u8] {
++        let start_at = bytes
++            .windows(start.len())
++            .position(|window| window == start)
++            .unwrap();
++        let end_at = bytes[start_at..]
++            .windows(end.len())
++            .position(|window| window == end)
++            .map(|offset| start_at + offset)
++            .unwrap();
++        &bytes[start_at..end_at]
++    }
++
++    #[test]
++    fn provenance_writer_matches_ordinary_rewrite_bytes() {
++        let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
++        let values = [("A1", 101), ("G1", 107)];
++        let provenance = rewrite_value_only_with_provenance(
++            source.source_xml(),
++            "Sheet1",
++            actions_for_sets(&values),
++        )
++        .unwrap();
++        let ordinary = rewrite(source.source_xml(), "Sheet1", actions_for_sets(&values)).unwrap();
++        assert_eq!(
++            provenance.bytes, ordinary,
++            "provenance must not alter output"
++        );
++        assert!(
++            !provenance.omitted.is_empty(),
++            "the comparison must be eligible"
++        );
++    }
++
++    #[test]
++    fn merge_omitted_cells_handles_same_row_gaps_and_a_lower_next_row_column() {
++        let source_xml = format!(
++            r#"<worksheet xmlns="{SML}"><dimension ref="A1:E2"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c r="C1"><v>3</v></c><c r="D1"><v>4</v></c><c r="E1"><v>5</v></c></row><row r="2"><c r="A2"><v>6</v></c></row></sheetData></worksheet>"#
++        );
++        let parsed_xml = format!(
++            r#"<worksheet xmlns="{SML}"><dimension ref="A1:E2"/><sheetData><row r="1"><c r="C1"><v>30</v></c></row><row r="2"/></sheetData></worksheet>"#
++        );
++        let source = full_store(source_xml.as_bytes());
++        let parsed = full_store(parsed_xml.as_bytes());
++        let omitted = [
++            Rect::from_a1("A1:B1").unwrap(),
++            Rect::from_a1("D1:E1").unwrap(),
++            // A2 starts at a lower column than E1's exclusive end.  Row
++            // order must still make this omission valid.
++            Rect::from_a1("A2").unwrap(),
++        ];
++        let merged = Store::merge_omitted_cells(parsed, &source, &omitted)
++            .expect("omitted ranges should be structurally valid")
++            .expect("same-row gaps must take the merge path, not fallback");
++        let expected_xml =
++            source_xml.replace("<c r=\"C1\"><v>3</v></c>", "<c r=\"C1\"><v>30</v></c>");
++        assert_store_matches(&merged, &full_store(expected_xml.as_bytes()));
++        assert!(matches!(
++            merged.entry(Address::from_a1("C1").unwrap()),
++            Some(entry) if matches!(&entry.cell, Cell::Value(Value::Number(number)) if number.as_str() == "30")
++        ));
++    }
++
++    #[test]
++    fn replacement_only_readback_matches_full_parse_for_all_scalar_facets() {
++        let worksheet = scalar_fixture();
++        let candidate = commit_with(&worksheet, |edit| {
++            edit.apply_batch([
++                CellValueEdit::set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap()),
++                // B1 is source-implicit.  The rewritten owner must gain an
++                // explicit address before any preceding owners are omitted.
++                CellValueEdit::set(Address::from_a1("B1").unwrap(), 22u32),
++                CellValueEdit::set(Address::from_a1("C1").unwrap(), false),
++                CellValueEdit::set(Address::from_a1("D1").unwrap(), "new & < escaped"),
++                CellValueEdit::set(
++                    Address::from_a1("E1").unwrap(),
++                    Value::date("2026-08-14").unwrap(),
++                ),
++                CellValueEdit::set(
++                    Address::from_a1("F1").unwrap(),
++                    Value::Error(ErrorValue::DivZero),
++                ),
++                CellValueEdit::set_formula(
++                    Address::from_a1("G1").unwrap(),
++                    Formula::new("A1+C1").unwrap(),
++                ),
++                // The source dimension is intentionally stale.  The emitted
++                // dimension must be used by the merged Store.
++                CellValueEdit::set(Address::from_a1("H4").unwrap(), 9u32),
++            ])
++        })
++        .expect("replacement-only candidate");
++        let expected = full_store(candidate.source_xml());
++        assert_store_matches(&candidate.cells, &expected);
++        for address in ["A1", "B1", "C1", "D1", "E1", "F1", "G1", "H4"] {
++            let marker = format!("r=\"{address}\"");
++            assert!(
++                candidate
++                    .source_xml()
++                    .windows(marker.len())
++                    .any(|window| window == marker.as_bytes()),
++                "changed cell {address} must have an explicit address"
++            );
++        }
++        assert!(matches!(
++            candidate.cell(Address::from_a1("B1").unwrap()),
++            Some(Cell::Value(Value::Number(number))) if number.as_str() == "22"
++        ));
++        assert_eq!(
++            candidate.cells.extents().declared().map(|range| range.a1()),
++            Some("A1:H4".to_owned())
++        );
++        assert!(matches!(
++            candidate.cell(Address::from_a1("A1").unwrap()),
++            Some(Cell::Value(Value::Number(number))) if number.as_str() == "42"
++        ));
++        assert!(matches!(
++            candidate.cell(Address::from_a1("D1").unwrap()),
++            Some(Cell::Value(Value::Text(text))) if text.as_str() == "new & < escaped"
++        ));
++        assert!(matches!(
++            candidate.cell(Address::from_a1("G1").unwrap()),
++            Some(Cell::Formula(formula)) if formula.text() == "A1+C1" && formula.cached().is_none()
++        ));
++        // Row 2 has no r attribute.  Keeping the row shell is required for
++        // its inferred row number and is checked through the exact row slice.
++        assert_eq!(candidate.cells.row_entries(), expected.row_entries());
++    }
++
++    #[test]
++    fn replacement_after_implicit_cells_preserves_every_omitted_address() {
++        let worksheet = scalar_fixture();
++        let source = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
++        let proof = proof_for_sets(&source, &[("A1", 101), ("G1", 107)]);
++        assert_eq!(
++            omission_shapes(&proof),
++            vec![(0, 1, 5), (0, 7, 7), (1, 0, 1), (3, 7, 7)],
++            "the long touched row and untouched rows must carry exact omitted owners"
++        );
++        assert_eq!(
++            &proof.bytes[proof.omitted[0].start..proof.omitted[0].end],
++            bytes_between(source.source_xml(), b"<c><v>2</v></c>", b"<x:c xmlns:x=")
++        );
++        assert_eq!(
++            &proof.bytes[proof.omitted[1].start..proof.omitted[1].end],
++            bytes_between(source.source_xml(), b"<c r=\"H1\" s=\"1\"/>", b"</x:row>")
++        );
++        assert_eq!(
++            &proof.bytes[proof.omitted[2].start..proof.omitted[2].end],
++            &bytes_between(source.source_xml(), b"<x:row>", b"</x:row>")[b"<x:row>".len()..]
++        );
++        assert_eq!(
++            &proof.bytes[proof.omitted[3].start..proof.omitted[3].end],
++            &bytes_between(source.source_xml(), b"<x:row r=\"4\">", b"</x:row>")
++                [b"<x:row r=\"4\">".len()..]
++        );
++        assert!(
++            source
++                .source_xml()
++                .windows(b"<x:row r=\"3\"/>".len())
++                .any(|window| { window == b"<x:row r=\"3\"/>" })
++        );
++        assert!(
++            proof
++                .bytes
++                .windows(b"<x:row r=\"3\"/>".len())
++                .any(|window| { window == b"<x:row r=\"3\"/>" }),
++            "untouched self-closing rows must remain byte-exact"
++        );
++        let candidate = Snapshot::from_rewritten_value_source(&source, proof).unwrap();
++        let expected = full_store(candidate.source_xml());
++        assert_store_matches(&candidate.cells, &expected);
++        for (address, expected_value) in [("B1", "2"), ("G1", "107"), ("H4", "8")] {
++            assert!(matches!(
++                candidate.cell(Address::from_a1(address).unwrap()),
++                Some(Cell::Value(Value::Number(number))) if number.as_str() == expected_value
++            ));
++        }
++        assert!(matches!(
++            candidate.cell(Address::from_a1("C1").unwrap()),
++            Some(Cell::Value(Value::Bool(true)))
++        ));
++        assert!(matches!(
++            candidate.cell(Address::from_a1("F1").unwrap()),
++            Some(Cell::Value(Value::Error(ErrorValue::NotAvailable)))
++        ));
++    }
++
++    #[test]
++    fn changed_output_bytes_are_observed_by_specialized_readback() {
++        let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
++        let mut proof = proof_for_set(&source, "A1", 42);
++        assert!(
++            !proof.omitted.is_empty(),
++            "this proof must take the reuse route"
++        );
++        let needle = b"<v>42</v>";
++        let position = proof
++            .bytes
++            .windows(needle.len())
++            .position(|window| window == needle)
++            .unwrap();
++        proof.bytes.splice(
++            position..position + needle.len(),
++            b"<v>84</v>".iter().copied(),
++        );
++        let candidate = Snapshot::from_rewritten_value_source(&source, proof).unwrap();
++        assert!(matches!(
++            candidate.cell(Address::from_a1("A1").unwrap()),
++            Some(Cell::Value(Value::Number(number))) if number.as_str() == "84"
++        ));
++        assert_store_matches(&candidate.cells, &full_store(candidate.source_xml()));
++    }
++
++    #[test]
++    fn omission_proof_from_another_source_cannot_reuse_its_store() {
++        let source_a = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
++        let source_b_xml = scalar_fixture().replace("<c><v>2</v></c>", "<c><v>902</v></c>");
++        let source_b = Snapshot::load(&fixture_package(&source_b_xml), "Sheet1").unwrap();
++        assert!(matches!(
++            source_b.cell(Address::from_a1("B1").unwrap()),
++            Some(Cell::Value(Value::Number(number))) if number.as_str() == "902"
++        ));
++        let proof = proof_for_set(&source_a, "A1", 42);
++        assert!(
++            !proof.omitted.is_empty(),
++            "the source-A proof must be eligible"
++        );
++        let candidate = Snapshot::from_rewritten_value_source(&source_b, proof).unwrap();
++        let expected = full_store(candidate.source_xml());
++        assert_store_matches(&candidate.cells, &expected);
++        assert!(matches!(
++            candidate.cell(Address::from_a1("B1").unwrap()),
++            Some(Cell::Value(Value::Number(number))) if number.as_str() == "2"
++        ));
++    }
++
++    #[test]
++    fn clear_remove_and_existing_row_insert_match_the_complete_parser() {
++        let clear_remove = format!(
++            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="5"><c r="A5"><v>1</v></c><c r="B5"><v>2</v></c><c><v>3</v></c><c r="E5"><v>5</v></c></row></sheetData></worksheet>"#
++        );
++        let cleared = commit_with(&clear_remove, |edit| {
++            edit.clear(Address::from_a1("B5").unwrap())
++        })
++        .expect("clear existing owner");
++        assert_store_matches(&cleared.cells, &full_store(cleared.source_xml()));
++
++        let inserted = format!(
++            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="5"><c r="A5"><v>1</v></c><c r="B5"><v>2</v></c><c r="D5"><v>4</v></c><c><v>5</v></c></row></sheetData></worksheet>"#
++        );
++        let inserted = commit_with(&inserted, |edit| {
++            edit.insert(Address::from_a1("C5").unwrap(), Number::new("30").unwrap())
++        })
++        .expect("insert in existing row");
++        assert_store_matches(&inserted.cells, &full_store(inserted.source_xml()));
++        assert!(matches!(
++            inserted.cell(Address::from_a1("E5").unwrap()),
++            Some(Cell::Value(Value::Number(number))) if number.as_str() == "5"
++        ));
++
++        let shifted = commit_with(&clear_remove, |edit| {
++            edit.remove(Address::from_a1("B5").unwrap())
++        });
++        assert!(
++            shifted.is_err(),
++            "shifted implicit follower must refuse readback"
++        );
++    }
++
++    #[test]
++    fn new_row_and_shared_formula_inputs_use_complete_parse_semantics() {
++        let worksheet = format!(
++            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="3"><c r="A3"><v>3</v></c></row></sheetData></worksheet>"#
++        );
++        let source = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
++        let proof = proof_for_set(&source, "A2", 2);
++        assert!(
++            proof.omitted.is_empty(),
++            "a new row must use complete parsing"
++        );
++        let inserted = commit_with(&worksheet, |edit| {
++            edit.insert(Address::from_a1("A2").unwrap(), Number::new("2").unwrap())
++        })
++        .expect("new row insertion");
++        assert_store_matches(&inserted.cells, &full_store(inserted.source_xml()));
++
++        let shared = format!(
++            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="shared" ref="A1:B2" si="7">A1+1</f><v>1</v></c><c r="B1"><f t="shared" si="7"/><v>2</v></c></row><row r="2"><c r="A2"><f t="shared" si="7"/><v>3</v></c><c r="B2"><f t="shared" si="7"/><v>4</v></c><c r="C2"><v>5</v></c></row></sheetData></worksheet>"#
++        );
++        let source = Snapshot::load(&fixture_package(&shared), "Sheet1").unwrap();
++        let proof = proof_for_set(&source, "C2", 50);
++        assert!(
++            proof.omitted.is_empty(),
++            "shared-formula worksheets must fall back"
++        );
++        let candidate = commit_with(&shared, |edit| {
++            edit.set(Address::from_a1("C2").unwrap(), 50u32)
++        })
++        .expect("unrelated shared-formula edit");
++        let expected = full_store(candidate.source_xml());
++        assert_store_matches(&candidate.cells, &expected);
++        for address in ["A1", "B1", "A2", "B2"] {
++            let address = Address::from_a1(address).unwrap();
++            assert_eq!(
++                candidate.cells.entry(address).unwrap().shared_formula,
++                expected.entry(address).unwrap().shared_formula,
++                "shared formula metadata at {address}"
++            );
++        }
++    }
++
++    #[test]
++    fn malformed_or_mce_candidate_bytes_are_rejected_before_merge() {
++        let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
++
++        let mut unknown = proof_for_set(&source, "A1", 42);
++        assert!(!unknown.omitted.is_empty());
++        let root_end = unknown.bytes.iter().position(|byte| *byte == b'>').unwrap();
++        unknown
++            .bytes
++            .splice(root_end..root_end, b" future=\"unknown\"".iter().copied());
++        assert!(Snapshot::from_rewritten_value_source(&source, unknown).is_err());
++
++        let mut mce = proof_for_set(&source, "A1", 42);
++        assert!(!mce.omitted.is_empty());
++        let root_end = mce.bytes.iter().position(|byte| *byte == b'>').unwrap();
++        mce.bytes.splice(
++            root_end..root_end,
++            b" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\""
++                .iter()
++                .copied(),
++        );
++        let close = b"</x:worksheet>";
++        let close_at = mce
++            .bytes
++            .windows(close.len())
++            .position(|window| window == close)
++            .unwrap();
++        mce.bytes.splice(
++            close_at..close_at,
++            b"<mc:AlternateContent/>".iter().copied(),
++        );
++        assert!(Snapshot::from_rewritten_value_source(&source, mce).is_err());
++    }
++
++    #[test]
++    fn no_op_source_edit_shares_the_original_semantic_store() {
++        let editor = source_backed_editor(&scalar_fixture());
++        let edit = editor.edit("Sheet1").unwrap();
++        let before = edit.before().clone();
++        let commit = edit.commit().unwrap();
++        assert!(!commit.changed());
++        assert!(commit.snapshot().shares_cell_store_with(&before));
++        assert_eq!(commit.snapshot().source_xml(), before.source_xml());
++    }
++}
+diff --git a/crates/litchi-xlsx/src/cell_values/source.rs b/crates/litchi-xlsx/src/cell_values/source.rs
+index 2f1680c0e..34b89ad0b 100644
+--- a/crates/litchi-xlsx/src/cell_values/source.rs
++++ b/crates/litchi-xlsx/src/cell_values/source.rs
+@@ -18,7 +18,7 @@ use crate::Selector;
+ use crate::cell::{Cell, Content, Number, Value};
+ use crate::error::{Error, Result, invalid};
+ use crate::formula::Formula;
+-use crate::raw::worksheet::edit::{Action, rewrite};
++use crate::raw::worksheet::edit::{Action, rewrite_value_only_with_provenance};
+ 
+ /// Maximum unique cells in one atomic value transaction.
+ pub const MAX_BATCH_EDITS: usize = 256;
+@@ -833,8 +833,12 @@ impl SourceEdit {
+             return Ok(Commit::new(self.before, patch, 0));
+         }
+         let changed = actions.len();
+-        let output = rewrite(self.before.source_xml(), self.before.sheet_name(), actions)?;
+-        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?
++        let output = rewrite_value_only_with_provenance(
++            self.before.source_xml(),
++            self.before.sheet_name(),
++            actions,
++        )?;
++        let snapshot = Snapshot::from_rewritten_value_source(&self.before, output)?
+             .with_invalidated_calculation()?;
+         for (address, expected) in &self.staged {
+             let matches = match expected {
+@@ -1170,13 +1174,17 @@ impl MultiSourceEdit {
+             }
+             changed_cells += actions.len();
+             touched_worksheets += 1;
+-            let output = rewrite(snapshot.source_xml(), snapshot.sheet_name(), actions)?;
++            let output = rewrite_value_only_with_provenance(
++                snapshot.source_xml(),
++                snapshot.sheet_name(),
++                actions,
++            )?;
+             aggregate_bytes = super::snapshot::checked_multi_bytes(
+                 aggregate_bytes,
+-                output.len(),
++                output.bytes.len(),
+                 super::snapshot::MAX_MULTI_WORKSHEET_BYTES,
+             )?;
+-            let candidate = Snapshot::from_rewritten_source(snapshot, output)?;
++            let candidate = Snapshot::from_rewritten_value_source(snapshot, output)?;
+             for (address, expected) in staged {
+                 let matches = match expected {
+                     StagedValueEdit::Set(content) => {
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
+index 4db350c25..ff464f85e 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
+@@ -25,7 +25,7 @@ pub(super) use snapshot::{
+     Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
+     MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag, scan,
+     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
+-    write_sheet_data,
++    write_sheet_data, write_sheet_data_with_provenance,
+ };
+ #[allow(
+     unused_imports,
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
+index 9b7889d81..20a1b013e 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
+@@ -144,6 +144,7 @@ pub(crate) struct Layout {
+     pub(crate) extended_validation: bool,
+     pub(crate) formula_ranges: Box<[SelectionRange]>,
+     pub(crate) shared_formulas: Box<[SharedFormulaGroup]>,
++    pub(crate) has_shared_formulas: bool,
+     pub(crate) defaults_compatibility: bool,
+     pub(crate) merge_cells: Option<MergeCellsSlot>,
+     pub(crate) merge_insertion: usize,
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+index 3d97fee6e..3af9bd8c8 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+@@ -1252,6 +1252,10 @@ impl Scanner {
+             ));
+         }
+         let shared_formulas = shared_formula_groups(&self.formulas, &sheet_data)?;
++        let has_shared_formulas = self
++            .formulas
++            .iter()
++            .any(|formula| formula.kind.as_ref() == "shared");
+         let mut formula_ranges = Vec::new();
+         let mut shared = HashMap::<u32, SelectionRange>::new();
+         for formula in &self.formulas {
+@@ -1322,6 +1326,7 @@ impl Scanner {
+             extended_validation: self.extended_validation,
+             formula_ranges: formula_ranges.into_boxed_slice(),
+             shared_formulas: shared_formulas.into_boxed_slice(),
++            has_shared_formulas,
+             defaults_compatibility: self.defaults_compatibility,
+             merge_cells: self.merge_cells,
+             merge_insertion,
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
+index 28bf4a409..3966bb648 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
+@@ -6,4 +6,4 @@ mod sheet_data;
+ 
+ pub(crate) use columns::{write_columns, write_new_columns};
+ pub(crate) use root::{write_defaults, write_new_defaults, write_root};
+-pub(crate) use sheet_data::write_sheet_data;
++pub(crate) use sheet_data::{write_sheet_data, write_sheet_data_with_provenance};
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+index 77bc79cb4..c50324062 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -13,6 +13,7 @@ use crate::cell::{Content, Value};
+ use crate::error::{Result, invalid};
+ use crate::outline::Outline;
+ use crate::raw::strings::encode_spreadsheet_text;
++use crate::raw::worksheet::edit::OmittedCells;
+ use crate::raw::worksheet::edit::model::{
+     Action, DescentEffect, HeightEffect, Payload, RowAction, StyleEffect,
+ };
+@@ -80,6 +81,221 @@ pub(crate) fn write_sheet_data(
+     Ok(())
+ }
+ 
++/// Write the complete ordinary output and retain the actual output spans of
++/// cell bodies that a reduced semantic readback may omit. This is a separate
++/// value-only route; callers that need row, column, or default effects keep
++/// using [`write_sheet_data`].
++pub(crate) fn write_sheet_data_with_provenance(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    data: &SheetData,
++    cells: BTreeMap<Address, Action>,
++    rows: BTreeMap<Row, RowAction>,
++    descent_name: &str,
++) -> Result<Box<[OmittedCells]>> {
++    let mut by_row = BTreeMap::<u32, RowEdits>::new();
++    for (address, action) in cells {
++        let number = address
++            .row()
++            .get()
++            .checked_add(1)
++            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
++        by_row
++            .entry(number)
++            .or_default()
++            .cells
++            .insert(address, action);
++    }
++    for (row, action) in rows {
++        let number = row
++            .get()
++            .checked_add(1)
++            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
++        by_row.entry(number).or_default().row = Some(action);
++    }
++    let mut omitted = Vec::new();
++    let mut recording = omitted.try_reserve(data.rows.len()).is_ok();
++    if !recording {
++        omitted.clear();
++    }
++
++    if data.empty {
++        write_tag(output, &data.tag, false, &[], &[]);
++        for (number, edits) in by_row {
++            write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
++        }
++        write_close(output, &data.tag.name);
++        return Ok(if recording {
++            omitted.into_boxed_slice()
++        } else {
++            Box::new([])
++        });
++    }
++
++    output.extend_from_slice(&source[data.span.start..data.tag_end]);
++    let mut cursor = data.tag_end;
++    let mut pending = by_row.into_iter().peekable();
++    for row in &data.rows {
++        output.extend_from_slice(&source[cursor..row.span.start]);
++        while pending
++            .peek()
++            .is_some_and(|(number, _)| *number < row.number)
++        {
++            if let Some((number, edits)) = pending.next() {
++                write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
++            }
++        }
++        if pending
++            .peek()
++            .is_some_and(|(number, _)| *number == row.number)
++        {
++            let (_, edits) = pending
++                .next()
++                .ok_or_else(|| invalid("worksheet row edit ordering was lost"))?;
++            let membership_changed = edits.cells.iter().any(|(address, action)| {
++                let exists = row
++                    .cells
++                    .binary_search_by_key(address, |cell| cell.address)
++                    .is_ok();
++                !exists || matches!(action, Action::Remove)
++            });
++            if membership_changed || edits.row.is_some() || row.empty {
++                write_row(output, source, row, &edits, descent_name)?;
++            } else {
++                write_replacement_row(output, source, row, &edits, &mut omitted, &mut recording)?;
++            }
++        } else {
++            output.extend_from_slice(&source[row.span.start..row.tag_end]);
++            let body_start = output.len();
++            output.extend_from_slice(&source[row.tag_end..row.close_start]);
++            let body_end = output.len();
++            record_omitted_row(&mut omitted, &mut recording, row, body_start, body_end)?;
++            output.extend_from_slice(&source[row.close_start..row.span.end]);
++        }
++        cursor = row.span.end;
++    }
++    output.extend_from_slice(&source[cursor..data.close_start]);
++    for (number, edits) in pending {
++        write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
++    }
++    output.extend_from_slice(&source[data.close_start..data.span.end]);
++    Ok(if recording {
++        omitted.into_boxed_slice()
++    } else {
++        Box::new([])
++    })
++}
++
++fn write_replacement_row(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    row: &RowSlot,
++    edits: &RowEdits,
++    omitted: &mut Vec<OmittedCells>,
++    recording: &mut bool,
++) -> Result<()> {
++    output.extend_from_slice(&source[row.span.start..row.tag_end]);
++    let mut cursor = row.tag_end;
++    let mut pending = edits.cells.iter().peekable();
++    let mut run = None::<(usize, Address, Address)>;
++    for cell in &row.cells {
++        output.extend_from_slice(&source[cursor..cell.span.start]);
++        let cell_start = output.len();
++        while pending
++            .peek()
++            .is_some_and(|(address, _)| **address < cell.address)
++        {
++            let (address, action) = pending
++                .next()
++                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
++            if let Some((start, first, last)) = run.take() {
++                record_omitted(omitted, recording, first, last, start, cell_start)?;
++            }
++            write_new_action(output, &row.tag.name, *address, action)?;
++        }
++        if pending
++            .peek()
++            .is_some_and(|(address, _)| **address == cell.address)
++        {
++            let (_, action) = pending
++                .next()
++                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
++            if let Some((start, first, last)) = run.take() {
++                record_omitted(omitted, recording, first, last, start, cell_start)?;
++            }
++            match action {
++                Action::Update { .. } => write_cell(output, source, cell, action)?,
++                Action::Remove => {
++                    return Err(invalid("replacement row unexpectedly removes a cell"));
++                },
++            }
++        } else {
++            let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
++            let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
++            run = Some((start, first, cell.address));
++            output.extend_from_slice(&source[cell.span.start..cell.span.end]);
++        }
++        cursor = cell.span.end;
++    }
++    output.extend_from_slice(&source[cursor..row.close_start]);
++    if let Some((start, first, last)) = run {
++        record_omitted(omitted, recording, first, last, start, output.len())?;
++    }
++    output.extend_from_slice(&source[row.close_start..row.span.end]);
++    Ok(())
++}
++
++fn record_omitted_row(
++    omitted: &mut Vec<OmittedCells>,
++    recording: &mut bool,
++    row: &RowSlot,
++    start: usize,
++    end: usize,
++) -> Result<()> {
++    let Some(first) = row.cells.first() else {
++        return Ok(());
++    };
++    let last = row
++        .cells
++        .last()
++        .ok_or_else(|| invalid("worksheet row cell provenance lost its last cell"))?;
++    record_omitted(omitted, recording, first.address, last.address, start, end)
++}
++
++fn record_omitted(
++    omitted: &mut Vec<OmittedCells>,
++    recording: &mut bool,
++    first: Address,
++    last: Address,
++    start: usize,
++    end: usize,
++) -> Result<()> {
++    if start >= end {
++        return Ok(());
++    }
++    if first.row() != last.row() || first.column() > last.column() {
++        return Err(invalid(
++            "worksheet cell provenance has an invalid address range",
++        ));
++    }
++    if !*recording {
++        return Ok(());
++    }
++    if omitted.try_reserve(1).is_err() {
++        *recording = false;
++        omitted.clear();
++        return Ok(());
++    }
++    omitted.push(OmittedCells {
++        row: first.row().get(),
++        first_column: first.column().get(),
++        last_column: last.column().get(),
++        start,
++        end,
++    });
++    Ok(())
++}
++
+ #[derive(Debug, Default)]
+ struct RowEdits {
+     cells: BTreeMap<Address, Action>,
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
+index a4c3106ae..404f6d5ed 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
+@@ -19,4 +19,7 @@ pub(crate) use model::{
+     Action, ColumnAction, DefaultsAction, DefaultsEffects, DescentEffect, HeightEffect, MergePlan,
+     OptionalEffect, Payload, Plan, RowAction, StyleEffect, WidthEffect,
+ };
+-pub(crate) use package::{rewrite, rewrite_merges};
++pub(crate) use package::{
++    OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite, rewrite_merges,
++    rewrite_value_only_with_provenance,
++};
+diff --git a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+index ad491f7cd..3ec1f282e 100644
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+@@ -1,18 +1,45 @@
+ //! Worksheet-package orchestration and merge-container patching.
+ 
+-use litchi_sheet::Rect;
++use std::collections::BTreeMap;
++
++use litchi_sheet::{Cell as Address, Rect};
+ 
+ use super::codec::{
+-    ExtensionNames, MergeCellsSlot, Span, Tag, scan, sibling_name, write_close, write_columns,
+-    write_defaults, write_new_columns, write_new_defaults, write_root, write_sheet_data, write_tag,
++    ExtensionNames, Layout, MergeCellsSlot, Span, Tag, scan, sibling_name, write_close,
++    write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
++    write_sheet_data, write_sheet_data_with_provenance, write_tag,
+ };
+-use super::model::{MergePlan, Plan};
++use super::model::{MergePlan, Payload, Plan};
+ use super::validation::{
+     expanded_dimension, plan_sets_descent, validate_actions, validate_column_actions,
+     validate_defaults_action, validate_row_actions,
+ };
+ use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
+ use crate::merge;
++
++/// One contiguous range of cell records omitted from the independent
++/// readback representation. The offsets always refer to the actual complete
++/// rewritten output, not to a reduced buffer.
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct OmittedCells {
++    pub(crate) row: u32,
++    pub(crate) first_column: u32,
++    pub(crate) last_column: u32,
++    pub(crate) start: usize,
++    pub(crate) end: usize,
++}
++
++/// Complete value-only output plus its private readback provenance.
++///
++/// Borrowing the exact input slice ties the omission metadata to the source
++/// store from which it was derived. The snapshot constructor checks that
++/// identity before merging retained cells into the reduced parse.
++#[derive(Debug)]
++pub(crate) struct ValueOnlyRewrite<'a> {
++    pub(crate) source: &'a [u8],
++    pub(crate) bytes: Vec<u8>,
++    pub(crate) omitted: Box<[OmittedCells]>,
++}
+ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Result<Vec<u8>> {
+     let plan = plan.into();
+     if plan.is_empty() {
+@@ -23,6 +50,10 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
+     validate_row_actions(&layout, sheet, &plan.rows)?;
+     validate_column_actions(&layout, sheet, &plan.columns)?;
+     validate_defaults_action(&layout, sheet, plan.defaults)?;
++    rewrite_with_layout(content, sheet, layout, plan)
++}
++
++fn rewrite_with_layout(content: &[u8], sheet: &str, layout: Layout, plan: Plan) -> Result<Vec<u8>> {
+     let dimension = expanded_dimension(&layout, &plan.cells);
+     let extension_names = ExtensionNames::plan(&layout, plan_sets_descent(&plan))?;
+ 
+@@ -125,6 +156,138 @@ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Res
+     Ok(output)
+ }
+ 
++/// Rewrite a value-only plan while recording spans that can be omitted from
++/// the independent semantic readback. All bytes in `bytes` remain the exact
++/// ordinary rewrite output. Unsupported eligibility falls back to that same
++/// output with no reuse metadata.
++pub(crate) fn rewrite_value_only_with_provenance<'a>(
++    content: &'a [u8],
++    sheet: &str,
++    cells: BTreeMap<Address, super::model::Action>,
++) -> Result<ValueOnlyRewrite<'a>> {
++    let plan = Plan::cells(cells);
++    if plan.is_empty() {
++        return Ok(ValueOnlyRewrite {
++            source: content,
++            bytes: content.to_vec(),
++            omitted: Box::new([]),
++        });
++    }
++
++    let layout = scan(content)?;
++    validate_actions(&layout, sheet, &plan.cells)?;
++    validate_row_actions(&layout, sheet, &plan.rows)?;
++    validate_column_actions(&layout, sheet, &plan.columns)?;
++    validate_defaults_action(&layout, sheet, plan.defaults)?;
++    let eligible = !layout.has_shared_formulas
++        && !plan
++            .cells
++            .values()
++            .any(|action| matches!(action.payload(), Some(Payload::SharedFormula { .. })))
++        && plan.cells.keys().all(|address| {
++            let Some(number) = address.row().get().checked_add(1) else {
++                return false;
++            };
++            layout
++                .sheet_data
++                .rows
++                .binary_search_by_key(&number, |row| row.number)
++                .is_ok()
++        });
++    if !eligible {
++        return Ok(ValueOnlyRewrite {
++            source: content,
++            bytes: rewrite_with_layout(content, sheet, layout, plan)?,
++            omitted: Box::new([]),
++        });
++    }
++
++    let dimension = expanded_dimension(&layout, &plan.cells);
++    let extension_names = ExtensionNames::plan(&layout, plan_sets_descent(&plan))?;
++    let effects = plan
++        .cells
++        .len()
++        .checked_add(plan.rows.len())
++        .and_then(|count| count.checked_add(plan.columns.len()))
++        .and_then(|count| count.checked_add(usize::from(plan.defaults.is_some())))
++        .ok_or_else(|| invalid("worksheet edit effect count overflow"))?;
++    let extra = effects
++        .checked_mul(128)
++        .and_then(|value| content.len().checked_add(value))
++        .ok_or_else(|| invalid("worksheet edit output size overflow"))?;
++    let mut output = Vec::new();
++    output
++        .try_reserve(extra)
++        .map_err(|source| allocation("worksheet edit output", source))?;
++    // Plan::cells has no row, column, or default effects; retain only the
++    // dimension and sheet-data envelope for this value-only route.
++    let Plan { cells, .. } = plan;
++    let mut cursor = 0usize;
++    if let Some((tag, range)) = dimension {
++        output.extend_from_slice(&content[cursor..tag.span.start]);
++        write_tag(
++            &mut output,
++            &tag.tag,
++            tag.empty,
++            &["ref"],
++            &[("ref", range.a1())],
++        );
++        cursor = tag.span.end;
++    }
++    output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
++    let omitted = if cells.is_empty() {
++        output
++            .extend_from_slice(&content[layout.sheet_data.span.start..layout.sheet_data.span.end]);
++        Box::new([])
++    } else {
++        write_sheet_data_with_provenance(
++            &mut output,
++            content,
++            &layout.sheet_data,
++            cells,
++            BTreeMap::new(),
++            &extension_names.descent,
++        )?
++    };
++    output.extend_from_slice(&content[layout.sheet_data.span.end..]);
++    Ok(ValueOnlyRewrite {
++        source: content,
++        bytes: output,
++        omitted,
++    })
++}
++
++/// Build the XML used only for the reduced semantic readback. Every span is
++/// checked against the complete output and must be sorted and disjoint.
++pub(crate) fn reduced_readback(content: &[u8], omitted: &[OmittedCells]) -> Result<Vec<u8>> {
++    let mut removed = 0usize;
++    let mut cursor = 0usize;
++    for span in omitted {
++        if span.start < cursor || span.start >= span.end || span.end > content.len() {
++            return Err(invalid("worksheet omission provenance is invalid"));
++        }
++        removed = removed
++            .checked_add(span.end - span.start)
++            .ok_or_else(|| invalid("worksheet omission size overflows usize"))?;
++        cursor = span.end;
++    }
++    let capacity = content
++        .len()
++        .checked_sub(removed)
++        .ok_or_else(|| invalid("worksheet omission exceeds rewritten output"))?;
++    let mut reduced = Vec::new();
++    reduced
++        .try_reserve_exact(capacity)
++        .map_err(|source| allocation("worksheet reduced readback", source))?;
++    cursor = 0;
++    for span in omitted {
++        reduced.extend_from_slice(&content[cursor..span.start]);
++        cursor = span.end;
++    }
++    reduced.extend_from_slice(&content[cursor..]);
++    Ok(reduced)
++}
++
+ #[derive(Debug)]
+ struct MergeReplacement {
+     span: Span,
+diff --git a/crates/litchi-xlsx/tests/source_backed_cell_values.rs b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+index 84aa2000d..24aa345a0 100644
+--- a/crates/litchi-xlsx/tests/source_backed_cell_values.rs
++++ b/crates/litchi-xlsx/tests/source_backed_cell_values.rs
+@@ -2875,3 +2875,21 @@ fn unrelated_scalar_edit_preserves_an_oversized_shared_formula_group() {
+         Some(Cell::Formula(_))
+     ));
+ }
++
++#[test]
++fn removing_a_cell_with_an_implicit_follower_refuses_shifted_readback() {
++    let bytes = fixture(
++        format!(
++            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c><v>3</v></c></row></sheetData></worksheet>"#
++        ),
++        false,
++    );
++    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
++    let mut edit = editor.edit("Sheet1").unwrap();
++    edit.remove(address("B1")).unwrap();
++    assert!(matches!(
++        edit.commit(),
++        Err(Error::Invalid(message))
++            if message == "value-only publication readback differs from staged state"
++    ));
++}

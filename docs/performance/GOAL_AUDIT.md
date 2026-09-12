@@ -1,5 +1,31 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0525: measured OOXML reconstruction progress; full optimization goal remains open
+
+[0525](changes/0525-xlsx-unchanged-cell-readback.md) advances the active
+OLE2/OOXML goal with source-bound omission of unchanged XLSX cell owners and
+independent parsing of actual changed output. The matched primary matrix passes
+the frozen native total/commit gates in all four shape/repeat pairs, and the
+profile gate passes at 31.5439–32.4414% lower commit Ir. Allocation calls,
+bytes and incremental region peak also fall in both shapes with exact repeat
+vectors. The candidate is retained after supplemental eager confirmation passed both
+pairs with zero >5% matched or drift flags. All 12 quality gates pass with
+1,293 successful executions; cleanup and exact evidence replay pass. They do not close
+physical FileSource/range, cold-cache, native Office-producer, fuzz, scaling or
+broad CRUD requirements, and do not complete the full optimization goal. ODF
+remains deferred until OLE2/OOXML work is complete; iWork is excluded.
+
+The native review retains 31 over-5% rows (7 open, 19 publication, 4 reopen,
+and 1 managed dense-sparse repeat-2 whole-child-RSS row at 85,648 → 90,244
+KiB, +5.3661%) and 76 same-build drifts; no main commit or total-elapsed row
+crosses 5%. Reopen diagnostics are outside measured edit/save elapsed time,
+and the accepted decision weighs these phase/RSS tradeoffs alongside all
+four primary total p50 gains. Quality has 12 passing gates and 1,293 successful
+executions; the candidate is accepted and both owned scratch trees are absent.
+The next audit targets scanner layout/address work (53.26% of these XLSX
+commit profiles), with Store merge (5.97%) secondary; rejected mechanisms
+remain excluded.
+
 ## 0524: visited-bit experiment closed; broader optimization goal remains open
 
 [0524](changes/0524-cfb-visited-bit-evaluation.md) completes and rejects the

@@ -1,0 +1,50 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x",
+    ",",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0525/baseline/hardware-r2-medium.csv",
+    "-e",
+    "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "--",
+    "/tmp/litchi-goal-0525/baseline-normal",
+    "--warmup",
+    "0",
+    "--samples",
+    "100",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0525/baseline/hardware-r2-medium.json"
+  ],
+  "start_utc": "2026-09-12T08:59:46.511412+00:00",
+  "end_utc": "2026-09-12T08:59:53.639002+00:00",
+  "seconds": 7.127593721001176,
+  "exit_code": 0,
+  "binary_sha256": "29477b1270773fa43a4e264a131d91e04fdd32899b7e4e2b430751c26b3670a8",
+  "source_manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+  "working_source_manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+  "script_sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d",
+  "plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0525-target/test-tmp"
+  },
+  "artifacts": {
+    "hardware-r2-medium.csv": "0ab5f4b84c46913186f59fb2daf27c22a49d902448ebcc2b83101c63aef2ccb9",
+    "hardware-r2-medium.json": "730c210a3f7cce3472977bf3435fb3cd7201eb6f7c8385ea75adc8bfa984cff6",
+    "hardware-r2-medium.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hardware-r2-medium.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

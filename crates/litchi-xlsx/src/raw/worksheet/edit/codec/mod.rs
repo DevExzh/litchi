@@ -25,7 +25,7 @@ pub(super) use snapshot::{
     Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
     MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag, scan,
     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
-    write_sheet_data,
+    write_sheet_data, write_sheet_data_with_provenance,
 };
 #[allow(
     unused_imports,

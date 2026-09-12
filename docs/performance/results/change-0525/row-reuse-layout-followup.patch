@@ -1,0 +1,165 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+@@ -5,7 +5,7 @@
+ use litchi_sheet::{Cell as Address, Rect};
+ 
+ use super::codec::{
+-    ExtensionNames, MergeCellsSlot, Span, Tag, scan, sibling_name, write_close, write_columns,
++    ExtensionNames, Layout, MergeCellsSlot, Span, Tag, scan, sibling_name, write_close, write_columns,
+     write_defaults, write_new_columns, write_new_defaults, write_root, write_sheet_data,
+     write_sheet_data_with_provenance, write_tag,
+ };
+@@ -50,6 +50,10 @@
+     validate_row_actions(&layout, sheet, &plan.rows)?;
+     validate_column_actions(&layout, sheet, &plan.columns)?;
+     validate_defaults_action(&layout, sheet, plan.defaults)?;
++    rewrite_with_layout(content, sheet, layout, plan)
++}
++
++fn rewrite_with_layout(content: &[u8], sheet: &str, layout: Layout, plan: Plan) -> Result<Vec<u8>> {
+     let dimension = expanded_dimension(&layout, &plan.cells);
+     let extension_names = ExtensionNames::plan(&layout, plan_sets_descent(&plan))?;
+ 
+@@ -193,7 +197,7 @@
+     if !eligible {
+         return Ok(ValueOnlyRewrite {
+             source: content,
+-            bytes: rewrite(content, sheet, plan)?,
++            bytes: rewrite_with_layout(content, sheet, layout, plan)?,
+             omitted: Box::new([]),
+         });
+     }
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -110,9 +110,10 @@
+         by_row.entry(number).or_default().row = Some(action);
+     }
+     let mut omitted = Vec::new();
+-    omitted
+-        .try_reserve(data.rows.len())
+-        .map_err(|source| crate::error::allocation("worksheet omission provenance", source))?;
++    let mut recording = omitted.try_reserve(data.rows.len()).is_ok();
++    if !recording {
++        omitted.clear();
++    }
+ 
+     if data.empty {
+         write_tag(output, &data.tag, false, &[], &[]);
+@@ -120,7 +121,11 @@
+             write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+         }
+         write_close(output, &data.tag.name);
+-        return Ok(omitted.into_boxed_slice());
++        return Ok(if recording {
++            omitted.into_boxed_slice()
++        } else {
++            Box::new([])
++        });
+     }
+ 
+     output.extend_from_slice(&source[data.span.start..data.tag_end]);
+@@ -153,14 +158,14 @@
+             if membership_changed || edits.row.is_some() || row.empty {
+                 write_row(output, source, row, &edits, descent_name)?;
+             } else {
+-                write_replacement_row(output, source, row, &edits, &mut omitted)?;
++                write_replacement_row(output, source, row, &edits, &mut omitted, &mut recording)?;
+             }
+         } else {
+             output.extend_from_slice(&source[row.span.start..row.tag_end]);
+             let body_start = output.len();
+             output.extend_from_slice(&source[row.tag_end..row.close_start]);
+             let body_end = output.len();
+-            record_omitted_row(&mut omitted, row, body_start, body_end)?;
++            record_omitted_row(&mut omitted, &mut recording, row, body_start, body_end)?;
+             output.extend_from_slice(&source[row.close_start..row.span.end]);
+         }
+         cursor = row.span.end;
+@@ -170,7 +175,11 @@
+         write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+     }
+     output.extend_from_slice(&source[data.close_start..data.span.end]);
+-    Ok(omitted.into_boxed_slice())
++    Ok(if recording {
++        omitted.into_boxed_slice()
++    } else {
++        Box::new([])
++    })
+ }
+ 
+ fn write_replacement_row(
+@@ -179,6 +188,7 @@
+     row: &RowSlot,
+     edits: &RowEdits,
+     omitted: &mut Vec<OmittedCells>,
++    recording: &mut bool,
+ ) -> Result<()> {
+     output.extend_from_slice(&source[row.span.start..row.tag_end]);
+     let mut cursor = row.tag_end;
+@@ -195,7 +205,7 @@
+                 .next()
+                 .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+             if let Some((start, first, last)) = run.take() {
+-                record_omitted(omitted, first, last, start, cell_start)?;
++                record_omitted(omitted, recording, first, last, start, cell_start)?;
+             }
+             write_new_action(output, &row.tag.name, *address, action)?;
+         }
+@@ -207,7 +217,7 @@
+                 .next()
+                 .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+             if let Some((start, first, last)) = run.take() {
+-                record_omitted(omitted, first, last, start, cell_start)?;
++                record_omitted(omitted, recording, first, last, start, cell_start)?;
+             }
+             match action {
+                 Action::Update { .. } => write_cell(output, source, cell, action)?,
+@@ -225,7 +235,7 @@
+     }
+     output.extend_from_slice(&source[cursor..row.close_start]);
+     if let Some((start, first, last)) = run {
+-        record_omitted(omitted, first, last, start, output.len())?;
++        record_omitted(omitted, recording, first, last, start, output.len())?;
+     }
+     output.extend_from_slice(&source[row.close_start..row.span.end]);
+     Ok(())
+@@ -233,6 +243,7 @@
+ 
+ fn record_omitted_row(
+     omitted: &mut Vec<OmittedCells>,
++    recording: &mut bool,
+     row: &RowSlot,
+     start: usize,
+     end: usize,
+@@ -244,11 +255,12 @@
+         .cells
+         .last()
+         .ok_or_else(|| invalid("worksheet row cell provenance lost its last cell"))?;
+-    record_omitted(omitted, first.address, last.address, start, end)
++    record_omitted(omitted, recording, first.address, last.address, start, end)
+ }
+ 
+ fn record_omitted(
+     omitted: &mut Vec<OmittedCells>,
++    recording: &mut bool,
+     first: Address,
+     last: Address,
+     start: usize,
+@@ -262,9 +274,14 @@
+             "worksheet cell provenance has an invalid address range",
+         ));
+     }
+-    omitted
+-        .try_reserve(1)
+-        .map_err(|source| crate::error::allocation("worksheet omission provenance", source))?;
++    if !*recording {
++        return Ok(());
++    }
++    if omitted.try_reserve(1).is_err() {
++        *recording = false;
++        omitted.clear();
++        return Ok(());
++    }
+     omitted.push(OmittedCells {
+         row: first.row().get(),
+         first_column: first.column().get(),

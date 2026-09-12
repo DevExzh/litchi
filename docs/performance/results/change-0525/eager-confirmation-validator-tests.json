@@ -1,0 +1,19 @@
+{
+  "status": "pass",
+  "valid_control_pass": true,
+  "wrapper_sha256": "2485c9f70cdb475c1eed0bc25d266de3a8ab18739090d1d6c53ae4aaa2e36ca4",
+  "report_sha256": "0c1b28fcb8c32b39807ea5d06bf94167fcdce518218099d93eea9ce35d4fb017",
+  "checks": [
+    {
+      "case": "altered_p50",
+      "rejected": true,
+      "reason": "A1.elapsed_ns.p50: 44382156 != 44382155"
+    },
+    {
+      "case": "altered_sink_vector",
+      "rejected": true,
+      "reason": "A1.operation_metrics.sink.accepted_bytes.values is not constant across samples"
+    }
+  ],
+  "scope": "In-memory mutations only; no raw artifact, source, or frozen-tool mutation."
+}

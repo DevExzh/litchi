@@ -1,0 +1,6 @@
+
+running 1 test
+test tests::xlsx_noncompact_cell_reference_guard_is_deterministic_and_editable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 489 filtered out; finished in 5.76s
+

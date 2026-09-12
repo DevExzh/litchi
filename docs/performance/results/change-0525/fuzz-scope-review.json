@@ -1,0 +1,38 @@
+{
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "fuzz",
+        "--version"
+      ],
+      "exit_code": 101,
+      "stdout": "",
+      "stderr": "error: no such command: `fuzz`\n\nhelp: a command with a similar name exists: `fix`\n\nhelp: view all installed commands with `cargo --list`\nhelp: find a package to install `fuzz` with `cargo search cargo-fuzz`\n"
+    },
+    {
+      "command": [
+        "rustup",
+        "toolchain",
+        "list"
+      ],
+      "exit_code": 0,
+      "stdout": "stable-x86_64-unknown-linux-gnu (default)\n1.56-x86_64-unknown-linux-gnu\n1.56.0-x86_64-unknown-linux-gnu\n1.65-x86_64-unknown-linux-gnu\n1.89-x86_64-unknown-linux-gnu\n1.89.0-x86_64-unknown-linux-gnu\n1.95-x86_64-unknown-linux-gnu\n1.95.0-x86_64-unknown-linux-gnu (active)\n1.98.1-x86_64-unknown-linux-gnu\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "rg",
+        "-n",
+        "xlsx|worksheet",
+        "crates/litchi/fuzz/fuzz_targets",
+        "crates/litchi/fuzz/Cargo.toml"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "xlsx_owner_fuzz_directory_exists": false,
+  "scope": "Read-only tool/target availability check. No fuzz execution claimed. New omission/reconstruction proof requires focused differential/adversarial tests and complete XLSX correctness gates; broader fuzz coverage remains open."
+}

@@ -1,5 +1,27 @@
 # Performance hotspot inventory
 
+## 0525: source-bound cell omission removes measured XLSX parser work (accepted)
+
+[0525](changes/0525-xlsx-unchanged-cell-readback.md) targets the reconstruction
+owner identified by 0522 attribution. In the four shape/repeat profile pairs
+(eight isolated commit-profile children),
+raw worksheet parser inclusive Ir falls from 74,795,981–139,959,208 to
+2,967,340–4,900,532, a 96.0266–96.5004% reduction, while the complete XML
+validator changes by less than 0.019%. The reduced parser reads actual emitted
+output and the merge reuses only source-proven omitted cells, so validation,
+readback and Store index rebuilding remain in the path. Native total and commit
+p50 gates pass at 11.2409–14.9001% and 30.0938–30.7698%. The native review
+retains 31 adverse rows (7 open, 19 publication, 4 reopen and 1 whole-child
+RSS); no main commit or total-elapsed row crosses 5%. The managed dense-sparse
+repeat-2 guard RSS row rises 5.3661%, and the original eager dense-sparse
+repeat-2 guard rises 4.5442% p50, 4.4781% mean, 4.7339% p95 and 5.8175% p99;
+the supplemental eager confirmation passes both pairs with zero >5% matched
+or drift flags. The candidate is accepted; cleanup and full replay pass.
+The next audit targets scanner layout/address work (53.26% of these XLSX
+commit profiles), with Store merge (5.97%) secondary. No
+cold/range, native-producer, scaling or broad CRUD conclusion follows.
+OLE2/OOXML stays ahead of deferred ODF; iWork is excluded.
+
 ## 0524: duplicate visited-bit work is too small for adoption
 
 [0524](changes/0524-cfb-visited-bit-evaluation.md) lowers XLS collector self Ir

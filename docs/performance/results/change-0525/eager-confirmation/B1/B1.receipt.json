@@ -1,0 +1,69 @@
+{
+  "artifacts": {
+    "eager-confirmation/B1/B1.json": "9fa0e87ab22ab52942ffa7c59d022017ad62088251392ec1ac64013642f6802b",
+    "eager-confirmation/B1/B1.rss.json": "70bec0ff1626ab2aa8b5c6dd3dc0ae98f1f213dbda1906a28b2d45e5ee5312dc",
+    "eager-confirmation/B1/B1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "eager-confirmation/B1/B1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "binary_path": "/tmp/litchi-goal-0525/candidate-normal",
+  "binary_sha256": "339dc0abbc33575218f1a10303c53fe2cc0892787607db716ec7b082e1c038a7",
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/usr/bin/time",
+    "-f",
+    "{\"max_rss_kib\":%M,\"elapsed_seconds\":%e,\"user_seconds\":%U,\"system_seconds\":%S}",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0525/eager-confirmation/B1/B1.rss.json",
+    "/tmp/litchi-goal-0525/candidate-normal",
+    "--warmup",
+    "20",
+    "--samples",
+    "100",
+    "--case",
+    "xlsx_eager_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0525/eager-confirmation/B1/B1.json"
+  ],
+  "end_utc": "2026-09-12T10:09:36.595477+00:00",
+  "environment": {
+    "GLIBC_TUNABLES": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "RUSTFLAGS": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0525-target/test-tmp"
+  },
+  "exit_code": 0,
+  "label": "B1",
+  "primary_plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "repeat": 1,
+  "retained_helpers": {
+    "eager_companion": {
+      "path": "analyze_eager_guard.py",
+      "sha256": "d4317d90bc523389c66d417fcbdeb6c330eee44f59862964192104e2d15cf220"
+    },
+    "frozen_run": {
+      "path": "run.py",
+      "sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d"
+    },
+    "numeric": {
+      "path": "analyze.py",
+      "sha256": "d1e2f5051e4dee2d90aed981499459a617d430fe5c37c42c80ac634b9bc106af"
+    }
+  },
+  "run_script_sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d",
+  "schema": "litchi-0525-eager-confirmation-receipt-v1",
+  "seconds": 8.49608469499799,
+  "source_manifest": "candidate/source-manifest.json",
+  "source_manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+  "stage": "candidate",
+  "start_utc": "2026-09-12T10:09:28.099361+00:00",
+  "supplemental_plan_sha256": "08bd39c750ef27ef4a337b603f67e432f40f59c8c3a5e424a1d0758d388b0eb9",
+  "validation": "pass",
+  "working_source_manifest": "candidate/source-manifest.json",
+  "working_source_manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+  "wrapper_sha256": "2485c9f70cdb475c1eed0bc25d266de3a8ab18739090d1d6c53ae4aaa2e36ca4"
+}

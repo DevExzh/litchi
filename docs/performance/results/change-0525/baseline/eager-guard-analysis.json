@@ -1,0 +1,801 @@
+{
+  "status": "pass",
+  "stage": "baseline",
+  "plan_sha256": "aff0ed66c6bca6ff6a16ef99f8e5c460d8e5c396f24700626f89cdff090a1650",
+  "primary_plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "capture_authority": {
+    "path": "eager_guard.py",
+    "sha256": "6b1b8d10db40e838394a862c5a7527a12278a5e11f6c519b8cb3cdde15d43431"
+  },
+  "analyzer": {
+    "path": "analyze_eager_guard.py",
+    "sha256": "d4317d90bc523389c66d417fcbdeb6c330eee44f59862964192104e2d15cf220"
+  },
+  "scope": "Check ordinary rewrite consumer for overhead from the private omission-proof route or shared Store indexing refactor. Use identical retained normal binaries in baseline/candidate paired repeats; no promotion to primary gain claim.",
+  "evidence": {
+    "stage": "baseline",
+    "rows": [
+      {
+        "name": "eager-r1-dense-sparse",
+        "kind": "primary",
+        "guard": null,
+        "repeat": 1,
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "samples": 30,
+        "timing": {
+          "elapsed_ns": {
+            "unit": "ns",
+            "samples": [
+              43620037,
+              43661406,
+              43718037,
+              43724477,
+              43725167,
+              43728237,
+              43740727,
+              43745507,
+              43751897,
+              43752888,
+              43759887,
+              43788648,
+              43805767,
+              43806987,
+              43808357,
+              43810888,
+              43829498,
+              43844278,
+              43869707,
+              43877298,
+              43879778,
+              43880478,
+              43895948,
+              43907658,
+              43919628,
+              43924448,
+              43939358,
+              43991558,
+              44001998,
+              44006229
+            ],
+            "p50": 43809622,
+            "p95": 44001998,
+            "p99": 44006229,
+            "min": 43620037,
+            "max": 44006229,
+            "mean": 43823892.53333333,
+            "standard_deviation": 99518.60733680744,
+            "confidence_interval_95": {
+              "method": "two-sided Student's t interval for the mean",
+              "lower": 43786735.84712147,
+              "upper": 43861049.21954519
+            }
+          }
+        },
+        "rss": {
+          "scope": "whole_child_process",
+          "max_rss_kib": 89760,
+          "elapsed_seconds": 3.57,
+          "user_seconds": 3.29,
+          "system_seconds": 0.28
+        },
+        "identity": {
+          "configuration": {
+            "samples_per_case": 30,
+            "warmup_iterations_per_case": 10,
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "dense-sparse"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "rtf_variants": [
+              "plain"
+            ],
+            "range_simulation": {
+              "fixed_latency_us": 100,
+              "request_overhead_us": 25,
+              "bandwidth_bytes_per_second": 52428800,
+              "max_physical_range_bytes": 4096
+            },
+            "execution_workers": [
+              1
+            ],
+            "opc_cache_lock_diagnostics": false
+          },
+          "corpus": {
+            "name": "xlsx-cell-values-dense-sparse",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "package_format": "XLSX/OPC/ZIP",
+            "shape": "dense-sparse",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "compression": "deflate",
+            "entry_count": 17792,
+            "archive_member_count": 17,
+            "entry_bytes": 4,
+            "uncompressed_payload_bytes": 4265472,
+            "archive_bytes": 4251863,
+            "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "xlsx": {
+              "sheet_count": 4,
+              "rows_per_sheet": 128,
+              "columns_per_sheet": 128,
+              "one_percent_update_count": 178,
+              "source_members": {
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ],
+                "shared_strings": null,
+                "styles": "xl/styles.xml"
+              }
+            }
+          },
+          "sink": {
+            "accepted_bytes": 4252436,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 65,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 0,
+              "bytes_513_to_4096": 3,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+        },
+        "identity_sha256": "a56677386210036daea394214ea9af1bdc10f26cf476c45c66280a7e3a923200",
+        "schema": {
+          "source_field": "absent",
+          "operation_metrics": {
+            "sample_count": 30,
+            "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+            "latency_claim": "comparable_timed_operation",
+            "source_field": "absent",
+            "phase_fields": "not_applicable"
+          },
+          "phase_metrics": "not_applicable"
+        },
+        "report_sha256": "414f2852d62a3873bff4bdc0a0853a8b7f0d3b95e6938ce26974f3815a23efe8"
+      },
+      {
+        "name": "eager-r1-medium",
+        "kind": "primary",
+        "guard": null,
+        "repeat": 1,
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "shape": "medium",
+        "samples": 30,
+        "timing": {
+          "elapsed_ns": {
+            "unit": "ns",
+            "samples": [
+              23147134,
+              23180034,
+              23183573,
+              23184494,
+              23189774,
+              23190784,
+              23194684,
+              23195154,
+              23197424,
+              23197894,
+              23203044,
+              23203754,
+              23204125,
+              23223824,
+              23226134,
+              23250674,
+              23260484,
+              23268954,
+              23272894,
+              23275075,
+              23282874,
+              23288654,
+              23294495,
+              23301164,
+              23303194,
+              23310024,
+              23313165,
+              23330445,
+              23384275,
+              23389225
+            ],
+            "p50": 23238404,
+            "p95": 23384275,
+            "p99": 23389225,
+            "min": 23147134,
+            "max": 23389225,
+            "mean": 23248247.53333333,
+            "standard_deviation": 62580.66390625282,
+            "confidence_interval_95": {
+              "method": "two-sided Student's t interval for the mean",
+              "lower": 23224882.153190654,
+              "upper": 23271612.91347601
+            }
+          }
+        },
+        "rss": {
+          "scope": "whole_child_process",
+          "max_rss_kib": 67608,
+          "elapsed_seconds": 2.23,
+          "user_seconds": 1.93,
+          "system_seconds": 0.29
+        },
+        "identity": {
+          "configuration": {
+            "samples_per_case": 30,
+            "warmup_iterations_per_case": 10,
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "medium"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "rtf_variants": [
+              "plain"
+            ],
+            "range_simulation": {
+              "fixed_latency_us": 100,
+              "request_overhead_us": 25,
+              "bandwidth_bytes_per_second": 52428800,
+              "max_physical_range_bytes": 4096
+            },
+            "execution_workers": [
+              1
+            ],
+            "opc_cache_lock_diagnostics": false
+          },
+          "corpus": {
+            "name": "xlsx-cell-values-medium",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "package_format": "XLSX/OPC/ZIP",
+            "shape": "medium",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "compression": "deflate",
+            "entry_count": 9216,
+            "archive_member_count": 17,
+            "entry_bytes": 4,
+            "uncompressed_payload_bytes": 4231168,
+            "archive_bytes": 4226429,
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "xlsx": {
+              "sheet_count": 4,
+              "rows_per_sheet": 48,
+              "columns_per_sheet": 48,
+              "one_percent_update_count": 93,
+              "source_members": {
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ],
+                "shared_strings": null,
+                "styles": "xl/styles.xml"
+              }
+            }
+          },
+          "sink": {
+            "accepted_bytes": 4226788,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 64,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 4,
+              "bytes_513_to_4096": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+        },
+        "identity_sha256": "ba40b5a1270e7264167311b453ea2f344443bad65b7aa4e41143d11e4258fb81",
+        "schema": {
+          "source_field": "absent",
+          "operation_metrics": {
+            "sample_count": 30,
+            "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+            "latency_claim": "comparable_timed_operation",
+            "source_field": "absent",
+            "phase_fields": "not_applicable"
+          },
+          "phase_metrics": "not_applicable"
+        },
+        "report_sha256": "29e0dba4104f2b1ec810d78f8febb3971f8121e5418e9fec7ce42015d1125aff"
+      },
+      {
+        "name": "eager-r2-dense-sparse",
+        "kind": "primary",
+        "guard": null,
+        "repeat": 2,
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "shape": "dense-sparse",
+        "samples": 30,
+        "timing": {
+          "elapsed_ns": {
+            "unit": "ns",
+            "samples": [
+              42826134,
+              42884675,
+              42921385,
+              42930055,
+              42945335,
+              42950475,
+              42955205,
+              42964994,
+              42973445,
+              42974125,
+              42975815,
+              42980885,
+              43012805,
+              43020375,
+              43024576,
+              43037766,
+              43041215,
+              43050386,
+              43059105,
+              43079915,
+              43092746,
+              43103996,
+              43117836,
+              43127505,
+              43167556,
+              43173396,
+              43218656,
+              43235156,
+              43241266,
+              43314837
+            ],
+            "p50": 43031171,
+            "p95": 43241266,
+            "p99": 43314837,
+            "min": 42826134,
+            "max": 43314837,
+            "mean": 43046720.7,
+            "standard_deviation": 115218.40649202777,
+            "confidence_interval_95": {
+              "method": "two-sided Student's t interval for the mean",
+              "lower": 43003702.270678885,
+              "upper": 43089739.12932112
+            }
+          }
+        },
+        "rss": {
+          "scope": "whole_child_process",
+          "max_rss_kib": 90052,
+          "elapsed_seconds": 3.46,
+          "user_seconds": 3.29,
+          "system_seconds": 0.17
+        },
+        "identity": {
+          "configuration": {
+            "samples_per_case": 30,
+            "warmup_iterations_per_case": 10,
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "dense-sparse"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "rtf_variants": [
+              "plain"
+            ],
+            "range_simulation": {
+              "fixed_latency_us": 100,
+              "request_overhead_us": 25,
+              "bandwidth_bytes_per_second": 52428800,
+              "max_physical_range_bytes": 4096
+            },
+            "execution_workers": [
+              1
+            ],
+            "opc_cache_lock_diagnostics": false
+          },
+          "corpus": {
+            "name": "xlsx-cell-values-dense-sparse",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "package_format": "XLSX/OPC/ZIP",
+            "shape": "dense-sparse",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "compression": "deflate",
+            "entry_count": 17792,
+            "archive_member_count": 17,
+            "entry_bytes": 4,
+            "uncompressed_payload_bytes": 4265472,
+            "archive_bytes": 4251863,
+            "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "xlsx": {
+              "sheet_count": 4,
+              "rows_per_sheet": 128,
+              "columns_per_sheet": 128,
+              "one_percent_update_count": 178,
+              "source_members": {
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ],
+                "shared_strings": null,
+                "styles": "xl/styles.xml"
+              }
+            }
+          },
+          "sink": {
+            "accepted_bytes": 4252436,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 65,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 0,
+              "bytes_513_to_4096": 3,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": "07eee3f980949f031776087ed61f06125edd82cb29394a608a3d8d5a4b28374d"
+        },
+        "identity_sha256": "a56677386210036daea394214ea9af1bdc10f26cf476c45c66280a7e3a923200",
+        "schema": {
+          "source_field": "absent",
+          "operation_metrics": {
+            "sample_count": 30,
+            "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+            "latency_claim": "comparable_timed_operation",
+            "source_field": "absent",
+            "phase_fields": "not_applicable"
+          },
+          "phase_metrics": "not_applicable"
+        },
+        "report_sha256": "f1f30aed30b34fc8e964c8bf04ad5d2e464392bd132093012ddf1efc27f356a5"
+      },
+      {
+        "name": "eager-r2-medium",
+        "kind": "primary",
+        "guard": null,
+        "repeat": 2,
+        "case": "xlsx_eager_cell_values_one_percent_edit_save",
+        "shape": "medium",
+        "samples": 30,
+        "timing": {
+          "elapsed_ns": {
+            "unit": "ns",
+            "samples": [
+              22915493,
+              22917143,
+              22941033,
+              22948763,
+              22955903,
+              22957723,
+              22962893,
+              22980803,
+              22982593,
+              22983133,
+              22984533,
+              22987433,
+              22987523,
+              22997633,
+              22999403,
+              23005353,
+              23017364,
+              23022654,
+              23052303,
+              23057084,
+              23062774,
+              23066424,
+              23072503,
+              23083694,
+              23091664,
+              23094993,
+              23095874,
+              23102313,
+              23169124,
+              23249824
+            ],
+            "p50": 23002378,
+            "p95": 23169124,
+            "p99": 23249824,
+            "min": 22915493,
+            "max": 23249824,
+            "mean": 23024865.0,
+            "standard_deviation": 75140.55341778566,
+            "confidence_interval_95": {
+              "method": "two-sided Student's t interval for the mean",
+              "lower": 22996810.20663175,
+              "upper": 23052919.79336825
+            }
+          }
+        },
+        "rss": {
+          "scope": "whole_child_process",
+          "max_rss_kib": 67100,
+          "elapsed_seconds": 2.19,
+          "user_seconds": 1.86,
+          "system_seconds": 0.32
+        },
+        "identity": {
+          "configuration": {
+            "samples_per_case": 30,
+            "warmup_iterations_per_case": 10,
+            "filesystem_cache_states": [
+              "warm",
+              "cold-requested"
+            ],
+            "filesystem_fresh_child_per_sample": true,
+            "filesystem_process_isolated": true,
+            "filesystem_root_selected": false,
+            "cases": [
+              "xlsx_eager_cell_values_one_percent_edit_save"
+            ],
+            "corpus_shapes": [
+              "tiny",
+              "many-small",
+              "few-large",
+              "wide-root"
+            ],
+            "payload_kinds": [
+              "compressible",
+              "incompressible"
+            ],
+            "writer_shapes": [
+              "tiny",
+              "large",
+              "payload-heavy"
+            ],
+            "xlsx_shapes": [
+              "tiny",
+              "medium",
+              "dense-wide"
+            ],
+            "xlsb_shapes": [
+              "tiny",
+              "medium",
+              "large",
+              "sparse"
+            ],
+            "xlsx_cell_crud_shapes": [
+              "medium"
+            ],
+            "xlsx_row_visibility_shapes": [
+              "medium",
+              "large"
+            ],
+            "semantic_shapes": [
+              "tiny",
+              "medium",
+              "large"
+            ],
+            "rtf_variants": [
+              "plain"
+            ],
+            "range_simulation": {
+              "fixed_latency_us": 100,
+              "request_overhead_us": 25,
+              "bandwidth_bytes_per_second": 52428800,
+              "max_physical_range_bytes": 4096
+            },
+            "execution_workers": [
+              1
+            ],
+            "opc_cache_lock_diagnostics": false
+          },
+          "corpus": {
+            "name": "xlsx-cell-values-medium",
+            "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+            "package_format": "XLSX/OPC/ZIP",
+            "shape": "medium",
+            "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+            "compression": "deflate",
+            "entry_count": 9216,
+            "archive_member_count": 17,
+            "entry_bytes": 4,
+            "uncompressed_payload_bytes": 4231168,
+            "archive_bytes": 4226429,
+            "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+            "target_entry": "Sheet1!A1",
+            "target_payload_bytes": 1,
+            "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+            "xlsx": {
+              "sheet_count": 4,
+              "rows_per_sheet": 48,
+              "columns_per_sheet": 48,
+              "one_percent_update_count": 93,
+              "source_members": {
+                "workbook": "xl/workbook.xml",
+                "worksheets": [
+                  "xl/worksheets/sheet1.xml",
+                  "xl/worksheets/sheet2.xml",
+                  "xl/worksheets/sheet3.xml",
+                  "xl/worksheets/sheet4.xml"
+                ],
+                "shared_strings": null,
+                "styles": "xl/styles.xml"
+              }
+            }
+          },
+          "sink": {
+            "accepted_bytes": 4226788,
+            "largest_write": 65536,
+            "write_calls": 143,
+            "write_size_buckets": {
+              "bytes_0": 0,
+              "bytes_16385_to_65536": 64,
+              "bytes_1_to_512": 75,
+              "bytes_4097_to_16384": 4,
+              "bytes_513_to_4096": 0,
+              "bytes_over_65536": 0
+            }
+          },
+          "output_sha256": "fc742a7ad139e2ce2e75fabfff8d2a33408dd5eeb10997717a2e2656d8423e6c"
+        },
+        "identity_sha256": "ba40b5a1270e7264167311b453ea2f344443bad65b7aa4e41143d11e4258fb81",
+        "schema": {
+          "source_field": "absent",
+          "operation_metrics": {
+            "sample_count": 30,
+            "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+            "latency_claim": "comparable_timed_operation",
+            "source_field": "absent",
+            "phase_fields": "not_applicable"
+          },
+          "phase_metrics": "not_applicable"
+        },
+        "report_sha256": "e503428faa29649cb0f03081be690d914cc39f520ddb954d3b48c4e25fa30e00"
+      }
+    ],
+    "manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+    "binary_sha256": "29477b1270773fa43a4e264a131d91e04fdd32899b7e4e2b430751c26b3670a8",
+    "validation": {
+      "expected_matrix": true,
+      "receipt_bindings": true,
+      "report_and_rss_valid": true,
+      "source_evidence": "absent_by_eager_schema",
+      "phase_evidence": "not_applicable"
+    }
+  }
+}

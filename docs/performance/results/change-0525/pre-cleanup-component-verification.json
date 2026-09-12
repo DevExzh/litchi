@@ -1,0 +1,7 @@
+{
+  "status": "pass_except_required_cleanup",
+  "scope": "Direct validate_all reached final cleanup validation after all source, receipts, analyzers, gates, quality and decision checks; cleanup not yet performed.",
+  "verifier_sha256": "367c2cd8a693c02352e24b1656ac2668bacb62fe3e2550aa189ad49e26da06d5",
+  "observed_utc": "2026-09-12T10:14:34.331026+00:00",
+  "expected_missing": "cannot read JSON /home/zhuhe/code/litchi/docs/performance/results/change-0525/cleanup.json: [Errno 2] No such file or directory: '/home/zhuhe/code/litchi/docs/performance/results/change-0525/cleanup.json'"
+}

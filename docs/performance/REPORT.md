@@ -1,5 +1,30 @@
 # Performance program phase report
 
+## 0525: XLSX unchanged-cell readback candidate meets measured admission (accepted)
+
+[0525](changes/0525-xlsx-unchanged-cell-readback.md) completes the matched
+source-backed XLSX experiment. Across 1,640 native durations, medium and
+dense-sparse primary total p50 improves 11.2409–14.9001% and commit p50
+30.0938–30.7698% in both repeats. The separate 40-sample allocator lane has
+repeat-identical reductions of 23.0353–23.3976% in calls, 33.1950–38.8712% in
+allocated bytes and 21.4593–39.0951% in incremental region peak. Four
+shape/repeat profile pairs (eight isolated profile children) pass the 15%
+mechanism gate with 31.5439–32.4414% lower commit Ir. The main report retains
+31 adverse rows: 7 open, 19 publication, 4 reopen and 1 whole-child-RSS row;
+there are no over-5% main commit or total-elapsed rows. The managed
+dense-sparse repeat-2 guard RSS row rises from 85,648 to 90,244 KiB (+5.3661%),
+and reopen diagnostics are outside measured edit/save elapsed time. The
+original eager guard retains dense-sparse repeat-2 changes of +4.5442% p50,
++4.4781% mean, +4.7339% p95 and +5.8175% p99, while supplemental eager ABBA
+confirmation passes both pairs with zero >5% matched or drift flags. These observed phase/RSS tradeoffs are retained
+alongside gains in all four primary total p50 rows; no blanket no-regression or
+RSS-improvement claim is made. The 76 same-build drift rows remain explicit.
+Quality has 12 passing gates and 1,293 successful executions. The accepted
+decision retains the candidate; cleanup and exact evidence replay pass. Hardware remains whole-child
+diagnostic evidence, and no physical-provider, cold/range, native-producer or
+scaling claim is made. OLE2/OOXML stays first; ODF is deferred and iWork
+excluded.
+
 ## 0524: reject CFB visited-bit fusion; retain validation guards
 
 [0524](changes/0524-cfb-visited-bit-evaluation.md) rejects the private visited-bit
