@@ -15,6 +15,7 @@ path = "main.rs"
 litchi-drawingml = { path = "../../../../../crates/litchi-drawingml" }
 litchi-opc = { path = "../../../../../crates/litchi-opc" }
 litchi-pptx = { path = "../../../../../crates/litchi-pptx" }
+soapberry-zip = { path = "../../../../../crates/soapberry-zip" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"

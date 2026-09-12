@@ -83,20 +83,41 @@ def verify_local_inputs(paths: list[Path], root: Path, commit: str) -> None:
             raise SystemExit(f"local source input differs from committed tree: {name}")
 
 
+def verify_owner_inputs(paths: list[Path], root: Path, commit: str) -> None:
+    """Pin every transitive path-package input to the approved owner tree."""
+    relative = sorted(
+        {
+            path.resolve().relative_to(root.resolve()).as_posix()
+            for path in paths
+        }
+    )
+    for name in relative:
+        path = root / name
+        require_file(path)
+        if sha256(path) != committed_blob_sha256(root, commit, name):
+            raise SystemExit(f"owner path-package input differs: {name}")
+
+
 def package_files(package: dict[str, object]) -> list[Path]:
+    """Capture the complete local package tree used by Cargo.
+
+    Metadata targets identify entry points, but they do not enumerate every
+    module, test fixture, example, build input, or included source file.  A
+    path-package closure that only follows target ``src_path`` values can
+    silently miss a transitive input.  The isolated run is deliberately
+    fail-closed, so capture every file below the package root while excluding
+    generated VCS/build trees.
+    """
     manifest = Path(str(package["manifest_path"])).resolve()
-    source_dir = manifest.parent / "src"
-    files = [manifest]
-    if source_dir.is_dir():
-        files.extend(path for path in source_dir.rglob("*") if path.is_file())
-    build_script = manifest.parent / "build.rs"
-    if build_script.is_file():
-        files.append(build_script)
-    for target in package["targets"]:  # type: ignore[index]
-        source = Path(str(target["src_path"])).resolve()  # type: ignore[index]
-        if source.is_file():
-            files.append(source)
-    return sorted(set(path.resolve() for path in files), key=str)
+    package_root = manifest.parent
+    ignored = {".git", "target"}
+    files = [
+        path.resolve()
+        for path in package_root.rglob("*")
+        if path.is_file()
+        and not ignored.intersection(path.relative_to(package_root).parts)
+    ]
+    return sorted(set(files), key=str)
 
 
 def main() -> None:
@@ -105,7 +126,16 @@ def main() -> None:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--git-commit", required=True)
+    parser.add_argument("--owner-commit")
+    parser.add_argument("--owner-exclude-package", action="append", default=[])
     parser.add_argument("--extra", type=Path, action="append", default=[])
+    parser.add_argument(
+        "--owner-extra",
+        type=Path,
+        action="append",
+        default=[],
+        help="workspace/build input also pinned to --owner-commit",
+    )
     args = parser.parse_args()
 
     root = args.root.resolve()
@@ -113,6 +143,8 @@ def main() -> None:
     metadata = json.loads(metadata_path.read_text())
     packages: list[tuple[str, str, str, Path, list[Path]]] = []
     local_inputs: list[Path] = []
+    owner_inputs: list[Path] = []
+    excluded_owner_packages = set(args.owner_exclude_package)
     for package in metadata["packages"]:
         files = package_files(package)
         source = str(package.get("source") or "path")
@@ -127,14 +159,22 @@ def main() -> None:
         )
         if package.get("source") is None:
             local_inputs.extend(files)
+            if args.owner_commit and package["name"] not in excluded_owner_packages:
+                owner_inputs.extend(files)
 
     extras = [require_file(path) for path in args.extra]
+    owner_extras = [require_file(path) for path in args.owner_extra]
     local_inputs.extend(extras)
+    local_inputs.extend(owner_extras)
+    owner_inputs.extend(owner_extras)
     verify_local_inputs(local_inputs, root, args.git_commit)
+    if args.owner_commit:
+        verify_owner_inputs(owner_inputs, root, args.owner_commit)
 
     lines = [
         f"format={FORMAT}",
         f"git_commit={args.git_commit}",
+        f"owner_commit={args.owner_commit or ''}",
         f"metadata_sha256={sha256(metadata_path)}",
     ]
     for name, version, source, manifest, files in sorted(
@@ -166,6 +206,8 @@ def main() -> None:
             lines.append(f"file={name}\t{version}\t{manifest_shown}\t{file_name}\t{digest}")
     for extra in extras:
         lines.append(f"extra=\t{shown(extra, root)}\t{sha256(extra)}")
+    for extra in owner_extras:
+        lines.append(f"owner_extra=\t{shown(extra, root)}\t{sha256(extra)}")
     args.output.write_text("\n".join(lines) + "\n")
 
 
