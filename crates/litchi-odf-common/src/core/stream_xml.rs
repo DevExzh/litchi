@@ -860,7 +860,7 @@ struct ExpandedAttributeName<'a> {
     local: &'a [u8],
 }
 
-fn validate_event_bytes(event: &Event<'_>, offset: u64) -> Result<()> {
+pub(crate) fn validate_event_bytes(event: &Event<'_>, offset: u64) -> Result<()> {
     let bytes: &[u8] = event;
     let text = str::from_utf8(bytes)
         .map_err(|error| invalid_xml(offset, format!("XML is not UTF-8: {error}")))?;
@@ -873,7 +873,7 @@ fn validate_event_bytes(event: &Event<'_>, offset: u64) -> Result<()> {
     Ok(())
 }
 
-fn validate_start_element(
+pub(crate) fn validate_start_element(
     tracker: &BindingTracker,
     element: &BytesStart<'_>,
     attributes: &mut usize,
@@ -1153,7 +1153,7 @@ fn append_namespace_bytes(
     Ok(())
 }
 
-fn validate_decl_attributes(
+pub(crate) fn validate_decl_attributes(
     tracker: &BindingTracker,
     declaration: &quick_xml::events::BytesDecl<'_>,
     attributes: &mut usize,
@@ -1201,7 +1201,7 @@ fn validate_decl_attributes(
     Ok(())
 }
 
-fn validate_end_element(
+pub(crate) fn validate_end_element(
     tracker: &BindingTracker,
     element: &quick_xml::events::BytesEnd<'_>,
     offset: u64,
@@ -1227,7 +1227,7 @@ fn validate_qname(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
     validate_name(&bytes[colon + 1..], offset, kind)
 }
 
-fn validate_name(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
+pub(crate) fn validate_name(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
     let text = str::from_utf8(bytes)
         .map_err(|error| invalid_xml(offset, format!("{kind} name is not UTF-8: {error}")))?;
     let mut chars = text.chars();
