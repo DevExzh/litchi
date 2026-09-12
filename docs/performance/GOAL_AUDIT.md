@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0540: XLSX validation/parser boundary attribution
+
+[0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.
+Fresh profiles and a combined source audit establish the next larger XLSX target after
+rejected 0539: shared worksheet traversal with separate validation/parser states and
+preserved first-error ordering. No implementation is yet admitted. Exact source equality
+reuses six final 0539 quality checks and 1,292 tests. The broad goal stays active;
+OLE2/OOXML first, ODF deferred, iWork excluded.
+
 ## 0539: XLSX transient ownership candidate rejected
 
 [0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched

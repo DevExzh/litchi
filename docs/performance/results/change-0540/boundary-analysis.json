@@ -1,0 +1,143 @@
+{
+  "planning_analysis_sha256": "2e0d45742bbed254538df858c8875b1ab778c3f9fe8f55189f1f62cd37c71a92",
+  "rows": [
+    {
+      "planning_ir": 125622471,
+      "raw_worksheet_ir": 75494767,
+      "raw_worksheet_percent": 60.09654673963546,
+      "repeat": 1,
+      "shape": "medium",
+      "traversal": {
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 5388140,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13727784,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5303078
+          },
+          "percent_planning": 19.438402863449486,
+          "sum_ir": 24419002
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 5386720,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13721005,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5296674
+          },
+          "percent_planning": 19.426778350825465,
+          "sum_ir": 24404399
+        }
+      },
+      "validator_direct_allocator_edges": {
+        "__rustc::__rust_alloc": 674891,
+        "__rustc::__rust_dealloc": 653565
+      },
+      "validator_direct_allocator_percent": 1.0574987018047113,
+      "worksheet_validation_ir": 46623181,
+      "worksheet_validation_percent": 37.11372704967728
+    },
+    {
+      "planning_ir": 237073145,
+      "raw_worksheet_ir": 141671642,
+      "raw_worksheet_percent": 59.758620910014926,
+      "repeat": 1,
+      "shape": "dense-sparse",
+      "traversal": {
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 10377772,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26427052,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10275160
+          },
+          "percent_planning": 19.858843143115177,
+          "sum_ir": 47079984
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 10376352,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26419973,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10268551
+          },
+          "percent_planning": 19.852470426374104,
+          "sum_ir": 47064876
+        }
+      },
+      "validator_direct_allocator_edges": {
+        "__rustc::__rust_alloc": 1294807,
+        "__rustc::__rust_dealloc": 1256885
+      },
+      "validator_direct_allocator_percent": 1.0763311044783246,
+      "worksheet_validation_ir": 89730628,
+      "worksheet_validation_percent": 37.84934307932684
+    },
+    {
+      "planning_ir": 125610151,
+      "raw_worksheet_ir": 75483173,
+      "raw_worksheet_percent": 60.09321093802363,
+      "repeat": 2,
+      "shape": "medium",
+      "traversal": {
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 5388140,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13727782,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5302917
+          },
+          "percent_planning": 19.440179639621643,
+          "sum_ir": 24418839
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 5386720,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13720874,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5296737
+          },
+          "percent_planning": 19.42862961768114,
+          "sum_ir": 24404331
+        }
+      },
+      "validator_direct_allocator_edges": {
+        "__rustc::__rust_alloc": 675472,
+        "__rustc::__rust_dealloc": 654025
+      },
+      "validator_direct_allocator_percent": 1.0584311772700599,
+      "worksheet_validation_ir": 46624710,
+      "worksheet_validation_percent": 37.11858446854347
+    },
+    {
+      "planning_ir": 237116049,
+      "raw_worksheet_ir": 141713108,
+      "raw_worksheet_percent": 59.765295768739804,
+      "repeat": 2,
+      "shape": "dense-sparse",
+      "traversal": {
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 10377772,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26427431,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10274920
+          },
+          "percent_planning": 19.855308486520876,
+          "sum_ir": 47080123
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct_edges": {
+            "quick_xml::name::NamespaceResolver::resolve_event": 10376352,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26419980,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10268433
+          },
+          "percent_planning": 19.848831489259506,
+          "sum_ir": 47064765
+        }
+      },
+      "validator_direct_allocator_edges": {
+        "__rustc::__rust_alloc": 1295101,
+        "__rustc::__rust_dealloc": 1256885
+      },
+      "validator_direct_allocator_percent": 1.0762603420403651,
+      "worksheet_validation_ir": 89731034,
+      "worksheet_validation_percent": 37.842665807914166
+    }
+  ],
+  "scope": "Each traversal sum adds three disjoint immediate children of one loop. Validator-wide totals include workbook calls as well as selected worksheets; snapshot direct validation cost isolates selected worksheets. The two loop sums describe measured work, not removable work or a latency estimate. Allocator child Ir is neither an allocation count nor a bound on all ownership cost.",
+  "status": "pass"
+}

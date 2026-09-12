@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0540: XLSX validation/parser boundary attribution
+
+[0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.
+The next target is the duplicated worksheet XML reader/namespace work, about 19–20% of
+planning Ir in each loop. Direct validator allocator/deallocator edges are only about
+1.06–1.08%; that is not a count or all ownership cost. A future shared traversal must
+first prove validation-first errors and bounded provisional state, then pass
+native/allocation/no-op/adversarial gates.
+
 ## 0539: XLSX transient ownership candidate rejected
 
 [0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched

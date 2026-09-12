@@ -1,0 +1,10 @@
+{
+  "created_utc": "2026-09-12T20:30:10.397035+00:00",
+  "uname": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "valgrind": "valgrind-3.26.0",
+  "cpu_allowed": [
+    "Cpus_allowed_list:\t0-31"
+  ],
+  "scope": "Process-visible environment only; no host-wide quiescence claim."
+}

@@ -1,0 +1,1322 @@
+{
+  "helper_sha256": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7",
+  "limitations": [
+    "Nested owners overlap; only immediate children of one owner are disjoint.",
+    "Call metadata outside positive selected edges may contain collection-off work and is not an allocation count.",
+    "Generated two-shape corpus, one measured owner call per child; no cold/range/scaling claim."
+  ],
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+  "plan_sha256": "3fb7dd1cae344d4e6e7db353a97128899660d7b8c4b998a0f0dbf15ee4490f58",
+  "rows": [
+    {
+      "annotations": {
+        "baseline/profile-r1-medium.inclusive.txt": "cf1224b8f4e0f36f9bde9d26093596d5756b2850f7379d6b5697cd62ca063d28",
+        "baseline/profile-r1-medium.self.txt": "32459b7a4a9fa965691f854b3202494fa14e3671470af13231c58a832cc42147"
+      },
+      "owners": {
+        "litchi_ooxml_common::mce::codec::process_markup_compatibility": {
+          "direct": {
+            "__memcmp_avx2_movbe": 3772174
+          },
+          "inclusive_ir": 6466820,
+          "self_ir": 2694646
+        },
+        "litchi_ooxml_common::mce::codec::process_ooxml": {
+          "direct": {
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 108,
+            "__rustc::__rust_dealloc": 4010,
+            "litchi_ooxml_common::mce::codec::process_markup_compatibility": 6466820,
+            "litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline": 102246
+          },
+          "inclusive_ir": 6575596,
+          "self_ir": 2412
+        },
+        "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 1061,
+            "__rustc::__rust_dealloc": 70,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 551,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceCatalogCapture>": 1491,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 90,
+            "litchi_opc::source_backed::SourceBackedPackage::source_version": 90,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 461,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": 125162321,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::load_source_catalog": 454581,
+            "litchi_xlsx::cell_values::snapshot::resolve_selectors": 1035
+          },
+          "inclusive_ir": 125622413,
+          "self_ir": 606
+        },
+        "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": {
+          "direct": {
+            "<alloc::string::String as core::clone::Clone>::clone": 680,
+            "<litchi_xlsx::cell_values::snapshot::SourceRelationship as core::clone::Clone>::clone": 6644,
+            "<litchi_xlsx::source_payload::SourcePayload as core::clone::Clone>::clone": 36,
+            "__memcpy_avx_unaligned_erms": 360,
+            "alloc::boxed::box_new_uninit": 204,
+            "litchi_opc::source_backed::PartView::data": 2861080,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 120,
+            "litchi_opc::source_backed::SourceBackedPackage::execution_context": 24,
+            "litchi_opc::source_backed::SourceBackedPackage::part": 1464,
+            "litchi_xlsx::cell_values::snapshot::PartState::new": 2465,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::copy_boxed": 684,
+            "litchi_xlsx::cell_values::snapshot::validate_scalar_cells": 92196,
+            "litchi_xlsx::cell_values::snapshot::validate_style_references": 75372,
+            "litchi_xlsx::cell_values::validation::validate_xml": 46623181,
+            "litchi_xlsx::raw::worksheet::parse": 75494767,
+            "litchi_xlsx::source_payload::SourcePayload::from_part_data": 1364
+          },
+          "inclusive_ir": 125162321,
+          "self_ir": 1624
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets": {
+          "direct": {
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 125622413
+          },
+          "inclusive_ir": 125622471,
+          "self_ir": 43
+        },
+        "litchi_xlsx::cell_values::validation::validate_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 4312783,
+            "__rustc::__rust_dealloc": 329735,
+            "litchi_xlsx::cell_values::validation::allowed_unqualified_attribute": 208976
+          },
+          "inclusive_ir": 6525348,
+          "self_ir": 1673854
+        },
+        "litchi_xlsx::cell_values::validation::validate_element": {
+          "direct": {
+            "__memcmp_avx2_movbe": 317013,
+            "litchi_xlsx::cell_values::validation::validate_attributes": 6525348,
+            "litchi_xlsx::cell_values::validation::validate_parent": 543676
+          },
+          "inclusive_ir": 9082712,
+          "self_ir": 1696675
+        },
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 6526,
+            "__memcmp_avx2_movbe": 505232,
+            "__memcpy_avx_unaligned_erms": 298612,
+            "__rustc::__rust_alloc": 674891,
+            "__rustc::__rust_dealloc": 653565,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 18642,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 3437,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::boxed::Box<[u8]>>>": 285,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1899,
+            "core::str::<impl str>::trim_matches": 469846,
+            "litchi_xlsx::cell_values::validation::bind_dialect": 1379718,
+            "litchi_xlsx::cell_values::validation::validate_element": 9082712,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 729026,
+            "quick_xml::events::BytesRef::decode": 1107794,
+            "quick_xml::name::NamespaceResolver::resolve_event": 5388140,
+            "quick_xml::name::NamespaceResolver::set_level": 391554,
+            "quick_xml::name::QName::local_name": 1083776,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13727784,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5303078
+          },
+          "inclusive_ir": 46650117,
+          "self_ir": 5823600
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct": {
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 72,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 772,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 188,
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 5151,
+            "__memcmp_avx2_movbe": 136,
+            "__memcpy_avx_unaligned_erms": 276600,
+            "__rustc::__rust_dealloc": 140,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 404,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve": 1564,
+            "alloc::vec::Vec<T,A>::push_mut": 451584,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 44,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 16,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1596,
+            "litchi_xlsx::cell::Store::from_unsorted": 791156,
+            "litchi_xlsx::column::resolve": 96,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish": 5664990,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::push_text": 1706999,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": 23310061,
+            "litchi_xlsx::raw::worksheet::semantic::materialize": 5786439,
+            "litchi_xlsx::raw::worksheet::semantic::resolve_shared_formulas": 64676,
+            "quick_xml::events::BytesRef::decode": 1107794,
+            "quick_xml::name::NamespaceResolver::resolve_event": 5386720,
+            "quick_xml::name::NamespaceResolver::set_level": 391408,
+            "quick_xml::name::QName::local_name": 784,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13721005,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5296674
+          },
+          "inclusive_ir": 68730873,
+          "self_ir": 4763804
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+          "direct": {
+            "__memcmp_avx2_movbe": 136,
+            "__rustc::__rust_dealloc": 140,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 4178,
+            "litchi_sheet::Rect::from_a1": 1776,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 3235218,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": 14881540,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_row": 1605573,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value": 101376,
+            "quick_xml::name::QName::local_name": 2166184
+          },
+          "inclusive_ir": 23310061,
+          "self_ir": 1313940
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": {
+          "direct": {
+            "__rustc::__rust_dealloc": 336705,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 101376,
+            "litchi_xlsx::raw::worksheet::codec::parse_cell_u32": 608256,
+            "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": 10275139,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 1532544
+          },
+          "inclusive_ir": 14881540,
+          "self_ir": 2027520
+        },
+        "litchi_xlsx::raw::worksheet::parse": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 120,
+            "core::str::converts::from_utf8": 117911,
+            "litchi_ooxml_common::mce::codec::process_ooxml": 6517185,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 68730873,
+            "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 128374
+          },
+          "inclusive_ir": 75494767,
+          "self_ir": 304
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 3371753
+          },
+          "inclusive_ir": 6741923,
+          "self_ir": 3370170
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 3804203,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 6741923,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 818,
+            "quick_xml::reader::state::ReaderState::emit_end": 3433624,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 330,
+            "quick_xml::reader::state::ReaderState::emit_start": 3581627,
+            "quick_xml::reader::state::ReaderState::emit_text": 147544
+          },
+          "inclusive_ir": 27467770,
+          "self_ir": 9757701
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 125575002
+              }
+            ],
+            "inclusive_ir": 125575002,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.1",
+          "sha256": "d5849ca52feba43116d9291543aaf563a9316bc6ae4319cbfdc416afd4ed44e0",
+          "summary_ir": 125575002
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31248785
+              }
+            ],
+            "inclusive_ir": 31248785,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.2",
+          "sha256": "90aec0bbb2ca892ca7896ede94b1bef8117323b3d9bd08c980f81fbdc9039d31",
+          "summary_ir": 31248785
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31286424
+              }
+            ],
+            "inclusive_ir": 31286424,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.3",
+          "sha256": "a43eddcef808c9357044112cf2778c322442164b38a583f9b9284cb92cbf203a",
+          "summary_ir": 31286424
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 125622471
+              }
+            ],
+            "inclusive_ir": 125622471,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.4",
+          "sha256": "db18931e966b82dcb6f2d394aae8023effc6ea32874640a74730e1ed33f434c7",
+          "summary_ir": 125622471
+        }
+      ],
+      "repeat": 1,
+      "selected": "baseline/profile-r1-medium.callgrind.4",
+      "shape": "medium",
+      "termination": {
+        "path": "baseline/profile-r1-medium.callgrind",
+        "sha256": "5ee9542e8ad191e4015463f3515da5d41b41612b62a16220e0006633f1694c2d",
+        "summary_ir": 0
+      }
+    },
+    {
+      "annotations": {
+        "baseline/profile-r1-dense-sparse.inclusive.txt": "e5de62690f96530b60c97cac9e387bf47ddf5e61ee5e53ffd8b7e8186546a15a",
+        "baseline/profile-r1-dense-sparse.self.txt": "9a7103d2a21924541e8418c2864b2ffdf0f633c5dbb94bbca3a4fc101149ec88"
+      },
+      "owners": {
+        "litchi_ooxml_common::mce::codec::process_markup_compatibility": {
+          "direct": {
+            "__memcmp_avx2_movbe": 7127624
+          },
+          "inclusive_ir": 12219020,
+          "self_ir": 5091396
+        },
+        "litchi_ooxml_common::mce::codec::process_ooxml": {
+          "direct": {
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 108,
+            "__rustc::__rust_dealloc": 3895,
+            "litchi_ooxml_common::mce::codec::process_markup_compatibility": 12219020,
+            "litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline": 102329
+          },
+          "inclusive_ir": 12327764,
+          "self_ir": 2412
+        },
+        "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 1011,
+            "__rustc::__rust_dealloc": 70,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 607,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceCatalogCapture>": 1463,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 90,
+            "litchi_opc::source_backed::SourceBackedPackage::source_version": 90,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 461,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": 236613990,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::load_source_catalog": 453694,
+            "litchi_xlsx::cell_values::snapshot::resolve_selectors": 949
+          },
+          "inclusive_ir": 237073087,
+          "self_ir": 606
+        },
+        "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": {
+          "direct": {
+            "<alloc::string::String as core::clone::Clone>::clone": 680,
+            "<litchi_xlsx::cell_values::snapshot::SourceRelationship as core::clone::Clone>::clone": 6939,
+            "<litchi_xlsx::source_payload::SourcePayload as core::clone::Clone>::clone": 36,
+            "__memcpy_avx_unaligned_erms": 360,
+            "alloc::boxed::box_new_uninit": 204,
+            "litchi_opc::source_backed::PartView::data": 4872785,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 120,
+            "litchi_opc::source_backed::SourceBackedPackage::execution_context": 24,
+            "litchi_opc::source_backed::SourceBackedPackage::part": 1482,
+            "litchi_xlsx::cell_values::snapshot::PartState::new": 2530,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::copy_boxed": 684,
+            "litchi_xlsx::cell_values::snapshot::validate_scalar_cells": 177956,
+            "litchi_xlsx::cell_values::snapshot::validate_style_references": 144876,
+            "litchi_xlsx::cell_values::validation::validate_xml": 89730628,
+            "litchi_xlsx::raw::worksheet::parse": 141671642,
+            "litchi_xlsx::source_payload::SourcePayload::from_part_data": 1364
+          },
+          "inclusive_ir": 236613990,
+          "self_ir": 1624
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets": {
+          "direct": {
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 237073087
+          },
+          "inclusive_ir": 237073145,
+          "self_ir": 43
+        },
+        "litchi_xlsx::cell_values::validation::validate_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 8362928,
+            "__rustc::__rust_dealloc": 633815,
+            "litchi_xlsx::cell_values::validation::allowed_unqualified_attribute": 401008
+          },
+          "inclusive_ir": 12619477,
+          "self_ir": 3221726
+        },
+        "litchi_xlsx::cell_values::validation::validate_element": {
+          "direct": {
+            "__memcmp_avx2_movbe": 610497,
+            "litchi_xlsx::cell_values::validation::validate_attributes": 12619477,
+            "litchi_xlsx::cell_values::validation::validate_parent": 1045900
+          },
+          "inclusive_ir": 17543573,
+          "self_ir": 3267699
+        },
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 7252,
+            "__memcmp_avx2_movbe": 972247,
+            "__memcpy_avx_unaligned_erms": 575060,
+            "__rustc::__rust_alloc": 1294807,
+            "__rustc::__rust_dealloc": 1256885,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 35906,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 2248,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::boxed::Box<[u8]>>>": 285,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1591,
+            "core::str::<impl str>::trim_matches": 907222,
+            "litchi_xlsx::cell_values::validation::bind_dialect": 2657254,
+            "litchi_xlsx::cell_values::validation::validate_element": 17543573,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 1403442,
+            "quick_xml::events::BytesRef::decode": 1957892,
+            "quick_xml::name::NamespaceResolver::resolve_event": 10377772,
+            "quick_xml::name::NamespaceResolver::set_level": 754098,
+            "quick_xml::name::QName::local_name": 2086208,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26427052,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10275160
+          },
+          "inclusive_ir": 89757138,
+          "self_ir": 11221184
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct": {
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 72,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 650,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 370,
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 5572,
+            "__memcmp_avx2_movbe": 136,
+            "__memcpy_avx_unaligned_erms": 533880,
+            "__rustc::__rust_dealloc": 140,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 404,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve": 1601,
+            "alloc::vec::Vec<T,A>::push_mut": 871808,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 44,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 16,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1596,
+            "litchi_xlsx::cell::Store::from_unsorted": 1512012,
+            "litchi_xlsx::column::resolve": 96,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish": 7831065,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::push_text": 3273881,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": 44891607,
+            "litchi_xlsx::raw::worksheet::semantic::materialize": 10928697,
+            "litchi_xlsx::raw::worksheet::semantic::resolve_shared_formulas": 124708,
+            "quick_xml::events::BytesRef::decode": 1957892,
+            "quick_xml::name::NamespaceResolver::resolve_event": 10376352,
+            "quick_xml::name::NamespaceResolver::set_level": 753952,
+            "quick_xml::name::QName::local_name": 784,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26419973,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10268551
+          },
+          "inclusive_ir": 128938191,
+          "self_ir": 9182332
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+          "direct": {
+            "__memcmp_avx2_movbe": 136,
+            "__rustc::__rust_dealloc": 140,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 4220,
+            "litchi_sheet::Rect::from_a1": 1860,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 6236090,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": 29171744,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_row": 2579549,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value": 195712,
+            "quick_xml::name::QName::local_name": 4171048
+          },
+          "inclusive_ir": 44891607,
+          "self_ir": 2531108
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": {
+          "direct": {
+            "__rustc::__rust_dealloc": 634450,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 195712,
+            "litchi_xlsx::raw::worksheet::codec::parse_cell_u32": 1174272,
+            "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": 20033625,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 3219445
+          },
+          "inclusive_ir": 29171744,
+          "self_ir": 3914240
+        },
+        "litchi_xlsx::raw::worksheet::parse": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 120,
+            "core::str::converts::from_utf8": 222673,
+            "litchi_ooxml_common::mce::codec::process_ooxml": 12269619,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 128938191,
+            "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 240735
+          },
+          "inclusive_ir": 141671642,
+          "self_ir": 304
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 6485993
+          },
+          "inclusive_ir": 12970403,
+          "self_ir": 6484410
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 7326059,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 12970403,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 824,
+            "quick_xml::reader::state::ReaderState::emit_end": 6612855,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 330,
+            "quick_xml::reader::state::ReaderState::emit_start": 6882167,
+            "quick_xml::reader::state::ReaderState::emit_text": 284760
+          },
+          "inclusive_ir": 52866075,
+          "self_ir": 18788677
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 237014633
+              }
+            ],
+            "inclusive_ir": 237014633,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.1",
+          "sha256": "e36a8189bd92b18009accd44dfc30302f3891bf435acfb32f457b678f810d88c",
+          "summary_ir": 237014633
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 214984639
+              }
+            ],
+            "inclusive_ir": 214984639,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.2",
+          "sha256": "5ff16c564d3b501246dfe8ed4f5238631144aa7123ab1fd994089d1a36d0a511",
+          "summary_ir": 214984639
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 215041327
+              }
+            ],
+            "inclusive_ir": 215041327,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.3",
+          "sha256": "e8f0c79c61570d30192b4e981baa902d8892d9c0b4f6d1c5898ccc03214dbb49",
+          "summary_ir": 215041327
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 237073145
+              }
+            ],
+            "inclusive_ir": 237073145,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.4",
+          "sha256": "5e3ee6d4241ce534a46b1b39748d35a10e89b9c5d213f2446e0697b1318918ad",
+          "summary_ir": 237073145
+        }
+      ],
+      "repeat": 1,
+      "selected": "baseline/profile-r1-dense-sparse.callgrind.4",
+      "shape": "dense-sparse",
+      "termination": {
+        "path": "baseline/profile-r1-dense-sparse.callgrind",
+        "sha256": "1f9f6220b6ee9e2a9418bdfda1085eb37289544a552fb57bdbe5d95ddd322755",
+        "summary_ir": 0
+      }
+    },
+    {
+      "annotations": {
+        "baseline/profile-r2-medium.inclusive.txt": "057b23b787421a9d731f2581c96c7a8acdefdfb7c1d7320c31e6dee6793accf6",
+        "baseline/profile-r2-medium.self.txt": "b081efb486bd95126440aaeb47cc3dcc9957a4583a6e376558c99af2c33ec094"
+      },
+      "owners": {
+        "litchi_ooxml_common::mce::codec::process_markup_compatibility": {
+          "direct": {
+            "__memcmp_avx2_movbe": 3772174
+          },
+          "inclusive_ir": 6466820,
+          "self_ir": 2694646
+        },
+        "litchi_ooxml_common::mce::codec::process_ooxml": {
+          "direct": {
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 108,
+            "__rustc::__rust_dealloc": 4191,
+            "litchi_ooxml_common::mce::codec::process_markup_compatibility": 6466820,
+            "litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline": 102531
+          },
+          "inclusive_ir": 6576062,
+          "self_ir": 2412
+        },
+        "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 1061,
+            "__rustc::__rust_dealloc": 70,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 541,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceCatalogCapture>": 1463,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 90,
+            "litchi_opc::source_backed::SourceBackedPackage::source_version": 90,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 461,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": 125151980,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::load_source_catalog": 452811,
+            "litchi_xlsx::cell_values::snapshot::resolve_selectors": 864
+          },
+          "inclusive_ir": 125610093,
+          "self_ir": 606
+        },
+        "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": {
+          "direct": {
+            "<alloc::string::String as core::clone::Clone>::clone": 680,
+            "<litchi_xlsx::cell_values::snapshot::SourceRelationship as core::clone::Clone>::clone": 6512,
+            "<litchi_xlsx::source_payload::SourcePayload as core::clone::Clone>::clone": 36,
+            "__memcpy_avx_unaligned_erms": 360,
+            "alloc::boxed::box_new_uninit": 204,
+            "litchi_opc::source_backed::PartView::data": 2860427,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 120,
+            "litchi_opc::source_backed::SourceBackedPackage::execution_context": 24,
+            "litchi_opc::source_backed::SourceBackedPackage::part": 1464,
+            "litchi_xlsx::cell_values::snapshot::PartState::new": 2974,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::copy_boxed": 684,
+            "litchi_xlsx::cell_values::snapshot::validate_scalar_cells": 92196,
+            "litchi_xlsx::cell_values::snapshot::validate_style_references": 75372,
+            "litchi_xlsx::cell_values::validation::validate_xml": 46624710,
+            "litchi_xlsx::raw::worksheet::parse": 75483173,
+            "litchi_xlsx::source_payload::SourcePayload::from_part_data": 1364
+          },
+          "inclusive_ir": 125151980,
+          "self_ir": 1624
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets": {
+          "direct": {
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 125610093
+          },
+          "inclusive_ir": 125610151,
+          "self_ir": 43
+        },
+        "litchi_xlsx::cell_values::validation::validate_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 4312783,
+            "__rustc::__rust_dealloc": 329735,
+            "litchi_xlsx::cell_values::validation::allowed_unqualified_attribute": 208976
+          },
+          "inclusive_ir": 6525348,
+          "self_ir": 1673854
+        },
+        "litchi_xlsx::cell_values::validation::validate_element": {
+          "direct": {
+            "__memcmp_avx2_movbe": 317009,
+            "litchi_xlsx::cell_values::validation::validate_attributes": 6525348,
+            "litchi_xlsx::cell_values::validation::validate_parent": 543676
+          },
+          "inclusive_ir": 9082708,
+          "self_ir": 1696675
+        },
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 6851,
+            "__memcmp_avx2_movbe": 505214,
+            "__memcpy_avx_unaligned_erms": 298612,
+            "__rustc::__rust_alloc": 675472,
+            "__rustc::__rust_dealloc": 654025,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 18642,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 3623,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::boxed::Box<[u8]>>>": 285,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 2079,
+            "core::str::<impl str>::trim_matches": 469846,
+            "litchi_xlsx::cell_values::validation::bind_dialect": 1379718,
+            "litchi_xlsx::cell_values::validation::validate_element": 9082708,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 729026,
+            "quick_xml::events::BytesRef::decode": 1107794,
+            "quick_xml::name::NamespaceResolver::resolve_event": 5388140,
+            "quick_xml::name::NamespaceResolver::set_level": 391554,
+            "quick_xml::name::QName::local_name": 1083776,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13727782,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5302917
+          },
+          "inclusive_ir": 46651664,
+          "self_ir": 5823600
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct": {
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 72,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 772,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 188,
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 5030,
+            "__memcmp_avx2_movbe": 136,
+            "__memcpy_avx_unaligned_erms": 276600,
+            "__rustc::__rust_dealloc": 140,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 404,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve": 1539,
+            "alloc::vec::Vec<T,A>::push_mut": 451584,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 44,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 16,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1596,
+            "litchi_xlsx::cell::Store::from_unsorted": 790741,
+            "litchi_xlsx::column::resolve": 96,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish": 5664945,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::push_text": 1704075,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": 23306260,
+            "litchi_xlsx::raw::worksheet::semantic::materialize": 5781968,
+            "litchi_xlsx::raw::worksheet::semantic::resolve_shared_formulas": 64676,
+            "quick_xml::events::BytesRef::decode": 1107794,
+            "quick_xml::name::NamespaceResolver::resolve_event": 5386720,
+            "quick_xml::name::NamespaceResolver::set_level": 391408,
+            "quick_xml::name::QName::local_name": 784,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13720874,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5296737
+          },
+          "inclusive_ir": 68719003,
+          "self_ir": 4763804
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+          "direct": {
+            "__memcmp_avx2_movbe": 136,
+            "__rustc::__rust_dealloc": 140,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 4169,
+            "litchi_sheet::Rect::from_a1": 1776,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 3235209,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": 14876959,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_row": 1606371,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value": 101376,
+            "quick_xml::name::QName::local_name": 2166184
+          },
+          "inclusive_ir": 23306260,
+          "self_ir": 1313940
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": {
+          "direct": {
+            "__rustc::__rust_dealloc": 334520,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 101376,
+            "litchi_xlsx::raw::worksheet::codec::parse_cell_u32": 608256,
+            "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": 10272743,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 1532544
+          },
+          "inclusive_ir": 14876959,
+          "self_ir": 2027520
+        },
+        "litchi_xlsx::raw::worksheet::parse": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 120,
+            "core::str::converts::from_utf8": 117911,
+            "litchi_ooxml_common::mce::codec::process_ooxml": 6517461,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 68719003,
+            "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 128374
+          },
+          "inclusive_ir": 75483173,
+          "self_ir": 304
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 3371753
+          },
+          "inclusive_ir": 6741923,
+          "self_ir": 3370170
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 3804203,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 6741923,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 822,
+            "quick_xml::reader::state::ReaderState::emit_end": 3433791,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 330,
+            "quick_xml::reader::state::ReaderState::emit_start": 3581108,
+            "quick_xml::reader::state::ReaderState::emit_text": 147544
+          },
+          "inclusive_ir": 27467422,
+          "self_ir": 9757701
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 125567352
+              }
+            ],
+            "inclusive_ir": 125567352,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.1",
+          "sha256": "18b56cfd9b65596f6b0f38c0483c67a93c751eb10ce2fff2ba03c577936afb4a",
+          "summary_ir": 125567352
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31250583
+              }
+            ],
+            "inclusive_ir": 31250583,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.2",
+          "sha256": "cc836a9143ac0018da7ae01c827e641b0a2b7f2540322956e7a3d1864b0b3bfb",
+          "summary_ir": 31250583
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 31284663
+              }
+            ],
+            "inclusive_ir": 31284663,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.3",
+          "sha256": "b0e02cbd065444ec58cc47162fe69831ffc20b83a98b0628a7a3b727b294e183",
+          "summary_ir": 31284663
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 125610151
+              }
+            ],
+            "inclusive_ir": 125610151,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.4",
+          "sha256": "5155481cfc871a624b3beaa616947d30d8959520173ba864c63901744a7c5362",
+          "summary_ir": 125610151
+        }
+      ],
+      "repeat": 2,
+      "selected": "baseline/profile-r2-medium.callgrind.4",
+      "shape": "medium",
+      "termination": {
+        "path": "baseline/profile-r2-medium.callgrind",
+        "sha256": "b75c5105bc095dade485b9ceb19157c142d95908ccbc13e379f9ddb9bcb640df",
+        "summary_ir": 0
+      }
+    },
+    {
+      "annotations": {
+        "baseline/profile-r2-dense-sparse.inclusive.txt": "012cf5d1549810114e2169550d47de05fb8f6f81af9cb6967ac14e955fb209fb",
+        "baseline/profile-r2-dense-sparse.self.txt": "1d907f8e264d96540c09f291494191640cf26c8f456e57c17dd31ffb743fc0b5"
+      },
+      "owners": {
+        "litchi_ooxml_common::mce::codec::process_markup_compatibility": {
+          "direct": {
+            "__memcmp_avx2_movbe": 7127624
+          },
+          "inclusive_ir": 12219020,
+          "self_ir": 5091396
+        },
+        "litchi_ooxml_common::mce::codec::process_ooxml": {
+          "direct": {
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 108,
+            "__rustc::__rust_dealloc": 4517,
+            "litchi_ooxml_common::mce::codec::process_markup_compatibility": 12219020,
+            "litchi_ooxml_common::mce::model::Capabilities::ooxml_baseline": 102776
+          },
+          "inclusive_ir": 12328833,
+          "self_ir": 2412
+        },
+        "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 1011,
+            "__rustc::__rust_dealloc": 70,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 500,
+            "core::ptr::drop_in_place<litchi_xlsx::cell_values::snapshot::SourceCatalogCapture>": 1721,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 90,
+            "litchi_opc::source_backed::SourceBackedPackage::source_version": 90,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::from_sheets": 461,
+            "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": 236655739,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::load_source_catalog": 455011,
+            "litchi_xlsx::cell_values::snapshot::resolve_selectors": 636
+          },
+          "inclusive_ir": 237115991,
+          "self_ir": 606
+        },
+        "litchi_xlsx::cell_values::snapshot::Snapshot::from_source_selected": {
+          "direct": {
+            "<alloc::string::String as core::clone::Clone>::clone": 680,
+            "<litchi_xlsx::cell_values::snapshot::SourceRelationship as core::clone::Clone>::clone": 6842,
+            "<litchi_xlsx::source_payload::SourcePayload as core::clone::Clone>::clone": 36,
+            "__memcpy_avx_unaligned_erms": 360,
+            "alloc::boxed::box_new_uninit": 204,
+            "litchi_opc::source_backed::PartView::data": 4872688,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 120,
+            "litchi_opc::source_backed::SourceBackedPackage::execution_context": 24,
+            "litchi_opc::source_backed::SourceBackedPackage::part": 1470,
+            "litchi_xlsx::cell_values::snapshot::PartState::new": 2613,
+            "litchi_xlsx::cell_values::snapshot::checked_multi_bytes": 56,
+            "litchi_xlsx::cell_values::snapshot::copy_boxed": 684,
+            "litchi_xlsx::cell_values::snapshot::validate_scalar_cells": 177956,
+            "litchi_xlsx::cell_values::snapshot::validate_style_references": 144876,
+            "litchi_xlsx::cell_values::validation::validate_xml": 89731034,
+            "litchi_xlsx::raw::worksheet::parse": 141713108,
+            "litchi_xlsx::source_payload::SourcePayload::from_part_data": 1364
+          },
+          "inclusive_ir": 236655739,
+          "self_ir": 1624
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets": {
+          "direct": {
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::load_source_backed": 237115991
+          },
+          "inclusive_ir": 237116049,
+          "self_ir": 43
+        },
+        "litchi_xlsx::cell_values::validation::validate_attributes": {
+          "direct": {
+            "<quick_xml::events::attributes::Attributes as core::iter::traits::iterator::Iterator>::next": 8362921,
+            "__rustc::__rust_dealloc": 633815,
+            "litchi_xlsx::cell_values::validation::allowed_unqualified_attribute": 401008
+          },
+          "inclusive_ir": 12619470,
+          "self_ir": 3221726
+        },
+        "litchi_xlsx::cell_values::validation::validate_element": {
+          "direct": {
+            "__memcmp_avx2_movbe": 610501,
+            "litchi_xlsx::cell_values::validation::validate_attributes": 12619470,
+            "litchi_xlsx::cell_values::validation::validate_parent": 1045900
+          },
+          "inclusive_ir": 17543570,
+          "self_ir": 3267699
+        },
+        "litchi_xlsx::cell_values::validation::validate_xml": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 7253,
+            "__memcmp_avx2_movbe": 972467,
+            "__memcpy_avx_unaligned_erms": 575060,
+            "__rustc::__rust_alloc": 1295101,
+            "__rustc::__rust_dealloc": 1256885,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 35906,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 2361,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::boxed::Box<[u8]>>>": 285,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1992,
+            "core::str::<impl str>::trim_matches": 907222,
+            "litchi_xlsx::cell_values::validation::bind_dialect": 2657254,
+            "litchi_xlsx::cell_values::validation::validate_element": 17543570,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 1403442,
+            "quick_xml::events::BytesRef::decode": 1957892,
+            "quick_xml::name::NamespaceResolver::resolve_event": 10377772,
+            "quick_xml::name::NamespaceResolver::set_level": 754098,
+            "quick_xml::name::QName::local_name": 2086208,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26427431,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10274920
+          },
+          "inclusive_ir": 89758303,
+          "self_ir": 11221184
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": {
+          "direct": {
+            "<alloc::collections::btree::map::BTreeMap<K,V,A> as core::ops::drop::Drop>::drop": 72,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 650,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 370,
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 5314,
+            "__memcmp_avx2_movbe": 136,
+            "__memcpy_avx_unaligned_erms": 533880,
+            "__rustc::__rust_dealloc": 140,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 404,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve": 1564,
+            "alloc::vec::Vec<T,A>::push_mut": 871808,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 44,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 16,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1618,
+            "litchi_xlsx::cell::Store::from_unsorted": 1511984,
+            "litchi_xlsx::column::resolve": 96,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::finish": 7833993,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::push_text": 3283541,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": 44901141,
+            "litchi_xlsx::raw::worksheet::semantic::materialize": 10948375,
+            "litchi_xlsx::raw::worksheet::semantic::resolve_shared_formulas": 124708,
+            "quick_xml::events::BytesRef::decode": 1957892,
+            "quick_xml::name::NamespaceResolver::resolve_event": 10376352,
+            "quick_xml::name::NamespaceResolver::set_level": 753952,
+            "quick_xml::name::QName::local_name": 784,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26419980,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10268433
+          },
+          "inclusive_ir": 128979579,
+          "self_ir": 9182332
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start": {
+          "direct": {
+            "__memcmp_avx2_movbe": 136,
+            "__rustc::__rust_dealloc": 140,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 4220,
+            "litchi_sheet::Rect::from_a1": 1860,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 6236099,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": 29181159,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_row": 2579659,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_value": 195712,
+            "quick_xml::name::QName::local_name": 4171048
+          },
+          "inclusive_ir": 44901141,
+          "self_ir": 2531108
+        },
+        "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::start_cell": {
+          "direct": {
+            "__rustc::__rust_dealloc": 643535,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::model::PendingCell>>": 195712,
+            "litchi_xlsx::raw::worksheet::codec::parse_cell_u32": 1174272,
+            "litchi_xlsx::raw::worksheet::codec::scan_cell_attributes": 20033955,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 3219445
+          },
+          "inclusive_ir": 29181159,
+          "self_ir": 3914240
+        },
+        "litchi_xlsx::raw::worksheet::parse": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 120,
+            "core::str::converts::from_utf8": 222673,
+            "litchi_ooxml_common::mce::codec::process_ooxml": 12269697,
+            "litchi_xlsx::raw::worksheet::codec::<impl litchi_xlsx::raw::worksheet::model::Parser>::parse": 128979579,
+            "litchi_xlsx::raw::worksheet::x14ac::may_contain_descent": 240735
+          },
+          "inclusive_ir": 141713108,
+          "self_ir": 304
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 6485993
+          },
+          "inclusive_ir": 12970403,
+          "self_ir": 6484410
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 7326059,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 12970403,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 824,
+            "quick_xml::reader::state::ReaderState::emit_end": 6612729,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 330,
+            "quick_xml::reader::state::ReaderState::emit_start": 6882517,
+            "quick_xml::reader::state::ReaderState::emit_text": 284760
+          },
+          "inclusive_ir": 52866299,
+          "self_ir": 18788677
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 236997208
+              }
+            ],
+            "inclusive_ir": 236997208,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.1",
+          "sha256": "a422af97610c96295e07ed080c28ef9d9563f15e4ab9b20b929c7479a90fb7fa",
+          "summary_ir": 236997208
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 214999456
+              }
+            ],
+            "inclusive_ir": 214999456,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.2",
+          "sha256": "380d9bad2d0ec92b0dbb581ebfdcb991bcd913ceec7235a12dc3335112810003",
+          "summary_ir": 214999456
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 215039682
+              }
+            ],
+            "inclusive_ir": 215039682,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.3",
+          "sha256": "158598009707af8f87456db4ea0d395a5d622ba7f6271cc57704daeba3b88620",
+          "summary_ir": 215039682
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 237116049
+              }
+            ],
+            "inclusive_ir": 237116049,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.4",
+          "sha256": "2e45e304eac0096b069fc1963f43e559ec7caff7a95d8894201b3e037c18fc12",
+          "summary_ir": 237116049
+        }
+      ],
+      "repeat": 2,
+      "selected": "baseline/profile-r2-dense-sparse.callgrind.4",
+      "shape": "dense-sparse",
+      "termination": {
+        "path": "baseline/profile-r2-dense-sparse.callgrind",
+        "sha256": "44b12a6b434948ffda5796bcce86ac61353fc185c1e4be8e92318ca19c33cc15",
+        "summary_ir": 0
+      }
+    }
+  ],
+  "scope": "Selected planning method Ir only. edit_sheets is the preferred native planning boundary; snapshot-loader fallback would exclude wrapper execution check and empty staging initialization. Selector construction is outside native planning. No latency improvement or production change is claimed.",
+  "status": "pass"
+}

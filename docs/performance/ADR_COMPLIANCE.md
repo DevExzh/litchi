@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0540: XLSX validation/parser boundary attribution
+
+[0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.
+No production or harness source changes. The source audit identifies validation-first
+error ordering, source identity, MCE/x14ac, resource and publication obligations for a
+future shared event stream. All accepted ADR/index hashes remain unchanged; no check is
+bypassed and no candidate is admitted.
+
 ## 0539: XLSX transient ownership candidate rejected
 
 [0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched

@@ -1,0 +1,8 @@
+{
+  "files": {
+    "docs/performance/results/change-0521/analyze_profiles.py": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7",
+    "docs/performance/results/change-0519/analyze_profiles.py": "9587f5a776b55d423b720a98cd228708c79af0956100fd164d81713e0c90488e",
+    "docs/performance/results/change-0519/compare_profile_lanes.py": "a817bb19e1f6d1b5989e41a72dbcf3166b9d0178099781e5ed78c9e5f19f3c74"
+  },
+  "scope": "Pinned profile analyzer and transitive raw edge parsers. Further verifier helper imports must also be bound before sealing."
+}

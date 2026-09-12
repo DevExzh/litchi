@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0540: XLSX validation/parser boundary attribution
+
+[0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.
+Four fresh release planning profiles cover medium and dense-sparse, with two repeats
+each. Worksheet validation consumes 37.1–37.8% of planning Ir and raw parsing
+59.8–60.1%. Each loop separately spends about 19–20% of planning Ir in three direct
+traversal children. These are nested attribution costs, not latency savings.
+
 ## 0539: XLSX transient ownership candidate rejected
 
 [0539](changes/0539-xlsx-transient-ownership-rejected.md) records the matched

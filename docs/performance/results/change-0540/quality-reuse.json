@@ -1,0 +1,112 @@
+{
+  "status": "pass",
+  "reason": "Current complete Rust/harness manifest equals sealed0539 baseline and restored final source; no source edits.",
+  "source_manifest_sha256": "00f7e6b3402083f2f37272a8417f1814f66401184c5e4d6275a19b6739ea5ed7",
+  "prior_seal_sha256": "a13e12c36971b2f995d2b6520c970e4445a40231df88e0a63222f61e1cfd7d9e",
+  "checks": {
+    "docs/performance/results/change-0539/baseline/final-quality-boundaries.receipt.json": {
+      "sha256": "970e537e927efa73e638fc7c272159061ae80ec9daea2f1c81088eb12880b458",
+      "command": [
+        "env",
+        "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0539-target",
+        "CARGO_BUILD_JOBS=2",
+        "CARGO_INCREMENTAL=0",
+        "RUSTDOCFLAGS=-D warnings",
+        "python3",
+        "-B",
+        "tools/check_crate_boundaries.py"
+      ],
+      "exit_code": 0
+    },
+    "docs/performance/results/change-0539/baseline/final-quality-check.receipt.json": {
+      "sha256": "7599f9a73cc811b3c9b9086c552b00d6b090060cf42ff55330830fd434ccd4b3",
+      "command": [
+        "env",
+        "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0539-target",
+        "CARGO_BUILD_JOBS=2",
+        "CARGO_INCREMENTAL=0",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "check",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0
+    },
+    "docs/performance/results/change-0539/baseline/final-quality-clippy.receipt.json": {
+      "sha256": "e6f57a6f497bad719b4b1590eac89265de9a631080a54647b245a62fa1c04010",
+      "command": [
+        "env",
+        "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0539-target",
+        "CARGO_BUILD_JOBS=2",
+        "CARGO_INCREMENTAL=0",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--lib",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0
+    },
+    "docs/performance/results/change-0539/baseline/final-quality-fmt.receipt.json": {
+      "sha256": "681dda5745660e839af4a1b9b60a2aece5e73823d2b39612bd1476abb72c258f",
+      "command": [
+        "env",
+        "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0539-target",
+        "CARGO_BUILD_JOBS=2",
+        "CARGO_INCREMENTAL=0",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0
+    },
+    "docs/performance/results/change-0539/baseline/final-quality-rustdoc.receipt.json": {
+      "sha256": "e99c980701b9845f21d202eea96f81feedb98f191a8ddd55467d33df1c824fa5",
+      "command": [
+        "env",
+        "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0539-target",
+        "CARGO_BUILD_JOBS=2",
+        "CARGO_INCREMENTAL=0",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "doc",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--no-deps"
+      ],
+      "exit_code": 0
+    },
+    "docs/performance/results/change-0539/baseline/final-quality-tests.receipt.json": {
+      "sha256": "85fc32e99e2ddb8f0f6e07bdcd93062a0ce2527aebffd6a073e1763a0eb6c03c",
+      "command": [
+        "env",
+        "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0539-target",
+        "CARGO_BUILD_JOBS=2",
+        "CARGO_INCREMENTAL=0",
+        "RUSTDOCFLAGS=-D warnings",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "litchi-xlsx",
+        "--all-features",
+        "--",
+        "--test-threads=2"
+      ],
+      "exit_code": 0
+    }
+  },
+  "successful_test_executions": 1292
+}
