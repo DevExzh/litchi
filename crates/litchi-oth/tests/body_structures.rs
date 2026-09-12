@@ -15,7 +15,7 @@ const CONTENT: &str = concat!(
     r#"<text:section text:name="Intro" text:protected="true"><text:p>section text</text:p></text:section>"#,
     r#"<text:note text:note-class="footnote" text:id="fn1"><text:note-citation text:label="1">1</text:note-citation><text:note-body><text:p>note text</text:p></text:note-body></text:note>"#,
     r#"<office:annotation office:name="comment"><dc:creator>Ada</dc:creator><text:p>review text</text:p></office:annotation>"#,
-    r#"<text:tracked-changes><text:changed-region text:id="r1"><text:insertion><text:p>inserted</text:p></text:insertion></text:changed-region></text:tracked-changes>"#,
+    r#"<text:tracked-changes><text:changed-region xml:id="r1" text:id="r1"><text:insertion><office:change-info><dc:creator>Ada</dc:creator><dc:date>2026-09-02T03:04:05Z</dc:date><text:p>inserted</text:p></office:change-info></text:insertion></text:changed-region></text:tracked-changes>"#,
     r#"<text:change-start text:change-id="r1"/><text:change-end text:change-id="r1"/>"#,
     r#"<text:table-of-content text:name="Contents" text:protected="true"><text:table-of-content-source/><text:index-body><text:p>cached entry</text:p></text:index-body></text:table-of-content>"#,
     r#"<draw:frame draw:name="Box" text:anchor-type="paragraph" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><draw:text-box><text:p>frame text</text:p></draw:text-box></draw:frame>"#,
@@ -44,7 +44,13 @@ fn projects_all_oth_body_structure_families() {
     let changes = body.changes().unwrap();
     assert_eq!(changes.len(), 3);
     assert!(matches!(changes[0].kind(), change::Kind::Insertion));
-    assert_eq!(changes[0].text(), "inserted");
+    assert_eq!(changes[0].text(), "");
+    assert_eq!(changes[0].info().unwrap().creator(), "Ada");
+    assert_eq!(changes[0].info().unwrap().date(), "2026-09-02T03:04:05Z");
+    assert_eq!(
+        changes[0].info().unwrap().paragraphs()[0].text(),
+        "inserted"
+    );
     assert!(matches!(changes[1].kind(), change::Kind::Start));
     let indexes = body.indexes().unwrap();
     assert_eq!(indexes[0].name(), Some("Contents"));
@@ -179,7 +185,7 @@ fn huge_table_repeats_stay_compact_and_checked() {
 fn change_markers_are_inert_without_tracked_changes_and_text_change_is_projected() {
     let without_tracking = CONTENT
         .replace(
-            r#"<text:tracked-changes><text:changed-region text:id="r1"><text:insertion><text:p>inserted</text:p></text:insertion></text:changed-region></text:tracked-changes>"#,
+            r#"<text:tracked-changes><text:changed-region xml:id="r1" text:id="r1"><text:insertion><office:change-info><dc:creator>Ada</dc:creator><dc:date>2026-09-02T03:04:05Z</dc:date><text:p>inserted</text:p></office:change-info></text:insertion></text:changed-region></text:tracked-changes>"#,
             "",
         );
     let template = Template::from_bytes(
@@ -225,7 +231,7 @@ fn foreign_wrappers_keep_typed_descendants_inert() {
 fn additional_index_and_frame_families_remain_inert_projections() {
     let content = CONTENT.replace(
         r#"</office:text>"#,
-        r#"<text:illustration-index><text:illustration-index-source/><text:index-body/></text:illustration-index><text:alphabetical-index><text:alphabetical-index-source/><text:index-body/></text:alphabetical-index><text:bibliography><text:bibliography-source/><text:index-body/></text:bibliography><draw:frame draw:name="Image"><draw:image xlink:href="Pictures/image"/></draw:frame><draw:frame draw:name="Object"><draw:object xlink:href="Object 1"/></draw:frame></office:text>"#,
+        r#"<text:illustration-index text:name="ExtraIllustrations"><text:illustration-index-source/><text:index-body/></text:illustration-index><text:alphabetical-index text:name="ExtraAlphabetical"><text:alphabetical-index-source/><text:index-body/></text:alphabetical-index><text:bibliography text:name="ExtraBibliography"><text:bibliography-source/><text:index-body/></text:bibliography><draw:frame draw:name="Image"><draw:image xlink:href="Pictures/image"/></draw:frame><draw:frame draw:name="Object"><draw:object xlink:href="Object 1"/></draw:frame></office:text>"#,
     );
     let template =
         Template::from_bytes(Builder::new().content_xml(content).build().unwrap()).unwrap();
