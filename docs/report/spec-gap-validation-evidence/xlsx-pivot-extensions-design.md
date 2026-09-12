@@ -435,6 +435,40 @@ unresolved-anchor status and must not present the index bound as validated. It
 must not expose `quick_xml`, `OpcPackage`, extension wrapper structs, or an
 archive part as an ordinary API.
 
+### Batch 2 integration-test API contract
+
+The implementation is in progress. The advanced source-bound test surface is
+`litchi_xlsx::pivot::cached_unique_names`; this contract does not claim that
+the implementation has passed its production gate. Its public names are
+`PivotCacheId`, `CacheSelector`, `FieldSelector`, `CachedUniqueName`,
+`DiagnosticStatus`, `Snapshot`, `Transaction`, `Commit`, and `Patch`.
+
+* `PivotCacheId(pub u32)` is the workbook semantic ID.
+  `CacheSelector::Id(PivotCacheId(...))` selects that ID; `Position(usize)` is
+  the optional source-order convenience selector.
+* `FieldSelector::Ordinal(usize)` and `Name(&str)` select a cache field.
+  Ambiguous field names must refuse.
+* `CachedUniqueName` has public `index: u32` and `name: String` fields.
+  `DiagnosticStatus::Unresolved` explicitly reports the unresolved item bound.
+* `Snapshot::load(&OpcPackage, impl Into<CacheSelector>, FieldSelector<'_>)`
+  returns `Result<Snapshot>`. `entries()` returns `&[CachedUniqueName]`, and
+  `diagnostic_status()` returns `DiagnosticStatus`.
+* `Transaction::new(&mut OpcPackage, impl Into<CacheSelector>, FieldSelector<'_>)`
+  returns `Result<Transaction<'_>>`. Its
+  `set_cached_unique_name(index: u32, name: impl Into<String>)` returns
+  `Result<bool>`: the index is the semantic item index, not the vector ordinal,
+  and `false` means the staged value was already equal.
+* `Transaction::commit()` returns `Result<Commit>`. `Commit::changed()` returns
+  `bool`, `snapshot()` returns `&Snapshot`, and `patch()` returns `&Patch`.
+  `Patch::inverse()` returns `Patch`; `apply(&mut OpcPackage)` returns
+  `Result<()>` and must validate its source read set before publication.
+
+`CacheSelector`, `FieldSelector`, and `DiagnosticStatus` may be aliases for
+the longer names `PivotCacheSelector`, `PivotCacheFieldSelector`, and
+`IndexBoundStatus`. The ordinary contextual workbook facade remains required;
+this explicit OPC surface is only the advanced layer. The independent test
+file is `crates/litchi-xlsx/tests/cached_unique_names.rs`.
+
 The source-bound implementation should provide the same lifecycle already
 used by the source-preserving data-type-icon owner
 ([`Snapshot`](../../../crates/litchi-xlsx/src/data_type_icons/package.rs:19),
