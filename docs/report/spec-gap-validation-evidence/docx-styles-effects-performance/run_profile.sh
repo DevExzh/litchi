@@ -24,7 +24,10 @@ fi
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 ROOT=$(cd -- "$HERE/../../../.." && pwd -P)
 SOURCE_COMMIT=8702fd4db8723acceb7deb51bcb40ff66604bf10
-SMOKE_COMMIT=8444e88baaaca128eed50a2eed26e0ecd25063c9
+# The profile's correctness prerequisite is the separately reviewed current
+# source smoke retained in fa927a8a9.  The historical d1/clean-46 smoke remains
+# replayable through run_smoke.sh and verify.py, but must not gate this profile.
+CURRENT_SMOKE_COMMIT=fa927a8a9de94891858a6bb3d44c21d5fa63697d
 HARNESS=$HERE/profile-harness/Cargo.toml
 MANIFEST_TOOL=$HERE/source_manifest.py
 PROFILE_VERIFIER=$HERE/verify_profile.py
@@ -79,8 +82,8 @@ if ! git -C "$ROOT" merge-base --is-ancestor "$SOURCE_COMMIT" "$HEAD"; then
     echo "checkout does not descend from approved production source $SOURCE_COMMIT" >&2
     exit 2
 fi
-if ! git -C "$ROOT" merge-base --is-ancestor "$SMOKE_COMMIT" "$HEAD"; then
-    echo "checkout does not descend from reviewed correctness smoke $SMOKE_COMMIT" >&2
+if ! git -C "$ROOT" merge-base --is-ancestor "$CURRENT_SMOKE_COMMIT" "$HEAD"; then
+    echo "checkout does not descend from reviewed current-source correctness smoke $CURRENT_SMOKE_COMMIT" >&2
     exit 2
 fi
 if [[ -n "$(git -C "$ROOT" status --porcelain --untracked-files=all)" ]]; then
