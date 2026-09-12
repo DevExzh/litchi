@@ -1,0 +1,69 @@
+{
+  "status": "reviewed",
+  "analysis_sha256": "dd134240f54106ba562def30697051387524b951552233564fc40cacb8137bfe",
+  "variations": [
+    {
+      "case": "xls_eager_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "p50",
+      "first": 424616,
+      "second": 450197,
+      "change_percent": 6.024502138402688,
+      "review": "Same-build second-child increase on a shared host; retained without exclusion. Two child observations cannot identify a cause or establish a stable tail. No candidate or speedup claim is made."
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "p95",
+      "first": 440812,
+      "second": 468822,
+      "change_percent": 6.354182735497216,
+      "review": "Same-build second-child increase on a shared host; retained without exclusion. Two child observations cannot identify a cause or establish a stable tail. No candidate or speedup claim is made."
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "p99",
+      "first": 446172,
+      "second": 476642,
+      "change_percent": 6.829204880628992,
+      "review": "Same-build second-child increase on a shared host; retained without exclusion. Two child observations cannot identify a cause or establish a stable tail. No candidate or speedup claim is made."
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "mean",
+      "first": 425230.49699999974,
+      "second": 450668.031,
+      "change_percent": 5.982057773245808,
+      "review": "Same-build second-child increase on a shared host; retained without exclusion. Two child observations cannot identify a cause or establish a stable tail. No candidate or speedup claim is made."
+    },
+    {
+      "case": "xls_owned_source_open",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "p95",
+      "first": 136300,
+      "second": 144341,
+      "change_percent": 5.8994864269992675,
+      "review": "Same-build second-child increase on a shared host; retained without exclusion. Two child observations cannot identify a cause or establish a stable tail. No candidate or speedup claim is made."
+    },
+    {
+      "case": "xls_owned_source_open",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "p99",
+      "first": 139591,
+      "second": 147131,
+      "change_percent": 5.401494365682602,
+      "review": "Same-build second-child increase on a shared host; retained without exclusion. Two child observations cannot identify a cause or establish a stable tail. No candidate or speedup claim is made."
+    },
+    {
+      "case": "xls_source_backed_open",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "p95",
+      "first": 141951,
+      "second": 149681,
+      "change_percent": 5.445541066987913,
+      "review": "Same-build second-child increase on a shared host; retained without exclusion. Two child observations cannot identify a cause or establish a stable tail. No candidate or speedup claim is made."
+    }
+  ]
+}

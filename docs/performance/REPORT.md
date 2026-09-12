@@ -1,5 +1,15 @@
 # Performance program phase report
 
+## 0523: measure current CFB allocation and OLE2 constructor costs
+
+[0523](changes/0523-cfb-open-allocation-attribution.md) adds canonical allocation
+observations to direct CFB open and retains a current baseline without changing
+production. The matrix includes 24,000 native samples, 720 separate allocation
+samples, eight constructor profile children and two whole-child hardware
+captures. Seven same-build timing variations over 5% remain visible. A private
+checked visited-bit experiment is next; no optimization is adopted here.
+OLE2/OOXML remains active and ODF deferred until that goal completes.
+
 ## 0522: reject a scanner optimization and strengthen XLSX guards
 
 [0522](changes/0522-xlsx-cell-reference-guard.md) rejects the common-cell

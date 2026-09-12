@@ -1,0 +1,796 @@
+--------------------------------------------------------------------------------
+Profile data file '/home/zhuhe/code/litchi/docs/performance/results/change-0523/baseline/profile-r2-xls-owned.callgrind.1' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 77714339
+Trigger: --dump-after=litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits
+Profiled target:  /tmp/litchi-goal-0523/normal --case xls_owned_source_open_one_cell --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0523/baseline/profile-r2-xls-owned.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0523/baseline/profile-r2-xls-owned.catalog.json (PID 1191165, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       100
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir        
+--------------------------------------------------------------------------------
+2,793,660  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir         file:function
+--------------------------------------------------------------------------------
+
+2,793,660  *  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+2,793,660  *  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+2,793,660  *  ???:(below main) [/tmp/litchi-goal-0523/normal]
+
+2,793,660  *  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+
+2,793,660  *  ???:litchi_perf_baseline::main [/tmp/litchi-goal-0523/normal]
+
+2,793,660  *  ???:litchi_perf_baseline::run [/tmp/litchi-goal-0523/normal]
+
+2,793,660  *  ???:litchi_perf_baseline::run_xls_owned_source_case [/tmp/litchi-goal-0523/normal]
+
+2,793,660  *  ???:main [/tmp/litchi-goal-0523/normal]
+
+2,793,660  *  ???:std::rt::lang_start::{{closure}} [/tmp/litchi-goal-0523/normal]
+
+2,793,660  *  ???:std::rt::lang_start_internal [/tmp/litchi-goal-0523/normal]
+
+2,793,660  *  ???:std::sys::backtrace::__rust_begin_short_backtrace [/tmp/litchi-goal-0523/normal]
+
+1,163,365  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (10x) [/tmp/litchi-goal-0523/normal]
+1,120,228  *  ???:litchi_cfb::file::SectorChainScratch::collect_exact [/tmp/litchi-goal-0523/normal]
+   41,806  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (126x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,331  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (56x) [/tmp/litchi-goal-0523/normal]
+
+  493,920  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (32,928x) [/tmp/litchi-goal-0523/normal]
+    3,930  < ???:litchi_cfb::file::OleFile<R>::load_fat (262x) [/tmp/litchi-goal-0523/normal]
+       45  < ???:litchi_cfb::file::OleFile<R>::load_directory (3x) [/tmp/litchi-goal-0523/normal]
+       15  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/tmp/litchi-goal-0523/normal]
+  497,910  *  ???:litchi_cfb::file::OleFile<R>::claim_sector [/tmp/litchi-goal-0523/normal]
+
+  398,342  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+  398,342  *  ???:litchi_cfb::file::OleFile<R>::validate_physical_sector_layout [/tmp/litchi-goal-0523/normal]
+
+2,058,474  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+  395,882  *  ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations [/tmp/litchi-goal-0523/normal]
+1,163,365  >   ???:litchi_cfb::file::SectorChainScratch::collect_exact (10x) [/tmp/litchi-goal-0523/normal]
+  493,920  >   ???:litchi_cfb::file::OleFile<R>::claim_sector (32,928x) [/tmp/litchi-goal-0523/normal]
+    4,829  >   ???:litchi_cfb::file::collect_sector_chain_exact (1x) [/tmp/litchi-goal-0523/normal]
+      401  >   ???:__rustc::__rust_dealloc (5x) [/tmp/litchi-goal-0523/normal]
+       77  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/tmp/litchi-goal-0523/normal]
+
+   41,806  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (126x) [/tmp/litchi-goal-0523/normal]
+   33,212  < ???:litchi_cfb::file::try_filled_vec (1x) [/tmp/litchi-goal-0523/normal]
+   13,143  < ???:litchi_cfb::file::OleFile<R>::read_sector_into (263x) [/tmp/litchi-goal-0523/normal]
+    8,342  < ???:litchi_cfb::file::collect_sector_chain_exact (24x) [/tmp/litchi-goal-0523/normal]
+    4,171  < ???:litchi_cfb::file::collect_directory_sector_chain (13x) [/tmp/litchi-goal-0523/normal]
+    4,115  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/tmp/litchi-goal-0523/normal]
+    4,115  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/tmp/litchi-goal-0523/normal]
+       99  < ???:litchi_xls::workbook::source::read_range (1x) [/tmp/litchi-goal-0523/normal]
+       99  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+       50  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       45  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (195x) [/tmp/litchi-goal-0523/normal]
+  109,197  *  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+  125,622  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+   50,164  *  ???:litchi_cfb::file::OleFile<R>::load_fat [/tmp/litchi-goal-0523/normal]
+   66,482  >   ???:litchi_cfb::file::OleFile<R>::read_sector_into (262x) [/tmp/litchi-goal-0523/normal]
+    4,115  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    3,930  >   ???:litchi_cfb::file::OleFile<R>::claim_sector (262x) [/tmp/litchi-goal-0523/normal]
+      383  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/tmp/litchi-goal-0523/normal]
+      365  >   ???:litchi_cfb::file::try_vec_with_capacity (1x) [/tmp/litchi-goal-0523/normal]
+      183  >   ???:__rustc::__rust_dealloc (2x) [/tmp/litchi-goal-0523/normal]
+
+   21,628  < ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at (334x) [/tmp/litchi-goal-0523/normal]
+    4,650  < ???:litchi_cfb::directory_name::directory_name_data (7,592x) [/tmp/litchi-goal-0523/normal]
+    1,800  < ???:litchi_cfb::file::OleFile<R>::load_directory (60x) [/tmp/litchi-goal-0523/normal]
+      580  < ???:0x0000000007949680 (2,719x) [???]
+      390  < ???:alloc::vec::Vec<T,A>::resize (13x) [/tmp/litchi-goal-0523/normal]
+      360  < ???:litchi_cfb::file::try_push (12x) [/tmp/litchi-goal-0523/normal]
+      180  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (6x) [/tmp/litchi-goal-0523/normal]
+      148  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (3x) [/tmp/litchi-goal-0523/normal]
+       65  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       39  < ???:<alloc::string::String as core::clone::Clone>::clone (1,508x) [/tmp/litchi-goal-0523/normal]
+       36  < ???:litchi_xls::number_format::codec::parse_number_format (10x) [/tmp/litchi-goal-0523/normal]
+       30  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       30  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (5x) [/tmp/litchi-goal-0523/normal]
+       30  < ???:litchi_cfb::file::try_filled_vec (1x) [/tmp/litchi-goal-0523/normal]
+       11  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/tmp/litchi-goal-0523/normal]
+   29,977  *  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   39,910  < ???:litchi_cfb::file::OleFile<R>::read_sector_into (263x) [/tmp/litchi-goal-0523/normal]
+      248  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+      152  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+   15,900  *  ???:std::io::default_read_exact [/tmp/litchi-goal-0523/normal]
+   24,410  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at (265x) [/tmp/litchi-goal-0523/normal]
+
+   21,633  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/tmp/litchi-goal-0523/normal]
+    4,224  < ???:litchi_cfb::shared::SharedOleFile::find_entry (3x) [/tmp/litchi-goal-0523/normal]
+   14,532  *  ???:litchi_cfb::directory_name::directory_name_data [/tmp/litchi-goal-0523/normal]
+    4,650  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (7,592x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,925  >   ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend (351x) [/tmp/litchi-goal-0523/normal]
+    1,950  >   ???:<core::char::ToUppercase as core::iter::traits::iterator::Iterator>::next (7,592x) [/tmp/litchi-goal-0523/normal]
+    1,800  >   ???:core::unicode::unicode_data::conversions::to_upper (3,796x) [/tmp/litchi-goal-0523/normal]
+
+   66,482  < ???:litchi_cfb::file::OleFile<R>::load_fat (262x) [/tmp/litchi-goal-0523/normal]
+      247  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/tmp/litchi-goal-0523/normal]
+   13,676  *  ???:litchi_cfb::file::OleFile<R>::read_sector_into [/tmp/litchi-goal-0523/normal]
+   39,910  >   ???:std::io::default_read_exact (263x) [/tmp/litchi-goal-0523/normal]
+   13,143  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (263x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   22,054  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (68x) [/tmp/litchi-goal-0523/normal]
+   11,884  *  ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact [/tmp/litchi-goal-0523/normal]
+    4,964  >   ???:litchi_core::source::ReadAt::read_exact_at (68x) [/tmp/litchi-goal-0523/normal]
+    1,794  >   ???:litchi_cfb::shared::SharedOleStreamCursor::physical_span (69x) [/tmp/litchi-goal-0523/normal]
+    1,518  >   ???:litchi_cfb::shared::SharedOleStreamCursor::advance_within (69x) [/tmp/litchi-goal-0523/normal]
+    1,214  >   ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state (69x) [/tmp/litchi-goal-0523/normal]
+      680  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (136x) [/tmp/litchi-goal-0523/normal]
+
+  106,557  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+    8,339  *  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits [/tmp/litchi-goal-0523/normal]
+   47,176  >   ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (1x) [/tmp/litchi-goal-0523/normal]
+   22,054  >   ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (68x) [/tmp/litchi-goal-0523/normal]
+   10,372  >   ???:litchi_cfb::shared::SharedOleStreamCursor::skip_forward (68x) [/tmp/litchi-goal-0523/normal]
+    4,639  >   ???:<litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next (69x) [/tmp/litchi-goal-0523/normal]
+    2,906  >   ???:litchi_xls::workbook::source::read_range (1x) [/tmp/litchi-goal-0523/normal]
+    1,795  >   ???:litchi_cfb::shared::SharedOleFile::stream_cursor_at (1x) [/tmp/litchi-goal-0523/normal]
+    1,732  >   ???:litchi_cfb::shared::SharedOleFile::stream_len (1x) [/tmp/litchi-goal-0523/normal]
+    1,294  >   ???:litchi_xls::records::BoundSheetRecord::parse (2x) [/tmp/litchi-goal-0523/normal]
+      906  >   ???:alloc::raw_vec::RawVecInner<A>::try_reserve (7x) [/tmp/litchi-goal-0523/normal]
+      884  >   ???:core::ptr::drop_in_place<litchi_xls::workbook::source::SourceBackedError> (68x) [/tmp/litchi-goal-0523/normal]
+      649  >   ???:alloc::vec::Vec<T,A>::into_boxed_slice (3x) [/tmp/litchi-goal-0523/normal]
+      542  >   ???:hashbrown::map::HashMap<K,V,S,A>::insert (2x) [/tmp/litchi-goal-0523/normal]
+      401  >   ???:<str>::to_lowercase (2x) [/tmp/litchi-goal-0523/normal]
+      366  >   ???:__rustc::__rust_dealloc (4x) [/tmp/litchi-goal-0523/normal]
+      327  >   ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop (1x) [/tmp/litchi-goal-0523/normal]
+      321  >   ???:litchi_xls::workbook::source::ensure_current_parts (3x) [/tmp/litchi-goal-0523/normal]
+      262  >   ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/tmp/litchi-goal-0523/normal]
+      244  >   ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/tmp/litchi-goal-0523/normal]
+      196  >   ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (1x) [/tmp/litchi-goal-0523/normal]
+      180  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (6x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      170  >   ???:<alloc::string::String as core::clone::Clone>::clone (2x) [/tmp/litchi-goal-0523/normal]
+      153  >   ???:alloc::boxed::box_new_uninit (3x) [/tmp/litchi-goal-0523/normal]
+      126  >   ???:litchi_xls::workbook::source::SourceInner::ensure_current (1x) [/tmp/litchi-goal-0523/normal]
+       96  >   ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (1x) [/tmp/litchi-goal-0523/normal]
+       94  >   ???:alloc::vec::Vec<T,A>::push_mut (4x) [/tmp/litchi-goal-0523/normal]
+       76  >   ???:__rustc::__rust_alloc (2x) [/tmp/litchi-goal-0523/normal]
+       63  >   ???:litchi_xls::records::Encoding::from_codepage (2x) [/tmp/litchi-goal-0523/normal]
+       57  >   ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (1x) [/tmp/litchi-goal-0523/normal]
+       49  >   ???:litchi_xls::records::BofRecord::parse (1x) [/tmp/litchi-goal-0523/normal]
+       40  >   ???:litchi_cfb::shared::SharedOleFile::source_version (1x) [/tmp/litchi-goal-0523/normal]
+       25  >   ???:litchi_xls::records::scan_shared_string_records (1x) [/tmp/litchi-goal-0523/normal]
+       21  >   ???:std::thread::local::LocalKey<T>::with (1x) [/tmp/litchi-goal-0523/normal]
+        2  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (2x) [/tmp/litchi-goal-0523/normal]
+
+   28,670  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (40x) [/tmp/litchi-goal-0523/normal]
+    8,066  *  ???:litchi_xls::number_format::codec::parse_number_format [/tmp/litchi-goal-0523/normal]
+   12,146  >   ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (40x) [/tmp/litchi-goal-0523/normal]
+    7,090  >   ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter (40x) [/tmp/litchi-goal-0523/normal]
+      880  >   ???:__rustc::__rust_dealloc (60x) [/tmp/litchi-goal-0523/normal]
+      226  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (10x) [/tmp/litchi-goal-0523/normal]
+      152  >   ???:<core::iter::adapters::cloned::Cloned<I> as core::iter::traits::iterator::Iterator>::fold (10x) [/tmp/litchi-goal-0523/normal]
+       72  >   ???:__rustc::__rust_alloc (10x) [/tmp/litchi-goal-0523/normal]
+       36  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (10x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        2  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (10x) [/tmp/litchi-goal-0523/normal]
+
+   59,052  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+    7,985  *  ???:litchi_cfb::file::OleFile<R>::load_directory [/tmp/litchi-goal-0523/normal]
+   21,633  >   ???:litchi_cfb::directory_name::directory_name_data (12x) [/tmp/litchi-goal-0523/normal]
+    8,506  >   ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (1x) [/tmp/litchi-goal-0523/normal]
+    5,045  >   ???:litchi_cfb::file::collect_directory_sector_chain (1x) [/tmp/litchi-goal-0523/normal]
+    4,418  >   ???:<alloc::string::String>::from_utf16 (12x) [/tmp/litchi-goal-0523/normal]
+    2,092  >   ???:litchi_cfb::file::try_push (38x) [/tmp/litchi-goal-0523/normal]
+    1,800  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (60x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,456  >   ???:litchi_cfb::file::try_filled_vec (2x) [/tmp/litchi-goal-0523/normal]
+      948  >   ???:<u16 as core::slice::cmp::SliceContains>::slice_contains (12x) [/tmp/litchi-goal-0523/normal]
+      884  >   ???:litchi_cfb::directory_name::DirectoryNameData::compare (11x) [/tmp/litchi-goal-0523/normal]
+      743  >   ???:__rustc::__rust_dealloc (18x) [/tmp/litchi-goal-0523/normal]
+      678  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/tmp/litchi-goal-0523/normal]
+      625  >   ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (1x) [/tmp/litchi-goal-0523/normal]
+      445  >   ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe (23x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      374  >   ???:litchi_cfb::file::OleFile<R>::validated_entry (22x) [/tmp/litchi-goal-0523/normal]
+      248  >   ???:std::io::default_read_exact (1x) [/tmp/litchi-goal-0523/normal]
+      240  >   ???:litchi_cfb::file::CheckedBitSet::insert (12x) [/tmp/litchi-goal-0523/normal]
+      212  >   ???:litchi_cfb::file::try_vec_with_capacity (2x) [/tmp/litchi-goal-0523/normal]
+      196  >   ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (1x) [/tmp/litchi-goal-0523/normal]
+      152  >   ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (1x) [/tmp/litchi-goal-0523/normal]
+      126  >   ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (1x) [/tmp/litchi-goal-0523/normal]
+       99  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       60  >   ???:core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>> (12x) [/tmp/litchi-goal-0523/normal]
+       45  >   ???:litchi_cfb::file::OleFile<R>::claim_sector (3x) [/tmp/litchi-goal-0523/normal]
+       23  >   ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>> (1x) [/tmp/litchi-goal-0523/normal]
+       19  >   ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>> (1x) [/tmp/litchi-goal-0523/normal]
+
+    7,090  < ???:litchi_xls::number_format::codec::parse_number_format (40x) [/tmp/litchi-goal-0523/normal]
+    5,944  *  ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter [/tmp/litchi-goal-0523/normal]
+    1,146  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (40x) [/tmp/litchi-goal-0523/normal]
+
+    9,964  < ???:litchi_cfb::shared::SharedOleStreamCursor::skip_forward (68x) [/tmp/litchi-goal-0523/normal]
+    5,633  *  ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward [/tmp/litchi-goal-0523/normal]
+    1,716  >   ???:litchi_cfb::shared::SharedOleStreamCursor::physical_span (66x) [/tmp/litchi-goal-0523/normal]
+    1,452  >   ???:litchi_cfb::shared::SharedOleStreamCursor::advance_within (66x) [/tmp/litchi-goal-0523/normal]
+    1,163  >   ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state (66x) [/tmp/litchi-goal-0523/normal]
+
+    3,637  < ./malloc/./malloc/malloc.c:__libc_malloc2 (42,070x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,359  < ./malloc/./malloc/malloc.c:_int_realloc (2,662x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    5,417  *  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      579  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (4,583x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   24,410  < ???:std::io::default_read_exact (265x) [/tmp/litchi-goal-0523/normal]
+    2,228  < ???:litchi_core::source::ReadAt::read_exact_at (69x) [/tmp/litchi-goal-0523/normal]
+    5,010  *  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at [/tmp/litchi-goal-0523/normal]
+   21,628  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (334x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    4,956  < ???:litchi_xls::number_format::codec::parse_xf (105x) [/tmp/litchi-goal-0523/normal]
+    4,662  *  ???:litchi_xls::border_fill::parse_xf_border_fill [/tmp/litchi-goal-0523/normal]
+      294  >   ???:litchi_xls::border_fill::FillPattern::from_bits (105x) [/tmp/litchi-goal-0523/normal]
+
+    4,639  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (69x) [/tmp/litchi-goal-0523/normal]
+    4,639  *  ???:<litchi_biff::stream::Records as core::iter::traits::iterator::Iterator>::next [/tmp/litchi-goal-0523/normal]
+
+    5,760  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (12x) [/tmp/litchi-goal-0523/normal]
+    4,404  *  ???:litchi_cfb::file::decode_utf16le [/tmp/litchi-goal-0523/normal]
+    1,356  >   ???:<alloc::string::String>::try_reserve (126x) [/tmp/litchi-goal-0523/normal]
+
+   12,146  < ???:litchi_xls::number_format::codec::parse_number_format (40x) [/tmp/litchi-goal-0523/normal]
+       96  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+    4,055  *  ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter [/tmp/litchi-goal-0523/normal]
+    7,677  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (80x) [/tmp/litchi-goal-0523/normal]
+      501  >   ???:__rustc::__rust_alloc (41x) [/tmp/litchi-goal-0523/normal]
+        9  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (41x) [/tmp/litchi-goal-0523/normal]
+
+    4,418  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/tmp/litchi-goal-0523/normal]
+    3,930  *  ???:<alloc::string::String>::from_utf16 [/tmp/litchi-goal-0523/normal]
+      476  >   ???:__rustc::__rust_alloc (1,417x) [/tmp/litchi-goal-0523/normal]
+       12  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1,417x) [/tmp/litchi-goal-0523/normal]
+
+    1,794  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (69x) [/tmp/litchi-goal-0523/normal]
+    1,716  < ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (66x) [/tmp/litchi-goal-0523/normal]
+    3,510  *  ???:litchi_cfb::shared::SharedOleStreamCursor::physical_span [/tmp/litchi-goal-0523/normal]
+
+   47,176  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+    3,044  *  ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals [/tmp/litchi-goal-0523/normal]
+   28,670  >   ???:litchi_xls::number_format::codec::parse_number_format (40x) [/tmp/litchi-goal-0523/normal]
+    9,033  >   ???:litchi_xls::number_format::codec::parse_xf (105x) [/tmp/litchi-goal-0523/normal]
+    2,309  >   ???:alloc::raw_vec::RawVec<T,A>::grow_one (30x) [/tmp/litchi-goal-0523/normal]
+    2,305  >   ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (15x) [/tmp/litchi-goal-0523/normal]
+    1,785  >   ???:core::hash::BuildHasher::hash_one (75x) [/tmp/litchi-goal-0523/normal]
+       30  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (5x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    1,518  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (69x) [/tmp/litchi-goal-0523/normal]
+    1,452  < ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (66x) [/tmp/litchi-goal-0523/normal]
+    2,970  *  ???:litchi_cfb::shared::SharedOleStreamCursor::advance_within [/tmp/litchi-goal-0523/normal]
+
+    4,964  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (68x) [/tmp/litchi-goal-0523/normal]
+      231  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (1x) [/tmp/litchi-goal-0523/normal]
+    2,967  *  ???:litchi_core::source::ReadAt::read_exact_at [/tmp/litchi-goal-0523/normal]
+    2,228  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::read_at (69x) [/tmp/litchi-goal-0523/normal]
+
+    2,925  < ???:litchi_cfb::directory_name::directory_name_data (351x) [/tmp/litchi-goal-0523/normal]
+    2,925  *  ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend [/tmp/litchi-goal-0523/normal]
+
+    9,033  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (105x) [/tmp/litchi-goal-0523/normal]
+    2,901  *  ???:litchi_xls::number_format::codec::parse_xf [/tmp/litchi-goal-0523/normal]
+    4,956  >   ???:litchi_xls::border_fill::parse_xf_border_fill (105x) [/tmp/litchi-goal-0523/normal]
+    1,176  >   ???:litchi_xls::alignment::CellAlignment::parse (105x) [/tmp/litchi-goal-0523/normal]
+
+    4,165  < ./malloc/./malloc/malloc.c:_int_free_chunk (46,276x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,877  *  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      984  >   ./malloc/./malloc/malloc.c:_int_free_maybe_trim (46,270x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      304  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (40,957x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    8,271  < ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (2,059x) [/tmp/litchi-goal-0523/normal]
+    2,165  < ???:alloc::raw_vec::RawVec<T,A>::grow_one (47x) [/tmp/litchi-goal-0523/normal]
+    1,331  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (56x) [/tmp/litchi-goal-0523/normal]
+      850  < ???:litchi_cfb::file::collect_sector_chain_exact (48x) [/tmp/litchi-goal-0523/normal]
+      750  < ???:litchi_cfb::file::try_filled_vec (3x) [/tmp/litchi-goal-0523/normal]
+      690  < ???:litchi_cfb::file::try_push (2x) [/tmp/litchi-goal-0523/normal]
+      678  < ???:litchi_cfb::file::OleFile<R>::load_directory (3x) [/tmp/litchi-goal-0523/normal]
+      635  < ???:alloc::raw_vec::RawVecInner<A>::try_reserve (50x) [/tmp/litchi-goal-0523/normal]
+      511  < ???:litchi_xls::workbook::source::read_range (1x) [/tmp/litchi-goal-0523/normal]
+      492  < ???:litchi_cfb::file::try_vec_with_capacity (3x) [/tmp/litchi-goal-0523/normal]
+      490  < ???:litchi_cfb::file::collect_directory_sector_chain (26x) [/tmp/litchi-goal-0523/normal]
+      383  < ???:litchi_cfb::file::OleFile<R>::load_fat (2x) [/tmp/litchi-goal-0523/normal]
+      158  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (2x) [/tmp/litchi-goal-0523/normal]
+       81  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/tmp/litchi-goal-0523/normal]
+       77  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/tmp/litchi-goal-0523/normal]
+       77  < ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (36x) [/tmp/litchi-goal-0523/normal]
+    2,760  *  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/tmp/litchi-goal-0523/normal]
+    9,507  >   ???:__rustc::__rust_realloc (3,113x) [/tmp/litchi-goal-0523/normal]
+    5,326  >   ???:__rustc::__rust_alloc (23,439x) [/tmp/litchi-goal-0523/normal]
+       46  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (23,439x) [/tmp/litchi-goal-0523/normal]
+
+    6,666  < ???:__rustc::__rdl_alloc (53,009x) [/tmp/litchi-goal-0523/normal]
+    2,615  *  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,051  >   ./malloc/./malloc/malloc.c:__libc_malloc2 (42,069x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    1,785  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (75x) [/tmp/litchi-goal-0523/normal]
+    1,190  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (50x) [/tmp/litchi-goal-0523/normal]
+      372  < ???:hashbrown::map::HashMap<K,V,S,A>::insert (7x) [/tmp/litchi-goal-0523/normal]
+    2,336  *  ???:core::hash::BuildHasher::hash_one [/tmp/litchi-goal-0523/normal]
+    1,011  >   ???:<core::hash::sip::Hasher<S> as core::hash::Hasher>::write (22,042x) [/tmp/litchi-goal-0523/normal]
+
+    1,214  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (69x) [/tmp/litchi-goal-0523/normal]
+    1,163  < ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (66x) [/tmp/litchi-goal-0523/normal]
+    2,329  *  ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state [/tmp/litchi-goal-0523/normal]
+       48  >   ???:litchi_cfb::shared::next_chain_sector (2x) [/tmp/litchi-goal-0523/normal]
+
+    1,950  < ???:litchi_cfb::directory_name::directory_name_data (7,592x) [/tmp/litchi-goal-0523/normal]
+    1,950  *  ???:<core::char::ToUppercase as core::iter::traits::iterator::Iterator>::next [/tmp/litchi-goal-0523/normal]
+
+    1,800  < ???:litchi_cfb::directory_name::directory_name_data (3,796x) [/tmp/litchi-goal-0523/normal]
+    1,800  *  ???:core::unicode::unicode_data::conversions::to_upper [/tmp/litchi-goal-0523/normal]
+
+    3,705  < ???:__rustc::__rdl_dealloc (52,919x) [/tmp/litchi-goal-0523/normal]
+    1,705  *  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,952  >   ./malloc/./malloc/malloc.c:_int_free_chunk (43,190x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    9,516  < ???:__rustc::__rdl_realloc (3,701x) [/tmp/litchi-goal-0523/normal]
+    1,683  *  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    7,683  >   ./malloc/./malloc/malloc.c:_int_realloc (3,128x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    7,683  < ./malloc/./malloc/malloc.c:realloc (3,128x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,631  *  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,910  >   ./malloc/./malloc/malloc.c:_int_free_chunk (3,091x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    2,359  >   ./malloc/./malloc/malloc.c:_int_malloc (2,662x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       95  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (446x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   10,795  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+    1,419  *  ???:litchi_cfb::file::OleFile<R>::load_minifat [/tmp/litchi-goal-0523/normal]
+    4,883  >   ???:litchi_cfb::file::collect_sector_chain_exact (1x) [/tmp/litchi-goal-0523/normal]
+    4,115  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      247  >   ???:litchi_cfb::file::OleFile<R>::read_sector_into (1x) [/tmp/litchi-goal-0523/normal]
+       81  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/tmp/litchi-goal-0523/normal]
+       35  >   ???:__rustc::__rust_dealloc (1x) [/tmp/litchi-goal-0523/normal]
+       15  >   ???:litchi_cfb::file::OleFile<R>::claim_sector (1x) [/tmp/litchi-goal-0523/normal]
+
+    7,055  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (11x) [/tmp/litchi-goal-0523/normal]
+      625  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+    1,368  *  ???:litchi_cfb::file::OleFile<R>::parse_directory_entry [/tmp/litchi-goal-0523/normal]
+    5,760  >   ???:litchi_cfb::file::decode_utf16le (12x) [/tmp/litchi-goal-0523/normal]
+      552  >   ???:litchi_cfb::file::format_clsid (12x) [/tmp/litchi-goal-0523/normal]
+
+    8,506  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+    1,223  *  ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative [/tmp/litchi-goal-0523/normal]
+    7,055  >   ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (11x) [/tmp/litchi-goal-0523/normal]
+      158  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/tmp/litchi-goal-0523/normal]
+       70  >   ???:__rustc::__rust_dealloc (2x) [/tmp/litchi-goal-0523/normal]
+
+    1,176  < ???:litchi_xls::number_format::codec::parse_xf (105x) [/tmp/litchi-goal-0523/normal]
+    1,176  *  ???:litchi_xls::alignment::CellAlignment::parse [/tmp/litchi-goal-0523/normal]
+
+    2,092  < ???:litchi_cfb::file::OleFile<R>::load_directory (38x) [/tmp/litchi-goal-0523/normal]
+    1,042  *  ???:litchi_cfb::file::try_push [/tmp/litchi-goal-0523/normal]
+      690  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/tmp/litchi-goal-0523/normal]
+      360  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (12x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    1,011  < ???:core::hash::BuildHasher::hash_one (22,042x) [/tmp/litchi-goal-0523/normal]
+    1,011  *  ???:<core::hash::sip::Hasher<S> as core::hash::Hasher>::write [/tmp/litchi-goal-0523/normal]
+
+    7,677  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (80x) [/tmp/litchi-goal-0523/normal]
+    1,146  < ???:<alloc::string::String as core::iter::traits::collect::FromIterator<char>>::from_iter (40x) [/tmp/litchi-goal-0523/normal]
+      230  < ???:litchi_xls::records::BoundSheetRecord::parse (14x) [/tmp/litchi-goal-0523/normal]
+      226  < ???:litchi_xls::number_format::codec::parse_number_format (10x) [/tmp/litchi-goal-0523/normal]
+    1,008  *  ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle [/tmp/litchi-goal-0523/normal]
+    8,271  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2,059x) [/tmp/litchi-goal-0523/normal]
+
+      984  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (46,270x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      984  *  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      579  < ./malloc/./malloc/malloc.c:_int_malloc (4,583x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      304  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (40,957x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       95  < ./malloc/./malloc/malloc.c:_int_realloc (446x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      978  *  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      948  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/tmp/litchi-goal-0523/normal]
+      948  *  ???:<u16 as core::slice::cmp::SliceContains>::slice_contains [/tmp/litchi-goal-0523/normal]
+
+    7,557  < ???:__rustc::__rust_alloc (53,009x) [/tmp/litchi-goal-0523/normal]
+      891  *  ???:__rustc::__rdl_alloc [/tmp/litchi-goal-0523/normal]
+    6,666  >   ./malloc/./malloc/malloc.c:malloc (53,009x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      884  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (68x) [/tmp/litchi-goal-0523/normal]
+      884  *  ???:core::ptr::drop_in_place<litchi_xls::workbook::source::SourceBackedError> [/tmp/litchi-goal-0523/normal]
+
+      884  < ???:litchi_cfb::file::OleFile<R>::load_directory (11x) [/tmp/litchi-goal-0523/normal]
+      884  *  ???:litchi_cfb::directory_name::DirectoryNameData::compare [/tmp/litchi-goal-0523/normal]
+
+    1,714  < ???:litchi_cfb::shared::SharedOleFile::stream_len (1x) [/tmp/litchi-goal-0523/normal]
+    1,714  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (1x) [/tmp/litchi-goal-0523/normal]
+    1,714  < ???:litchi_cfb::shared::SharedOleFile::stream_cursor_at (1x) [/tmp/litchi-goal-0523/normal]
+      858  *  ???:litchi_cfb::shared::SharedOleFile::find_entry [/tmp/litchi-goal-0523/normal]
+    4,224  >   ???:litchi_cfb::directory_name::directory_name_data (3x) [/tmp/litchi-goal-0523/normal]
+       60  >   ???:core::ptr::drop_in_place<litchi_cfb::file::OleError> (15x) [/tmp/litchi-goal-0523/normal]
+
+      680  < ???:litchi_cfb::shared::SharedOleStreamCursor::read_exact (136x) [/tmp/litchi-goal-0523/normal]
+       40  < ???:litchi_xls::workbook::source::ensure_current_parts (8x) [/tmp/litchi-goal-0523/normal]
+       25  < ???:litchi_cfb::shared::SharedOleFile::source_version (5x) [/tmp/litchi-goal-0523/normal]
+       15  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (3x) [/tmp/litchi-goal-0523/normal]
+       10  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (2x) [/tmp/litchi-goal-0523/normal]
+      770  *  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version [/tmp/litchi-goal-0523/normal]
+
+    2,305  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (15x) [/tmp/litchi-goal-0523/normal]
+      196  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+      713  *  ???:hashbrown::raw::RawTable<T,A>::reserve_rehash [/tmp/litchi-goal-0523/normal]
+    1,190  >   ???:core::hash::BuildHasher::hash_one (50x) [/tmp/litchi-goal-0523/normal]
+      528  >   ???:hashbrown::raw::RawTableInner::fallible_with_capacity (16x) [/tmp/litchi-goal-0523/normal]
+       70  >   ???:__rustc::__rust_dealloc (10x) [/tmp/litchi-goal-0523/normal]
+
+    2,910  < ./malloc/./malloc/malloc.c:_int_realloc (3,091x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    1,952  < ./malloc/./malloc/malloc.c:free (43,190x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      697  *  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    4,165  >   ./malloc/./malloc/malloc.c:_int_free_merge_chunk (46,276x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    1,294  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/tmp/litchi-goal-0523/normal]
+      586  *  ???:litchi_xls::records::BoundSheetRecord::parse [/tmp/litchi-goal-0523/normal]
+      271  >   ???:core::iter::traits::iterator::Iterator::try_fold (14x) [/tmp/litchi-goal-0523/normal]
+      230  >   ???:alloc::raw_vec::RawVecInner<A>::reserve::do_reserve_and_handle (14x) [/tmp/litchi-goal-0523/normal]
+      207  >   ???:core::iter::traits::iterator::Iterator::fold (14x) [/tmp/litchi-goal-0523/normal]
+
+   10,066  < ???:__rustc::__rust_realloc (3,701x) [/tmp/litchi-goal-0523/normal]
+      550  *  ???:__rustc::__rdl_realloc [/tmp/litchi-goal-0523/normal]
+    9,516  >   ./malloc/./malloc/malloc.c:realloc (3,701x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      900  < ???:litchi_cfb::file::try_filled_vec (2x) [/tmp/litchi-goal-0523/normal]
+      510  *  ???:alloc::vec::Vec<T,A>::resize [/tmp/litchi-goal-0523/normal]
+      390  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (13x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    1,356  < ???:litchi_cfb::file::decode_utf16le (126x) [/tmp/litchi-goal-0523/normal]
+      480  *  ???:<alloc::string::String>::try_reserve [/tmp/litchi-goal-0523/normal]
+      876  >   ???:<alloc::raw_vec::RawVecInner>::finish_grow (1,478x) [/tmp/litchi-goal-0523/normal]
+
+      445  < ???:litchi_cfb::file::OleFile<R>::load_directory (23x) [/tmp/litchi-goal-0523/normal]
+      445  *  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   10,372  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (68x) [/tmp/litchi-goal-0523/normal]
+      408  *  ???:litchi_cfb::shared::SharedOleStreamCursor::skip_forward [/tmp/litchi-goal-0523/normal]
+    9,964  >   ???:litchi_cfb::shared::SharedOleStreamCursor::move_forward (68x) [/tmp/litchi-goal-0523/normal]
+
+      876  < ???:<alloc::string::String>::try_reserve (1,478x) [/tmp/litchi-goal-0523/normal]
+      384  *  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/tmp/litchi-goal-0523/normal]
+      480  >   ???:__rustc::__rust_alloc (4,886x) [/tmp/litchi-goal-0523/normal]
+       12  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (4,886x) [/tmp/litchi-goal-0523/normal]
+
+    4,051  < ./malloc/./malloc/malloc.c:malloc (42,069x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      378  *  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    3,637  >   ./malloc/./malloc/malloc.c:_int_malloc (42,070x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      374  < ???:litchi_cfb::file::OleFile<R>::load_directory (22x) [/tmp/litchi-goal-0523/normal]
+      374  *  ???:litchi_cfb::file::OleFile<R>::validated_entry [/tmp/litchi-goal-0523/normal]
+
+      552  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (12x) [/tmp/litchi-goal-0523/normal]
+      336  *  ???:litchi_cfb::file::format_clsid [/tmp/litchi-goal-0523/normal]
+      216  >   ???:litchi_core::simd::cmp::is_all_zero_avx2 (126x) [/tmp/litchi-goal-0523/normal]
+
+      401  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/tmp/litchi-goal-0523/normal]
+      323  *  ???:<str>::to_lowercase [/tmp/litchi-goal-0523/normal]
+       76  >   ???:__rustc::__rust_alloc (13x) [/tmp/litchi-goal-0523/normal]
+        2  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (13x) [/tmp/litchi-goal-0523/normal]
+
+      528  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (16x) [/tmp/litchi-goal-0523/normal]
+      319  *  ???:hashbrown::raw::RawTableInner::fallible_with_capacity [/tmp/litchi-goal-0523/normal]
+      160  >   ???:__rustc::__rust_alloc (195x) [/tmp/litchi-goal-0523/normal]
+       45  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (195x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        4  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (195x) [/tmp/litchi-goal-0523/normal]
+
+      294  < ???:litchi_xls::border_fill::parse_xf_border_fill (105x) [/tmp/litchi-goal-0523/normal]
+      294  *  ???:litchi_xls::border_fill::FillPattern::from_bits [/tmp/litchi-goal-0523/normal]
+
+      906  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (7x) [/tmp/litchi-goal-0523/normal]
+      271  *  ???:alloc::raw_vec::RawVecInner<A>::try_reserve [/tmp/litchi-goal-0523/normal]
+      635  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (50x) [/tmp/litchi-goal-0523/normal]
+
+      271  < ???:litchi_xls::records::BoundSheetRecord::parse (14x) [/tmp/litchi-goal-0523/normal]
+      271  *  ???:core::iter::traits::iterator::Iterator::try_fold [/tmp/litchi-goal-0523/normal]
+
+      240  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/tmp/litchi-goal-0523/normal]
+      240  *  ???:litchi_cfb::file::CheckedBitSet::insert [/tmp/litchi-goal-0523/normal]
+
+    5,045  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+      236  *  ???:litchi_cfb::file::collect_directory_sector_chain [/tmp/litchi-goal-0523/normal]
+    4,171  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (13x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      490  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (26x) [/tmp/litchi-goal-0523/normal]
+      148  >   ???:__rustc::__rust_dealloc (13x) [/tmp/litchi-goal-0523/normal]
+
+    2,237  < ???:litchi_xls::workbook::source::read_range (1x) [/tmp/litchi-goal-0523/normal]
+      234  *  ???:litchi_cfb::shared::SharedOleFile::read_stream_range [/tmp/litchi-goal-0523/normal]
+    1,714  >   ???:litchi_cfb::shared::SharedOleFile::find_entry (1x) [/tmp/litchi-goal-0523/normal]
+      231  >   ???:litchi_core::source::ReadAt::read_exact_at (1x) [/tmp/litchi-goal-0523/normal]
+       48  >   ???:litchi_cfb::shared::next_chain_sector (2x) [/tmp/litchi-goal-0523/normal]
+       10  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (2x) [/tmp/litchi-goal-0523/normal]
+
+      321  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (3x) [/tmp/litchi-goal-0523/normal]
+      107  < ???:litchi_xls::workbook::source::SourceInner::ensure_current (1x) [/tmp/litchi-goal-0523/normal]
+      228  *  ???:litchi_xls::workbook::source::ensure_current_parts [/tmp/litchi-goal-0523/normal]
+      160  >   ???:litchi_cfb::shared::SharedOleFile::source_version (4x) [/tmp/litchi-goal-0523/normal]
+       40  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (8x) [/tmp/litchi-goal-0523/normal]
+
+    4,883  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/tmp/litchi-goal-0523/normal]
+    4,829  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/tmp/litchi-goal-0523/normal]
+      224  *  ???:litchi_cfb::file::collect_sector_chain_exact [/tmp/litchi-goal-0523/normal]
+    8,342  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (24x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      850  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (48x) [/tmp/litchi-goal-0523/normal]
+      296  >   ???:__rustc::__rust_dealloc (24x) [/tmp/litchi-goal-0523/normal]
+
+      216  < ???:litchi_cfb::file::format_clsid (126x) [/tmp/litchi-goal-0523/normal]
+      216  *  ???:litchi_core::simd::cmp::is_all_zero_avx2 [/tmp/litchi-goal-0523/normal]
+
+      207  < ???:litchi_xls::records::BoundSheetRecord::parse (14x) [/tmp/litchi-goal-0523/normal]
+      207  *  ???:core::iter::traits::iterator::Iterator::fold [/tmp/litchi-goal-0523/normal]
+
+2,686,323  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+      194  *  ???:litchi_cfb::file::OleFile<R>::open_with_limits [/tmp/litchi-goal-0523/normal]
+2,058,474  >   ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/tmp/litchi-goal-0523/normal]
+  398,342  >   ???:litchi_cfb::file::OleFile<R>::validate_physical_sector_layout (1x) [/tmp/litchi-goal-0523/normal]
+  125,622  >   ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/tmp/litchi-goal-0523/normal]
+   59,052  >   ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+   33,577  >   ???:litchi_cfb::file::try_filled_vec (1x) [/tmp/litchi-goal-0523/normal]
+   10,795  >   ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/tmp/litchi-goal-0523/normal]
+      152  >   ???:std::io::default_read_exact (1x) [/tmp/litchi-goal-0523/normal]
+       65  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       50  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      160  < ???:litchi_xls::workbook::source::ensure_current_parts (4x) [/tmp/litchi-goal-0523/normal]
+       40  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+      175  *  ???:litchi_cfb::shared::SharedOleFile::source_version [/tmp/litchi-goal-0523/normal]
+       25  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (5x) [/tmp/litchi-goal-0523/normal]
+
+      542  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/tmp/litchi-goal-0523/normal]
+      170  *  ???:hashbrown::map::HashMap<K,V,S,A>::insert [/tmp/litchi-goal-0523/normal]
+      372  >   ???:core::hash::BuildHasher::hash_one (7x) [/tmp/litchi-goal-0523/normal]
+
+2,686,921  < ???:litchi_cfb::shared::SharedOleFile::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+      169  *  ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits [/tmp/litchi-goal-0523/normal]
+2,686,323  >   ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+      211  >   ???:litchi_cfb::file::OleFile<R>::into_parsed_index (1x) [/tmp/litchi-goal-0523/normal]
+      148  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+       51  >   ???:alloc::boxed::box_new_uninit (1x) [/tmp/litchi-goal-0523/normal]
+       15  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::version (3x) [/tmp/litchi-goal-0523/normal]
+        4  >   ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::len (1x) [/tmp/litchi-goal-0523/normal]
+
+      152  < ???:litchi_xls::number_format::codec::parse_number_format (10x) [/tmp/litchi-goal-0523/normal]
+      152  *  ???:<core::iter::adapters::cloned::Cloned<I> as core::iter::traits::iterator::Iterator>::fold [/tmp/litchi-goal-0523/normal]
+
+      262  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+      151  *  ???:litchi_xls::workbook::source::validate_sheet_offsets [/tmp/litchi-goal-0523/normal]
+       40  >   ???:__rustc::__rust_alloc (1x) [/tmp/litchi-goal-0523/normal]
+       35  >   ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left (1x) [/tmp/litchi-goal-0523/normal]
+       35  >   ???:__rustc::__rust_dealloc (1x) [/tmp/litchi-goal-0523/normal]
+        1  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1x) [/tmp/litchi-goal-0523/normal]
+
+      150  *  ./malloc/./malloc/arena.c:realloc
+
+    2,309  < ???:litchi_xls::number_format::codec::<impl litchi_xls::number_format::model::Formatting>::parse_globals (30x) [/tmp/litchi-goal-0523/normal]
+      144  *  ???:alloc::raw_vec::RawVec<T,A>::grow_one [/tmp/litchi-goal-0523/normal]
+    2,165  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (47x) [/tmp/litchi-goal-0523/normal]
+
+   33,577  < ???:litchi_cfb::file::OleFile<R>::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+    1,456  < ???:litchi_cfb::file::OleFile<R>::load_directory (2x) [/tmp/litchi-goal-0523/normal]
+      141  *  ???:litchi_cfb::file::try_filled_vec [/tmp/litchi-goal-0523/normal]
+   33,212  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+      900  >   ???:alloc::vec::Vec<T,A>::resize (2x) [/tmp/litchi-goal-0523/normal]
+      750  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/tmp/litchi-goal-0523/normal]
+       30  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      170  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/tmp/litchi-goal-0523/normal]
+      108  < ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (2x) [/tmp/litchi-goal-0523/normal]
+      120  *  ???:<alloc::string::String as core::clone::Clone>::clone [/tmp/litchi-goal-0523/normal]
+      116  >   ???:__rustc::__rust_alloc (1,508x) [/tmp/litchi-goal-0523/normal]
+       39  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1,508x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        3  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1,508x) [/tmp/litchi-goal-0523/normal]
+
+2,793,660  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at (1x) [/tmp/litchi-goal-0523/normal]
+      104  *  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits [/tmp/litchi-goal-0523/normal]
+2,686,928  >   ???:litchi_cfb::shared::SharedOleFile::open_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+  106,557  >   ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       40  >   ???:__rustc::__rust_alloc (1x) [/tmp/litchi-goal-0523/normal]
+       30  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        1  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1x) [/tmp/litchi-goal-0523/normal]
+
+    5,326  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (23,439x) [/tmp/litchi-goal-0523/normal]
+      501  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (41x) [/tmp/litchi-goal-0523/normal]
+      480  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (4,886x) [/tmp/litchi-goal-0523/normal]
+      476  < ???:<alloc::string::String>::from_utf16 (1,417x) [/tmp/litchi-goal-0523/normal]
+      160  < ???:alloc::boxed::box_new_uninit (4x) [/tmp/litchi-goal-0523/normal]
+      160  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (195x) [/tmp/litchi-goal-0523/normal]
+      133  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/tmp/litchi-goal-0523/normal]
+      116  < ???:<alloc::string::String as core::clone::Clone>::clone (1,508x) [/tmp/litchi-goal-0523/normal]
+       76  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/tmp/litchi-goal-0523/normal]
+       76  < ???:<str>::to_lowercase (13x) [/tmp/litchi-goal-0523/normal]
+       72  < ???:litchi_xls::number_format::codec::parse_number_format (10x) [/tmp/litchi-goal-0523/normal]
+       40  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       40  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/tmp/litchi-goal-0523/normal]
+       99  *  ???:__rustc::__rust_alloc [/tmp/litchi-goal-0523/normal]
+    7,557  >   ???:__rustc::__rdl_alloc (53,009x) [/tmp/litchi-goal-0523/normal]
+
+       46  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (23,439x) [/tmp/litchi-goal-0523/normal]
+       12  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (4,886x) [/tmp/litchi-goal-0523/normal]
+       12  < ???:<alloc::string::String>::from_utf16 (1,417x) [/tmp/litchi-goal-0523/normal]
+        9  < ???:<alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter (41x) [/tmp/litchi-goal-0523/normal]
+        4  < ???:alloc::boxed::box_new_uninit (4x) [/tmp/litchi-goal-0523/normal]
+        4  < ???:hashbrown::raw::RawTableInner::fallible_with_capacity (195x) [/tmp/litchi-goal-0523/normal]
+        3  < ???:<alloc::string::String as core::clone::Clone>::clone (1,508x) [/tmp/litchi-goal-0523/normal]
+        2  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/tmp/litchi-goal-0523/normal]
+        2  < ???:<str>::to_lowercase (13x) [/tmp/litchi-goal-0523/normal]
+        2  < ???:litchi_xls::number_format::codec::parse_number_format (10x) [/tmp/litchi-goal-0523/normal]
+        1  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+        1  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/tmp/litchi-goal-0523/normal]
+        1  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/tmp/litchi-goal-0523/normal]
+       99  *  ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 [/tmp/litchi-goal-0523/normal]
+
+       48  < ???:litchi_cfb::shared::SharedOleFile::read_stream_range (2x) [/tmp/litchi-goal-0523/normal]
+       48  < ???:litchi_cfb::shared::SharedOleStreamCursor::normalize_state (2x) [/tmp/litchi-goal-0523/normal]
+       96  *  ???:litchi_cfb::shared::next_chain_sector [/tmp/litchi-goal-0523/normal]
+
+       94  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (4x) [/tmp/litchi-goal-0523/normal]
+       94  *  ???:alloc::vec::Vec<T,A>::push_mut [/tmp/litchi-goal-0523/normal]
+
+      365  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/tmp/litchi-goal-0523/normal]
+      212  < ???:litchi_cfb::file::OleFile<R>::load_directory (2x) [/tmp/litchi-goal-0523/normal]
+       85  *  ???:litchi_cfb::file::try_vec_with_capacity [/tmp/litchi-goal-0523/normal]
+      492  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/tmp/litchi-goal-0523/normal]
+
+    1,795  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       81  *  ???:litchi_cfb::shared::SharedOleFile::stream_cursor_at [/tmp/litchi-goal-0523/normal]
+    1,714  >   ???:litchi_cfb::shared::SharedOleFile::find_entry (1x) [/tmp/litchi-goal-0523/normal]
+
+      327  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       79  *  ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop [/tmp/litchi-goal-0523/normal]
+      248  >   ???:__rustc::__rust_dealloc (11x) [/tmp/litchi-goal-0523/normal]
+
+       72  *  ./malloc/../string/bits/string_fortified.h:_int_realloc
+      616  >   ???:0x0000000007949680 (2,662x) [???]
+
+      649  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (3x) [/tmp/litchi-goal-0523/normal]
+       65  *  ???:alloc::vec::Vec<T,A>::into_boxed_slice [/tmp/litchi-goal-0523/normal]
+      584  >   ???:__rustc::__rust_realloc (2x) [/tmp/litchi-goal-0523/normal]
+
+      211  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       63  *  ???:litchi_cfb::file::OleFile<R>::into_parsed_index [/tmp/litchi-goal-0523/normal]
+      148  >   ???:__rustc::__rust_dealloc (1x) [/tmp/litchi-goal-0523/normal]
+
+       60  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/tmp/litchi-goal-0523/normal]
+       60  *  ???:core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>> [/tmp/litchi-goal-0523/normal]
+
+       60  < ???:litchi_cfb::shared::SharedOleFile::find_entry (15x) [/tmp/litchi-goal-0523/normal]
+       60  *  ???:core::ptr::drop_in_place<litchi_cfb::file::OleError> [/tmp/litchi-goal-0523/normal]
+
+      196  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+       59  *  ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone [/tmp/litchi-goal-0523/normal]
+      108  >   ???:<alloc::string::String as core::clone::Clone>::clone (2x) [/tmp/litchi-goal-0523/normal]
+       29  >   ???:<T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec (1x) [/tmp/litchi-goal-0523/normal]
+
+    2,906  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       59  *  ???:litchi_xls::workbook::source::read_range [/tmp/litchi-goal-0523/normal]
+    2,237  >   ???:litchi_cfb::shared::SharedOleFile::read_stream_range (1x) [/tmp/litchi-goal-0523/normal]
+      511  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/tmp/litchi-goal-0523/normal]
+       99  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    3,762  < ???:__rustc::__rust_dealloc (52,919x) [/tmp/litchi-goal-0523/normal]
+       57  *  ???:__rustc::__rdl_dealloc [/tmp/litchi-goal-0523/normal]
+    3,705  >   ./malloc/./malloc/malloc.c:free (52,919x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+      880  < ???:litchi_xls::number_format::codec::parse_number_format (60x) [/tmp/litchi-goal-0523/normal]
+      743  < ???:litchi_cfb::file::OleFile<R>::load_directory (18x) [/tmp/litchi-goal-0523/normal]
+      401  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (5x) [/tmp/litchi-goal-0523/normal]
+      366  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (4x) [/tmp/litchi-goal-0523/normal]
+      296  < ???:litchi_cfb::file::collect_sector_chain_exact (24x) [/tmp/litchi-goal-0523/normal]
+      248  < ???:<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop (11x) [/tmp/litchi-goal-0523/normal]
+      183  < ???:litchi_cfb::file::OleFile<R>::load_fat (2x) [/tmp/litchi-goal-0523/normal]
+      161  < ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (2x) [/tmp/litchi-goal-0523/normal]
+      148  < ???:litchi_cfb::file::OleFile<R>::into_parsed_index (1x) [/tmp/litchi-goal-0523/normal]
+      148  < ???:litchi_cfb::file::collect_directory_sector_chain (13x) [/tmp/litchi-goal-0523/normal]
+       70  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (2x) [/tmp/litchi-goal-0523/normal]
+       70  < ???:hashbrown::raw::RawTable<T,A>::reserve_rehash (10x) [/tmp/litchi-goal-0523/normal]
+       35  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/tmp/litchi-goal-0523/normal]
+       35  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/tmp/litchi-goal-0523/normal]
+       35  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/tmp/litchi-goal-0523/normal]
+       57  *  ???:__rustc::__rust_dealloc [/tmp/litchi-goal-0523/normal]
+    3,762  >   ???:__rustc::__rdl_dealloc (52,919x) [/tmp/litchi-goal-0523/normal]
+
+      126  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+       49  *  ???:litchi_cfb::file::CheckedBitSet::try_with_capacity [/tmp/litchi-goal-0523/normal]
+       77  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (36x) [/tmp/litchi-goal-0523/normal]
+
+       48  *  ./malloc/./malloc/arena.c:free
+
+      152  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+       57  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       48  *  ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop [/tmp/litchi-goal-0523/normal]
+      161  >   ???:__rustc::__rust_dealloc (2x) [/tmp/litchi-goal-0523/normal]
+
+      244  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       47  *  ???:alloc::sync::Arc<T,A>::from_box_in [/tmp/litchi-goal-0523/normal]
+      133  >   ???:__rustc::__rust_alloc (1x) [/tmp/litchi-goal-0523/normal]
+       35  >   ???:__rustc::__rust_dealloc (1x) [/tmp/litchi-goal-0523/normal]
+       17  >   ???:alloc::sync::arcinner_layout_for_value_layout (1x) [/tmp/litchi-goal-0523/normal]
+       11  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+        1  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (1x) [/tmp/litchi-goal-0523/normal]
+
+      153  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (3x) [/tmp/litchi-goal-0523/normal]
+       51  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       40  *  ???:alloc::boxed::box_new_uninit [/tmp/litchi-goal-0523/normal]
+      160  >   ???:__rustc::__rust_alloc (4x) [/tmp/litchi-goal-0523/normal]
+        4  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (4x) [/tmp/litchi-goal-0523/normal]
+
+       36  *  ./malloc/./malloc/arena.c:__libc_malloc2
+
+      616  < ./malloc/../string/bits/string_fortified.h:_int_realloc (2,662x)
+       36  *  ???:0x0000000007949680 [???]
+      580  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (2,719x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+       35  < ???:litchi_xls::workbook::source::validate_sheet_offsets (1x) [/tmp/litchi-goal-0523/normal]
+       35  *  ???:core::slice::sort::shared::smallsort::insertion_sort_shift_left [/tmp/litchi-goal-0523/normal]
+
+       49  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       35  *  ???:litchi_xls::records::BofRecord::parse [/tmp/litchi-goal-0523/normal]
+       14  >   ???:core::ptr::drop_in_place<litchi_xls::error::Error> (5x) [/tmp/litchi-goal-0523/normal]
+
+       29  < ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (1x) [/tmp/litchi-goal-0523/normal]
+       29  *  ???:<T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec [/tmp/litchi-goal-0523/normal]
+
+       63  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (2x) [/tmp/litchi-goal-0523/normal]
+       27  *  ???:litchi_xls::records::Encoding::from_codepage [/tmp/litchi-goal-0523/normal]
+       36  >   ???:litchi_codepage::Mbcs::require (8x) [/tmp/litchi-goal-0523/normal]
+
+    9,507  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3,113x) [/tmp/litchi-goal-0523/normal]
+      584  < ???:alloc::vec::Vec<T,A>::into_boxed_slice (2x) [/tmp/litchi-goal-0523/normal]
+       25  *  ???:__rustc::__rust_realloc [/tmp/litchi-goal-0523/normal]
+   10,066  >   ???:__rustc::__rdl_realloc (3,701x) [/tmp/litchi-goal-0523/normal]
+
+       25  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       25  *  ???:litchi_xls::records::scan_shared_string_records [/tmp/litchi-goal-0523/normal]
+
+       23  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+       23  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>> [/tmp/litchi-goal-0523/normal]
+
+       36  < ???:litchi_xls::records::Encoding::from_codepage (8x) [/tmp/litchi-goal-0523/normal]
+       22  *  ???:litchi_codepage::Mbcs::require [/tmp/litchi-goal-0523/normal]
+       14  >   ???:litchi_codepage::Page::new (8x) [/tmp/litchi-goal-0523/normal]
+
+       19  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/tmp/litchi-goal-0523/normal]
+       19  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>> [/tmp/litchi-goal-0523/normal]
+
+      126  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       19  *  ???:litchi_xls::workbook::source::SourceInner::ensure_current [/tmp/litchi-goal-0523/normal]
+      107  >   ???:litchi_xls::workbook::source::ensure_current_parts (1x) [/tmp/litchi-goal-0523/normal]
+
+    1,732  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       18  *  ???:litchi_cfb::shared::SharedOleFile::stream_len [/tmp/litchi-goal-0523/normal]
+    1,714  >   ???:litchi_cfb::shared::SharedOleFile::find_entry (1x) [/tmp/litchi-goal-0523/normal]
+
+       17  < ???:alloc::sync::Arc<T,A>::from_box_in (1x) [/tmp/litchi-goal-0523/normal]
+       17  *  ???:alloc::sync::arcinner_layout_for_value_layout [/tmp/litchi-goal-0523/normal]
+
+       14  < ???:litchi_xls::records::BofRecord::parse (5x) [/tmp/litchi-goal-0523/normal]
+       14  *  ???:core::ptr::drop_in_place<litchi_xls::error::Error> [/tmp/litchi-goal-0523/normal]
+
+       14  < ???:litchi_codepage::Mbcs::require (8x) [/tmp/litchi-goal-0523/normal]
+       14  *  ???:litchi_codepage::Page::new [/tmp/litchi-goal-0523/normal]
+
+       21  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_shared_ole_file_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+       13  *  ???:std::thread::local::LocalKey<T>::with [/tmp/litchi-goal-0523/normal]
+        8  >   ???:core::ops::function::FnOnce::call_once (1x) [/tmp/litchi-goal-0523/normal]
+
+        8  < ???:std::thread::local::LocalKey<T>::with (1x) [/tmp/litchi-goal-0523/normal]
+        8  *  ???:core::ops::function::FnOnce::call_once [/tmp/litchi-goal-0523/normal]
+
+2,686,928  < ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+        7  *  ???:litchi_cfb::shared::SharedOleFile::open_with_limits [/tmp/litchi-goal-0523/normal]
+2,686,921  >   ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+
+        4  < ???:litchi_cfb::shared::SharedOleFile::open_source_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+        4  *  ???:<litchi_core::source::OwnedSource as litchi_core::source::ReadAt>::len [/tmp/litchi-goal-0523/normal]
+
+        .  *  ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at [/tmp/litchi-goal-0523/normal]
+2,793,660  >   ???:litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits (1x) [/tmp/litchi-goal-0523/normal]
+

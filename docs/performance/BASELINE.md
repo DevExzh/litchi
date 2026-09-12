@@ -1,5 +1,15 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0523: current direct-CFB and XLS source-open baseline
+
+[0523](changes/0523-cfb-open-allocation-attribution.md) retains 24,000 native
+samples and 720 separate operation allocation samples. Direct CFB p50 spans
+2.260–2.270 µs for tiny, 135.560–136.070 µs for many-small and
+101.920–102.470 µs for few-large; allocation calls are respectively 32, 544
+and 29. `xls_owned_source_open_one_cell` p50 is 130.495–131.086 µs with 126
+allocation calls. Seven same-build timing variations remain. This harness-only
+baseline is not a matched speedup comparison with historical 0511.
+
 ## 0522: complete a mixed XLSX scanner ABBA comparison
 
 [0522](changes/0522-xlsx-cell-reference-guard.md) retains 1,640 native

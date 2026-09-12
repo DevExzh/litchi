@@ -54589,17 +54589,33 @@ fn run_cfb_open(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let expected_file_size = u64::try_from(corpus.archive.len())?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
         let duration = started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
         if ole.file_size() != expected_file_size {
             return Err("CFB open file size differs from generated corpus manifest".into());
         }
         std::hint::black_box(&ole);
+        if iteration >= warmup_iterations {
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_ns(duration)?,
+                process_metrics: None,
+                allocation_metrics,
+            });
+        }
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
-    Ok(result(Case::CfbOpen, corpus, elapsed, None))
+    let mut output = result(Case::CfbOpen, corpus, elapsed, None);
+    output.operation_metrics =
+        Some(operation_metrics::from_in_process_observations_without_sink(&observations)?);
+    Ok(output)
 }
 
 fn run_cfb_list_streams(
@@ -65901,6 +65917,52 @@ mod tests {
             ) {
                 assert_eq!(measured.source.as_ref().unwrap().read_calls.len(), 1);
             }
+        }
+    }
+
+    #[test]
+    fn cfb_open_operation_metrics_align_and_report_unavailable_allocator() {
+        // The ordinary test binary does not install the allocator wrapper.
+        // Hold the same lock as allocator-target tests while proving that the
+        // harness publishes unavailable rather than measured zero.
+        let _allocation_test_lock = super::allocation_metrics::TEST_LOCK.lock().unwrap();
+        for shape in [CorpusShape::Tiny, CorpusShape::FewLarge] {
+            let corpus = build_cfb_corpus(shape, PayloadKind::Incompressible).unwrap();
+            let measured = run_case(Case::CfbOpen, &corpus, 1, 3).unwrap();
+
+            assert_eq!(measured.case, Case::CfbOpen.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), 3);
+            let operation = measured
+                .operation_metrics
+                .as_ref()
+                .expect("CFB open publishes operation metrics");
+            assert_eq!(operation.sample_count, 3);
+            assert_eq!(operation.sample_indices, measured.elapsed_ns.sample_order);
+            let allocation = operation
+                .allocation
+                .as_ref()
+                .expect("CFB open publishes allocator status");
+            assert_eq!(allocation.status, MetricStatus::Unavailable);
+            assert_eq!(
+                allocation.scope,
+                super::allocation_metrics::Scope::OperationGlobalSystemAllocator
+            );
+            assert!(allocation.allocation_calls.values.is_none());
+            assert!(allocation.allocated_bytes.values.is_none());
+            assert!(allocation.region_peak_live_bytes.values.is_none());
+            assert_eq!(operation.source.status, MetricStatus::NotApplicable);
+            assert!(operation.source.logical_read_calls.values.is_none());
+
+            let mut reopened =
+                litchi_cfb::OleFile::open(std::io::Cursor::new(corpus.archive.as_slice())).unwrap();
+            assert_eq!(reopened.file_size(), corpus.archive.len() as u64);
+            assert_eq!(reopened.list_streams().len(), corpus.manifest.entry_count);
+            assert_eq!(
+                reopened
+                    .open_stream(&[corpus.target_name.as_str()])
+                    .unwrap(),
+                corpus.target_payload
+            );
         }
     }
 

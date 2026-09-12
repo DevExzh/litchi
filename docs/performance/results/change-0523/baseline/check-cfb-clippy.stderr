@@ -1,0 +1,22 @@
+    Checking hybrid-array v0.4.14
+    Checking serde_core v1.0.229
+    Checking block-buffer v0.12.1
+    Checking crypto-common v0.2.2
+    Checking libc v0.2.189
+    Checking digest v0.11.3
+    Checking getrandom v0.4.3
+    Checking num-traits v0.2.19
+    Checking serde v1.0.229
+    Checking memchr v2.8.3
+    Checking chrono v0.4.45
+    Checking serde_json v1.0.149
+    Checking thiserror v2.0.18
+    Checking rand v0.10.2
+    Checking zerocopy v0.8.56
+    Checking sha2 v0.11.0
+    Checking either v1.18.0
+    Checking smallvec v1.16.0
+    Checking rayon v1.12.0
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.07s

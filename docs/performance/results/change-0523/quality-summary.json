@@ -1,0 +1,58 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "c78a84dd31a2b8a41b782a2038058e295392d451c887e1ff2a00752ad6a3bf06",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-cfb-clippy.receipt.json",
+      "receipt_sha256": "63fce23748f412e4074e41e5afd4c64cfd51dfb3fec2f93545d67790ffb826ba",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-cfb-no-default-tests.receipt.json",
+      "receipt_sha256": "efbdeb7f3a46993c6fc9c2704c551cae734a355105428e1049064b0712ce45d0",
+      "executed_tests": 305
+    },
+    {
+      "name": "check-cfb-tests.receipt.json",
+      "receipt_sha256": "f93197ce58bb8dc96e5296bc13e3d2f67b736ad56ba367dc4d04f3314a3133e2",
+      "executed_tests": 305
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "d62c4f7eebee3b11c13a9c7e4df69f7613c804172a497c5eec9fa11b99ded1d6",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "72894f6b47de5e27ac762cda84f0ae28dfda58bab2b1009d58e4e439cd1d2ba1",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "de0c5c5916e876bc3b85643933ebcbafecfc7d1427d7232a7dd7ec63bcc5fccc",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "ac22bc17bbecd305cb4027f906815babb1728d716b4a05b5e62142acd77dbc3a",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-rustdoc.receipt.json",
+      "receipt_sha256": "d61ee309e94e646a3dfa3c789feaf354050b920c2ff1d676ff3aa74fef58b6c1",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "93901959c307d95dad3750be3289d1931776251011f83ff5f95a46577095d727",
+      "executed_tests": 0
+    }
+  ],
+  "executed_tests": 610,
+  "focused_preflight_tests": 1,
+  "total_valid_test_executions": 611
+}

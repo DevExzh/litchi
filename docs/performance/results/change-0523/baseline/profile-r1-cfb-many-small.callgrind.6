@@ -1,0 +1,1840 @@
+# callgrind format
+version: 1
+creator: callgrind-3.26.0
+pid: 1190942
+cmd:  /tmp/litchi-goal-0523/normal --case cfb_open --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0523/baseline/profile-r1-cfb-many-small.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0523/baseline/profile-r1-cfb-many-small.catalog.json --shape many-small --payload incompressible
+part: 6
+
+
+desc: I1 cache: 
+desc: D1 cache: 
+desc: LL cache: 
+
+desc: Timerange: Basic block 8907507 - 9638278
+desc: Trigger: --dump-after=litchi_cfb::file::OleFile<R>::open
+
+positions: line
+events: Ir
+summary: 2806360
+
+
+ob=(1) /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+fl=(1) ???
+fn=(0) 0x0000000000023cc0
+cob=(7) /tmp/litchi-goal-0523/normal
+cfi=(165) ???
+cfn=(574) (below main)
+calls=0 0 
+0 2806360
+
+ob=(2) /usr/lib/x86_64-linux-gnu/libc.so.6
+fl=(155) ./malloc/./malloc/malloc.c
+fn=(758) free
+3319 273
++3 546
++15 546
+-4 819
++8 819
++6 813
++6 271
+-3 542
++3 271
+-3 271
++1 542
++2 813
+3007 29
++8 29
+-12 29
++4 87
++1 29
++7 29
+3354 29
++10 726
+-34 244
++40 488
+fi=(154) ./malloc/./malloc/arena.c
+151 732
+fe=(155)
+3374 732
+cfn=(750) _int_free_chunk
+calls=490 4351 
+* 34135
+
+fn=(648) __libc_malloc2
+3247 2886
++4 962
++28 2405
+-26 1443
+cfn=(650) _int_malloc
+calls=481 3790 
+* 66284
++1 2405
+fi=(154)
+151 962
+fe=(155)
+
+fn=(748) _int_realloc
+4559 28
++11 84
++8 14
++2 7
++1 21
++1 28
++4 14
++14 3
++53 6
+-53 6
++57 3
+-57 3
++57 6
+-2 6
++2 2
++1 1
++16 1
++1 4
+-1 2
++1 24
+-79 14
++12 14
++12 28
+cfn=(650)
+calls=4 3790 
+* 735
+* 4
++1 8
++3 4
++6 12
++36 2
+-4 2
++3 2
++5 2
+-4 2
+-1 2
++5 2
+-4 2
++4 2
+-1 2
++1 6
+cfn=(750)
+calls=2 4351 
+* 218
+* 2
+-60 4
+-1 8
++5 18
+cfn=(790) unlink_chunk.isra.0
+calls=3 1592 
+* 63
++44 15
+-48 6
++28 4
+fi=(214) ./malloc/../string/bits/string_fortified.h
+29 4
+fe=(155)
+4637 4
+fi=(214)
+29 8
+fe=(155)
+4638 8
+fi=(214)
+29 4
+cob=(3) ???
+cfi=(152) ???
+cfn=(714) 0x0000000007949680
+calls=4 -29 
+* 125
+fe=(155)
+4642 24
+cfn=(750)
+calls=4 4351 
+* 490
++2 8
+
+fn=(750)
+4351 1000
++8 250
+-3 250
++3 250
+-3 500
++6 500
++6 250
+cfn=(752) _int_free_merge_chunk
+calls=496 +39 
+* 30593
++5 500
++27 750
+
+fn=(752)
+4407 2000
++7 1250
+-6 250
++9 750
++5 750
++4 500
+-1 500
++1 500
+1895 750
+4433 500
++2 216
++2 216
++1 864
++2 216
+-4 216
++4 216
+cfn=(790)
+calls=337 1592 
+* 4422
++18 500
++6 500
++4 245
++4 500
++9 112
+-1 112
++2 224
++2 336
++7 276
++1 552
++1 138
++2 276
++3 828
++4 138
+-1 138
++2 138
++1 138
++2 414
++1 138
+-61 138
+-1 276
++1 828
+-1 138
+cfn=(754) _int_free_maybe_trim
+calls=316 +83 
+* 3312
++57 112
+-1 112
++2 112
++1 112
++2 336
++1 112
+-61 112
+-1 224
++1 672
+-1 112
+cfn=(754)
+calls=180 +83 
+* 2698
++20 5
++1 5
+-1 5
+cfn=(790)
+calls=130 1592 
+* 98
++1 5
+-49 1250
+
+fn=(754)
+4528 2750
++3 500
++2 4
++3 6
++14 2750
+
+fn=(646) malloc
+3283 537
+1269 1074
++19 537
+3287 537
+1288 1610
+3287 1072
++2 1587
++2 1058
++2 3180
+3030 112
++4 224
++4 56
++1 56
+3294 56
+-7 2
++19 481
+cfn=(648)
+calls=481 -59 
+* 77347
+-17 2
+
+fn=(650)
+3790 4365
++32 970
+1288 2910
+3831 970
++16 970
++54 35
++18 483
+-1 483
++12 966
+-11 966
+-1 1449
++12 966
+-6 469
++5 469
+-7 469
++2 938
++9 938
++3 938
+-3 16
++3 16
++1 1431
+-3 477
++5 477
++1 1908
++2 1908
+-10 477
++12 954
++1 954
++2 954
++11 1878
++29 18
++1 18
++4 36
++31 36
++8 72
++1 2
++1 2
+-1 2
++4 4
+-4 14
++1 14
+-1 14
++4 28
++5 4
+-2 1
++3 2
++6 3
++3 3
++2 2
++33 2
++9 1
+-9 4
++1 1
++1 1
++1 1
++1 1
++6 2
+-10 58
++9 29
+-9 116
++1 29
++1 29
++1 29
++1 29
++6 58
+3053 8
+-27 8
++27 8
+-27 8
++4 16
++4 32
++4 8
++1 8
+4113 8
+3850 478
++2 478
+-2 478
++2 956
++2 2
++1 4
++2 2
++1 2
++1 2
++2 8
++6 6
++1 4
+2919 4
+3872 6
++4 43
++1 22
++2 18
++2 9
++1 9
++1 18
++2 9
+2999 9
++16 9
+3886 9
+3003 18
++4 36
++1 9
++7 9
++32 13
+1888 2
+3893 2
+1888 4
+4340 4365
+3901 541
+-52 2868
+4105 90
+3930 114
+4111 120
++13 36
+-2 72
++2 14
++3 7
+-3 7
++3 14
+4277 20
++3 80
++2 30
++1 10
+1888 10
+4286 10
+1888 20
+4280 160
++2 60
++1 20
+1888 20
+4286 20
+1888 46
+4286 6
+1888 12
+3994 8
++1 8
+-1 8
++1 16
+2919 16
+3998 24
++4 16
++1 24
+3003 8
+3981 8
+3015 8
+4006 8
+3003 8
++4 32
++1 8
++7 8
+4007 8
++24 102
++52 15
+-51 15
++51 45
+3959 924
++2 459
+-1 918
++27 20
++1 20
++4 40
++31 60
++2 24
++1 36
++1 12
+-1 12
++1 12
+-2 4
++1 6
++1 2
+-1 2
++1 7
++4 93
+4195 36
++1 36
++1 36
+-1 36
++1 36
++1 72
++1 108
++5 270
++16 297
++2 594
+-4 768
++8 87
++3 174
++2 102
++1 51
++1 51
+-2 51
+-27 51
++4 27
++3 36
+-3 12
++3 16
+-3 9
++3 12
+-3 9
++5 36
++1 18
++24 72
++3 72
++2 36
++3 72
+-3 144
++3 36
+cfn=(790)
+calls=36 1592 
+* 828
++3 216
++15 30
++1 60
++3 30
+-9 30
++9 60
++1 30
++1 30
++3 60
++1 23
++1 70
+-23 6
+-1 6
++1 12
+3965 439
++3 439
+-4 878
++3 439
+-1 439
++1 878
++1 878
++1 878
++2 672
++4 336
++6 336
+-6 2352
++2 1008
++5 336
+-4 336
++4 672
+cfn=(658) alloc_perturb
+calls=336 1887 
+* 1680
+-7 103
++6 103
+-6 721
++2 309
++5 103
+-4 103
++4 206
+cfn=(658)
+calls=103 1887 
+* 515
++1 439
+
+fn=(790)
+1592 260
++2 780
+-2 260
++2 520
++3 260
++3 520
+-2 260
++2 520
++3 260
++1 260
++1 883
++2 24
++1 36
++3 24
++14 12
++1 12
++3 520
+
+fn=(744) realloc
+3380 14
++7 14
+-7 63
++11 14
+4837 7
++1 7
+-1 7
++1 7
+-1 14
++2 21
+3425 7
+-22 7
++22 35
++4 14
+1288 42
+3436 14
+fi=(154)
+151 21
+fe=(155)
+3469 14
+4840 7
+3411 14
++90 63
+-30 28
+cfn=(748)
+calls=7 4559 
+* 2121
+* 7
++1 35
+fi=(154)
+151 21
+fe=(155)
+3472 14
+
+fn=(658)
+1887 439
++1 1317
++2 439
+
+fl=(203) ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+fn=(716) __memcpy_avx_unaligned_erms
+255 14934
++1 14934
++6 14934
++1 14934
++2 1601
++1 1601
++1 1601
++3 1
++1 1
++1 1
++3 2
++30 13333
++1 13333
++2 13333
++1 13333
++2 13332
++4 13332
++1 13332
++1 13332
++1 6666
++1 6666
++1 6666
++1 6666
++2 6666
++2 13332
++39 1
++1 1
++1 1
++1 1
++1 1
++7 1
++1 1
++1 1
++1 1
++1 1
++1 1
++1 2
++5 1600
++1 1600
++5 1599
++1 1599
++2 1559
++1 1559
++1 1559
++2 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 1558
++1 3116
++4 40
++1 40
++4 40
++2 40
++4 40
++1 40
++11 40
++3 40
++2 40
++2 40
++4 40
++1 40
++9 35
++1 35
++2 35
++2 35
++1 35
++1 35
++3 35
++2 35
++2 35
++2 70
++6 35
++1 35
++1 35
++1 35
++1 35
++1 35
++1 35
++1 35
++1 35
++1 35
++1 35
++1 35
+-11 67
++1 67
++1 67
++1 67
++1 67
++1 67
++1 67
++1 67
++1 67
++1 67
++1 67
++1 67
++2 35
++1 35
++1 35
++1 35
++2 35
++4 70
++13 5
++1 5
++2 5
++1 5
++1 5
++2 5
++2 5
++2 10
++6 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 5
++1 5
+-11 10
++1 10
++1 10
++1 10
++1 10
++1 10
++1 10
++1 10
++1 10
++1 10
++1 10
++1 10
++2 5
++1 5
++1 5
++1 5
++2 5
++1 10
++9 1
++7 1
++1 1
++6 1
++3 1
++2 1
++3 1
++1 1
++2 1
++2 33233
++2 1
++2 1
++2 2
++5 1
++1 1
++4 1
++2 1
++3 1
++4 1
++1 1
++4 1
++4 1
+
+fl=(168) ./csu/../sysdeps/nptl/libc_start_call_main.h
+fn=(598) (below main)
+cob=(7)
+cfi=(165)
+cfn=(606) main
+calls=0 0 
+59 2806360
+
+fl=(219) ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+fn=(796) __memset_avx2_unaligned_erms
+198 304
++1 608
++5 304
++1 304
++1 304
++1 304
++1 304
++2 2
++1 2
++1 4
++9 3
++1 3
++2 6
++5 302
++1 302
++6 299
++1 299
++12 299
++3 299
++1 299
++12 296
++1 296
++13 296
++1 296
++2 296
++3 296
++3 296
++3 296
++1 296
++1 296
++1 296
++1 296
++1 296
++1 296
+-6 591
++1 591
++1 591
++1 591
++1 591
++1 591
++1 887
++3 296
++1 296
++1 296
++1 296
++3 592
++15 3
++1 3
++1 3
++1 3
++1 3
++1 41474
++5 3
++2 6
+
+fl=(166) ./csu/../csu/libc-start.c
+fn=(576) __libc_start_main@@GLIBC_2.34
+cfi=(168)
+cfn=(598)
+calls=0 30 
+360 2806360
+
+fl=(233) ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+fn=(900) __memcmp_avx2_movbe
+73 513
++7 513
++1 513
++3 256
++1 256
++1 256
++4 256
++1 256
++2 256
++1 256
+337 256
++1 256
++1 256
++1 256
++1 256
++1 512
++59 257
++1 257
++5 257
++1 257
++1 257
++1 257
++1 257
++3 235
++1 235
++1 235
++1 235
++3 235
++1 235
++1 235
++1 470
++6 22
++1 22
++82 22
++1 22
++1 22
++1 22
++1 22
++4 22
++1 22
++1 22
++1 22
++1 22
++1 22
++2 22
++2 22
+
+ob=(7)
+fl=(165)
+fn=(1120) litchi_cfb::file::read_u32_le
+0 65744
+
+fn=(1140) litchi_cfb::file::OleFile<R>::validated_directory_entries
+0 34
+cfn=(990) alloc::raw_vec::RawVecInner<A>::finish_grow
+calls=1 0 
+0 358
+0 129494
+cfn=(1142) <u16 as core::slice::cmp::SliceContains>::slice_contains
+calls=257 0 
+0 44622
+0 2056
+cfn=(1144) <alloc::string::String>::from_utf16
+calls=257 0 
+0 237456
+0 2570
+cfn=(1042) litchi_cfb::directory_name::directory_name_data
+calls=257 0 
+0 1077435
+0 14649
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=257 73 
+0 4371
+0 1285
+cfn=(1146) <litchi_cfb::file::DirectoryNodeColor as core::convert::TryFrom<u8>>::try_from
+calls=257 0 
+0 4080
+0 5911
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=257 255 
+0 7710
+0 8224
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=257 255 
+0 7710
+0 33
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=3 255 
+0 90
+0 3380
+cfn=(1148) litchi_cfb::file::try_push
+calls=260 0 
+0 14820
+0 1845
+cfn=(1150) litchi_cfb::file::CheckedBitSet::try_with_capacity
+calls=1 0 
+0 388
+0 15
+cfn=(1152) litchi_cfb::file::CheckedBitSet::insert
+calls=1 0 
+0 20
+0 4
+cfn=(844) __rustc::__rust_dealloc
+calls=1 0 
+0 35
+0 8
+cfn=(990)
+calls=1 0 
+0 77
+0 12
+cfn=(1148)
+calls=1 0 
+0 23
+0 14
+cfn=(1128) litchi_cfb::file::try_vec_with_capacity
+calls=1 0 
+0 423
+0 20
+cfn=(1148)
+calls=1 0 
+0 26
+0 11031
+cfn=(1154) litchi_cfb::file::OleFile<R>::validated_entry
+calls=256 0 
+0 4352
+0 4608
+cfn=(1152)
+calls=256 0 
+0 5120
+0 2269
+cfn=(1154)
+calls=249 0 
+0 4233
+0 1743
+cfn=(1156) litchi_cfb::directory_name::DirectoryNameData::compare
+calls=249 0 
+0 39603
+0 1072
+cfn=(1154)
+calls=6 0 
+0 102
+0 1180
+cfn=(1154)
+calls=236 0 
+0 4012
+0 1694
+cfn=(1156)
+calls=242 0 
+0 38674
+0 5562
+cfn=(1148)
+calls=256 0 
+0 6656
+0 3584
+cfn=(1148)
+calls=256 0 
+0 7394
+0 263
+cfn=(844)
+calls=1 0 
+0 35
+0 4416
+cfn=(844)
+calls=1 0 
+0 35
+0 6
+
+fn=(1142)
+0 44622
+
+fn=(1162) litchi_cfb::file::decode_utf16le
+0 4626
+cfn=(904) <alloc::string::String>::try_reserve
+calls=257 0 
+0 63372
+0 208718
+
+fn=(1176) <T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec
+0 29
+
+fn=(1178) litchi_cfb::file::OleFile<R>::build_storage_tree_iterative
+0 30
+cfn=(990)
+calls=1 0 
+0 81
+0 14
+cfn=(1150)
+calls=1 0 
+0 460
+0 6927
+cfn=(1152)
+calls=256 0 
+0 5120
+0 5120
+cfn=(1160) litchi_cfb::file::OleFile<R>::parse_directory_entry
+calls=256 0 
+0 317211
+0 15745
+cfn=(844)
+calls=1 0 
+0 35
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 1
+
+fn=(1188) litchi_cfb::file::collect_sector_chain_exact
+0 74
+cfn=(990)
+calls=2 0 
+0 433
+0 30
+cfn=(990)
+calls=2 0 
+0 162
+0 28
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=2 198 
+0 38
+0 17434
+cfn=(844)
+calls=2 0 
+0 70
+0 2
+
+fn=(844)
+0 273
+cfn=(846) __rustc::__rdl_dealloc
+calls=537 0 
+0 44117
+
+fn=(830) __rustc::__rust_alloc
+0 537
+cfn=(832) __rustc::__rdl_alloc
+calls=537 0 
+0 94361
+
+fn=(1128)
+0 29
+cfn=(990)
+calls=1 0 
+0 740
+0 18
+cfn=(990)
+calls=1 0 
+0 398
+0 13
+
+fn=(1146)
+0 4080
+
+fn=(1158) alloc::vec::Vec<T,A>::resize
+0 6054
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1 255 
+0 30
+0 7795
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1 255 
+0 30
+0 10
+
+fn=(1186) litchi_cfb::file::OleFile<R>::load_minifat
+0 20
+cfn=(1188)
+calls=1 0 
+0 1320
+0 26
+cfn=(1126) litchi_cfb::file::OleFile<R>::claim_sector
+calls=1 0 
+0 15
+0 217
+cfn=(1126)
+calls=31 0 
+0 465
+0 209
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=1 198 
+0 4115
+0 19
+cfn=(1130) litchi_cfb::file::OleFile<R>::read_sector_into
+calls=1 0 
+0 189
+0 186
+cfn=(1130)
+calls=31 0 
+0 5851
+0 416
+cfn=(1120)
+calls=32 0 
+0 512
+0 24384
+cfn=(1120)
+calls=4064 0 
+0 65024
+0 57576
+cfn=(844)
+calls=1 0 
+0 35
+0 31
+cfn=(990)
+calls=1 0 
+0 618
+0 7
+
+fn=(1046) core::unicode::unicode_data::conversions::to_upper
+0 79992
+
+fn=(1116) litchi_cfb::file::OleFile<R>::open
+0 20
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1 255 
+0 77
+0 9
+cfn=(1118) litchi_cfb::file::read_u16_le
+calls=1 0 
+0 16
+0 11
+cfn=(1118)
+calls=1 0 
+0 16
+0 10
+cfn=(1118)
+calls=1 0 
+0 16
+0 11
+cfn=(1118)
+calls=1 0 
+0 16
+0 12
+cfn=(1120)
+calls=1 0 
+0 16
+0 12
+cfn=(1120)
+calls=1 0 
+0 16
+0 11
+cfn=(1120)
+calls=1 0 
+0 16
+0 11
+cfn=(1120)
+calls=1 0 
+0 16
+0 12
+cfn=(1120)
+calls=1 0 
+0 16
+0 11
+cfn=(1120)
+calls=1 0 
+0 16
+0 11
+cfn=(1120)
+calls=1 0 
+0 16
+0 11
+cfn=(1120)
+calls=1 0 
+0 16
+0 68
+cfn=(1122) litchi_cfb::file::try_filled_vec
+calls=1 0 
+0 172
+0 42
+cfn=(1124) litchi_cfb::file::OleFile<R>::load_fat
+calls=1 0 
+0 7217
+0 7
+cfn=(1132) litchi_cfb::file::OleFile<R>::load_directory
+calls=1 0 
+0 2249529
+0 9
+cfn=(1186)
+calls=1 0 
+0 161235
+0 5
+cfn=(1190) litchi_cfb::file::OleFile<R>::validate_stream_allocations
+calls=1 0 
+0 380194
+0 5
+cfn=(1194) litchi_cfb::file::OleFile<R>::validate_physical_sector_layout
+calls=1 0 
+0 7382
+0 6
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1 255 
+0 65
+0 3
+
+fn=(1132)
+0 20
+cfn=(1134) litchi_cfb::file::collect_directory_sector_chain
+calls=1 0 
+0 5859
+0 10
+cfn=(1136) litchi_cfb::file::checked_directory_data_len
+calls=1 0 
+0 7
+0 13
+cfn=(844)
+calls=1 0 
+0 177
+0 28
+cfn=(1126)
+calls=1 0 
+0 15
+0 448
+cfn=(1126)
+calls=64 0 
+0 960
+0 401
+cfn=(1138) litchi_cfb::file::OleFile<R>::read_sectors_batched
+calls=1 0 
+0 34200
+0 10
+cfn=(1140)
+calls=1 0 
+0 1716842
+0 21
+cfn=(1122)
+calls=1 0 
+0 6436
+0 29
+cfn=(1160)
+calls=1 0 
+0 625
+0 17
+cfn=(990)
+calls=1 0 
+0 364
+0 13
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=1 198 
+0 33298
+0 26
+cfn=(1172) <litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone
+calls=1 0 
+0 196
+0 46
+cfn=(1178)
+calls=1 0 
+0 350786
+0 22
+cfn=(1122)
+calls=1 0 
+0 8343
+0 3432
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=260 255 
+0 7800
+0 1560
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=260 255 
+0 7800
+0 4634
+cob=(2)
+cfi=(233)
+cfn=(900)
+calls=256 73 
+0 4996
+0 517
+cfn=(1180) core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>
+calls=1 0 
+0 5
+0 768
+cfn=(1180)
+calls=256 0 
+0 1280
+0 1028
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=257 255 
+0 7710
+0 1799
+cfn=(844)
+calls=257 0 
+0 43461
+0 3114
+cfn=(844)
+calls=1 0 
+0 166
+0 10
+cfn=(954) <alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop
+calls=1 0 
+0 157
+0 23
+cfn=(1182) core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>>
+calls=1 0 
+0 23
+0 6
+cfn=(1184) core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>>
+calls=1 0 
+0 19
+0 9
+
+fn=(1156)
+0 78277
+
+fn=(1172)
+0 14
+cfn=(1174) <alloc::string::String as core::clone::Clone>::clone
+calls=1 0 
+0 87
+0 8
+cfn=(1174)
+calls=1 0 
+0 21
+0 7
+cfn=(1176)
+calls=1 0 
+0 29
+0 30
+
+fn=(838) std::sys::backtrace::__rust_begin_short_backtrace
+cfn=(840) litchi_perf_baseline::main
+calls=0 0 
+0 2806360
+
+fn=(882) __rustc::__rdl_realloc
+0 154
+cob=(2)
+cfi=(155)
+cfn=(744)
+calls=7 3380 
+0 2632
+
+fn=(1118)
+0 64
+
+fn=(1122)
+0 28
+cfn=(1158)
+calls=1 0 
+0 6036
+0 19
+cfn=(990)
+calls=1 0 
+0 347
+0 30
+cfn=(990)
+calls=1 0 
+0 81
+0 11
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=1 198 
+0 50
+0 25
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1 255 
+0 30
+0 4
+cfn=(1158)
+calls=1 0 
+0 7883
+0 19
+cfn=(990)
+calls=1 0 
+0 383
+0 5
+
+fn=(1144)
+0 3598
+cfn=(828) __rustc::__rust_no_alloc_shim_is_unstable_v2
+calls=257 0 
+0 257
+0 771
+cfn=(830)
+calls=257 0 
+0 45909
+0 186921
+
+fn=(1182)
+0 23
+
+fn=(1190)
+0 36
+cfn=(1188)
+calls=1 0 
+0 16951
+0 27
+cfn=(1126)
+calls=1 0 
+0 15
+0 3066
+cfn=(1126)
+calls=511 0 
+0 7665
+0 3097
+cfn=(1150)
+calls=1 0 
+0 180
+0 8257
+cfn=(1192) litchi_cfb::file::SectorChainScratch::collect_exact
+calls=256 0 
+0 165909
+0 72192
+cfn=(1152)
+calls=4096 0 
+0 81920
+0 20752
+cfn=(844)
+calls=1 0 
+0 35
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 7
+cfn=(844)
+calls=1 0 
+0 35
+0 8
+
+fn=(848) litchi_perf_baseline::run
+cfn=(1244) litchi_perf_baseline::run_case_with_config
+calls=0 0 
+0 2806360
+
+fn=(1048) <core::char::ToUppercase as core::iter::traits::iterator::Iterator>::next
+0 86658
+
+fn=(1026) <smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend
+0 107459
+
+fn=(1124)
+0 51
+cfn=(1120)
+calls=1 0 
+0 16
+0 24
+cfn=(1120)
+calls=4 0 
+0 64
+0 65
+cfn=(1126)
+calls=5 0 
+0 75
+0 66
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=1 198 
+0 4115
+0 28
+cfn=(1128)
+calls=1 0 
+0 775
+0 74
+cfn=(1130)
+calls=5 0 
+0 943
+0 713
+cfn=(990)
+calls=1 0 
+0 81
+0 65
+cfn=(844)
+calls=1 0 
+0 35
+0 27
+
+fn=(1148)
+0 13366
+cfn=(990)
+calls=2 0 
+0 690
+0 4440
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=260 255 
+0 7800
+0 2623
+
+fn=(1152)
+0 92180
+
+fn=(1160)
+0 15420
+cfn=(1162)
+calls=257 0 
+0 276716
+0 3341
+cfn=(1164) litchi_cfb::file::format_clsid
+calls=257 0 
+0 11822
+0 10537
+
+fn=(606)
+cfn=(608) std::rt::lang_start_internal
+calls=0 0 
+0 2806360
+
+fn=(832)
+0 4833
+cob=(2)
+cfi=(155)
+cfn=(646)
+calls=537 3283 
+0 89528
+
+fn=(608)
+cfn=(836) std::rt::lang_start::{{closure}}
+calls=0 0 
+0 2806360
+
+fn=(836)
+cfn=(838)
+calls=0 0 
+0 2806360
+
+fn=(1130)
+0 1258
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=37 198 
+0 1850
+0 555
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=37 255 
+0 2839
+0 481
+
+fn=(1138)
+0 921
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1 255 
+0 33264
+0 15
+
+fn=(1154)
+0 12699
+
+fn=(1164)
+0 4369
+cfn=(1170) litchi_core::simd::cmp::is_all_zero_avx2
+calls=257 0 
+0 4626
+0 2827
+
+fn=(1170)
+0 4626
+
+fn=(1184)
+0 19
+
+fn=(574)
+cob=(2)
+cfi=(166)
+cfn=(576)
+calls=0 242 
+0 2806360
+
+fn=(878) <alloc::raw_vec::RawVecInner>::finish_grow
+0 4112
+cfn=(828)
+calls=257 0 
+0 257
+0 771
+cfn=(830)
+calls=257 0 
+0 44611
+0 3341
+
+fn=(904)
+0 7196
+cfn=(878)
+calls=257 0 
+0 53092
+0 3084
+
+fn=(1042)
+0 4675
+cfn=(1044) core::slice::memchr::memchr_aligned
+calls=256 0 
+0 23040
+0 74621
+cfn=(1026)
+calls=257 0 
+0 107459
+0 86674
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=6666 255 
+0 86658
+0 26664
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=6666 255 
+0 119988
+0 106656
+cfn=(1046)
+calls=6666 0 
+0 79992
+0 99990
+cfn=(1048)
+calls=6666 0 
+0 53328
+0 19998
+cfn=(1048)
+calls=6666 0 
+0 33330
+0 154362
+
+fn=(1126)
+0 9210
+
+fn=(1134)
+0 3149
+cfn=(990)
+calls=6 0 
+0 2464
+0 73
+cfn=(844)
+calls=1 0 
+0 35
+0 19
+cfn=(990)
+calls=1 0 
+0 81
+0 14
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=1 198 
+0 19
+0 5
+
+fn=(1136)
+0 7
+
+fn=(1192)
+0 8978
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=1 198 
+0 50
+0 18
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=1 198 
+0 50
+0 1275
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=255 198 
+0 12750
+0 142600
+cfn=(990)
+calls=1 0 
+0 81
+0 15
+cfn=(990)
+calls=1 0 
+0 81
+0 11
+
+fn=(990)
+0 285
+cfn=(880) __rustc::__rust_realloc
+calls=2 0 
+0 610
+0 37
+cfn=(828)
+calls=11 0 
+0 11
+0 33
+cfn=(830)
+calls=11 0 
+0 3077
+0 531
+cfn=(880)
+calls=5 0 
+0 2183
+0 43
+cfn=(828)
+calls=11 0 
+0 11
+0 33
+cfn=(830)
+calls=11 0 
+0 1261
+0 198
+
+fn=(828)
+0 537
+
+fn=(954)
+0 26
+cfn=(844)
+calls=1 0 
+0 131
+
+fn=(1150)
+0 114
+cfn=(990)
+calls=3 0 
+0 793
+0 33
+cob=(2)
+cfi=(219)
+cfn=(796)
+calls=3 198 
+0 67
+0 21
+
+fn=(1180)
+0 1285
+
+fn=(1194)
+0 7382
+
+fn=(1244)
+cfn=(1246) litchi_perf_baseline::run_cfb_open
+calls=0 0 
+0 2806360
+
+fn=(1246)
+cfn=(1116)
+calls=1 0 
+0 2806360
+
+fn=(1044)
+0 23040
+
+fn=(840)
+cfn=(848)
+calls=0 0 
+0 2806360
+
+fn=(846)
+0 273
+cob=(2)
+cfi=(155)
+cfn=(758)
+calls=537 3319 
+0 43844
+
+fn=(880)
+0 7
+cfn=(882)
+calls=7 0 
+0 2786
+
+fn=(1174)
+0 22
+cfn=(828)
+calls=1 0 
+0 1
+0 3
+cfn=(830)
+calls=1 0 
+0 40
+0 7
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=1 255 
+0 13
+0 22
+
+ob=(3)
+fl=(152)
+fn=(714)
+0 8
+cob=(2)
+cfi=(203)
+cfn=(716)
+calls=4 255 
+0 117
+
+totals: 2806360
