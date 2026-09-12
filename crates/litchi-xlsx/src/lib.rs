@@ -86,6 +86,7 @@ pub mod drawing;
 pub mod edit;
 mod error;
 pub mod external_links;
+pub mod form_control;
 pub mod formula;
 pub mod header_footer;
 pub mod hyperlinks;
