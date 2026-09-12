@@ -20,10 +20,14 @@ if [[ ! -x /usr/bin/time ]]; then
     exit 2
 fi
 
-HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(cd -- "$HERE/../../../.." && pwd)
+HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+ROOT=$(cd -- "$HERE/../../../.." && pwd -P)
 HARNESS="$HERE/harness/Cargo.toml"
-RESULTS="$HERE/results"
+if [[ -z "${XLSX_SVG_PROFILE_RESULTS:-}" ]]; then
+    echo "set XLSX_SVG_PROFILE_RESULTS to a fresh output directory outside the checkout" >&2
+    exit 2
+fi
+RESULTS=$(realpath -m -- "$XLSX_SVG_PROFILE_RESULTS")
 TARGET_INPUT=${CARGO_TARGET_DIR:-/var/tmp/litchi-xlsx-svg-lifecycle-profile-target}
 if [[ "$TARGET_INPUT" = /* ]]; then
     TARGET=$(realpath -m -- "$TARGET_INPUT")
@@ -31,6 +35,8 @@ else
     TARGET=$(realpath -m -- "$PWD/$TARGET_INPUT")
 fi
 MANIFEST_TOOL="$HERE/source_manifest.py"
+PROFILE_PINS="$HERE/profile_pins.py"
+COMMITTED_INPUTS="$HERE/committed_inputs.py"
 LANES=(
     capture_native_fixture
     capture_raster_two_cell_small capture_raster_two_cell_large
@@ -66,6 +72,10 @@ LANES=(
     detach_end_to_end_distinct_one_cell_large
     detach_end_to_end_distinct_absolute_small
     detach_end_to_end_distinct_absolute_large
+    same_picture_attach_detach_two_cell
+    same_picture_attach_detach_one_cell
+    same_picture_attach_detach_absolute
+    multisheet_attach_detach
     noop_detach_two_cell noop_detach_one_cell noop_detach_absolute
     limit_small limit_large
     mixed_caps_rejection
@@ -88,39 +98,46 @@ if [[ "$PROCESSES" -ne 3 || "$WARMUP" -lt 2 || "$SAMPLES" -lt 20 ]]; then
     echo "acceptance requires 3 processes, at least 2 warmups, and at least 20 samples" >&2
     exit 2
 fi
-if [[ "$TARGET" == "/" || "$TARGET" == "$ROOT" || "$TARGET" == "$ROOT/target" || "$TARGET" == "$HERE" ]]; then
-    echo "refusing unsafe Cargo target path: $TARGET" >&2
+# Keep retained evidence disjoint from both source and disposable build output.
+if [[ "$RESULTS" == "$ROOT" || "$RESULTS" == "$ROOT/"* || "$ROOT" == "$RESULTS/"* ]]; then
+    echo "profile results must be outside the checkout: $RESULTS" >&2
     exit 2
+fi
+if [[ "$TARGET" == "$ROOT" || "$TARGET" == "$ROOT/"* || "$ROOT" == "$TARGET/"* || "$TARGET" == "/" ]]; then
+    echo "Cargo target must be outside the checkout: $TARGET" >&2
+    exit 2
+fi
+if [[ "$RESULTS" == "/" || "$RESULTS" == "$TARGET" || "$RESULTS" == "$TARGET/"* || "$TARGET" == "$RESULTS/"* ]]; then
+    echo "profile results and Cargo target must be disjoint: $RESULTS / $TARGET" >&2
+    exit 2
+fi
+if [[ -e "$RESULTS" || -L "$RESULTS" || -L "$XLSX_SVG_PROFILE_RESULTS" ]]; then
+    echo "refusing existing profile output; choose a fresh directory: $RESULTS" >&2
+    exit 2
+fi
+if [[ -e "$TARGET" || -L "$TARGET" ]]; then
+    if [[ "${ALLOW_EXISTING_TARGET:-}" != "1" || ! -d "$TARGET" ]]; then
+        echo "refusing to reuse an existing target; choose a fresh target or set ALLOW_EXISTING_TARGET=1" >&2
+        exit 2
+    fi
 fi
 
 TARGET_CREATED=0
-if [[ -e "$TARGET" && "${ALLOW_EXISTING_TARGET:-}" != "1" ]]; then
-    echo "refusing to reuse an existing target; remove it or set ALLOW_EXISTING_TARGET=1" >&2
-    exit 2
-fi
-if [[ ! -e "$TARGET" ]]; then
-    TARGET_CREATED=1
-fi
 cleanup_target() {
     if [[ "$TARGET_CREATED" == "1" ]]; then
-        rm -rf -- "$TARGET"
+        find "$TARGET" -depth -delete
     fi
 }
 trap cleanup_target EXIT
 
-mkdir -p "$RESULTS" "$TARGET"
-# Remove only this runner's acceptance outputs. Historical exploratory
-# receipts and review records in the same directory are not disposable.
-for lane in "${LANES[@]}"; do
-    rm -f "$RESULTS/${lane}"-p[0-9]*.json \
-        "$RESULTS/${lane}"-p[0-9]*.time.txt \
-        "$RESULTS/${lane}"-p[0-9]*.stderr.log
-done
-rm -f "$RESULTS"/metadata-before.json "$RESULTS"/metadata-after.json \
-    "$RESULTS"/build.log "$RESULTS"/commands.txt \
-    "$RESULTS"/source-manifest-before.txt "$RESULTS"/source-manifest-after.txt \
-    "$RESULTS"/source-provenance.txt "$RESULTS"/binary.sha256 "$RESULTS"/binary-after.sha256 \
-    "$RESULTS"/build-provenance.txt "$HERE/report.md" "$HERE/verification.json"
+# mkdir without -p atomically refuses an output directory created after preflight.
+# Failed-run diagnostics are retained here; no prior receipt is ever removed.
+mkdir -p -- "$(dirname -- "$RESULTS")" "$(dirname -- "$TARGET")"
+mkdir -- "$RESULTS"
+if [[ ! -e "$TARGET" ]]; then
+    mkdir -- "$TARGET"
+    TARGET_CREATED=1
+fi
 
 unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP
 export CARGO_TARGET_DIR="$TARGET"
@@ -129,17 +146,40 @@ export LC_ALL=C
 
 cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS" \
     >"$RESULTS/metadata-before.json"
+CURRENT_COMMIT=$(git -C "$ROOT" rev-parse HEAD)
+SOURCE_PIN=$(python3 "$PROFILE_PINS" | sed -n 's/^source_pin=//p')
+if [[ -z "$SOURCE_PIN" ]]; then
+    echo "profile source pin manifest did not produce a source pin" >&2
+    exit 1
+fi
+if [[ -n "${XLSX_SVG_PROFILE_SOURCE_PIN:-}" && "$XLSX_SVG_PROFILE_SOURCE_PIN" != "$SOURCE_PIN" ]]; then
+    echo "requested XLSX SVG source pin differs from the approved profile pin" >&2
+    exit 2
+fi
+if ! git -C "$ROOT" merge-base --is-ancestor "$SOURCE_PIN" "$CURRENT_COMMIT"; then
+    echo "refusing profile without the approved XLSX SVG source commit in history: $SOURCE_PIN" >&2
+    exit 2
+fi
+mapfile -t PINNED_SOURCES < <(python3 "$PROFILE_PINS" --paths)
+guard_args=(--root "$ROOT" --commit "$SOURCE_PIN")
+for source in "${PINNED_SOURCES[@]}"; do
+    guard_args+=(--path "$source")
+done
+python3 "$COMMITTED_INPUTS" "${guard_args[@]}"
 python3 "$MANIFEST_TOOL" \
     --metadata "$RESULTS/metadata-before.json" \
     --root "$ROOT" \
     --output "$RESULTS/source-manifest-before.txt" \
     --extra "$ROOT/Cargo.toml" \
-    --extra "$ROOT/Cargo.lock" \
+    --extra "$ROOT/rust-toolchain.toml" \
+    --extra "$ROOT/.cargo/config.toml" \
     --extra "$HARNESS" \
     --extra "$HERE/harness/Cargo.lock" \
     --extra "$HERE/harness/adapter.rs" \
     --extra "$HERE/harness/support.rs" \
     --extra "$MANIFEST_TOOL" \
+    --extra "$PROFILE_PINS" \
+    --extra "$COMMITTED_INPUTS" \
     --extra "$HERE/run_profile.sh" \
     --extra "$HERE/summarize.py" \
     --extra "$HERE/verify.py" \
@@ -149,7 +189,8 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/corpus-manifest.json" \
     --extra "$ROOT/3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx" \
     --extra "$ROOT/docs/GOAL.md" \
-    --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md"
+    --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md" \
+    --git-commit "$CURRENT_COMMIT"
 
 cargo build --release --locked --offline --manifest-path "$HARNESS" \
     >"$RESULTS/build.log" 2>&1
@@ -202,12 +243,15 @@ python3 "$MANIFEST_TOOL" \
     --root "$ROOT" \
     --output "$RESULTS/source-manifest-after.txt" \
     --extra "$ROOT/Cargo.toml" \
-    --extra "$ROOT/Cargo.lock" \
+    --extra "$ROOT/rust-toolchain.toml" \
+    --extra "$ROOT/.cargo/config.toml" \
     --extra "$HARNESS" \
     --extra "$HERE/harness/Cargo.lock" \
     --extra "$HERE/harness/adapter.rs" \
     --extra "$HERE/harness/support.rs" \
     --extra "$MANIFEST_TOOL" \
+    --extra "$PROFILE_PINS" \
+    --extra "$COMMITTED_INPUTS" \
     --extra "$HERE/run_profile.sh" \
     --extra "$HERE/summarize.py" \
     --extra "$HERE/verify.py" \
@@ -217,7 +261,8 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/corpus-manifest.json" \
     --extra "$ROOT/3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx" \
     --extra "$ROOT/docs/GOAL.md" \
-    --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md"
+    --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md" \
+    --git-commit "$CURRENT_COMMIT"
 cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt"
 
 {
@@ -226,7 +271,9 @@ cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt
     printf 'source_manifest_after_sha256='
     sha256sum "$RESULTS/source-manifest-after.txt" | cut -d' ' -f1
     printf 'git_head='
-    git -C "$ROOT" rev-parse HEAD
+    printf '%s\n' "$CURRENT_COMMIT"
+    printf 'approved_source_pin=%s\n' "$SOURCE_PIN"
+    printf '%s\n' 'committed_input_guard=profile_pins.py + committed_inputs.py + source_manifest.py'
     printf '%s\n' 'source_sha256:'
     for path in \
         "$ROOT/crates/litchi-xlsx/src/drawing/mod.rs" \
@@ -239,7 +286,10 @@ cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt
     done
     printf '%s\n' 'harness_sha256:'
     find "$HERE/harness" -type f -print0 | sort -z | xargs -0 sha256sum
+    printf '%s\n' 'guard_sha256:'
+    sha256sum "$PROFILE_PINS" "$COMMITTED_INPUTS" "$MANIFEST_TOOL"
 } >"$RESULTS/source-provenance.txt"
 
-python3 "$HERE/summarize.py" --results "$RESULTS" --output "$HERE/report.md"
-python3 "$HERE/verify.py"
+python3 "$HERE/summarize.py" --results "$RESULTS" --output "$RESULTS/report.md"
+python3 "$HERE/verify.py" --root "$ROOT" --results "$RESULTS" \
+    --report "$RESULTS/report.md" --output "$RESULTS/verification.json"
