@@ -1,0 +1,21 @@
+{
+  "adverse_review_sha256": "539ac4acca222f90cc15c5ad61e6e64052e3cd5338dd55a834c632346e2f24f1",
+  "comparison_sha256": "4190c055763e835c5e5c951c57e9516736ff6943ef44d6baf1bec9fe1aaccc5a",
+  "disposition": "accepted",
+  "eager_adverse_review_sha256": "f6fda922019649156eaa4bb2415ad605ee5581b9e345fb7fe9aab820694dfde3",
+  "eager_comparison_sha256": "7f21a5b5a4c7917901be854fe705fefdc96beaa552c7160e0782382658779822",
+  "eager_confirmation_adverse_review_sha256": "c00e45660cbc28598ea73b85fdc01c8853a4c15f04b75a02fec634c7ef907a49",
+  "eager_confirmation_comparison_sha256": "5b830001574c7ab934cfbc59a60869a3b8d9a6c9fc9d5988c7c720e3b136be9d",
+  "eager_confirmation_gate": true,
+  "final_source": "candidate",
+  "final_source_manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+  "native_primary_gate": true,
+  "observed_utc": "2026-09-12T10:10:55.856591+00:00",
+  "plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "production_change_retained": true,
+  "profile_analysis_sha256": "24ec2d392d2d6e6e35f14240c571ac62fd03d29414be1ecb9b6a916891cb7c12",
+  "profile_gate": true,
+  "quality_summary_sha256": "b1ae71ea7987bd23e52ce5e2ca7edaf2cf6411f5ff360587c55570d9311dacce",
+  "review": "Retain source-bound unchanged-cell readback reuse. Every primary shape/repeat passes >=5% median improvement in total edit/save and commit; every commit profile passes >=15% Ir reduction. All 14 main guard total medians improve, and all 12 source-bound quality gates pass. Review retains 31 main adverse metrics (7 open, 19 publication, 4 reopen, 1 whole-child RSS) and 76 same-build drift flags. Managed dense repeat-2 RSS rises 85648 to 90244 KiB (+5.36615%); this is an accepted measured tradeoff, not a blanket memory improvement. Reopen diagnostics are excluded from measured edit/save total. Original eager dense repeat-2 shifts across its row, including p99 +5.817512%, and remains retained. Fresh four-child confirmation passes both median/mean guards with zero >5% matched or drift flags, supporting retention without a general eager speedup or stability claim. Full emitted XML validation, actual-output parsing, provenance checks and fallback remain required. OLE2/OOXML optimization remains active; ODF deferred and iWork excluded.",
+  "schema": "litchi_0525_decision_v1"
+}

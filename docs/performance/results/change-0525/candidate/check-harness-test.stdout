@@ -1,0 +1,6 @@
+
+running 1 test
+test tests::xlsx_source_cell_values_commit_allocation_metrics_align_with_phases ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 489 filtered out; finished in 6.15s
+

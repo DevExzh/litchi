@@ -1252,6 +1252,10 @@ impl Scanner {
             ));
         }
         let shared_formulas = shared_formula_groups(&self.formulas, &sheet_data)?;
+        let has_shared_formulas = self
+            .formulas
+            .iter()
+            .any(|formula| formula.kind.as_ref() == "shared");
         let mut formula_ranges = Vec::new();
         let mut shared = HashMap::<u32, SelectionRange>::new();
         for formula in &self.formulas {
@@ -1322,6 +1326,7 @@ impl Scanner {
             extended_validation: self.extended_validation,
             formula_ranges: formula_ranges.into_boxed_slice(),
             shared_formulas: shared_formulas.into_boxed_slice(),
+            has_shared_formulas,
             defaults_compatibility: self.defaults_compatibility,
             merge_cells: self.merge_cells,
             merge_insertion,

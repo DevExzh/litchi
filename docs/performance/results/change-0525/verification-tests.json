@@ -1,0 +1,43 @@
+{
+  "schema": "litchi-0525-verifier-negative-probes-v1",
+  "status": "pass",
+  "valid_controls_pass": true,
+  "checks": [
+    {
+      "case": "receipt_source_manifest_mismatch",
+      "rejected": true,
+      "reason": "baseline/build-normal.receipt.json source manifest binding differs"
+    },
+    {
+      "case": "preflight_alias_requires_candidate_manifest",
+      "rejected": true,
+      "reason": "quality check stage is not candidate-equivalent: preflight-1"
+    },
+    {
+      "case": "preflight_failed_receipt_cannot_alias_quality_gate",
+      "rejected": true,
+      "reason": "quality check failed: preflight-1/check-xlsx-tests.receipt.json"
+    },
+    {
+      "case": "native_abba_block_inversion",
+      "rejected": true,
+      "reason": "native receipt blocks differ from frozen ABBA order: [('baseline', 1), ('candidate', 2), ('candidate', 1), ('baseline', 2)]"
+    },
+    {
+      "case": "primary_admission_duplicate_row",
+      "rejected": true,
+      "reason": "baseline primary native matrix differs from plan: [(2, 'dense-sparse')]"
+    },
+    {
+      "case": "cleanup_missing_plan_binding",
+      "rejected": true,
+      "reason": "cleanup receipt plan binding differs"
+    },
+    {
+      "case": "quality_schema_unsafe_stage_path",
+      "rejected": true,
+      "reason": "quality check name contains an unsafe path"
+    }
+  ],
+  "scope": "Seven bounded custody/schema probes using retained receipts and in-memory values; no build, capture, analyzer replay, source, frozen-tool, or retained-artifact mutation."
+}

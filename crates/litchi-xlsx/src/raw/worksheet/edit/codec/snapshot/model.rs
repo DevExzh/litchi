@@ -144,6 +144,7 @@ pub(crate) struct Layout {
     pub(crate) extended_validation: bool,
     pub(crate) formula_ranges: Box<[SelectionRange]>,
     pub(crate) shared_formulas: Box<[SharedFormulaGroup]>,
+    pub(crate) has_shared_formulas: bool,
     pub(crate) defaults_compatibility: bool,
     pub(crate) merge_cells: Option<MergeCellsSlot>,
     pub(crate) merge_insertion: usize,

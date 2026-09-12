@@ -1,0 +1,26 @@
+{
+  "adverse_flag_count": 0,
+  "all_adverse_metrics_retained": true,
+  "comparison_sha256": "5b830001574c7ab934cfbc59a60869a3b8d9a6c9fc9d5988c7c720e3b136be9d",
+  "complete": true,
+  "matched": [],
+  "no_primary_gain_claim": true,
+  "order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "paired_comparisons": [
+    "A1_vs_B1",
+    "A2_vs_B2"
+  ],
+  "phase_metrics": {
+    "status": "not_applicable"
+  },
+  "review": "Both frozen confirmation pairs pass the <=5% adverse median and mean guard. A1/B1 median -2.543162%, mean -2.622600%; A2/B2 median -3.799717%, mean -3.695763%. All p95, p99, and whole-child RSS comparisons are also below the adverse threshold, and no absolute same-build drift exceeds 5%. This bounded four-child, 400-sample diagnostic does not erase the original eager dense repeat-2 whole-row shift (median +4.544245%, mean +4.478126%, p99 +5.817512%) and does not prove general eager acceleration or host stability. Exact corpus, sink, output and source-absence oracles pass. Retain candidate with original and main campaign flags visible.",
+  "runtime_comparison_performed": true,
+  "same_build": [],
+  "same_build_drift_count": 0,
+  "schema": "litchi_0525_eager_confirmation_adverse_review_v1"
+}

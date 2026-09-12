@@ -1,0 +1,51 @@
+{
+  "completed": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "entries": {
+    "A1": {
+      "binding": "eager-confirmation/A1/A1.binding.json",
+      "binding_sha256": "d9ac8ef34aabb33328da22883f4ebfe766dbb8aefedf4d7fd4fe0c24ed884753",
+      "receipt": "eager-confirmation/A1/A1.receipt.json",
+      "receipt_sha256": "4bc37f07992f319fa7b9150a46addcb5962dfe3096b20ea077be147a5206e732",
+      "repeat": 1,
+      "stage": "baseline"
+    },
+    "A2": {
+      "binding": "eager-confirmation/A2/A2.binding.json",
+      "binding_sha256": "82758bab4b4e1a5088381eb225d32361270d3844a1ac83f90e5679acf3b3dac6",
+      "receipt": "eager-confirmation/A2/A2.receipt.json",
+      "receipt_sha256": "d065e5f321e703650354975d41995711eff0582aee27c32fad29fae345417f41",
+      "repeat": 2,
+      "stage": "baseline"
+    },
+    "B1": {
+      "binding": "eager-confirmation/B1/B1.binding.json",
+      "binding_sha256": "39716905eaec47588074d7cb3f2751dcaef8d2979d9a19d317998204c555aa99",
+      "receipt": "eager-confirmation/B1/B1.receipt.json",
+      "receipt_sha256": "b300faca73b74c5a9d4a78b6dba6a966389681a79a61278f97521fcafe84db3d",
+      "repeat": 1,
+      "stage": "candidate"
+    },
+    "B2": {
+      "binding": "eager-confirmation/B2/B2.binding.json",
+      "binding_sha256": "758971d9074c2b79673adc7c9cd9a5e3ed17a7e8ef0fba80169bb2a9444ff64f",
+      "receipt": "eager-confirmation/B2/B2.receipt.json",
+      "receipt_sha256": "e7954097f7b36add7bb23b2913e70e62d5b4b674535674082f6b541070c3fcae",
+      "repeat": 2,
+      "stage": "candidate"
+    }
+  },
+  "order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "plan_sha256": "08bd39c750ef27ef4a337b603f67e432f40f59c8c3a5e424a1d0758d388b0eb9",
+  "schema": "litchi-0525-eager-confirmation-state-v1",
+  "status": "complete"
+}

@@ -1,0 +1,86 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+@@ -219,18 +219,10 @@
+     output
+         .try_reserve(extra)
+         .map_err(|source| allocation("worksheet edit output", source))?;
+-    let Plan {
+-        defaults,
+-        cells,
+-        rows,
+-        columns,
+-    } = plan;
++    // Plan::cells has no row, column, or default effects; retain only the
++    // dimension and sheet-data envelope for this value-only route.
++    let Plan { cells, .. } = plan;
+     let mut cursor = 0usize;
+-    if let Some(effect) = &extension_names.root {
+-        output.extend_from_slice(&content[cursor..layout.root.span.start]);
+-        write_root(&mut output, &layout.root, effect);
+-        cursor = layout.root.span.end;
+-    }
+     if let Some((tag, range)) = dimension {
+         output.extend_from_slice(&content[cursor..tag.span.start]);
+         write_tag(
+@@ -242,51 +234,8 @@
+         );
+         cursor = tag.span.end;
+     }
+-    if let Some(action) = defaults {
+-        match layout.defaults.as_ref() {
+-            Some(stored) => {
+-                output.extend_from_slice(&content[cursor..stored.span.start]);
+-                if !action.is_remove() {
+-                    write_defaults(
+-                        &mut output,
+-                        content,
+-                        stored,
+-                        action.effects(),
+-                        &extension_names.descent,
+-                    );
+-                }
+-                cursor = stored.span.end;
+-            },
+-            None if action.materializes() => {
+-                let insertion = layout
+-                    .columns
+-                    .as_ref()
+-                    .map_or(layout.sheet_data.span.start, |columns| columns.span.start);
+-                output.extend_from_slice(&content[cursor..insertion]);
+-                write_new_defaults(
+-                    &mut output,
+-                    &layout.sheet_data.tag.name,
+-                    action.effects(),
+-                    &extension_names.descent,
+-                );
+-                cursor = insertion;
+-            },
+-            None => {},
+-        }
+-    }
+-    if !columns.is_empty() {
+-        if let Some(stored) = layout.columns.as_ref() {
+-            output.extend_from_slice(&content[cursor..stored.span.start]);
+-            write_columns(&mut output, content, stored, columns, sheet)?;
+-            cursor = stored.span.end;
+-        } else {
+-            output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
+-            write_new_columns(&mut output, &layout.sheet_data.tag.name, columns);
+-            cursor = layout.sheet_data.span.start;
+-        }
+-    }
+     output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
+-    let omitted = if cells.is_empty() && rows.is_empty() {
++    let omitted = if cells.is_empty() {
+         output.extend_from_slice(&content[layout.sheet_data.span.start..layout.sheet_data.span.end]);
+         Box::new([])
+     } else {
+@@ -295,7 +244,7 @@
+             content,
+             &layout.sheet_data,
+             cells,
+-            rows,
++            BTreeMap::new(),
+             &extension_names.descent,
+         )?
+     };

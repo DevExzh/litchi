@@ -1,5 +1,27 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0525: matched XLSX unchanged-cell reconstruction (accepted)
+
+[0525](changes/0525-xlsx-unchanged-cell-readback.md) retains the complete
+source-bound ABBA comparison: 1,640 native durations, 40 allocator samples,
+240 original-eager samples and 400 supplemental-confirmation samples. The
+profile lane has four shape/repeat pairs (eight isolated commit-profile
+children). Primary total p50 falls 11.2409–14.9001% and commit p50
+30.0938–30.7698% across medium and dense-sparse repeats. Allocator vectors are
+identical across repeats: calls fall 23.0353–23.3976%, allocated bytes
+33.1950–38.8712%, and incremental region peak 21.4593–39.0951%. Commit Ir falls
+31.5439–32.4414%, passing both frozen gates. The accepted decision retains the
+candidate. Its supplemental eager gate passes: A1/B1 p50/mean changes are
+−2.543162%/−2.622600% and A2/B2 are −3.799717%/−3.695763%, with zero >5%
+matched or same-build drift flags. The original eager row shift remains
+explicit. Main adverse rows split into 7 open, 19 publication, 4 reopen and 1
+whole-child-RSS row, with no main commit or total-elapsed flag; the managed
+dense-sparse repeat-2 guard RSS row is 85,648 → 90,244 KiB (+5.3661%), and 76
+same-build drift rows remain explicit. Quality has 12 passing gates and 1,293
+successful executions. Cleanup, full verification and recursive seal verification pass. This source-backed XLSX result makes no physical-provider, cold/range,
+native-producer or scaling claim. OLE2/OOXML remains first; ODF is deferred and
+iWork is excluded.
+
 ## 0524: matched CFB chain-visitation evaluation
 
 [0524](changes/0524-cfb-visited-bit-evaluation.md) retains A1/B1/B2/A2 evidence:

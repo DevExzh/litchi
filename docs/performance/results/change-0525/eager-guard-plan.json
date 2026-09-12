@@ -1,0 +1,15 @@
+{
+  "schema": "litchi-0525-eager-guard-plan-v1",
+  "case": "xlsx_eager_cell_values_one_percent_edit_save",
+  "shapes": [
+    "medium",
+    "dense-sparse"
+  ],
+  "repeats": 2,
+  "warmup": 10,
+  "samples": 30,
+  "cpu": 2,
+  "purpose": "Check ordinary rewrite consumer for overhead from the private omission-proof route or shared Store indexing refactor. Use identical retained normal binaries in baseline/candidate paired repeats; no promotion to primary gain claim.",
+  "gate": "Review every >5% adverse p50/p95/p99/mean and peak RSS metric by shape and repeat.",
+  "primary_plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97"
+}

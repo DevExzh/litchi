@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "attempts": [
+    {
+      "stage": "preflight-1",
+      "outcome": "compile failure",
+      "executed_tests": 0,
+      "cause": "Missing write_sheet_data_with_provenance re-export in codec/snapshot.rs; E0432 and dependent unused import.",
+      "fix": "Added the missing crate-private facade re-export."
+    },
+    {
+      "stage": "preflight-2",
+      "outcome": "unit test failure",
+      "passed": 978,
+      "failed": 2,
+      "cause": "Two new source-backed tests used the compact-only PackageWriter directly with indented XML; both failed during fixture setup before the changed path.",
+      "fix": "Generate a compact placeholder OPC archive, then use the raw ZIP fixture writer to install the exact original worksheet, preserving indentation coverage."
+    },
+    {
+      "stage": "preflight-3",
+      "outcome": "full XLSX all-features tests passed",
+      "executed_tests": 1288,
+      "result_groups": 59
+    }
+  ]
+}

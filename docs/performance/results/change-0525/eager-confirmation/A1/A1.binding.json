@@ -1,0 +1,37 @@
+{
+  "artifacts": {
+    "eager-confirmation/A1/A1.json": "0c1b28fcb8c32b39807ea5d06bf94167fcdce518218099d93eea9ce35d4fb017",
+    "eager-confirmation/A1/A1.rss.json": "40bd3a3b21292f307c72dbab7d23840d34cb073de8ec774344de6b0bec9d2fb5",
+    "eager-confirmation/A1/A1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "eager-confirmation/A1/A1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "binary_sha256": "29477b1270773fa43a4e264a131d91e04fdd32899b7e4e2b430751c26b3670a8",
+  "label": "A1",
+  "output": "eager-confirmation/A1/A1.json",
+  "primary_plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "receipt_sha256": "4bc37f07992f319fa7b9150a46addcb5962dfe3096b20ea077be147a5206e732",
+  "repeat": 1,
+  "retained_helpers": {
+    "eager_companion": {
+      "path": "analyze_eager_guard.py",
+      "sha256": "d4317d90bc523389c66d417fcbdeb6c330eee44f59862964192104e2d15cf220"
+    },
+    "frozen_run": {
+      "path": "run.py",
+      "sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d"
+    },
+    "numeric": {
+      "path": "analyze.py",
+      "sha256": "d1e2f5051e4dee2d90aed981499459a617d430fe5c37c42c80ac634b9bc106af"
+    }
+  },
+  "rss": "eager-confirmation/A1/A1.rss.json",
+  "run_script_sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d",
+  "schema": "litchi-0525-eager-confirmation-binding-v1",
+  "source_manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+  "stage": "baseline",
+  "supplemental_plan_sha256": "08bd39c750ef27ef4a337b603f67e432f40f59c8c3a5e424a1d0758d388b0eb9",
+  "validation": "pass",
+  "working_source_manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+  "wrapper_sha256": "2485c9f70cdb475c1eed0bc25d266de3a8ab18739090d1d6c53ae4aaa2e36ca4"
+}

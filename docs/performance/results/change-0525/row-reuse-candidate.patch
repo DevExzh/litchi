@@ -1,0 +1,810 @@
+--- a/crates/litchi-xlsx/src/cell.rs
++++ b/crates/litchi-xlsx/src/cell.rs
+@@ -627,7 +627,7 @@
+     }
+ }
+ 
+-#[derive(Debug)]
++#[derive(Debug, Clone)]
+ pub(crate) struct Stored {
+     pub(crate) address: Address,
+     pub(crate) cell: Cell,
+@@ -799,6 +799,61 @@
+         })
+     }
+ 
++    /// Merge source cell records named by reduced-readback provenance into a
++    /// parsed candidate. The parsed store remains authoritative for worksheet
++    /// structure; indexes and extents are rebuilt for the combined cells.
++    pub(crate) fn merge_omitted_cells(
++        parsed: Self,
++        source: &Self,
++        omitted: &[Rect],
++    ) -> Result<Option<Self>> {
++        if omitted.is_empty() || !omitted_ranges_are_ordered(omitted) {
++            return Ok(None);
++        }
++        let source_count = entries_in_omitted_ranges(&source.cells, omitted);
++        if source_count == 0 || entries_in_omitted_ranges(&parsed.cells, omitted) != 0 {
++            return Ok(None);
++        }
++        let total = parsed
++            .cells
++            .len()
++            .checked_add(source_count)
++            .ok_or_else(|| invalid("merged worksheet cell count overflows usize"))?;
++        let mut cells = Vec::new();
++        cells
++            .try_reserve_exact(total)
++            .map_err(|source| allocation("merged worksheet cells", source))?;
++        cells.extend_from_slice(&parsed.cells);
++        for entry in &source.cells {
++            if entry_in_omitted_ranges(entry.address, omitted) {
++                cells.push(entry.clone());
++            }
++        }
++
++        let Store {
++            rows,
++            columns,
++            defaults,
++            merges,
++            extents,
++            ..
++        } = parsed;
++        let mut merge_ranges = Vec::new();
++        merge_ranges
++            .try_reserve_exact(merges.as_slice().len())
++            .map_err(|source| allocation("merged worksheet ranges", source))?;
++        merge_ranges.extend_from_slice(merges.as_slice());
++        Self::from_unsorted(
++            cells,
++            rows.into_vec(),
++            columns,
++            defaults,
++            merge_ranges,
++            extents.declared,
++        )
++        .map(Some)
++    }
++
+     pub(crate) fn view(&self, address: Address) -> View<'_> {
+         if let Some(range) = self.merges.containing(address)
+             && range.start() != address
+@@ -889,6 +944,53 @@
+     }
+ }
+ 
++fn omitted_ranges_are_ordered(ranges: &[Rect]) -> bool {
++    let mut previous_end = None::<(u32, u32)>;
++    for range in ranges {
++        let start = range.start();
++        let start = (start.row().get(), start.column().get());
++        if previous_end.is_some_and(|end| start < end) {
++            return false;
++        }
++        previous_end = Some(range.end());
++    }
++    true
++}
++
++fn entries_in_omitted_ranges(entries: &[Stored], ranges: &[Rect]) -> usize {
++    let mut range_index = 0usize;
++    let mut count = 0usize;
++    for entry in entries {
++        while let Some(range) = ranges.get(range_index) {
++            let address = entry.address;
++            let start = range.start();
++            let start = (start.row().get(), start.column().get());
++            let end = range.end();
++            let position = (address.row().get(), address.column().get());
++            if position < start {
++                break;
++            }
++            if position >= end {
++                range_index += 1;
++                continue;
++            }
++            count += 1;
++            break;
++        }
++    }
++    count
++}
++
++fn entry_in_omitted_ranges(address: Address, ranges: &[Rect]) -> bool {
++    let position = (address.row().get(), address.column().get());
++    ranges.iter().any(|range| {
++        let start = range.start();
++        let start = (start.row().get(), start.column().get());
++        let end = range.end();
++        position >= start && position < end
++    })
++}
++
+ #[derive(Debug, Default)]
+ struct Bounds {
+     value: Option<(u32, u32, u32, u32)>,
+--- a/crates/litchi-xlsx/src/cell_values/source.rs
++++ b/crates/litchi-xlsx/src/cell_values/source.rs
+@@ -18,7 +18,7 @@
+ use crate::cell::{Cell, Content, Number, Value};
+ use crate::error::{Error, Result, invalid};
+ use crate::formula::Formula;
+-use crate::raw::worksheet::edit::{Action, rewrite};
++use crate::raw::worksheet::edit::{Action, rewrite_value_only_with_provenance};
+ 
+ /// Maximum unique cells in one atomic value transaction.
+ pub const MAX_BATCH_EDITS: usize = 256;
+@@ -833,8 +833,12 @@
+             return Ok(Commit::new(self.before, patch, 0));
+         }
+         let changed = actions.len();
+-        let output = rewrite(self.before.source_xml(), self.before.sheet_name(), actions)?;
+-        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?
++        let output = rewrite_value_only_with_provenance(
++            self.before.source_xml(),
++            self.before.sheet_name(),
++            actions,
++        )?;
++        let snapshot = Snapshot::from_rewritten_value_source(&self.before, output)?
+             .with_invalidated_calculation()?;
+         for (address, expected) in &self.staged {
+             let matches = match expected {
+@@ -1170,13 +1174,17 @@
+             }
+             changed_cells += actions.len();
+             touched_worksheets += 1;
+-            let output = rewrite(snapshot.source_xml(), snapshot.sheet_name(), actions)?;
++            let output = rewrite_value_only_with_provenance(
++                snapshot.source_xml(),
++                snapshot.sheet_name(),
++                actions,
++            )?;
+             aggregate_bytes = super::snapshot::checked_multi_bytes(
+                 aggregate_bytes,
+-                output.len(),
++                output.bytes.len(),
+                 super::snapshot::MAX_MULTI_WORKSHEET_BYTES,
+             )?;
+-            let candidate = Snapshot::from_rewritten_source(snapshot, output)?;
++            let candidate = Snapshot::from_rewritten_value_source(snapshot, output)?;
+             for (address, expected) in staged {
+                 let matches = match expected {
+                     StagedValueEdit::Set(content) => {
+--- a/crates/litchi-xlsx/src/cell_values/snapshot.rs
++++ b/crates/litchi-xlsx/src/cell_values/snapshot.rs
+@@ -9,9 +9,9 @@
+     BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships,
+     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
+ };
+-use litchi_sheet::Cell as Address;
++use litchi_sheet::{Cell as Address, Rect};
+ 
+-use crate::cell::{Cell, SharedFormulaStorage, Store, Value};
++use crate::cell::{Cell, SharedFormulaStorage, Store, Stored, Value};
+ use crate::error::{EditBlock, Error, Result, allocation, invalid};
+ use crate::formula::Kind;
+ use crate::source_payload::SourcePayload;
+@@ -362,6 +362,24 @@
+     }
+ }
+ 
++fn stored_entry_is_supported(entry: &Stored) -> bool {
++    entry.shared_string.is_none()
++        && !entry.inline_rich
++        && entry.cell_metadata.is_none()
++        && entry.value_metadata.is_none()
++}
++
++fn reuse_markup_requires_fallback(bytes: &[u8]) -> bool {
++    [
++        b"dyDescent".as_slice(),
++        b"AlternateContent".as_slice(),
++        b"Ignorable".as_slice(),
++        b"schemas.microsoft.com/office/spreadsheetml/2009/9/ac".as_slice(),
++    ]
++    .iter()
++    .any(|marker| bytes.windows(marker.len()).any(|window| window == *marker))
++}
++
+ impl Snapshot {
+     fn from_owned_selected(
+         package: &OpcPackage,
+@@ -694,6 +712,84 @@
+         Ok(result)
+     }
+ 
++    /// Rebind a value-only rewrite after validating its complete output.
++    ///
++    /// The independent parser sees the full worksheet envelope and all
++    /// changed cell records, while provenance-selected source records fill
++    /// only the omitted cell spans. Any provenance mismatch, reduced-parser
++    /// refusal, or unexpected collision falls back to the ordinary complete
++    /// parse so the public error and preservation authority remain unchanged.
++    pub(crate) fn from_rewritten_value_source(
++        source: &Self,
++        rewrite: raw::worksheet::edit::ValueOnlyRewrite<'_>,
++    ) -> Result<Self> {
++        source.source.check_execution()?;
++        if rewrite.omitted.is_empty() || !std::ptr::eq(rewrite.source, source.source_xml()) {
++            return Self::from_rewritten_source(source, rewrite.bytes);
++        }
++        validation::worksheet_xml(&rewrite.bytes)?;
++        if reuse_markup_requires_fallback(&rewrite.bytes) {
++            return Self::from_rewritten_source(source, rewrite.bytes);
++        }
++        let reduced = match raw::worksheet::edit::reduced_readback(&rewrite.bytes, &rewrite.omitted)
++        {
++            Ok(reduced) => reduced,
++            Err(_) => return Self::from_rewritten_source(source, rewrite.bytes),
++        };
++        let parsed = match raw::worksheet::parse(&reduced, || Ok(None)) {
++            Ok(parsed) => parsed,
++            Err(_) => return Self::from_rewritten_source(source, rewrite.bytes),
++        };
++        let mut omitted = Vec::new();
++        if omitted.try_reserve_exact(rewrite.omitted.len()).is_err() {
++            return Self::from_rewritten_source(source, rewrite.bytes);
++        }
++        for span in &rewrite.omitted {
++            let Some(end_column) = span.last_column.checked_add(1) else {
++                return Self::from_rewritten_source(source, rewrite.bytes);
++            };
++            let Some(end_row) = span.row.checked_add(1) else {
++                return Self::from_rewritten_source(source, rewrite.bytes);
++            };
++            let Ok(start) = Address::at(span.row, span.first_column) else {
++                return Self::from_rewritten_source(source, rewrite.bytes);
++            };
++            let Ok(range) = Rect::new(start, end_row, end_column) else {
++                return Self::from_rewritten_source(source, rewrite.bytes);
++            };
++            omitted.push(range);
++        }
++        if !Self::value_reuse_entries_are_supported(source, &parsed, &omitted) {
++            return Self::from_rewritten_source(source, rewrite.bytes);
++        }
++        let merged = match Store::merge_omitted_cells(parsed, &source.cells, &omitted) {
++            Ok(merged) => merged,
++            Err(_) => return Self::from_rewritten_source(source, rewrite.bytes),
++        };
++        let Some(cells) = merged else {
++            return Self::from_rewritten_source(source, rewrite.bytes);
++        };
++        let mut result = source.clone();
++        result.cells = Arc::new(cells);
++        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(rewrite.bytes));
++        result.source.check_execution()?;
++        Ok(result)
++    }
++
++    fn value_reuse_entries_are_supported(
++        source: &Self,
++        parsed: &Store,
++        omitted: &[Rect],
++    ) -> bool {
++        let source_ok = source
++            .cells
++            .entries()
++            .iter()
++            .filter(|entry| omitted.iter().any(|range| range.contains(entry.address)))
++            .all(stored_entry_is_supported);
++        source_ok && parsed.entries().iter().all(stored_entry_is_supported)
++    }
++
+     pub(super) fn invalidated_workbook_xml(&self) -> Result<Arc<Vec<u8>>> {
+         self.source.check_execution()?;
+         let bytes = raw::recalc::invalidate(self.source.workbook.bytes.as_bytes())?;
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs
+@@ -19,4 +19,7 @@
+     Action, ColumnAction, DefaultsAction, DefaultsEffects, DescentEffect, HeightEffect, MergePlan,
+     OptionalEffect, Payload, Plan, RowAction, StyleEffect, WidthEffect,
+ };
+-pub(crate) use package::{rewrite, rewrite_merges};
++pub(crate) use package::{
++    OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite, rewrite_merges,
++    rewrite_value_only_with_provenance,
++};
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/package.rs
+@@ -1,18 +1,45 @@
+ //! Worksheet-package orchestration and merge-container patching.
+ 
+-use litchi_sheet::Rect;
++use std::collections::BTreeMap;
++
++use litchi_sheet::{Cell as Address, Rect};
+ 
+ use super::codec::{
+     ExtensionNames, MergeCellsSlot, Span, Tag, scan, sibling_name, write_close, write_columns,
+-    write_defaults, write_new_columns, write_new_defaults, write_root, write_sheet_data, write_tag,
++    write_defaults, write_new_columns, write_new_defaults, write_root, write_sheet_data,
++    write_sheet_data_with_provenance, write_tag,
+ };
+-use super::model::{MergePlan, Plan};
++use super::model::{MergePlan, Payload, Plan};
+ use super::validation::{
+     expanded_dimension, plan_sets_descent, validate_actions, validate_column_actions,
+     validate_defaults_action, validate_row_actions,
+ };
+ use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
+ use crate::merge;
++
++/// One contiguous range of cell records omitted from the independent
++/// readback representation. The offsets always refer to the actual complete
++/// rewritten output, not to a reduced buffer.
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct OmittedCells {
++    pub(crate) row: u32,
++    pub(crate) first_column: u32,
++    pub(crate) last_column: u32,
++    pub(crate) start: usize,
++    pub(crate) end: usize,
++}
++
++/// Complete value-only output plus its private readback provenance.
++///
++/// Borrowing the exact input slice ties the omission metadata to the source
++/// store from which it was derived. The snapshot constructor checks that
++/// identity before merging retained cells into the reduced parse.
++#[derive(Debug)]
++pub(crate) struct ValueOnlyRewrite<'a> {
++    pub(crate) source: &'a [u8],
++    pub(crate) bytes: Vec<u8>,
++    pub(crate) omitted: Box<[OmittedCells]>,
++}
+ pub(crate) fn rewrite(content: &[u8], sheet: &str, plan: impl Into<Plan>) -> Result<Vec<u8>> {
+     let plan = plan.into();
+     if plan.is_empty() {
+@@ -125,6 +152,188 @@
+     Ok(output)
+ }
+ 
++/// Rewrite a value-only plan while recording spans that can be omitted from
++/// the independent semantic readback. All bytes in `bytes` remain the exact
++/// ordinary rewrite output. Unsupported eligibility falls back to that same
++/// output with no reuse metadata.
++pub(crate) fn rewrite_value_only_with_provenance<'a>(
++    content: &'a [u8],
++    sheet: &str,
++    cells: BTreeMap<Address, super::model::Action>,
++) -> Result<ValueOnlyRewrite<'a>> {
++    let plan = Plan::cells(cells);
++    if plan.is_empty() {
++        return Ok(ValueOnlyRewrite {
++            source: content,
++            bytes: content.to_vec(),
++            omitted: Box::new([]),
++        });
++    }
++
++    let layout = scan(content)?;
++    validate_actions(&layout, sheet, &plan.cells)?;
++    validate_row_actions(&layout, sheet, &plan.rows)?;
++    validate_column_actions(&layout, sheet, &plan.columns)?;
++    validate_defaults_action(&layout, sheet, plan.defaults)?;
++    let eligible = !layout.has_shared_formulas
++        && !plan
++            .cells
++            .values()
++            .any(|action| matches!(action.payload(), Some(Payload::SharedFormula { .. })))
++        && plan.cells.keys().all(|address| {
++            let Some(number) = address.row().get().checked_add(1) else {
++                return false;
++            };
++            layout
++                .sheet_data
++                .rows
++                .binary_search_by_key(&number, |row| row.number)
++                .is_ok()
++        });
++    if !eligible {
++        return Ok(ValueOnlyRewrite {
++            source: content,
++            bytes: rewrite(content, sheet, plan)?,
++            omitted: Box::new([]),
++        });
++    }
++
++    let dimension = expanded_dimension(&layout, &plan.cells);
++    let extension_names = ExtensionNames::plan(&layout, plan_sets_descent(&plan))?;
++    let effects = plan
++        .cells
++        .len()
++        .checked_add(plan.rows.len())
++        .and_then(|count| count.checked_add(plan.columns.len()))
++        .and_then(|count| count.checked_add(usize::from(plan.defaults.is_some())))
++        .ok_or_else(|| invalid("worksheet edit effect count overflow"))?;
++    let extra = effects
++        .checked_mul(128)
++        .and_then(|value| content.len().checked_add(value))
++        .ok_or_else(|| invalid("worksheet edit output size overflow"))?;
++    let mut output = Vec::new();
++    output
++        .try_reserve(extra)
++        .map_err(|source| allocation("worksheet edit output", source))?;
++    let Plan {
++        defaults,
++        cells,
++        rows,
++        columns,
++    } = plan;
++    let mut cursor = 0usize;
++    if let Some(effect) = &extension_names.root {
++        output.extend_from_slice(&content[cursor..layout.root.span.start]);
++        write_root(&mut output, &layout.root, effect);
++        cursor = layout.root.span.end;
++    }
++    if let Some((tag, range)) = dimension {
++        output.extend_from_slice(&content[cursor..tag.span.start]);
++        write_tag(
++            &mut output,
++            &tag.tag,
++            tag.empty,
++            &["ref"],
++            &[("ref", range.a1())],
++        );
++        cursor = tag.span.end;
++    }
++    if let Some(action) = defaults {
++        match layout.defaults.as_ref() {
++            Some(stored) => {
++                output.extend_from_slice(&content[cursor..stored.span.start]);
++                if !action.is_remove() {
++                    write_defaults(
++                        &mut output,
++                        content,
++                        stored,
++                        action.effects(),
++                        &extension_names.descent,
++                    );
++                }
++                cursor = stored.span.end;
++            },
++            None if action.materializes() => {
++                let insertion = layout
++                    .columns
++                    .as_ref()
++                    .map_or(layout.sheet_data.span.start, |columns| columns.span.start);
++                output.extend_from_slice(&content[cursor..insertion]);
++                write_new_defaults(
++                    &mut output,
++                    &layout.sheet_data.tag.name,
++                    action.effects(),
++                    &extension_names.descent,
++                );
++                cursor = insertion;
++            },
++            None => {},
++        }
++    }
++    if !columns.is_empty() {
++        if let Some(stored) = layout.columns.as_ref() {
++            output.extend_from_slice(&content[cursor..stored.span.start]);
++            write_columns(&mut output, content, stored, columns, sheet)?;
++            cursor = stored.span.end;
++        } else {
++            output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
++            write_new_columns(&mut output, &layout.sheet_data.tag.name, columns);
++            cursor = layout.sheet_data.span.start;
++        }
++    }
++    output.extend_from_slice(&content[cursor..layout.sheet_data.span.start]);
++    let omitted = if cells.is_empty() && rows.is_empty() {
++        output.extend_from_slice(&content[layout.sheet_data.span.start..layout.sheet_data.span.end]);
++        Box::new([])
++    } else {
++        write_sheet_data_with_provenance(
++            &mut output,
++            content,
++            &layout.sheet_data,
++            cells,
++            rows,
++            &extension_names.descent,
++        )?
++    };
++    output.extend_from_slice(&content[layout.sheet_data.span.end..]);
++    Ok(ValueOnlyRewrite {
++        source: content,
++        bytes: output,
++        omitted,
++    })
++}
++
++/// Build the XML used only for the reduced semantic readback. Every span is
++/// checked against the complete output and must be sorted and disjoint.
++pub(crate) fn reduced_readback(content: &[u8], omitted: &[OmittedCells]) -> Result<Vec<u8>> {
++    let mut removed = 0usize;
++    let mut cursor = 0usize;
++    for span in omitted {
++        if span.start < cursor || span.start >= span.end || span.end > content.len() {
++            return Err(invalid("worksheet omission provenance is invalid"));
++        }
++        removed = removed
++            .checked_add(span.end - span.start)
++            .ok_or_else(|| invalid("worksheet omission size overflows usize"))?;
++        cursor = span.end;
++    }
++    let capacity = content
++        .len()
++        .checked_sub(removed)
++        .ok_or_else(|| invalid("worksheet omission exceeds rewritten output"))?;
++    let mut reduced = Vec::new();
++    reduced
++        .try_reserve_exact(capacity)
++        .map_err(|source| allocation("worksheet reduced readback", source))?;
++    cursor = 0;
++    for span in omitted {
++        reduced.extend_from_slice(&content[cursor..span.start]);
++        cursor = span.end;
++    }
++    reduced.extend_from_slice(&content[cursor..]);
++    Ok(reduced)
++}
++
+ #[derive(Debug)]
+ struct MergeReplacement {
+     span: Span,
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs
+@@ -25,7 +25,7 @@
+     Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
+     MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag, scan,
+     write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
+-    write_sheet_data,
++    write_sheet_data, write_sheet_data_with_provenance,
+ };
+ #[allow(
+     unused_imports,
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs
+@@ -144,6 +144,7 @@
+     pub(crate) extended_validation: bool,
+     pub(crate) formula_ranges: Box<[SelectionRange]>,
+     pub(crate) shared_formulas: Box<[SharedFormulaGroup]>,
++    pub(crate) has_shared_formulas: bool,
+     pub(crate) defaults_compatibility: bool,
+     pub(crate) merge_cells: Option<MergeCellsSlot>,
+     pub(crate) merge_insertion: usize,
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+@@ -1252,6 +1252,10 @@
+             ));
+         }
+         let shared_formulas = shared_formula_groups(&self.formulas, &sheet_data)?;
++        let has_shared_formulas = self
++            .formulas
++            .iter()
++            .any(|formula| formula.kind.as_ref() == "shared");
+         let mut formula_ranges = Vec::new();
+         let mut shared = HashMap::<u32, SelectionRange>::new();
+         for formula in &self.formulas {
+@@ -1322,6 +1326,7 @@
+             extended_validation: self.extended_validation,
+             formula_ranges: formula_ranges.into_boxed_slice(),
+             shared_formulas: shared_formulas.into_boxed_slice(),
++            has_shared_formulas,
+             defaults_compatibility: self.defaults_compatibility,
+             merge_cells: self.merge_cells,
+             merge_insertion,
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs
+@@ -6,4 +6,4 @@
+ 
+ pub(crate) use columns::{write_columns, write_new_columns};
+ pub(crate) use root::{write_defaults, write_new_defaults, write_root};
+-pub(crate) use sheet_data::write_sheet_data;
++pub(crate) use sheet_data::{write_sheet_data, write_sheet_data_with_provenance};
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs
+@@ -13,6 +13,7 @@
+ use crate::error::{Result, invalid};
+ use crate::outline::Outline;
+ use crate::raw::strings::encode_spreadsheet_text;
++use crate::raw::worksheet::edit::OmittedCells;
+ use crate::raw::worksheet::edit::model::{
+     Action, DescentEffect, HeightEffect, Payload, RowAction, StyleEffect,
+ };
+@@ -80,6 +81,200 @@
+     Ok(())
+ }
+ 
++/// Write the complete ordinary output and retain the actual output spans of
++/// cell bodies that a reduced semantic readback may omit. This is a separate
++/// value-only route; callers that need row, column, or default effects keep
++/// using [`write_sheet_data`].
++pub(crate) fn write_sheet_data_with_provenance(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    data: &SheetData,
++    cells: BTreeMap<Address, Action>,
++    rows: BTreeMap<Row, RowAction>,
++    descent_name: &str,
++) -> Result<Box<[OmittedCells]>> {
++    let mut by_row = BTreeMap::<u32, RowEdits>::new();
++    for (address, action) in cells {
++        let number = address
++            .row()
++            .get()
++            .checked_add(1)
++            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
++        by_row.entry(number).or_default().cells.insert(address, action);
++    }
++    for (row, action) in rows {
++        let number = row
++            .get()
++            .checked_add(1)
++            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
++        by_row.entry(number).or_default().row = Some(action);
++    }
++    let mut omitted = Vec::new();
++    omitted
++        .try_reserve(data.rows.len())
++        .map_err(|source| crate::error::allocation("worksheet omission provenance", source))?;
++
++    if data.empty {
++        write_tag(output, &data.tag, false, &[], &[]);
++        for (number, edits) in by_row {
++            write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
++        }
++        write_close(output, &data.tag.name);
++        return Ok(omitted.into_boxed_slice());
++    }
++
++    output.extend_from_slice(&source[data.span.start..data.tag_end]);
++    let mut cursor = data.tag_end;
++    let mut pending = by_row.into_iter().peekable();
++    for row in &data.rows {
++        output.extend_from_slice(&source[cursor..row.span.start]);
++        while pending
++            .peek()
++            .is_some_and(|(number, _)| *number < row.number)
++        {
++            if let Some((number, edits)) = pending.next() {
++                write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
++            }
++        }
++        if pending
++            .peek()
++            .is_some_and(|(number, _)| *number == row.number)
++        {
++            let (_, edits) = pending
++                .next()
++                .ok_or_else(|| invalid("worksheet row edit ordering was lost"))?;
++            let membership_changed = edits.cells.iter().any(|(address, action)| {
++                let exists = row
++                    .cells
++                    .binary_search_by_key(address, |cell| cell.address)
++                    .is_ok();
++                !exists || matches!(action, Action::Remove)
++            });
++            if membership_changed || edits.row.is_some() || row.empty {
++                write_row(output, source, row, &edits, descent_name)?;
++            } else {
++                write_replacement_row(output, source, row, &edits, &mut omitted)?;
++            }
++        } else {
++            output.extend_from_slice(&source[row.span.start..row.tag_end]);
++            let body_start = output.len();
++            output.extend_from_slice(&source[row.tag_end..row.close_start]);
++            let body_end = output.len();
++            record_omitted_row(&mut omitted, row, body_start, body_end)?;
++            output.extend_from_slice(&source[row.close_start..row.span.end]);
++        }
++        cursor = row.span.end;
++    }
++    output.extend_from_slice(&source[cursor..data.close_start]);
++    for (number, edits) in pending {
++        write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
++    }
++    output.extend_from_slice(&source[data.close_start..data.span.end]);
++    Ok(omitted.into_boxed_slice())
++}
++
++fn write_replacement_row(
++    output: &mut Vec<u8>,
++    source: &[u8],
++    row: &RowSlot,
++    edits: &RowEdits,
++    omitted: &mut Vec<OmittedCells>,
++) -> Result<()> {
++    output.extend_from_slice(&source[row.span.start..row.tag_end]);
++    let mut cursor = row.tag_end;
++    let mut pending = edits.cells.iter().peekable();
++    let mut run = None::<(usize, Address, Address)>;
++    for cell in &row.cells {
++        output.extend_from_slice(&source[cursor..cell.span.start]);
++        let cell_start = output.len();
++        while pending
++            .peek()
++            .is_some_and(|(address, _)| **address < cell.address)
++        {
++            let (address, action) = pending
++                .next()
++                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
++            if let Some((start, first, last)) = run.take() {
++                record_omitted(omitted, first, last, start, cell_start)?;
++            }
++            write_new_action(output, &row.tag.name, *address, action)?;
++        }
++        if pending
++            .peek()
++            .is_some_and(|(address, _)| **address == cell.address)
++        {
++            let (_, action) = pending
++                .next()
++                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
++            if let Some((start, first, last)) = run.take() {
++                record_omitted(omitted, first, last, start, cell_start)?;
++            }
++            match action {
++                Action::Update { .. } => write_cell(output, source, cell, action)?,
++                Action::Remove => {
++                    return Err(invalid("replacement row unexpectedly removes a cell"));
++                },
++            }
++        } else {
++            let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
++            let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
++            run = Some((start, first, cell.address));
++            output.extend_from_slice(&source[cell.span.start..cell.span.end]);
++        }
++        cursor = cell.span.end;
++    }
++    output.extend_from_slice(&source[cursor..row.close_start]);
++    if let Some((start, first, last)) = run {
++        record_omitted(omitted, first, last, start, output.len())?;
++    }
++    output.extend_from_slice(&source[row.close_start..row.span.end]);
++    Ok(())
++}
++
++fn record_omitted_row(
++    omitted: &mut Vec<OmittedCells>,
++    row: &RowSlot,
++    start: usize,
++    end: usize,
++) -> Result<()> {
++    let Some(first) = row.cells.first() else {
++        return Ok(());
++    };
++    let last = row
++        .cells
++        .last()
++        .ok_or_else(|| invalid("worksheet row cell provenance lost its last cell"))?;
++    record_omitted(omitted, first.address, last.address, start, end)
++}
++
++fn record_omitted(
++    omitted: &mut Vec<OmittedCells>,
++    first: Address,
++    last: Address,
++    start: usize,
++    end: usize,
++) -> Result<()> {
++    if start >= end {
++        return Ok(());
++    }
++    if first.row() != last.row() || first.column() > last.column() {
++        return Err(invalid(
++            "worksheet cell provenance has an invalid address range",
++        ));
++    }
++    omitted
++        .try_reserve(1)
++        .map_err(|source| crate::error::allocation("worksheet omission provenance", source))?;
++    omitted.push(OmittedCells {
++        row: first.row().get(),
++        first_column: first.column().get(),
++        last_column: last.column().get(),
++        start,
++        end,
++    });
++    Ok(())
++}
++
+ #[derive(Debug, Default)]
+ struct RowEdits {
+     cells: BTreeMap<Address, Action>,

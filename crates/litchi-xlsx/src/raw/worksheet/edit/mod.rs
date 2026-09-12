@@ -19,4 +19,7 @@ pub(crate) use model::{
     Action, ColumnAction, DefaultsAction, DefaultsEffects, DescentEffect, HeightEffect, MergePlan,
     OptionalEffect, Payload, Plan, RowAction, StyleEffect, WidthEffect,
 };
-pub(crate) use package::{rewrite, rewrite_merges};
+pub(crate) use package::{
+    OmittedCells, ValueOnlyRewrite, reduced_readback, rewrite, rewrite_merges,
+    rewrite_value_only_with_provenance,
+};

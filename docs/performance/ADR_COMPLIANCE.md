@@ -1,5 +1,24 @@
 # Performance optimization ADR-compliance matrix
 
+## 0525: preserve validation authority while retaining the XLSX work-elimination candidate (accepted)
+
+[0525](changes/0525-xlsx-unchanged-cell-readback.md) keeps complete emitted
+XML validation, source/version and execution fences, independent reduced
+actual-output parsing, a fallible source-bound Store merge, full index/extent
+rebuilds, staged semantic readback and existing resource limits. Unsupported
+action/dependency shapes and all speculative failures use the complete parser;
+optional provenance allocation fails open. The candidate changes no public API,
+dependency, unsafe code or resource policy, and the 30 accepted ADR/index
+hashes remain bound. Native total/commit and profile gates pass; 31 adverse
+rows (7 open, 19 publication, 4 reopen, 1 whole-child RSS) and 76 same-build
+drifts remain reviewable, with no main commit or total-elapsed flag. Quality
+has 12 passing gates and 1,293 successful executions. The candidate is accepted
+after both supplemental eager confirmation pairs passed with zero >5% flags.
+Post-cleanup source and evidence replay passes; both owned scratch trees are absent.
+This scoped synthetic result does not establish physical-provider, cold/range,
+native-producer or scaling coverage. OLE2/OOXML remains active, ODF deferred,
+and iWork excluded.
+
 ## 0524: reject insufficient performance; preserve test and validation authority
 
 [0524](changes/0524-cfb-visited-bit-evaluation.md) restores production after

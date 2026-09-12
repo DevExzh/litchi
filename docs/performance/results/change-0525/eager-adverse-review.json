@@ -1,0 +1,163 @@
+{
+  "adverse_flag_count": 1,
+  "all_adverse_metrics_retained": true,
+  "comparison_sha256": "7f21a5b5a4c7917901be854fe705fefdc96beaa552c7160e0782382658779822",
+  "complete": true,
+  "disposition": "retained_supplemental_diagnostic",
+  "matched": [
+    {
+      "adverse_over_five_percent": true,
+      "baseline": 43314837,
+      "candidate": 45834683,
+      "change_percent": 5.817512368798705,
+      "context": {
+        "first_repeat_context": {
+          "baseline": {
+            "max": 44006229,
+            "max_rss_kib": 89760,
+            "mean": 43823892.53333333,
+            "min": 43620037,
+            "p50": 43809622,
+            "p95": 44001998,
+            "p99": 44006229,
+            "standard_deviation": 99518.60733680744
+          },
+          "candidate": {
+            "max": 43478322,
+            "max_rss_kib": 86124,
+            "mean": 43090304.866666675,
+            "min": 42930600,
+            "p50": 43055736,
+            "p95": 43414352,
+            "p99": 43478322,
+            "standard_deviation": 138132.3921617385
+          },
+          "metric_changes_percent": {
+            "mean": -1.6739445637072858,
+            "p50": -1.720822882242623,
+            "p95": -1.3354984471386944,
+            "p99": -1.199618808510039
+          },
+          "repeat": 1
+        },
+        "flagged_repeat_summary": {
+          "baseline": {
+            "max": 43314837,
+            "max_rss_kib": 90052,
+            "mean": 43046720.7,
+            "min": 42826134,
+            "p50": 43031171,
+            "p95": 43241266,
+            "p99": 43314837,
+            "standard_deviation": 115218.40649202777
+          },
+          "candidate": {
+            "max": 45834683,
+            "max_rss_kib": 86220,
+            "mean": 44974407.10000001,
+            "min": 44444636,
+            "p50": 44986613,
+            "p95": 45288270,
+            "p99": 45834683,
+            "standard_deviation": 278581.0019259982
+          },
+          "change_percent": {
+            "max": 5.817512368798705,
+            "mean": 4.47812601901636,
+            "min": 3.7792390973231393,
+            "p50": 4.544245379703926,
+            "p95": 4.733913202263773,
+            "p99": 5.817512368798705
+          }
+        },
+        "identity_equal": true,
+        "ranked_sample_count": {
+          "baseline": 30,
+          "candidate": 30
+        },
+        "raw_ranked_samples": {
+          "baseline_elapsed_ns": [
+            42826134,
+            42884675,
+            42921385,
+            42930055,
+            42945335,
+            42950475,
+            42955205,
+            42964994,
+            42973445,
+            42974125,
+            42975815,
+            42980885,
+            43012805,
+            43020375,
+            43024576,
+            43037766,
+            43041215,
+            43050386,
+            43059105,
+            43079915,
+            43092746,
+            43103996,
+            43117836,
+            43127505,
+            43167556,
+            43173396,
+            43218656,
+            43235156,
+            43241266,
+            43314837
+          ],
+          "candidate_elapsed_ns": [
+            44444636,
+            44482416,
+            44520147,
+            44591358,
+            44620707,
+            44768778,
+            44837578,
+            44838279,
+            44849988,
+            44891468,
+            44898208,
+            44932569,
+            44955649,
+            44980868,
+            44984709,
+            44988518,
+            45071429,
+            45083049,
+            45084309,
+            45089070,
+            45091779,
+            45128870,
+            45138439,
+            45138489,
+            45147380,
+            45155050,
+            45178370,
+            45217150,
+            45288270,
+            45834683
+          ]
+        },
+        "schema_scope": "eager reports deliberately omit source and phase vectors"
+      },
+      "metric": "elapsed_ns",
+      "repeat": 2,
+      "review": "Retain this individual eager diagnostic tail flag for dense-sparse repeat 2: the exact ranked 30-sample p99/max is 43314837 ns to 45834683 ns (5.817512%). In the same row, p50 is 43031171 to 44986613 ns, p95 is 43241266 to 45288270 ns, and mean is 43046720.7 to 44974407.10000001 ns. The first repeat for this shape is included in context before disposition. The eager schema has no source or phase vectors, so this flag cannot localize to row reuse or change the native admission gate; it remains retained and no eager speedup claim is made.",
+      "shape": "dense-sparse",
+      "stat": "p99"
+    }
+  ],
+  "no_primary_gain_claim": true,
+  "phase_metrics": {
+    "reason": "eager reports contain no source or phase vectors",
+    "status": "not_applicable"
+  },
+  "review": "The eager guard is a supplemental ordinary-rewrite diagnostic. Its comparison has no source or phase vectors, so every adverse timing/RSS metric is retained without an operation-local or primary gain claim.",
+  "runtime_comparison_performed": true,
+  "same_build": [],
+  "same_build_drift_count": 0,
+  "schema": "litchi_0525_eager_adverse_review_v1"
+}

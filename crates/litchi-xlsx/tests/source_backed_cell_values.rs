@@ -2881,3 +2881,21 @@ fn unrelated_scalar_edit_preserves_an_oversized_shared_formula_group() {
         Some(Cell::Formula(_))
     ));
 }
+
+#[test]
+fn removing_a_cell_with_an_implicit_follower_refuses_shifted_readback() {
+    let bytes = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c><v>3</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.remove(address("B1")).unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Invalid(message))
+            if message == "value-only publication readback differs from staged state"
+    ));
+}

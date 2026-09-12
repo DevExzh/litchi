@@ -1,0 +1,10 @@
+{
+  "observed_utc": "2026-09-12T10:09:03.044611+00:00",
+  "frozen_hashes": {
+    "eager-confirmation-plan.json": "08bd39c750ef27ef4a337b603f67e432f40f59c8c3a5e424a1d0758d388b0eb9",
+    "eager_confirmation_guard.py": "2485c9f70cdb475c1eed0bc25d266de3a8ab18739090d1d6c53ae4aaa2e36ca4"
+  },
+  "capture_root_absent": true,
+  "competing_capture_build_processes": [],
+  "scope": "Point observation of accessible process comm names only; not whole-campaign isolation proof. Plan timestamp predates final draft corrections; these final hashes were verified before first capture."
+}

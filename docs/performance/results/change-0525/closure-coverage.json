@@ -1,0 +1,46 @@
+{
+  "schema": "litchi-0525-source-derived-closure-v1",
+  "source": "tools/perf-baseline/src/lib.rs",
+  "source_sha256": "1d4f9ed81ffed0a65d3ff49572c50f2e8bf60867d4befeffc77d2174526fbafd",
+  "owners": [
+    "xlsx_cell_crud_inventory",
+    "xlsx_cell_crud_updates"
+  ],
+  "scope": "Exact deterministic generator translation for static mechanism selection; counts are not instruction, allocation, or latency estimates. Current source is bound to retained0522 baseline.",
+  "results": [
+    {
+      "shape": "medium",
+      "cells": 9216,
+      "updates": 93,
+      "touched_rows": 93,
+      "cells_in_touched_rows": 4464,
+      "row_only_skipped_cells": 4752,
+      "row_only_skipped_fraction": 0.515625,
+      "cell_span_skipped_cells": 9123,
+      "cell_span_skipped_fraction": 0.9899088541666666,
+      "updates_by_sheet": [
+        24,
+        23,
+        23,
+        23
+      ]
+    },
+    {
+      "shape": "dense-sparse",
+      "cells": 17792,
+      "updates": 178,
+      "touched_rows": 142,
+      "cells_in_touched_rows": 16769,
+      "row_only_skipped_cells": 1023,
+      "row_only_skipped_fraction": 0.057497751798561154,
+      "cell_span_skipped_cells": 17614,
+      "cell_span_skipped_fraction": 0.9899955035971223,
+      "updates_by_sheet": [
+        164,
+        11,
+        2,
+        1
+      ]
+    }
+  ]
+}

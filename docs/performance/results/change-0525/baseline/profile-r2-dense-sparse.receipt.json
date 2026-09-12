@@ -1,0 +1,52 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--zero-before=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--dump-after=litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0525/baseline/profile-r2-dense-sparse.callgrind",
+    "/tmp/litchi-goal-0525/baseline-normal",
+    "--warmup",
+    "0",
+    "--samples",
+    "1",
+    "--case",
+    "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "--xlsx-cell-crud-shape",
+    "dense-sparse",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0525/baseline/profile-r2-dense-sparse.json"
+  ],
+  "start_utc": "2026-09-12T08:58:26.752503+00:00",
+  "end_utc": "2026-09-12T08:59:16.667744+00:00",
+  "seconds": 49.91524301600293,
+  "exit_code": 0,
+  "binary_sha256": "29477b1270773fa43a4e264a131d91e04fdd32899b7e4e2b430751c26b3670a8",
+  "source_manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+  "working_source_manifest_sha256": "4838d157514eb9479d080d475f32921f97c30acc3ca59da43ceb1626cd9c5d03",
+  "script_sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d",
+  "plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null,
+    "TMPDIR": "/home/zhuhe/litchi-goal-0525-target/test-tmp"
+  },
+  "artifacts": {
+    "profile-r2-dense-sparse.callgrind": "91a6d2999c841ed9fa8496f8df87235c1b601b9ed5a8f39418f8df023e5d8a5b",
+    "profile-r2-dense-sparse.callgrind.1": "b6b8916b01c185f4e5da59eca55b4a441f1ce2b09cd21165db7952c514460ac6",
+    "profile-r2-dense-sparse.callgrind.2": "d11e153250c8c2d01293d5c8ac0a4fb215590e3cc09dfb12875b3f57387a0f4c",
+    "profile-r2-dense-sparse.callgrind.3": "64ab7ee991ed976110f834ae2923d4179b4dc0cef346b8496a9b81d49e7d9b8b",
+    "profile-r2-dense-sparse.callgrind.4": "a07f5694846567eb301be4bd59b6d3a79ee1a489aa70045b8d79d3bddb064a17",
+    "profile-r2-dense-sparse.json": "905a253a0928e1a9f35ef2cced7b6cac526316747a43545994592aea84576de9",
+    "profile-r2-dense-sparse.stderr": "6d1b4b20189ae66111197e0c1e9830b16a940334382a61fc6bb4e31e51b68426",
+    "profile-r2-dense-sparse.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

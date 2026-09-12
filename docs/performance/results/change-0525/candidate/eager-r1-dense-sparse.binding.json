@@ -1,0 +1,15 @@
+{
+  "schema": "litchi-0525-eager-guard-binding-v1",
+  "stage": "candidate",
+  "name": "eager-r1-dense-sparse",
+  "primary_plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "eager_plan_sha256": "aff0ed66c6bca6ff6a16ef99f8e5c460d8e5c396f24700626f89cdff090a1650",
+  "run_script_sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d",
+  "guard_script_sha256": "6b1b8d10db40e838394a862c5a7527a12278a5e11f6c519b8cb3cdde15d43431",
+  "source_manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+  "binary_sha256": "339dc0abbc33575218f1a10303c53fe2cc0892787607db716ec7b082e1c038a7",
+  "receipt_sha256": "dafa43d4983b6ebf646b6e12bc7800b1dfc3790ffe978e9d2c2691da77da0170",
+  "command_sha256": "0ad6c5254290198513c2bed8e45012bf2a002d285c650bb9b7db043b2d691458",
+  "output": "candidate/eager-r1-dense-sparse.json",
+  "rss": "candidate/eager-r1-dense-sparse.rss.json"
+}

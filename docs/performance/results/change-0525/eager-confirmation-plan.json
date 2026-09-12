@@ -1,0 +1,124 @@
+{
+  "capture_root": "eager-confirmation",
+  "capture_wrapper": "eager_confirmation_guard.py",
+  "case": "xlsx_eager_cell_values_one_percent_edit_save",
+  "retained_helpers": {
+    "frozen_run": {
+      "path": "run.py",
+      "sha256": "1415937a8ee4602d5d8205c1b7fb98b84fd3d002d44758d3c5b8fe84a283b75d"
+    },
+    "numeric": {
+      "path": "analyze.py",
+      "sha256": "d1e2f5051e4dee2d90aed981499459a617d430fe5c37c42c80ac634b9bc106af"
+    },
+    "eager_companion": {
+      "path": "analyze_eager_guard.py",
+      "sha256": "d4317d90bc523389c66d417fcbdeb6c330eee44f59862964192104e2d15cf220"
+    }
+  },
+  "children": [
+    {
+      "binary_identity": "baseline/binary-normal.json",
+      "binary_path": "/tmp/litchi-goal-0525/baseline-normal",
+      "label": "A1",
+      "repeat": 1,
+      "source_manifest": "baseline/source-manifest.json",
+      "working_source_manifest": "candidate/source-manifest.json",
+      "stage": "baseline"
+    },
+    {
+      "binary_identity": "candidate/binary-normal.json",
+      "binary_path": "/tmp/litchi-goal-0525/candidate-normal",
+      "label": "B1",
+      "repeat": 1,
+      "source_manifest": "candidate/source-manifest.json",
+      "working_source_manifest": "candidate/source-manifest.json",
+      "stage": "candidate"
+    },
+    {
+      "binary_identity": "candidate/binary-normal.json",
+      "binary_path": "/tmp/litchi-goal-0525/candidate-normal",
+      "label": "B2",
+      "repeat": 2,
+      "source_manifest": "candidate/source-manifest.json",
+      "working_source_manifest": "candidate/source-manifest.json",
+      "stage": "candidate"
+    },
+    {
+      "binary_identity": "baseline/binary-normal.json",
+      "binary_path": "/tmp/litchi-goal-0525/baseline-normal",
+      "label": "A2",
+      "repeat": 2,
+      "source_manifest": "baseline/source-manifest.json",
+      "working_source_manifest": "candidate/source-manifest.json",
+      "stage": "baseline"
+    }
+  ],
+  "comparison_output": "eager-confirmation-comparison.json",
+  "cpu": 2,
+  "custody": {
+    "fresh_child_per_capture": true,
+    "fresh_child_per_sample": false,
+    "process_isolated": true,
+    "receipt_artifacts": [
+      "json",
+      "rss.json",
+      "stdout",
+      "stderr"
+    ],
+    "source_manifest_and_binary_hash_before_after_child": true
+  },
+  "frozen_at_utc": "2026-09-12T09:53:47.941874+00:00",
+  "gate": {
+    "p50_and_mean_max_adverse_change_percent": 5.0,
+    "paired_comparisons": [
+      "A1_vs_B1",
+      "A2_vs_B2"
+    ],
+    "primary_gain_claim": false,
+    "requires_both_pairs": true,
+    "review_every_over_five_percent_tail_or_rss": true
+  },
+  "metrics": {
+    "adverse_threshold_percent": 5.0,
+    "elapsed": "results[0].elapsed_ns",
+    "elapsed_statistics": [
+      "p50",
+      "p95",
+      "p99",
+      "mean"
+    ],
+    "retain_all_adverse": true,
+    "rss": "whole_child_process.max_rss_kib"
+  },
+  "oracle_reference": "baseline/eager-r2-dense-sparse.json",
+  "oracle_reference_sha256": "f1f30aed30b34fc8e964c8bf04ad5d2e464392bd132093012ddf1efc27f356a5",
+  "oracles": {
+    "corpus": "exactly_equal_to_oracle_reference",
+    "identity": "exact_corpus_sink_output_and_source_absence_across_children",
+    "operation_metrics_phase_vectors": "not_applicable",
+    "operation_metrics_source_status": "not_applicable",
+    "output_sha256": "exactly_equal_to_oracle_reference",
+    "result_source_field": "absent",
+    "sink": "exactly_equal_to_oracle_reference"
+  },
+  "order": [
+    "A1",
+    "B1",
+    "B2",
+    "A2"
+  ],
+  "owned_paths": [
+    "/tmp/litchi-goal-0525",
+    "/home/zhuhe/litchi-goal-0525-target"
+  ],
+  "primary_plan_sha256": "78d3fad228e4bd00476148044bbcffc8d48ec02f1e825b59c95385f92da40f97",
+  "purpose": "Bounded ABBA confirmation of the dense-sparse eager rewrite guard after the original r2 p99 tail flag; diagnostic only and no primary gain claim.",
+  "revision": "f08daf3976714dffebe37e40bd895d87266aaf8d",
+  "samples": 100,
+  "schema": "litchi-0525-eager-confirmation-plan-v1",
+  "shape": "dense-sparse",
+  "status": "frozen-supplemental-before-capture",
+  "tmpdir": "/home/zhuhe/litchi-goal-0525-target/test-tmp",
+  "warmup": 20
+}

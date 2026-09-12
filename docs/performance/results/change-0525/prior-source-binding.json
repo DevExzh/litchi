@@ -1,0 +1,8 @@
+{
+  "revision": "f08daf3976714dffebe37e40bd895d87266aaf8d",
+  "historical_manifest": "docs/performance/results/change-0522/baseline/source-manifest.json",
+  "historical_manifest_sha256": "837c58ada06400725a9152203d3daec3dce022068aa56f3731f58034ad294657",
+  "compared_xlsx_source_files": 451,
+  "mismatches": [],
+  "scope": "Retained profiles support candidate selection only; fresh matched binaries required for admission."
+}

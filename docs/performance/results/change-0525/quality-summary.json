@@ -1,0 +1,93 @@
+{
+  "status": "pass",
+  "stage": "candidate",
+  "checks": [
+    {
+      "name": "check-fmt.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "cadaf2c2e414bf1ccd8ebde5cd1dbcb653ec923d6067ff0f5d3892f924dd3031",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "140e1283a427fa907a10df773224278094a727b1fa6b365da54845cfecc7ab4d",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xlsx-tests.receipt.json",
+      "stage": "preflight-3",
+      "receipt_sha256": "070a691fc58f7e5eb4015fee2b4dd171f66e385040fa5d42966baf580da7ef4d",
+      "exit_code": 0,
+      "executed_tests": 1288
+    },
+    {
+      "name": "check-harness-noncompact-test.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "c81c6468c3393ccc9142c39ae66c2c39ea560e7d068550c6769127355dabec84",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-harness-test.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "e65def8250c418dd32778fa445cd683ccf4865f43225cca0ad2cb730c032da5f",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-harness-existing-metrics-tests.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "61fe530c3992cd4cee0a23f8ac3ab932d1b936c05c8416314a6733cd82cc1fab",
+      "exit_code": 0,
+      "executed_tests": 3
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "6cd367511daeee0fe899a42736af9eb83431b12f9264021bec26832e8592cc8d",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-clippy.receipt.json",
+      "stage": "preflight-3",
+      "receipt_sha256": "cd01af0716c98271ec5a94d1079f3b678ac2e2ebf99fad8cdc959e4d1dffd948",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "7c6747fe0d9bd30e910efabea540a4e5f945e990a6881f8b05e7bf84df2f7a61",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-rustdoc.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "16976d405a3630ff32abc4ccf36cbed52c83454c07f8c2710f0afc6e5d914cf3",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-boundaries.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "4377676a988032417d51d29b8880883103512baf53165fc64219954515f87ff9",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "stage": "candidate",
+      "receipt_sha256": "83655e4d2646518caf673f1046186f74cc10322e4f3852f74e2a79af2eae40be",
+      "exit_code": 0,
+      "executed_tests": 0
+    }
+  ],
+  "executed_tests": 1293,
+  "source_manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+  "alias_scope": "XLSX tests and Clippy reuse preflight-3 only on exact candidate manifest equality."
+}

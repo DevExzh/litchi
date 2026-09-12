@@ -1,0 +1,32 @@
+{
+  "schema": "litchi-0525-eager-guard-verification-adjustment-v1",
+  "stage": "baseline",
+  "status": "frozen-analyzer-replaced",
+  "failed_command": [
+    "python3",
+    "-B",
+    "eager_guard.py",
+    "baseline",
+    "analyze"
+  ],
+  "failed_analyzer": {
+    "path": "eager_guard.py",
+    "sha256": "6b1b8d10db40e838394a862c5a7527a12278a5e11f6c519b8cb3cdde15d43431",
+    "exit_code": 1,
+    "exception": "xlsx_0521_numerical.EvidenceError",
+    "message": "eager-r1-medium has no source evidence",
+    "failure": "BASE.validate_result requires result.source.xlsx_cell_values phase evidence"
+  },
+  "raw_report_fact": {
+    "path": "baseline/eager-r1-medium.json",
+    "result_source_field_present": false,
+    "operation_phase_vectors": "not_applicable"
+  },
+  "replacement": {
+    "path": "analyze_eager_guard.py",
+    "sha256": "d4317d90bc523389c66d417fcbdeb6c330eee44f59862964192104e2d15cf220",
+    "custody_authority": "eager_guard.py",
+    "runtime_comparison_performed": false
+  },
+  "scope": "Verification adjustment only; no capture or runtime comparison was performed by this record."
+}

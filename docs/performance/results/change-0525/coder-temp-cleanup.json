@@ -1,0 +1,10 @@
+{
+  "observed_utc": "2026-09-12T09:32:05.656027+00:00",
+  "paths": {
+    "/tmp/litchi-row-src-0525.Y1CGSj": "absent",
+    "/tmp/litchi-row-base-0525": "absent",
+    "/tmp/litchi-package-simplify-0525.rs": "absent",
+    "/tmp/row-reuse-candidate-0525.patch": "absent"
+  },
+  "scope": "Coder-owned draft source and follow-up copies; main capture scratch retained until completion."
+}

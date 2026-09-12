@@ -1,0 +1,4 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 41.36s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0525-target/debug/deps/litchi_xlsx-73b0086f175e6f45)
+error: test failed, to rerun pass `-p litchi-xlsx --lib`
