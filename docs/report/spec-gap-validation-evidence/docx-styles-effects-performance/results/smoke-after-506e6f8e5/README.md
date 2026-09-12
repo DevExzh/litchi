@@ -29,3 +29,8 @@ No matched before/after performance conclusion can be drawn from this smoke.
 The future after profile must use the reviewed matrix, fixture bytes, lockfile,
 resolved dependency closure, toolchain, flags, phase schema, and allocator/RSS
 definitions from `after-capture-plan.md`.
+
+`root-verification.json` is the independent root verifier result. Root restored
+all 167 raw files solely from commit `421ff35ce` to the recorded external path,
+ran the frozen `0aa99593` verifier, and confirmed byte equality with
+`smoke-verification.json`. The temporary restoration was removed afterward.
