@@ -1,0 +1,14 @@
+{
+  "created_utc": "2026-09-12T21:36:31.447949+00:00",
+  "stage": "before first baseline freeze/build/capture; candidate patch frozen separately before application",
+  "files": {
+    "plan.json": "3af53ad3cb369cc0df209ecd26a9dce2cacacf3fdc4cbd65edb0c926aead72d3",
+    "allocation-gates.json": "23da6353f1fffb1120ec37d97b8a829a029020586832a91272820764ccfea24f",
+    "quality-plan.json": "8199c8bda9a317decaf0c2675463c61c919c3fa2a5661e99f3b8642010e13d2a",
+    "run.py": "888c269c9a43cba3bbef48ac8f22600b91d717f4419a542c5f8865b0ff0a56b4",
+    "guard_run.py": "7aa05029afaf41737578142207747ecbe49a383f340e48071c6f32d1b5cc6858",
+    "baseline_phase.py": "0c9b5a7b238e9a2fbde25416b5806fbc12991d5b6d7f5cff7b70adf72d942447",
+    "candidate_phase.py": "848099b4cabc854cc548afcecb1b034f8d9575f2619fdb8ff3155bb64f7592f4",
+    "final_quality.py": "00cc1b476a7b838b7efb20ad139cce96a0b3eece2f7257a49ba8e28fc126b7d1"
+  }
+}

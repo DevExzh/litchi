@@ -1,0 +1,12 @@
+diff --git a/tools/perf-baseline/src/lib.rs b/tools/perf-baseline/src/lib.rs
+index 0450f9e4d..615233e37 100644
+--- a/tools/perf-baseline/src/lib.rs
++++ b/tools/perf-baseline/src/lib.rs
+@@ -45,6 +45,7 @@ mod security_corpus;
+ mod xls_numeric;
+ #[cfg(test)]
+ mod xlsx_commit_metrics_tests;
++pub mod xlsx_planning_guard;
+ pub mod xml_stream_audit;
+ pub mod zip_directory_spool;
+ 

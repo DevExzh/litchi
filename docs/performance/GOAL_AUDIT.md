@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0542: concrete progress; broad OLE2/OOXML goal remains active
+
+[0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) adds a measured valid/late-error planning guard and identifies why a
+shared XLSX traversal candidate cannot yet be retained. Valid native and memory
+gates pass, but three late-raw latency rows and a retained-validator overlap
+require a new candidate. Production is restored; the unmeasured follow-up and
+full evidence are retained. ODF optimization remains deferred until the
+OLE2/OOXML optimization goal completes.
+
 ## 0541: public XLSX planning first-error guards
 
 [0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. The

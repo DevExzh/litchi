@@ -1,0 +1,374 @@
+{
+  "abba": {
+    "lanes": 4,
+    "order": [
+      {
+        "lane": "native",
+        "repeat": 1,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T21:47:45.110078+00:00"
+      },
+      {
+        "lane": "native",
+        "repeat": 1,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T21:58:12.931073+00:00"
+      },
+      {
+        "lane": "native",
+        "repeat": 2,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T21:59:32.499147+00:00"
+      },
+      {
+        "lane": "native",
+        "repeat": 2,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T22:00:52.993320+00:00"
+      },
+      {
+        "lane": "alloc",
+        "repeat": 1,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T21:48:46.712700+00:00"
+      },
+      {
+        "lane": "alloc",
+        "repeat": 1,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T21:59:12.290766+00:00"
+      },
+      {
+        "lane": "alloc",
+        "repeat": 2,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T22:00:32.761617+00:00"
+      },
+      {
+        "lane": "alloc",
+        "repeat": 2,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T22:01:54.864191+00:00"
+      },
+      {
+        "lane": "guard-native",
+        "repeat": 1,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T21:48:54.773284+00:00"
+      },
+      {
+        "lane": "guard-native",
+        "repeat": 1,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T21:59:20.234043+00:00"
+      },
+      {
+        "lane": "guard-native",
+        "repeat": 2,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T22:00:40.716571+00:00"
+      },
+      {
+        "lane": "guard-native",
+        "repeat": 2,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T22:02:02.988276+00:00"
+      },
+      {
+        "lane": "guard-alloc",
+        "repeat": 1,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T21:49:00.708231+00:00"
+      },
+      {
+        "lane": "guard-alloc",
+        "repeat": 1,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T21:59:27.622852+00:00"
+      },
+      {
+        "lane": "guard-alloc",
+        "repeat": 2,
+        "stage": "candidate",
+        "start_utc": "2026-09-12T22:00:48.109077+00:00"
+      },
+      {
+        "lane": "guard-alloc",
+        "repeat": 2,
+        "stage": "baseline",
+        "start_utc": "2026-09-12T22:02:08.898459+00:00"
+      }
+    ],
+    "status": "pass"
+  },
+  "adr_entries": 30,
+  "adverse_review": {
+    "allocation_analysis_sha256": "1505dd6eb4a13131f16e18e1377f9e1a24ae4c1d62753ccd7bb1da03f9f90f7d",
+    "comparison_sha256": "844e3b94e8b1bc790f3331fef124c178b06f8942db357d4d6fa81e37528c2787",
+    "guard_analysis_sha256": "2c365c422684fe89871f0aac0d9584d447181725702ea48ac8525637957f26d2",
+    "plan_sha256": "3af53ad3cb369cc0df209ecd26a9dce2cacacf3fdc4cbd65edb0c926aead72d3",
+    "records": 577,
+    "status": "pass",
+    "unique_ids": 577
+  },
+  "allocation_gates_created_utc": "2026-09-12T21:27:29.813423+00:00",
+  "analyses": {
+    "allocation": {
+      "analyzer": "analyze_allocation.py",
+      "analyzer_sha256": "98919e3ef5bc0b5e7841811e44064e7d2377e2fc54ce0610c7db7ddf4e005f94",
+      "planning_gate_passed": true,
+      "report": "allocation-analysis.json",
+      "report_sha256": "1505dd6eb4a13131f16e18e1377f9e1a24ae4c1d62753ccd7bb1da03f9f90f7d",
+      "report_status": "pass",
+      "status": "pass"
+    },
+    "guard": {
+      "admission_status": "reject",
+      "analyzer": "analyze_guard.py",
+      "analyzer_sha256": "01ec1c938e0eb8b31b19404825d3e6e0818a32c595341ee3a6b2d25dfcb4ed00",
+      "report": "guard-analysis.json",
+      "report_sha256": "2c365c422684fe89871f0aac0d9584d447181725702ea48ac8525637957f26d2",
+      "report_status": "pass",
+      "status": "pass"
+    },
+    "native": {
+      "admission_status": "eligible-for-conditional-lanes",
+      "analyzer": "analyze.py",
+      "analyzer_sha256": "1383fd7814613dc1785af05d6d7f7b0d024acb23baadd1273ea7f2fe0d19cffb",
+      "native_admission": {
+        "decision": "eligible-for-conditional-lanes",
+        "passed": true,
+        "rows": [
+          {
+            "native_primary_planning_p50": {
+              "baseline": 13548238,
+              "candidate": 9970153,
+              "metric": "plan_ns",
+              "passed": true,
+              "reduction_percent": 26.40996563538373,
+              "required_reduction_percent": 10.0
+            },
+            "native_primary_total_mean": {
+              "baseline": 42386536.74999998,
+              "candidate": 38967429.420000024,
+              "passed": true,
+              "reduction_percent": 8.066493731644531,
+              "required_reduction_percent": 3.0
+            },
+            "native_primary_total_p50": {
+              "baseline": 42341986,
+              "candidate": 38948014,
+              "passed": true,
+              "reduction_percent": 8.015618351014522,
+              "required_reduction_percent": 3.0
+            },
+            "passed": true,
+            "planning_ir_conditional": {
+              "baseline": null,
+              "candidate": null,
+              "metric": "planning_ir",
+              "note": "Callgrind planning Ir is conditional and is not manufactured by native analysis.",
+              "required_reduction_percent": 5.0,
+              "status": "unmeasured",
+              "used_for_gate": false
+            },
+            "repeat": 1,
+            "shape": "dense-sparse"
+          },
+          {
+            "native_primary_planning_p50": {
+              "baseline": 7102543,
+              "candidate": 5305869,
+              "metric": "plan_ns",
+              "passed": true,
+              "reduction_percent": 25.29620728800938,
+              "required_reduction_percent": 10.0
+            },
+            "native_primary_total_mean": {
+              "baseline": 22035687.480000004,
+              "candidate": 20405417.29,
+              "passed": true,
+              "reduction_percent": 7.3983178036976085,
+              "required_reduction_percent": 3.0
+            },
+            "native_primary_total_p50": {
+              "baseline": 21941381,
+              "candidate": 20264004,
+              "passed": true,
+              "reduction_percent": 7.644810506685975,
+              "required_reduction_percent": 3.0
+            },
+            "passed": true,
+            "planning_ir_conditional": {
+              "baseline": null,
+              "candidate": null,
+              "metric": "planning_ir",
+              "note": "Callgrind planning Ir is conditional and is not manufactured by native analysis.",
+              "required_reduction_percent": 5.0,
+              "status": "unmeasured",
+              "used_for_gate": false
+            },
+            "repeat": 1,
+            "shape": "medium"
+          },
+          {
+            "native_primary_planning_p50": {
+              "baseline": 13539694,
+              "candidate": 9987121,
+              "metric": "plan_ns",
+              "passed": true,
+              "reduction_percent": 26.238207451364854,
+              "required_reduction_percent": 10.0
+            },
+            "native_primary_total_mean": {
+              "baseline": 43010515.27000001,
+              "candidate": 39054322.830000035,
+              "passed": true,
+              "reduction_percent": 9.198198196801036,
+              "required_reduction_percent": 3.0
+            },
+            "native_primary_total_p50": {
+              "baseline": 42962092,
+              "candidate": 39031293,
+              "passed": true,
+              "reduction_percent": 9.149459016101916,
+              "required_reduction_percent": 3.0
+            },
+            "passed": true,
+            "planning_ir_conditional": {
+              "baseline": null,
+              "candidate": null,
+              "metric": "planning_ir",
+              "note": "Callgrind planning Ir is conditional and is not manufactured by native analysis.",
+              "required_reduction_percent": 5.0,
+              "status": "unmeasured",
+              "used_for_gate": false
+            },
+            "repeat": 2,
+            "shape": "dense-sparse"
+          },
+          {
+            "native_primary_planning_p50": {
+              "baseline": 7103220,
+              "candidate": 5430660,
+              "metric": "plan_ns",
+              "passed": true,
+              "reduction_percent": 23.546504261447627,
+              "required_reduction_percent": 10.0
+            },
+            "native_primary_total_mean": {
+              "baseline": 21824445.494999997,
+              "candidate": 20428619.514999997,
+              "passed": true,
+              "reduction_percent": 6.3956996310389,
+              "required_reduction_percent": 3.0
+            },
+            "native_primary_total_p50": {
+              "baseline": 21818299,
+              "candidate": 20304719,
+              "passed": true,
+              "reduction_percent": 6.937204408097991,
+              "required_reduction_percent": 3.0
+            },
+            "passed": true,
+            "planning_ir_conditional": {
+              "baseline": null,
+              "candidate": null,
+              "metric": "planning_ir",
+              "note": "Callgrind planning Ir is conditional and is not manufactured by native analysis.",
+              "required_reduction_percent": 5.0,
+              "status": "unmeasured",
+              "used_for_gate": false
+            },
+            "repeat": 2,
+            "shape": "medium"
+          }
+        ],
+        "scope": "Every planned XLSX primary shape/repeat must meet measured workflow elapsed p50, total mean, and plan_ns p50 gates. Publication p50 and planning Ir are diagnostics/conditional evidence and do not enter native admission."
+      },
+      "report": "comparison.json",
+      "report_sha256": "844e3b94e8b1bc790f3331fef124c178b06f8942db357d4d6fa81e37528c2787",
+      "report_status": "pass",
+      "status": "pass"
+    }
+  },
+  "cleanup": {
+    "reason": "cleanup.json is pending",
+    "status": "pending"
+  },
+  "decision": {
+    "allocation_status": "pass",
+    "conditional": {
+      "eager": {
+        "receipts": 0,
+        "status": "not-captured"
+      },
+      "hardware": {
+        "receipts": 0,
+        "status": "not-captured"
+      },
+      "profile": {
+        "receipts": 0,
+        "status": "not-captured"
+      }
+    },
+    "decision": "rejected",
+    "final_stage": "baseline",
+    "guard_status": "pass",
+    "native_status": "pass",
+    "quality": {
+      "receipts": 8,
+      "stage": "baseline",
+      "test_counts": {
+        "executed": 1298,
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1298,
+        "result_lines": 59
+      }
+    }
+  },
+  "failed_attempt_receipts": 0,
+  "frozen_inputs_created_utc": "2026-09-12T21:36:31.447949+00:00",
+  "guard_reports": {
+    "expected": 48,
+    "reports": 48,
+    "status": "pass"
+  },
+  "next_candidate": {
+    "admission": "unmeasured-only",
+    "label": "unmeasured proposal",
+    "note": "next-priority.md",
+    "note_sha256": "77bf4716b0413ceaf0157553963ed87a4a074324e33558de3ec777884605bf2a",
+    "patch": "next-candidate.patch",
+    "patch_paths": [
+      "crates/litchi-xlsx/src/cell_values/validation.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/codec.rs",
+      "crates/litchi-xlsx/src/raw/worksheet/mod.rs"
+    ],
+    "patch_sha256": "83e325982227cbc2122f2bee8ec7b3aacda7cae2a18006f10c1cf12a1c708da8",
+    "provenance": "replayed against frozen candidate sources",
+    "status": "pass"
+  },
+  "performance_claim": "candidate decision is bound to replayed analyzer evidence",
+  "receipts": 111,
+  "scope": "0542 OOXML/XLSX shared worksheet traversal pilot; ODF deferred",
+  "seal": {
+    "reason": "SHA256SUMS is pending",
+    "status": "pending"
+  },
+  "source": {
+    "changed_files": [
+      "tools/perf-baseline/src/bin/xlsx_planning_guard.rs",
+      "tools/perf-baseline/src/lib.rs",
+      "tools/perf-baseline/src/xlsx_planning_guard.rs"
+    ],
+    "entries": 8589,
+    "manifest_sha256": "ffe0a317c546ecf26b77284105656ba3c2ae9576af926446e9ca666bfe5251c9"
+  },
+  "stages": [
+    "baseline",
+    "candidate"
+  ],
+  "status": "incomplete"
+}

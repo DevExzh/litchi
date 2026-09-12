@@ -1,0 +1,60 @@
+{
+  "decision": "reject",
+  "final_stage": "baseline",
+  "runtime_restored": true,
+  "native_passed": true,
+  "allocation_passed": true,
+  "guard_passed": false,
+  "full_test_count": 1298,
+  "performance_claim": "No retained runtime speedup; measured candidate only.",
+  "rationale": "Three of four late-raw native p50 rows exceed the frozen 2x baseline-valid envelope; post-EOF materialization failure repeats full validation/raw parsing and historical x14ac retry. Static review also requires dropping validator state before fallback to avoid overlapping error allocations.",
+  "refusal_failures": [
+    {
+      "baseline_valid_p50": 6569656,
+      "candidate_invalid_p50": 13453284,
+      "candidate_to_baseline_valid_ratio": 2.0477912389933355,
+      "case": "late-raw",
+      "max_allowed_ratio": 2.0,
+      "metric": "timing.edit_sheets.p50",
+      "passed": false,
+      "repeat": 1,
+      "shape": "medium"
+    },
+    {
+      "baseline_valid_p50": 11702116,
+      "candidate_invalid_p50": 23883112,
+      "candidate_to_baseline_valid_ratio": 2.040922513500977,
+      "case": "late-raw",
+      "max_allowed_ratio": 2.0,
+      "metric": "timing.edit_sheets.p50",
+      "passed": false,
+      "repeat": 1,
+      "shape": "dense-sparse"
+    },
+    {
+      "baseline_valid_p50": 11710008,
+      "candidate_invalid_p50": 23862327,
+      "candidate_to_baseline_valid_ratio": 2.037772049344458,
+      "case": "late-raw",
+      "max_allowed_ratio": 2.0,
+      "metric": "timing.edit_sheets.p50",
+      "passed": false,
+      "repeat": 2,
+      "shape": "dense-sparse"
+    }
+  ],
+  "retained_enabler": [
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/bin/xlsx_planning_guard.rs",
+    "tools/perf-baseline/src/xlsx_planning_guard.rs"
+  ],
+  "candidate_cap_tests_retained_in_live_source": false,
+  "conditional_lanes": "profile/hardware/eager unexecuted because refusal gate failed; prepared scripts have no performance evidence",
+  "baseline_manifest_sha256": "ffe0a317c546ecf26b77284105656ba3c2ae9576af926446e9ca666bfe5251c9",
+  "candidate_manifest_sha256": "5d80f6154fc01c256960f59c63e921357dea5a09ba5c6ea009badfabd849e51f",
+  "final_source_manifest_sha256": "ffe0a317c546ecf26b77284105656ba3c2ae9576af926446e9ca666bfe5251c9",
+  "comparison_sha256": "844e3b94e8b1bc790f3331fef124c178b06f8942db357d4d6fa81e37528c2787",
+  "allocation_analysis_sha256": "1505dd6eb4a13131f16e18e1377f9e1a24ae4c1d62753ccd7bb1da03f9f90f7d",
+  "guard_analysis_sha256": "2c365c422684fe89871f0aac0d9584d447181725702ea48ac8525637957f26d2",
+  "plan_sha256": "3af53ad3cb369cc0df209ecd26a9dce2cacacf3fdc4cbd65edb0c926aead72d3"
+}

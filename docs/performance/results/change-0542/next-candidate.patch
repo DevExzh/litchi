@@ -1,0 +1,103 @@
+--- a/crates/litchi-xlsx/src/cell_values/validation.rs
++++ b/crates/litchi-xlsx/src/cell_values/validation.rs
+@@ -202,15 +202,17 @@
+         |namespace, event| validator.observe(namespace, event),
+     );
+     match attempt {
+-        raw::worksheet::SourceParseAttempt::Parsed(cells) => {
++        raw::worksheet::SourceParseAttempt::Complete(parsed) => {
+             validator.finish()?;
+-            Ok(cells)
++            raw::worksheet::complete_source_parse(content, parsed)
+         },
+         raw::worksheet::SourceParseAttempt::ProvisionalFailed => {
++            drop(validator);
+             worksheet_xml(content)?;
+             raw::worksheet::parse(content, || Ok(None))
+         },
+         raw::worksheet::SourceParseAttempt::ReaderFailed => {
++            drop(validator);
+             worksheet_xml(content)?;
+             raw::worksheet::parse(content, || Ok(None))
+         },
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -1111,10 +1111,12 @@
+ /// Traverse one eligible source with the ordinary parser while giving a
+ /// caller-owned validator a borrowed view of each event first.
+ ///
+-/// Parser failures are deliberately not returned here. The source-backed
++/// Early parser failures are deliberately not returned here. The source-backed
+ /// caller repeats the established two-pass path so the historical error text
+ /// and precedence remain authoritative. Returning immediately on any
+-/// provisional failure drops the parser before fallback starts.
++/// provisional failure drops the parser before fallback starts. Once the
++/// observer accepts EOF, the finalization result is carried to the raw facade
++/// so its historical extension-error retry can still run.
+ pub(super) fn parse_source_with_observer<'a, F, O>(
+     content: &[u8],
+     strings: F,
+@@ -1167,8 +1169,5 @@
+         }
+     }
+ 
+-    match parser.finish_parse(strings) {
+-        Ok(store) => super::SourceParseAttempt::Parsed(store),
+-        Err(_) => super::SourceParseAttempt::ProvisionalFailed,
+-    }
++    super::SourceParseAttempt::Complete(parser.finish_parse(strings))
+ }
+--- a/crates/litchi-xlsx/src/raw/worksheet/mod.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/mod.rs
+@@ -38,7 +38,7 @@
+ pub(crate) const MAX_SHARED_PROVISIONAL_EVENTS: usize = 131_072;
+ 
+ pub(crate) enum SourceParseAttempt {
+-    Parsed(Store),
++    Complete(Result<Store>),
+     ProvisionalFailed,
+     ReaderFailed,
+ }
+@@ -77,6 +77,27 @@
+     codec::parse_source_with_observer(content, strings, observer)
+ }
+ 
++/// Finish a source-backed raw parse while retaining the historical x14ac
++/// retry that follows a plain worksheet parser failure.
++pub(crate) fn complete_source_parse(content: &[u8], parsed: Result<Store>) -> Result<Store> {
++    let needs_extension_capture = x14ac::may_contain_descent(content);
++    complete_source_parse_with_extension_state(content, needs_extension_capture, parsed)
++}
++
++fn complete_source_parse_with_extension_state(
++    content: &[u8],
++    needs_extension_capture: bool,
++    parsed: Result<Store>,
++) -> Result<Store> {
++    if parsed.is_err() && !needs_extension_capture {
++        // The extension scan historically ran first. Repeat it only on a
++        // rejected plain worksheet so its typed error and error precedence
++        // remain unchanged without charging successful no-extension reads.
++        x14ac::capture(content)?;
++    }
++    parsed
++}
++
+ pub(crate) fn parse<'a, F>(content: &[u8], strings: F) -> Result<Store>
+ where
+     F: FnOnce() -> Result<Option<&'a [Text]>>,
+@@ -94,13 +115,7 @@
+         model::Parser::parse(content, strings, extensions)
+     })();
+ 
+-    if parsed.is_err() && !needs_extension_capture {
+-        // The extension scan historically ran first. Repeat it only on a
+-        // rejected plain worksheet so its typed error and error precedence
+-        // remain unchanged without charging successful no-extension reads.
+-        x14ac::capture(content)?;
+-    }
+-    parsed
++    complete_source_parse_with_extension_state(content, needs_extension_capture, parsed)
+ }
+ 
+ pub(crate) fn parse_defaults(content: &[u8]) -> Result<Option<Defaults>> {

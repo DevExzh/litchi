@@ -1,5 +1,13 @@
 # Performance program phase report
 
+## 0542: no retained runtime speedup
+
+[0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) rejects the shared XLSX traversal candidate despite 6.9–9.1% measured
+workflow p50 reductions: three late-raw rows exceed 2x baseline-valid planning
+p50. Ordinary and invalid peak gates pass. The standalone planning guard is
+retained; production and candidate-only cap tests are restored to baseline.
+The next error-forwarding proposal is unmeasured.
+
 ## 0541: public XLSX planning first-error guards
 
 [0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. Six

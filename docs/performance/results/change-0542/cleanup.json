@@ -1,0 +1,20 @@
+{
+  "removed": [
+    "/home/zhuhe/litchi-goal-0542-target"
+  ],
+  "owned_paths_absent": true,
+  "accessible_process_references": [],
+  "patch_replay_temporary_directories_absent": true,
+  "retained_binary_sha256_before_removal": {
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/baseline-guard-alloc": "b2f1dce75a78e7d1406d68a60e8f8a2345179b6276d5694ceb24b367fba5e773",
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/baseline-alloc": "4f76647787832e0ec056d7c255e24fea146c04241723674b9ffcd6a7ccfe2229",
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/baseline-normal": "a2c4d45ff498f0ac527c19b2d50e05838a8be887f3135eea0739023c5aeae636",
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/baseline-guard-normal": "0b44837f16e931fb4ae31e38ba3f285f0ac060e55c75bc2b477563336988df43",
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/candidate-guard-alloc": "feacdd316d8b6457482bc1b318d5cf0087870dd00ab1dddb09d35cdbe0ed1e75",
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/candidate-alloc": "15029fe438c1e54e2dd046a9a73a7c7e7363a3e6ab5ad1ed8a9fc41110f3cbea",
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/candidate-normal": "abefeef03dbb5363084a99a958fb4d384d4841989fa2137455c05cc607efaa86",
+    "/home/zhuhe/litchi-goal-0542-target/retained-binaries/candidate-guard-normal": "3420385ae37a561d946cc88f16987f4e577c0f42702decd2754e08844a6e8b87"
+  },
+  "completed_utc": "2026-09-12T22:22:20.449190+00:00",
+  "scope": "Accessible /proc command lines, cwd/exe links and file descriptors checked before removing the sole owned target; verification temporary directories absent."
+}

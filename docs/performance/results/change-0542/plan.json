@@ -1,0 +1,138 @@
+{
+  "revision": "50bbf53d1c5ed4d799f7b0df1be74738a019a486",
+  "created_utc": "2026-09-12T21:18:57.891557+00:00",
+  "hypothesis": "Share worksheet XML event traversal between independent value-only validation and raw parser states, preserving original-source eligibility and whole-validator/per-worksheet error order.",
+  "harness_enabler": "Standalone planning refusal/empty-edit guard bin and harness-library implementation using existing operation-scoped Region; identical sources in both manifests.",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 200
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30,
+    "scope": "Operation-local planning,commit,publication global System allocation counters; two repeats eachshape eachbuild; no latency interpretation"
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::edit_sheets",
+    "scope": "Exact-name method capture; uniquely identify measured caller edge, retain lifecycle and termination dumps. No latency conversion."
+  },
+  "cpu": 2,
+  "admission": "Everyprimaryshape/repeat workflowp50/mean>=3% andplanningp50>=10% improvement. Ordinaryplanning allocation bytes/peak max<=1%increase; calls/reallocationsdiagnostic. Refusalguard candidateinvalidp50<=2x baselinevalidp50 andpeak<=1.10x baselinevalidpeak, eachshape/repeat. Every>5%adverse/drift individuallyreviewed. Ifpilotpasses, planningIr>=5%reduction andeager/noop guards/qualityrequired. Reject unboundedprovisionalstate orsemanticfailure.",
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0542-target"
+  ],
+  "native_order": [
+    "baseline native-r1 before candidate application",
+    "candidate native-r1",
+    "candidate native-r2",
+    "retained baseline native-r2 under candidate source checkout"
+  ],
+  "retained_baseline_custody": "Retained baseline binary and build manifest remain hash-bound; candidate checkout source is independently bound during final A2 and differs only in the frozen candidate file inventory.",
+  "status": "frozen-before-build-and-capture",
+  "resource_scope": "Private shared event traversal; no token buffer, no public/dependency/unsafe change; retain fullchecked attributes, namespace/grammar checks, MCE/x14ac/source/budget/errororder.",
+  "hardware": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 100,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole fresh child including corpus/setup/publication/oracles; diagnostic only, not isolated commit counters."
+  },
+  "candidate_source_roots": [
+    "crates/litchi-xlsx/src/cell_values/",
+    "crates/litchi-xlsx/src/raw/worksheet/"
+  ],
+  "candidate_source_binding": "Exact source file inventory and SHA256 values captured independently for each stage; candidate diff must be nonempty and entirely within candidate_source_roots. Harness source is identical. Review exact production/test patch before application.",
+  "gates": {
+    "total_p50_reduction_percent": 3.0,
+    "total_mean_reduction_percent": 3.0,
+    "planning_p50_reduction_percent": 10.0,
+    "planning_ir_reduction_percent": 5.0,
+    "require_every_shape_repeat": true
+  },
+  "conditional_lanes": {
+    "profile": "Required for retention only after pilot gates pass; preserved baseline binaries may run under candidate checkout.",
+    "hardware": "Diagnostic only after pilot gates pass.",
+    "eager": "Required before retention: xlsx_open_owned and xlsx_first_cell, same fresh baseline/candidate binaries and both corpusshapes; ordinary XLSX medium/dense-wide read controls; separate frozen lane."
+  },
+  "previous_turn": "Priority steering confirmed OLE2/OOXML first, ODF deferred; no implementation or measurement progress. Revalidated live agents and resumed 0542.",
+  "refusal_guard": {
+    "bin": "xlsx_planning_guard",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "cases": [
+      "valid",
+      "late-validator",
+      "late-raw"
+    ],
+    "repeats": 2,
+    "native_warmup": 5,
+    "native_samples": 30,
+    "allocation_warmup": 2,
+    "allocation_samples": 10,
+    "native_invalid_max_baseline_valid_ratio": 2.0,
+    "allocation_invalid_peak_max_baseline_valid_ratio": 1.1,
+    "ordinary_valid_max_regression_percent": 5.0,
+    "scope": "Operation-local planning only; setup/open/selector construction and result inspection/commit/drop outside region; valid-empty-edit commit is no-op oracle."
+  }
+}

@@ -45,6 +45,7 @@ mod security_corpus;
 mod xls_numeric;
 #[cfg(test)]
 mod xlsx_commit_metrics_tests;
+pub mod xlsx_planning_guard;
 pub mod xml_stream_audit;
 pub mod zip_directory_spool;
 

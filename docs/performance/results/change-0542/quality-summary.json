@@ -1,0 +1,61 @@
+{
+  "status": "pass",
+  "final_source": "baseline",
+  "final_checks": [
+    {
+      "command": "quality-tests",
+      "receipt": "baseline/final-quality-tests.receipt.json",
+      "sha256": "4dbf7da7be65a8647ce23f86a1a835e4f310db56bfc21d88d3950ddb4cf0d15e",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-check",
+      "receipt": "baseline/final-quality-check.receipt.json",
+      "sha256": "4f2113cbaaa9cc77cc2de839059756b131c344b0f07655cc9c522c65b683840f",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-clippy",
+      "receipt": "baseline/final-quality-clippy.receipt.json",
+      "sha256": "a673f528301356d1adc0a9c4d14f97b675523c1ac5fc7d8539df729a852dc80a",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-rustdoc",
+      "receipt": "baseline/final-quality-rustdoc.receipt.json",
+      "sha256": "f275c753a468dc4cc24665dcfe6dedb2105180772b0331d5ec2f2e0e44a5e4d2",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-fmt",
+      "receipt": "baseline/final-quality-fmt.receipt.json",
+      "sha256": "7a8043dc6e5acdee946904d6603c7e9edda6e1a6f22fa12f456ed0a700533b33",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-boundaries",
+      "receipt": "baseline/final-quality-boundaries.receipt.json",
+      "sha256": "0581ace7fbd252afee7ebb6429c5b0e7776d82bd2bb0b6464d1da6daeca29127",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-guard-clippy",
+      "receipt": "baseline/final-quality-guard-clippy.receipt.json",
+      "sha256": "64465e7cc33f3d6927b2a0f966369841f1c7131ef11efc9c38ce0c443d749933",
+      "exit_code": 0
+    },
+    {
+      "command": "quality-guard-fmt",
+      "receipt": "baseline/final-quality-guard-fmt.receipt.json",
+      "sha256": "0215ad1a6578b7b7f58e2a98012fb2947e50600584f623a933dd1f5a7d0a51ad",
+      "exit_code": 0
+    }
+  ],
+  "test_counts": {
+    "baseline/quality-tests": 1298,
+    "candidate/quality-tests": 1301,
+    "baseline/final-quality-tests": 1298
+  },
+  "total_test_executions": 3897,
+  "failed_build_or_capture_receipts": 0
+}
