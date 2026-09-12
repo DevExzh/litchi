@@ -1,0 +1,507 @@
+{
+  "status": "pass",
+  "schema": "litchi-0535-diagnostic-native-v1",
+  "plan_sha256": "6f1fa017c41d2e9e48043795509479dc28e566508c4eb7545c847fece4611d34",
+  "source_manifest_sha256": "9d6a53738f299107582b71e5ddab03922b9646771df4d77b639b3fdc7fd6ff75",
+  "binary_sha256": "caa376f8313f4c2342e20ca4d3ee5126b06805206581fe276dbf5a76ab94028a",
+  "helper_sha256": {
+    "docs/performance/results/change-0534/analyze.py": "0a01fd0a1a0f3daf7bba388b91d4529523753abdc903973aab37acff8690dbe2",
+    "docs/performance/results/change-0511/verify.py": "b2983f39fea25cfb121623dd9ef000df9c76ccba65e0ac4750d3e843e0477cf5"
+  },
+  "native_samples": 4000,
+  "profile_timing_samples_excluded": 20,
+  "native_rows": [
+    {
+      "name": "native-r1-xls",
+      "repeat": 1,
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "samples": 1000,
+      "identity": {
+        "case": "xls_owned_source_open_one_cell",
+        "corpus": {
+          "name": "xls-comments-opaque-heavy",
+          "generator": "litchi-xls-comments-opaque-heavy-v1",
+          "package_format": "XLS/CFB",
+          "shape": "256-comments-opaque-heavy",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 257,
+          "archive_member_count": 10,
+          "entry_bytes": 2097152,
+          "uncompressed_payload_bytes": 16858200,
+          "archive_bytes": 16995840,
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "target_entry": "Workbook",
+          "target_payload_bytes": 80946,
+          "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1",
+        "source": null
+      },
+      "report_sha256": "5f995910ddf182b8cd6e8f61d2b03637b153e453566b144c9fd6df09029ba1bd",
+      "receipt_sha256": "79f0fb1f7f6353fee991851ab553e9f90799d6f99c3879d4f7139137894ba566",
+      "timing_stats": {
+        "min": 89261,
+        "p50": 95615,
+        "p95": 107160,
+        "p99": 112910,
+        "max": 119580,
+        "mean": 96685.79000000004,
+        "standard_deviation": 4825.354225266716,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 96386.35416044177,
+          "upper": 96985.2258395583
+        }
+      },
+      "rss": {
+        "max_rss_kib": 147028,
+        "elapsed_seconds": 0.76,
+        "user_seconds": 0.59,
+        "system_seconds": 0.17
+      }
+    },
+    {
+      "name": "native-r1-cfb",
+      "repeat": 1,
+      "case": "cfb_open",
+      "shape": "few-large",
+      "samples": 1000,
+      "identity": {
+        "case": "cfb_open",
+        "corpus": {
+          "name": "cfb-few-large-incompressible",
+          "generator": "litchi-cfb-synthetic-v1",
+          "package_format": "CFB/OLE2",
+          "shape": "few-large",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 4,
+          "archive_member_count": 4,
+          "entry_bytes": 4194304,
+          "uncompressed_payload_bytes": 16777216,
+          "archive_bytes": 16912384,
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "target_entry": "benchmark_stream_00003.bin",
+          "target_payload_bytes": 4194304,
+          "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": null,
+        "source": null
+      },
+      "report_sha256": "5f1bbcb72817498b26c208e80777f415ba43c6021602086ec97e1fc6ec8d963f",
+      "receipt_sha256": "f1860cb1807b8c7429c0e22e40cd40848079c2ee477618a3158c72f1a2465c2f",
+      "timing_stats": {
+        "min": 68620,
+        "p50": 68840,
+        "p95": 74410,
+        "p99": 76200,
+        "max": 92420,
+        "mean": 69357.52999999996,
+        "standard_deviation": 1826.246411373641,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 69244.20285303808,
+          "upper": 69470.85714696183
+        }
+      },
+      "rss": {
+        "max_rss_kib": 49676,
+        "elapsed_seconds": 0.33,
+        "user_seconds": 0.19,
+        "system_seconds": 0.13
+      }
+    },
+    {
+      "name": "native-r2-cfb",
+      "repeat": 2,
+      "case": "cfb_open",
+      "shape": "few-large",
+      "samples": 1000,
+      "identity": {
+        "case": "cfb_open",
+        "corpus": {
+          "name": "cfb-few-large-incompressible",
+          "generator": "litchi-cfb-synthetic-v1",
+          "package_format": "CFB/OLE2",
+          "shape": "few-large",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 4,
+          "archive_member_count": 4,
+          "entry_bytes": 4194304,
+          "uncompressed_payload_bytes": 16777216,
+          "archive_bytes": 16912384,
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "target_entry": "benchmark_stream_00003.bin",
+          "target_payload_bytes": 4194304,
+          "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": null,
+        "source": null
+      },
+      "report_sha256": "dd46b146ef697a77fed1f1a97229d0700e684a84191af99cfd016510dc24a579",
+      "receipt_sha256": "d1ce2e843b64cad9c44806f8f619d679735e78c24ab6fe4ca75489aa2dde1a2a",
+      "timing_stats": {
+        "min": 74441,
+        "p50": 75790,
+        "p95": 81170,
+        "p99": 82450,
+        "max": 99110,
+        "mean": 76262.30700000004,
+        "standard_deviation": 1851.1619067915499,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 76147.4337298024,
+          "upper": 76377.18027019768
+        }
+      },
+      "rss": {
+        "max_rss_kib": 49736,
+        "elapsed_seconds": 0.33,
+        "user_seconds": 0.18,
+        "system_seconds": 0.14
+      }
+    },
+    {
+      "name": "native-r2-xls",
+      "repeat": 2,
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "samples": 1000,
+      "identity": {
+        "case": "xls_owned_source_open_one_cell",
+        "corpus": {
+          "name": "xls-comments-opaque-heavy",
+          "generator": "litchi-xls-comments-opaque-heavy-v1",
+          "package_format": "XLS/CFB",
+          "shape": "256-comments-opaque-heavy",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 257,
+          "archive_member_count": 10,
+          "entry_bytes": 2097152,
+          "uncompressed_payload_bytes": 16858200,
+          "archive_bytes": 16995840,
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "target_entry": "Workbook",
+          "target_payload_bytes": 80946,
+          "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1",
+        "source": null
+      },
+      "report_sha256": "280d3523e67ebff08c669bf01497cd52e6dd209054b97001199ef13e126e8f09",
+      "receipt_sha256": "421eaae1a43c167718b7016e203ba85899ef13aeecc58def34195102ae82553e",
+      "timing_stats": {
+        "min": 88720,
+        "p50": 95590,
+        "p95": 107590,
+        "p99": 114000,
+        "max": 179681,
+        "mean": 96794.53499999996,
+        "standard_deviation": 5869.797024248878,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 96430.28659088023,
+          "upper": 97158.78340911969
+        }
+      },
+      "rss": {
+        "max_rss_kib": 147032,
+        "elapsed_seconds": 0.77,
+        "user_seconds": 0.58,
+        "system_seconds": 0.18
+      }
+    }
+  ],
+  "profile_rows": [
+    {
+      "name": "profile-r1-xls-owned",
+      "repeat": 1,
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "samples": 5,
+      "identity": {
+        "case": "xls_owned_source_open_one_cell",
+        "corpus": {
+          "name": "xls-comments-opaque-heavy",
+          "generator": "litchi-xls-comments-opaque-heavy-v1",
+          "package_format": "XLS/CFB",
+          "shape": "256-comments-opaque-heavy",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 257,
+          "archive_member_count": 10,
+          "entry_bytes": 2097152,
+          "uncompressed_payload_bytes": 16858200,
+          "archive_bytes": 16995840,
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "target_entry": "Workbook",
+          "target_payload_bytes": 80946,
+          "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1",
+        "source": null
+      },
+      "report_sha256": "86488315e594420dd0c3c1b297c3d305577048e8c3aaa33976f43ea3a4d0e61d",
+      "receipt_sha256": "20648c948f5976a389b9ddd2be26387762b459feb685bcb3796838f145c5a051"
+    },
+    {
+      "name": "profile-r1-cfb-few-large",
+      "repeat": 1,
+      "case": "cfb_open",
+      "shape": "few-large",
+      "samples": 5,
+      "identity": {
+        "case": "cfb_open",
+        "corpus": {
+          "name": "cfb-few-large-incompressible",
+          "generator": "litchi-cfb-synthetic-v1",
+          "package_format": "CFB/OLE2",
+          "shape": "few-large",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 4,
+          "archive_member_count": 4,
+          "entry_bytes": 4194304,
+          "uncompressed_payload_bytes": 16777216,
+          "archive_bytes": 16912384,
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "target_entry": "benchmark_stream_00003.bin",
+          "target_payload_bytes": 4194304,
+          "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": null,
+        "source": null
+      },
+      "report_sha256": "25fc2fcabc92c4e5729a6a63db95d64bc251c9fdb0d9d53f50a118ec532b405b",
+      "receipt_sha256": "6d9a0f548ffa226e66d7720cef7c6ea0458c17a6d052e894c3b8d56c8256d053"
+    },
+    {
+      "name": "profile-r2-xls-owned",
+      "repeat": 2,
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "samples": 5,
+      "identity": {
+        "case": "xls_owned_source_open_one_cell",
+        "corpus": {
+          "name": "xls-comments-opaque-heavy",
+          "generator": "litchi-xls-comments-opaque-heavy-v1",
+          "package_format": "XLS/CFB",
+          "shape": "256-comments-opaque-heavy",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 257,
+          "archive_member_count": 10,
+          "entry_bytes": 2097152,
+          "uncompressed_payload_bytes": 16858200,
+          "archive_bytes": 16995840,
+          "archive_sha256": "6a57231ba681bc7bdd38d447ebd5348ef3b1fefedeefb1e61c97f22faa074e53",
+          "target_entry": "Workbook",
+          "target_payload_bytes": 80946,
+          "target_payload_sha256": "c78e03ba3743132e04b08bf6f4579ceb1c112a22c441c1e036381d3e06c6d041",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": "e726a50d216e6d71d7c53aabd23ab5e0d4677c3ef1f41fc35410143ebe6381c1",
+        "source": null
+      },
+      "report_sha256": "56f455fdb9d9c668d2797b8f9acf73624db15aa34a136e44fc714f457ddae440",
+      "receipt_sha256": "160998dc500440543765f54d099574c822dfe2dbfe935572ea1adbd8bc1c5aec"
+    },
+    {
+      "name": "profile-r2-cfb-few-large",
+      "repeat": 2,
+      "case": "cfb_open",
+      "shape": "few-large",
+      "samples": 5,
+      "identity": {
+        "case": "cfb_open",
+        "corpus": {
+          "name": "cfb-few-large-incompressible",
+          "generator": "litchi-cfb-synthetic-v1",
+          "package_format": "CFB/OLE2",
+          "shape": "few-large",
+          "payload_kind": "incompressible",
+          "compression": "none",
+          "entry_count": 4,
+          "archive_member_count": 4,
+          "entry_bytes": 4194304,
+          "uncompressed_payload_bytes": 16777216,
+          "archive_bytes": 16912384,
+          "archive_sha256": "4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+          "target_entry": "benchmark_stream_00003.bin",
+          "target_payload_bytes": 4194304,
+          "target_payload_sha256": "57d0fc8d7b94f2ef821acdb06ac16a3cd450572b825d4e26e0d400df5e838706",
+          "xlsx": null
+        },
+        "sink": null,
+        "output_sha256": null,
+        "source": null
+      },
+      "report_sha256": "928a17e1a478b7035b26eaeeba58b619ee78229ae39d084c739c3ed0ba1567f1",
+      "receipt_sha256": "5783bcc8212155adfe103fa4e5e39fa4dc86c6c49a93b5eed6e3572a36c4b11d"
+    }
+  ],
+  "same_build_variations_over_five_percent": [
+    {
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "timing_stats.max",
+      "first": 119580,
+      "second": 179681,
+      "change_percent": 50.26007693594246,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "timing_stats.standard_deviation",
+      "first": 4825.354225266716,
+      "second": 5869.797024248878,
+      "change_percent": 21.644893830036537,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metric": "rss.system_seconds",
+      "first": 0.17,
+      "second": 0.18,
+      "change_percent": 5.88235294117645,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.confidence_interval_95.lower",
+      "first": 69244.20285303808,
+      "second": 76147.4337298024,
+      "change_percent": 9.969399014406367,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.confidence_interval_95.upper",
+      "first": 69470.85714696183,
+      "second": 76377.18027019768,
+      "change_percent": 9.941324185227618,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.max",
+      "first": 92420,
+      "second": 99110,
+      "change_percent": 7.238692923609613,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.mean",
+      "first": 69357.52999999996,
+      "second": 76262.30700000004,
+      "change_percent": 9.955338663300296,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.min",
+      "first": 68620,
+      "second": 74441,
+      "change_percent": 8.482949577382692,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.p50",
+      "first": 68840,
+      "second": 75790,
+      "change_percent": 10.095874491574675,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.p95",
+      "first": 74410,
+      "second": 81170,
+      "change_percent": 9.084800430049732,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "timing_stats.p99",
+      "first": 76200,
+      "second": 82450,
+      "change_percent": 8.202099737532809,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "rss.system_seconds",
+      "first": 0.13,
+      "second": 0.14,
+      "change_percent": 7.692307692307709,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metric": "rss.user_seconds",
+      "first": 0.19,
+      "second": 0.18,
+      "change_percent": -5.263157894736848,
+      "repeat_first": 1,
+      "repeat_second": 2,
+      "review": "Retain both same-build observations. No causal attribution, sample removal, stable-tail or before/after speedup claim follows."
+    }
+  ],
+  "scope": "Two warm synthetic in-memory baseline scenarios; profile clocks excluded from native latency; normal allocator metrics unavailable; no candidate, allocation or speedup claim"
+}

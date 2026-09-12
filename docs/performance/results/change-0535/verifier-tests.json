@@ -1,0 +1,36 @@
+{
+  "checks": [
+    {
+      "name": "omitted-host-artifact",
+      "observed_refusal": "omitted-host-artifact raw artifact inventory differs",
+      "status": "pass"
+    },
+    {
+      "name": "forged-raw-vector-hash",
+      "observed_refusal": "forged-raw-vector-hash raw artifact custody differs: native-r1-xls.json",
+      "status": "pass"
+    },
+    {
+      "name": "unexpected-extra-artifact",
+      "observed_refusal": "unexpected-extra-artifact raw artifact inventory differs",
+      "status": "pass"
+    },
+    {
+      "name": "overlapping-capture-intervals",
+      "observed_refusal": "probe receipt intervals overlap",
+      "status": "pass"
+    },
+    {
+      "name": "forged-diagnostic-claim",
+      "observed_refusal": "plan envelope differs",
+      "status": "pass"
+    }
+  ],
+  "instruction_profile_rows": 4,
+  "native_rows": 4,
+  "prior_quality_checks": 14,
+  "prior_quality_executed_tests": 4382,
+  "receipt_inventory": 19,
+  "scope": "Five in-memory custody probes plus prior-quality, numeric, instruction-analysis, and receipt-inventory positive controls; no Rust execution or evidence writes.",
+  "status": "pass"
+}
