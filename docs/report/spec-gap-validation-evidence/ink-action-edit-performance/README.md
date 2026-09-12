@@ -51,8 +51,17 @@ PROFILE_ARM=candidate PROFILE_FROZEN=1 \
   bash docs/report/spec-gap-validation-evidence/ink-action-edit-performance/run_profile.sh
 ```
 
-The candidate timing run remains freeze-gated; its source pin and exact hash
-selection must pass independent review before capture.
+The approved paired capture is retained in the [baseline receipts](results/paired-baseline-e5c18ca/)
+and [candidate receipts](results/paired-candidate-251d361f/). The deterministic
+[matched comparison](results/matched-report.md) reports candidate-minus-baseline
+deltas for the retained bounded lanes and makes no package-wide performance
+claim.
+It can be regenerated from the retained receipts without starting a profile
+process:
+
+```sh
+python3 docs/report/spec-gap-validation-evidence/ink-action-edit-performance/compare.py
+```
 
 The frozen owner and semantic tests have already passed their repository gates:
 
