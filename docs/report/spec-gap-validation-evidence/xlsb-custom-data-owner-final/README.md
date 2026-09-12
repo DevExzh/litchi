@@ -59,3 +59,5 @@ The separate user-owned `tests/custom_data.rs` was not modified or included in
 this test selection. Its fixture uses compact `XmlPart` construction with
 formatting whitespace, omits `END_EXT_CONN14`, and uses an unsupported direct
 extension namespace. The new valid formatted physical-source regression passes.
+
+Supplemental independent review approves feature commit `16102fe75` and verifies the final v6 hashes and allocation audit; see `supplemental-review.json`.
