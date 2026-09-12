@@ -356,7 +356,12 @@ following normative checks are required before exposing an editable view:
   and boolean flags follow [`CT_PivotValueCellExtra:5614`](<../../../3rdparty/specs/[MS-XLSX]/2%20Structures/2.6%20Complex%20Types.md:5614>). XML Schema booleans on the extra flags accept `true`, `false`, `1`,
   or `0`; absence remains distinguishable from an explicit default. The `bc`
   and `fc` values are validated as `ST_UnsignedIntHex` per
-  [`CT_PivotValueCellExtra:5626`](<../../../3rdparty/specs/[MS-XLSX]/2%20Structures/2.6%20Complex%20Types.md:5626>). The `in` value is
+  [`CT_PivotValueCellExtra:5626`](<../../../3rdparty/specs/[MS-XLSX]/2%20Structures/2.6%20Complex%20Types.md:5626>).
+  The ECMA `sml.xsd` defines this type as `xsd:hexBinary` restricted to four
+  bytes: exactly eight hexadecimal digits after XML Schema whitespace
+  normalization. It is not a variable-width hexadecimal integer. Authored
+  changed values must retain that width; untouched lexical spellings remain
+  source-preserved. The `in` value is
   validated as `unsignedInt` per [`CT_PivotValueCellExtra:5624`](<../../../3rdparty/specs/[MS-XLSX]/2%20Structures/2.6%20Complex%20Types.md:5624>): the local value-valid parser accepts a leading
   `+` on digits and an all-zero negative spelling such as `-0`, while rejecting
   a negative nonzero value; the strict bound remains `in < actual C510
