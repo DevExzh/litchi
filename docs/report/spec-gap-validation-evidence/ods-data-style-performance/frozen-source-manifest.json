@@ -1,0 +1,25 @@
+{
+  "base_head": "d20f8402295c8a73a54faa25f8a424a70c092b36",
+  "candidate_commit": "a889b380cf48933fe1c0fb030988ca3b752dec2f",
+  "capture_scope": "historical_pre_correction_candidate",
+  "current_source_comparable": false,
+  "hash_algorithm": "sha256",
+  "files": {
+    "Cargo.lock": "9886ab7f4458ddcf4286fa686a420d9351f4cfc278552484c64791dd159fc282",
+    "crates/litchi-odf-common/src/core/binding_tracker.rs": "bbce8561226974fe7a6dfbb9afc76b2e2a39db9c6e21f7ac182f474700dac896",
+    "crates/litchi-odf-common/src/core/stream_xml.rs": "0a69000e09a77d8cd88bf668f4d70c556741a30881df462faaba297a6ef60c2a",
+    "crates/litchi-odf-common/src/core/xml_splice.rs": "4a3df5effdb0b500207a6e65fce69375e93682e282dbd2239bc27ded69e3cb38",
+    "crates/litchi-odf-common/tests/xml_splice_publication.rs": "b5d1c1e04a2f2b0898bf4f3c88a9aa19d33d2000c717650b7766b3222bd6e88b",
+    "crates/litchi-ods/src/advanced.rs": "cdded5bc00a8ed6b9775843ff8128ab0bf1ab227bb4b3e52cf419892a4e4ce5e",
+    "crates/litchi-ods/src/data_style/mod.rs": "df8c404ed5b5dfca309f4116e10239a0ee4be3cf8c4d985e42b98922cf5fdfc3",
+    "crates/litchi-ods/src/data_style/source.rs": "c56beaa6ed5e1f8cf77bf3a42006c3e2f016b890c7b1c3fdefad2a4886124ecf",
+    "crates/litchi-ods/src/document.rs": "ed61fcd31b997a3eea725a550cfc5645055aadad6e18bf0210c9e7f728a41fdc",
+    "crates/litchi-ods/tests/data_style_vocabulary.rs": "625edda3c176319bc87efabe1f3707d65e7b86a3a6a379cb4aee2d7b8a29858a"
+  },
+  "artifacts": {
+    "frozen-source.patch": "a14b8e8c7a33f86145b70d9b4b0c713e6739e1d1753105a07380d407979b41d0",
+    "frozen-source-delta.bundle": "bb0c1192861f30639b3be8869c4ac72d263a21ef8da651378494d0d350cd4c6b",
+    "frozen-Cargo.lock": "9886ab7f4458ddcf4286fa686a420d9351f4cfc278552484c64791dd159fc282",
+    "harness/Cargo.lock": "8043bb7c29e458b858249de77737f9ba5a339a6a346028df7265d44aa3d8b62e"
+  }
+}

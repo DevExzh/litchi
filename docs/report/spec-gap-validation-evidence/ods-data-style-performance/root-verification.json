@@ -1,0 +1,11 @@
+{
+  "scope": "historical pre-correction source; artifact verification only, no root binary rerun",
+  "source_manifest_sha256": "51f8f27e20c2bd3a3db5c431f7c1e5ba133173d93729e70096f22b525381aa0a",
+  "patch_replay_files": 9,
+  "separate_workspace_lock_verified": true,
+  "bundle_verified": true,
+  "receipt_rows_each": 10,
+  "non_timing_fields_equal": true,
+  "provenance_artifact_links_verified": true,
+  "temporary_index_removed": true
+}

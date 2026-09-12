@@ -1,0 +1,7 @@
+Command:
+TMPDIR=/var/tmp CARGO_TARGET_DIR=/var/tmp/ods-style-profile-frozen-target cargo run --manifest-path docs/report/spec-gap-validation-evidence/ods-data-style-performance/harness/Cargo.toml --locked --offline --quiet
+
+The command was run twice against the same frozen source and target. All ten
+rows had identical source/result sizes, allocation/deallocation counts, byte
+totals, and correctness flags. Only elapsed_us varied. The second run used
+the same fixture hashes recorded in README.md.
