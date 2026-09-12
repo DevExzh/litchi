@@ -1,0 +1,26 @@
+{
+  "schema": "litchi-0532-profile-retry-plan-v1",
+  "status": "frozen-before-retry",
+  "created_utc": "2026-09-12T15:28:04.949269+00:00",
+  "primary_plan_sha256": "cd9055e39a760143746d02f4a7a21f556f7c4cf9c45d91978283a51be4a49811",
+  "frozen_run_sha256": "b85672a757e7ea1e2aa747b76812d93c319dbee90b930c8c57db835024b8a712",
+  "failed_receipt_sha256": "c9ada7b08e7823d6b0582470bb4ef8feb28532e8efe1f98b846e3427ca04753c",
+  "failed_artifacts": {
+    "profile-r1-xls-owned.receipt.json": "c9ada7b08e7823d6b0582470bb4ef8feb28532e8efe1f98b846e3427ca04753c",
+    "profile-r1-xls-owned.stderr": "6054d896409ce61a1bf68c7d939d4e9d439d4148edde511190d8b4e8d6b968a4",
+    "profile-r1-xls-owned.callgrind": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "profile-r1-xls-owned.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "profile-r1-xls-owned.host.json": "064e732da6683424a6617c6ec70b5dd8190846a8b526e858cb6f69aac4d8993f"
+  },
+  "relocation": "Original baseline/profile-r1-xls-owned.* files moved byte-for-byte to failed-profile-initial before a fresh retry with distinct receipt time and profiler PID.",
+  "cause": "Valgrind failed writing 48 bytes to its /tmp vgdb shared memory file before profiling; no valid operation measurement from this attempt.",
+  "retry_extra_argument": "--vgdb=no",
+  "scope": "Disable unused debugger interface only; same binary, constructors, CPU, warmup, samples, corpus, and raw dump validation.",
+  "removed_failed_profiler_files": [
+    {
+      "path": "/tmp/vgdb-pipe-shared-mem-vgdb-2971009-by-zhuhe-on-???",
+      "mode": 33152,
+      "size": 0
+    }
+  ]
+}

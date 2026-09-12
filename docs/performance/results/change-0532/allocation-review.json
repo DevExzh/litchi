@@ -1,0 +1,511 @@
+{
+  "schema": "litchi-0532-allocation-review-v1",
+  "analysis_sha256": "78e977337ac75724548cc4ebbc213d30759a559badc4d608f51b8a0ea7f9a2cf",
+  "rows": [
+    {
+      "case": "xls_semantic_open",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            7260
+          ],
+          "second_unique": [
+            7260
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            307
+          ],
+          "second_unique": [
+            307
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            1015869
+          ],
+          "second_unique": [
+            1015869
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            698237
+          ],
+          "second_unique": [
+            698237
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_eager_open_list_worksheets",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            7263
+          ],
+          "second_unique": [
+            7263
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            307
+          ],
+          "second_unique": [
+            307
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            1015982
+          ],
+          "second_unique": [
+            1015982
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            698237
+          ],
+          "second_unique": [
+            698237
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_eager_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            7260
+          ],
+          "second_unique": [
+            7260
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            307
+          ],
+          "second_unique": [
+            307
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            1015869
+          ],
+          "second_unique": [
+            1015869
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            698237
+          ],
+          "second_unique": [
+            698237
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_source_backed_open",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            124
+          ],
+          "second_unique": [
+            124
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            25
+          ],
+          "second_unique": [
+            25
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            223742
+          ],
+          "second_unique": [
+            223742
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            191084
+          ],
+          "second_unique": [
+            191084
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            127
+          ],
+          "second_unique": [
+            127
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            25
+          ],
+          "second_unique": [
+            25
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            223807
+          ],
+          "second_unique": [
+            223807
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            191084
+          ],
+          "second_unique": [
+            191084
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_source_backed_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            126
+          ],
+          "second_unique": [
+            126
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            25
+          ],
+          "second_unique": [
+            25
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            223774
+          ],
+          "second_unique": [
+            223774
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            191084
+          ],
+          "second_unique": [
+            191084
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_owned_source_open",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            124
+          ],
+          "second_unique": [
+            124
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            25
+          ],
+          "second_unique": [
+            25
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            223742
+          ],
+          "second_unique": [
+            223742
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            191084
+          ],
+          "second_unique": [
+            191084
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            127
+          ],
+          "second_unique": [
+            127
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            25
+          ],
+          "second_unique": [
+            25
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            223807
+          ],
+          "second_unique": [
+            223807
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            191084
+          ],
+          "second_unique": [
+            191084
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            126
+          ],
+          "second_unique": [
+            126
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            25
+          ],
+          "second_unique": [
+            25
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            223774
+          ],
+          "second_unique": [
+            223774
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            191084
+          ],
+          "second_unique": [
+            191084
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "cfb_open",
+      "shape": "tiny",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            32
+          ],
+          "second_unique": [
+            32
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            1
+          ],
+          "second_unique": [
+            1
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            4456
+          ],
+          "second_unique": [
+            4456
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            3384
+          ],
+          "second_unique": [
+            3384
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "cfb_open",
+      "shape": "many-small",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            544
+          ],
+          "second_unique": [
+            544
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            7
+          ],
+          "second_unique": [
+            7
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            214186
+          ],
+          "second_unique": [
+            214186
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            193026
+          ],
+          "second_unique": [
+            193026
+          ],
+          "vectors_equal": true
+        }
+      }
+    },
+    {
+      "case": "cfb_open",
+      "shape": "few-large",
+      "metrics": {
+        "allocation_calls": {
+          "first_unique": [
+            29
+          ],
+          "second_unique": [
+            29
+          ],
+          "vectors_equal": true
+        },
+        "reallocation_calls": {
+          "first_unique": [
+            1
+          ],
+          "second_unique": [
+            1
+          ],
+          "vectors_equal": true
+        },
+        "allocated_bytes": {
+          "first_unique": [
+            213571
+          ],
+          "second_unique": [
+            213571
+          ],
+          "vectors_equal": true
+        },
+        "incremental_region_peak_live_bytes": {
+          "first_unique": [
+            205129
+          ],
+          "second_unique": [
+            205129
+          ],
+          "vectors_equal": true
+        }
+      }
+    }
+  ],
+  "scope": "Constructor/operation allocation regions only. Allocation, reallocation, allocated bytes and incremental region peak remain separate. Instrumented elapsed times and whole-process memory are not inferred from these counters. No before/after allocation gain is claimed."
+}

@@ -1,0 +1,83 @@
+{
+  "revision": "70e04d90181847ffe24c2ec8b8d5e1cd3b47981f",
+  "created_utc": "2026-09-12T15:18:04.530599+00:00",
+  "previous_turn": "progress: 0531 rejected after rebuilt candidate failed native gates; restored runtime and retained regression tests, quality and cleanup verified",
+  "scope": "Fresh current-head CFB/OLE2 constructor attribution and native/allocation baseline for residual ownership and physical reconciliation; no optimization admitted by this baseline",
+  "priority": "OLE2/OOXML active; ODF deferred until that goal completes; iWork excluded",
+  "hypothesis": "Per-sector out-of-line claim_sector success-path ABI/prologue and repeated reconciliation bounds may account for material residual work; confirm raw exclusive cost and generated code before a semantics-preserving candidate",
+  "cpu": 2,
+  "groups": {
+    "xls": {
+      "cases": [
+        "xls_semantic_open",
+        "xls_eager_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open",
+        "xls_source_backed_open_list_worksheets",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ]
+    },
+    "cfb": {
+      "cases": [
+        "cfb_open"
+      ],
+      "shapes": [
+        "tiny",
+        "many-small",
+        "few-large"
+      ],
+      "payload": "incompressible"
+    }
+  },
+  "native": {
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 1000,
+    "order": [
+      "r1 xls",
+      "r1 cfb",
+      "r2 cfb",
+      "r2 xls"
+    ]
+  },
+  "allocation": {
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30,
+    "scope": "Existing constructor/operation clock with canonical operation-global System allocator region; excludes construction of input fixtures, correctness oracles, report construction and object drop"
+  },
+  "profile": {
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "jobs": [
+      "xls-owned",
+      "cfb-tiny",
+      "cfb-many-small",
+      "cfb-few-large"
+    ],
+    "xls_owner": "litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "cfb_owner": "litchi_cfb::file::OleFile<R>::open",
+    "scope": "Parent-constructor toggles preserve positive incoming scope and separate exclusive owner costs without millions of per-sector dumps. Collection/claim/reconciliation are not fused. Source-line and disassembly evidence will distinguish work from call overhead."
+  },
+  "hardware": {
+    "repeats": 2,
+    "case": "xls_owned_source_open_one_cell",
+    "warmup": 0,
+    "samples": 1000,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole-child diagnostic including setup/copies/queries/oracles/drop/report; no operation-local hardware claim; unavailable or multiplexed groups cannot support claims"
+  },
+  "review": {
+    "same_build_adverse_percent": 5,
+    "policy": "Retain every same-build variation and any failed/unsupported diagnostic. No optimization admission from this baseline alone. Allocation enabler requires alignment, explicit unavailable normal mode, checked measured values and preserved timer/oracle boundaries."
+  },
+  "owned_paths": [
+    "/tmp/litchi-goal-0532",
+    "/home/zhuhe/litchi-goal-0532-target"
+  ],
+  "status": "frozen-before-build-and-capture"
+}

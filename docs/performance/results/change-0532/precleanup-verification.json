@@ -1,0 +1,44 @@
+{
+  "status": "pass",
+  "scope": "Complete source/build/assembly/capture/native/allocation/profile/mechanism/hardware/variation/quality replay before owned cleanup",
+  "receipt_inventory": {
+    "status": "pass",
+    "successful_receipts": 56,
+    "receipt_names_sha256": "bb15d084758affd8536f3a9a7b9a944cfe905d2a517f0e41c6f9967fff0be7da"
+  },
+  "timeline": {
+    "status": "pass",
+    "successful_receipts": 56,
+    "retained_failed_attempts": 1,
+    "serial_intervals": 57,
+    "first": "build-normal",
+    "last": "check-owner-rustdoc"
+  },
+  "quality": {
+    "status": "pass",
+    "path": "quality-summary.json",
+    "sha256": "36418843acb841fa2293bde062da53debef1af071b9817e5decbc5083ad0c17c",
+    "checks": 5,
+    "executed_tests": 1957,
+    "reuse": {
+      "status": "pass",
+      "path": "quality-reuse.json",
+      "sha256": "b681eed016c73ac0571491e3ffec9d6c0f018fee4df38c86c164c3ea676b8a4b",
+      "prior_tests": 4757,
+      "prior_replay": {
+        "quality": {
+          "path": "restored-quality-summary.json",
+          "sha256": "5f3447aa59b29d1f615301ce1ecc760b8487c8af3f4825d5789bc1749395e55c",
+          "stage": "restored",
+          "checks": 8,
+          "executed_tests": 4757
+        },
+        "seal": {
+          "path": "SHA256SUMS",
+          "entries": 998,
+          "sha256": "f178a86d44ceeacc4c1fc9ab1c23fb9d25f018146959b38cba80a07997389168"
+        }
+      }
+    }
+  }
+}

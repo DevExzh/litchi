@@ -1,0 +1,14 @@
+{
+  "schema": "litchi-0532-quality-reuse-v1",
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "prior_bundle": "change-0531",
+  "prior_source_manifest": "restored/source-manifest.json",
+  "prior_source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "prior_quality_summary": "restored-quality-summary.json",
+  "prior_quality_summary_sha256": "5f3447aa59b29d1f615301ce1ecc760b8487c8af3f4825d5789bc1749395e55c",
+  "prior_verifier_sha256": "ccc174a87203a4ed5d634bd84875e88009aa2555630e2030a655d5463228fa47",
+  "prior_seal_sha256": "f178a86d44ceeacc4c1fc9ab1c23fb9d25f018146959b38cba80a07997389168",
+  "source_maps_equal": true,
+  "successful_test_executions": 4757,
+  "scope": "All Rust and standalone harness sources/configurations match the fully verified0531 restored source. Reuse its eight applicable gates; add fresh CFB/XLS owner checks for this measurement batch."
+}

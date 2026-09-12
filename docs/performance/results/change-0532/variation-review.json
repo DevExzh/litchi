@@ -1,0 +1,8 @@
+{
+  "schema": "litchi-0532-variation-review-v1",
+  "analysis_sha256": "78e977337ac75724548cc4ebbc213d30759a559badc4d608f51b8a0ea7f9a2cf",
+  "complete": true,
+  "variations": [],
+  "threshold_percent": 5,
+  "review": "No native p50/p95/p99/mean or whole-child peak-RSS repeat difference crossed the frozen five-percent review threshold. All24 native rows and24000samples remain included. Two repeats on one shared host do not prove a universal noise bound; this is baseline evidence, not a candidate admission."
+}

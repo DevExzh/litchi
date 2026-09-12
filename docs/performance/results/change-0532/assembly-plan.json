@@ -1,0 +1,13 @@
+{
+  "schema": "litchi-0532-assembly-plan-v1",
+  "status": "frozen-before-inspection",
+  "owners": [
+    "claim_sector",
+    "validate_stream_allocations",
+    "validate_physical_sector_layout"
+  ],
+  "binary_sha256": "ad0e47d21c12359440259dc466baa0048168a9f936137bdcb9d51fe9797d921d",
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "script_sha256": "33d074d1c574260e9c55012300bc2bf321ae2e6d6d1e0459d558638843800509",
+  "scope": "Disassembly explains measured code shape; static instructions are not a latency or dynamic-count claim."
+}

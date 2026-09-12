@@ -1,0 +1,33 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "check-cfb-tests",
+      "receipt_sha256": "144a14267e8415ca22a8540ebd11fa307851a5e816420d4eb56a5885fa8edb4d",
+      "executed_tests": 306
+    },
+    {
+      "name": "check-cfb-no-default-tests",
+      "receipt_sha256": "645ff41e6cd908cf9c51222b33c082dd5c0cc94298a1a16836a2a87c94c798d1",
+      "executed_tests": 306
+    },
+    {
+      "name": "check-xls-tests",
+      "receipt_sha256": "aaf8fa743ebae3e1e946a4adae00a239b5d1527bbc1920652b6515cced877a33",
+      "executed_tests": 1345
+    },
+    {
+      "name": "check-owner-clippy",
+      "receipt_sha256": "8e31d9c16c51210400fd2c77f9a44efdb2060d553da1877d8bb99f5e47aaeba8",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-owner-rustdoc",
+      "receipt_sha256": "72038f8d7cf1fe5e9916745c41ad7da746c3c3c2179cc6a9168baab904c87e6b",
+      "executed_tests": 0
+    }
+  ],
+  "executed_tests": 1957,
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "checks_script_sha256": "632df05fb4676f668b0e8b6acf4ac81eb5d1058f85e7ac0a2829b7c35205ba48"
+}

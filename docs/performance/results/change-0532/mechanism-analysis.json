@@ -1,0 +1,882 @@
+{
+  "schema": "litchi-0532-claim-mechanism-v1",
+  "status": "pass",
+  "performance_claim": "none",
+  "bindings": {
+    "profile-analysis.json": "7b2c87f5b0dd8783e7b06d74aa2f411c448b74f837ea09f3146b9ee195e2e1fa",
+    "analysis.json": "78e977337ac75724548cc4ebbc213d30759a559badc4d608f51b8a0ea7f9a2cf",
+    "assembly-index.json": "43e77b7c6662db2284c2e3e4a1f3c5ab0d29e0d578e67a903a6e48566f36f544",
+    "baseline/source-manifest.json": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514"
+  },
+  "source_geometry": {
+    "generator": "tools/perf-baseline/src/lib.rs",
+    "writer_default": "crates/litchi-cfb/src/writer/core.rs",
+    "sector_bytes": 512
+  },
+  "code": [
+    {
+      "name": "assembly-claim_sector-0",
+      "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E",
+      "bytes": 363,
+      "stack_reservation_bytes": 112,
+      "success_path_instruction_count": 15,
+      "entry_instructions": [
+        "push   %rbx",
+        "sub    $0x70,%rsp",
+        "mov    %rdi,%rbx",
+        "mov    %ecx,0xc(%rsp)",
+        "mov    %ecx,%eax",
+        "cmp    %rax,%rdx",
+        "jbe    2818fd5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E+0xc5>",
+        "movzbl (%rsi,%rax,1),%ecx",
+        "test   %cl,%cl",
+        "je     281906a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E+0x15a>"
+      ],
+      "success_instructions": [
+        "mov    %r8b,(%rsi,%rax,1)",
+        "movq   $0xb,(%rbx)",
+        "add    $0x70,%rsp",
+        "pop    %rbx",
+        "ret"
+      ],
+      "assembly_sha256": "87749a62904999e822f5e91bcc1dd301d65fda121345f26cd6c9d02e834434a5"
+    },
+    {
+      "name": "assembly-claim_sector-1",
+      "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E",
+      "bytes": 363,
+      "stack_reservation_bytes": 112,
+      "success_path_instruction_count": 15,
+      "entry_instructions": [
+        "push   %rbx",
+        "sub    $0x70,%rsp",
+        "mov    %rdi,%rbx",
+        "mov    %ecx,0xc(%rsp)",
+        "mov    %ecx,%eax",
+        "cmp    %rax,%rdx",
+        "jbe    178d895 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E+0xc5>",
+        "movzbl (%rsi,%rax,1),%ecx",
+        "test   %cl,%cl",
+        "je     178d92a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E+0x15a>"
+      ],
+      "success_instructions": [
+        "mov    %r8b,(%rsi,%rax,1)",
+        "movq   $0xb,(%rbx)",
+        "add    $0x70,%rsp",
+        "pop    %rbx",
+        "ret"
+      ],
+      "assembly_sha256": "82b4d6ee5131be4e73b4ef4258cefc237e3f1a10ffa824c5b216b1932fac2d22"
+    },
+    {
+      "name": "assembly-claim_sector-2",
+      "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE",
+      "bytes": 363,
+      "stack_reservation_bytes": 112,
+      "success_path_instruction_count": 15,
+      "entry_instructions": [
+        "push   %rbx",
+        "sub    $0x70,%rsp",
+        "mov    %rdi,%rbx",
+        "mov    %ecx,0xc(%rsp)",
+        "mov    %ecx,%eax",
+        "cmp    %rax,%rdx",
+        "jbe    1f63f25 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE+0xc5>",
+        "movzbl (%rsi,%rax,1),%ecx",
+        "test   %cl,%cl",
+        "je     1f63fba <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE+0x15a>"
+      ],
+      "success_instructions": [
+        "mov    %r8b,(%rsi,%rax,1)",
+        "movq   $0xb,(%rbx)",
+        "add    $0x70,%rsp",
+        "pop    %rbx",
+        "ret"
+      ],
+      "assembly_sha256": "04cce90037efe3367385a50f1f761e927302806dd170acaf945df77b0bff35f4"
+    },
+    {
+      "name": "assembly-claim_sector-3",
+      "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE",
+      "bytes": 363,
+      "stack_reservation_bytes": 112,
+      "success_path_instruction_count": 15,
+      "entry_instructions": [
+        "push   %rbx",
+        "sub    $0x70,%rsp",
+        "mov    %rdi,%rbx",
+        "mov    %ecx,0xc(%rsp)",
+        "mov    %ecx,%eax",
+        "cmp    %rax,%rdx",
+        "jbe    285b3b5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE+0xc5>",
+        "movzbl (%rsi,%rax,1),%ecx",
+        "test   %cl,%cl",
+        "je     285b44a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE+0x15a>"
+      ],
+      "success_instructions": [
+        "mov    %r8b,(%rsi,%rax,1)",
+        "movq   $0xb,(%rbx)",
+        "add    $0x70,%rsp",
+        "pop    %rbx",
+        "ret"
+      ],
+      "assembly_sha256": "b122996842cbe30fe974522b07e4a8b44dcac6a352c6889a755d89299a07436d"
+    },
+    {
+      "name": "assembly-claim_sector-4",
+      "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E",
+      "bytes": 363,
+      "stack_reservation_bytes": 112,
+      "success_path_instruction_count": 15,
+      "entry_instructions": [
+        "push   %rbx",
+        "sub    $0x70,%rsp",
+        "mov    %rdi,%rbx",
+        "mov    %ecx,0xc(%rsp)",
+        "mov    %ecx,%eax",
+        "cmp    %rax,%rdx",
+        "jbe    2f19cb5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E+0xc5>",
+        "movzbl (%rsi,%rax,1),%ecx",
+        "test   %cl,%cl",
+        "je     2f19d4a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E+0x15a>"
+      ],
+      "success_instructions": [
+        "mov    %r8b,(%rsi,%rax,1)",
+        "movq   $0xb,(%rbx)",
+        "add    $0x70,%rsp",
+        "pop    %rbx",
+        "ret"
+      ],
+      "assembly_sha256": "3d3892235e0fbc70ddd949070ec9abc75153038cead2feeb569a0ddcba1e1416"
+    },
+    {
+      "name": "assembly-claim_sector-5",
+      "symbol": "_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E",
+      "bytes": 363,
+      "stack_reservation_bytes": 112,
+      "success_path_instruction_count": 15,
+      "entry_instructions": [
+        "push   %rbx",
+        "sub    $0x70,%rsp",
+        "mov    %rdi,%rbx",
+        "mov    %ecx,0xc(%rsp)",
+        "mov    %ecx,%eax",
+        "cmp    %rax,%rdx",
+        "jbe    2833d55 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E+0xc5>",
+        "movzbl (%rsi,%rax,1),%ecx",
+        "test   %cl,%cl",
+        "je     2833dea <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E+0x15a>"
+      ],
+      "success_instructions": [
+        "mov    %r8b,(%rsi,%rax,1)",
+        "movq   $0xb,(%rbx)",
+        "add    $0x70,%rsp",
+        "pop    %rbx",
+        "ret"
+      ],
+      "assembly_sha256": "36a8537fcbcaa8ce4ddcef5d58204e01631dddd4bbb3db11af77b4953335a681"
+    }
+  ],
+  "caller_code": [
+    {
+      "name": "assembly-validate_stream_allocations-0",
+      "claim_call_sites": [
+        "286017d:\te8 6e b1 ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+        "286053f:\te8 ac ad ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>"
+      ],
+      "assembly_sha256": "1d83557c3db366397ed3bdac3e2fed1cc1f07ad5b8cad8fea17a31164e031f29"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-1",
+      "claim_call_sites": [
+        "28221bd:\te8 4e 6d ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+        "282257f:\te8 8c 69 ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+      ],
+      "assembly_sha256": "931bf3546b55c03345caae927117c1a2e33d8aaf22c5218b21ec4c25d1937085"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-2",
+      "claim_call_sites": [
+        "179975d:\te8 6e 40 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+        "1799b1f:\te8 ac 3c ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+      ],
+      "assembly_sha256": "3157a657dd21bbd61c65afb09e6eb9437dfcc713a1c6ebce995435399632d73a"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-3",
+      "claim_call_sites": [
+        "1799f9d:\te8 2e 38 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+        "179a35f:\te8 6c 34 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+      ],
+      "assembly_sha256": "1a7c1972538be6b511352d4bab42b8366b1efacfb286d2738159b5f65c72cb7f"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-4",
+      "claim_call_sites": [
+        "1f6afad:\te8 ae 8e ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+        "1f6b36f:\te8 ec 8a ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>"
+      ],
+      "assembly_sha256": "f89b3ef991babcdce3b20548c4ea51abc3a0d7299d18b6e2fa11d103811616bb"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-5",
+      "claim_call_sites": [
+        "28229fd:\te8 0e 65 ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>",
+        "2822dbf:\te8 4c 61 ff ff       \tcall   2818f10 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h098a45d827051878E>"
+      ],
+      "assembly_sha256": "13bee8cce67badf978781788cc1bba015c3d0cf6b1d197df025608f6007c8830"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-6",
+      "claim_call_sites": [
+        "2836c0d:\te8 7e d0 ff ff       \tcall   2833c90 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E>",
+        "2836fcf:\te8 bc cc ff ff       \tcall   2833c90 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17he3aeaa99c224a891E>"
+      ],
+      "assembly_sha256": "ed5ab2d508ce73f8409a2478b442bc948d61abd6b72c99f5df5a891d8ea081f6"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-7",
+      "claim_call_sites": [
+        "28609bd:\te8 2e a9 ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>",
+        "2860d7f:\te8 6c a5 ff ff       \tcall   285b2f0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h606e7a877c8f68efE>"
+      ],
+      "assembly_sha256": "6aed316787f897d991407e138da766b35ad1afa8010764ef80b2e50e456c5b39"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-8",
+      "claim_call_sites": [
+        "2f222ad:\te8 3e 79 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>",
+        "2f2273f:\te8 ac 74 ff ff       \tcall   2f19bf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h707ec80d6702e8a2E>"
+      ],
+      "assembly_sha256": "3f6257225a5795cfa23feef2aaed27410a4799a75bba9bca8a54b72380d47afb"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-9",
+      "claim_call_sites": [
+        "1f6b7ed:\te8 6e 86 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>",
+        "1f6bbaf:\te8 ac 82 ff ff       \tcall   1f63e60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h1abbbc64dbfa0c4dE>"
+      ],
+      "assembly_sha256": "f6f3da450de32cbf3451b1d9071f9c2c71f8f2caa34b7d25234a3fac4f1345d7"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-10",
+      "claim_call_sites": [
+        "179a7dd:\te8 ee 2f ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+        "179ab9f:\te8 2c 2c ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+      ],
+      "assembly_sha256": "b25f27aa540728d682f1805e091d63eb98bb63888073311033fddb86f887e069"
+    },
+    {
+      "name": "assembly-validate_stream_allocations-11",
+      "claim_call_sites": [
+        "179b01d:\te8 ae 27 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>",
+        "179b3df:\te8 ec 23 ff ff       \tcall   178d7d0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$12claim_sector17h17b4e8ac7b40ce90E>"
+      ],
+      "assembly_sha256": "0819c0f01991958cc2a97fb52124ec62939dba77a977f8a13da6f26b44318f7d"
+    }
+  ],
+  "rows": [
+    {
+      "name": "profile-r1-xls-owned",
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "repeat": 1,
+      "archive_bytes": 16995840,
+      "physical_sectors": 33194,
+      "claims": [
+        {
+          "dump": "baseline/profile-r1-xls-owned.callgrind.1",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-xls-owned.callgrind.2",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-xls-owned.callgrind.3",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-xls-owned.callgrind.4",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-xls-owned.callgrind.5",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 13973372,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 2489550,
+          "share_percent": 17.816386767632036,
+          "rank": 1
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 1991710,
+          "share_percent": 14.253610366917878,
+          "rank": 2
+        },
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 1979410,
+          "share_percent": 14.165585801337,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          126
+        ],
+        "reallocation_calls": [
+          25
+        ],
+        "allocated_bytes": [
+          223774
+        ],
+        "incremental_region_peak_live_bytes": [
+          191084
+        ]
+      }
+    },
+    {
+      "name": "profile-r1-cfb-tiny",
+      "case": "cfb_open",
+      "shape": "tiny",
+      "repeat": 1,
+      "archive_bytes": 3584,
+      "physical_sectors": 6,
+      "claims": [
+        {
+          "dump": "baseline/profile-r1-cfb-tiny.callgrind.2",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-tiny.callgrind.3",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-tiny.callgrind.4",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-tiny.callgrind.5",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-tiny.callgrind.6",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 245142,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 4285,
+          "share_percent": 1.7479664847312986,
+          "rank": 1
+        },
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 450,
+          "share_percent": 0.18356707540935457,
+          "rank": 2
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 430,
+          "share_percent": 0.17540853872449438,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          32
+        ],
+        "reallocation_calls": [
+          1
+        ],
+        "allocated_bytes": [
+          4456
+        ],
+        "incremental_region_peak_live_bytes": [
+          3384
+        ]
+      }
+    },
+    {
+      "name": "profile-r1-cfb-many-small",
+      "case": "cfb_open",
+      "shape": "many-small",
+      "repeat": 1,
+      "archive_bytes": 314880,
+      "physical_sectors": 614,
+      "claims": [
+        {
+          "dump": "baseline/profile-r1-cfb-many-small.callgrind.2",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-many-small.callgrind.3",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-many-small.callgrind.4",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-many-small.callgrind.5",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-many-small.callgrind.6",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 14030627,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 537245,
+          "share_percent": 3.8290876095558666,
+          "rank": 1
+        },
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 46050,
+          "share_percent": 0.3282105639327451,
+          "rank": 2
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 36910,
+          "share_percent": 0.2630673597124348,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          544
+        ],
+        "reallocation_calls": [
+          7
+        ],
+        "allocated_bytes": [
+          214186
+        ],
+        "incremental_region_peak_live_bytes": [
+          193026
+        ]
+      }
+    },
+    {
+      "name": "profile-r1-cfb-few-large",
+      "case": "cfb_open",
+      "shape": "few-large",
+      "repeat": 1,
+      "archive_bytes": 16912384,
+      "physical_sectors": 33031,
+      "claims": [
+        {
+          "dump": "baseline/profile-r1-cfb-few-large.callgrind.2",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-few-large.callgrind.3",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-few-large.callgrind.4",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-few-large.callgrind.5",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r1-cfb-few-large.callgrind.6",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 13072619,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 2477325,
+          "share_percent": 18.95048727420267,
+          "rank": 1
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 1981930,
+          "share_percent": 15.160925289721975,
+          "rank": 2
+        },
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 1967820,
+          "share_percent": 15.05298976433108,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          29
+        ],
+        "reallocation_calls": [
+          1
+        ],
+        "allocated_bytes": [
+          213571
+        ],
+        "incremental_region_peak_live_bytes": [
+          205129
+        ]
+      }
+    },
+    {
+      "name": "profile-r2-xls-owned",
+      "case": "xls_owned_source_open_one_cell",
+      "shape": "256-comments-opaque-heavy",
+      "repeat": 2,
+      "archive_bytes": 16995840,
+      "physical_sectors": 33194,
+      "claims": [
+        {
+          "dump": "baseline/profile-r2-xls-owned.callgrind.1",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-xls-owned.callgrind.2",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-xls-owned.callgrind.3",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-xls-owned.callgrind.4",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-xls-owned.callgrind.5",
+          "calls": 33194,
+          "exclusive_ir": 497910,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 13969844,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 2489550,
+          "share_percent": 17.820886188850785,
+          "rank": 1
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 1991710,
+          "share_percent": 14.257210030405494,
+          "rank": 2
+        },
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 1979410,
+          "share_percent": 14.16916323475051,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          126
+        ],
+        "reallocation_calls": [
+          25
+        ],
+        "allocated_bytes": [
+          223774
+        ],
+        "incremental_region_peak_live_bytes": [
+          191084
+        ]
+      }
+    },
+    {
+      "name": "profile-r2-cfb-tiny",
+      "case": "cfb_open",
+      "shape": "tiny",
+      "repeat": 2,
+      "archive_bytes": 3584,
+      "physical_sectors": 6,
+      "claims": [
+        {
+          "dump": "baseline/profile-r2-cfb-tiny.callgrind.2",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-tiny.callgrind.3",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-tiny.callgrind.4",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-tiny.callgrind.5",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-tiny.callgrind.6",
+          "calls": 6,
+          "exclusive_ir": 90,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 245142,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 4285,
+          "share_percent": 1.7479664847312986,
+          "rank": 1
+        },
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 450,
+          "share_percent": 0.18356707540935457,
+          "rank": 2
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 430,
+          "share_percent": 0.17540853872449438,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          32
+        ],
+        "reallocation_calls": [
+          1
+        ],
+        "allocated_bytes": [
+          4456
+        ],
+        "incremental_region_peak_live_bytes": [
+          3384
+        ]
+      }
+    },
+    {
+      "name": "profile-r2-cfb-many-small",
+      "case": "cfb_open",
+      "shape": "many-small",
+      "repeat": 2,
+      "archive_bytes": 314880,
+      "physical_sectors": 614,
+      "claims": [
+        {
+          "dump": "baseline/profile-r2-cfb-many-small.callgrind.2",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-many-small.callgrind.3",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-many-small.callgrind.4",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-many-small.callgrind.5",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-many-small.callgrind.6",
+          "calls": 614,
+          "exclusive_ir": 9210,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 14030627,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 537245,
+          "share_percent": 3.8290876095558666,
+          "rank": 1
+        },
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 46050,
+          "share_percent": 0.3282105639327451,
+          "rank": 2
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 36910,
+          "share_percent": 0.2630673597124348,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          544
+        ],
+        "reallocation_calls": [
+          7
+        ],
+        "allocated_bytes": [
+          214186
+        ],
+        "incremental_region_peak_live_bytes": [
+          193026
+        ]
+      }
+    },
+    {
+      "name": "profile-r2-cfb-few-large",
+      "case": "cfb_open",
+      "shape": "few-large",
+      "repeat": 2,
+      "archive_bytes": 16912384,
+      "physical_sectors": 33031,
+      "claims": [
+        {
+          "dump": "baseline/profile-r2-cfb-few-large.callgrind.2",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-few-large.callgrind.3",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-few-large.callgrind.4",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-few-large.callgrind.5",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        },
+        {
+          "dump": "baseline/profile-r2-cfb-few-large.callgrind.6",
+          "calls": 33031,
+          "exclusive_ir": 495465,
+          "ir_per_call": 15
+        }
+      ],
+      "constructor_ir": 13072619,
+      "exclusive_owner_ranking": [
+        {
+          "sector": "claim_sector",
+          "exclusive_ir": 2477325,
+          "share_percent": 18.95048727420267,
+          "rank": 1
+        },
+        {
+          "sector": "physical_reconciliation",
+          "exclusive_ir": 1981930,
+          "share_percent": 15.160925289721975,
+          "rank": 2
+        },
+        {
+          "sector": "validate_stream_allocations",
+          "exclusive_ir": 1967820,
+          "share_percent": 15.05298976433108,
+          "rank": 3
+        }
+      ],
+      "allocation_unique_values": {
+        "allocation_calls": [
+          29
+        ],
+        "reallocation_calls": [
+          1
+        ],
+        "allocated_bytes": [
+          213571
+        ],
+        "incremental_region_peak_live_bytes": [
+          205129
+        ]
+      }
+    }
+  ],
+  "next_candidate": "Private cold error helpers and ordinary inlining for claim_sector; preserve exact checked body and collect-then-claim order.",
+  "limitations": "15 Ir per claim is measured only in these constructor dumps and matches the recorded x86-64 success path. It is not a latency saving estimate, allocation count, or universal instruction cost. Inclusive parent costs overlap. The standalone harness has no explicit LTO profile; root workspace release LTO does not apply to it. No candidate is adopted."
+}

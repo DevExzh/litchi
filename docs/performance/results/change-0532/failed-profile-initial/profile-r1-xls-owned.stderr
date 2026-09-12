@@ -1,0 +1,7 @@
+==2971009== Callgrind, a call-graph generating cache profiler
+==2971009== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==2971009== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==2971009== Command: /tmp/litchi-goal-0532/normal --case xls_owned_source_open_one_cell --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/profile-r1-xls-owned.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/profile-r1-xls-owned.catalog.json
+==2971009== 
+==2971009== For interactive control, run 'callgrind_control -h'.
+==2971009== error writing 48 bytes to shared mem /tmp/vgdb-pipe-shared-mem-vgdb-2971009-by-zhuhe-on-???

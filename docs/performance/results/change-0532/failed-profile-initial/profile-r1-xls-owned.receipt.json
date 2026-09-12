@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "valgrind",
+    "--tool=callgrind",
+    "--collect-atstart=no",
+    "--toggle-collect=litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "--zero-before=litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "--dump-after=litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "--callgrind-out-file=/home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/profile-r1-xls-owned.callgrind",
+    "/tmp/litchi-goal-0532/normal",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--warmup",
+    "0",
+    "--samples",
+    "5",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/profile-r1-xls-owned.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0532/baseline/profile-r1-xls-owned.catalog.json"
+  ],
+  "start_utc": "2026-09-12T15:26:06.161304+00:00",
+  "end_utc": "2026-09-12T15:26:06.451805+00:00",
+  "seconds": 0.29052107500319835,
+  "exit_code": 1,
+  "binary_sha256": "ad0e47d21c12359440259dc466baa0048168a9f936137bdcb9d51fe9797d921d",
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "script_sha256": "b85672a757e7ea1e2aa747b76812d93c319dbee90b930c8c57db835024b8a712",
+  "plan_sha256": "cd9055e39a760143746d02f4a7a21f556f7c4cf9c45d91978283a51be4a49811",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "profile-r1-xls-owned.callgrind": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "profile-r1-xls-owned.host.json": "064e732da6683424a6617c6ec70b5dd8190846a8b526e858cb6f69aac4d8993f",
+    "profile-r1-xls-owned.stderr": "6054d896409ce61a1bf68c7d939d4e9d439d4148edde511190d8b4e8d6b968a4",
+    "profile-r1-xls-owned.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "command": [
+    "env",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--bin",
+    "litchi-perf-baseline-alloc",
+    "--target-dir",
+    "/home/zhuhe/litchi-goal-0532-target",
+    "--features",
+    "allocator-metrics"
+  ],
+  "start_utc": "2026-09-12T15:28:28.532165+00:00",
+  "end_utc": "2026-09-12T15:29:56.876399+00:00",
+  "seconds": 88.34425171000476,
+  "exit_code": 0,
+  "binary_sha256": null,
+  "source_manifest_sha256": "c2fbb838229f7fcb40d51d7d8bf90721d7ff2e9658601db60e28342ccd6bd514",
+  "script_sha256": "b85672a757e7ea1e2aa747b76812d93c319dbee90b930c8c57db835024b8a712",
+  "plan_sha256": "cd9055e39a760143746d02f4a7a21f556f7c4cf9c45d91978283a51be4a49811",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "build-alloc.host.json": "c4b092f2dcfe04ca7f355cede91b9cad783a3f9b20c80ac16a085bb86bec6bb6",
+    "build-alloc.stderr": "61835d34e984b22b321557400e40b90097a76b09fabc22b4e717ef44b992bd46",
+    "build-alloc.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
