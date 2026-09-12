@@ -61,3 +61,5 @@ formatting whitespace, omits `END_EXT_CONN14`, and uses an unsupported direct
 extension namespace. The new valid formatted physical-source regression passes.
 
 Supplemental independent review approves feature commit `16102fe75` and verifies the final v6 hashes and allocation audit; see `supplemental-review.json`.
+
+Candidate-only performance characterization is committed in `1b64b0fd5`; see [the measurement report](../xlsb-custom-data-performance/report.md) and [independent review](../xlsb-custom-data-performance/review.json). A clean root replay passed 120 samples across 24 lane/class groups, including complete per-ID reference counts and forward/inverse payload checks. The instrumented measurements use synthetic fixtures and make no native-producer, baseline, or speedup claim.
