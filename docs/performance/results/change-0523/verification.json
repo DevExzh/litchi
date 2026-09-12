@@ -1,0 +1,16 @@
+{
+  "status": "pass",
+  "native_samples": 24000,
+  "allocation_samples": 720,
+  "profile_children": 8,
+  "production_unchanged": true,
+  "source_replay": true,
+  "serial_intervals": 32,
+  "source_files": 8584,
+  "quality_gates": 10,
+  "exact_report_replay": true,
+  "exact_annotation_replay": true,
+  "negative_vectors": 4,
+  "owned_paths_absent": true,
+  "seal_entries": null
+}

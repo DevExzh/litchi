@@ -1,0 +1,12 @@
+{
+  "scope": "Unchanged CFB production parser; allocator bracket is in harness only",
+  "fuzz_files": {
+    "crates/litchi-cfb/fuzz/.gitignore": "a24ed50fc1f28dcafa5d4f9eac712faf4b1ffd7910177f5ce30289197a7a2484",
+    "crates/litchi-cfb/fuzz/Cargo.toml": "7600a4cb4b653b6a054bbb1ba5bd46f4bec076ff4b9991f839cc78dc3e5fd841",
+    "crates/litchi-cfb/fuzz/README.md": "4ba9840d7e1f79fef2cf82b6b1d076aaa5ef1d5914a89f791d5a4ae813fda0d6",
+    "crates/litchi-cfb/fuzz/fuzz_targets/parse_cfb.rs": "5db8e81b7562d9dd38878795fb79cb4d961b7c9d36042816b691aebb0c19351d"
+  },
+  "cargo_fuzz": null,
+  "toolchains": "stable-x86_64-unknown-linux-gnu (default)\n1.56-x86_64-unknown-linux-gnu\n1.56.0-x86_64-unknown-linux-gnu\n1.65-x86_64-unknown-linux-gnu\n1.89-x86_64-unknown-linux-gnu\n1.89.0-x86_64-unknown-linux-gnu\n1.95-x86_64-unknown-linux-gnu\n1.95.0-x86_64-unknown-linux-gnu (active)\n1.98.1-x86_64-unknown-linux-gnu\n",
+  "disposition": "No fuzz campaign executed: cargo-fuzz and a nightly toolchain are unavailable. Existing CFB unit/integration/doc and native benchmark oracles are separate correctness evidence; no fuzz or producer coverage completion claim."
+}

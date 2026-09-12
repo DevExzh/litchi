@@ -1,5 +1,17 @@
 # Performance optimization ADR-compliance matrix
 
+## 0523: preserve operation boundaries while adding allocation observations
+
+[0523](changes/0523-cfb-open-allocation-attribution.md) changes only the standalone
+Rust harness and supporting evidence/documentation. All 30 previously read
+ADR/index hashes remain unchanged. The canonical allocator region surrounds
+the existing constructor clock; oracle/drop/provider behavior is preserved,
+normal allocation status is explicitly unavailable, and observations align
+with raw elapsed samples. Source/corpus/output checks support ADRs 0003/0006;
+separate native/allocation/profile lanes and retained variation support ADR
+0005. No production, API, dependency, unsafe-code or resource-policy change
+is made. OLE2/OOXML stays active; ODF is deferred.
+
 ## 0522: reject the candidate; retain semantic and benchmark guards
 
 [0522](changes/0522-xlsx-cell-reference-guard.md) restores the baseline

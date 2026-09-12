@@ -1,0 +1,6 @@
+{
+  "reason": "Final two source-NotApplicable test assertions were added 4.6 seconds after initial build began. Initial test command passed, but before/after harness hash guard correctly rejected its custody. Original receipt/logs retained; rerun final unchanged source before freezing or any performance capture.",
+  "initial_test_exit_code": 0,
+  "initial_source_unchanged": false,
+  "production_changed": false
+}

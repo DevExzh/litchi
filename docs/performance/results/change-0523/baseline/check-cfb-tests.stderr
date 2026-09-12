@@ -1,0 +1,52 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling crossbeam-utils v0.8.22
+   Compiling typenum v1.20.1
+   Compiling serde_core v1.0.229
+   Compiling hybrid-array v0.4.14
+   Compiling libc v0.2.189
+   Compiling crossbeam-epoch v0.9.20
+   Compiling autocfg v1.5.1
+   Compiling cfg-if v1.0.4
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.4
+   Compiling syn v2.0.114
+   Compiling crossbeam-deque v0.8.7
+   Compiling rand_core v0.10.1
+   Compiling zmij v1.0.19
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling cpufeatures v0.3.1
+   Compiling serde_derive v1.0.229
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling zerocopy v0.8.56
+   Compiling rayon-core v1.13.0
+   Compiling thiserror v2.0.18
+   Compiling serde_json v1.0.149
+   Compiling const-oid v0.10.2
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.18
+   Compiling chacha20 v0.10.2
+   Compiling memchr v2.8.3
+   Compiling iana-time-zone v0.1.65
+   Compiling itoa v1.0.18
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling either v1.18.0
+   Compiling smallvec v1.16.0
+   Compiling fast-float2 v0.2.4
+   Compiling once_cell v1.21.4
+   Compiling base64 v0.22.1
+   Compiling rayon v1.12.0
+   Compiling zerocopy-derive v0.8.56
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling fixedbitset v0.5.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.84s
+     Running unittests src/lib.rs (/home/zhuhe/litchi-goal-0523-target/debug/deps/litchi_cfb-5b8b4235e47a11e8)
+     Running tests/sequential_writer.rs (/home/zhuhe/litchi-goal-0523-target/debug/deps/sequential_writer-41c6a16934dc5d86)
+     Running tests/writer_storage_move.rs (/home/zhuhe/litchi-goal-0523-target/debug/deps/writer_storage_move-bbb866a3d68e0047)
+   Doc-tests litchi_cfb

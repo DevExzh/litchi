@@ -1,0 +1,31 @@
+{
+  "command": [
+    "env",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--lib",
+    "cfb_open_operation_metrics_align_and_report_unavailable_allocator",
+    "--target-dir",
+    "/home/zhuhe/litchi-goal-0523-target"
+  ],
+  "start_utc": "2026-09-12T06:58:45.363617+00:00",
+  "end_utc": "2026-09-12T07:06:12.288286+00:00",
+  "seconds": 446.924678691008,
+  "exit_code": 0,
+  "source_hashes": {
+    "tools/perf-baseline/src/lib.rs": "75e04ccf63a5d8070cab08735aefcfa92f887bc5a6fd7107fe8073a5181df61d"
+  },
+  "source_unchanged": false,
+  "artifacts": {
+    "preflight-test.stdout": "a5357dcdaee8870daeaa01258358c666b0061ad9d48c8aacbcd774a48a9dcb0e",
+    "preflight-test.stderr": "fac9c9fe1db50be0ae7c33408617a400e0f131a975ab5dbfb0056df7bc4b2ebd"
+  }
+}

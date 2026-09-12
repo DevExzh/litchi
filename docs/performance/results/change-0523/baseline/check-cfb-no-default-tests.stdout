@@ -1,0 +1,327 @@
+
+running 274 tests
+test allocation_validation_tests::hostile_reported_length_is_rejected_before_header_read ... ok
+test allocation_validation_tests::hostile_count_metadata_is_rejected_before_index_allocation ... ok
+test allocation_validation_tests::low_level_default_ingress_limit_is_finite ... ok
+test allocation_validation_tests::hostile_version_4_directory_count_is_rejected_before_index_allocation ... ok
+test allocation_validation_tests::hostile_difat_and_minifat_counts_are_rejected_before_index_allocation ... ok
+test allocation_validation_tests::ignores_the_unused_tail_of_the_header_difat ... ok
+test allocation_validation_tests::low_level_ingress_accepts_exact_limit_and_rejects_max_plus_one ... ok
+test allocation_validation_tests::opens_files_whose_length_is_not_a_whole_number_of_sectors ... ok
+test allocation_validation_tests::opens_real_world_word_compound_files ... ok
+test allocation_validation_tests::open_rejects_fat_stream_short_excess_and_terminal_markers ... ok
+test allocation_validation_tests::open_rejects_fat_stream_cycles_and_invalid_markers ... ok
+test allocation_validation_tests::rejects_directory_and_fat_sector_overlap ... ok
+test allocation_validation_tests::open_rejects_minifat_cycles_and_invalid_markers ... ok
+test allocation_validation_tests::rejects_difat_start_count_disagreement ... ok
+test allocation_validation_tests::rejects_fat_sector_without_fatsect_marker ... ok
+test allocation_validation_tests::opens_version_3_files_with_an_uninitialized_stream_size_high_word ... ok
+test allocation_validation_tests::rejects_version_3_directory_sector_count ... ok
+test allocation_validation_tests::open_rejects_minifat_stream_short_excess_and_terminal_markers ... ok
+test allocation_validation_tests::still_rejects_sectors_that_start_past_the_end_of_the_file ... ok
+test allocation_validation_tests::still_rejects_a_header_difat_list_shorter_than_its_count ... ok
+test allocation_validation_tests::rejects_incorrect_minifat_sector_count ... ok
+test allocation_validation_tests::version_3_directory_byte_limit_is_checked_at_padded_sector_boundaries ... ok
+test directory_validation_tests::accepts_black_height_mismatch_but_rejects_stream_children ... ok
+test file::tests::batched_sector_reads_place_noncontiguous_sectors_in_order ... ok
+test file::tests::detects_cycles_in_allocation_chains ... ok
+test directory_validation_tests::accepts_interoperable_root_color_values ... ok
+test directory_validation_tests::accepts_non_black_tree_roots_but_rejects_invalid_ordering ... ok
+test directory_validation_tests::rejects_invalid_names_types_and_colors ... ok
+test allocation_validation_tests::version_4_directory_byte_limit_is_checked_before_chain_allocation ... ok
+test file::tests::direct_ranges_cover_boundaries_and_preserve_truncated_sector_zero_fill ... ok
+test file::tests::direct_ranges_follow_fragmented_fat_and_minifat_chains ... ok
+test file::tests::direct_ranges_reject_bad_metadata_without_unbounded_traversal ... ok
+test file::tests::direct_ranges_are_cursor_independent_local_and_retry_interrupted_reads ... ok
+test file::tests::directory_name_decoder_checks_utf16_extents_without_panicking ... ok
+test file::tests::direct_ranges_propagate_seek_and_read_failures_and_match_open_stream ... ok
+test file::tests::fat_stream_chain_errors_remain_typed_and_ordered ... ok
+test file::tests::fat_stream_replays_fragmented_chain_in_order_at_exact_size ... ok
+test file::tests::fat_stream_read_zero_fills_a_truncated_final_sector ... ok
+test file::tests::direct_ranges_validate_bounds_before_payload_io_and_allow_exact_eof ... ok
+test file::tests::minifat_stream_chain_errors_remain_typed_and_ordered ... ok
+test file::tests::minifat_stream_replays_fragmented_chain_in_order_at_exact_size ... ok
+test file::tests::read_sector_into_zero_fills_a_truncated_final_sector ... ok
+test file::tests::lookup_refuses_a_missing_validated_name_cache_entry ... ok
+test file::tests::lookup_uses_ascii_case_equivalence ... ok
+test file::tests::lookup_uses_cfb_simple_uppercase_comparison ... ok
+test file::tests::rejects_minifat_buffer_size_overflow_before_reading_a_sector ... ok
+test file::tests::fat_stream_reads_only_the_declared_logical_size ... ok
+test file::tests::rejects_sector_reads_past_the_physical_file ... ok
+test file::tests::rejects_difat_counts_beyond_the_physical_file_before_reserving ... ok
+test file::tests::reports_minifat_allocation_failure_without_panicking ... ok
+test file::tests::parsed_name_cache_is_sid_aligned_with_directory_entries ... ok
+test file::tests::rejects_cyclic_directory_trees ... ok
+test file::tests::reusable_chain_scratch_preserves_early_and_late_end_errors ... ok
+test file::tests::rejects_invalid_header_shifts_and_versions_without_panicking ... ok
+test file::tests::returns_not_found_for_missing_and_invalid_caller_names ... ok
+test file::tests::rejects_self_referential_difat_chains ... ok
+test file::tests::reusable_chain_scratch_resets_after_cycle_and_reuses_after_error ... ok
+test file::tests::reusable_chain_scratch_reserves_growth_before_walking ... ok
+test file::tests::rejects_chain_lengths_before_reserving_chain_storage ... ok
+test file::tests::malformed_large_declarations_do_not_unwind ... ok
+test file::tests::reusable_chain_scratch_resets_after_success_and_empty_chain ... ok
+test file::tests::reusable_chain_scratch_reuses_buffers_for_different_lengths ... ok
+test file::tests::tolerates_nonfree_fat_padding_beyond_the_physical_file ... ok
+test shared::tests::bounded_ranges_cover_boundaries_and_reject_out_of_range_without_io ... ok
+test overlay_tests::fragmented_fat_chain_yields_sorted_nonoverlapping_publication ... ok
+test shared::tests::bounded_ranges_read_only_the_requested_mini_and_fat_bytes ... ok
+test shared::tests::bulk_preflight_failures_do_not_consume_minifat_direct_state ... ok
+test overlay_tests::duplicate_length_and_limit_failures_are_typed ... ok
+test shared::tests::bulk_reads_enforce_byte_and_context_budget_caps ... ok
+test shared::tests::bulk_preload_materializes_once_and_repeated_eligible_open_is_cached ... ok
+test shared::tests::bulk_multi_minifat_batch_converges_on_one_root_cache ... ok
+test shared::tests::bulk_reads_charge_work_before_starting_payload_reads ... ok
+test shared::tests::bulk_reads_observe_mid_read_cancellation_atomically ... ok
+test shared::tests::bulk_reads_observe_preexisting_cancellation_atomically ... ok
+test shared::tests::bulk_reads_reject_source_change_without_returning_partial_results ... ok
+test shared::tests::bulk_session_skips_pool_when_only_bounded_batches_are_ineligible ... ok
+test shared::tests::bulk_single_minifat_keeps_direct_width_one_and_two ... ok
+test shared::tests::cache_takeover_preserves_epoch_and_intent_until_waiters_leave ... ok
+test shared::tests::cache_failure_retries_cache_without_returning_to_direct ... ok
+test shared::tests::cache_request_published_before_direct_failure_remains_permanent ... ok
+test shared::tests::bulk_reads_preserve_input_order_and_match_serial_reads ... ok
+test shared::tests::bulk_reads_honor_task_cap_and_use_a_local_pool_when_eligible ... ok
+test shared::tests::case_aliases_resolve_to_the_same_direct_target_sid ... ok
+test shared::tests::completed_without_handoff_designates_a_retry_owner ... ok
+test shared::tests::concurrent_range_reads_are_independent_and_source_positional ... ok
+test shared::tests::claimant_is_serialized_through_owner_terminal_release ... ok
+test shared::tests::concurrent_eligible_opens_share_one_direct_range_without_cache ... ok
+test shared::tests::contiguous_minifat_ranges_coalesce_to_one_exact_read_for_common_sector_sizes ... ok
+test overlay_tests::version_four_sector_geometry_publishes_mini_and_fat_overlays ... ok
+test shared::tests::delayed_old_epoch_waiter_drop_does_not_decrement_new_handoff ... ok
+test shared::tests::direct_epoch_exhaustion_fails_closed_to_root_cache ... ok
+test file::tests::finds_exact_names_in_a_wide_sibling_tree ... ok
+test shared::tests::direct_open_rejects_a_mini_sector_start_outside_the_captured_file ... ok
+test shared::tests::different_minifat_target_takes_cache_and_a_b_a_stays_cached ... ok
+test shared::tests::deep_minifat_ranges_use_the_prevalidated_root_chain_index ... ok
+test shared::tests::direct_open_zero_fills_a_truncated_final_root_sector_like_the_cache ... ok
+test shared::tests::eligible_minifat_open_repeats_same_target_without_root_cache ... ok
+test shared::tests::delayed_same_sid_waiter_and_different_sid_takeover_converge ... ok
+test shared::tests::direct_owner_unwind_wakes_same_sid_waiter_via_raii ... ok
+test shared::tests::fat_interleave_does_not_change_the_active_minifat_direct_target ... ok
+test shared::tests::fat_range_read_error_prefers_source_change_from_post_read_fence ... ok
+test shared::tests::fat_range_read_errors_preserve_stable_source_error_and_retry_successfully ... ok
+test shared::tests::failed_cache_takeover_during_direct_read_leaves_retryable_cache_state ... ok
+test shared::tests::full_fat_range_uses_one_exact_contiguous_chain_read ... ok
+test shared::tests::intent_before_registration_gets_a_bounded_handoff ... ok
+test shared::tests::fragmented_minifat_chain_keeps_logical_order_and_separates_physical_runs ... ok
+test shared::tests::intent_count_transition_reasserts_the_same_word_bit ... ok
+test shared::tests::malformed_minifat_chain_is_refused_without_root_materialization ... ok
+test shared::tests::minifat_range_read_error_prefers_source_change_from_post_read_fence ... ok
+test shared::tests::force_cache_requests_before_a_delayed_direct_read_finishes ... ok
+test shared::tests::minifat_direct_thresholds_cover_zero_ratio_and_size_cutoffs ... ok
+test shared::tests::minifat_ranges_handle_short_and_interrupted_positional_reads ... ok
+test shared::tests::fragmented_fat_ranges_follow_logical_chain_order ... ok
+test shared::tests::late_intent_terminalizes_failure_and_completed_without_handoff ... ok
+test shared::tests::minifat_range_reads_do_not_consume_the_direct_repeat_state ... ok
+test shared::tests::failed_ministream_initialization_can_retry ... ok
+test shared::tests::open_stream_fat_control_keeps_full_contiguous_chain_read ... ok
+test allocation_validation_tests::opens_the_complete_legacy_office_compound_file_corpus ... ok
+test shared::tests::open_stream_selected_minifat_reads_one_exact_cross_sector_range ... ok
+test shared::tests::open_stream_selected_minifat_preserves_fragmented_logical_order ... ok
+test shared::tests::owner_completion_before_and_after_intent_never_strands_a_late_caller ... ok
+test shared::tests::preserves_existing_parser_corruption_checks ... ok
+test shared::tests::open_stream_selected_minifat_refuses_source_change_during_payload_read ... ok
+test shared::tests::range_reads_refuse_source_changes_before_publication ... ok
+test shared::tests::range_source_failures_are_retryable_and_do_not_materialize_mini_stream ... ok
+test shared::tests::poisoned_singleflight_state_returns_a_typed_error ... ok
+test shared::tests::public_minifat_range_keeps_truncated_eof_error_and_destination_tail ... ok
+test shared::tests::rejects_input_before_parsing_when_over_the_finite_limit ... ok
+test shared::tests::persistent_structural_failure_with_multiple_waiters_designates_retries ... ok
+test shared::tests::regular_stream_reads_are_concurrent_without_a_shared_cursor ... ok
+test shared::tests::rejects_a_source_that_changes_during_structural_open ... ok
+test shared::tests::persistent_io_failure_with_multiple_waiters_designates_retries ... ok
+test shared::tests::rejects_a_source_that_changes_during_payload_read ... ok
+test shared::tests::same_sid_structural_failure_wakes_waiter_without_cache ... ok
+test shared::tests::same_target_repeat3_and_repeat8_keep_exact_direct_ranges ... ok
+test shared::tests::shared_limit_rejects_oversized_source_before_positional_reads ... ok
+test shared::tests::selected_minifat_open_refuses_short_or_excess_chain_without_materialization ... ok
+test shared::tests::shared_limits_reuse_typed_low_level_limit_validation ... ok
+test shared::tests::shared_open_propagates_directory_byte_limit ... ok
+test shared::tests::shared_validation_reuses_selected_directory_byte_limit ... ok
+test shared::tests::selected_ministream_reads_are_bounded_and_same_target_repeats_stay_direct ... ok
+test shared::tests::stream_cursor_fat_sequential_reads_match_ranges_without_restarting_chain ... ok
+test shared::tests::stream_cursor_forward_skip_rejects_backward_and_out_of_bounds_moves ... ok
+test shared::tests::same_sid_source_change_wakes_waiter_without_cache_or_retry_read ... ok
+test shared::tests::stream_cursor_fragmented_fat_reads_match_logical_order ... ok
+test shared::tests::stream_cursor_minifat_parity_leaves_cache_unmaterialized ... ok
+test shared::tests::stream_cursor_skip_does_not_fence_but_next_read_rejects_mutation ... ok
+test shared::tests::stream_cursor_fences_before_during_and_after_hostile_reads ... ok
+test shared::tests::failed_direct_marker_wakes_same_sid_waiter_for_a_retry ... ok
+test shared::tests::waiter_drop_before_owner_release_clears_slot_before_repeat_overlap ... ok
+test shared::tests::stream_cursor_minifat_handles_partial_root_tail_like_range_reader ... ok
+test shared::tests::same_sid_singleflight_covers_36_and_4095_with_aliases_and_isolation ... ok
+test overlay_tests::public_owned_arc_source_publishes_exactly ... ok
+test overlay_tests::owned_atomic_save_uses_only_hashed_emission_scan ... ok
+test overlay_tests::atomic_path_preflight_failure_leaves_destination_and_directory_unchanged ... ok
+test splice_tests::invalid_fat_and_minifat_topology_is_rejected_at_validated_ingress ... ok
+test splice_tests::length_range_overlap_and_expected_preconditions_are_checked ... ok
+test splice_tests::owner_validation_error_returns_no_plan_and_keeps_its_native_type ... ok
+test splice_tests::mini_splice_planning_does_not_materialize_the_root_mini_stream ... ok
+test splice_tests::every_finite_limit_accepts_exactly_the_bound_and_rejects_above_it ... ok
+test splice_tests::owner_validation_is_closed_by_the_final_stable_token_fingerprint ... ok
+test splice_tests::composed_view_handles_short_and_interrupted_reads_and_is_concurrent ... ok
+test splice_tests::owned_owner_validated_planning_elides_only_the_final_complete_fingerprint ... ok
+test splice_tests::fragmented_fat_stream_ranges_are_mapped_in_logical_order ... ok
+test validation_tests::configured_input_ceiling_blocks_without_calling_the_input_malformed ... ok
+test splice_tests::first_middle_last_and_multi_stream_splices_preserve_every_other_byte ... ok
+test stream_move_tests::rejects_storage_moves_duplicate_sources_missing_parents_and_invalid_names ... ok
+test validation_tests::directory_byte_limit_is_a_blocked_cfb_validation_ingress ... ok
+test validation_tests::fat_topology_rejection_is_a_deterministic_structured_issue ... ok
+test validation_tests::report_limits_are_enforced_before_retention ... ok
+test validation_tests::source_instability_and_io_failure_remain_errors ... ok
+test splice_tests::stable_token_mutation_after_initial_precondition_read_is_rejected ... ok
+test splice_tests::owner_validation_shares_the_fenced_target_and_preserves_typed_results ... ok
+test validation_tests::valid_source_completes_the_single_truthful_ingress_capability ... ok
+test validation_tests::version_change_between_preflight_and_canonical_ingress_is_an_error ... ok
+test writer::core::tests::allocation_errors_preserve_resource_and_source ... ok
+test writer::core::tests::allocation_table_planning_is_checked_and_converges ... ok
+test validation_tests::shared_view_revalidation_refuses_a_changed_source_version ... ok
+test writer::core::tests::delete_storage_removes_descendants_and_clsids_without_prefix_collisions ... ok
+test overlay_tests::owned_overlay_planning_elides_only_the_final_complete_fingerprint ... ok
+test writer::core::tests::move_storage_retains_stream_payload_allocations_and_insertion_order ... ok
+test overlay_tests::operation_shape_matches_generic_and_owned_overlay_policy ... ok
+test writer::core::tests::sector_id_ranges_use_maxregsect_as_an_exclusive_end ... ok
+test writer::core::tests::owned_stream_retains_payload_allocation_through_write ... ok
+test writer::core::tests::serialization_normalizes_the_sink_position ... ok
+test writer::core::tests::test_create_storage ... ok
+test validation_tests::directory_topology_rejection_is_a_structured_issue ... ok
+test writer::core::tests::test_create_stream ... ok
+test writer::core::tests::test_create_writer ... ok
+test writer::core::tests::path_table_reservation_reports_overflow_without_mutation ... ok
+test overlay_tests::owned_direct_write_uses_only_the_hashed_emission_scan ... ok
+test writer::core::tests::delete_storage_rejects_root_and_missing_paths_atomically ... ok
+test overlay_tests::hostile_read_during_emission_reports_exact_sink_prefix ... ok
+test writer::core::tests::test_encode_name ... ok
+test writer::difat::tests::difat_sector_range_is_checked_without_allocation ... ok
+test writer::difat::tests::invalid_sector_geometry_is_typed ... ok
+test writer::core::tests::version_three_limits_are_checked_without_large_allocations ... ok
+test writer::difat::tests::test_difat_4096_sectors ... ok
+test writer::difat::tests::test_difat_calculation ... ok
+test writer::difat::tests::test_difat_generation ... ok
+test writer::core::tests::save_reports_committed_when_parent_sync_fails ... ok
+test writer::core::tests::save_preserves_existing_destination_when_serialization_fails ... ok
+test overlay_tests::hostile_read_overreport_during_emission_reports_the_exact_sink_prefix ... ok
+test writer::difat::tests::test_no_difat_needed ... ok
+test writer::difat::tests::test_difat_multiple_sectors ... ok
+test writer::directory::tests::failed_serialization_does_not_mutate_sibling_tree ... ok
+test writer::directory::tests::rejects_invalid_and_ambiguous_sibling_names ... ok
+test writer::directory::tests::serializes_maximum_utf16_name_without_truncation ... ok
+test writer::directory::tests::test_root_entry ... ok
+test writer::directory::tests::test_stream_entry ... ok
+test writer::directory::tests::test_directory_builder ... ok
+test writer::fat::tests::invalid_sector_geometry_is_typed ... ok
+test writer::fat::tests::sector_limit_uses_maxregsect_as_an_exclusive_count ... ok
+test writer::fat::tests::test_allocate_chain ... ok
+test writer::fat::tests::test_empty_chain ... ok
+test writer::fat::tests::test_mark_fat_sectors ... ok
+test writer::fat::tests::test_sector_size ... ok
+test writer::fat::tests::test_validate_good_fat ... ok
+test writer::header::tests::invalid_sector_geometry_is_typed ... ok
+test writer::header::tests::test_header_generation ... ok
+test writer::header::tests::test_sector_size_4096 ... ok
+test writer::header::tests::test_sector_size_512 ... ok
+test writer::minifat::tests::allocation_rejects_invalid_sector_geometry_before_mutation ... ok
+test writer::minifat::tests::allocation_rejects_ministream_cutoff_before_mutation ... ok
+test writer::minifat::tests::empty_minifat_rejects_invalid_sector_geometry ... ok
+test writer::minifat::tests::serialized_minifat_rejects_invalid_sector_geometry ... ok
+test writer::minifat::tests::test_allocate_mini_chain ... ok
+test writer::minifat::tests::test_empty_mini_chain ... ok
+test writer::minifat::tests::test_generate_minifat_sectors ... ok
+test writer::minifat::tests::test_multiple_allocations ... ok
+test writer::sequential::tests::exact_two_gib_and_reserved_sector_boundaries_are_explicit ... ok
+test writer::sequential::tests::four_k_geometry_covers_fat_and_difat_transition ... ok
+test writer::tests::test_invalid_sector_size ... ok
+test writer::sequential::tests::detected_temp_substitution_is_not_deleted_by_cleanup ... ok
+test writer::tests::test_delete_storage_removes_descendants_when_serialized ... ok
+test writer::sequential::tests::failed_replace_cleans_only_unpublished_temporary_file ... ok
+test writer::tests::test_boundary_conditions ... ok
+test writer::tests::test_list_streams_after_write ... ok
+test writer::tests::test_owned_streams_preserve_borrowed_wire_layout ... ok
+test splice_tests::sequential_publication_reopens_with_the_existing_reader ... ok
+test writer::tests::test_save_preserves_directory_when_atomic_replace_fails ... ok
+test writer::sequential::tests::parent_sync_failure_reports_committed_and_keeps_destination ... ok
+test writer::tests::test_save_atomically_overwrites_existing_file ... ok
+test stream_move_tests::forward_and_inverse_refuse_a_stale_source ... ok
+test writer::tests::test_write_empty_stream ... ok
+test writer::tests::test_write_owned_streams_round_trip ... ok
+test writer::tests::test_write_simple_ole_file ... ok
+test writer::tests::test_write_update_delete ... ok
+test writer::tests::test_write_to_file ... ok
+test writer::tests::test_write_sector_size_4096 ... ok
+test writer::tests::test_write_multiple_streams ... ok
+test writer::tests::test_write_mixed_sizes ... ok
+test writer::tests::test_write_with_minifat ... ok
+test writer::tests::test_write_large_stream ... ok
+test stream_move_tests::evaluates_final_casefold_collisions_atomically_and_allows_swaps ... ok
+test stream_move_tests::moves_and_renames_a_batch_without_touching_payload_or_allocation_sectors ... ok
+test splice_tests::no_op_inverse_and_stale_source_contracts_are_exact ... ok
+test stream_move_tests::version_four_directory_fragments_are_bounded_before_collection ... ok
+test overlay_tests::atomic_path_late_stable_token_mutation_leaves_destination_unchanged ... ok
+test overlay_tests::stable_token_mutation_of_an_emitted_chunk_is_caught_before_success ... ok
+test overlay_tests::fingerprint_requests_are_coalesced_without_widening_publication_chunks ... ok
+test overlay_tests::atomic_path_publication_replaces_after_complete_staging ... ok
+test stream_move_tests::no_op_and_every_finite_limit_are_exact ... ok
+test overlay_tests::direct_write_to_retains_three_complete_source_scans ... ok
+test overlay_tests::overlays_minifat_and_fat_cutover_and_preserves_unselected_bytes ... ok
+test overlay_tests::short_and_interrupted_sink_writes_complete_exactly ... ok
+test overlay_tests::mini_overlay_preserves_a_neighbor_in_the_same_host_sector ... ok
+test directory_validation_tests::accepts_writer_generated_red_black_directories ... ok
+test overlay_tests::version_and_stable_token_byte_changes_are_caught_before_output ... ok
+test overlay_tests::atomic_save_skips_only_the_duplicate_post_emission_source_scan ... ok
+test writer::directory::tests::builds_valid_red_black_trees_for_adversarial_sibling_counts ... ok
+test overlay_tests::hostile_sink_progress_is_typed ... ok
+test file::tests::lists_deep_directory_trees_without_call_stack_growth ... ok
+test overlay_tests::exact_and_empty_noops_copy_the_source_byte_for_byte ... ok
+
+test result: ok. 274 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+
+running 13 tests
+test cancellation_after_header_reports_an_exact_prefix ... ok
+test planning_limits_do_not_call_sink ... ok
+test atomic_save_overwrites_existing_destination ... ok
+test atomic_save_reopens_candidate_before_replace ... ok
+test mixed_minifat_fat_nested_storage_clsids_reopen ... ok
+test output_limit_accepts_exact_and_rejects_one_under_without_sink_calls ... ok
+test interrupted_retries_recheck_cancellation_before_retrying ... ok
+test source_length_failures_are_typed_and_leave_prefix_evidence ... ok
+test short_nonseek_sink_matches_reference_bytes ... ok
+test sink_zero_and_flush_failures_report_progress ... ok
+test sector_size_4096_and_current_writer_wire_parity ... ok
+test exact_fat_boundary_has_no_difat_and_one_over_has_difat ... ok
+test difat_boundary_streams_without_retaining_source_payload ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 6 tests
+test accepts_case_only_rename_but_refuses_other_case_insensitive_collisions ... ok
+test root_self_descendant_and_missing_parent_refusals_are_atomic ... ok
+test refuses_oversized_untrusted_names_before_admitting_a_move ... ok
+test explicit_limits_accept_exact_bounds_and_refuse_one_less_atomically ... ok
+test moves_complete_subtree_without_reallocating_or_reordering_stream_payloads ... ok
+test refuses_an_oversized_existing_path_before_canonical_allocation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 13 tests
+test crates/litchi-cfb/src/writer/core.rs - writer::core (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::FATSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::DIFSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::ENDOFCHAIN (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::NOSTREAM (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::MAXREGSECT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_storage (line 487) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::create_stream (line 372) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::save (line 1178) - compile ... ok
+test crates/litchi-cfb/src/writer/directory.rs - writer::directory::DirectoryEntryBuilder::set_clsid (line 184) ... ignored
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::set_root_clsid (line 341) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::STGTY_ROOT (line 43) - compile ... ok
+test crates/litchi-cfb/src/writer/core.rs - writer::core::OleWriter::new (line 273) ... ok
+
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.17s; merged doctests compilation took 0.16s

@@ -1,5 +1,17 @@
 # Performance hotspot inventory
 
+## 0523: checked CFB chain visitation is the next bounded experiment
+
+[0523](changes/0523-cfb-open-allocation-attribution.md) refreshes OLE2 constructor
+attribution and fills the direct-CFB allocation observation gap. Chain
+collection accounts for 40.08–40.09% of XLS constructor instructions and
+42.62% of direct CFB few-large instructions, exclusively. The source review identifies duplicate checked visited-bit access in `collect_exact` as
+a narrow candidate. Required ownership, cycle, marker and physical-layout
+checks cannot simply be removed or reordered. A fresh matched native comparison
+must demonstrate useful repeatable workflow improvement before adoption.
+Historical pre-batching FAT shares are not current hotspot measurements.
+OLE2/OOXML remains ahead of deferred ODF.
+
 ## 0522: redundant cell-tag work is insufficient for admission
 
 [0522](changes/0522-xlsx-cell-reference-guard.md) proves a narrow common-cell

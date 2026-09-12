@@ -1,0 +1,82 @@
+{
+  "revision": "0e6379307c5174babfc832edc6113a16c8e9233a",
+  "created_utc": "2026-09-12T06:50:12.756168+00:00",
+  "previous_turn": "progress: 0522 scanner candidate rejected under frozen admission; tests/noncompact guard/evidence committed and cleanup verified",
+  "scope": "Current CFB/OLE2 source-open attribution and necessary direct CFB operation-allocation measurement enabler; no production optimization or before/after speedup claim",
+  "priority": "OLE2/OOXML active; ODF deferred until that goal completes; iWork excluded",
+  "hypothesis": "After accepted FAT batching, exact chain collection and ownership/reconciliation remain dominant; measure current instructions and allocation demand before a bounded work-elimination candidate",
+  "cpu": 2,
+  "groups": {
+    "xls": {
+      "cases": [
+        "xls_semantic_open",
+        "xls_eager_open_list_worksheets",
+        "xls_eager_open_one_cell",
+        "xls_source_backed_open",
+        "xls_source_backed_open_list_worksheets",
+        "xls_source_backed_open_one_cell",
+        "xls_owned_source_open",
+        "xls_owned_source_open_list_worksheets",
+        "xls_owned_source_open_one_cell"
+      ]
+    },
+    "cfb": {
+      "cases": [
+        "cfb_open"
+      ],
+      "shapes": [
+        "tiny",
+        "many-small",
+        "few-large"
+      ],
+      "payload": "incompressible"
+    }
+  },
+  "native": {
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 1000,
+    "order": [
+      "r1 xls",
+      "r1 cfb",
+      "r2 cfb",
+      "r2 xls"
+    ]
+  },
+  "allocation": {
+    "repeats": 2,
+    "warmup": 3,
+    "samples": 30,
+    "scope": "Existing constructor/operation clock with canonical operation-global System allocator region; excludes construction of input fixtures, correctness oracles, report construction and object drop"
+  },
+  "profile": {
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "jobs": [
+      "xls-owned",
+      "cfb-tiny",
+      "cfb-many-small",
+      "cfb-few-large"
+    ],
+    "xls_owner": "litchi_xls::workbook::source::SourceBackedWorkbook::from_read_at_with_limits",
+    "cfb_owner": "litchi_cfb::file::OleFile<R>::open",
+    "scope": "zero-before/dump-after/toggle exact constructor; retain setup CFB open dump and use only positive incoming benchmark-runner dumps for operation attribution"
+  },
+  "hardware": {
+    "repeats": 2,
+    "case": "xls_owned_source_open_one_cell",
+    "warmup": 0,
+    "samples": 1000,
+    "events": "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "scope": "Whole-child diagnostic including setup/copies/queries/oracles/drop/report; no operation-local hardware claim; unavailable or multiplexed groups cannot support claims"
+  },
+  "review": {
+    "same_build_adverse_percent": 5,
+    "policy": "Retain every same-build variation and any failed/unsupported diagnostic. No optimization admission from this baseline alone. Allocation enabler requires alignment, explicit unavailable normal mode, checked measured values and preserved timer/oracle boundaries."
+  },
+  "owned_paths": [
+    "/tmp/litchi-goal-0523",
+    "/home/zhuhe/litchi-goal-0523-target"
+  ]
+}

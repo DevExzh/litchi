@@ -1,5 +1,16 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0523: CFB allocation gap closed; OLE2/OOXML optimization continues
+
+[0523](changes/0523-cfb-open-allocation-attribution.md) adds missing direct-CFB
+allocation observations and a current OLE2 baseline: 24,000 native samples,
+720 allocation samples and eight constructor profile children. Production is
+unchanged; this is no speedup or coverage-catalog promotion. The next bounded
+experiment is checked visited-bit lookup/set in chain collection, subject to
+fresh matched admission. Provider, producer, cold/range, fuzz, scaling and broad
+CRUD requirements remain open. OLE2/OOXML stays first; ODF is deferred until
+that optimization goal completes, and iWork is excluded.
+
 ## 0522: complete candidate evaluation; OLE2/OOXML goal stays open
 
 [0522](changes/0522-xlsx-cell-reference-guard.md) completes the narrow

@@ -1,0 +1,31 @@
+{
+  "command": [
+    "env",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0523-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "python3",
+    "-B",
+    "tools/check_crate_boundaries.py"
+  ],
+  "start_utc": "2026-09-12T07:23:39.581428+00:00",
+  "end_utc": "2026-09-12T07:27:53.476592+00:00",
+  "seconds": 253.8951738540054,
+  "exit_code": 0,
+  "binary_sha256": null,
+  "source_manifest_sha256": "de633055a8f19ef6d839a01ef716614287ebe910cb6cee2d440aa1668746bda1",
+  "script_sha256": "b35fcde2e8e863f8dd55e0983e982a3aeb073a866e96ae6dc6991c86c49eba36",
+  "plan_sha256": "cd85d0969f3f7d6b9127049147c302aa671949d3b01f4ed49735a3af0d4a7688",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "check-boundaries.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "check-boundaries.stdout": "34cc224397f594d4848fc236307b46b5eb98b87a86cfd9452652eaf3a7e770d9"
+  }
+}
