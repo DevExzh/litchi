@@ -515,6 +515,40 @@ mod tests {
     }
 
     #[test]
+    fn form_control_execution_cancellation_remains_typed() {
+        let leaf =
+            crate::form_control::FormControlError::from(litchi_core::ExecutionError::Cancelled);
+        assert!(matches!(
+            Error::from(leaf),
+            Error::FormControl(crate::form_control::FormControlError::Execution(
+                litchi_core::ExecutionError::Cancelled
+            ))
+        ));
+    }
+
+    #[test]
+    fn form_control_execution_limit_retains_resource_scope_and_full_width() {
+        let scope: std::sync::Arc<str> = "caller/form-control-parser".into();
+        let expected = litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::Work,
+            observed: u64::MAX,
+            limit: u64::MAX - 1,
+            scope: scope.clone(),
+        };
+        let leaf = crate::form_control::FormControlError::from(
+            litchi_core::ExecutionError::ResourceLimit(expected.clone()),
+        );
+        let Error::FormControl(crate::form_control::FormControlError::Execution(
+            litchi_core::ExecutionError::ResourceLimit(actual),
+        )) = Error::from(leaf)
+        else {
+            panic!("execution budget refusal must retain its typed source");
+        };
+        assert_eq!(actual, expected);
+        assert!(std::sync::Arc::ptr_eq(&actual.scope, &scope));
+    }
+
+    #[test]
     fn allocation_preserves_resource_and_source() {
         let mut values = Vec::<u8>::new();
         let source = values

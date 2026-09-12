@@ -207,6 +207,9 @@ impl Limits {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum FormControlError {
+    /// The caller's execution policy refused parsing or was cancelled.
+    #[error(transparent)]
+    Execution(#[from] litchi_core::ExecutionError),
     /// The XML or typed model violates the admitted schema slice.
     #[error("invalid form-control properties: {0}")]
     Invalid(String),
