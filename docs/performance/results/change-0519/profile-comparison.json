@@ -1,0 +1,2297 @@
+{
+  "bindings": {
+    "baseline": {
+      "binary_sha256": [
+        "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374"
+      ],
+      "candidate_plan_sha256": [
+        null
+      ],
+      "plan_sha256": [
+        "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e"
+      ],
+      "source_manifest_sha256": [
+        "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef"
+      ]
+    },
+    "candidate": {
+      "binary_sha256": [
+        "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800"
+      ],
+      "candidate_plan_sha256": [
+        "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8"
+      ],
+      "plan_sha256": [
+        "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e"
+      ],
+      "source_manifest_sha256": [
+        "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93"
+      ]
+    }
+  },
+  "comparisons": [
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2503029,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r1/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "40a03b6f9bc47a2d547ea9cfc85d42b115f9fdcb2de0a3ac4da1f6074de741a9",
+        "publication_calls": 1,
+        "publication_direct_ir": 2519734,
+        "publication_inclusive_ir": 2520209,
+        "publication_self_ir": 475,
+        "receipt": "profile-r1/p128-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 2503029,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 1192927
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 1192927,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1310262,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r1/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "6e29ee97a422badbe2a25c44397d958e5e137e6c250d3773484408ccbcfc283b",
+        "publication_calls": 1,
+        "publication_direct_ir": 1326885,
+        "publication_inclusive_ir": 1327360,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r1/p128-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9306,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1310262,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 2503029,
+          "candidate": 1310262,
+          "delta_ir": -1192767,
+          "delta_pct": -47.652943693421044,
+          "ratio_candidate_over_baseline": 0.5234705630657895
+        },
+        "publication_inclusive_ir": {
+          "baseline": 2520209,
+          "candidate": 1327360,
+          "delta_ir": -1192849,
+          "delta_pct": -47.33135228070371,
+          "ratio_candidate_over_baseline": 0.5266864771929629
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9306,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.32133676092545027,
+          "ratio_candidate_over_baseline": 0.9967866323907455
+        },
+        "topology_inclusive_ir": {
+          "baseline": 2503029,
+          "candidate": 1310262,
+          "delta_ir": -1192767,
+          "delta_pct": -47.652943693421044,
+          "ratio_candidate_over_baseline": 0.5234705630657895
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 1192927,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "batch",
+      "repeat": "r1",
+      "route": "p128-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2503957,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r1/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "21e5a3b38b8a7a94072b02188bb74362eef5c71e697eb68124d94a7aa3d93e16",
+        "publication_calls": 1,
+        "publication_direct_ir": 2520582,
+        "publication_inclusive_ir": 2521057,
+        "publication_self_ir": 475,
+        "receipt": "profile-r1/p128-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 2503957,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 1193251
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 1193251,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1309831,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r1/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "0e43f848b4cf04403c4fe4f3b5459aa1046ca9220b590fae066345299150c4ee",
+        "publication_calls": 1,
+        "publication_direct_ir": 1326393,
+        "publication_inclusive_ir": 1326868,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r1/p128-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p128-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9306,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1309831,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 2503957,
+          "candidate": 1309831,
+          "delta_ir": -1194126,
+          "delta_pct": -47.68955696922911,
+          "ratio_candidate_over_baseline": 0.5231044303077089
+        },
+        "publication_inclusive_ir": {
+          "baseline": 2521057,
+          "candidate": 1326868,
+          "delta_ir": -1194189,
+          "delta_pct": -47.36858389159785,
+          "ratio_candidate_over_baseline": 0.5263141610840215
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9306,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.32133676092545027,
+          "ratio_candidate_over_baseline": 0.9967866323907455
+        },
+        "topology_inclusive_ir": {
+          "baseline": 2503957,
+          "candidate": 1309831,
+          "delta_ir": -1194126,
+          "delta_pct": -47.68955696922911,
+          "ratio_candidate_over_baseline": 0.5231044303077089
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 1193251,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r1",
+      "route": "p128-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6077380,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r1/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "af1fab9e411b340e41be792aafc5a6418aa1779c15149bf87a9f060a9c3d5d60",
+        "publication_calls": 1,
+        "publication_direct_ir": 6096911,
+        "publication_inclusive_ir": 6097386,
+        "publication_self_ir": 475,
+        "receipt": "profile-r1/p512-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6077380,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726088
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726088,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1351155,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r1/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "8f3810fa5b04039c399c013687fe13479a59fd80708a06712a4d32f09992c82d",
+        "publication_calls": 1,
+        "publication_direct_ir": 1370614,
+        "publication_inclusive_ir": 1371089,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r1/p512-k1-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9306,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1351155,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6077380,
+          "candidate": 1351155,
+          "delta_ir": -4726225,
+          "delta_pct": -77.7674754581744,
+          "ratio_candidate_over_baseline": 0.2223252454182559
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6097386,
+          "candidate": 1371089,
+          "delta_ir": -4726297,
+          "delta_pct": -77.51349512725618,
+          "ratio_candidate_over_baseline": 0.2248650487274383
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9306,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.32133676092545027,
+          "ratio_candidate_over_baseline": 0.9967866323907455
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6077380,
+          "candidate": 1351155,
+          "delta_ir": -4726225,
+          "delta_pct": -77.7674754581744,
+          "ratio_candidate_over_baseline": 0.2223252454182559
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726088,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "batch",
+      "repeat": "r1",
+      "route": "p512-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6077069,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r1/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "c767ef0c20107eee12963f2a3aa561491a10e1036d10ebd81ad12df73c3a24fc",
+        "publication_calls": 1,
+        "publication_direct_ir": 6096521,
+        "publication_inclusive_ir": 6096996,
+        "publication_self_ir": 475,
+        "receipt": "profile-r1/p512-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6077069,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726753
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726753,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1350422,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r1/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "657c7c191fc7b995b1350d7d84648920847b908d27d64a5176c3686ae3bd33e0",
+        "publication_calls": 1,
+        "publication_direct_ir": 1369914,
+        "publication_inclusive_ir": 1370389,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r1/p512-k1-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9306,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1350422,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6077069,
+          "candidate": 1350422,
+          "delta_ir": -4726647,
+          "delta_pct": -77.77839942248475,
+          "ratio_candidate_over_baseline": 0.22221600577515246
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6096996,
+          "candidate": 1370389,
+          "delta_ir": -4726607,
+          "delta_pct": -77.52353782092034,
+          "ratio_candidate_over_baseline": 0.22476462179079665
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9306,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.32133676092545027,
+          "ratio_candidate_over_baseline": 0.9967866323907455
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6077069,
+          "candidate": 1350422,
+          "delta_ir": -4726647,
+          "delta_pct": -77.77839942248475,
+          "ratio_candidate_over_baseline": 0.22221600577515246
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726753,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r1",
+      "route": "p512-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6079684,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r1/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "ced25997abedab01a984f1d1d37026454fc1ff37c297943a56cd8318899a2e03",
+        "publication_calls": 1,
+        "publication_direct_ir": 6099830,
+        "publication_inclusive_ir": 6100460,
+        "publication_self_ir": 630,
+        "receipt": "profile-r1/p512-k32-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9790,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6079684,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726846
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726846,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1353447,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r1/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "8514666967950982cd21dcb1bcaa6f99265a57930df9b21d9f0000ca5b87dc1b",
+        "publication_calls": 1,
+        "publication_direct_ir": 1373537,
+        "publication_inclusive_ir": 1374167,
+        "publication_self_ir": 630,
+        "receipt": "profile-after-r1/p512-k32-owned-batch.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9760,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1353447,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6079684,
+          "candidate": 1353447,
+          "delta_ir": -4726237,
+          "delta_pct": -77.73820152494768,
+          "ratio_candidate_over_baseline": 0.22261798475052322
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6100460,
+          "candidate": 1374167,
+          "delta_ir": -4726293,
+          "delta_pct": -77.47437078515391,
+          "ratio_candidate_over_baseline": 0.22525629214846093
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9790,
+          "candidate": 9760,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.3064351378958108,
+          "ratio_candidate_over_baseline": 0.9969356486210419
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6079684,
+          "candidate": 1353447,
+          "delta_ir": -4726237,
+          "delta_pct": -77.73820152494768,
+          "ratio_candidate_over_baseline": 0.22261798475052322
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726846,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "batch",
+      "repeat": "r1",
+      "route": "p512-k32-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6079848,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r1/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "2ee6bf29ba42f387a56a78cee7e0f51ef2b390256811218fc8d6f0462f7edf1c",
+        "publication_calls": 1,
+        "publication_direct_ir": 6099662,
+        "publication_inclusive_ir": 6100292,
+        "publication_self_ir": 630,
+        "receipt": "profile-r1/p512-k32-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9477,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6079848,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726623
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726623,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1353278,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r1/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "ed3139de64155c2d738676039da40fdd1a1fdf15f91d55b9c112ceb672c42f84",
+        "publication_calls": 1,
+        "publication_direct_ir": 1372950,
+        "publication_inclusive_ir": 1373580,
+        "publication_self_ir": 630,
+        "receipt": "profile-after-r1/p512-k32-owned-repeated.json",
+        "repeat": "r1",
+        "route": "p512-k32-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9429,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1353278,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6079848,
+          "candidate": 1353278,
+          "delta_ir": -4726570,
+          "delta_pct": -77.74158169743717,
+          "ratio_candidate_over_baseline": 0.22258418302562827
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6100292,
+          "candidate": 1373580,
+          "delta_ir": -4726712,
+          "delta_pct": -77.48337292706644,
+          "ratio_candidate_over_baseline": 0.22516627072933557
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9477,
+          "candidate": 9429,
+          "candidate_call_absent": false,
+          "delta_ir": -48,
+          "delta_pct": -0.5064893953782845,
+          "ratio_candidate_over_baseline": 0.9949351060462172
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6079848,
+          "candidate": 1353278,
+          "delta_ir": -4726570,
+          "delta_pct": -77.74158169743717,
+          "ratio_candidate_over_baseline": 0.22258418302562827
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726623,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r1",
+      "route": "p512-k32-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2502464,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r2/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "2c7d9854bd576e95a7b3e4149c3a6bf962c76dc2eed5d216fa28c97011b4a3f3",
+        "publication_calls": 1,
+        "publication_direct_ir": 2519101,
+        "publication_inclusive_ir": 2519576,
+        "publication_self_ir": 475,
+        "receipt": "profile-r2/p128-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 2502464,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 1193023
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 1193023,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1310114,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r2/p128-k1-owned-batch.callgrind",
+        "profile_sha256": "e5d24937eababe7cd070ce7bb2e2491af6e635f10415e8b79eaff8856a4c49bd",
+        "publication_calls": 1,
+        "publication_direct_ir": 1326664,
+        "publication_inclusive_ir": 1327139,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r2/p128-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9306,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1310114,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 2502464,
+          "candidate": 1310114,
+          "delta_ir": -1192350,
+          "delta_pct": -47.64703907828445,
+          "ratio_candidate_over_baseline": 0.5235296092171555
+        },
+        "publication_inclusive_ir": {
+          "baseline": 2519576,
+          "candidate": 1327139,
+          "delta_ir": -1192437,
+          "delta_pct": -47.32689150873004,
+          "ratio_candidate_over_baseline": 0.5267310849126996
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9306,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.32133676092545027,
+          "ratio_candidate_over_baseline": 0.9967866323907455
+        },
+        "topology_inclusive_ir": {
+          "baseline": 2502464,
+          "candidate": 1310114,
+          "delta_ir": -1192350,
+          "delta_pct": -47.64703907828445,
+          "ratio_candidate_over_baseline": 0.5235296092171555
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 1193023,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "batch",
+      "repeat": "r2",
+      "route": "p128-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 2502847,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r2/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "c75a8dc3d27a7cb0375f74e63cc8684463b851f502ea50625f8a1420f84d8f6f",
+        "publication_calls": 1,
+        "publication_direct_ir": 2519535,
+        "publication_inclusive_ir": 2520010,
+        "publication_self_ir": 475,
+        "receipt": "profile-r2/p128-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 2502847,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 1192947
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 1192947,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "128",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p128-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1310121,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r2/p128-k1-owned-repeated.callgrind",
+        "profile_sha256": "de2e0180519517b97b3b1ac73af33929602a4fcf8ddf4f5b062c005fcdd39937",
+        "publication_calls": 1,
+        "publication_direct_ir": 1326693,
+        "publication_inclusive_ir": 1327168,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r2/p128-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p128-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9306,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1310121,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p128-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 2502847,
+          "candidate": 1310121,
+          "delta_ir": -1192726,
+          "delta_pct": -47.654770747073236,
+          "ratio_candidate_over_baseline": 0.5234522925292676
+        },
+        "publication_inclusive_ir": {
+          "baseline": 2520010,
+          "candidate": 1327168,
+          "delta_ir": -1192842,
+          "delta_pct": -47.33481216344379,
+          "ratio_candidate_over_baseline": 0.526651878365562
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9306,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.32133676092545027,
+          "ratio_candidate_over_baseline": 0.9967866323907455
+        },
+        "topology_inclusive_ir": {
+          "baseline": 2502847,
+          "candidate": 1310121,
+          "delta_ir": -1192726,
+          "delta_pct": -47.654770747073236,
+          "ratio_candidate_over_baseline": 0.5234522925292676
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 1192947,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r2",
+      "route": "p128-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6077468,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r2/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "12f49e7ee492a5892e1626c5cf5066560d1fb8436d421eac99c98167b855a939",
+        "publication_calls": 1,
+        "publication_direct_ir": 6096999,
+        "publication_inclusive_ir": 6097474,
+        "publication_self_ir": 475,
+        "receipt": "profile-r2/p512-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6077468,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726215
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726215,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1351289,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r2/p512-k1-owned-batch.callgrind",
+        "profile_sha256": "ccbe6554efa841a3f294540c6df4b06bb5726c9ea806754c22c31dd5200fe5f5",
+        "publication_calls": 1,
+        "publication_direct_ir": 1370769,
+        "publication_inclusive_ir": 1371244,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r2/p512-k1-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9312,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1351289,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6077468,
+          "candidate": 1351289,
+          "delta_ir": -4726179,
+          "delta_pct": -77.76559251319793,
+          "ratio_candidate_over_baseline": 0.22234407486802069
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6097474,
+          "candidate": 1371244,
+          "delta_ir": -4726230,
+          "delta_pct": -77.51127762086398,
+          "ratio_candidate_over_baseline": 0.22488722379136017
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9312,
+          "candidate_call_absent": false,
+          "delta_ir": -24,
+          "delta_pct": -0.25706940874036244,
+          "ratio_candidate_over_baseline": 0.9974293059125964
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6077468,
+          "candidate": 1351289,
+          "delta_ir": -4726179,
+          "delta_pct": -77.76559251319793,
+          "ratio_candidate_over_baseline": 0.22234407486802069
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726215,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "batch",
+      "repeat": "r2",
+      "route": "p512-k1-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6077026,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r2/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "af198d9bd2421a1fb8eaab9d22f5ada2ccc6290df3f4e9dbf5a2c90ed4ab5e2e",
+        "publication_calls": 1,
+        "publication_direct_ir": 6096640,
+        "publication_inclusive_ir": 6097115,
+        "publication_self_ir": 475,
+        "receipt": "profile-r2/p512-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9336,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6077026,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726820
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726820,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "1",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k1-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1350046,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r2/p512-k1-owned-repeated.callgrind",
+        "profile_sha256": "f5f31692e855332adf4bfeb06f7d2ea0e6f13a5c8406ac27148487b1818cbef7",
+        "publication_calls": 1,
+        "publication_direct_ir": 1369534,
+        "publication_inclusive_ir": 1370009,
+        "publication_self_ir": 475,
+        "receipt": "profile-after-r2/p512-k1-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k1-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9306,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1350046,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k1-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6077026,
+          "candidate": 1350046,
+          "delta_ir": -4726980,
+          "delta_pct": -77.784429423208,
+          "ratio_candidate_over_baseline": 0.22215570576792004
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6097115,
+          "candidate": 1370009,
+          "delta_ir": -4727106,
+          "delta_pct": -77.53020895948329,
+          "ratio_candidate_over_baseline": 0.22469791040516704
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9336,
+          "candidate": 9306,
+          "candidate_call_absent": false,
+          "delta_ir": -30,
+          "delta_pct": -0.32133676092545027,
+          "ratio_candidate_over_baseline": 0.9967866323907455
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6077026,
+          "candidate": 1350046,
+          "delta_ir": -4726980,
+          "delta_pct": -77.784429423208,
+          "ratio_candidate_over_baseline": 0.22215570576792004
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726820,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r2",
+      "route": "p512-k1-owned-repeated",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6079905,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r2/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "bfe937095156cdda0d572a6e9bdd1a084ddd77428259bdd42c2b89e9d8229dd0",
+        "publication_calls": 1,
+        "publication_direct_ir": 6100082,
+        "publication_inclusive_ir": 6100712,
+        "publication_self_ir": 630,
+        "receipt": "profile-r2/p512-k32-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9790,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6079905,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726914
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726914,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "batch",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1352982,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "batch",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r2/p512-k32-owned-batch.callgrind",
+        "profile_sha256": "13b0472b43f6177a66e02dbc3be93c6b38cacc384d3a7d7523f70975f2d3c7dd",
+        "publication_calls": 1,
+        "publication_direct_ir": 1373097,
+        "publication_inclusive_ir": 1373727,
+        "publication_self_ir": 630,
+        "receipt": "profile-after-r2/p512-k32-owned-batch.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-batch",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9780,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1352982,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6079905,
+          "candidate": 1352982,
+          "delta_ir": -4726923,
+          "delta_pct": -77.74665887049221,
+          "ratio_candidate_over_baseline": 0.2225334112950778
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6100712,
+          "candidate": 1373727,
+          "delta_ir": -4726985,
+          "delta_pct": -77.48251351645513,
+          "ratio_candidate_over_baseline": 0.2251748648354487
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9790,
+          "candidate": 9780,
+          "candidate_call_absent": false,
+          "delta_ir": -10,
+          "delta_pct": -0.10214504596527396,
+          "ratio_candidate_over_baseline": 0.9989785495403473
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6079905,
+          "candidate": 1352982,
+          "delta_ir": -4726923,
+          "delta_pct": -77.74665887049221,
+          "ratio_candidate_over_baseline": 0.2225334112950778
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726914,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "batch",
+      "repeat": "r2",
+      "route": "p512-k32-owned-batch",
+      "same_api": true
+    },
+    {
+      "baseline": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "75a2679708d4ad9a119a9600683c0adc080b0a6e4a699294360ef4c459e00374",
+        "candidate_plan_sha256": null,
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 6079902,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-r2/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "8f881a04edffe169c5fc0da907271463b663ca3c48962937896c30a2cea7c9a0",
+        "publication_calls": 1,
+        "publication_direct_ir": 6099648,
+        "publication_inclusive_ir": 6100278,
+        "publication_self_ir": 630,
+        "receipt": "profile-r2/p512-k32-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9453,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "7aa4c9c0a35a9120d7a180d0466b2a1a5b7b4840e40a6462b1919453f68dfaef",
+        "topology_inclusive_ir": 6079902,
+        "variant": "baseline",
+        "xml_validator_calls": {
+          "calls": 1,
+          "edges": [
+            {
+              "callee": "litchi_opc::xml_splice::validate_source_xml",
+              "caller": "litchi_opc::xml_splice::SourceXmlPart::check_for_publication",
+              "calls": 1,
+              "inclusive_ir": 4726640
+            }
+          ],
+          "positive_edge_count": 1,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": 4726640,
+        "xml_validator_policy": "present"
+      },
+      "candidate": {
+        "annotation_checks": {
+          "candidate_fresh_docx_scan_absent": true,
+          "candidate_fresh_snapshot_build_absent": true,
+          "direct_owner_matches_raw": true,
+          "direct_owner_matches_topology_inclusive": true,
+          "exclusive_direct_edges_match_inclusive": true,
+          "exclusive_self_matches_raw": true,
+          "inclusive_direct_edges_match_raw": true,
+          "inclusive_publication_matches_raw": true,
+          "raw_exactly_one_positive_call": true,
+          "raw_publication_total_scoped": true,
+          "semantic_snapshot_owner_requirement_satisfied": true,
+          "xml_validator_annotation_policy_satisfied": true,
+          "xml_validator_call_policy_satisfied": true
+        },
+        "api": {
+          "mode": "repeated",
+          "paragraphs": "512",
+          "repeats": "1",
+          "replacements": "32",
+          "samples": "1",
+          "source": "owned",
+          "warmups": "0"
+        },
+        "binary_sha256": "48a09a4668c0e3c8a12ea6d20dd9129330f9e891193967f989f92c26625fc800",
+        "candidate_plan_sha256": "6a9ebf34b2e896f73dfbd3d942f29c994efe64f239f6e41d8a2d1ce1a40490a8",
+        "case": "p512-k32-owned",
+        "direct_owner": {
+          "calls": 1,
+          "inclusive_ir": 1353240,
+          "name": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream"
+        },
+        "fresh_positive_functions": {
+          "litchi_docx::document::transaction::Snapshot::from_source_xml": [],
+          "litchi_docx::source_backed::ensure_source_document_xml": []
+        },
+        "mode": "repeated",
+        "plan_sha256": "020cdca03baaad9dc6352354a2b4dcf3e84153d1e5e8d064304026cfdd7df95e",
+        "profile": "profile-after-r2/p512-k32-owned-repeated.callgrind",
+        "profile_sha256": "d21a692d7c6c21038dc67d3487f6b89f7f2f827cb1b7b0b1fc9cacbfc301c5e6",
+        "publication_calls": 1,
+        "publication_direct_ir": 1373598,
+        "publication_inclusive_ir": 1374228,
+        "publication_self_ir": 630,
+        "receipt": "profile-after-r2/p512-k32-owned-repeated.json",
+        "repeat": "r2",
+        "route": "p512-k32-owned-repeated",
+        "semantic_snapshot_owner_present": true,
+        "snapshot_owner": {
+          "calls": 1,
+          "inclusive_ir": 9857,
+          "name": "litchi_docx::source_backed::Package::main_document_snapshot_with_before"
+        },
+        "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+        "topology_inclusive_ir": 1353240,
+        "variant": "candidate",
+        "xml_validator_calls": {
+          "calls": 0,
+          "edges": [],
+          "positive_edge_count": 0,
+          "target": "litchi_opc::xml_splice::validate_source_xml"
+        },
+        "xml_validator_inclusive_ir": null,
+        "xml_validator_policy": "absent"
+      },
+      "case": "p512-k32-owned",
+      "metrics": {
+        "direct_owner_inclusive_ir": {
+          "baseline": 6079902,
+          "candidate": 1353240,
+          "delta_ir": -4726662,
+          "delta_pct": -77.74240440059724,
+          "ratio_candidate_over_baseline": 0.22257595599402755
+        },
+        "publication_inclusive_ir": {
+          "baseline": 6100278,
+          "candidate": 1374228,
+          "delta_ir": -4726050,
+          "delta_pct": -77.47269878520291,
+          "ratio_candidate_over_baseline": 0.22527301214797096
+        },
+        "snapshot_owner_inclusive_ir": {
+          "baseline": 9453,
+          "candidate": 9857,
+          "candidate_call_absent": false,
+          "delta_ir": 404,
+          "delta_pct": 4.273775520998635,
+          "ratio_candidate_over_baseline": 1.0427377552099864
+        },
+        "topology_inclusive_ir": {
+          "baseline": 6079902,
+          "candidate": 1353240,
+          "delta_ir": -4726662,
+          "delta_pct": -77.74240440059724,
+          "ratio_candidate_over_baseline": 0.22257595599402755
+        },
+        "xml_validator_inclusive_ir": {
+          "baseline": 4726640,
+          "candidate": null,
+          "candidate_call_absent": true,
+          "delta_ir": null,
+          "delta_pct": null,
+          "ratio_candidate_over_baseline": null
+        }
+      },
+      "mode": "repeated",
+      "repeat": "r2",
+      "route": "p512-k32-owned-repeated",
+      "same_api": true
+    }
+  ],
+  "functions": {
+    "direct_owner": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+    "fresh_docx_scan": "litchi_docx::source_backed::ensure_source_document_xml",
+    "fresh_snapshot_build": "litchi_docx::document::transaction::Snapshot::from_source_xml",
+    "publication": "litchi_docx::source_backed::Package::publish_document_commit_to_stream",
+    "snapshot_owner": [
+      "litchi_docx::source_backed::Package::main_document_snapshot",
+      "litchi_docx::source_backed::Package::main_document_snapshot_with_before",
+      "litchi_docx::source_backed::Package::main_document_snapshot_with_hint"
+    ],
+    "topology": "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream",
+    "xml_validator": "litchi_opc::xml_splice::validate_source_xml",
+    "xml_validator_policy": {
+      "baseline": "present",
+      "candidate": "absent"
+    }
+  },
+  "matrix": {
+    "arms": [
+      "p128-k1-owned-batch",
+      "p128-k1-owned-repeated",
+      "p512-k1-owned-batch",
+      "p512-k1-owned-repeated",
+      "p512-k32-owned-batch",
+      "p512-k32-owned-repeated"
+    ],
+    "matched_pairs": 12,
+    "profiles_per_variant": 12,
+    "repeats": [
+      "r1",
+      "r2"
+    ]
+  },
+  "schema": "managed_docx_publication_profile_comparison_v1",
+  "scope": "Callgrind Ir publication-method diagnostic; owned source; one measured sample; zero warmups; one harness repeat; publication excludes caller Snapshot drop; no RSS claim",
+  "validation": {
+    "all_annotation_checks": true,
+    "baseline_exact_one_positive_call": true,
+    "baseline_profile_count": 12,
+    "candidate_exact_one_positive_call": true,
+    "candidate_profile_count": 12,
+    "same_api_for_all_pairs": true
+  }
+}

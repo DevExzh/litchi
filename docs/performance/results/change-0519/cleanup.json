@@ -1,0 +1,17 @@
+{
+  "completed_utc": "2026-09-12T04:16:04.287114+00:00",
+  "owned_paths": [
+    "/tmp/litchi-goal-0519",
+    "/home/zhuhe/litchi-goal-0519-target"
+  ],
+  "additional_owned_verifier_reports": [
+    "/tmp/litchi-verify-0519-baseline.json",
+    "/tmp/litchi-verify-0519-candidate3.json",
+    "/tmp/litchi-verify-0519-current.json",
+    "/tmp/litchi-verify-0519-latest.json"
+  ],
+  "accessible_process_references_before_removal": [],
+  "process_fd_directories_unavailable": 434,
+  "owned_paths_absent": true,
+  "owned_python_cache_absent": true
+}

@@ -1,0 +1,25 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "started_utc": "2026-09-12T03:50:48.956270+00:00",
+  "elapsed_seconds": 17.809949948001304,
+  "exit_code": 0,
+  "source_unchanged": true,
+  "source_manifest_sha256": "5e0b4f9bbe9e5c1c3808b10f5d593a395d639db6eb1023b398bc774d66bd5a93",
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "environment": {
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0519-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "TMPDIR": "/tmp/litchi-goal-0519",
+    "RUSTDOCFLAGS": "-D warnings",
+    "LITCHI_0415_PYTHON_ZIP": "/tmp/litchi-goal-0519/independent-zip64.zip"
+  }
+}

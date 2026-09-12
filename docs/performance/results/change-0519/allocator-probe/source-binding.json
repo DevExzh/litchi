@@ -1,0 +1,19 @@
+{
+  "source": "crates/litchi-docx/examples/managed_paragraph_batch_perf.rs",
+  "source_sha256": "89ffdd564f6a76814fcc8b769f324557bd15a5201cb366ce9e75ade0a1c61181",
+  "source_lines": 907,
+  "generated": "docs/performance/results/change-0519/allocator-probe/src/main.rs",
+  "generated_sha256": "40f06c12173b0d5552f200cb1ef98b3e8172402094be8afae352f8b4ef9da768",
+  "generated_lines": 990,
+  "diff": "docs/performance/results/change-0519/allocator-probe/source-diff.patch",
+  "canonical_modules": {
+    "allocation_metrics": "tools/perf-baseline/src/allocation_metrics.rs",
+    "counting_allocator": "tools/perf-baseline/src/bin/support/counting_allocator.rs"
+  },
+  "anchors": {
+    "publication_region_start": "allocation_metrics::begin() immediately before publish_document_commit_to_stream",
+    "publication_region_finish": "allocation_region.finish() immediately after publish returns and before drop(published)",
+    "json_emission": "run_sample_and_emit after run_sample lifecycle and semantic oracles",
+    "csv": "source CSV writer copied unchanged"
+  }
+}

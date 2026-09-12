@@ -1,0 +1,11 @@
+{
+  "frozen_utc": "2026-09-12T03:39:58.741205+00:00",
+  "base": "45d71cb6f0cd5d003c544b61c748552a513b0245",
+  "hypothesis": "SourceXmlPart original and derived payloads are already fully validated and immutable. Reuse that result iff full destination ReadLimits equal stored limits after all existing contenttype/lineage/source/PartBytes checks; preserve one payload-length Work charge and final source fence. Different destination limits retain full validation.",
+  "mechanism": "0518 candidate publication retains one XML validation call costing approximately1.19M p128 or4.73M p512 Ir within2.52M/6.10M publication totals.",
+  "scope": "Private OPC check_for_publication; both additions and replacements; original and derived proofs; no API/dependency/unsafe/cache changes. DOCX candidate reparse/readback untouched.",
+  "before": "24 preflight; 2x24native; 2x6methodprofiles;6hardware;2x24separateallocatorcases",
+  "after": "Same native/profile/hardware/allocator protocol and exact oracles; all flags retained.",
+  "admission": "Useful representative end-to-end improvement, scoped instruction and allocation mechanism, all required correctness and policy gates. Work/I/O/output/release counters unchanged.",
+  "priority": "OLE2/OOXML until full goal complete; ODF deferred; iWork excluded"
+}

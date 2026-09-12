@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## 0519: reuse the immutable OPC publication XML proof
+
+[0519](changes/0519-opc-publication-xml-proof-reuse.md) reuses complete XML
+validation when destination and proof `ReadLimits` are exactly equal. The
+publication owner retains Work, source/context, PartBytes, destination identity,
+security, topology, transfer, and DOCX candidate readback checks. Different
+limits retain full XML validation; matching limits no longer reserve unused
+parser workspace.
+
+Across 48 matched synthetic DOCX comparisons, lifecycle p50 improves
+1.43–26.41% and publication p50 improves 36.31–80.85%. Scoped publication
+instructions fall 47.33–47.37% for p128 and 77.47–77.53% for p512. The separate
+allocator probe records 109→96 calls and 75,001→74,218 allocated bytes;
+incremental region peak remains 72,535 bytes. Work, source I/O, exact output,
+and release counters are unchanged. RSS has no >5% adverse flag.
+
+All 107 phase flags remain explicit, including two second-campaign lifecycle
+p99 regressions dominated by edit outliers. The separate eight-child tail
+guard improves lifecycle p99 by 14.47–18.07% in all four comparisons, while
+retaining three short commit-phase flags and all original flags. All nine
+quality gates pass, including 5,012 executed tests. No general tail-latency,
+cold/range, native Office producer, or scaling improvement is claimed. The
+remaining local publication profile is mostly ZIP preservation and copying;
+its instruction count alone does not prove further removable work. OLE2/OOXML
+remains active, ODF deferred, and iWork excluded.
+
 ## 0518: reuse the retained DOCX source snapshot at publication
 
 [0518](changes/0518-docx-source-snapshot-reuse.md) reuses the immutable
@@ -46,17 +72,20 @@ production is restored. Two independent no-op fixture fixes remain, with
 1,263 tests passing on unchanged production. OLE2/OOXML work remains active;
 ODF is deferred and iWork excluded.
 
-## Current priority after 0518: OLE2 and OOXML
+## Current priority after 0519: OLE2 and OOXML
 
 Per the user's instruction, prioritize OLE2 and OOXML performance
 until their full optimization goal is complete. Further ODF optimization is
 deferred until then. This overrides the ordering of older entries below.
 CFB profiling and FAT batching are complete in 0511. The 0514 source-pass
-fusion and 0516 emitted-output fusion are rejected. The 0517 and 0518 DOCX publication
-changes remove repeated XML and current-snapshot construction work. The
-remaining topology/XML publication owner needs a proof review before further
-optimization; required candidate validation and readback must remain intact.
-Retain the 0499/0500 review flags. This investigation queue is not a completion checklist. The broader requirements and
+fusion and 0516 emitted-output fusion are rejected. The 0517–0519 DOCX publication
+changes remove repeated XML and current-snapshot construction work. Further
+publication investigation must distinguish required byte copying from
+removable work and compare its end-to-end value with broader OLE2/OOXML
+coverage. Required candidate validation and readback remain intact.
+The [next-priority review](results/change-0519/next-priority-review.md)
+selects current source-backed XLSX one-percent edit/save phase and resource
+attribution before another DOCX publication change. Retain the 0499/0500 review flags. This investigation queue is not a completion checklist. The broader requirements and
 outstanding coverage remain open; iWork remains outside this workstream.
 See the [priority review](results/change-0510/ole2-ooxml-priority-review.md).
 

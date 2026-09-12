@@ -1,0 +1,93 @@
+{
+  "reports": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0519/analyze_native.py",
+        "--json",
+        "/tmp/litchi-goal-0519/report-replay/baseline-native-analysis.json",
+        "--markdown",
+        "/tmp/litchi-goal-0519/report-replay/baseline-native-analysis.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "5121b99ab3d7924dc07b7693b479f1e9374cb1deca22c7695ff574752028be32",
+      "output_sha256": {
+        "baseline-native-analysis.json": "f0f34a17163600067d34bb78f46f629f0cd4c089a04dbf7a145b44538b462f61",
+        "baseline-native-analysis.md": "78dbbe21cd71b8cb085042aad90bf8eb2502a054c2ea3fe59a86f91a170997b8"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0519/analyze_native.py",
+        "--lanes",
+        "after-r1",
+        "after-r2",
+        "--json",
+        "/tmp/litchi-goal-0519/report-replay/candidate-native-analysis.json",
+        "--markdown",
+        "/tmp/litchi-goal-0519/report-replay/candidate-native-analysis.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "5121b99ab3d7924dc07b7693b479f1e9374cb1deca22c7695ff574752028be32",
+      "output_sha256": {
+        "candidate-native-analysis.json": "5e33f2c674d8bf3ccedf0a02f8605b26f37f3639b57c8b4800eaae27c9ef8563",
+        "candidate-native-analysis.md": "4a25dd4dfd9f148f42399ca4c52552e0fff441688d92f39c0aae065198fd3766"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0519/compare_candidate.py",
+        "--json",
+        "/tmp/litchi-goal-0519/report-replay/candidate-comparison.json",
+        "--markdown",
+        "/tmp/litchi-goal-0519/report-replay/candidate-comparison.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "d3cf50f005276207171cdb5f3659ae66ecc29ae343324da866ddbd7156e547b5",
+      "output_sha256": {
+        "candidate-comparison.json": "6e7ecb330e234546c0ca43fea69d603e6024f5498b1bdbebf6ffe82ff415ecbe",
+        "candidate-comparison.md": "1ea9762adeab647abed7dbd48fa8f40c1ff4712846f2b5f462bc417d063ccc9c"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0519/compare_profile_lanes.py",
+        "--json",
+        "/tmp/litchi-goal-0519/report-replay/profile-comparison.json",
+        "--markdown",
+        "/tmp/litchi-goal-0519/report-replay/profile-comparison.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "a817bb19e1f6d1b5989e41a72dbcf3166b9d0178099781e5ed78c9e5f19f3c74",
+      "output_sha256": {
+        "profile-comparison.json": "e902acf48139b3222312473ab6aa7ad4c888f38416546d8339ef8037561ad477",
+        "profile-comparison.md": "11238ddcabcb4caf5e444821b15ef41fc5d503c3de1ff750a2107a28d64bc3d4"
+      }
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0519/analyze_allocations.py",
+        "--output",
+        "/tmp/litchi-goal-0519/report-replay/publication-allocation-comparison.json",
+        "--markdown",
+        "/tmp/litchi-goal-0519/report-replay/publication-allocation-comparison.md"
+      ],
+      "exit_code": 0,
+      "helper_sha256": "507d7dcfe842cca9ce7878934f81d536a344240c17c192465285d131fa4805e8",
+      "output_sha256": {
+        "publication-allocation-comparison.json": "b58d57853cab0d534f32ad2db3466b8a249a98fe43e97ba2f63b42844309845e",
+        "publication-allocation-comparison.md": "8bb13415d51d5983e85cfb8b953db6d8b79ebe0143f68aa100a9bf0005e8e785"
+      }
+    }
+  ],
+  "temporary_replay_removed": true
+}

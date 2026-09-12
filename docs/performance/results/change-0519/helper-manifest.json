@@ -1,0 +1,9 @@
+{
+  "docs/performance/results/change-0500/verify-evidence.py": "923e7bb2f9cb02c2ae642535457a7d491b53d02fc095028f773cc43b515dbcab",
+  "docs/performance/results/change-0515/analyze.py": "465e574da2854bce539f76f6c5c8c0665a1572fe9864339622eaf016e007f381",
+  "docs/performance/results/change-0415/interop.py": "9f3d498a1f9efe21eb97dfdf82eeb5c8befe191207ffb546a86bb1661f824ffe",
+  "tools/check_crate_boundaries.py": "4300ffa943039f4dfe68307cf0e7b6d335142aef2c728c4d1ceafe52d54fd9e2",
+  "tools/crate_boundaries.json": "93e1f1c01364f8bdf81e3a818be7e121ec760ec83c4d9aca5a8d952485cc3d33",
+  "tools/check_perf_claims.py": "d53ab2fdab5d5a492a23ac0f85fb58b19cabec396ecfdb1edc3a5c89964f7fbc",
+  "docs/performance/claim-registry-v1.json": "b8847b7e2fe2c5d15d5fe091f7f7f6bca8f2ec38a25decfe20a36a76f5eef955"
+}
