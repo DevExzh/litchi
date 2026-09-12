@@ -194,12 +194,6 @@ impl Package {
         crate::metadata::Snapshot::from_source(source)
     }
 
-    /// Decode the optional spreadsheet calculation-settings owner.
-    pub(crate) fn calculation_settings(&self) -> Result<Option<Settings>> {
-        crate::settings::Snapshot::from_content_xml(self.content_xml())
-            .map(|snapshot| snapshot.calculation().cloned())
-    }
-
     /// Read the ordered named-definition catalog from `content.xml`.
     ///
     /// # Errors

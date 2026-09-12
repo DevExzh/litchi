@@ -11,6 +11,8 @@ use std::{borrow::Cow, collections::BTreeSet, fmt::Write as _, num::IntErrorKind
 
 use litchi_core::{Error, Result};
 
+pub(crate) mod source;
+
 /// Maximum size of one style name or text value.
 pub const MAX_STYLE_TEXT_BYTES: usize = 65_536;
 /// Maximum number of child particles in one authored number body.
@@ -1402,6 +1404,14 @@ impl Number {
         Ok(output)
     }
 
+    /// Return the exact canonical markup size after validation without
+    /// allocating the serialized fragment.  Package owners use this for
+    /// caller-limit preflight before constructing a replacement buffer.
+    pub(crate) fn serialized_markup_size(&self) -> Result<usize> {
+        self.validate()?;
+        self.markup_size()
+    }
+
     /// Atomically replace the number body.
     pub fn set_format(&mut self, format: Option<Format>) -> Result<()> {
         let previous = self.format.clone();
@@ -1819,6 +1829,14 @@ impl Data {
         output.push('>');
         enforce_markup_limit(&output)?;
         Ok(output)
+    }
+
+    /// Return the exact canonical markup size after validation without
+    /// allocating the serialized fragment.  Package owners use this for
+    /// caller-limit preflight before constructing a replacement buffer.
+    pub(crate) fn serialized_markup_size(&self) -> Result<usize> {
+        self.validate()?;
+        self.markup_size()
     }
 
     fn markup_size(&self) -> Result<usize> {

@@ -1,0 +1,16 @@
+{
+  "parent": "3724b88f469a29c92d5625655a03e1de8a9fff42",
+  "files": {
+    "crates/litchi-ods/src/advanced.rs": "0d1fad5bd849a0e34a1f60cdfec6dd62185bff2ac35673aa6148a63da3df3677",
+    "crates/litchi-ods/src/authoring/builder.rs": "adb9a82cb97c51e972fa4213e9a27b722574437a20fb32e5247bb05045dbaebc",
+    "crates/litchi-ods/src/data_style/mod.rs": "d5e1caad8b0f41fe506669616ee4163665f3ff165774d43861420b29aea09f24",
+    "crates/litchi-ods/src/document.rs": "ed61fcd31b997a3eea725a550cfc5645055aadad6e18bf0210c9e7f728a41fdc",
+    "crates/litchi-ods/src/facade/mod.rs": "79a8dd565387b35265427caca2f690c83b9e68a19a9d27abf03745b948a17f79",
+    "crates/litchi-ods/src/open_parse.rs": "41503f2146b551cd83ca20ecd37ccba69a57f3529c21aca4a98d8851317c1467",
+    "crates/litchi-ods/src/package/document.rs": "cdfefd76a240bc31e62865099db6128ca420e045222b4bb3fc4051be7bf37276",
+    "crates/litchi-ods/src/data_style/source.rs": "97121798e76fda01d7d12a1be10c4a34457d6447e1fb5de6184a86e5b2629261",
+    "crates/litchi-ods/tests/data_style_vocabulary.rs": "3b891291717210cbc6e377927a914786e448e22d3623f13305bb761ed668faab",
+    "crates/litchi-ods/src/worksheet/codec.rs": "5ce767fe0f655768ad6d507c582f225991d836e6f7990a7bccdd09d5736da45b"
+  },
+  "review_status": "Approved: final independent v9 owner review confirms insertion preflight fix and owner/facade scope; scanner review approved separately."
+}
