@@ -5,13 +5,13 @@ use super::{
     MAX_AGGREGATE_BYTES, MAX_DEPTH, MAX_OCCURRENCES, MAX_VALUE_BYTES, OFFICE, TEXT, XLINK, invalid,
     make_error,
 };
+use crate::core::ResolvedReader;
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Body, Part, Scope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
@@ -58,7 +58,7 @@ pub(super) fn parse_part(
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -70,7 +70,6 @@ pub(super) fn parse_part(
         if let Some(budget) = budget {
             budget.event(depth)?;
         }
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| make_error(format!("invalid auto-mark-file XML: {error}")))?;
@@ -81,7 +80,7 @@ pub(super) fn parse_part(
                         "text:alphabetical-index-auto-mark-file cannot contain elements",
                     );
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if is_auto_mark_file(namespace.as_deref(), &local) {
@@ -150,7 +149,7 @@ pub(super) fn parse_part(
                         "text:alphabetical-index-auto-mark-file cannot contain elements",
                     );
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if is_auto_mark_file(namespace.as_deref(), &local) {
@@ -224,7 +223,7 @@ fn is_auto_mark_file(namespace: Option<&str>, local: &str) -> bool {
 }
 
 fn register_reference(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     scope: &mut TextScope,
@@ -285,7 +284,7 @@ fn register_reference(
 }
 
 fn collect_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
@@ -301,7 +300,7 @@ fn collect_attributes(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace = namespace_uri(&namespace, reader.decoder())?.unwrap_or_default();
+        let namespace = namespace_uri(&namespace)?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
@@ -364,12 +363,14 @@ fn required_nonempty(attributes: &Attributes, namespace: &str, local: &str) -> R
     }
 }
 
-fn namespace_uri(
-    result: &ResolveResult<'_>,
-    decoder: quick_xml::Decoder,
-) -> Result<Option<String>> {
-    crate::namespace::resolved_namespace_uri(result, decoder, "auto-mark-file")
-        .map(|namespace| namespace.map(|uri| uri.into_owned()))
+fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
+    crate::elements::xml::normalized_namespace_uri(result, "auto-mark-file")?
+        .map(|uri| {
+            std::str::from_utf8(uri)
+                .map(str::to_owned)
+                .map_err(|_error| make_error("auto-mark-file namespace URI is not UTF-8"))
+        })
+        .transpose()
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {

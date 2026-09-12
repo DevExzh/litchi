@@ -5,13 +5,13 @@ use super::{
     STYLE, TEXT,
     model::{Connections, Declaration, Use},
 };
+use crate::core::ResolvedReader;
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Body, HeaderFooter, Part, Scope};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone)]
@@ -42,7 +42,7 @@ pub(super) fn parse_part(
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -55,7 +55,6 @@ pub(super) fn parse_part(
         if let Some(budget) = budget {
             budget.event(depth)?;
         }
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| make_error(format!("invalid DDE connection XML: {error}")))?;
@@ -64,7 +63,7 @@ pub(super) fn parse_part(
                 if pending_declaration.is_some() || pending_use.is_some() {
                     return invalid("DDE connection elements cannot contain elements");
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if let Some(group) = active.as_ref() {
@@ -129,7 +128,7 @@ pub(super) fn parse_part(
                 if pending_declaration.is_some() || pending_use.is_some() {
                     return invalid("DDE connection elements cannot contain elements");
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if let Some(group) = active.as_ref() {
@@ -251,7 +250,7 @@ fn start_group(
 }
 
 fn parse_declaration(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     scope: Scope,
@@ -288,7 +287,7 @@ fn parse_declaration(
 }
 
 fn parse_use(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     stack: &[Frame],
@@ -367,7 +366,7 @@ fn add_use(
 }
 
 fn collect_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
@@ -383,7 +382,7 @@ fn collect_attributes(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace = namespace_uri(&namespace, reader.decoder())?.unwrap_or_default();
+        let namespace = namespace_uri(&namespace)?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
@@ -412,7 +411,7 @@ fn collect_attributes(
 }
 
 fn optional_attribute(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     namespace: &str,
     local: &str,
@@ -429,7 +428,7 @@ fn optional_attribute(
             continue;
         }
         let (resolved, resolved_local) = reader.resolver().resolve_attribute(attribute.key);
-        if namespace_uri(&resolved, reader.decoder())?.as_deref() == Some(namespace)
+        if namespace_uri(&resolved)?.as_deref() == Some(namespace)
             && resolved_local.as_ref() == local.as_bytes()
         {
             if value.is_some() {
@@ -542,12 +541,14 @@ fn parse_bool(value: &str) -> Result<bool> {
     }
 }
 
-fn namespace_uri(
-    result: &ResolveResult<'_>,
-    decoder: quick_xml::Decoder,
-) -> Result<Option<String>> {
-    crate::namespace::resolved_namespace_uri(result, decoder, "DDE connection")
-        .map(|namespace| namespace.map(|uri| uri.into_owned()))
+fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
+    crate::elements::xml::normalized_namespace_uri(result, "DDE connection")?
+        .map(|uri| {
+            std::str::from_utf8(uri)
+                .map(str::to_owned)
+                .map_err(|_error| make_error("DDE connection namespace URI is not UTF-8"))
+        })
+        .transpose()
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {

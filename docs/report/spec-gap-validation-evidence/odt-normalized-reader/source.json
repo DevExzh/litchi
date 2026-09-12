@@ -1,0 +1,17 @@
+{
+  "parent": "f19c29d2428b97efa30c2c24e584b36d89395059",
+  "files": {
+    "crates/litchi-odt/src/auto_mark_file/codec.rs": "f357fa4017edf45cbe06ba7de6bb7fb8f2787fa317ee2ff4a25ff7128d8d67e0",
+    "crates/litchi-odt/src/bibliography_configuration/codec.rs": "f2b54caa2ff0ca34dcc63736389eb2a3a70fee1c988643466df025a894e874a4",
+    "crates/litchi-odt/src/content_metadata.rs": "68b0e29793fc58e4aca310573d37eedeae01416ab265069e5c0a0f139ebc7b94",
+    "crates/litchi-odt/src/dde_connection/codec.rs": "b816e98168a2fad56d960b87c5b00809c1062bf8685463860a41e8f457338a6f",
+    "crates/litchi-odt/src/elements/xml.rs": "459c40419861ce98ff0daf1ee30f0e7175e468c79fe7da67d63b6d6ea8cea3d0",
+    "crates/litchi-odt/src/flat/mod.rs": "60756e7c40900e06b1e4090114a7eb16881c14c6e52b6366ef3ea41cb36a0fbc",
+    "crates/litchi-odt/src/generic/codec.rs": "af26127963f477d45f4f5453d2dc7c02ac05d8a405abd7da5e74ac8110ec56d8",
+    "crates/litchi-odt/src/variable_declaration/codec.rs": "b5d5778b6a0e4b8b2e008352d01ac4522e73a38b3630267c57186e3bc267a57e",
+    "crates/litchi-odt/src/variable_declaration/package.rs": "b5cfae11d028665b56438952f24331f6bbfb385343f8a5227c64bc8d3cd45ea6",
+    "crates/litchi-odt/src/xforms.rs": "a53fc7e8eb710eedef7ae17a6c392d4ab2413cd49cdd7e55aa2c2c4959a36054",
+    "crates/litchi-odt/tests/flat_text_templates.rs": "e17b5295dd11995d5dbd73819e758aaae460bf19cba793596cd8bf12f54ba653"
+  },
+  "review": "Independent odt_resolved_reader_review: APPROVED for these ten source consumers and test; no global namespace coverage claim."
+}

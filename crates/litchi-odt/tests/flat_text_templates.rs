@@ -544,7 +544,7 @@ fn oversized_flat_reader_charges_growth_peak_and_admits_with_enough_memory() {
                 limit.observed,
                 64 * 1024 + u64::try_from(source.len()).unwrap()
             );
-        }
+        },
         error => panic!("expected peak memory refusal, got {error}"),
     }
     assert_eq!(refusal_budget.used(Resource::Memory), 0);

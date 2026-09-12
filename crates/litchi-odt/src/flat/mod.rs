@@ -5,9 +5,9 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::core::ResolvedReader;
 use litchi_core::{Error, Metadata, Resource, ResourceLimit, Result};
 use quick_xml::events::Event;
-use quick_xml::reader::NsReader;
 
 use crate::elements::parser::{OrderElement, Parser};
 use crate::elements::table::Table;
@@ -601,7 +601,7 @@ fn render_paragraph_edits(
 }
 
 fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSite>> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -609,14 +609,19 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
     let mut sites = Vec::new();
 
     loop {
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
-        let is_office =
-            crate::namespace::namespace_matches(&namespace, OFFICE_NAMESPACE, decoder, "flat ODT")?;
-        let is_text =
-            crate::namespace::namespace_matches(&namespace, TEXT_NAMESPACE, decoder, "flat ODT")?;
+        let is_office = crate::elements::xml::normalized_namespace_matches(
+            &namespace,
+            OFFICE_NAMESPACE,
+            "flat ODT",
+        )?;
+        let is_text = crate::elements::xml::normalized_namespace_matches(
+            &namespace,
+            TEXT_NAMESPACE,
+            "flat ODT",
+        )?;
         let event = event.into_owned();
         let event_end = usize::try_from(reader.buffer_position()).map_err(|_error| {
             resource_limit_error(
@@ -680,7 +685,7 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
 }
 
 fn classify_paragraph_end(
-    reader: &mut NsReader<&[u8]>,
+    reader: &mut ResolvedReader<'_>,
     buffer: &mut Vec<u8>,
     content_start: usize,
     outer_depth: usize,

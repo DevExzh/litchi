@@ -5,13 +5,13 @@ use super::{
     FO, MAX_AGGREGATE_BYTES, MAX_DEPTH, MAX_SORT_KEYS, MAX_VALUE_BYTES, MAX_XML_BYTES, OFFICE,
     STYLE, TEXT,
 };
+use crate::core::ResolvedReader;
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::Part;
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::HashMap;
 
 impl Configuration {
@@ -170,7 +170,7 @@ fn parse_part(
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -182,7 +182,6 @@ fn parse_part(
         if let Some(budget) = budget {
             budget.event(depth)?;
         }
-        let decoder = reader.decoder();
         let (namespace, event) =
             reader
                 .read_resolved_event_into(&mut buffer)
@@ -194,7 +193,7 @@ fn parse_part(
                 if pending_sort_key.is_some() {
                     return invalid("text:sort-key cannot contain elements");
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if let Some(configuration) = active.as_mut() {
@@ -249,7 +248,7 @@ fn parse_part(
                 if pending_sort_key.is_some() {
                     return invalid("text:sort-key cannot contain elements");
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if let Some(configuration) = active.as_mut() {
@@ -363,7 +362,7 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
         return invalid("bibliography configuration XML exceeds 64 MiB");
     }
     parse_bibliography_configuration(xml)?;
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -372,7 +371,6 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
     let mut styles_site = None;
 
     loop {
-        let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|source| {
@@ -380,7 +378,7 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
                     "invalid bibliography configuration XML while locating mutation site: {source}"
                 ))
             })?;
-        let namespace = namespace_uri(&resolved, decoder)?;
+        let namespace = namespace_uri(&resolved)?;
         match event {
             Event::Start(ref element) => {
                 let end = reader.buffer_position() as usize;
@@ -525,7 +523,7 @@ pub(crate) fn remove_bibliography_configuration_xml(xml: &str) -> Result<String>
 
 #[allow(clippy::too_many_arguments)]
 fn start_configuration(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     depth: usize,
@@ -586,7 +584,7 @@ fn start_configuration(
 }
 
 fn add_sort_key(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     configuration: &mut ActiveConfiguration,
     aggregate: &mut usize,
@@ -626,7 +624,7 @@ fn add_sort_key(
 }
 
 fn collect_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
@@ -645,7 +643,7 @@ fn collect_attributes(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace = namespace_uri(&namespace, reader.decoder())?.unwrap_or_default();
+        let namespace = namespace_uri(&namespace)?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
@@ -716,12 +714,14 @@ fn reject_spoofed_name(namespace: Option<&str>, local: &str) -> Result<()> {
     Ok(())
 }
 
-fn namespace_uri(
-    result: &ResolveResult<'_>,
-    decoder: quick_xml::Decoder,
-) -> Result<Option<String>> {
-    crate::namespace::resolved_namespace_uri(result, decoder, "bibliography configuration")
-        .map(|namespace| namespace.map(|uri| uri.into_owned()))
+fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
+    crate::elements::xml::normalized_namespace_uri(result, "bibliography configuration")?
+        .map(|uri| {
+            std::str::from_utf8(uri)
+                .map(str::to_owned)
+                .map_err(|_error| make_error("bibliography namespace URI is not UTF-8"))
+        })
+        .transpose()
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {
