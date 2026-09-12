@@ -256,6 +256,13 @@ pub use page_setup::{
 pub use phonetic_properties::{
     PhoneticAlignment, PhoneticProperties, PhoneticType, parse_phonetic_properties,
 };
+pub use pivot::{
+    PivotServerFormatAttributeEdit, PivotServerFormatsCommit, PivotServerFormatsPatch,
+    PivotServerFormatsSnapshot, PivotServerFormatsTransaction, PivotTableSelector,
+    PivotTableServerFormats, PivotTableServerFormatsEdit, PivotTableServerFormatsWorkbookCommit,
+    PivotTableServerFormatsWorkbookPatch, PivotTableView, ServerFormat, ServerFormatEdit,
+    apply_pivot_server_formats_patch, edit_pivot_server_formats, load_pivot_server_formats,
+};
 pub use print_options::{PrintOptions, parse_print_options};
 pub use streaming::{
     StreamingCell, StreamingCellValue, StreamingValue, StreamingWorkbookLimits,

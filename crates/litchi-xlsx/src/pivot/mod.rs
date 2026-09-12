@@ -11,12 +11,24 @@ pub mod chart;
 pub mod fields;
 pub mod filters;
 pub mod reader;
+pub mod server_formats;
 pub mod styles;
 pub mod writer;
 
 pub use reader::{
     read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
     read_pivot_tables,
+};
+pub use server_formats::{
+    AttributeEdit as PivotServerFormatAttributeEdit, Commit as PivotServerFormatsCommit,
+    Patch as PivotServerFormatsPatch, PivotTableSelector, PivotTableServerFormats, PivotTableView,
+    ServerFormat, ServerFormatEdit, Snapshot as PivotServerFormatsSnapshot,
+    Transaction as PivotServerFormatsTransaction,
+    WorkbookCommit as PivotTableServerFormatsWorkbookCommit,
+    WorkbookPatch as PivotTableServerFormatsWorkbookPatch,
+    WorkbookTransaction as PivotTableServerFormatsEdit,
+    apply_patch as apply_pivot_server_formats_patch, edit as edit_pivot_server_formats,
+    load as load_pivot_server_formats,
 };
 pub use writer::{write_pivot_cache_definition, write_pivot_cache_records, write_pivot_table};
 
