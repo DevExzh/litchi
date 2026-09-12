@@ -9,8 +9,8 @@ use crate::error::{OpcError, Result};
 use crate::limits::{ReadLimits, ReadResource};
 use crate::packuri::{PackURI, PartNameConflict};
 use soapberry_zip::CompressionMethod;
-use soapberry_zip::office::{LazyArchiveReader, LimitResource};
 use soapberry_zip::ZipArchive;
+use soapberry_zip::office::{LazyArchiveReader, LimitResource};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
 use std::path::Path;
@@ -329,6 +329,9 @@ impl<'data> PhysPkgReader<'data> {
         let membername = pack_uri.membername();
         let label = pack_uri.to_string();
         let declared = self.declared_part_bytes(membername, &label)?;
+        self.archive
+            .validate_unencrypted_entry(membername)
+            .map_err(|error| map_part_error(&label, &error))?;
         let reservation = self.reserve_declared_parts(&[declared])?;
         match self.archive.read(membername) {
             Ok(blob) => {
@@ -371,6 +374,9 @@ impl<'data> PhysPkgReader<'data> {
             self.limits.max_part_bytes(),
         )?;
         self.archive
+            .validate_unencrypted_entry(membername)
+            .map_err(|error| map_part_error(&label, &error))?;
+        self.archive
             .read_stored_borrowed(membername)
             .map_err(|error| map_part_error(&label, &error))
     }
@@ -384,6 +390,9 @@ impl<'data> PhysPkgReader<'data> {
     /// # Errors
     /// Returns an error if the member is missing or unreadable.
     pub fn read_member(&self, name: &str) -> Result<Vec<u8>> {
+        self.archive
+            .validate_unencrypted_entry(name)
+            .map_err(|error| map_archive_error(&error))?;
         self.archive
             .read(name)
             .map_err(|error| map_archive_error(&error))
@@ -504,6 +513,9 @@ impl<'data> PhysPkgReader<'data> {
             })?;
         for uri in uris {
             let name = uri.membername();
+            self.archive
+                .validate_unencrypted_entry(name)
+                .map_err(|error| map_part_error(uri.as_str(), &error))?;
             declared.push(self.declared_part_bytes(name, uri.as_str())?);
             names.push(name);
         }
@@ -603,6 +615,9 @@ impl<'data> PhysPkgReader<'data> {
             .metadata(name)
             .map(|metadata| metadata.uncompressed_size())
             .map_err(|error| map_part_error(label, &error))?;
+        self.archive
+            .validate_unencrypted_entry(name)
+            .map_err(|error| map_part_error(label, &error))?;
         self.limits.check(resource, declared, maximum)?;
         let blob = self
             .archive
@@ -617,6 +632,9 @@ impl<'data> PhysPkgReader<'data> {
             .archive
             .metadata(name)
             .map(|metadata| metadata.uncompressed_size())
+            .map_err(|error| map_part_error(label, &error))?;
+        self.archive
+            .validate_unencrypted_entry(name)
             .map_err(|error| map_part_error(label, &error))?;
         self.limits.check(
             ReadResource::RelationshipXmlBytes,

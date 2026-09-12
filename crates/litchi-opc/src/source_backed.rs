@@ -5307,6 +5307,45 @@ impl PartCache {
         context.consume(Resource::Work, declared_bytes)
     }
 
+    /// Reserve a source payload which is read outside the ordinary Part cache.
+    ///
+    /// Physical relationship members are indexed as metadata, but the owner
+    /// reader retains their exact bytes in a [`PartData`] handle.  Keep that
+    /// handle on the same memory/object/work accounting path as a cold Part
+    /// load so a managed caller cannot bypass its budget by asking for a
+    /// sidecar directly.
+    fn reserve_direct_payload(
+        &self,
+        declared_bytes: u64,
+    ) -> std::result::Result<LoadResources, ExecutionError> {
+        self.check_context()?;
+        let mut state = lock_with_observer(
+            &self.state,
+            &mut NoopDiagnosticObserver,
+            LockOperation::Cache,
+        )
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let reservation = self.reserve_for_load(&mut state, declared_bytes)?;
+        drop(state);
+
+        let payload_object_reservation = match self.reserve_object_for_load() {
+            Ok(reservation) => reservation,
+            Err(error) => {
+                drop(reservation);
+                return Err(error);
+            },
+        };
+        if let Err(error) = self.charge_cold_work(declared_bytes) {
+            drop(payload_object_reservation);
+            drop(reservation);
+            return Err(error);
+        }
+        Ok(LoadResources {
+            reservation,
+            payload_object_reservation,
+        })
+    }
+
     fn reserve_for_load(
         &self,
         state: &mut CacheStateInner,
@@ -6569,6 +6608,88 @@ impl SourceBackedPackage {
     /// package metadata, and non-part members without reading payload bytes.
     pub fn physical_member_names(&self) -> impl ExactSizeIterator<Item = &str> {
         self.archive.file_names()
+    }
+
+    /// Read and retain the exact physical relationships member for one
+    /// ordinary source part.
+    ///
+    /// The returned [`PartData`] preserves the source bytes and, for a
+    /// managed package, retains the memory/object reservations for the life
+    /// of the handle.  The central-directory size is checked against the
+    /// package and caller ceilings before the archive allocates or
+    /// decompresses the member; declared decompression bytes are charged to
+    /// `Resource::Work` before the read starts.
+    pub fn relationships_data_for_with_limit(
+        &self,
+        source_uri: &PackURI,
+        maximum: usize,
+    ) -> Result<Option<PartData>> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let relationships_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let Some(entry) = self.archive.entry_id(relationships_uri.membername()) else {
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            return Ok(None);
+        };
+        let metadata = self.archive.metadata_for(entry)?;
+        let maximum = maximum.min(self.limits.max_relationship_xml_bytes());
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.limits.check(
+            ReadResource::RelationshipXmlBytes,
+            metadata.uncompressed_size(),
+            maximum as u64,
+        )?;
+
+        // Match the ordinary cold-Part path: reserve the decoded payload and
+        // its owner object, and charge declared decompression work before
+        // invoking the ZIP reader.  The relationship member is not inserted
+        // into the Part cache, so these reservations are carried directly by
+        // the returned PartData handle.
+        let resources = self
+            .cache
+            .reserve_direct_payload(metadata.uncompressed_size())
+            .map_err(map_execution_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.source.monitor_publication();
+
+        let read_result = self
+            .archive
+            .read_entry(entry)
+            .map_err(map_preservation_error);
+        let source_result = self.source.ensure_current();
+        let execution_result = self.cache.check_context().map_err(map_execution_error);
+        let bytes = match (source_result, execution_result, read_result) {
+            (Err(error), _, _) => return Err(error),
+            (Ok(()), Err(error), _) => return Err(error),
+            (Ok(()), Ok(()), Err(error)) => return Err(error),
+            (Ok(()), Ok(()), Ok(bytes)) => bytes,
+        };
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if bytes.len() as u64 != metadata.uncompressed_size() {
+            return Err(OpcError::ZipError(format!(
+                "source-backed OPC relationships member declared {} uncompressed bytes but read {}",
+                metadata.uncompressed_size(),
+                bytes.len()
+            )));
+        }
+        self.limits.check(
+            ReadResource::RelationshipXmlBytes,
+            bytes.len() as u64,
+            maximum as u64,
+        )?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(Some(PartData {
+            payload: CachedPayload {
+                bytes: Arc::new(bytes),
+                reservation: resources.reservation,
+                object_reservation: resources.payload_object_reservation,
+            },
+        }))
     }
 
     /// Whether any retained physical member declares traditional ZIP encryption.
@@ -14559,6 +14680,100 @@ mod tests {
             .unwrap_err();
         assert!(matches!(error, OpcError::Cancelled));
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn source_relationship_handle_absence_is_fenced_without_budget_charge() {
+        let source = archive_bytes(root_relationships(), b"<document/>", false);
+        let (budget, _cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let memory_before = budget.used(Resource::Memory);
+        let objects_before = budget.used(Resource::Objects);
+        let work_before = budget.used(Resource::Work);
+
+        assert!(
+            package
+                .relationships_data_for_with_limit(&owner, 64 * 1024)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Objects), objects_before);
+        assert_eq!(budget.used(Resource::Work), work_before);
+    }
+
+    #[test]
+    fn source_relationship_handle_charges_work_and_releases_memory_on_drop() {
+        let relationships = canonical_document_relationships(&[]);
+        let source = topology_relationship_archive(&relationships);
+        let (budget, _cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let memory_before = budget.used(Resource::Memory);
+        let objects_before = budget.used(Resource::Objects);
+        let work_before = budget.used(Resource::Work);
+        let data = package
+            .relationships_data_for_with_limit(&owner, relationships.len())
+            .unwrap()
+            .expect("the physical relationship member is present");
+
+        assert_eq!(data.as_bytes(), relationships.as_slice());
+        assert_eq!(
+            budget.used(Resource::Memory),
+            memory_before + relationships.len() as u64
+        );
+        assert_eq!(budget.used(Resource::Objects), objects_before + 1);
+        assert_eq!(
+            budget.used(Resource::Work),
+            work_before + relationships.len() as u64
+        );
+        drop(data);
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Objects), objects_before);
+        // Work is cumulative by design and therefore remains charged after
+        // the source handle releases its retained decoded bytes.
+        assert_eq!(
+            budget.used(Resource::Work),
+            work_before + relationships.len() as u64
+        );
+    }
+
+    #[test]
+    fn source_relationship_handle_checks_cancellation_before_read() {
+        let relationships = canonical_document_relationships(&[]);
+        let source = topology_relationship_archive(&relationships);
+        let (budget, cancellation_source, context) =
+            managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let memory_before = budget.used(Resource::Memory);
+        let work_before = budget.used(Resource::Work);
+        cancellation_source.cancel();
+
+        assert!(matches!(
+            package.relationships_data_for_with_limit(&owner, relationships.len()),
+            Err(OpcError::Cancelled)
+        ));
+        assert_eq!(budget.used(Resource::Memory), memory_before);
+        assert_eq!(budget.used(Resource::Work), work_before);
     }
 
     #[test]

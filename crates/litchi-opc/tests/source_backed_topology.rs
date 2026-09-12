@@ -278,7 +278,16 @@ fn zip_member(bytes: &[u8], wanted: &str) -> Vec<u8> {
         .unwrap()
 }
 
-fn mark_entry_encrypted(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
+fn mark_entry_encrypted(bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
+    mark_entry_flags(bytes, wanted, 1, 1)
+}
+
+fn mark_entry_flags(
+    mut bytes: Vec<u8>,
+    wanted: &str,
+    local_flags_to_set: u16,
+    central_flags_to_set: u16,
+) -> Vec<u8> {
     let eocd = bytes
         .windows(4)
         .rposition(|window| window == 0x0605_4b50_u32.to_le_bytes())
@@ -295,9 +304,9 @@ fn mark_entry_encrypted(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
         let name = &bytes[name_start..name_start + name_len];
         let local_offset = read_u32(&bytes, cursor + 42) as usize;
         if name == wanted.as_bytes() {
-            let central_flags = read_u16(&bytes, cursor + 8) | 1;
+            let central_flags = read_u16(&bytes, cursor + 8) | central_flags_to_set;
             bytes[cursor + 8..cursor + 10].copy_from_slice(&central_flags.to_le_bytes());
-            let local_flags = read_u16(&bytes, local_offset + 6) | 1;
+            let local_flags = read_u16(&bytes, local_offset + 6) | local_flags_to_set;
             bytes[local_offset + 6..local_offset + 8].copy_from_slice(&local_flags.to_le_bytes());
             return bytes;
         }
@@ -1030,24 +1039,30 @@ fn topology_publication_refuses_trailing_data_before_writing() {
 }
 
 #[test]
-fn topology_publication_refuses_an_encrypted_entry_before_writing() {
+fn source_admission_refuses_an_encrypted_entry() {
     let source = mark_entry_encrypted(source_bytes(false, false, false), "custom/untouched.xml");
-    let mut plan = SourceTopologyPlan::new();
-    plan.try_add_part(
-        pack("/custom/new.bin"),
-        "application/octet-stream",
-        b"new bytes".to_vec(),
-    )
-    .unwrap();
-    let mut output = Vec::new();
-    let error = open(&source)
-        .write_topology_to_stream(&mut output, plan)
-        .unwrap_err();
-    assert!(matches!(
-        error,
-        OpcError::SourceBackedOverlayUnavailable { .. }
-    ));
-    assert!(output.is_empty());
+    let error = match SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source))) {
+        Ok(_) => panic!("encrypted source must be refused during admission"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, OpcError::ZipError(_)));
+}
+
+#[test]
+fn source_admission_checks_strong_and_local_only_encryption_flags() {
+    for (local_flags, central_flags) in [(1, 1), (1 << 6, 1 << 6), (1, 0), (1 << 6, 0)] {
+        let source = mark_entry_flags(
+            source_bytes(false, false, false),
+            "custom/untouched.xml",
+            local_flags,
+            central_flags,
+        );
+        let error = match SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source))) {
+            Ok(_) => panic!("encrypted source must be refused during admission"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, OpcError::ZipError(_)));
+    }
 }
 
 #[test]

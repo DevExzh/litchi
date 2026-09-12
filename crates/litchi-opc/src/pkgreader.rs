@@ -51,11 +51,19 @@ pub(crate) fn indexed_archive_with_limits<R: soapberry_zip::ReaderAt>(
         archive.entries_hint(),
         limits.max_archive_total_entries() as u64,
     )?;
-    soapberry_zip::office::IndexedArchive::from_zip_archive_with_limits(
+    let archive = soapberry_zip::office::IndexedArchive::from_zip_archive_with_limits(
         archive,
         limits.zip_limits(),
     )
-    .map_err(OpcError::from)
+    .map_err(OpcError::from)?;
+    // Source-backed ingress performs this bounded fixed-header scan before it
+    // reserves catalog objects. IndexedArchive retains a proof under its
+    // existing byte-stable ReaderAt contract, so the source catalog's own
+    // fail-closed guard does not reread every local header.
+    archive
+        .validate_unencrypted_entries()
+        .map_err(OpcError::from)?;
+    Ok(archive)
 }
 
 /// The small ZIP surface needed by the structural OPC reader.
@@ -74,6 +82,10 @@ pub(crate) trait ArchiveAccess {
         &'a self,
         name: &str,
     ) -> std::result::Result<Option<&'a [u8]>, soapberry_zip::Error>;
+
+    /// Reject ZIP encryption in either central or local member headers before
+    /// the OPC catalog allocates retained structures or materializes payloads.
+    fn validate_unencrypted_entries(&self) -> std::result::Result<(), soapberry_zip::Error>;
 
     /// Return a shared materialization when this archive has a validated,
     /// reusable decompression path. Positional archives intentionally retain
@@ -168,6 +180,10 @@ impl ArchiveAccess for soapberry_zip::office::LazyArchiveReader<'_> {
         Self::read_stored_borrowed(self, name)
     }
 
+    fn validate_unencrypted_entries(&self) -> std::result::Result<(), soapberry_zip::Error> {
+        Self::validate_unencrypted_entries(self)
+    }
+
     fn read_shared(
         &self,
         name: &str,
@@ -204,6 +220,10 @@ impl<R: soapberry_zip::ReaderAt> ArchiveAccess for soapberry_zip::office::Indexe
         // borrowed payload would not have a sound lifetime, so they always
         // use the owned read path.
         Ok(None)
+    }
+
+    fn validate_unencrypted_entries(&self) -> std::result::Result<(), soapberry_zip::Error> {
+        Self::validate_unencrypted_entries(self)
     }
 }
 
@@ -676,6 +696,9 @@ impl PackageReader {
     pub fn from_phys_reader(phys_reader: &PhysPkgReader<'_>) -> Result<Self> {
         let archive = phys_reader.archive();
         let limits = phys_reader.limits();
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)?;
         limits.check(
             ReadResource::ArchiveMembers,
             archive.len() as u64,
@@ -748,6 +771,9 @@ impl PackageReader {
     ) -> Result<Self> {
         let archive = phys_reader.archive();
         let limits = phys_reader.limits();
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)?;
         limits.check(
             ReadResource::ArchiveMembers,
             archive.len() as u64,
@@ -1361,6 +1387,9 @@ impl PackageReader {
         archive: &A,
         limits: ReadLimits,
     ) -> Result<SourceCatalog> {
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)?;
         limits.check(
             ReadResource::ArchiveMembers,
             archive.len() as u64,
@@ -1416,6 +1445,10 @@ impl PackageReader {
         limits: ReadLimits,
     ) -> std::result::Result<SourceCatalog, ValidationCatalogError> {
         let phase = |phase, error| ValidationCatalogError { phase, error };
+        archive
+            .validate_unencrypted_entries()
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
         limits
             .check(
                 ReadResource::ArchiveMembers,
