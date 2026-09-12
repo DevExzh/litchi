@@ -393,6 +393,18 @@ impl Fixture {
     }
 }
 
+fn prefixed_server_format_fixture(dialect: Dialect, prefix: &'static str) -> Fixture {
+    Fixture::build(FixtureOptions {
+        dialect,
+        ext_prefix: prefix,
+        server_prefix: prefix,
+        server_formats: format!(
+            r#"<{prefix}:serverFormat culture="first"/><{prefix}:serverFormat culture="second"/>"#
+        ),
+        ..FixtureOptions::default()
+    })
+}
+
 #[test]
 fn workbook_facade_resolves_server_formats_by_semantic_selector() {
     let fixture = Fixture::build(FixtureOptions::default());
@@ -811,10 +823,14 @@ fn replace_default_server_format_children(package: &mut OpcPackage, replacement:
     // the compact fixture first, then replace only the retained table bytes so
     // the owner scanner sees physical XML whitespace/comments rather than a
     // normalized reconstruction.
+    let original = r##"<x15:serverFormat culture="en-US" format="#,##0.00"/><x15:serverFormat culture="_x005F_x005F_005F_x005F_"/>"##;
+    replace_table_fragment(package, original, replacement);
+}
+
+fn replace_table_fragment(package: &mut OpcPackage, original: &str, replacement: &str) {
     let table_uri = PackURI::new(TABLE_URI).unwrap();
     let table = package.get_part_mut(&table_uri).unwrap();
     let source = String::from_utf8(table.blob().to_vec()).unwrap();
-    let original = r##"<x15:serverFormat culture="en-US" format="#,##0.00"/><x15:serverFormat culture="_x005F_x005F_005F_x005F_"/>"##;
     let changed = source.replace(original, replacement);
     assert_ne!(changed, source);
     table.set_blob(changed.into_bytes());
@@ -1221,6 +1237,411 @@ fn exact_no_op_and_inverse_do_not_regenerate_the_owner() {
     assert_eq!(table_blob(&package), before);
     commit.patch().inverse().apply(&mut package).unwrap();
     assert_eq!(table_blob(&package), before);
+}
+
+#[test]
+fn structural_list_crud_preserves_order_count_comments_and_prefix_in_both_dialects() {
+    for (dialect, prefix) in [(Dialect::Transitional, "x15"), (Dialect::Strict, "p")] {
+        let fixture = prefixed_server_format_fixture(dialect, prefix);
+        let mut package = fixture.package();
+        let original = format!(
+            r#"<{prefix}:serverFormat culture="first"/><{prefix}:serverFormat culture="second"/>"#
+        );
+        let with_comments = format!(
+            r#"<!-- before -->
+  <{prefix}:serverFormat culture="first"/>
+  <!-- between -->
+  <{prefix}:serverFormat culture="second"/>
+  <!-- after -->"#
+        );
+        replace_table_fragment(&mut package, &original, &with_comments);
+
+        let before = table_blob(&package);
+        let mut transaction = edit(&mut package, "Pivot").unwrap();
+        transaction
+            .insert_server_format(
+                1,
+                ServerFormat::new(Some("inserted".to_owned()), Some("0.00%".to_owned())),
+            )
+            .unwrap();
+        transaction.move_server_format(2, 0).unwrap();
+        assert_eq!(
+            transaction.remove_server_format(1).unwrap(),
+            ServerFormat::new(Some("first".to_owned()), None)
+        );
+        transaction
+            .push_server_format(ServerFormat::new(Some("tail".to_owned()), None))
+            .unwrap();
+        transaction.reorder_server_formats(&[2, 0, 1]).unwrap();
+        let commit = transaction.commit().unwrap();
+        assert!(commit.changed());
+
+        let expected = [
+            ServerFormat::new(Some("tail".to_owned()), None),
+            ServerFormat::new(Some("second".to_owned()), None),
+            ServerFormat::new(Some("inserted".to_owned()), Some("0.00%".to_owned())),
+        ];
+        assert_eq!(load(&package, "Pivot").unwrap().formats(), expected);
+        let changed = String::from_utf8(table_blob(&package)).unwrap();
+        assert!(changed.contains(r#"count="3""#));
+        assert!(changed.contains("<!-- before -->"));
+        assert!(changed.contains("<!-- between -->"));
+        assert!(changed.contains("<!-- after -->"));
+        assert!(changed.contains(&format!("<{prefix}:serverFormat culture=\"tail\"/>")));
+        assert!(changed.contains(&format!("<{prefix}:serverFormat culture=\"second\"/>")));
+
+        // This source intentionally retains physical comments/spacing.  The
+        // ordinary PackageWriter publication contract is compact-only, while
+        // the owner under test must still read and rewrite the retained XML.
+        assert_eq!(load(&package, "Pivot").unwrap().formats(), expected);
+
+        commit.patch().inverse().apply(&mut package).unwrap();
+        assert_eq!(table_blob(&package), before);
+    }
+}
+
+#[test]
+fn ordinary_workbook_facade_supports_structural_list_edits_and_exact_inverse() {
+    for (dialect, prefix) in [(Dialect::Transitional, "x15"), (Dialect::Strict, "p")] {
+        let fixture = prefixed_server_format_fixture(dialect, prefix);
+        let workbook = Workbook::from_bytes(fixture.bytes.clone()).unwrap();
+        let original = workbook
+            .pivot_table_server_formats_source("Pivot")
+            .unwrap()
+            .source_xml()
+            .to_vec();
+
+        let mut transaction = workbook.edit_pivot_table("Pivot").unwrap();
+        transaction
+            .insert_server_format(1, ServerFormat::new(Some("middle".to_owned()), None))
+            .unwrap();
+        transaction.move_server_format(2, 0).unwrap();
+        assert_eq!(
+            transaction.remove_server_format(1).unwrap(),
+            ServerFormat::new(Some("first".to_owned()), None)
+        );
+        let commit = transaction.commit().unwrap();
+        assert!(commit.changed());
+        assert_eq!(
+            commit.snapshot().formats(),
+            &[
+                ServerFormat::new(Some("second".to_owned()), None),
+                ServerFormat::new(Some("middle".to_owned()), None),
+            ]
+        );
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("pivot-server-formats-list.xlsx");
+        commit.workbook().save(&path).unwrap();
+        let reopened = Workbook::open(&path).unwrap();
+        assert_eq!(
+            reopened.pivot_table("Pivot").unwrap().formats(),
+            commit.snapshot().formats()
+        );
+
+        let restored = commit
+            .workbook()
+            .apply_pivot_table_server_formats_patch(&commit.patch().inverse())
+            .unwrap();
+        assert!(restored.changed());
+        assert_eq!(
+            restored
+                .workbook()
+                .pivot_table_server_formats_source("Pivot")
+                .unwrap()
+                .source_xml(),
+            original.as_slice()
+        );
+    }
+}
+
+#[test]
+fn equal_typed_reorder_retains_each_lexical_leaf_source() {
+    let fixture = Fixture::build(FixtureOptions {
+        server_formats: format!(
+            r#"<x15:serverFormat culture="same" format="0"/><p:serverFormat xmlns:p="{EXT_NS}" format="0" culture="&#115;ame"/>"#
+        ),
+        ..FixtureOptions::default()
+    });
+    let mut package = fixture.package();
+    let before = table_blob(&package);
+    let snapshot = load(&package, "Pivot").unwrap();
+    assert_eq!(snapshot.formats()[0], snapshot.formats()[1]);
+
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    transaction.reorder_server_formats(&[1, 0]).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    let changed = String::from_utf8(table_blob(&package)).unwrap();
+    let prefixed = changed.find(r#"<p:serverFormat xmlns:p="#).unwrap();
+    let defaulted = changed.find(r#"<x15:serverFormat culture="same""#).unwrap();
+    assert!(prefixed < defaulted);
+    assert!(changed.contains(r#"format="0" culture="&#115;ame""#));
+    assert_eq!(
+        load(&package, "Pivot").unwrap().formats(),
+        snapshot.formats()
+    );
+
+    commit.patch().inverse().apply(&mut package).unwrap();
+    assert_eq!(table_blob(&package), before);
+}
+
+#[test]
+fn insert_remove_is_an_exact_noop_but_remove_insert_is_a_source_change() {
+    let fixture = Fixture::build(FixtureOptions::default());
+    let mut package = fixture.package();
+    let before = table_blob(&package);
+    let inserted = ServerFormat::new(Some("new".to_owned()), Some("0.00".to_owned()));
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    transaction
+        .insert_server_format(1, inserted.clone())
+        .unwrap();
+    assert_eq!(transaction.remove_server_format(1).unwrap(), inserted);
+    let commit = transaction.commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+    assert_eq!(table_blob(&package), before);
+
+    let fixture = Fixture::build(FixtureOptions {
+        server_formats:
+            r#"<x15:serverFormat culture="&#115;ame"/><x15:serverFormat culture="other"/>"#
+                .to_owned(),
+        ..FixtureOptions::default()
+    });
+    let mut package = fixture.package();
+    let before = table_blob(&package);
+    let expected = load(&package, "Pivot").unwrap().formats().to_vec();
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    let removed = transaction.remove_server_format(0).unwrap();
+    assert_eq!(removed, ServerFormat::new(Some("same".to_owned()), None));
+    transaction.insert_server_format(0, removed).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert!(!commit.patch().is_empty());
+    assert_eq!(load(&package, "Pivot").unwrap().formats(), expected);
+    assert_ne!(table_blob(&package), before);
+}
+
+#[test]
+fn structural_list_cardinality_and_invalid_operations_are_failure_atomic() {
+    let fixture = Fixture::build(FixtureOptions::default());
+    let mut package = fixture.package();
+    let before = table_blob(&package);
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    assert!(
+        transaction
+            .insert_server_format(3, ServerFormat::new(None, None))
+            .is_err()
+    );
+    assert!(transaction.remove_server_format(2).is_err());
+    assert!(transaction.move_server_format(0, 2).is_err());
+    assert!(transaction.reorder_server_formats(&[0, 0]).is_err());
+    drop(transaction);
+    assert_eq!(table_blob(&package), before);
+
+    let mut package = fixture.package();
+    let before = table_blob(&package);
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    transaction.remove_server_format(0).unwrap();
+    assert!(transaction.remove_server_format(0).is_err());
+    drop(transaction);
+    assert_eq!(table_blob(&package), before);
+
+    let mut package = fixture.package();
+    replace_table_fragment(&mut package, r#" count="2">"#, ">");
+    let malformed = table_blob(&package);
+    assert!(edit(&mut package, "Pivot").is_err());
+    assert!(load(&package, "Pivot").is_err());
+    assert_eq!(table_blob(&package), malformed);
+}
+
+#[test]
+fn proven_index_references_are_remapped_and_invalid_removals_are_refused() {
+    let fixture = Fixture::build(FixtureOptions {
+        pivot_table_outer_exts: pivot_data_extension(&pivot_value_cell("1")),
+        ..FixtureOptions::default()
+    });
+    let mut package = fixture.package();
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    transaction
+        .insert_server_format(0, ServerFormat::new(Some("new".to_owned()), None))
+        .unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    let changed = String::from_utf8(table_blob(&package)).unwrap();
+    assert!(changed.contains(r#"<x15:x in="2"/>"#));
+    assert!(!changed.contains(r#"<x15:x in="1"/>"#));
+    assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 3);
+
+    let fixture = Fixture::build(FixtureOptions {
+        pivot_table_outer_exts: pivot_data_extension(&pivot_value_cell("1")),
+        ..FixtureOptions::default()
+    });
+    let mut package = fixture.package();
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    transaction.reorder_server_formats(&[1, 0]).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    let changed = String::from_utf8(table_blob(&package)).unwrap();
+    assert!(changed.contains(r#"<x15:x in="0"/>"#));
+    assert!(!changed.contains(r#"<x15:x in="1"/>"#));
+
+    let fixture = Fixture::build(FixtureOptions {
+        pivot_table_outer_exts: pivot_data_extension(&pivot_value_cell("1")),
+        ..FixtureOptions::default()
+    });
+    let mut package = fixture.package();
+    let before = table_blob(&package);
+    let mut transaction = edit(&mut package, "Pivot").unwrap();
+    transaction.remove_server_format(1).unwrap();
+    assert!(transaction.commit().is_err());
+    assert_eq!(table_blob(&package), before);
+
+    let fixture = Fixture::build(FixtureOptions {
+        pivot_table_outer_exts: pivot_data_extension(&pivot_value_cell("2")),
+        ..FixtureOptions::default()
+    });
+    let mut package = fixture.package();
+    let before = table_blob(&package);
+    assert!(edit(&mut package, "Pivot").is_err());
+    assert_eq!(table_blob(&package), before);
+}
+
+#[test]
+fn opaque_namespaced_wrapped_and_mce_index_references_refuse_structural_edits() {
+    let namespaced = format!(
+        r#"<ext uri="{PIVOT_TABLE_DATA_URI}"><x15:pivotTableData><x15:pivotRow><x15:c><x15:x xmlns:p="{EXT_NS}" p:in="1"/></x15:c></x15:pivotRow></x15:pivotTableData></ext>"#
+    );
+    let wrapped = format!(
+        r#"<ext uri="{PIVOT_TABLE_DATA_URI}"><x15:pivotTableData><x15:wrapper>{}</x15:wrapper></x15:pivotTableData></ext>"#,
+        pivot_value_cell("1")
+    );
+    let mce = format!(
+        r#"<ext uri="{PIVOT_TABLE_DATA_URI}"><mc:AlternateContent><mc:Choice Requires="x15"><x15:pivotTableData>{}</x15:pivotTableData></mc:Choice><mc:Fallback><x15:futureFallback/></mc:Fallback></mc:AlternateContent></ext>"#,
+        pivot_value_cell("1")
+    );
+
+    for (label, opaque_reference) in [
+        ("namespaced", namespaced),
+        ("wrapped", wrapped),
+        ("mce", mce),
+    ] {
+        let fixture = Fixture::build(FixtureOptions {
+            pivot_table_outer_exts: opaque_reference,
+            ..FixtureOptions::default()
+        });
+        let mut package = fixture.package();
+        let snapshot = load(&package, "Pivot").unwrap();
+        assert!(
+            snapshot.has_opaque_index_references(),
+            "{label} reference must remain readable as a source diagnostic"
+        );
+        let before = table_blob(&package);
+        let mut transaction = edit(&mut package, "Pivot").unwrap();
+        transaction
+            .insert_server_format(0, ServerFormat::new(Some("new".to_owned()), None))
+            .unwrap();
+        assert!(
+            transaction.commit().is_err(),
+            "{label} reference must refuse structural edits"
+        );
+        assert_eq!(table_blob(&package), before);
+    }
+}
+
+#[test]
+fn unchanged_reference_indices_retain_whitespace_and_entity_lexical_spelling() {
+    for raw_index in [" 01 ", "&#48;1"] {
+        let fixture = Fixture::build(FixtureOptions {
+            server_count: "3",
+            server_formats: concat!(
+                r#"<x15:serverFormat culture="first"/>"#,
+                r#"<x15:serverFormat culture="referenced"/>"#,
+                r#"<x15:serverFormat culture="third"/>"#,
+            )
+            .to_owned(),
+            pivot_table_outer_exts: pivot_data_extension(&pivot_value_cell(raw_index)),
+            ..FixtureOptions::default()
+        });
+        let mut package = fixture.package();
+        let source = String::from_utf8(table_blob(&package)).unwrap();
+        assert!(source.contains(&format!(r#"in="{raw_index}""#)));
+
+        let mut transaction = edit(&mut package, "Pivot").unwrap();
+        transaction
+            .insert_server_format(3, ServerFormat::new(Some("appended".to_owned()), None))
+            .unwrap();
+        transaction.reorder_server_formats(&[0, 1, 3, 2]).unwrap();
+        let commit = transaction.commit().unwrap();
+        assert!(commit.changed());
+
+        let changed = String::from_utf8(table_blob(&package)).unwrap();
+        assert!(
+            changed.contains(&format!(r#"in="{raw_index}""#)),
+            "structural edits that keep the referenced index must preserve raw lexical in"
+        );
+        assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 4);
+    }
+}
+
+#[test]
+fn structural_list_aggregate_cap_is_checked_before_publication() {
+    let fixture = Fixture::build(FixtureOptions::default());
+    let inserted = ServerFormat::new(
+        Some("inserted-list-value".to_owned()),
+        Some("0.00%".to_owned()),
+    );
+    let source_total = fixture
+        .package()
+        .iter_parts()
+        .map(|part| part.blob().len() as u64)
+        .sum::<u64>();
+
+    let mut probe = fixture.package();
+    let mut probe_transaction = edit(&mut probe, "Pivot").unwrap();
+    probe_transaction
+        .insert_server_format(1, inserted.clone())
+        .unwrap();
+    probe_transaction.commit().unwrap();
+    let final_total = probe
+        .iter_parts()
+        .map(|part| part.blob().len() as u64)
+        .sum::<u64>();
+    assert!(final_total > source_total);
+
+    let exact_limits = ReadLimits::builder()
+        .max_total_part_bytes(final_total)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut exact = OpcPackage::from_bytes_with_limits(&fixture.bytes, exact_limits).unwrap();
+    let mut exact_transaction = edit(&mut exact, "Pivot").unwrap();
+    exact_transaction
+        .insert_server_format(1, inserted.clone())
+        .unwrap();
+    assert!(exact_transaction.commit().is_ok());
+    assert_eq!(
+        exact
+            .iter_parts()
+            .map(|part| part.blob().len() as u64)
+            .sum::<u64>(),
+        final_total
+    );
+
+    let one_under_limits = ReadLimits::builder()
+        .max_total_part_bytes(final_total - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut one_under =
+        OpcPackage::from_bytes_with_limits(&fixture.bytes, one_under_limits).unwrap();
+    let before = table_blob(&one_under);
+    let mut one_under_transaction = edit(&mut one_under, "Pivot").unwrap();
+    one_under_transaction
+        .insert_server_format(1, inserted)
+        .unwrap();
+    assert!(one_under_transaction.commit().is_err());
+    assert_eq!(table_blob(&one_under), before);
 }
 
 #[test]

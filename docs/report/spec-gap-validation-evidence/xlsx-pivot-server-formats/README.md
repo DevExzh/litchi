@@ -30,14 +30,17 @@ and validates the supported F057 source-connection route when present. The
 payload is the qualified `x15:serverFormat` collection.
 
 Reads expose the ordered typed collection and optional decoded `culture` and
-`format` values. Writes are scalar-only on existing leaves: `Keep`, `Set`, and
-`Clear` can preserve, add/replace, or remove either optional attribute. Child
-count, list order, `count`, opaque siblings, namespaces, comments, processing
-instructions, and unchanged lexical bytes remain source material. List
-mutation and broader container/Part lifecycle operations are not implemented
-by this scalar batch; they remain additional work in the wider PivotTable
-extension audit. The owner does not refresh or calculate PivotTables or render
-them.
+`format` values. Scalar writes use `Keep`, `Set`, and `Clear` so either
+optional attribute can be preserved, added/replaced, or removed. List writes
+use `insert_server_format`, `push_server_format`, `remove_server_format`,
+`move_server_format`, and `reorder_server_formats`; reorder inputs map each
+final position to its prior position. Structural publication updates the
+required `count` exactly, refuses removal of the final child, preserves known
+`pivotValueCellExtra@in` associations, and refuses opaque or removed
+associations. Opaque siblings, namespaces, comments, processing instructions,
+and unchanged lexical bytes remain source material. Container and Part
+lifecycle operations remain additional work in the wider PivotTable extension
+audit. The owner does not refresh or calculate PivotTables or render them.
 
 The implementation recognizes only the evidenced C510/983426/725AE2AE/ABF5
 closure and the optional F057 owner. It does not guess newer extension URIs or

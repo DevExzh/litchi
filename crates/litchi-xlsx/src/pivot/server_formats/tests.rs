@@ -148,6 +148,83 @@ fn source_noop_is_empty() {
 }
 
 #[test]
+fn ordered_list_edits_update_count_and_round_trip_exactly() {
+    let mut package = package();
+    let table_uri = PackURI::new("/xl/pivotTables/pivotTable1.xml").unwrap();
+    let original = package.get_part(&table_uri).unwrap().blob().to_vec();
+
+    let mut transaction = Transaction::new(&mut package, "Pivot").unwrap();
+    transaction
+        .insert_server_format(
+            1,
+            ServerFormat::new(Some("fr-FR".to_owned()), Some("& <".to_owned())),
+        )
+        .unwrap();
+    transaction.move_server_format(2, 0).unwrap();
+    let commit = transaction.commit().unwrap();
+    let changed = package.get_part(&table_uri).unwrap().blob();
+    let changed_text = std::str::from_utf8(changed).unwrap();
+    assert!(changed_text.contains("count=\"3\""));
+    assert!(changed_text.contains("culture=\"fr-FR\""));
+    assert!(changed_text.contains("format=\"&amp; &lt;\""));
+    assert_eq!(commit.snapshot().formats().len(), 3);
+    assert_eq!(
+        commit.snapshot().formats()[0],
+        ServerFormat::new(None, None)
+    );
+
+    commit.patch().inverse().apply(&mut package).unwrap();
+    assert_eq!(package.get_part(&table_uri).unwrap().blob(), original);
+}
+
+#[test]
+fn ordered_list_reorder_preserves_leaf_source_and_count_lexical_bytes() {
+    let mut package = package();
+    let table_uri = PackURI::new("/xl/pivotTables/pivotTable1.xml").unwrap();
+    let original = package.get_part(&table_uri).unwrap().blob().to_vec();
+    let mut transaction = Transaction::new(&mut package, "Pivot").unwrap();
+    transaction.reorder_server_formats(&[1, 0]).unwrap();
+    let commit = transaction.commit().unwrap();
+    let changed = package.get_part(&table_uri).unwrap().blob();
+    let original_text = std::str::from_utf8(&original).unwrap();
+    let changed_text = std::str::from_utf8(changed).unwrap();
+    assert_eq!(changed_text.matches("count=\"2\"").count(), 1);
+    assert_eq!(changed_text.matches("culture=\"en-US\"").count(), 1);
+    assert!(
+        changed_text.find("<x15:serverFormat/>").unwrap()
+            < changed_text.find("culture=\"en-US\"").unwrap()
+    );
+    assert!(original_text.contains("<x15:serverFormat culture=\"en-US\" format=\"0.00\"/>"));
+    assert_eq!(
+        commit.snapshot().formats()[0],
+        ServerFormat::new(None, None)
+    );
+}
+
+#[test]
+fn ordered_list_refuses_removing_required_final_child() {
+    let mut package = package();
+    let mut transaction = Transaction::new(&mut package, "Pivot").unwrap();
+    transaction.remove_server_format(0).unwrap();
+    let error = transaction.remove_server_format(0).unwrap_err();
+    assert!(error.to_string().contains("retain one server-format child"));
+}
+
+#[test]
+fn ordinary_workbook_structural_edit_uses_same_public_path() {
+    let workbook = Workbook::from_package(package()).unwrap();
+    let mut edit = workbook.edit_pivot_table("Pivot").unwrap();
+    edit.push_server_format(ServerFormat::new(None, Some("0".to_owned())))
+        .unwrap();
+    edit.reorder_server_formats(&[2, 0, 1]).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().formats().len(), 3);
+    assert_eq!(commit.snapshot().formats()[0].format.as_deref(), Some("0"));
+    let round_trip = commit.patch().inverse().apply(commit.workbook()).unwrap();
+    assert_eq!(round_trip.snapshot().formats().len(), 2);
+}
+
+#[test]
 fn worksheet_metadata_deduplicates_canonical_target_edges() {
     let mut package = package();
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();

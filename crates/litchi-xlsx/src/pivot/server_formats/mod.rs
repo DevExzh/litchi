@@ -5,9 +5,9 @@
 //! contains the `pivotTableReferences` relationship closure for a
 //! non-worksheet PivotTable and the associated cache is an external cache
 //! with a `pivotCacheIdVersion` extension.  The owner captures the original
-//! PivotTable XML in an `Arc` and retains byte ranges for the two scalar
-//! attributes which may be edited.  Unknown extension bytes and all other
-//! package members remain source material.
+//! PivotTable XML in an `Arc` and retains byte ranges for the required ordered
+//! `serverFormat` leaves and their optional scalar attributes.  Unknown
+//! extension bytes and all other package members remain source material.
 //!
 //! The ordinary workbook surface is `Workbook::pivot_table_server_formats`
 //! (also available as `Workbook::pivot_server_formats`) for typed reads and
@@ -21,10 +21,11 @@
 //! This owner covers the C510 `pivotTableServerFormats` payload under a
 //! non-worksheet PivotTable and its required `pivotTableReferences`/external
 //! cache closure, including the recognized ABF5 cache-version extension.  It
-//! reads and writes only the two optional scalar attributes on existing
-//! `x15:serverFormat` leaves.  It does not infer newer extension URIs, invent
-//! list or index mappings, or claim native Excel PivotTable authoring or
-//! refresh semantics.
+//! reads and writes the required ordered `x15:serverFormat` leaves and their
+//! two optional scalar attributes.  Structural edits preserve known
+//! `pivotValueCellExtra@in` associations or fail closed when the source cannot
+//! prove them.  It does not infer newer extension URIs, invent index mappings,
+//! or claim native Excel PivotTable authoring or refresh semantics.
 
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
@@ -40,7 +41,8 @@ use crate::Workbook;
 use crate::error::{Error, Result, invalid};
 use crate::raw;
 use crate::source_attributes::{
-    escaped_xstring_len, try_escaped_xstring, validate_xml_characters, value_span,
+    append_escaped_xstring, escaped_xstring_len, try_escaped_xstring, validate_xml_characters,
+    value_span,
 };
 
 mod relationships;
@@ -78,7 +80,7 @@ const MAX_SERVER_FORMATS: usize = (1usize << 31) - 1;
 const MAX_REFERENCE_COUNT: usize = (1usize << 31) - 1;
 const MAX_ATTRIBUTE_TEXT_BYTES: usize = 1024 * 1024;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct XmlScanLimits {
     part_bytes: usize,
     events: usize,
@@ -342,7 +344,10 @@ pub struct Snapshot {
     workbook_context: Arc<Vec<u8>>,
     table_owner: Range<usize>,
     extension_owner: Range<usize>,
+    count: AttributeSource,
     entries: Box<[EntrySource]>,
+    index_refs: Box<[IndexReference]>,
+    opaque_index_refs: bool,
     selection: usize,
 }
 
@@ -402,6 +407,13 @@ impl Snapshot {
         self.value.has_ambiguous_mce_owner()
     }
 
+    /// Whether an unproven `pivotValueCellExtra@in` source prevents a
+    /// structural list edit from preserving index associations.
+    #[must_use]
+    pub const fn has_opaque_index_references(&self) -> bool {
+        self.opaque_index_refs
+    }
+
     /// Exact source XML for the PivotTable definition Part.
     #[must_use]
     pub fn source_xml(&self) -> &[u8] {
@@ -458,6 +470,9 @@ struct EntrySource {
     culture: Option<AttributeSource>,
     format: Option<AttributeSource>,
     start_tag: Range<usize>,
+    element: Range<usize>,
+    qname: Vec<u8>,
+    namespace_decl: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug)]
@@ -537,11 +552,13 @@ struct RelationshipState {
     external: bool,
 }
 
-/// Failure-atomic edits over one PivotTable's server-format scalar metadata.
+/// Failure-atomic edits over one PivotTable's ordered server-format list and
+/// scalar metadata.
 pub struct Transaction<'a> {
     target: &'a mut OpcPackage,
     before: Snapshot,
     staged: Vec<ServerFormat>,
+    staged_sources: Vec<Option<usize>>,
     selection: usize,
 }
 
@@ -561,11 +578,20 @@ impl<'a> Transaction<'a> {
                 source,
             })?;
         staged.extend_from_slice(before.formats());
+        let mut staged_sources = Vec::new();
+        staged_sources
+            .try_reserve_exact(before.formats().len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable staged server-format source order",
+                source,
+            })?;
+        staged_sources.extend((0..before.formats().len()).map(Some));
         Ok(Self {
             selection: before.selection,
             target,
             before,
             staged,
+            staged_sources,
         })
     }
 
@@ -597,6 +623,103 @@ impl<'a> Transaction<'a> {
         validate_text(&value.format, text_limit)?;
         *slot = value;
         Ok(true)
+    }
+
+    /// Insert one ordered `serverFormat` leaf before `index`.
+    ///
+    /// The collection is schema-required and non-empty, so insertion accepts
+    /// `0..=len` and publication updates the required `count` attribute.
+    pub fn insert_server_format(&mut self, index: usize, value: ServerFormat) -> Result<()> {
+        if index > self.staged.len() {
+            return Err(invalid("server-format insertion index is out of range"));
+        }
+        if self.staged.len() >= MAX_SERVER_FORMATS {
+            return Err(invalid("server-format collection exceeds its count limit"));
+        }
+        let text_limit = caller_attribute_limit(self.target.read_limits());
+        validate_text(&value.culture, text_limit)?;
+        validate_text(&value.format, text_limit)?;
+        self.staged
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable staged server-format values",
+                source,
+            })?;
+        self.staged_sources
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable staged server-format source order",
+                source,
+            })?;
+        self.staged.insert(index, value);
+        self.staged_sources.insert(index, None);
+        Ok(())
+    }
+
+    /// Append one ordered `serverFormat` leaf.
+    pub fn push_server_format(&mut self, value: ServerFormat) -> Result<()> {
+        self.insert_server_format(self.staged.len(), value)
+    }
+
+    /// Remove one ordered `serverFormat` leaf.
+    ///
+    /// Removing the last leaf is refused because the schema requires at least
+    /// one `serverFormat` child.  Removing the whole payload/container is a
+    /// separate lifecycle operation and is not inferred here.
+    pub fn remove_server_format(&mut self, index: usize) -> Result<ServerFormat> {
+        if self.staged.len() == 1 {
+            return Err(invalid(
+                "pivotTableServerFormats must retain one server-format child",
+            ));
+        }
+        if index >= self.staged.len() {
+            return Err(invalid("server-format removal index is out of range"));
+        }
+        self.staged_sources.remove(index);
+        Ok(self.staged.remove(index))
+    }
+
+    /// Move one leaf, interpreting `to` in the final ordered sequence.
+    pub fn move_server_format(&mut self, from: usize, to: usize) -> Result<()> {
+        if from >= self.staged.len() || to >= self.staged.len() {
+            return Err(invalid("server-format move index is out of range"));
+        }
+        if from != to {
+            let value = self.staged.remove(from);
+            let source = self.staged_sources.remove(from);
+            self.staged.insert(to, value);
+            self.staged_sources.insert(to, source);
+        }
+        Ok(())
+    }
+
+    /// Reorder the leaves using a final-position-to-old-position permutation.
+    pub fn reorder_server_formats(&mut self, order: &[usize]) -> Result<()> {
+        let len = self.staged.len();
+        validate_permutation(order, len)?;
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(len)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable reordered server-format values",
+                source,
+            })?;
+        for &index in order {
+            values.push(clone_server_format(&self.staged[index])?);
+        }
+        let mut sources = Vec::new();
+        sources
+            .try_reserve_exact(len)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable reordered server-format source order",
+                source,
+            })?;
+        for &index in order {
+            sources.push(self.staged_sources[index]);
+        }
+        self.staged = values;
+        self.staged_sources = sources;
+        Ok(())
     }
 
     /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
@@ -661,6 +784,11 @@ impl<'a> Transaction<'a> {
     #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.formats() != self.staged.as_slice()
+            || self
+                .staged_sources
+                .iter()
+                .enumerate()
+                .any(|(index, source)| *source != Some(index))
     }
 
     /// Validate, rewrite, reopen, and atomically publish the staged edit.
@@ -681,6 +809,7 @@ impl<'a> Transaction<'a> {
         let output = rewrite_table(
             &self.before,
             &self.staged,
+            &self.staged_sources,
             caller_part_limit(self.target.read_limits()),
             self.target.read_limits().max_total_part_bytes(),
             caller_attribute_limit(self.target.read_limits()),
@@ -885,6 +1014,7 @@ pub struct WorkbookTransaction {
     source: Workbook,
     before: Snapshot,
     staged: Vec<ServerFormat>,
+    staged_sources: Vec<Option<usize>>,
     selection: usize,
 }
 
@@ -903,11 +1033,20 @@ impl WorkbookTransaction {
                 source,
             })?;
         staged.extend_from_slice(before.formats());
+        let mut staged_sources = Vec::new();
+        staged_sources
+            .try_reserve_exact(before.formats().len())
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook staged pivot server-format source order",
+                source,
+            })?;
+        staged_sources.extend((0..before.formats().len()).map(Some));
         Ok(Self {
             source: source.clone(),
             selection: before.selection,
             before,
             staged,
+            staged_sources,
         })
     }
 
@@ -943,6 +1082,97 @@ impl WorkbookTransaction {
         validate_text(&value.format, text_limit)?;
         *slot = value;
         Ok(true)
+    }
+
+    /// Insert one ordered `serverFormat` leaf before `index`.
+    pub fn insert_server_format(&mut self, index: usize, value: ServerFormat) -> Result<()> {
+        if index > self.staged.len() {
+            return Err(invalid("server-format insertion index is out of range"));
+        }
+        if self.staged.len() >= MAX_SERVER_FORMATS {
+            return Err(invalid("server-format collection exceeds its count limit"));
+        }
+        let text_limit = caller_attribute_limit(self.source.pivot_package().read_limits());
+        validate_text(&value.culture, text_limit)?;
+        validate_text(&value.format, text_limit)?;
+        self.staged
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook staged pivot server-format values",
+                source,
+            })?;
+        self.staged_sources
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook staged pivot server-format source order",
+                source,
+            })?;
+        self.staged.insert(index, value);
+        self.staged_sources.insert(index, None);
+        Ok(())
+    }
+
+    /// Append one ordered `serverFormat` leaf.
+    pub fn push_server_format(&mut self, value: ServerFormat) -> Result<()> {
+        self.insert_server_format(self.staged.len(), value)
+    }
+
+    /// Remove one ordered `serverFormat` leaf while retaining the required
+    /// non-empty collection.
+    pub fn remove_server_format(&mut self, index: usize) -> Result<ServerFormat> {
+        if self.staged.len() == 1 {
+            return Err(invalid(
+                "pivotTableServerFormats must retain one server-format child",
+            ));
+        }
+        if index >= self.staged.len() {
+            return Err(invalid("server-format removal index is out of range"));
+        }
+        self.staged_sources.remove(index);
+        Ok(self.staged.remove(index))
+    }
+
+    /// Move one leaf, interpreting `to` in the final ordered sequence.
+    pub fn move_server_format(&mut self, from: usize, to: usize) -> Result<()> {
+        if from >= self.staged.len() || to >= self.staged.len() {
+            return Err(invalid("server-format move index is out of range"));
+        }
+        if from != to {
+            let value = self.staged.remove(from);
+            let source = self.staged_sources.remove(from);
+            self.staged.insert(to, value);
+            self.staged_sources.insert(to, source);
+        }
+        Ok(())
+    }
+
+    /// Reorder the leaves using a final-position-to-old-position permutation.
+    pub fn reorder_server_formats(&mut self, order: &[usize]) -> Result<()> {
+        let len = self.staged.len();
+        validate_permutation(order, len)?;
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(len)
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook reordered server-format values",
+                source,
+            })?;
+        for &index in order {
+            values.push(clone_server_format(&self.staged[index])?);
+        }
+        let mut sources = Vec::new();
+        sources
+            .try_reserve_exact(len)
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook reordered server-format source order",
+                source,
+            })?;
+        for &index in order {
+            sources.push(self.staged_sources[index]);
+        }
+        self.staged = values;
+        self.staged_sources = sources;
+        Ok(())
     }
 
     /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
@@ -1007,21 +1237,29 @@ impl WorkbookTransaction {
     #[must_use]
     pub fn is_changed(&self) -> bool {
         self.before.formats() != self.staged.as_slice()
+            || self
+                .staged_sources
+                .iter()
+                .enumerate()
+                .any(|(index, source)| *source != Some(index))
     }
 
     /// Validate, reopen, and publish a new immutable Workbook snapshot.
     pub fn commit(self) -> Result<WorkbookCommit> {
-        let mut candidate = self.source.pivot_package().clone();
+        let source = self.source;
+        let staged = self.staged;
+        let staged_sources = self.staged_sources;
+        let selection = self.selection;
+        let mut candidate = source.pivot_package().clone();
         let mut transaction =
-            Transaction::new(&mut candidate, PivotTableSelector::Position(self.selection))?;
-        for (index, value) in self.staged.iter().cloned().enumerate() {
-            transaction.set_server_format(index, value)?;
-        }
+            Transaction::new(&mut candidate, PivotTableSelector::Position(selection))?;
+        transaction.staged = staged;
+        transaction.staged_sources = staged_sources;
         let committed = transaction.commit()?;
         let changed = committed.changed();
         let low_patch = committed.patch().clone();
-        let workbook = self.source.adopt_published_package(candidate)?;
-        let patch = WorkbookPatch::new(self.source, workbook.clone(), low_patch);
+        let workbook = source.adopt_published_package(candidate)?;
+        let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
         Ok(WorkbookCommit::new(workbook, patch, changed))
     }
 }
@@ -1196,6 +1434,9 @@ struct ConnectionCatalog {
 struct PayloadInfo {
     entries: Vec<ParsedEntry>,
     owner: Range<usize>,
+    count: AttributeSource,
+    index_refs: Vec<IndexReference>,
+    opaque_index_refs: bool,
     diagnostic_index_boundary: bool,
     mce_ambiguous: bool,
 }
@@ -1203,6 +1444,12 @@ struct PayloadInfo {
 struct ParsedEntry {
     value: ServerFormat,
     source: EntrySource,
+}
+
+#[derive(Clone, Debug)]
+struct IndexReference {
+    value: Range<usize>,
+    index: usize,
 }
 
 impl Graph {
@@ -1415,6 +1662,14 @@ impl Graph {
             boxed.push(entry.value.clone());
             entries.push(entry.source.clone());
         }
+        let mut index_refs = Vec::new();
+        index_refs
+            .try_reserve_exact(table.payload.index_refs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format index references",
+                source,
+            })?;
+        index_refs.extend(table.payload.index_refs.iter().cloned());
         Ok(Snapshot {
             value: PivotTableServerFormats {
                 table_name: table.name.clone(),
@@ -1431,7 +1686,10 @@ impl Graph {
             workbook_context: Arc::clone(&self.workbook_context),
             table_owner: table.owner.clone(),
             extension_owner: table.payload.owner.clone(),
+            count: table.payload.count.clone(),
             entries: entries.into_boxed_slice(),
+            index_refs: index_refs.into_boxed_slice(),
+            opaque_index_refs: table.payload.opaque_index_refs,
             selection: index,
         })
     }
@@ -1451,6 +1709,48 @@ fn apply_attribute(
         AttributeEdit::Clear => *slot = None,
     }
     Ok(())
+}
+
+fn validate_permutation(order: &[usize], length: usize) -> Result<()> {
+    if order.len() != length {
+        return Err(invalid("server-format reorder must include every leaf"));
+    }
+    let mut seen = Vec::new();
+    seen.try_reserve_exact(length)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable server-format reorder check",
+            source,
+        })?;
+    seen.resize(length, false);
+    for &index in order {
+        let slot = seen
+            .get_mut(index)
+            .ok_or_else(|| invalid("server-format reorder index is out of range"))?;
+        if *slot {
+            return Err(invalid("server-format reorder contains a duplicate index"));
+        }
+        *slot = true;
+    }
+    Ok(())
+}
+
+fn clone_server_format(value: &ServerFormat) -> Result<ServerFormat> {
+    Ok(ServerFormat {
+        culture: try_clone_string(value.culture.as_deref(), "server-format culture")?,
+        format: try_clone_string(value.format.as_deref(), "server-format format")?,
+    })
+}
+
+fn try_clone_string(value: Option<&str>, resource: &'static str) -> Result<Option<String>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let mut cloned = String::new();
+    cloned
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    cloned.push_str(value);
+    Ok(Some(cloned))
 }
 
 fn validate_text(value: &Option<String>, maximum_text_bytes: usize) -> Result<()> {
@@ -1514,14 +1814,47 @@ fn package_total_bytes(package: &OpcPackage) -> Result<u64> {
 fn rewrite_table(
     before: &Snapshot,
     staged: &[ServerFormat],
+    staged_sources: &[Option<usize>],
     maximum_output_bytes: usize,
     maximum_total_bytes: u64,
     maximum_attribute_bytes: usize,
     current_total_bytes: u64,
 ) -> Result<Vec<u8>> {
-    if before.entries.len() != staged.len() {
-        return Err(invalid("server-format structural edits are not supported"));
+    let scalar_shape = staged.len() == before.entries.len()
+        && staged_sources.len() == before.entries.len()
+        && staged_sources
+            .iter()
+            .enumerate()
+            .all(|(index, source)| *source == Some(index));
+    if scalar_shape {
+        return rewrite_scalar_table(
+            before,
+            staged,
+            maximum_output_bytes,
+            maximum_total_bytes,
+            maximum_attribute_bytes,
+            current_total_bytes,
+        );
     }
+    rewrite_structural_table(
+        before,
+        staged,
+        staged_sources,
+        maximum_output_bytes,
+        maximum_total_bytes,
+        maximum_attribute_bytes,
+        current_total_bytes,
+    )
+}
+
+fn rewrite_scalar_table(
+    before: &Snapshot,
+    staged: &[ServerFormat],
+    maximum_output_bytes: usize,
+    maximum_total_bytes: u64,
+    maximum_attribute_bytes: usize,
+    current_total_bytes: u64,
+) -> Result<Vec<u8>> {
     let source = before.table.bytes.as_slice();
     let owner = source
         .get(before.extension_owner.clone())
@@ -1619,6 +1952,802 @@ fn rewrite_table(
         output.splice(range, value);
     }
     Ok(output)
+}
+
+#[derive(Clone, Copy)]
+struct LeafAttributePlan<'a> {
+    start: usize,
+    end: usize,
+    name: &'static [u8],
+    value: Option<&'a str>,
+}
+
+fn rewrite_structural_table(
+    before: &Snapshot,
+    staged: &[ServerFormat],
+    staged_sources: &[Option<usize>],
+    maximum_output_bytes: usize,
+    maximum_total_bytes: u64,
+    maximum_attribute_bytes: usize,
+    current_total_bytes: u64,
+) -> Result<Vec<u8>> {
+    let source = before.table.bytes.as_slice();
+    let owner = source
+        .get(before.extension_owner.clone())
+        .ok_or_else(|| invalid("PivotTable server-format owner range is invalid"))?;
+    if owner.len() > MAX_FRAGMENT_BYTES {
+        return Err(invalid(
+            "pivotTableServerFormats owner fragment exceeds limit",
+        ));
+    }
+    if staged.is_empty() || staged.len() > MAX_SERVER_FORMATS {
+        return Err(invalid(
+            "pivotTableServerFormats must retain between one and fewer than 2^31 leaves",
+        ));
+    }
+    if staged_sources.len() != staged.len() {
+        return Err(invalid(
+            "server-format source order does not match staged values",
+        ));
+    }
+    if before.value.has_diagnostic_index_boundary() {
+        return Err(invalid(
+            "pivotTableServerFormats has an ambiguous pivotValueCellExtra@in == count boundary",
+        ));
+    }
+    if before.opaque_index_refs {
+        return Err(invalid(
+            "pivotTableServerFormats has an unproven pivotValueCellExtra@in reference",
+        ));
+    }
+    let text_limit = maximum_attribute_bytes;
+    for value in staged {
+        validate_text(&value.culture, text_limit)?;
+        validate_text(&value.format, text_limit)?;
+    }
+
+    let old_len = before.entries.len();
+    let mut old_to_new = Vec::new();
+    old_to_new
+        .try_reserve_exact(old_len)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable server-format source permutation",
+            source,
+        })?;
+    old_to_new.resize(old_len, usize::MAX);
+    for (new_index, source_index) in staged_sources.iter().enumerate() {
+        let Some(source_index) = source_index else {
+            continue;
+        };
+        let slot = old_to_new
+            .get_mut(*source_index)
+            .ok_or_else(|| invalid("server-format source order is out of range"))?;
+        if *slot != usize::MAX {
+            return Err(invalid("server-format source order contains a duplicate"));
+        }
+        *slot = new_index;
+    }
+
+    let count_changed = staged.len() != old_len;
+    let count_bytes = decimal_u32(
+        u32::try_from(staged.len())
+            .map_err(|_| invalid("pivotTableServerFormats count does not fit unsignedInt"))?,
+    );
+    if count_changed
+        && (before.count.value.start < before.extension_owner.start
+            || before.count.value.end > before.extension_owner.end)
+    {
+        return Err(invalid(
+            "pivotTableServerFormats count source range is outside its owner",
+        ));
+    }
+    let mut owner_len = owner.len();
+    if count_changed {
+        owner_len = owner_len
+            .checked_sub(
+                before
+                    .count
+                    .value
+                    .end
+                    .saturating_sub(before.count.value.start),
+            )
+            .and_then(|length| length.checked_add(count_bytes.len))
+            .ok_or_else(|| invalid("PivotTable server-format owner length overflows"))?;
+    }
+    for old_index in 0..old_len {
+        let old_entry = &before.entries[old_index];
+        let replacement_len = if old_index < staged.len() {
+            staged_child_len(
+                before,
+                staged,
+                staged_sources,
+                old_index,
+                maximum_attribute_bytes,
+            )?
+        } else {
+            0
+        };
+        owner_len = owner_len
+            .checked_sub(
+                old_entry
+                    .element
+                    .end
+                    .saturating_sub(old_entry.element.start),
+            )
+            .and_then(|length| length.checked_add(replacement_len))
+            .ok_or_else(|| invalid("PivotTable server-format owner length overflows"))?;
+    }
+    for new_index in old_len..staged.len() {
+        owner_len = owner_len
+            .checked_add(staged_child_len(
+                before,
+                staged,
+                staged_sources,
+                new_index,
+                maximum_attribute_bytes,
+            )?)
+            .ok_or_else(|| invalid("PivotTable server-format owner length overflows"))?;
+    }
+    if owner_len > MAX_FRAGMENT_BYTES {
+        return Err(invalid(
+            "rewritten pivotTableServerFormats owner fragment exceeds limit",
+        ));
+    }
+
+    let mut output_len = source.len();
+    output_len = output_len
+        .checked_sub(owner.len())
+        .and_then(|length| length.checked_add(owner_len))
+        .ok_or_else(|| invalid("PivotTable server-format output length overflows"))?;
+    let mut previous_reference_end = 0usize;
+    for reference in &before.index_refs {
+        if reference.value.start < previous_reference_end
+            || reference.value.end > source.len()
+            || reference.value.start > reference.value.end
+        {
+            return Err(invalid(
+                "pivotValueCellExtra@in source ranges are not ordered",
+            ));
+        }
+        previous_reference_end = reference.value.end;
+        let new_index = *old_to_new
+            .get(reference.index)
+            .ok_or_else(|| invalid("pivotValueCellExtra@in source index is out of range"))?;
+        if new_index == usize::MAX {
+            return Err(invalid(
+                "removing a server-format leaf would orphan pivotValueCellExtra@in",
+            ));
+        }
+        if new_index != reference.index {
+            let old_digits = reference.value.end.saturating_sub(reference.value.start);
+            let new_digits = decimal_u32(
+                u32::try_from(new_index)
+                    .map_err(|_| invalid("pivotValueCellExtra@in does not fit unsignedInt"))?,
+            );
+            output_len = output_len
+                .checked_sub(old_digits)
+                .and_then(|length| length.checked_add(new_digits.len))
+                .ok_or_else(|| invalid("PivotTable server-format output length overflows"))?;
+        }
+    }
+    if owner_len > MAX_PART_BYTES
+        || owner_len > maximum_output_bytes
+        || output_len > MAX_PART_BYTES
+        || output_len > maximum_output_bytes
+    {
+        return Err(invalid("PivotTable output exceeds the caller's Part limit"));
+    }
+    let output_len_u64 = u64::try_from(output_len).unwrap_or(u64::MAX);
+    let source_len = u64::try_from(source.len()).unwrap_or(u64::MAX);
+    let prospective_total = current_total_bytes
+        .checked_sub(source_len)
+        .and_then(|total| total.checked_add(output_len_u64))
+        .ok_or_else(|| invalid("PivotTable candidate aggregate bytes overflow"))?;
+    if prospective_total > maximum_total_bytes {
+        return Err(invalid(
+            "PivotTable output exceeds the caller's aggregate Part limit",
+        ));
+    }
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable structural server-format output",
+            source,
+        })?;
+    append_structural_table(
+        &mut output,
+        source,
+        before,
+        staged,
+        staged_sources,
+        &old_to_new,
+        count_changed,
+        &count_bytes,
+        maximum_attribute_bytes,
+    )?;
+    if output.len() != output_len {
+        return Err(invalid(
+            "PivotTable structural server-format output length mismatch",
+        ));
+    }
+    Ok(output)
+}
+
+fn staged_child_len(
+    before: &Snapshot,
+    staged: &[ServerFormat],
+    staged_sources: &[Option<usize>],
+    new_index: usize,
+    maximum_attribute_bytes: usize,
+) -> Result<usize> {
+    let Some(source_index) = staged_sources[new_index] else {
+        let include_open =
+            target_leaf_includes_open(before.table.bytes.as_slice(), before, new_index);
+        return new_leaf_len(
+            &before.entries[0].qname,
+            before.entries[0].namespace_decl.as_deref(),
+            &staged[new_index],
+            maximum_attribute_bytes,
+            include_open,
+        );
+    };
+    let include_open = target_leaf_includes_open(before.table.bytes.as_slice(), before, new_index);
+    existing_leaf_len(
+        before.table.bytes.as_slice(),
+        &before.entries[source_index],
+        &before.formats()[source_index],
+        &staged[new_index],
+        maximum_attribute_bytes,
+        include_open,
+    )
+}
+
+fn target_leaf_includes_open(source: &[u8], before: &Snapshot, new_index: usize) -> bool {
+    before.entries.get(new_index).is_none_or(|entry| {
+        entry
+            .element
+            .start
+            .checked_sub(1)
+            .and_then(|index| source.get(index))
+            != Some(&b'<')
+    })
+}
+
+fn existing_leaf_len(
+    source: &[u8],
+    entry: &EntrySource,
+    previous: &ServerFormat,
+    next: &ServerFormat,
+    maximum_attribute_bytes: usize,
+    include_open: bool,
+) -> Result<usize> {
+    let plans = leaf_attribute_plans(source, entry, previous, next, maximum_attribute_bytes)?;
+    let source_has_open = source.get(entry.element.start) == Some(&b'<');
+    let mut length = entry.element.end.saturating_sub(entry.element.start);
+    if include_open != source_has_open {
+        length = if include_open {
+            length
+                .checked_add(1)
+                .ok_or_else(|| invalid("server-format leaf length overflows"))?
+        } else {
+            length
+                .checked_sub(1)
+                .ok_or_else(|| invalid("server-format leaf length underflows"))?
+        };
+    }
+    for plan in plans.into_iter().flatten() {
+        let added = match plan.value {
+            Some(value) => escaped_attribute_len(value)?,
+            None => 0,
+        };
+        if plan.start == plan.end {
+            let attribute_len = 4usize
+                .checked_add(plan.name.len())
+                .and_then(|length| length.checked_add(added))
+                .ok_or_else(|| invalid("server-format leaf length overflows"))?;
+            length = length
+                .checked_add(attribute_len)
+                .ok_or_else(|| invalid("server-format leaf length overflows"))?;
+        } else {
+            length = length
+                .checked_sub(plan.end.saturating_sub(plan.start))
+                .and_then(|length| length.checked_add(added))
+                .ok_or_else(|| invalid("server-format leaf length overflows"))?;
+        }
+    }
+    Ok(length)
+}
+
+fn new_leaf_len(
+    qname: &[u8],
+    namespace_decl: Option<&[u8]>,
+    value: &ServerFormat,
+    maximum_attribute_bytes: usize,
+    include_open: bool,
+) -> Result<usize> {
+    let mut length = usize::from(include_open)
+        .checked_add(qname.len())
+        .and_then(|length| length.checked_add(2))
+        .ok_or_else(|| invalid("server-format leaf length overflows"))?;
+    if let Some(namespace_decl) = namespace_decl {
+        length = length
+            .checked_add(namespace_decl.len())
+            .ok_or_else(|| invalid("server-format namespace length overflows"))?;
+    }
+    for (name, value) in [
+        (b"culture".as_slice(), value.culture.as_deref()),
+        (b"format".as_slice(), value.format.as_deref()),
+    ] {
+        if let Some(value) = value {
+            let encoded = checked_attribute_value_len(name, value, maximum_attribute_bytes)?;
+            let attribute_len = 4usize
+                .checked_add(name.len())
+                .and_then(|length| length.checked_add(encoded))
+                .ok_or_else(|| invalid("server-format leaf length overflows"))?;
+            length = length
+                .checked_add(attribute_len)
+                .ok_or_else(|| invalid("server-format leaf length overflows"))?;
+        }
+    }
+    Ok(length)
+}
+
+fn checked_attribute_value_len(
+    name: &[u8],
+    value: &str,
+    maximum_attribute_bytes: usize,
+) -> Result<usize> {
+    let encoded = escaped_attribute_len(value)?;
+    if name
+        .len()
+        .checked_add(encoded)
+        .is_none_or(|length| length > maximum_attribute_bytes)
+    {
+        return Err(invalid("server-format attribute exceeds its text limit"));
+    }
+    Ok(encoded)
+}
+
+fn leaf_attribute_plans<'a>(
+    source: &[u8],
+    entry: &EntrySource,
+    previous: &ServerFormat,
+    next: &'a ServerFormat,
+    maximum_attribute_bytes: usize,
+) -> Result<[Option<LeafAttributePlan<'a>>; 2]> {
+    let mut plans = [
+        attribute_plan(
+            source,
+            entry.start_tag.clone(),
+            b"culture",
+            entry.culture.as_ref(),
+            previous.culture.as_ref(),
+            next.culture.as_deref(),
+            maximum_attribute_bytes,
+        )?,
+        attribute_plan(
+            source,
+            entry.start_tag.clone(),
+            b"format",
+            entry.format.as_ref(),
+            previous.format.as_ref(),
+            next.format.as_deref(),
+            maximum_attribute_bytes,
+        )?,
+    ];
+    if let (Some(left), Some(right)) = (plans[0], plans[1])
+        && right.start < left.start
+    {
+        plans.swap(0, 1);
+    }
+    Ok(plans)
+}
+
+fn attribute_plan<'a>(
+    source: &[u8],
+    start_tag: Range<usize>,
+    name: &'static [u8],
+    current: Option<&AttributeSource>,
+    previous: Option<&String>,
+    next: Option<&'a str>,
+    maximum_attribute_bytes: usize,
+) -> Result<Option<LeafAttributePlan<'a>>> {
+    if previous.map(String::as_str) == next {
+        return Ok(None);
+    }
+    if let Some(value) = next {
+        checked_attribute_value_len(name, value, maximum_attribute_bytes)?;
+    }
+    let plan = match (current, next) {
+        (Some(current), Some(value)) => LeafAttributePlan {
+            start: current.value.start,
+            end: current.value.end,
+            name,
+            value: Some(value),
+        },
+        (Some(current), None) => LeafAttributePlan {
+            start: current.whole.start,
+            end: current.whole.end,
+            name,
+            value: None,
+        },
+        (None, Some(value)) => {
+            let insertion = if start_tag.end >= 2
+                && source.get(start_tag.end - 2..start_tag.end) == Some(b"/>")
+            {
+                start_tag.end - 2
+            } else {
+                start_tag
+                    .end
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("server-format start tag range underflow"))?
+            };
+            if source.get(insertion) != Some(&b'>')
+                && source.get(insertion..insertion.saturating_add(2)) != Some(b"/>")
+            {
+                return Err(invalid(
+                    "server-format attribute insertion point is ambiguous",
+                ));
+            }
+            LeafAttributePlan {
+                start: insertion,
+                end: insertion,
+                name,
+                value: Some(value),
+            }
+        },
+        (None, None) => return Ok(None),
+    };
+    Ok(Some(plan))
+}
+
+#[derive(Clone, Copy)]
+struct DecimalBytes {
+    bytes: [u8; 10],
+    len: usize,
+}
+
+fn decimal_u32(value: u32) -> DecimalBytes {
+    let mut bytes = [0; 10];
+    let mut value = value;
+    let mut len = 0usize;
+    loop {
+        bytes[9 - len] = b'0' + (value % 10) as u8;
+        len += 1;
+        value /= 10;
+        if value == 0 {
+            break;
+        }
+    }
+    bytes.copy_within(10 - len..10, 0);
+    DecimalBytes { bytes, len }
+}
+
+fn append_structural_table(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    before: &Snapshot,
+    staged: &[ServerFormat],
+    staged_sources: &[Option<usize>],
+    old_to_new: &[usize],
+    count_changed: bool,
+    count: &DecimalBytes,
+    maximum_attribute_bytes: usize,
+) -> Result<()> {
+    let owner = &before.extension_owner;
+    let mut cursor = 0usize;
+    let mut owner_written = false;
+    for reference in &before.index_refs {
+        if !owner_written && owner.start <= reference.value.start {
+            let mut ignored_count = false;
+            append_source_segment(
+                output,
+                source,
+                cursor..owner.start,
+                None,
+                &mut ignored_count,
+            )?;
+            append_structural_owner(
+                output,
+                source,
+                before,
+                staged,
+                staged_sources,
+                count_changed,
+                count,
+                maximum_attribute_bytes,
+            )?;
+            cursor = owner.end;
+            owner_written = true;
+        }
+        if reference.value.start < cursor
+            || reference.value.end < reference.value.start
+            || (reference.value.start < owner.end && reference.value.end > owner.start)
+        {
+            return Err(invalid(
+                "pivotValueCellExtra@in overlaps the server-format owner",
+            ));
+        }
+        let mut ignored_count = false;
+        append_source_segment(
+            output,
+            source,
+            cursor..reference.value.start,
+            None,
+            &mut ignored_count,
+        )?;
+        let new_index = *old_to_new
+            .get(reference.index)
+            .ok_or_else(|| invalid("pivotValueCellExtra@in source index is out of range"))?;
+        if new_index == usize::MAX {
+            return Err(invalid(
+                "removing a server-format leaf would orphan pivotValueCellExtra@in",
+            ));
+        }
+        if new_index == reference.index {
+            output.extend_from_slice(&source[reference.value.clone()]);
+        } else {
+            let digits = decimal_u32(
+                u32::try_from(new_index)
+                    .map_err(|_| invalid("pivotValueCellExtra@in does not fit unsignedInt"))?,
+            );
+            output.extend_from_slice(&digits.bytes[..digits.len]);
+        }
+        cursor = reference.value.end;
+    }
+    if !owner_written {
+        let mut ignored_count = false;
+        append_source_segment(
+            output,
+            source,
+            cursor..owner.start,
+            None,
+            &mut ignored_count,
+        )?;
+        append_structural_owner(
+            output,
+            source,
+            before,
+            staged,
+            staged_sources,
+            count_changed,
+            count,
+            maximum_attribute_bytes,
+        )?;
+        cursor = owner.end;
+    }
+    let mut ignored_count = false;
+    append_source_segment(
+        output,
+        source,
+        cursor..source.len(),
+        None,
+        &mut ignored_count,
+    )
+}
+
+fn append_structural_owner(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    before: &Snapshot,
+    staged: &[ServerFormat],
+    staged_sources: &[Option<usize>],
+    count_changed: bool,
+    count: &DecimalBytes,
+    maximum_attribute_bytes: usize,
+) -> Result<()> {
+    let mut cursor = before.extension_owner.start;
+    let mut count_written = false;
+    for old_index in 0..before.entries.len() {
+        let entry = &before.entries[old_index];
+        append_source_segment(
+            output,
+            source,
+            cursor..entry.element.start,
+            count_changed.then_some((before.count.value.clone(), count)),
+            &mut count_written,
+        )?;
+        if old_index < staged.len() {
+            append_staged_child(
+                output,
+                source,
+                before,
+                staged,
+                staged_sources,
+                old_index,
+                maximum_attribute_bytes,
+            )?;
+        }
+        cursor = entry.element.end;
+    }
+    for new_index in before.entries.len()..staged.len() {
+        append_staged_child(
+            output,
+            source,
+            before,
+            staged,
+            staged_sources,
+            new_index,
+            maximum_attribute_bytes,
+        )?;
+    }
+    append_source_segment(
+        output,
+        source,
+        cursor..before.extension_owner.end,
+        count_changed.then_some((before.count.value.clone(), count)),
+        &mut count_written,
+    )?;
+    if count_changed && !count_written {
+        return Err(invalid(
+            "pivotTableServerFormats count source range is not in its owner",
+        ));
+    }
+    Ok(())
+}
+
+fn append_staged_child(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    before: &Snapshot,
+    staged: &[ServerFormat],
+    staged_sources: &[Option<usize>],
+    new_index: usize,
+    maximum_attribute_bytes: usize,
+) -> Result<()> {
+    let Some(source_index) = staged_sources[new_index] else {
+        let template = &before.entries[0];
+        let include_open = target_leaf_includes_open(source, before, new_index);
+        return append_new_leaf(
+            output,
+            &template.qname,
+            template.namespace_decl.as_deref(),
+            &staged[new_index],
+            maximum_attribute_bytes,
+            include_open,
+        );
+    };
+    let include_open = target_leaf_includes_open(source, before, new_index);
+    append_existing_leaf(
+        output,
+        source,
+        &before.entries[source_index],
+        &before.formats()[source_index],
+        &staged[new_index],
+        maximum_attribute_bytes,
+        include_open,
+    )
+}
+
+fn append_existing_leaf(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    entry: &EntrySource,
+    previous: &ServerFormat,
+    next: &ServerFormat,
+    maximum_attribute_bytes: usize,
+    include_open: bool,
+) -> Result<()> {
+    let plans = leaf_attribute_plans(source, entry, previous, next, maximum_attribute_bytes)?;
+    let source_has_open = source.get(entry.element.start) == Some(&b'<');
+    let source_start = if source_has_open && !include_open {
+        entry
+            .element
+            .start
+            .checked_add(1)
+            .ok_or_else(|| invalid("server-format leaf source range overflows"))?
+    } else {
+        entry.element.start
+    };
+    if include_open && !source_has_open {
+        output.push(b'<');
+    }
+    let mut cursor = source_start;
+    for plan in plans.into_iter().flatten() {
+        if plan.start < cursor || plan.end < plan.start || plan.end > entry.element.end {
+            return Err(invalid("server-format attribute source range is invalid"));
+        }
+        output.extend_from_slice(&source[cursor..plan.start]);
+        if let Some(value) = plan.value {
+            if plan.start == plan.end {
+                output.push(b' ');
+                output.extend_from_slice(plan.name);
+                output.extend_from_slice(b"=\"");
+                append_encoded_xstring(output, value)?;
+                output.push(b'"');
+            } else {
+                append_encoded_xstring(output, value)?;
+            }
+        }
+        cursor = if plan.start == plan.end {
+            plan.start
+        } else {
+            plan.end
+        };
+    }
+    output.extend_from_slice(&source[cursor..entry.element.end]);
+    Ok(())
+}
+
+fn append_new_leaf(
+    output: &mut Vec<u8>,
+    qname: &[u8],
+    namespace_decl: Option<&[u8]>,
+    value: &ServerFormat,
+    maximum_attribute_bytes: usize,
+    include_open: bool,
+) -> Result<()> {
+    if include_open {
+        output.push(b'<');
+    }
+    output.extend_from_slice(qname);
+    if let Some(namespace_decl) = namespace_decl {
+        output.extend_from_slice(namespace_decl);
+    }
+    for (name, value) in [
+        (b"culture".as_slice(), value.culture.as_deref()),
+        (b"format".as_slice(), value.format.as_deref()),
+    ] {
+        if let Some(value) = value {
+            checked_attribute_value_len(name, value, maximum_attribute_bytes)?;
+            output.push(b' ');
+            output.extend_from_slice(name);
+            output.extend_from_slice(b"=\"");
+            append_encoded_xstring(output, value)?;
+            output.push(b'"');
+        }
+    }
+    output.extend_from_slice(b"/>");
+    Ok(())
+}
+
+fn append_encoded_xstring(output: &mut Vec<u8>, value: &str) -> Result<()> {
+    let encoded_len = escaped_xstring_len(value)?;
+    let required = output
+        .len()
+        .checked_add(encoded_len)
+        .ok_or_else(|| invalid("escaped server-format attribute length overflows"))?;
+    if required > output.capacity() {
+        return Err(invalid(
+            "encoded server-format attribute exceeds its preflight output capacity",
+        ));
+    }
+    let previous_len = output.len();
+    append_escaped_xstring(output, value);
+    if output.len() != required || output.len() - previous_len != encoded_len {
+        return Err(invalid(
+            "encoded server-format attribute length disagrees with its preflight",
+        ));
+    }
+    Ok(())
+}
+
+fn append_source_segment(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    range: Range<usize>,
+    count: Option<(Range<usize>, &DecimalBytes)>,
+    count_written: &mut bool,
+) -> Result<()> {
+    if range.start > range.end || range.end > source.len() {
+        return Err(invalid("PivotTable source segment is invalid"));
+    }
+    if let Some((count_range, count_value)) = count {
+        if count_range.start < range.end && count_range.end > range.start {
+            if *count_written || count_range.start < range.start || count_range.end > range.end {
+                return Err(invalid("PivotTable count source range overlaps its owner"));
+            }
+            output.extend_from_slice(&source[range.start..count_range.start]);
+            output.extend_from_slice(&count_value.bytes[..count_value.len]);
+            output.extend_from_slice(&source[count_range.end..range.end]);
+            *count_written = true;
+            return Ok(());
+        }
+    }
+    output.extend_from_slice(&source[range]);
+    Ok(())
 }
 
 fn apply_planned_attribute_delta(
@@ -2225,7 +3354,7 @@ fn parse_table(
             "PivotTable cache relationship targets the wrong content type",
         ));
     }
-    let payload = parse_payload(&scan)?;
+    let payload = parse_payload(&scan, part.blob())?;
     Ok(TableInfo {
         name: meta.name,
         cache_id: meta.cache_id,
@@ -2644,7 +3773,7 @@ fn admit_worksheet_table_target(
     Ok(true)
 }
 
-fn parse_payload(scan: &XmlScan) -> Result<PayloadInfo> {
+fn parse_payload(scan: &XmlScan, source: &[u8]) -> Result<PayloadInfo> {
     let mut payloads = Vec::new();
     let root = scan
         .elements
@@ -2686,6 +3815,8 @@ fn parse_payload(scan: &XmlScan) -> Result<PayloadInfo> {
         .map(|attr| parse_u32(&attr.value, "pivotTableServerFormats count"))
         .transpose()?
         .ok_or_else(|| invalid("pivotTableServerFormats requires count"))?;
+    let count_source = attr_source(payload, b"count")?
+        .ok_or_else(|| invalid("pivotTableServerFormats requires count"))?;
     if count == 0 || count as usize > MAX_SERVER_FORMATS {
         return Err(invalid(
             "pivotTableServerFormats count is outside its bounded domain",
@@ -2718,6 +3849,9 @@ fn parse_payload(scan: &XmlScan) -> Result<PayloadInfo> {
                 culture: attr_source(element, b"culture")?,
                 format: attr_source(element, b"format")?,
                 start_tag: element.start.clone(),
+                element: element.start.start..element.end,
+                qname: source_element_qname(source, &element.start, scan.limits.name_bytes)?,
+                namespace_decl: source_element_namespace_decl(source, &element.start, scan.limits)?,
             },
         });
     }
@@ -2726,57 +3860,115 @@ fn parse_payload(scan: &XmlScan) -> Result<PayloadInfo> {
             "pivotTableServerFormats count does not equal child count",
         ));
     }
+    let mut index_refs = Vec::new();
+    let mut opaque_index_refs = false;
     let mut diagnostic = false;
     for element in &scan.elements {
         if element.ns != EXT_NS || element.local != b"x" {
             continue;
         }
-        let Some(cell) = element
-            .parent_index
-            .and_then(|index| scan.elements.get(index))
-        else {
+        let Some((data_index, mce_context)) = owned_pivot_data_ancestor(scan, root, element) else {
             continue;
         };
-        if cell.ns != EXT_NS || cell.local != b"c" {
+        if mce_context || element.mce_context {
+            opaque_index_refs = true;
             continue;
         }
-        let Some(row) = cell.parent_index.and_then(|index| scan.elements.get(index)) else {
-            continue;
-        };
-        if row.ns != EXT_NS || row.local != b"pivotRow" {
-            continue;
-        }
-        let Some(data) = row.parent_index.and_then(|index| scan.elements.get(index)) else {
-            continue;
-        };
-        if data.ns != EXT_NS
-            || data.local != b"pivotTableData"
-            || !is_owned_payload(scan, root, data, PIVOT_TABLE_DATA_URI)
-        {
-            continue;
-        }
-        if let Some(attr) = element
-            .attrs
-            .iter()
-            .find(|attr| attr.ns.is_empty() && attr.local == b"in")
-        {
-            let index = parse_u32(&attr.value, "pivotValueCellExtra in")? as usize;
-            if index > entries.len() {
-                return Err(invalid(
-                    "pivotValueCellExtra@in exceeds server-format count",
-                ));
+        let mut in_attribute = None;
+        let mut in_count = 0usize;
+        let mut namespaced_in = false;
+        for attribute in &element.attrs {
+            if attribute.local != b"in" {
+                continue;
             }
-            if index == entries.len() {
-                diagnostic = true;
+            in_count += 1;
+            if attribute.ns.is_empty() {
+                in_attribute = Some(attribute);
+            } else {
+                namespaced_in = true;
             }
         }
+        if in_count == 0 {
+            continue;
+        }
+        let exact = exact_pivot_value_cell_chain(scan, element, data_index);
+        if !exact || in_count != 1 || namespaced_in {
+            opaque_index_refs = true;
+            continue;
+        }
+        let Some(attribute) = in_attribute else {
+            opaque_index_refs = true;
+            continue;
+        };
+        let index = parse_u32(&attribute.value, "pivotValueCellExtra in")? as usize;
+        if index > entries.len() {
+            return Err(invalid(
+                "pivotValueCellExtra@in exceeds server-format count",
+            ));
+        }
+        if index == entries.len() {
+            diagnostic = true;
+        }
+        index_refs
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable server-format index references",
+                source,
+            })?;
+        index_refs.push(IndexReference {
+            value: attr_source(element, b"in")?
+                .ok_or_else(|| invalid("pivotValueCellExtra in source range is missing"))?
+                .value,
+            index,
+        });
     }
     Ok(PayloadInfo {
         entries,
         owner: payload.start.start..payload.end,
+        count: count_source,
+        index_refs,
+        opaque_index_refs,
         diagnostic_index_boundary: diagnostic,
         mce_ambiguous: payload.mce_context,
     })
+}
+
+fn owned_pivot_data_ancestor(
+    scan: &XmlScan,
+    root: &XmlElement,
+    element: &XmlElement,
+) -> Option<(usize, bool)> {
+    let mut current = element.parent_index;
+    while let Some(index) = current {
+        let data = scan.elements.get(index)?;
+        if data.ns == EXT_NS
+            && data.local == b"pivotTableData"
+            && is_owned_payload(scan, root, data, PIVOT_TABLE_DATA_URI)
+        {
+            return Some((index, data.mce_context));
+        }
+        current = data.parent_index;
+    }
+    None
+}
+
+fn exact_pivot_value_cell_chain(scan: &XmlScan, element: &XmlElement, data: usize) -> bool {
+    let Some(cell) = element
+        .parent_index
+        .and_then(|index| scan.elements.get(index))
+    else {
+        return false;
+    };
+    if cell.ns != EXT_NS || cell.local != b"c" {
+        return false;
+    }
+    let Some(row) = cell.parent_index.and_then(|index| scan.elements.get(index)) else {
+        return false;
+    };
+    if row.ns != EXT_NS || row.local != b"pivotRow" {
+        return false;
+    }
+    row.parent_index == Some(data)
 }
 
 fn validate_server_format_leaf(element: &XmlElement) -> Result<()> {
@@ -2832,6 +4024,141 @@ fn attr_source(element: &XmlElement, name: &[u8]) -> Result<Option<AttributeSour
     }))
 }
 
+fn source_element_qname(
+    source: &[u8],
+    start: &Range<usize>,
+    maximum_name_bytes: usize,
+) -> Result<Vec<u8>> {
+    let name_start = match source.get(start.start) {
+        Some(b'<') => start
+            .start
+            .checked_add(1)
+            .ok_or_else(|| invalid("serverFormat QName range overflows"))?,
+        Some(_) => start.start,
+        None => return Err(invalid("serverFormat QName range is outside its source")),
+    };
+    let raw = source
+        .get(name_start..start.end)
+        .ok_or_else(|| invalid("serverFormat QName range is outside its source"))?;
+    let name_len = raw
+        .iter()
+        .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
+        .ok_or_else(|| invalid("serverFormat start tag has no QName"))?;
+    if name_len == 0 || name_len > MAX_NAME_BYTES || name_len > maximum_name_bytes {
+        return Err(invalid("serverFormat QName exceeds its source limit"));
+    }
+    let mut qname = Vec::new();
+    qname
+        .try_reserve_exact(name_len)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable server-format QName",
+            source,
+        })?;
+    qname.extend_from_slice(&raw[..name_len]);
+    Ok(qname)
+}
+
+fn source_element_namespace_decl(
+    source: &[u8],
+    start: &Range<usize>,
+    limits: XmlScanLimits,
+) -> Result<Option<Vec<u8>>> {
+    let qname = source_element_qname(source, start, limits.name_bytes)?;
+    let prefix = qname
+        .iter()
+        .position(|byte| *byte == b':')
+        .map(|index| &qname[..index]);
+    let name_start = if source.get(start.start) == Some(&b'<') {
+        start.start.saturating_add(1)
+    } else {
+        start.start
+    };
+    let mut cursor = name_start.saturating_add(qname.len());
+    while cursor < start.end {
+        while cursor < start.end && is_xml_space(source[cursor]) {
+            cursor += 1;
+        }
+        if cursor >= start.end || matches!(source[cursor], b'/' | b'>') {
+            break;
+        }
+        let attr_start = cursor;
+        while cursor < start.end
+            && !is_xml_space(source[cursor])
+            && !matches!(source[cursor], b'=' | b'/' | b'>')
+        {
+            cursor += 1;
+        }
+        let attr_name = source.get(attr_start..cursor).unwrap_or_default();
+        while cursor < start.end && is_xml_space(source[cursor]) {
+            cursor += 1;
+        }
+        if source.get(cursor) != Some(&b'=') {
+            return Err(invalid("serverFormat namespace declaration is malformed"));
+        }
+        cursor += 1;
+        while cursor < start.end && is_xml_space(source[cursor]) {
+            cursor += 1;
+        }
+        let quote = *source
+            .get(cursor)
+            .ok_or_else(|| invalid("serverFormat namespace declaration has no value"))?;
+        if !matches!(quote, b'\'' | b'"') {
+            return Err(invalid("serverFormat namespace declaration is not quoted"));
+        }
+        cursor += 1;
+        while cursor < start.end && source[cursor] != quote {
+            cursor += 1;
+        }
+        if cursor >= start.end {
+            return Err(invalid(
+                "serverFormat namespace declaration is unterminated",
+            ));
+        }
+        cursor += 1;
+        let matches_prefix = match prefix {
+            Some(prefix) => {
+                attr_name.len() == 6 + prefix.len()
+                    && attr_name.starts_with(b"xmlns:")
+                    && &attr_name[6..] == prefix
+            },
+            None => attr_name == b"xmlns",
+        };
+        if matches_prefix {
+            let mut declaration = Vec::new();
+            let declaration_len = 1usize
+                .checked_add(attr_name.len())
+                .and_then(|length| length.checked_add(3))
+                .and_then(|length| length.checked_add(EXT_NS.len()))
+                .ok_or_else(|| invalid("serverFormat namespace declaration overflows"))?;
+            if declaration_len > MAX_NAMESPACE_BYTES
+                || declaration_len > limits.namespace_bytes
+                || declaration_len > limits.attribute_bytes
+            {
+                return Err(invalid(
+                    "serverFormat namespace declaration exceeds its source limit",
+                ));
+            }
+            declaration
+                .try_reserve_exact(declaration_len)
+                .map_err(|source| Error::Allocation {
+                    resource: "PivotTable server-format namespace declaration",
+                    source,
+                })?;
+            declaration.push(b' ');
+            declaration.extend_from_slice(attr_name);
+            declaration.extend_from_slice(b"=\"");
+            declaration.extend_from_slice(EXT_NS);
+            declaration.push(b'"');
+            return Ok(Some(declaration));
+        }
+    }
+    Ok(None)
+}
+
+fn is_xml_space(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+}
+
 fn parse_u32(value: &str, owner: &str) -> Result<u32> {
     let value = value.trim_matches(|character| matches!(character, ' ' | '\t' | '\r' | '\n'));
     if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
@@ -2857,6 +4184,7 @@ fn decode_spreadsheet_text(value: &str) -> Result<String> {
 #[derive(Debug)]
 struct XmlScan {
     elements: Vec<XmlElement>,
+    limits: XmlScanLimits,
 }
 
 #[derive(Debug)]
@@ -3042,7 +4370,7 @@ fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Resul
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("PivotTable XML is unterminated"));
     }
-    Ok(XmlScan { elements })
+    Ok(XmlScan { elements, limits })
 }
 
 fn event_end_position(bytes: &[u8], before: usize, after: usize) -> usize {
