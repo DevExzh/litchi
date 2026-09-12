@@ -22,7 +22,7 @@ use support::{AllocSnapshot, begin_window};
 
 const DEFAULT_WARMUP: usize = 0;
 const DEFAULT_SAMPLES: usize = 1;
-const SOURCE_COMMIT: &str = "8702fd4db8723acceb7deb51bcb40ff66604bf10";
+const SOURCE_COMMIT: &str = "d000d977b99e03f8542c7dae74acf767a91b1feb";
 const OPC_SOURCE_LABEL: &str = "styles-effects-source-committed";
 
 fn usage() {

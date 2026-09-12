@@ -16,7 +16,7 @@ SOURCE_COMMIT = "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119"
 # The historical 52-lane smoke remains bound to SOURCE_COMMIT.  Profile
 # receipts use the separately approved attribution baseline so retaining the
 # smoke does not rewrite its source identity.
-PROFILE_SOURCE_COMMIT = "8702fd4db8723acceb7deb51bcb40ff66604bf10"
+PROFILE_SOURCE_COMMIT = "d000d977b99e03f8542c7dae74acf767a91b1feb"
 MANIFEST_FORMAT = "docx-styles-effects-cargo-source-closure-v1"
 RECEIPT_SCHEMA = "docx-styles-effects-smoke-v1"
 U64_MAX = (1 << 64) - 1
