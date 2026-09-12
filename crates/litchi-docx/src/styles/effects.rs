@@ -22,6 +22,45 @@ use quick_xml::{Reader, XmlVersion};
 use crate::styles::{Style, Styles, Type};
 use crate::{Error, Result};
 
+#[cfg(test)]
+mod test_trace {
+    use std::cell::Cell;
+
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub(super) struct Counts {
+        pub(super) loads: usize,
+        pub(super) candidate_clones: usize,
+    }
+
+    thread_local! {
+        static COUNTS: Cell<Counts> = const { Cell::new(Counts { loads: 0, candidate_clones: 0 }) };
+    }
+
+    pub(super) fn reset() {
+        COUNTS.with(|counts| counts.set(Counts::default()));
+    }
+
+    pub(super) fn take() -> Counts {
+        COUNTS.with(|counts| counts.get())
+    }
+
+    pub(super) fn record_load() {
+        COUNTS.with(|counts| {
+            let mut value = counts.get();
+            value.loads = value.loads.saturating_add(1);
+            counts.set(value);
+        });
+    }
+
+    pub(super) fn record_candidate_clone() {
+        COUNTS.with(|counts| {
+            let mut value = counts.get();
+            value.candidate_clones = value.candidate_clones.saturating_add(1);
+            counts.set(value);
+        });
+    }
+}
+
 /// Microsoft's stylesWithEffects relationship type.
 pub const RELATIONSHIP_TYPE: &str =
     "http://schemas.microsoft.com/office/2007/relationships/stylesWithEffects";
@@ -1358,6 +1397,9 @@ fn capture_graph_token(
 /// Load a complete owner-wide effects snapshot. Absence is represented by a
 /// present snapshot whose resource() is None.
 pub fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
+    #[cfg(test)]
+    test_trace::record_load();
+
     let graph = inspect_graph(package)?;
     let resource = graph
         .binding(owner)
@@ -1396,15 +1438,63 @@ pub fn apply_patch(package: &mut OpcPackage, owner: Owner, patch: &Patch) -> Res
         return Ok(current);
     }
 
-    let mut candidate = package.clone();
+    let mut candidate = {
+        #[cfg(test)]
+        test_trace::record_candidate_clone();
+        package.clone()
+    };
+    let published = apply_projected_patch(&mut candidate, owner, patch, projected, Some(package))?;
+    *package = candidate;
+    Ok(published)
+}
+
+/// Apply a patch to the exact candidate clone owned by the package facade.
+///
+/// The caller must have loaded `current` from the same source package immediately
+/// before entering the outer semantic edit, and `package` must be the candidate
+/// clone created by that edit. This private seam is intentionally not a general
+/// candidate admission API: it requires the package-bound graph token, recomputes
+/// the source patch, and performs the complete publication/readback validation.
+pub(crate) fn apply_patch_staged(
+    package: &mut OpcPackage,
+    owner: Owner,
+    patch: &Patch,
+    current: Snapshot,
+) -> Result<Snapshot> {
+    if current.graph.is_none() {
+        return Err(invalid(
+            "staged stylesWithEffects patch requires a package-bound current snapshot",
+        ));
+    }
+    if patch.owner != owner {
+        return Err(Error::InvalidFormat(
+            "stylesWithEffects patch owner does not match the requested package owner".to_owned(),
+        ));
+    }
+    let projected = patch.apply_to_snapshot(&current)?;
+    if current.same_state(&projected) {
+        return Ok(current);
+    }
+    apply_projected_patch(package, owner, patch, projected, None)
+}
+
+fn apply_projected_patch(
+    package: &mut OpcPackage,
+    owner: Owner,
+    patch: &Patch,
+    projected: Snapshot,
+    signature_source: Option<&OpcPackage>,
+) -> Result<Snapshot> {
     publish_resource(
-        &mut candidate,
+        package,
         owner,
         projected.resource.clone(),
         patch.after_graph.as_ref(),
     )?;
-    candidate.validate_signature_edit_from(package)?;
-    let published = load(&candidate, owner)?;
+    if let Some(source) = signature_source {
+        package.validate_signature_edit_from(source)?;
+    }
+    let published = load(package, owner)?;
     let graph_matches = match (&published.graph, &projected.graph) {
         (Some(published), Some(projected)) => published.same_published_state(projected),
         (None, None) => true,
@@ -1418,7 +1508,6 @@ pub fn apply_patch(package: &mut OpcPackage, owner: Owner, patch: &Patch) -> Res
     if !graph_matches {
         return Err(invalid("staged stylesWithEffects graph did not round-trip"));
     }
-    *package = candidate;
     Ok(published)
 }
 
@@ -2766,4 +2855,127 @@ fn root_namespace(element: &quick_xml::events::BytesStart<'_>) -> Result<String>
         }
     }
     Err(invalid("stylesWithEffects XML root has no Word namespace"))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    const FIXTURE: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/poi/test-data/document/Bug54849.docx"
+    ));
+
+    fn changed_resource(snapshot: &Snapshot) -> Resource {
+        let mut xml = snapshot
+            .resource()
+            .expect("effects fixture has a main resource")
+            .xml_bytes()
+            .to_vec();
+        let closing = b"</w:styles>";
+        let offset = xml
+            .windows(closing.len())
+            .position(|window| window == closing)
+            .expect("effects fixture has a styles root");
+        xml.splice(
+            offset..offset,
+            br#"<w:style w:type="paragraph" w:styleId="EffectsCountProbe"><w:name w:val="Effects Count Probe"/></w:style>"#.iter().copied(),
+        );
+        Resource::from_xml(xml).expect("changed effects resource")
+    }
+
+    fn changed_patch(snapshot: &Snapshot) -> (Patch, Resource) {
+        let resource = changed_resource(snapshot);
+        let mut edit = snapshot.edit();
+        edit.replace_resource(Some(resource.clone()))
+            .expect("stage changed effects resource");
+        (
+            edit.commit()
+                .expect("commit changed effects resource")
+                .into_patch(),
+            resource,
+        )
+    }
+
+    #[test]
+    fn staged_facade_reuses_snapshot_and_skips_nested_effects_clone() {
+        let mut package = crate::Package::from_reader(Cursor::new(FIXTURE.to_vec()))
+            .expect("open effects fixture");
+        let snapshot = package
+            .styles_with_effects(Owner::MainDocument)
+            .expect("load effects fixture");
+        let (patch, expected) = changed_patch(&snapshot);
+
+        test_trace::reset();
+        let applied = package
+            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+            .expect("apply staged effects patch");
+        let counts = test_trace::take();
+
+        assert_eq!(counts.loads, 2);
+        assert_eq!(counts.candidate_clones, 0);
+        assert_eq!(
+            applied
+                .resource()
+                .expect("published effects resource")
+                .xml_bytes(),
+            expected.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn direct_patch_retains_nested_effects_candidate_clone() {
+        let mut package = OpcPackage::from_vec(FIXTURE.to_vec()).expect("open effects fixture");
+        let snapshot = load(&package, Owner::MainDocument).expect("load effects fixture");
+        let (patch, expected) = changed_patch(&snapshot);
+
+        test_trace::reset();
+        let applied = patch
+            .apply(&mut package)
+            .expect("apply direct effects patch");
+        let counts = test_trace::take();
+
+        assert_eq!(counts.loads, 2);
+        assert_eq!(counts.candidate_clones, 1);
+        assert_eq!(
+            applied
+                .resource()
+                .expect("published effects resource")
+                .xml_bytes(),
+            expected.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn staged_patch_rejects_unbound_standalone_snapshot() {
+        let current = Snapshot::from_xml(
+            Owner::MainDocument,
+            br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
+                .to_vec(),
+        )
+        .expect("standalone effects snapshot");
+        let replacement = Resource::from_xml(
+            br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="probe"/></w:styles>"#
+                .to_vec(),
+        )
+        .expect("standalone replacement resource");
+        let mut edit = current.edit();
+        edit.replace_resource(Some(replacement))
+            .expect("stage standalone replacement");
+        let patch = edit
+            .commit()
+            .expect("commit standalone replacement")
+            .into_patch();
+        let mut package = OpcPackage::new();
+
+        let error = apply_patch_staged(&mut package, Owner::MainDocument, &patch, current)
+            .expect_err("unbound staged patch must be rejected");
+        assert!(matches!(
+            error,
+            Error::Invalid(message) if message.contains("package-bound current snapshot")
+        ));
+        assert_eq!(package.part_count(), 0);
+    }
 }
