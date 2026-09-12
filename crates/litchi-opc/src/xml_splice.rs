@@ -896,6 +896,20 @@ fn validate_source_xml(
     Ok(())
 }
 
+/// Validate complete source XML with the bounded namespace-aware grammar used
+/// by source-preserving OPC publication.
+///
+/// The public wrapper intentionally does not issue a source token. It lets a
+/// format owner validate an opaque XML resource before retaining its own
+/// source handle while keeping the execution-context hook crate-private.
+pub fn validate_source_xml_bytes(
+    partname: &PackURI,
+    bytes: &[u8],
+    limits: ReadLimits,
+) -> Result<()> {
+    validate_source_xml(partname, bytes, limits, None)
+}
+
 fn consume_work_from_context(
     context: Option<&litchi_core::ExecutionContext>,
     bytes: usize,
