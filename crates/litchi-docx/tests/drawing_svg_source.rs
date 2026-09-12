@@ -17,7 +17,14 @@ const PIC: &str = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const ASVG: &str = "http://schemas.microsoft.com/office/drawing/2016/SVG/main";
 const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+const STRICT_W: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+const STRICT_WP: &str = "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing";
+const STRICT_A: &str = "http://purl.oclc.org/ooxml/drawingml/main";
+const STRICT_PIC: &str = "http://purl.oclc.org/ooxml/drawingml/picture";
+const STRICT_R: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+const STRICT_MCE: &str = "http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const PICTURE_URI: &str = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+const STRICT_PICTURE_URI: &str = "http://purl.oclc.org/ooxml/drawingml/picture";
 const SVG_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
 const INLINE_FIXTURE: &str = concat!(
@@ -359,6 +366,21 @@ fn synthetic_document(body: &str) -> Vec<u8> {
     .into_bytes()
 }
 
+fn strict_document(body: &str) -> Vec<u8> {
+    let mut document = String::from_utf8(synthetic_document(body)).expect("synthetic XML");
+    for (transitional, strict) in [
+        (W, STRICT_W),
+        (WP, STRICT_WP),
+        (A, STRICT_A),
+        (PIC, STRICT_PIC),
+        (R, STRICT_R),
+        (PICTURE_URI, STRICT_PICTURE_URI),
+    ] {
+        document = document.replace(transitional, strict);
+    }
+    document.into_bytes()
+}
+
 #[test]
 fn alias_unknown_duplicate_and_mce_owners_keep_direct_policy() {
     let aliased = synthetic_document(
@@ -425,6 +447,39 @@ fn alias_unknown_duplicate_and_mce_owners_keep_direct_policy() {
             .svg_owner(),
         SvgOwnerState::Refused
     ));
+}
+
+#[test]
+fn strict_host_keeps_canonical_mc_semantics_and_ignores_strict_mc_alias() {
+    let extension =
+        format!(r#"<a:ext uri="{SVG_URI}"><asvg:svgBlip r:embed="rIdStrictSvg"/></a:ext>"#);
+    let picture = synthetic_picture(&extension);
+
+    let strict_xml = strict_document(&picture);
+    let strict = SourceDrawing::scan(&strict_xml).expect("strict SVG source");
+    assert_eq!(strict.dialect(), DrawingDialect::Strict);
+    assert!(matches!(
+        strict.picture(0).unwrap().svg_owner(),
+        SvgOwnerState::Embedded(_)
+    ));
+
+    let canonical_mce = strict_document(&format!(
+        r#"<mc:AlternateContent><mc:Choice Requires="w14">{picture}</mc:Choice><mc:Fallback/></mc:AlternateContent>"#
+    ));
+    let canonical = SourceDrawing::scan(&canonical_mce).expect("canonical MC source");
+    assert!(matches!(
+        canonical.picture(0).unwrap().svg_owner(),
+        SvgOwnerState::Refused
+    ));
+
+    let foreign_mce = strict_document(&format!(
+        r#"<strictMc:AlternateContent xmlns:strictMc="{STRICT_MCE}"><strictMc:Choice Requires="w14">{picture}</strictMc:Choice><strictMc:Fallback/></strictMc:AlternateContent>"#
+    ));
+    let foreign = SourceDrawing::scan(&foreign_mce).expect("foreign strict MC source");
+    assert!(
+        foreign.pictures().is_empty(),
+        "the strict MC URI is foreign and must remain opaque/unselected"
+    );
 }
 
 #[test]
