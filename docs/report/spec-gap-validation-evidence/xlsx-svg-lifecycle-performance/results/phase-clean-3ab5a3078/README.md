@@ -65,3 +65,10 @@ post-correction Python suite contained 41 tests.
 `root-verification.json` separately records the root receipt, source-input,
 production-pin, and exact-copy checks. It does not claim that the historical
 verifier detects the provenance mutations described above.
+
+Follow-up `2053dc8a3` hardens command flags, compiler/allocator/phase-scope
+provenance, incremental mode, and binary-path binding. Independent replay
+passed all 43 Python tests and rejected nine disposable mutation probes while
+accepting this unchanged capture. Use that verifier or a reviewed successor
+for future checks. This closes the tooling issue without changing the
+historical source, receipts, or deferred optimization decision.
