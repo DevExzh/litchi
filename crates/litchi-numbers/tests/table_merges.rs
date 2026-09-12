@@ -33,6 +33,7 @@ const SHEET_NAME: &str = "Sheet 1";
 const TABLE_NAME: &str = "shared-model";
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHEET_MESSAGE_TYPE: u32 = 2;
+const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 
@@ -118,6 +119,85 @@ fn rewrite_native_table_model(
     mutate: impl FnOnce(&mut tst::TableModelArchive),
 ) -> TestResult<Vec<u8>> {
     rewrite_table_model(source, first_table_model, mutate)
+}
+
+/// Convert the selected native sheet to Numbers' form based sheet envelope.
+///
+/// The semantic projection already accepts this representation, while the
+/// focused merge reader additionally requires the matching rooted
+/// `FieldInfo.path` declaration. Keeping both changes in this helper makes
+/// the integration test exercise the complete ownership contract.
+fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    let mut replacement = None;
+
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data())?;
+        let mut archive = Archive::parse(stream.as_bytes())?;
+        let mut changed = false;
+        for object in &mut archive.objects {
+            let Some(message_index) = object.messages.iter().position(|message| {
+                message.type_ == SHEET_MESSAGE_TYPE
+                    && tn::SheetArchive::decode(message.data.as_slice())
+                        .map(|sheet| sheet.name == SHEET_NAME)
+                        .unwrap_or(false)
+            }) else {
+                continue;
+            };
+
+            let message = object
+                .messages
+                .get(message_index)
+                .ok_or_else(|| "selected Numbers sheet message is missing".to_owned())?;
+            let sheet = tn::SheetArchive::decode(message.data.as_slice())?;
+            let drawable_references = sheet
+                .drawable_infos
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>();
+            let form = tn::FormBasedSheetArchive {
+                super_: sheet,
+                ..Default::default()
+            };
+            object.replace_message_preserving_header(
+                message_index,
+                RawMessage {
+                    type_: FORM_BASED_SHEET_MESSAGE_TYPE,
+                    data: form.encode_to_vec(),
+                },
+            )?;
+            let info = object
+                .archive_info
+                .message_infos
+                .get_mut(message_index)
+                .ok_or_else(|| "selected Numbers sheet metadata is missing".to_owned())?;
+            info.type_ = FORM_BASED_SHEET_MESSAGE_TYPE;
+            info.field_infos.clear();
+            let mut drawables = litchi_iwa_core::FieldInfo::new(vec![1, 2]);
+            drawables.object_references = drawable_references;
+            info.field_infos.push(drawables);
+            changed = true;
+            break;
+        }
+        if changed {
+            replacement = Some((
+                entry.name().to_owned(),
+                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+            ));
+            break;
+        }
+    }
+
+    let Some((name, component)) = replacement else {
+        return Err("native Numbers sheet payload is missing".into());
+    };
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(&name, component.as_slice())],
+        ArchiveLimits::default(),
+    )?)
 }
 
 /// Supply the native aggregate edges omitted by the compatibility oracle.
@@ -276,6 +356,57 @@ fn native_merge_reads_by_name_and_position_without_rewriting_source() -> TestRes
     );
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
+}
+
+#[test]
+fn form_based_sheet_merge_reads_use_the_rooted_field_path() -> TestResult {
+    let source = rewrite_native_sheet_as_form_based(NATIVE_SOURCE)?;
+    let package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&package)?;
+    let expected = [Region::new(10, 1, 2, 2)?];
+
+    assert_eq!(
+        package.table_merges(SHEET_NAME, TABLE_NAME)?,
+        expected,
+        "form based sheet names must resolve the nested drawable reference"
+    );
+    assert_eq!(
+        package.table_merges(SheetSelector::index(0), TableSelector::index(0))?,
+        expected,
+        "form based sheet positions must resolve the same rooted table"
+    );
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn form_based_sheet_merge_rejects_a_flattened_ownership_path() -> TestResult {
+    let source = rewrite_native_sheet_as_form_based(NATIVE_SOURCE)?;
+    let invalid = rewrite_message_metadata(
+        &source,
+        |object, message_index| {
+            object.messages[message_index].type_ == FORM_BASED_SHEET_MESSAGE_TYPE
+                && tn::FormBasedSheetArchive::decode(object.messages[message_index].data.as_slice())
+                    .map(|sheet| sheet.super_.name == SHEET_NAME)
+                    .unwrap_or(false)
+        },
+        |object, message_index| {
+            let info = object
+                .archive_info
+                .message_infos
+                .get_mut(message_index)
+                .expect("form based sheet metadata exists");
+            let mut changed = false;
+            for field in &mut info.field_infos {
+                if field.path.path.as_slice() == [1, 2] {
+                    field.path.path = vec![2];
+                    changed = true;
+                }
+            }
+            assert!(changed, "native form based sheet declares a nested edge");
+        },
+    )?;
+    assert_invalid(&invalid)
 }
 
 #[test]

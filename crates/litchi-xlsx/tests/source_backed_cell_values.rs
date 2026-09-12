@@ -29,6 +29,10 @@ const CALC_CHAIN: &str = "/xl/calcChain.xml";
 const CALC_CHAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
 const CALC_CHAIN_REL_ID: &str = "rIdCalculationChain";
+// Source-backed publication retains one fixed OPC chunk for streaming even
+// when the selected overlay is an exact no-op. Keep this transient window
+// separate from the retained source payload budget below.
+const MANAGED_PUBLICATION_SCRATCH_BYTES: u64 = 64 * 1024;
 static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(1_000);
 
 struct VersionedSource {
@@ -336,6 +340,12 @@ fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext
     .unwrap();
     let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
     (budget, cancellation_source, context)
+}
+
+fn managed_publication_memory(payload_bytes: u64) -> u64 {
+    payload_bytes
+        .checked_add(MANAGED_PUBLICATION_SCRATCH_BYTES)
+        .expect("managed publication memory fits in u64")
 }
 
 fn with_style_and_theme(bytes: &[u8]) -> Vec<u8> {
@@ -1314,7 +1324,8 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
 fn managed_scalar_exact_noop_publishes_without_detaching_source() {
     let bytes = three_cells();
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
-    let (budget, _cancellation_source, context) = managed_context(exact);
+    let (budget, _cancellation_source, context) =
+        managed_context(managed_publication_memory(exact));
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::ReadLimits::default(),
@@ -1552,7 +1563,8 @@ fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
     let exact = part_len(&bytes, MAIN)
         + part_len(&bytes, SHEET)
         + part_len(&bytes, "/xl/worksheets/sheet2.xml");
-    let (budget, _cancellation_source, context) = managed_context(exact);
+    let (budget, _cancellation_source, context) =
+        managed_context(managed_publication_memory(exact));
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::ReadLimits::default(),

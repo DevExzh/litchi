@@ -2227,15 +2227,18 @@ mod tests {
 
     #[test]
     #[cfg(all(feature = "docx", feature = "odt"))]
-    fn owned_odt_bytes_keep_odt_owner_with_malformed_ooxml_catalog() {
+    fn owned_odt_bytes_do_not_hide_malformed_ooxml_catalog() {
         let bytes = add_odt_member(&minimal_odt(), "[Content_Types].xml", b"<Types><broken>");
-        let document =
-            Document::from_bytes(bytes).expect("malformed OOXML catalog must fall back to ODT");
-        assert!(matches!(&document.inner, DocumentImpl::Odt(_)));
-        assert_eq!(
-            document.text().expect("ODT text must remain readable"),
-            "Source-backed ODT"
-        );
+        let error = match Document::from_bytes(bytes) {
+            Ok(_) => panic!("malformed OOXML catalog must not fall back to ODT"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::Other(message)
+                if message.contains("Invalid [Content_Types].xml manifest:")
+                    && message.contains("root must be Types")
+        ));
     }
 
     #[test]
@@ -2602,7 +2605,10 @@ mod tests {
         let bytes = minimal_docx(
             br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>managed</w:t></w:r></w:p><w:p><w:r><w:t>selected</w:t></w:r></w:p></w:body></w:document>"#,
         );
-        let memory = bytes.len() as u64;
+        // Managed queries retain the source XML and paragraph index while
+        // admitting a temporary bounded parser. The compressed ZIP length is
+        // therefore not a sufficient memory ceiling for this fixture.
+        let memory = 1_u64 << 20;
         let budget = litchi_core::Budget::root(
             "facade-managed-docx-paragraph-text",
             litchi_core::Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
@@ -3207,7 +3213,7 @@ mod tests {
 
     #[test]
     #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
-    fn filesystem_odt_keeps_source_owner_with_malformed_ooxml_catalog() {
+    fn filesystem_odt_does_not_hide_malformed_ooxml_catalog() {
         let bytes = add_odt_member(&minimal_odt(), "[Content_Types].xml", b"<Types><broken>");
         let temporary = tempfile::Builder::new()
             .suffix(".odt")
@@ -3215,13 +3221,16 @@ mod tests {
             .expect("temporary malformed polyglot path");
         std::fs::write(temporary.path(), bytes).expect("write malformed OOXML/ODF package");
 
-        let document = Document::open(temporary.path())
-            .expect("malformed OOXML catalog must fall back to ODT");
-        assert!(matches!(&document.inner, DocumentImpl::OdtSource(_)));
-        assert_eq!(
-            document.text().expect("ODT text must remain readable"),
-            "Source-backed ODT"
-        );
+        let error = match Document::open(temporary.path()) {
+            Ok(_) => panic!("malformed OOXML catalog must not fall back to ODT"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::Other(message)
+                if message.contains("Invalid [Content_Types].xml manifest:")
+                    && message.contains("root must be Types")
+        ));
     }
 
     #[test]

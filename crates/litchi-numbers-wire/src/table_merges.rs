@@ -474,14 +474,14 @@ impl Decoder {
             }
             Ok(())
         })?;
-        if let Some(owner_uid) = owner_uid {
-            self.scan_cfuuid(
-                owner_uid,
-                depth
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("table merge owner UUID depth overflow"))?,
-            )?;
-        }
+        let owner_uid =
+            owner_uid.ok_or_else(|| invalid("MergeOwnerArchive is missing required owner_id"))?;
+        self.scan_cfuuid(
+            owner_uid,
+            depth
+                .checked_add(1)
+                .ok_or_else(|| invalid("table merge owner UUID depth overflow"))?,
+        )?;
         Ok(store)
     }
 
@@ -535,11 +535,11 @@ impl Decoder {
             _ => Ok(()),
         })?;
 
+        let next_index = next_index
+            .ok_or_else(|| invalid("FormulaStoreArchive is missing next_formula_index"))?;
         if pair_count == 0 {
             return Ok(());
         }
-        let next_index = next_index
-            .ok_or_else(|| invalid("FormulaStoreArchive is missing next_formula_index"))?;
         let rows = rows.ok_or_else(|| invalid("table model is missing number_of_rows"))?;
         let columns = columns.ok_or_else(|| invalid("table model is missing number_of_columns"))?;
 

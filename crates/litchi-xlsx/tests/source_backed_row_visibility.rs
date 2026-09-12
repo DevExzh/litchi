@@ -631,7 +631,8 @@ fn managed_exact_noop_publication_is_byte_exact_and_releases_budget() {
     );
     let bytes = ordinary(xml);
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
-    let (budget, _cancellation_source, context) = managed_context(exact);
+    let (budget, _cancellation_source, context) =
+        managed_context(exact + MANAGED_PUBLICATION_PLANNING_HEADROOM);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::ReadLimits::default(),
@@ -783,7 +784,8 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
         format!(r#"<worksheet xmlns="{SML}"><sheetData><row r="1"/></sheetData></worksheet>"#);
     let signed = fixture(plain.clone(), ct::SML_SHEET_MAIN, true);
     let signed_exact = part_len(&signed, MAIN) + part_len(&signed, SHEET);
-    let (budget, _cancellation_source, context) = managed_context(signed_exact);
+    let (budget, _cancellation_source, context) =
+        managed_context(signed_exact + MANAGED_PUBLICATION_PLANNING_HEADROOM);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(signed.clone())),
         litchi_xlsx::ReadLimits::default(),

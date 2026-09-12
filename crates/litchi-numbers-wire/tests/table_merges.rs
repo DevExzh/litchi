@@ -406,6 +406,28 @@ fn absent_owner_and_empty_store_are_empty_successes() {
     let model = table_model(4, 4, Some(&owner_without_store), false);
     let result = read_table_merges(&model, default_limits()).expect("empty merge owner");
     assert!(result.regions.is_empty());
+
+    let empty_store = formula_store(0, &[], false);
+    let owner_with_empty_store = merge_owner(Some(&empty_store), false);
+    let model = table_model(4, 4, Some(&owner_with_empty_store), false);
+    let result = read_table_merges(&model, default_limits()).expect("empty formula store");
+    assert!(result.regions.is_empty());
+}
+
+#[test]
+fn rejects_missing_required_merge_owner_id() {
+    let store = formula_store(1, &[], false);
+    let owner_without_id = field_bytes(2, &store);
+
+    assert_invalid(&table_model(8, 8, Some(&owner_without_id), false));
+}
+
+#[test]
+fn rejects_missing_required_empty_formula_store_index() {
+    let empty_store = Vec::new();
+    let owner = merge_owner(Some(&empty_store), false);
+
+    assert_invalid(&table_model(8, 8, Some(&owner), false));
 }
 
 #[test]
