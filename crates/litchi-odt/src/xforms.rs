@@ -19,13 +19,14 @@
     reason = "the XForms model is a bounded inert XML declaration projection"
 )]
 
+use crate::core::ResolvedReader;
 use crate::generic::{ChargedXml, FlatMutationBudget, MemoryLease, allocate_xml};
 use crate::namespace::{FORMNS, OFFICENS, XFORMSNS, XMLNS};
 use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
+use quick_xml::reader::Reader;
 use std::collections::HashSet;
 use std::mem::size_of;
 
@@ -490,7 +491,7 @@ fn parse_models_inner(xml: &str, budget: Option<&FlatMutationBudget>) -> Result<
             "ODF XML exceeds the {MAX_XML_BYTES} XForms model limit"
         )));
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -503,11 +504,10 @@ fn parse_models_inner(xml: &str, budget: Option<&FlatMutationBudget>) -> Result<
             budget.event(depth)?;
         }
         let event_position = reader.buffer_position() as usize;
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid XForms XML: {error}")))?;
-        let namespace = resolved_namespace(&namespace, decoder)?.unwrap_or_default();
+        let namespace = resolved_namespace(&namespace)?.unwrap_or_default();
         let event_end = reader.buffer_position() as usize;
         match event {
             Event::Start(ref source) => {
@@ -846,7 +846,7 @@ fn xforms_parser_memory_plan(xml: &str, budget: Option<&FlatMutationBudget>) -> 
         )));
     }
     let mut plan = XFormsMemoryPlan::default();
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -858,15 +858,14 @@ fn xforms_parser_memory_plan(xml: &str, budget: Option<&FlatMutationBudget>) -> 
             budget.event(depth)?;
         }
         let event_start = reader.buffer_position() as usize;
-        let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid XForms XML: {error}")))?;
         let (namespace_len, is_office, is_xforms) = match &resolved {
             ResolveResult::Bound(value) => (
                 value.as_ref().len(),
-                crate::namespace::namespace_matches(&resolved, OFFICENS, decoder, "XForms")?,
-                crate::namespace::namespace_matches(&resolved, XFORMSNS, decoder, "XForms")?,
+                value.as_ref() == OFFICENS.as_bytes(),
+                value.as_ref() == XFORMSNS.as_bytes(),
             ),
             ResolveResult::Unbound => (0, false, false),
             ResolveResult::Unknown(prefix) => {
@@ -1127,7 +1126,7 @@ fn parse_model(
     if let Some(budget) = budget {
         budget.check()?;
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -1143,11 +1142,10 @@ fn parse_model(
             budget.event(depth)?;
         }
         let event_position = reader.buffer_position() as usize;
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid XForms model XML: {error}")))?;
-        let namespace = resolved_namespace(&namespace, decoder)?.unwrap_or_default();
+        let namespace = resolved_namespace(&namespace)?.unwrap_or_default();
         let event_end = reader.buffer_position() as usize;
         match event {
             Event::Start(ref source) => {
@@ -1262,7 +1260,7 @@ fn parse_model(
 }
 
 fn parse_model_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     model: &mut Model,
 ) -> Result<()> {
@@ -1310,7 +1308,7 @@ fn parse_child(
     namespace: &str,
     local: &str,
     raw: &str,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     inherited_declarations: &[String],
 ) -> Result<ModelChild> {
@@ -1921,7 +1919,7 @@ fn add_size_budget(total: &mut usize, amount: usize) -> Result<()> {
     Ok(())
 }
 
-fn attributes(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) -> Result<Vec<Attribute>> {
+fn attributes(reader: &ResolvedReader<'_>, source: &BytesStart<'_>) -> Result<Vec<Attribute>> {
     let mut output = Vec::new();
     for attribute in source.attributes() {
         let attribute = attribute
@@ -1935,9 +1933,8 @@ fn attributes(reader: &NsReader<&[u8]>, source: &BytesStart<'_>) -> Result<Vec<A
                 "XForms element exceeds {MAX_ATTRIBUTES} attributes"
             )));
         }
-        let decoder = reader.decoder();
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace_uri = resolved_namespace(&namespace, decoder)?.unwrap_or_default();
+        let namespace_uri = resolved_namespace(&namespace)?.unwrap_or_default();
         let prefix = attribute
             .key
             .as_ref()
@@ -2170,7 +2167,7 @@ fn public_namespace_bindings(declarations: &[String]) -> Vec<NamespaceBinding> {
 }
 
 fn first_namespace_declarations(raw: &str) -> Result<Vec<String>> {
-    let mut reader = NsReader::from_str(raw);
+    let mut reader = Reader::from_str(raw);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -2323,7 +2320,7 @@ fn first_tag_span(
     raw: &str,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<(usize, bool, HashSet<String>)> {
-    let mut reader = NsReader::from_str(raw);
+    let mut reader = Reader::from_str(raw);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -2415,7 +2412,7 @@ fn take_attr(attrs: &[Attribute], namespace: &str, local: &str) -> Option<String
 }
 
 fn inner_xml(raw: &str) -> Result<Option<String>> {
-    let mut reader = NsReader::from_str(raw);
+    let mut reader = Reader::from_str(raw);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -2760,7 +2757,7 @@ fn validate_fragment_with_context_with_budget(
             "{resource} XML exceeds its bounded size after namespace context injection"
         )));
     }
-    let mut reader = NsReader::from_str(source);
+    let mut reader = ResolvedReader::from_xml(source);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -2780,11 +2777,10 @@ fn validate_fragment_with_context_with_budget(
         if let Some(budget) = budget {
             budget.event(depth)?;
         }
-        let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid {resource} XML: {error}")))?;
-        resolved_namespace(&resolved, decoder)?;
+        resolved_namespace(&resolved)?;
         match event {
             Event::Start(ref value) => {
                 validate_fragment_attributes(&reader, value, budget)?;
@@ -2951,7 +2947,7 @@ fn validate_extension_with_budget(
 }
 
 fn extension_root_name(xml: &str, budget: Option<&FlatMutationBudget>) -> Result<(String, String)> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -2969,7 +2965,6 @@ fn extension_root_name(xml: &str, budget: Option<&FlatMutationBudget>) -> Result
         if let Some(budget) = budget {
             budget.event(depth)?;
         }
-        let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| {
@@ -2977,7 +2972,7 @@ fn extension_root_name(xml: &str, budget: Option<&FlatMutationBudget>) -> Result
             })?;
         match event {
             Event::Start(source) => {
-                let namespace = resolved_namespace(&resolved, decoder)?.unwrap_or_default();
+                let namespace = resolved_namespace(&resolved)?.unwrap_or_default();
                 let local = utf8(source.local_name().as_ref(), "XForms extension root name")?;
                 depth = depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("XForms extension depth overflow".to_string())
@@ -2988,7 +2983,7 @@ fn extension_root_name(xml: &str, budget: Option<&FlatMutationBudget>) -> Result
                 return Ok((namespace, local));
             },
             Event::Empty(source) => {
-                let namespace = resolved_namespace(&resolved, decoder)?.unwrap_or_default();
+                let namespace = resolved_namespace(&resolved)?.unwrap_or_default();
                 let local = utf8(source.local_name().as_ref(), "XForms extension root name")?;
                 if let Some(budget) = budget {
                     budget.observe_depth(1)?;
@@ -3011,7 +3006,7 @@ fn extension_root_name(xml: &str, budget: Option<&FlatMutationBudget>) -> Result
 }
 
 fn validate_fragment_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
@@ -3026,9 +3021,8 @@ fn validate_fragment_attributes(
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
             continue;
         }
-        let decoder = reader.decoder();
         let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
-        resolved_namespace(&namespace, decoder)?;
+        resolved_namespace(&namespace)?;
     }
     Ok(())
 }
@@ -3075,12 +3069,10 @@ const fn is_xml_1_0_char(value: char) -> bool {
         || (value as u32 >= 0x10000 && value as u32 <= 0x10FFFF)
 }
 
-fn resolved_namespace(
-    namespace: &ResolveResult<'_>,
-    decoder: quick_xml::Decoder,
-) -> Result<Option<String>> {
-    crate::namespace::resolved_namespace_uri(namespace, decoder, "XForms")
-        .map(|value| value.map(|uri| uri.into_owned()))
+fn resolved_namespace(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
+    crate::elements::xml::normalized_namespace_uri(namespace, "XForms")?
+        .map(|uri| utf8(uri, "XForms namespace URI"))
+        .transpose()
 }
 
 fn utf8(value: &[u8], description: &str) -> Result<String> {
@@ -3105,7 +3097,7 @@ fn model_spans_with_optional_budget(
             "ODF XML exceeds the {MAX_XML_BYTES} edit limit"
         )));
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -3117,11 +3109,10 @@ fn model_spans_with_optional_budget(
             budget.event(depth)?;
         }
         let event_position = reader.buffer_position() as usize;
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid XForms XML: {error}")))?;
-        let namespace = resolved_namespace(&namespace, decoder)?.unwrap_or_default();
+        let namespace = resolved_namespace(&namespace)?.unwrap_or_default();
         let event_end = reader.buffer_position() as usize;
         match event {
             Event::Start(ref source) => {
@@ -3450,7 +3441,7 @@ fn model_has_direct_lexical_material(
     xml: &str,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<bool> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -3514,7 +3505,7 @@ fn container_span(
     local: &str,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<Option<(usize, usize)>> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -3526,11 +3517,10 @@ fn container_span(
             budget.event(depth)?;
         }
         let event_position = reader.buffer_position() as usize;
-        let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| Error::InvalidFormat(format!("invalid ODF XML: {error}")))?;
-        let resolved = resolved_namespace(&resolved, decoder)?.unwrap_or_default();
+        let resolved = resolved_namespace(&resolved)?.unwrap_or_default();
         let end = reader.buffer_position() as usize;
         match event {
             Event::Start(ref source) => {

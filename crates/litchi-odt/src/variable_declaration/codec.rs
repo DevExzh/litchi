@@ -5,6 +5,7 @@ use super::{
     MAX_DECLARATIONS, MAX_DEPTH, MAX_GROUPS, MAX_NAME_BYTES, MAX_VALUE_BYTES, MAX_XML_BYTES,
     OFFICE, Part, STYLE, Scope, TEXT, Value, ValueType,
 };
+use crate::core::ResolvedReader;
 use crate::core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication};
 use crate::datatype::{Boolean, Date};
 use crate::generic::{ChargedXml, FlatMutationBudget, allocate_xml};
@@ -12,7 +13,6 @@ use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::{
     collections::{HashMap, HashSet},
     ops::Range,
@@ -751,7 +751,7 @@ fn scan_scope_with_optional_budget(
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("variable declaration XML exceeds 64 MiB"));
     }
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut depth = 0usize;
@@ -767,13 +767,12 @@ fn scan_scope_with_optional_budget(
         if let Some(budget) = budget {
             budget.event(depth)?;
         }
-        let decoder = reader.decoder();
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("invalid variable declaration XML: {error}")))?;
         match event {
             Event::Start(ref element) => {
-                let namespace = namespace_uri(&resolved, decoder)?;
+                let namespace = namespace_uri(&resolved)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_declaration_name(namespace.as_deref(), &local)?;
                 let event_end = reader.buffer_position() as usize;
@@ -821,7 +820,7 @@ fn scan_scope_with_optional_budget(
                 if let Some(budget) = budget {
                     budget.observe_depth(depth.saturating_add(1))?;
                 }
-                let namespace = namespace_uri(&resolved, decoder)?;
+                let namespace = namespace_uri(&resolved)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_declaration_name(namespace.as_deref(), &local)?;
                 let event_end = reader.buffer_position() as usize;
@@ -1002,7 +1001,7 @@ pub(super) fn parse_part(
     declaration_count: &mut usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut stack = Vec::<Frame>::new();
@@ -1012,7 +1011,6 @@ pub(super) fn parse_part(
         if let Some(budget) = budget {
             budget.event(depth)?;
         }
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| invalid(format!("invalid variable declaration XML: {error}")))?;
@@ -1021,7 +1019,7 @@ pub(super) fn parse_part(
                 if pending.is_some() {
                     return Err(invalid("variable declarations cannot contain elements"));
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_declaration_name(namespace.as_deref(), &local)?;
                 if let Some(group) = active.as_mut() {
@@ -1093,7 +1091,7 @@ pub(super) fn parse_part(
                 if pending.is_some() {
                     return Err(invalid("variable declarations cannot contain elements"));
                 }
-                let namespace = namespace_uri(&namespace, decoder)?;
+                let namespace = namespace_uri(&namespace)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_declaration_name(namespace.as_deref(), &local)?;
                 if let Some(group) = active.as_mut() {
@@ -1223,7 +1221,7 @@ pub(super) fn parse_part(
 
 #[allow(clippy::too_many_arguments)]
 fn start_group(
-    _reader: &NsReader<&[u8]>,
+    _reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     kind: Kind,
@@ -1322,7 +1320,7 @@ fn add_declaration(
 }
 
 fn parse_declaration(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     kind: Kind,
     aggregate: &mut usize,
@@ -1416,7 +1414,7 @@ fn parse_declaration(
 type Attributes = HashMap<(String, String), String>;
 
 fn collect_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Attributes> {
@@ -1428,7 +1426,7 @@ fn collect_attributes(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace = namespace_uri(&namespace, reader.decoder())?.unwrap_or_default();
+        let namespace = namespace_uri(&namespace)?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
@@ -1567,7 +1565,7 @@ fn parse_double(value: &str) -> Result<f64> {
 
 #[allow(clippy::too_many_arguments)]
 fn record_use(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     part: Part,
     kind: Kind,
@@ -1744,7 +1742,7 @@ fn required<'a>(attributes: &'a Attributes, namespace: &str, local: &str) -> Res
 }
 
 fn required_attribute(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     namespace: &str,
     local: &str,
@@ -1754,7 +1752,7 @@ fn required_attribute(
 }
 
 fn optional_attribute(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     namespace: &str,
     local: &str,
@@ -1767,7 +1765,7 @@ fn optional_attribute(
             continue;
         }
         let (resolved, resolved_local) = reader.resolver().resolve_attribute(attribute.key);
-        if namespace_uri(&resolved, reader.decoder())?.as_deref() == Some(namespace)
+        if namespace_uri(&resolved)?.as_deref() == Some(namespace)
             && resolved_local.as_ref() == local.as_bytes()
         {
             if value.is_some() {
@@ -1784,12 +1782,14 @@ fn optional_attribute(
     Ok(value)
 }
 
-fn namespace_uri(
-    namespace: &ResolveResult<'_>,
-    decoder: quick_xml::Decoder,
-) -> Result<Option<String>> {
-    crate::namespace::resolved_namespace_uri(namespace, decoder, "variable declaration")
-        .map(|namespace| namespace.map(|uri| uri.into_owned()))
+fn namespace_uri(namespace: &ResolveResult<'_>) -> Result<Option<String>> {
+    crate::elements::xml::normalized_namespace_uri(namespace, "variable declaration")?
+        .map(|uri| {
+            std::str::from_utf8(uri)
+                .map(str::to_owned)
+                .map_err(|_error| invalid("variable declaration namespace URI is not UTF-8"))
+        })
+        .transpose()
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {

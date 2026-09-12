@@ -3,9 +3,9 @@
 use super::Family;
 use super::flat::FlatMutationBudget;
 use crate::constants;
+use crate::core::ResolvedReader;
 use litchi_core::{Error, ExecutionContext, ExecutionError, Resource, Result};
 use quick_xml::events::Event;
-use quick_xml::reader::NsReader;
 
 pub(super) fn validate_flat_document_with_context(
     xml: &str,
@@ -83,7 +83,7 @@ fn validate_flat_document_inner(
 ) -> Result<()> {
     const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     let mut depth = 0usize;
     let mut root_seen = false;
     let mut root_closed = false;
@@ -104,16 +104,14 @@ fn validate_flat_document_inner(
     };
     loop {
         event_budget.event(depth, &mut maximum_depth)?;
-        let decoder = reader.decoder();
         let (namespace, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid flat OpenDocument XML: {error}"))
         })?;
         match event {
             Event::Start(element) => {
-                let is_office = crate::namespace::namespace_matches(
+                let is_office = crate::elements::xml::normalized_namespace_matches(
                     &namespace,
                     OFFICE_NAMESPACE,
-                    decoder,
                     "flat OpenDocument",
                 )?;
                 if depth == 0 {
@@ -135,10 +133,9 @@ fn validate_flat_document_inner(
                 event_budget.observe(depth, &mut maximum_depth)?;
             },
             Event::Empty(element) => {
-                let is_office = crate::namespace::namespace_matches(
+                let is_office = crate::elements::xml::normalized_namespace_matches(
                     &namespace,
                     OFFICE_NAMESPACE,
-                    decoder,
                     "flat OpenDocument",
                 )?;
                 if depth == 0 {

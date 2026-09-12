@@ -20,6 +20,7 @@
     reason = "the metadata codec is a bounded XML projection with compatibility-oriented naming"
 )]
 
+use crate::core::ResolvedReader;
 use crate::elements::field::{
     MetaFieldAttribute, MetaFieldContent, MetaFieldElement, MetaFieldNode,
 };
@@ -31,8 +32,8 @@ use crate::namespace::{
 use litchi_core::{Error, Position, Reservation, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, QName, ResolveResult};
-use quick_xml::reader::NsReader;
+use quick_xml::name::{PrefixDeclaration, QName, ResolveResult};
+use quick_xml::reader::Reader;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write as _,
@@ -517,7 +518,7 @@ fn parse_part_inner(
         )));
     }
     reserve_namespace_resolver_memory(xml, memory)?;
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -531,13 +532,12 @@ fn parse_part_inner(
     let mut seen = 0usize;
 
     loop {
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid ODF metadata XML: {error}")))?;
         let namespace_uri = match &event {
             Event::Start(_) | Event::Empty(_) => {
-                resolved_namespace_with_memory(&namespace, decoder, memory)?
+                resolved_namespace_with_memory(&namespace, memory)?
             },
             _ => None,
         };
@@ -1049,7 +1049,7 @@ fn host_for(
 }
 
 fn parse_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     memory: &mut MetadataMemory<'_>,
 ) -> Result<Vec<MetaFieldAttribute>> {
@@ -1068,8 +1068,7 @@ fn parse_attributes(
             )));
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace_uri = resolved_namespace_with_memory(&namespace, reader.decoder(), memory)?
-            .unwrap_or_default();
+        let namespace_uri = resolved_namespace_with_memory(&namespace, memory)?.unwrap_or_default();
         if metadata_attribute_decode_needs_owned(attribute.value.as_ref()) {
             memory.reserve_bytes(
                 attribute.value.len(),
@@ -1095,7 +1094,7 @@ fn parse_attributes(
 }
 
 fn parse_meta_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     memory: &mut MetadataMemory<'_>,
 ) -> Result<Vec<MetaFieldAttribute>> {
@@ -1146,7 +1145,7 @@ fn rdfa_from_attributes(
 }
 
 fn text_meta_root_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     attrs: &[MetaFieldAttribute],
     memory: &mut MetadataMemory<'_>,
@@ -1171,7 +1170,7 @@ fn text_meta_root_attributes(
 }
 
 fn unknown_text_meta_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     memory: &mut MetadataMemory<'_>,
 ) -> Result<Vec<MetadataAttribute>> {
@@ -1185,8 +1184,7 @@ fn unknown_text_meta_attributes(
             continue;
         }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace_uri = resolved_namespace_with_memory(&namespace, reader.decoder(), memory)?
-            .unwrap_or_default();
+        let namespace_uri = resolved_namespace_with_memory(&namespace, memory)?.unwrap_or_default();
         let local_name = utf8_with_memory(local.as_ref(), "text:meta attribute name", memory)?;
         if (namespace_uri == XMLNS && local_name == "id") || namespace_uri == XHTMLNS {
             continue;
@@ -1797,16 +1795,17 @@ fn is_valid_metadata_prefix(prefix: &str) -> bool {
 
 fn resolved_namespace_with_memory(
     namespace: &ResolveResult<'_>,
-    decoder: quick_xml::Decoder,
     memory: &mut MetadataMemory<'_>,
 ) -> Result<Option<String>> {
     let Some(namespace) =
-        crate::namespace::resolved_namespace_uri(namespace, decoder, "ODT metadata")?
+        crate::elements::xml::normalized_namespace_uri(namespace, "ODT metadata")?
     else {
         return Ok(None);
     };
+    let namespace = std::str::from_utf8(namespace)
+        .map_err(|_| Error::InvalidFormat("ODT metadata namespace URI is not UTF-8".into()))?;
     memory
-        .clone_string(namespace.as_ref(), "ODT metadata namespace URI")
+        .clone_string(namespace, "ODT metadata namespace URI")
         .map(Some)
 }
 
@@ -3082,11 +3081,10 @@ fn source_namespace_binding(
     memory: &mut MetadataMemory<'_>,
 ) -> Result<Option<String>> {
     reserve_namespace_resolver_memory(source, memory)?;
-    let mut reader = NsReader::from_str(source);
+    let mut reader = ResolvedReader::from_xml(source);
     reader.config_mut().trim_text(false);
     loop {
-        let decoder = reader.decoder();
-        let event = reader.read_event().map_err(|error| {
+        let (_resolved_event, event) = reader.read_resolved_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid RDFa target start tag: {error}"))
         })?;
         match event {
@@ -3096,8 +3094,23 @@ fn source_namespace_binding(
                         Error::InvalidFormat(format!("invalid RDFa namespace declaration: {error}"))
                     })?;
                     if attribute.key.as_ref().strip_prefix(b"xmlns:") == Some(prefix.as_bytes()) {
-                        let resolved = ResolveResult::Bound(Namespace(attribute.value.as_ref()));
-                        return resolved_namespace_with_memory(&resolved, decoder, memory);
+                        let Some(namespace) =
+                            reader
+                                .resolver()
+                                .bindings()
+                                .find_map(|(declaration, namespace)| match declaration {
+                                    PrefixDeclaration::Named(value)
+                                        if value == prefix.as_bytes() =>
+                                    {
+                                        Some(namespace)
+                                    },
+                                    _ => None,
+                                })
+                        else {
+                            return Ok(None);
+                        };
+                        let resolved = ResolveResult::Bound(namespace);
+                        return resolved_namespace_with_memory(&resolved, memory);
                     }
                 }
                 return Ok(None);
@@ -3293,7 +3306,7 @@ fn metadata_first_tag_span(
     raw: &str,
     memory: &mut MetadataMemory<'_>,
 ) -> Result<(usize, bool, HashSet<String>)> {
-    let mut reader = NsReader::from_str(raw);
+    let mut reader = Reader::from_str(raw);
     reader.config_mut().trim_text(false);
     let mut seen = 0usize;
     loop {
@@ -3368,7 +3381,7 @@ fn scan_spans_with_budget<'a>(
     }
     let mut memory = MetadataMemory::new(budget);
     reserve_namespace_resolver_memory(xml, &mut memory)?;
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut stack: Vec<(Span, Vec<(String, Option<String>)>)> = Vec::new();
@@ -3377,14 +3390,12 @@ fn scan_spans_with_budget<'a>(
     let mut seen = 0usize;
     loop {
         let event_position = reader.buffer_position() as usize;
-        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::InvalidFormat(format!("invalid ODF XML: {error}")))?;
         let namespace = match &event {
             Event::Start(_) | Event::Empty(_) => {
-                resolved_namespace_with_memory(&namespace, decoder, &mut memory)?
-                    .unwrap_or_default()
+                resolved_namespace_with_memory(&namespace, &mut memory)?.unwrap_or_default()
             },
             _ => String::new(),
         };
@@ -3531,7 +3542,7 @@ fn scan_spans_with_budget<'a>(
 }
 
 fn target_attribute_names(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     memory: &mut MetadataMemory<'_>,
 ) -> Result<Vec<String>> {
@@ -3544,7 +3555,7 @@ fn target_attribute_names(
         }
         let raw = utf8_with_memory(attr.key.as_ref(), "XML attribute name", memory)?;
         let (namespace, local) = reader.resolver().resolve_attribute(attr.key);
-        let namespace = resolved_namespace_with_memory(&namespace, reader.decoder(), memory)?;
+        let namespace = resolved_namespace_with_memory(&namespace, memory)?;
         if namespace.as_deref() == Some(XHTMLNS)
             && matches!(
                 local.as_ref(),
@@ -3558,7 +3569,7 @@ fn target_attribute_names(
 }
 
 fn target_attribute_value(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     source: &BytesStart<'_>,
     namespace: &str,
     local: &str,
@@ -3571,10 +3582,9 @@ fn target_attribute_value(
             continue;
         }
         let (resolved, local_name) = reader.resolver().resolve_attribute(attr.key);
-        if crate::namespace::namespace_matches(
+        if crate::elements::xml::normalized_namespace_matches(
             &resolved,
-            namespace,
-            reader.decoder(),
+            namespace.as_bytes(),
             "ODT metadata target attribute",
         )? && local_name.as_ref() == local.as_bytes()
         {

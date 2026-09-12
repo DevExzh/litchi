@@ -4,11 +4,11 @@
 //! document-wide declaration/reference inventory and its cross-part limits.
 
 use super::{Kind, MAX_XML_BYTES, Part, Scope, codec, model::Declarations};
+use crate::core::ResolvedReader;
 use crate::generic::{FlatMutationBudget, MemoryLease};
 use litchi_core::Result;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 use std::mem::size_of;
 
@@ -145,7 +145,7 @@ pub(crate) fn parser_memory_plan(
         if xml.len() > MAX_XML_BYTES {
             return Err(codec::invalid("variable declaration XML exceeds 64 MiB"));
         }
-        let mut reader = NsReader::from_str(xml);
+        let mut reader = ResolvedReader::from_xml(xml);
         reader.config_mut().check_end_names = true;
         let mut depth = 0usize;
         loop {
