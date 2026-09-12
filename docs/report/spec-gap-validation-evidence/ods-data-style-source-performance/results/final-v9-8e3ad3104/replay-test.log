@@ -1,0 +1,174 @@
+base_commit=2e023cbd253a9b46ec2582e5319cbcbcddac5433
+candidate_commit=8e3ad310426a534c0bb17a789eb2c42a96e61310
+source_checkout=/home/zhuhe/code/litchi-spec-gaps
+output_dir=/var/tmp/ods-data-style-source-profile-replay-output.nihY92
+target_dir=/var/tmp/ods-data-style-source-profile-replay-target.APQRyJ
+repeats=1
+   Compiling typenum v1.20.1
+   Compiling cfg-if v1.0.4
+   Compiling zeroize v1.9.0
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling version_check v0.9.5
+   Compiling const-oid v0.9.6
+   Compiling rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling subtle v2.6.1
+   Compiling base64ct v1.8.3
+   Compiling cmov v0.5.4
+   Compiling flagset v0.4.7
+   Compiling cpufeatures v0.3.1
+   Compiling autocfg v1.5.1
+   Compiling libm v0.2.16
+   Compiling zerocopy v0.8.57
+   Compiling crossbeam-utils v0.8.23
+   Compiling crossbeam-epoch v0.9.21
+   Compiling memchr v2.8.3
+   Compiling const-oid v0.10.2
+   Compiling serde_core v1.0.229
+   Compiling thiserror v2.0.20
+   Compiling cpufeatures v0.2.17
+   Compiling crc32fast v1.5.2
+   Compiling base16ct v0.2.0
+   Compiling crossbeam-deque v0.8.8
+   Compiling siphasher v1.0.3
+   Compiling cpubits v0.1.1
+   Compiling serde v1.0.229
+   Compiling zmij v1.0.23
+   Compiling rayon-core v1.13.0
+   Compiling num-bigint-dig v0.8.6
+   Compiling smallvec v1.16.1
+   Compiling fastrand v2.5.0
+   Compiling spin v0.9.9
+   Compiling serde_json v1.0.151
+   Compiling zlib-rs v0.6.7
+   Compiling chacha20 v0.10.2
+   Compiling ctutils v0.4.2
+   Compiling iana-time-zone v0.1.65
+   Compiling either v1.18.0
+   Compiling lazy_static v1.5.0
+   Compiling phf_shared v0.14.0
+   Compiling itoa v1.0.18
+   Compiling uppsala v0.9.0
+   Compiling byteorder v1.5.0
+   Compiling once_cell v1.21.4
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling generic-array v0.14.7
+   Compiling pem-rfc7468 v0.7.0
+   Compiling log v0.4.34
+   Compiling bumpalo v3.20.3
+   Compiling hashbrown v0.17.1
+   Compiling simd-adler32 v0.3.10
+   Compiling num-traits v0.2.19
+   Compiling equivalent v1.0.2
+   Compiling typed-path v0.12.3
+   Compiling phf_generator v0.14.0
+   Compiling quick-xml v0.41.0
+   Compiling zopfli v0.8.3
+   Compiling syn v2.0.119
+   Compiling syn v3.0.5
+   Compiling hybrid-array v0.4.15
+   Compiling indexmap v2.14.1
+   Compiling getrandom v0.2.17
+   Compiling rand v0.10.2
+   Compiling rand_core v0.6.4
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling block-padding v0.4.2
+   Compiling inout v0.2.2
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling inout v0.1.4
+   Compiling ff v0.13.1
+   Compiling crypto-bigint v0.5.5
+   Compiling password-hash v0.5.0
+   Compiling cipher v0.4.4
+   Compiling digest v0.10.7
+   Compiling group v0.13.0
+   Compiling rayon v1.12.0
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling sha1 v0.10.7
+   Compiling blake2 v0.10.6
+   Compiling blowfish v0.9.1
+   Compiling num-integer v0.1.47
+   Compiling rfc6979 v0.4.0
+   Compiling argon2 v0.5.3
+   Compiling num-iter v0.1.46
+   Compiling digest v0.11.3
+   Compiling cipher v0.5.2
+   Compiling universal-hash v0.6.1
+   Compiling aead v0.6.1
+   Compiling polyval v0.7.3
+   Compiling sha2 v0.11.0
+   Compiling hmac v0.13.0
+   Compiling sha1 v0.11.0
+   Compiling ghash v0.6.0
+   Compiling aes v0.9.3
+   Compiling ctr v0.10.1
+   Compiling cbc v0.2.1
+   Compiling pbkdf2 v0.13.0
+   Compiling thiserror-impl v2.0.20
+   Compiling serde_derive v1.0.229
+   Compiling aes-gcm v0.11.1
+   Compiling flate2 v1.1.10
+   Compiling zip v8.6.0
+   Compiling bergshamra-core v0.7.0
+   Compiling bergshamra-xml v0.7.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling bergshamra-c14n v0.7.0
+   Compiling der_derive v0.7.3
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi-spec-gaps/crates/xml-minifier-macros)
+   Compiling phf_macros v0.14.0
+   Compiling rand_chacha v0.3.1
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/soapberry-zip)
+   Compiling rand v0.8.8
+   Compiling phf v0.14.0
+   Compiling xml-minifier v0.1.0 (/home/zhuhe/code/litchi-spec-gaps/crates/xml-minifier)
+   Compiling der v0.7.10
+   Compiling chrono v0.4.45
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling x509-cert v0.2.5
+   Compiling sec1 v0.7.3
+   Compiling pkcs1 v0.7.5
+   Compiling rsa v0.9.10
+   Compiling elliptic-curve v0.13.8
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-core)
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling p256 v0.13.2
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-odf-common)
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-spec-gaps/crates/litchi-ods)
+   Compiling ods-data-style-source-performance v0.0.0 (/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-data-style-source-performance/harness)
+    Finished `release` profile [optimized] target(s) in 18.97s
+     Running `/var/tmp/ods-data-style-source-profile-replay-target.APQRyJ/release/ods-data-style-source-performance`
+{"kind":"run","repeats":1,"scales":[8,128,512],"output_dir":"/var/tmp/ods-data-style-source-profile-replay-output.nihY92","allocator":"process-global-counting","copy_scope":"explicit harness byte clones only"}
+{"kind":"measurement","scale":8,"operation":"source_query","iteration":0,"source_bytes":2544,"result_bytes":10,"allocations":2463,"deallocations":2224,"requested_bytes":1101128,"released_bytes":1101128,"live_before_bytes":20605,"live_after_bytes":20605,"net_live_bytes_delta":0,"peak_live_bytes":166463,"peak_live_bytes_delta":145858,"copy_bytes_observed":2544,"elapsed_ns":259961,"exact_noop":false}
+{"kind":"measurement","scale":8,"operation":"snapshot_clone","iteration":0,"source_bytes":2544,"result_bytes":2544,"allocations":0,"deallocations":0,"requested_bytes":0,"released_bytes":0,"live_before_bytes":31039,"live_after_bytes":31039,"net_live_bytes_delta":0,"peak_live_bytes":31039,"peak_live_bytes_delta":0,"copy_bytes_observed":0,"elapsed_ns":193911,"exact_noop":false}
+{"kind":"measurement","scale":8,"operation":"metadata_noop","iteration":0,"source_bytes":2544,"result_bytes":2544,"allocations":3898,"deallocations":3531,"requested_bytes":2106757,"released_bytes":2106757,"live_before_bytes":31039,"live_after_bytes":31039,"net_live_bytes_delta":0,"peak_live_bytes":189619,"peak_live_bytes_delta":158580,"copy_bytes_observed":2544,"elapsed_ns":389641,"exact_noop":true}
+{"kind":"measurement","scale":8,"operation":"scalar_patch","iteration":0,"source_bytes":2544,"result_bytes":2030,"allocations":6209,"deallocations":5646,"requested_bytes":7896280,"released_bytes":7896280,"live_before_bytes":31039,"live_after_bytes":31039,"net_live_bytes_delta":0,"peak_live_bytes":485691,"peak_live_bytes_delta":454652,"copy_bytes_observed":2544,"elapsed_ns":769853,"exact_noop":false}
+{"kind":"measurement","scale":8,"operation":"graph_put","iteration":0,"source_bytes":2544,"result_bytes":2110,"allocations":9218,"deallocations":8351,"requested_bytes":10305838,"released_bytes":10305838,"live_before_bytes":31039,"live_after_bytes":31039,"net_live_bytes_delta":0,"peak_live_bytes":485084,"peak_live_bytes_delta":454045,"copy_bytes_observed":2544,"elapsed_ns":1062334,"exact_noop":false}
+{"kind":"measurement","scale":8,"operation":"graph_replace","iteration":0,"source_bytes":2386,"result_bytes":1878,"allocations":6202,"deallocations":5595,"requested_bytes":8159317,"released_bytes":8159317,"live_before_bytes":31679,"live_after_bytes":31679,"net_live_bytes_delta":0,"peak_live_bytes":489525,"peak_live_bytes_delta":457846,"copy_bytes_observed":2386,"elapsed_ns":685032,"exact_noop":false}
+{"kind":"measurement","scale":8,"operation":"graph_replace_same_value","iteration":0,"source_bytes":2390,"result_bytes":2390,"allocations":3790,"deallocations":3416,"requested_bytes":2142406,"released_bytes":2142406,"live_before_bytes":31679,"live_after_bytes":31679,"net_live_bytes_delta":0,"peak_live_bytes":186733,"peak_live_bytes_delta":155054,"copy_bytes_observed":2390,"elapsed_ns":344781,"exact_noop":true}
+{"kind":"measurement","scale":8,"operation":"graph_remove","iteration":0,"source_bytes":2386,"result_bytes":1859,"allocations":7709,"deallocations":6891,"requested_bytes":8891043,"released_bytes":8891043,"live_before_bytes":31679,"live_after_bytes":31679,"net_live_bytes_delta":0,"peak_live_bytes":476773,"peak_live_bytes_delta":445094,"copy_bytes_observed":2386,"elapsed_ns":806952,"exact_noop":false}
+{"kind":"measurement","scale":128,"operation":"source_query","iteration":0,"source_bytes":4078,"result_bytes":10,"allocations":10411,"deallocations":10164,"requested_bytes":2596832,"released_bytes":2596832,"live_before_bytes":24145,"live_after_bytes":24145,"net_live_bytes_delta":0,"peak_live_bytes":287996,"peak_live_bytes_delta":263851,"copy_bytes_observed":4078,"elapsed_ns":1256624,"exact_noop":false}
+{"kind":"measurement","scale":128,"operation":"snapshot_clone","iteration":0,"source_bytes":4078,"result_bytes":4078,"allocations":0,"deallocations":0,"requested_bytes":0,"released_bytes":0,"live_before_bytes":73391,"live_after_bytes":73391,"net_live_bytes_delta":0,"peak_live_bytes":73391,"peak_live_bytes_delta":0,"copy_bytes_observed":0,"elapsed_ns":193821,"exact_noop":false}
+{"kind":"measurement","scale":128,"operation":"metadata_noop","iteration":0,"source_bytes":4078,"result_bytes":4078,"allocations":10882,"deallocations":10511,"requested_bytes":3502563,"released_bytes":3502563,"live_before_bytes":73391,"live_after_bytes":73391,"net_live_bytes_delta":0,"peak_live_bytes":345545,"peak_live_bytes_delta":272154,"copy_bytes_observed":4078,"elapsed_ns":1377285,"exact_noop":true}
+{"kind":"measurement","scale":128,"operation":"scalar_patch","iteration":0,"source_bytes":4078,"result_bytes":3565,"allocations":19940,"deallocations":19366,"requested_bytes":10735357,"released_bytes":10735357,"live_before_bytes":73391,"live_after_bytes":73391,"net_live_bytes_delta":0,"peak_live_bytes":886675,"peak_live_bytes_delta":813284,"copy_bytes_observed":4078,"elapsed_ns":2740420,"exact_noop":false}
+{"kind":"measurement","scale":128,"operation":"graph_put","iteration":0,"source_bytes":4078,"result_bytes":3697,"allocations":24997,"deallocations":24111,"requested_bytes":14126812,"released_bytes":14126812,"live_before_bytes":73391,"live_after_bytes":73391,"net_live_bytes_delta":0,"peak_live_bytes":833534,"peak_live_bytes_delta":760143,"copy_bytes_observed":4078,"elapsed_ns":3472902,"exact_noop":false}
+{"kind":"measurement","scale":128,"operation":"graph_replace","iteration":0,"source_bytes":2765,"result_bytes":2261,"allocations":10908,"deallocations":10295,"requested_bytes":9247026,"released_bytes":9247026,"live_before_bytes":74031,"live_after_bytes":74031,"net_live_bytes_delta":0,"peak_live_bytes":778971,"peak_live_bytes_delta":704940,"copy_bytes_observed":2765,"elapsed_ns":1237775,"exact_noop":false}
+{"kind":"measurement","scale":128,"operation":"graph_replace_same_value","iteration":0,"source_bytes":2771,"result_bytes":2771,"allocations":8017,"deallocations":7636,"requested_bytes":3080151,"released_bytes":3080151,"live_before_bytes":74031,"live_after_bytes":74031,"net_live_bytes_delta":0,"peak_live_bytes":307733,"peak_live_bytes_delta":233702,"copy_bytes_observed":2771,"elapsed_ns":795202,"exact_noop":true}
+{"kind":"measurement","scale":128,"operation":"graph_remove","iteration":0,"source_bytes":2765,"result_bytes":2238,"allocations":13835,"deallocations":11811,"requested_bytes":9884945,"released_bytes":9884945,"live_before_bytes":74031,"live_after_bytes":74031,"net_live_bytes_delta":0,"peak_live_bytes":658259,"peak_live_bytes_delta":584228,"copy_bytes_observed":2765,"elapsed_ns":1407045,"exact_noop":false}
+{"kind":"measurement","scale":512,"operation":"source_query","iteration":0,"source_bytes":8610,"result_bytes":10,"allocations":35822,"deallocations":35571,"requested_bytes":7387224,"released_bytes":7387224,"live_before_bytes":39165,"live_after_bytes":39165,"net_live_bytes_delta":0,"peak_live_bytes":1045904,"peak_live_bytes_delta":1006739,"copy_bytes_observed":8610,"elapsed_ns":4634056,"exact_noop":false}
+{"kind":"measurement","scale":512,"operation":"snapshot_clone","iteration":0,"source_bytes":8610,"result_bytes":8610,"allocations":0,"deallocations":0,"requested_bytes":0,"released_bytes":0,"live_before_bytes":213135,"live_after_bytes":213135,"net_live_bytes_delta":0,"peak_live_bytes":213135,"peak_live_bytes_delta":0,"copy_bytes_observed":0,"elapsed_ns":197301,"exact_noop":false}
+{"kind":"measurement","scale":512,"operation":"metadata_noop","iteration":0,"source_bytes":8610,"result_bytes":8610,"allocations":33219,"deallocations":32846,"requested_bytes":7975159,"released_bytes":7975159,"live_before_bytes":213135,"live_after_bytes":213135,"net_live_bytes_delta":0,"peak_live_bytes":1169841,"peak_live_bytes_delta":956706,"copy_bytes_observed":8610,"elapsed_ns":4690336,"exact_noop":true}
+{"kind":"measurement","scale":512,"operation":"scalar_patch","iteration":0,"source_bytes":8610,"result_bytes":8100,"allocations":63848,"deallocations":63268,"requested_bytes":19838229,"released_bytes":19838229,"live_before_bytes":213135,"live_after_bytes":213135,"net_live_bytes_delta":0,"peak_live_bytes":2177499,"peak_live_bytes_delta":1964364,"copy_bytes_observed":8610,"elapsed_ns":9144022,"exact_noop":false}
+{"kind":"measurement","scale":512,"operation":"graph_put","iteration":0,"source_bytes":8610,"result_bytes":8244,"allocations":75437,"deallocations":74541,"requested_bytes":26382083,"released_bytes":26382083,"live_before_bytes":213135,"live_after_bytes":213135,"net_live_bytes_delta":0,"peak_live_bytes":1956550,"peak_live_bytes_delta":1743415,"copy_bytes_observed":8610,"elapsed_ns":11225159,"exact_noop":false}
+{"kind":"measurement","scale":512,"operation":"graph_replace","iteration":0,"source_bytes":3899,"result_bytes":3398,"allocations":25950,"deallocations":25334,"requested_bytes":12735502,"released_bytes":12735502,"live_before_bytes":213775,"live_after_bytes":213775,"net_live_bytes_delta":0,"peak_live_bytes":1714309,"peak_live_bytes_delta":1500534,"copy_bytes_observed":3899,"elapsed_ns":2993841,"exact_noop":false}
+{"kind":"measurement","scale":512,"operation":"graph_replace_same_value","iteration":0,"source_bytes":3907,"result_bytes":3907,"allocations":21524,"deallocations":21139,"requested_bytes":6086551,"released_bytes":6086551,"live_before_bytes":213775,"live_after_bytes":213775,"net_live_bytes_delta":0,"peak_live_bytes":1099237,"peak_live_bytes_delta":885462,"copy_bytes_observed":3907,"elapsed_ns":2211808,"exact_noop":true}
+{"kind":"measurement","scale":512,"operation":"graph_remove","iteration":0,"source_bytes":3899,"result_bytes":3372,"allocations":33422,"deallocations":27555,"requested_bytes":13073412,"released_bytes":13073412,"live_before_bytes":213775,"live_after_bytes":213775,"net_live_bytes_delta":0,"peak_live_bytes":1249551,"peak_live_bytes_delta":1035776,"copy_bytes_observed":3899,"elapsed_ns":3302841,"exact_noop":false}
