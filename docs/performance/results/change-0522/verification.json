@@ -1,0 +1,23 @@
+{
+  "status": "pass",
+  "native_samples": 1640,
+  "allocator_samples": 40,
+  "profile_samples": 8,
+  "stage_receipts": {
+    "baseline": 29,
+    "candidate": 40
+  },
+  "serialized_intervals": 69,
+  "source_replay": true,
+  "measured_source_differences": [
+    "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs"
+  ],
+  "disposition": "rejected_and_reverted",
+  "final_source": "baseline",
+  "final_codec_tests": 19,
+  "exact_report_replay": true,
+  "exact_annotation_replay": true,
+  "negative_vectors": 4,
+  "owned_paths_absent": true,
+  "seal_entries": null
+}

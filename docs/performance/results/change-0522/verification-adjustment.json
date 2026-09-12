@@ -1,0 +1,13 @@
+{
+  "reason": "Frozen primary admission failed. Verify the measured candidate source by retained manifest/patch replay and candidate-bound quality receipts; require final checkout to match baseline after scanner-only revert and one additional baseline-bound 19-test codec check. Capture plan/driver and all completed evidence remain unchanged.",
+  "final_expected_receipts": {
+    "baseline": 29,
+    "candidate": 40
+  },
+  "capture_script_changed": false,
+  "capture_plan_changed": false,
+  "initial_verification_failure": {
+    "check": "candidate harness hash must appear in source review",
+    "reason": "The two source-review Markdown tables accidentally omitted the final hex character of the harness SHA-256. Frozen manifests and actual source already matched; the table transcription was corrected without changing source, captures or the assertion."
+  }
+}

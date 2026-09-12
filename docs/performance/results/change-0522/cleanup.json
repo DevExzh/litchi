@@ -1,0 +1,10 @@
+{
+  "removed": [
+    "/tmp/litchi-goal-0522",
+    "/home/zhuhe/litchi-goal-0522-target"
+  ],
+  "accessible_process_references": [],
+  "owned_paths_absent": true,
+  "python_cache_absent": true,
+  "scope": "Accessible /proc cmdline, cwd, executable and descriptor links; own ancestors excluded."
+}

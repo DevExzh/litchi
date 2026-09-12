@@ -1,0 +1,119 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs
+@@ -1,9 +1,12 @@
+ //! Streaming `SpreadsheetML` scanner for worksheet snapshots.
+ 
++use std::borrow::Cow;
+ use std::collections::HashMap;
+ 
++use litchi_ooxml_common::XmlError;
+ use litchi_ooxml_common::xml::unqualified_attribute_value;
+ use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Rect};
++use quick_xml::XmlVersion;
+ use quick_xml::encoding::Decoder;
+ use quick_xml::events::{BytesStart, Event};
+ use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+@@ -116,6 +119,39 @@
+ struct PendingMerge {
+     range: Rect,
+     start: usize,
++}
++
++/// Decode the unqualified cell reference once and prove whether the raw
++/// element can use the compact cell-tag representation. The checked attribute
++/// iteration, error mapping, and reference decode order mirror
++/// `unqualified_attribute_value`; the raw-name proof lets callers elide the
++/// second `cell_tag` scan only for an unprefixed `c` with no attributes or one
++/// unqualified `r` attribute.
++fn cell_reference<'a>(
++    element: &'a BytesStart<'_>,
++    decoder: Decoder,
++) -> Result<(Option<Cow<'a, str>>, bool)> {
++    let mut value: Option<Cow<'a, str>> = None;
++    let mut plain = element.name().as_ref() == b"c";
++    for attribute in element.attributes() {
++        let attribute = attribute.map_err(|error| XmlError::Malformed(error.to_string()))?;
++        plain &= attribute.key.as_ref() == b"r";
++        if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == b"r" {
++            if value.is_some() {
++                return Err(XmlError::Invalid(format!(
++                    "duplicate XML attribute '{}'",
++                    String::from_utf8_lossy(b"r")
++                ))
++                .into());
++            }
++            value = Some(
++                attribute
++                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
++                    .map_err(|error| XmlError::Malformed(error.to_string()))?,
++            );
++        }
++    }
++    Ok((value, plain))
+ }
+ 
+ fn merge_range(element: &BytesStart<'_>, decoder: Decoder) -> Result<Rect> {
+@@ -652,8 +688,12 @@
+         }
+         if parent == Some(FrameKind::Row) && is_spreadsheetml_name(namespace, element.name(), b"c")
+         {
+-            let address = self.cell_address(element, decoder)?;
+-            let tag = cell_tag(element, decoder)?;
++            let (address, plain) = self.cell_address(element, decoder)?;
++            let tag = if plain {
++                None
++            } else {
++                cell_tag(element, decoder)?
++            };
+             self.row
+                 .as_mut()
+                 .ok_or_else(|| invalid("empty cell outside row"))?
+@@ -956,8 +996,12 @@
+         start: usize,
+         end: usize,
+     ) -> Result<()> {
+-        let address = self.cell_address(element, decoder)?;
+-        let tag = cell_tag(element, decoder)?;
++        let (address, plain) = self.cell_address(element, decoder)?;
++        let tag = if plain {
++            None
++        } else {
++            cell_tag(element, decoder)?
++        };
+         self.cell = Some(PendingCell {
+             address,
+             start,
+@@ -970,15 +1014,20 @@
+         Ok(())
+     }
+ 
+-    fn cell_address(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<Address> {
++    fn cell_address(
++        &mut self,
++        element: &BytesStart<'_>,
++        decoder: Decoder,
++    ) -> Result<(Address, bool)> {
+         let row = self
+             .row
+             .as_ref()
+             .ok_or_else(|| invalid("cell outside edit row"))?
+             .number;
+-        let column = match unqualified_attribute_value(element, b"r", decoder)? {
++        let (reference, plain) = cell_reference(element, decoder)?;
++        let column = match reference {
+             Some(reference) => {
+-                let (reference_row, column) = parse_a1(&reference)?;
++                let (reference_row, column) = parse_a1(reference.as_ref())?;
+                 if reference_row != row {
+                     return Err(invalid(format!(
+                         "cell reference '{reference}' does not belong to row {row}"
+@@ -998,7 +1047,8 @@
+             .as_mut()
+             .ok_or_else(|| invalid("cell outside edit row"))?;
+         pending.last_column = column;
+-        Address::at(row - 1, column - 1).map_err(Into::into)
++        let address = Address::at(row - 1, column - 1)?;
++        Ok((address, plain))
+     }
+ 
+     fn scan_formula(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {

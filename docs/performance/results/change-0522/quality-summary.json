@@ -1,0 +1,79 @@
+{
+  "status": "pass",
+  "scope": "Measured candidate before scanner-only rejection revert",
+  "checks": [
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "8fde2d092794250fc7e08734ab2266003ad7a00d9d1d0499d1c3740fca5f67bc",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "ad3554465797367ba7329cb1d83731d474c10d23eb5bd1431335a0b8e0a56002",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xlsx-tests.receipt.json",
+      "receipt_sha256": "4431627a9803c4fe6aaa6eac4d09e89d1f45ce88fdb96ef70d0630f493a523f6",
+      "exit_code": 0,
+      "executed_tests": 1277
+    },
+    {
+      "name": "check-harness-noncompact-test.receipt.json",
+      "receipt_sha256": "abfce77d285099958cbf579bc719adac4b42dc3921865e908ba877f6ebea437b",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-harness-test.receipt.json",
+      "receipt_sha256": "7f7fd9685c8f319e58e9c1b7e08464c8a74886d2bb4f511feb364eaae24a4eeb",
+      "exit_code": 0,
+      "executed_tests": 1
+    },
+    {
+      "name": "check-harness-existing-metrics-tests.receipt.json",
+      "receipt_sha256": "b2ed45f50fdb40f4316fc2c58182ab4f9084c7a8441bb57b920ab451f4926599",
+      "exit_code": 0,
+      "executed_tests": 3
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "b1d6c3fe1c32ead71039880fd9643a3a87be6e24426a3b6b610e4e46a580f0bd",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-clippy.receipt.json",
+      "receipt_sha256": "d6eb46d40290b8e3585c9da08a089654593db8e1df9d155b98c85076a0f3a8b4",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "f02b84340d0bbc4f73191c142e7f5f2a1cc23ae02225b4bdaeacebe7d5e585e1",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-rustdoc.receipt.json",
+      "receipt_sha256": "36f43d167abfe3e120284e49005c4eb2569761a711dc01c49ca2e000d2889d48",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "8593ea9b5da0f217de7837560895a7284dd4d14387e9961e9f58617312c5e3ef",
+      "exit_code": 0,
+      "executed_tests": 0
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "fdebe93f2adc16f3bdf4bb6327da96ea27478f1820e26ba5cda28a19e45d18ea",
+      "exit_code": 0,
+      "executed_tests": 0
+    }
+  ],
+  "executed_tests": 1282
+}

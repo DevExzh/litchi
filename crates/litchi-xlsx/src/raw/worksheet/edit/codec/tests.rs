@@ -2,6 +2,7 @@
 
 use std::mem::size_of;
 
+use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
@@ -9,6 +10,7 @@ use quick_xml::reader::NsReader;
 use super::wire::{cell_tag, tag as owned_tag, write_cell_tag};
 use super::{Attribute, Tag, scan, scan_with_event_limit, sibling_name, write_tag};
 use crate::raw::worksheet::model::MAX_XML_DEPTH;
+use crate::raw::worksheet::parse_a1;
 
 const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
@@ -267,6 +269,148 @@ fn snapshot_scan_marks_only_plain_cells_as_tagless() {
     assert!(cells[2].tag.is_some());
     assert!(cells[3].tag.is_some());
     assert!(cells[4].tag.is_some());
+}
+
+#[test]
+fn snapshot_scan_keeps_legacy_cell_reference_and_tag_semantics_together() {
+    let cases: &[(&[u8], &str, bool)] = &[
+        (br#"<c/>"#, "A7", true),
+        (br#"<c><v>1</v></c>"#, "B7", false),
+        (br#"<c r="C7"/>"#, "C7", true),
+        (br#"<x:c r="D7"/>"#, "D7", true),
+        (br#"<c r="E&#x37;"/>"#, "E7", true),
+        (
+            br#"<c z='before' r='F7' xmlns:x='urn:future' x:opaque='a&amp;b'/>"#,
+            "F7",
+            true,
+        ),
+    ];
+    let cells_xml = cases
+        .iter()
+        .map(|(xml, _, _)| std::str::from_utf8(xml).expect("cell XML is UTF-8"))
+        .collect::<String>();
+    let source = format!(
+        r#"<worksheet xmlns="{MAIN}" xmlns:x="{MAIN}"><sheetData><row r="7">{cells_xml}</row></sheetData></worksheet>"#
+    );
+    let layout = scan(source.as_bytes()).expect("worksheet scan");
+    let cells = &layout.sheet_data.rows[0].cells;
+    assert_eq!(cells.len(), cases.len());
+
+    for (&(xml, expected_a1, expected_empty), cell) in cases.iter().zip(cells) {
+        let (element, decoder) = start_element(xml);
+        let reference = unqualified_attribute_value(&element, b"r", decoder)
+            .expect("legacy cell reference lookup");
+        if let Some(reference) = reference.as_deref() {
+            let (reference_row, _) = parse_a1(reference).expect("legacy cell reference parse");
+            assert_eq!(reference_row, 7);
+        } else {
+            assert!(matches!(expected_a1, "A7" | "B7"));
+        }
+        let expected_tag = cell_tag(&element, decoder).expect("legacy compact cell tag");
+
+        assert_eq!(cell.address.a1(), expected_a1);
+        assert_eq!(cell.empty, expected_empty);
+        assert_eq!(cell.tag.is_some(), expected_tag.is_some());
+        if let (Some(actual), Some(expected)) = (&cell.tag, &expected_tag) {
+            assert_eq!(actual.name, expected.name);
+            assert_eq!(actual.attributes.len(), expected.attributes.len());
+            for (actual, expected) in actual.attributes.iter().zip(&expected.attributes) {
+                assert_eq!(actual.name, expected.name);
+                assert_eq!(actual.value, expected.value);
+            }
+        }
+    }
+
+    let prefixed = cells[3].tag.as_ref().expect("prefixed cell tag");
+    assert_eq!(prefixed.name.as_ref(), "x:c");
+    let retained = cells[5].tag.as_ref().expect("attribute-rich cell tag");
+    assert_eq!(
+        retained
+            .attributes
+            .iter()
+            .map(|attribute| attribute.name.as_ref())
+            .collect::<Vec<_>>(),
+        ["z", "r", "xmlns:x", "x:opaque"]
+    );
+    assert_eq!(retained.attributes[0].value.as_ref(), "before");
+    assert_eq!(retained.attributes[1].value.as_ref(), "F7");
+    assert_eq!(retained.attributes[2].value.as_ref(), "urn:future");
+    assert_eq!(retained.attributes[3].value.as_ref(), "a&b");
+}
+
+fn legacy_cell_pipeline_error(xml: &[u8]) -> (String, String) {
+    let (element, decoder) = start_element(xml);
+    let reference = match unqualified_attribute_value(&element, b"r", decoder) {
+        Ok(reference) => reference,
+        Err(error) => {
+            let error = crate::error::Error::from(error);
+            return (format!("{error:?}"), error.to_string());
+        },
+    };
+    if let Some(reference) = reference {
+        if let Err(error) = parse_a1(&reference) {
+            return (format!("{error:?}"), error.to_string());
+        }
+    }
+    if let Err(error) = cell_tag(&element, decoder) {
+        return (format!("{error:?}"), error.to_string());
+    }
+    panic!("legacy cell pipeline unexpectedly accepted {xml:?}");
+}
+
+fn worksheet_with_cell(cell: &[u8]) -> Vec<u8> {
+    let mut source = format!(r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1">"#).into_bytes();
+    source.extend_from_slice(cell);
+    source.extend_from_slice(b"</row></sheetData></worksheet>");
+    source
+}
+
+#[test]
+fn snapshot_scan_preserves_cell_error_precedence_through_trailing_attributes() {
+    let cases: &[&[u8]] = &[
+        br#"<c r="A1" future="&missing;"/>"#,
+        br#"<c r="A1" future="one" future="two"/>"#,
+        br#"<c r="not-a-cell" future="&missing;"/>"#,
+        b"<c r=\"\xff\" future=\"&missing;\"/>",
+        b"<c r=\"A1\" future=\"\xff\"/>",
+    ];
+
+    for cell in cases {
+        let expected = legacy_cell_pipeline_error(cell);
+        let source = worksheet_with_cell(cell);
+        let error = scan(&source).expect_err("cell pipeline should reject malformed input");
+        assert_eq!(
+            format!("{error:?}"),
+            expected.0,
+            "typed error changed for {cell:?}"
+        );
+        assert_eq!(
+            error.to_string(),
+            expected.1,
+            "display error changed for {cell:?}"
+        );
+    }
+}
+
+#[test]
+fn snapshot_scan_rejects_a_truncated_cell_start_after_reference_attributes() {
+    let source =
+        format!(r#"<worksheet xmlns="{MAIN}"><sheetData><row r="1"><c r="A1" future="value""#)
+            .into_bytes();
+    let expected = {
+        let mut reader = NsReader::from_reader(source.as_slice());
+        reader.config_mut().check_end_names = true;
+        loop {
+            match reader.read_event() {
+                Ok(Event::Eof) => panic!("truncated worksheet unexpectedly reached EOF"),
+                Ok(_) => {},
+                Err(error) => break crate::error::invalid(error.to_string()),
+            }
+        }
+    };
+    let error = scan(&source).expect_err("truncated cell start should be rejected");
+    assert_eq!(format!("{error:?}"), format!("{expected:?}"));
+    assert_eq!(error.to_string(), expected.to_string());
 }
 
 #[test]

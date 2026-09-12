@@ -1,5 +1,17 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0522: complete candidate evaluation; OLE2/OOXML goal stays open
+
+[0522](changes/0522-xlsx-cell-reference-guard.md) completes the narrow
+common-cell scanner evaluation and rejects it under the frozen native gate.
+Medium primary total p50 is mixed across repeats despite lower commit
+instructions and allocations. The scanner is restored; stronger codec tests,
+an explicit prefixed/multi-attribute harness guard and complete evidence are
+retained. No coverage-catalog, provider, cold/range, producer, fuzz or scaling
+gap is closed by this synthetic comparison. OLE2/OOXML remains the active
+priority until its optimization goal completes. ODF, including the historical
+ODG regression row below, is deferred; iWork remains excluded.
+
 ## 0521: XLSX ownership optimization accepted; broader goal remains open
 
 [0521](changes/0521-xlsx-borrow-validation-events.md) closes the narrow
@@ -2106,14 +2118,19 @@ a normalizing fallback for a different unsupported source.
 
 ## Prioritized remaining work
 
+OLE2 and OOXML take precedence until their optimization goal is complete.
+ODF work, including the retained ODG regression investigation, is deferred.
+The priorities below apply within that ordering; historical ODF evidence
+remains retained without scheduling it ahead of OLE2/OOXML.
+
 | Priority | Requirement from `docs/GOAL.md` | Next reviewable evidence |
 | --- | --- | --- |
-| P0 | Resolve the 0502 ODG open regressions | Profile parser and per-shape metadata work with operation-local attribution, then capture a same-protocol before/after pair for plain and metadata corpora. Keep the boxed-layout/heaptrack result separate from latency and allocation-count claims. |
+| Deferred ODF | Resolve the 0502 ODG open regressions | Profile parser and per-shape metadata work with operation-local attribution, then capture a same-protocol before/after pair for plain and metadata corpora. Keep the boxed-layout/heaptrack result separate from latency and allocation-count claims. |
 | P0 | Restore replayable 0501 custody or recapture it | The retained 0501 reports and historical receipt are usable, but `/tmp/litchi-goal-0501` no longer contains the frozen before executable. Rebuild from the recorded source/build manifest or retain a new verified replay bundle before claiming current independent replay. |
 | P0 | Complete the Phase-1 metric and CRUD baseline | The 6,030-sample default refresh closes the timing-report gate for 11 measured mappings (48 rows) within the 33-selector index, but the 15-category checklist still has correctness-only/unsupported rows and lacks complete throughput, copy/decompression, lock-wait, cold/warm, and scaling coverage. Promote only rows with validated timing evidence. |
 | P0 | Measure provider and publication intersections | Extend the 0491–0494 DOCX provider/cold baselines and 0497 atomic logical-tail capability to genuine borrowed input, sequential non-seek sinks, filesystem atomic save, source-version/cancellation failures, and physical cold behavior across representative formats. |
 | P1 | Address the retained local batch and lifecycle adverse rows | Revisit 0499/0500 serial-versus-batch choices and their flagged latency/RSS rows with operation-local CPU/allocation evidence. Publish full explicit 1/2/4/8-worker curves, lock-wait proxy, and serial-fraction/Amdahl analysis before widening concurrency. |
-| P1 | Finish source-backed CRUD adoption across formats | Extend selective open/read/edit/save and dependency-closure publication through DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, and ODF owners; measure physical I/O, decompression/recompression, copies, allocations, RSS, and semantic phase boundaries. |
+| P1 | Finish source-backed CRUD adoption across formats | Extend selective open/read/edit/save and dependency-closure publication through DOCX, XLSX, PPTX, XLSB, DOC, XLS, and PPT owners, followed by ODF after the OLE2/OOXML optimization goal completes; measure physical I/O, decompression/recompression, copies, allocations, RSS, and semantic phase boundaries. |
 | P1 | Cover the high-impact CRUD categories and real producers | Add or explicitly classify conversion, creation, append variants, structural/deletion/sanitization, cross-document copy, merge/split, patch/inverse/three-way merge, repair/normalize, dynamic content, security, malformed, signed/encrypted/macro-enabled, and independently produced Office corpora. |
 | P1 | Close ZIP64/CFB and output-source preservation intersections | Exercise ZIP64 and CFB topology/stream cases with non-seek sinks, cancellation, configured limits, physical cold/high-latency sources, unchanged-member passthrough, and atomic finalization while retaining typed refusals and exact untouched bytes. |
 | P2 | Apply layout, cache, or SIMD tuning only from measured hot loops | Require operation-local profiles, scalar fallbacks, differential malformed-input tests, and material end-to-end benefit before any low-level change. |

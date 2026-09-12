@@ -1,0 +1,87 @@
+{
+  "revision": "96fe51a3a70d97dfc49610788bf32963ae58ea2e",
+  "created_utc": "2026-09-12T05:43:44.850959+00:00",
+  "hypothesis": "Reuse a checked, decoded common cell reference as proof for compact tag=None; remove redundant cell_tag scan/decode and forced reference String while preserving ordered error variants and fallback tags.",
+  "harness_enabler": "Opt-in noncompact shape mixes prefixed c+r and unprefixed c+r+t numeric tags, with unchanged medium geometry; frozen identically before and after production candidate.",
+  "primary": {
+    "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 20,
+    "samples": 100
+  },
+  "guards": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "medium",
+        "dense-sparse"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "vendor-extension"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_percent_edit_save",
+      "shapes": [
+        "noncompact"
+      ]
+    }
+  ],
+  "guard_samples": 30,
+  "guard_warmup": 10,
+  "guard_repeats": 2,
+  "allocation": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 5,
+    "scope": "staged sets and MultiSourceEdit::commit; no publication/reopen/oracles"
+  },
+  "profile": {
+    "shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "repeats": 2,
+    "warmup": 0,
+    "samples": 1,
+    "owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+    "scope": "Separate zero-before/dump-after/toggle exact-name; fourth call only, preceding3lifecyclecalls retained"
+  },
+  "cpu": 2,
+  "admission": "Require useful repeatable primary total improvement and unchanged semantic/output/resource oracles. Flag every >5% adverse latency/mean/peak change by case; retain/review all flags. No inferred cold/range/native producer/scaling claim.",
+  "owned_paths": [
+    "/tmp/litchi-goal-0522",
+    "/home/zhuhe/litchi-goal-0522-target"
+  ],
+  "native_order": [
+    "baseline native-r1 before candidate application",
+    "candidate native-r1",
+    "candidate native-r2",
+    "retained baseline native-r2 under candidate source checkout"
+  ],
+  "retained_baseline_custody": "Final A2 executes the unchanged retained baseline-normal hash; its build/capture source manifest remains baseline, while the receipt separately binds current candidate working source. Full manifests must differ only in scanner production file and both source patches are replayed at verification."
+}

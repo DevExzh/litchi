@@ -1,0 +1,27 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "case": "phase_alignment",
+      "rejected": true,
+      "reason": "native-r1-primary-medium phase sum does not match elapsed sample 27"
+    },
+    {
+      "case": "generic_counter",
+      "rejected": true,
+      "reason": "source.read_calls is not constant across retained samples"
+    },
+    {
+      "case": "output_identity",
+      "rejected": true,
+      "reason": "native-r1-primary-medium source output digest does not match result output"
+    },
+    {
+      "case": "allocation_balance",
+      "rejected": true,
+      "reason": "alloc-r1-medium.commit_allocation_metrics[0] live-byte balance does not reconcile"
+    }
+  ],
+  "valid_controls_pass": true,
+  "scope": "In-memory raw semantic mutations; retained artifacts are unchanged."
+}
