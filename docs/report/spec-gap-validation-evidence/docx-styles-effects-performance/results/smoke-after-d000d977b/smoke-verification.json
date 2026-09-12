@@ -1,0 +1,18 @@
+{
+  "corpus": {
+    "fixtures": 4,
+    "lanes": 52
+  },
+  "manifest": {
+    "extras": 21,
+    "files": 790,
+    "packages": 9
+  },
+  "passed": true,
+  "receipts": {
+    "lanes": 52,
+    "samples": 52
+  },
+  "schema": "docx-styles-effects-smoke-verification-v1",
+  "source_commit": "d000d977b99e03f8542c7dae74acf767a91b1feb"
+}
