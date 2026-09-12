@@ -44,13 +44,17 @@ fresh process, zero warmups, and one correctness sample per lane. Full timing,
 scaling, and speedup claims remain gated until this smoke is independently
 reviewed and a measurement harness is approved.
 
-The first frozen-source run executed all 43 lanes, but only 42 passed the
-fail-closed verifier. Its raw receipts remain outside the checkout at
-`/var/tmp/litchi-docx-styles-effects-first-failed-raw-20260912-b` with a
-per-file SHA manifest. Existing-owner replacement in `cap_total_part_bytes`
-grew aggregate part bytes from 110,027 to 110,151. With a 110,150-byte limit,
-publication returned a typed `ReadLimit` while transaction commit incorrectly
-succeeded. Production commit `d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119`
-projects replacement aggregate bytes at commit and adds the focused regression;
-a fresh clean 52-lane smoke must validate that sealed source pin before any
-timing run.
+The first frozen-source run has a durable failure slice in
+[`historical-first-failed-20260912/`](historical-first-failed-20260912/).
+The preserved capture contained 43 lane receipts and was rejected by the
+fail-closed verifier because existing-owner replacement in
+`cap_total_part_bytes` grew aggregate part bytes from 110,027 to 110,151 while
+the one-unit-under limit was 110,150 and the transaction commit-stage refusal
+was not observed. The exact cap receipt, source manifest, build/provenance
+receipts, commands, and hashes are retained in that directory. The complete
+byte-exact raw bundle and its per-file SHA manifest remain outside the checkout
+at `/var/tmp/litchi-docx-styles-effects-first-failed-raw-20260912-b`.
+
+Production commit `d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119` projects replacement
+aggregate bytes at commit and adds the focused regression. A fresh clean 52-lane
+smoke must validate that sealed source pin before any timing run.

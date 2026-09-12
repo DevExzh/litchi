@@ -2,9 +2,10 @@
 """Hash the transitive Cargo source closure and bind production inputs to Git.
 
 The production closure is compared with the approved source commit through
-``git cat-file``. Evidence harness files and copied native fixtures added in a
-descendant commit are compared with that captured commit's blobs as well.
-Working-tree cleanliness alone cannot establish either source identity.
+``git cat-file``. The captured evidence subtree (harness files and copied
+native fixtures) is compared with the descendant HEAD's blobs, including when
+those paths already exist at the approved source commit. Working-tree
+cleanliness alone cannot establish either source identity.
 """
 
 from __future__ import annotations
@@ -117,6 +118,11 @@ def main() -> None:
     root = args.root.resolve()
     evidence = args.evidence.resolve()
     metadata = args.metadata.resolve()
+    evidence_shown = display(evidence, root).rstrip("/")
+
+    def is_evidence_path(shown: str) -> bool:
+        return shown.startswith(evidence_shown + "/")
+
     current_head = git_output(root, "rev-parse", "HEAD")
     ancestry = subprocess.run(
         [
@@ -163,7 +169,10 @@ def main() -> None:
         )
         for path in files:
             shown = display(path, root)
-            if committed_blob_sha256(root, args.source_commit, shown) is None:
+            # The production pin can contain an older copy of the evidence
+            # harness. Evidence remains bound to the captured descendant HEAD,
+            # even when a path also exists at the production source commit.
+            if is_evidence_path(shown) or committed_blob_sha256(root, args.source_commit, shown) is None:
                 local_inputs.append(path)
             else:
                 production_inputs.append(path)
@@ -171,7 +180,7 @@ def main() -> None:
     extras = [require_file(path) for path in args.extra]
     for path in extras:
         shown = display(path, root)
-        if committed_blob_sha256(root, args.source_commit, shown) is None:
+        if is_evidence_path(shown) or committed_blob_sha256(root, args.source_commit, shown) is None:
             local_inputs.append(path)
         else:
             production_inputs.append(path)
@@ -188,13 +197,12 @@ def main() -> None:
             + ", ".join(changed)
         )
 
-    evidence_shown = display(evidence, root).rstrip("/")
     for path in sorted(set(local_inputs), key=str):
         shown = display(path, root)
         # A new path in the production closure would silently expand the
-        # approved source pin.  Descendant additions are admissible only for
-        # the committed evidence harness/fixtures themselves.
-        if not shown.startswith(evidence_shown + "/"):
+        # approved source pin. Captured evidence paths are admissible only
+        # when their descendant HEAD blobs match the staged files.
+        if not is_evidence_path(shown):
             raise SystemExit(
                 "production build input is outside the approved source pin: "
                 + shown
