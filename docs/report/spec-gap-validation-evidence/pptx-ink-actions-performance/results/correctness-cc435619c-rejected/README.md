@@ -17,14 +17,13 @@ all 42 lanes are resolved.
 raw/ contains the 38 capture receipt files
 (4921714 bytes), and raw/diagnostic/
 contains the two diagnostic stdout/stderr files. The complete file list and
-SHA-256 values are in retention-manifest.json. The release binary and its
-external Cargo target remain at the paths recorded there for root byte audit;
-the target contains 1015 files and
-356994119 bytes. The binary SHA-256 is
+SHA-256 values are in retention-manifest.json. The release binary and its external Cargo target were retained through the
+root Git-byte audit; the target contained 1015 files and 356994119 bytes. The binary SHA-256 is
 c68b101dd2e46080da30a25415ec1d72a63186f123e19c4989f30cc897fbd6a4.
 
 The source manifests and Cargo metadata match before and after. No /usr/bin/time,
 timing matrix, native PowerPoint acceptance, or speedup claim was produced.
-Keep the source worktree, binary, target, raw capture, and diagnostic until
-root completes the byte audit. Do not reuse this rejected target for the
-post-fix capture.
+Root verified all 40 raw files against committed Git bytes in `d2cc59bdd`,
+then removed the duplicate external capture, diagnostic, and build target.
+The clean source worktree remains available. A post-fix capture requires a
+fresh target and results directory.
