@@ -1,14 +1,15 @@
 //! Bounded, inert SpreadsheetML 2009/9 form-control properties.
 //!
-//! This module owns the XML payload of an Office 2010 `ctrlProp` part.  It is
-//! deliberately a leaf codec: package relationships, worksheet controls,
-//! ActiveX ownership, and workbook transactions remain with the XLSX package
-//! owner.  Parsing and detached writing are nevertheless source preserving
-//! and bounded so the package owner can compose them without a second XML
-//! safety policy.
+//! This module owns the XML payload of an Office 2010 `ctrlProp` part and a
+//! bounded read-only worksheet owner that composes that leaf with its admitted
+//! DrawingML/VML identity closure.  Package mutation, ActiveX ownership,
+//! workbook transactions, and mirror-writing lifecycle remain outside this
+//! batch.  Parsing and detached writing are source preserving and bounded so
+//! the package owner can compose them without a second XML safety policy.
 
 mod codec;
 mod model;
+mod owner;
 
 pub use codec::{
     SourceProperties, SourceView, SourceWritable, insert_item, inspect, inspect_with_limits, parse,
@@ -20,6 +21,17 @@ pub use model::{
     FormControlFormula, Item, ItemList, KnownOrUnknown, NamespaceBinding, ObjectType,
     OpaqueAttribute, OpaqueXml, Properties, ScalarField, ScalarValue, SelectionType, TextHAlign,
     TextVAlign,
+};
+pub use owner::{
+    FormControlCollection, FormControlDiagnostic, FormControlDiagnosticCode, FormControlOwnerError,
+    FormControlPartRead, FormControlReadSet, FormControlView, MceProvenance, OwnerLimits,
+    OwnerProfile, OwnerResult, RelationshipFingerprint, ShapeClosure, SourceBackedFormControlOwner,
+};
+pub(crate) use owner::{
+    eager_form_controls_for_sheet, owner_to_xlsx, source_form_controls_for_sheet,
+};
+pub(crate) use owner::{
+    eager_form_controls_for_sheet_with_limits, source_form_controls_for_sheet_with_limits,
 };
 
 /// The Office 2010 SpreadsheetML form-control-properties namespace.

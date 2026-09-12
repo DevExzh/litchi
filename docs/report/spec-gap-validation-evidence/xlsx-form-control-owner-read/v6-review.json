@@ -1,0 +1,16 @@
+{
+  "verdict": "approved",
+  "scope": "Read-only worksheet form-control ownership; final aggregate projection correction",
+  "owner_sha256": "ac8f6dfadd81d1a584488d0dcb3fcb3ef6ceaba75d51f99dc9fab0843df0bb3a",
+  "test_sha256": "82f63c55571eb38184cc6dc6ae2082fc4bb089dba44481bc5130cc78af1528fb",
+  "reviewer": "xlsx_form_control_owner_review",
+  "findings": [
+    "Exact retained eager inventory bytes seed scanner projection ledger.",
+    "Ledger-only seeding avoids duplicate context reservations.",
+    "Inventory reservations remain live through scan and release on success or failure.",
+    "No-context scan enforces aggregate projection ceiling."
+  ],
+  "root_tests_passed": 1232,
+  "root_clippy_exit": 0,
+  "root_rustdoc_exit": 0
+}
