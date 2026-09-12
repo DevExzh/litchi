@@ -3,7 +3,8 @@
   "status": "recipe-only-until-api-freeze",
   "description": "Deterministic bounded recipes for ordinary worksheet direct-picture SVG lifecycle profiling.",
   "source_fixture": {
-    "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
+    "path": "docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/fixtures/tdf169496_hidden_graphic.xlsx",
+    "original_path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx",
     "sha256": "0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72",
     "use": "read/capture topology only; never mutate or treat as Office acceptance evidence"
   },
