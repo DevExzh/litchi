@@ -1,0 +1,442 @@
+{
+  "capture_head": "0090bc68f949a5b80342bc3be696b7609a1c3325",
+  "capture_results_directory": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results",
+  "clean_source_worktree": "/var/tmp/pptx-ink-actions-correctness-0090bc68f-clean",
+  "closure": {
+    "binary_path": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/target/release/pptx-ink-actions-performance",
+    "binary_sha256": "54463a17367957e8ee6c7a9acfcce27943ba4b480b8cc1196e3da4ae652c004f",
+    "binary_size_bytes": 4238000,
+    "design_git_blob": "597400950b1027c47cd6e4cbbedd23915bc0980e",
+    "design_sha256": "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d",
+    "harness_lock_sha256": "3c773b848134c52df596034ffbbe8688dde9924fb741dee8bc8bce0eaa772f2e",
+    "helper_sha256": "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e",
+    "metadata_after_sha256": "00792a0b2d5ef313ea5e74494070c7734f581b7aa07aeacde6a0ee8b6b7b7f99",
+    "metadata_before_sha256": "00792a0b2d5ef313ea5e74494070c7734f581b7aa07aeacde6a0ee8b6b7b7f99",
+    "source_manifest_after_sha256": "7d4a39a6992c325dbd83c2c02af2609124d06b18c62c875da38c6b326dc199c0",
+    "source_manifest_before_sha256": "7d4a39a6992c325dbd83c2c02af2609124d06b18c62c875da38c6b326dc199c0"
+  },
+  "counts": {
+    "capture_receipt_bytes": 4920810,
+    "capture_receipt_files": 38,
+    "diagnostic_bytes": 45620,
+    "diagnostic_files": 19,
+    "external_capture_target_bytes": 356995785,
+    "external_capture_target_files": 1015,
+    "external_regression_target_bytes": 352877043,
+    "external_regression_target_files": 1013,
+    "regression_receipt_bytes": 4493,
+    "regression_receipt_files": 2,
+    "retained_bytes": 4970923,
+    "retained_files": 59
+  },
+  "diagnostic_directory": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics",
+  "diagnostic_findings": {
+    "distinct_lanes": {
+      "failed_predicate": "preservation_ok",
+      "lanes": [
+        "package_read_large_distinct",
+        "package_read_near_distinct",
+        "package_apply_medium_distinct"
+      ],
+      "observed": "shared_pointer_observation=shared despite multiple distinct target names",
+      "proposed_minimal_fix": "Track pointer identity per physical target: repeated inbound edges to one target may share, while pointers across distinct target names must remain isolated; preserve the receipt observation without weakening the topology predicate."
+    },
+    "inverse_lanes": {
+      "failed_predicate": "retained_baseline_balance_ok",
+      "lanes": [
+        "package_inverse_small_shared",
+        "package_inverse_case_equivalent"
+      ],
+      "observed": "after_drop_live_bytes was 22 bytes below retained_baseline_live_bytes; all phase equations and semantic/preservation/inverse/reopen checks passed.",
+      "proposed_minimal_fix": "Prepare a separate operation package for inverse lanes, as apply lanes already do, so forward plus inverse publication does not mutate or release allocations from the retained baseline."
+    },
+    "stale_content_type": {
+      "failed_predicate": "baseline_reopenable",
+      "observed": "expected and actual Error::ContentType matched; source and package manifest were preserved; public baseline ink_actions read correctly refused the intentionally mutated content type.",
+      "proposed_minimal_fix": "Make baseline reopenability recognize the expected typed ContentType refusal after successful OPC reopen, while retaining manifest/source checks and the public read attempt."
+    }
+  },
+  "failed_matrix_lanes": [
+    "package_read_large_distinct",
+    "package_read_near_distinct",
+    "package_apply_medium_distinct",
+    "package_inverse_small_shared",
+    "package_inverse_case_equivalent",
+    "stale_content_type"
+  ],
+  "files": [
+    {
+      "bytes": 165,
+      "retained_path": "raw/capture/binary-after.sha256",
+      "sha256": "ae537392f458e638b569a83078c6586c4906fc45521b578ab269110b9c50f0c2",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/binary-after.sha256"
+    },
+    {
+      "bytes": 208,
+      "retained_path": "raw/capture/binary-file.txt",
+      "sha256": "b22ccf0b6f46fb93419c3a7aa7c97726cf2550afb1a902aa4cc33f113ae69c87",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/binary-file.txt"
+    },
+    {
+      "bytes": 42,
+      "retained_path": "raw/capture/binary-stat.txt",
+      "sha256": "7817fa0e63ed8f6fc71c3b343a52da211ade3abeb8d2a624015f8a48a8b409e9",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/binary-stat.txt"
+    },
+    {
+      "bytes": 165,
+      "retained_path": "raw/capture/binary.sha256",
+      "sha256": "ae537392f458e638b569a83078c6586c4906fc45521b578ab269110b9c50f0c2",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/binary.sha256"
+    },
+    {
+      "bytes": 2495,
+      "retained_path": "raw/capture/capture-provenance.json",
+      "sha256": "8b31c61955e720b447e25bb28dd6169a6ead69e27b6fa17574b09512c5dafeb7",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/capture-provenance.json"
+    },
+    {
+      "bytes": 4125,
+      "retained_path": "raw/capture/cargo-build-release.stderr",
+      "sha256": "0ad2e8a274a3f5e0fed66568312df04bb46d9a2fcd7c5d8e432102c7c8e3add6",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-build-release.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/cargo-build-release.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-build-release.stdout"
+    },
+    {
+      "bytes": 209,
+      "retained_path": "raw/capture/cargo-lock.sha256",
+      "sha256": "ebde60933cfea83ae15a74bd4150300df57f2ce388e32512173ddef692c37c96",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-lock.sha256"
+    },
+    {
+      "bytes": 600754,
+      "retained_path": "raw/capture/cargo-metadata-after.json",
+      "sha256": "00792a0b2d5ef313ea5e74494070c7734f581b7aa07aeacde6a0ee8b6b7b7f99",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-metadata-after.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/cargo-metadata-after.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-metadata-after.stderr"
+    },
+    {
+      "bytes": 600754,
+      "retained_path": "raw/capture/cargo-metadata-before.json",
+      "sha256": "00792a0b2d5ef313ea5e74494070c7734f581b7aa07aeacde6a0ee8b6b7b7f99",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-metadata-before.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/cargo-metadata-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-metadata-before.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/cargo-version-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-version-before.stderr"
+    },
+    {
+      "bytes": 36,
+      "retained_path": "raw/capture/cargo-version-before.txt",
+      "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/cargo-version-before.txt"
+    },
+    {
+      "bytes": 23212,
+      "retained_path": "raw/capture/commands.jsonl",
+      "sha256": "928c752d4699593a56bcf0bc670b4a6ced1439ca2394eb7203599a1367c6385b",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/commands.jsonl"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/committed-inputs-guard.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/committed-inputs-guard.stderr"
+    },
+    {
+      "bytes": 663,
+      "retained_path": "raw/capture/committed-inputs-guard.stdout",
+      "sha256": "d844a795e0efe6782061aca51d12a3b3616822a773b2a8c619e145818c031d04",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/committed-inputs-guard.stdout"
+    },
+    {
+      "bytes": 211,
+      "retained_path": "raw/capture/corpus-manifest.sha256",
+      "sha256": "bf1b0563f5232fd7c07144fcc587ffedc77d720825002e10ad5456eb3a5bf5b8",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/corpus-manifest.sha256"
+    },
+    {
+      "bytes": 188,
+      "retained_path": "raw/capture/design.sha256",
+      "sha256": "87fe470fb525979b4ae410b9849404dd11a242695feeab7b6a123e8a4807632a",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/design.sha256"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/git-status-after.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/git-status-after.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/git-status-before.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/git-status-before.txt"
+    },
+    {
+      "bytes": 165,
+      "retained_path": "raw/capture/helper.sha256",
+      "sha256": "6664e9e74c7581c1a6deced9940aa9b0a86e560b8ba578b7490c06d75f3496d2",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/helper.sha256"
+    },
+    {
+      "bytes": 697,
+      "retained_path": "raw/capture/host-after.txt",
+      "sha256": "9c70d0c683454cea5f89317dbd81cc4e5271c797a17b3faba6edfb17ab57783f",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/host-after.txt"
+    },
+    {
+      "bytes": 697,
+      "retained_path": "raw/capture/host-before.txt",
+      "sha256": "1258dc0cc855867ba960a57e8c06e65ada8f69ca1e912bfe73a188c6dde0b017",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/host-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/host-probe.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/host-probe.stderr"
+    },
+    {
+      "bytes": 954,
+      "retained_path": "raw/capture/host-probe.stdout",
+      "sha256": "a8b95f671e42b0244fb4c8ee42ec7f3a1ce2552fe54c334046a9ec455a3746f9",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/host-probe.stdout"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/matrix-correctness.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/matrix-correctness.json"
+    },
+    {
+      "bytes": 207,
+      "retained_path": "raw/capture/matrix-correctness.stderr",
+      "sha256": "39429cbbdc250e6ec404148c68f18a5dc74918ce874578e803948861d42ed074",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/matrix-correctness.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/rustc-vV-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/rustc-vV-before.stderr"
+    },
+    {
+      "bytes": 196,
+      "retained_path": "raw/capture/rustc-vV-before.txt",
+      "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/rustc-vV-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/rustfmt-version-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/rustfmt-version-before.stderr"
+    },
+    {
+      "bytes": 45,
+      "retained_path": "raw/capture/rustfmt-version-before.txt",
+      "sha256": "21e923568a260155c34a6f780f9513d3962c088aa3bbe8c91ab5385f470547d1",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/rustfmt-version-before.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/source-manifest-after.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/source-manifest-after.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/source-manifest-after.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/source-manifest-after.stdout"
+    },
+    {
+      "bytes": 1842311,
+      "retained_path": "raw/capture/source-manifest-after.txt",
+      "sha256": "7d4a39a6992c325dbd83c2c02af2609124d06b18c62c875da38c6b326dc199c0",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/source-manifest-after.txt"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/source-manifest-before.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/source-manifest-before.stderr"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/capture/source-manifest-before.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/source-manifest-before.stdout"
+    },
+    {
+      "bytes": 1842311,
+      "retained_path": "raw/capture/source-manifest-before.txt",
+      "sha256": "7d4a39a6992c325dbd83c2c02af2609124d06b18c62c875da38c6b326dc199c0",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/results/source-manifest-before.txt"
+    },
+    {
+      "bytes": 203,
+      "retained_path": "raw/regression/regression.stdout",
+      "sha256": "bccf381623c29464aadc70626a2d55e5f7c60dc2a0d6060aaea0d6b2bbf0b413",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/regression.stdout"
+    },
+    {
+      "bytes": 4290,
+      "retained_path": "raw/regression/regression.stderr",
+      "sha256": "de2e995fb941ccc764e5d1192b878a9e2b34c32689782c3eef7d2fa4bfdb1eb1",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/regression.stderr"
+    },
+    {
+      "bytes": 604,
+      "retained_path": "raw/diagnostics/package_apply_medium_distinct/command.json",
+      "sha256": "53ba1d724c906278c8b8553be9ba87e857187770fc0aa0617a1bc1b6a17f19e5",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_apply_medium_distinct/command.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/diagnostics/package_apply_medium_distinct/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_apply_medium_distinct/stderr.txt"
+    },
+    {
+      "bytes": 6301,
+      "retained_path": "raw/diagnostics/package_apply_medium_distinct/stdout.json",
+      "sha256": "b9aa356724fb562a2e587bfd03863021e9f49181f2f6356059f5f87b885363b8",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_apply_medium_distinct/stdout.json"
+    },
+    {
+      "bytes": 612,
+      "retained_path": "raw/diagnostics/package_inverse_case_equivalent/command.json",
+      "sha256": "935f5ba8f8a9e0301ec64f0a3e570217c082318aee26a257d2de326038d470cb",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_case_equivalent/command.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/diagnostics/package_inverse_case_equivalent/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_case_equivalent/stderr.txt"
+    },
+    {
+      "bytes": 6252,
+      "retained_path": "raw/diagnostics/package_inverse_case_equivalent/stdout.json",
+      "sha256": "4b50bbb9adcf40da1c8747f0be559dadd719a1f4a36d2f83753ad27f33bf20d5",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_case_equivalent/stdout.json"
+    },
+    {
+      "bytes": 600,
+      "retained_path": "raw/diagnostics/package_inverse_small_shared/command.json",
+      "sha256": "bd05adfc6779e24d34818779ee8db00b702a649224d6a47c3b2d663dcdd3e2ca",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_small_shared/command.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/diagnostics/package_inverse_small_shared/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_small_shared/stderr.txt"
+    },
+    {
+      "bytes": 6250,
+      "retained_path": "raw/diagnostics/package_inverse_small_shared/stdout.json",
+      "sha256": "7cf5380c019245298b83579c1d9e264ed7c2af52f6573c47a5544b377a402add",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_inverse_small_shared/stdout.json"
+    },
+    {
+      "bytes": 596,
+      "retained_path": "raw/diagnostics/package_read_large_distinct/command.json",
+      "sha256": "ed3315ccc7d08f4d3bab918231a4eee17793e4f2d537c6354190dc9b63f659fa",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_large_distinct/command.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/diagnostics/package_read_large_distinct/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_large_distinct/stderr.txt"
+    },
+    {
+      "bytes": 6335,
+      "retained_path": "raw/diagnostics/package_read_large_distinct/stdout.json",
+      "sha256": "c2599cf1028c8889d3eb2ff2b0ae4b878456a538ca38a97a7b6941297d62bd27",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_large_distinct/stdout.json"
+    },
+    {
+      "bytes": 592,
+      "retained_path": "raw/diagnostics/package_read_near_distinct/command.json",
+      "sha256": "a3b87fa8da50f8435fa4267eda3c120167652fc42cc3065cbbaa56be7e9f4bcc",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_near_distinct/command.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/diagnostics/package_read_near_distinct/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_near_distinct/stderr.txt"
+    },
+    {
+      "bytes": 6402,
+      "retained_path": "raw/diagnostics/package_read_near_distinct/stdout.json",
+      "sha256": "5e4998d4efc654fec06c59f932fa3e76dbc1a0534b1421c4ace201161bf8294d",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/package_read_near_distinct/stdout.json"
+    },
+    {
+      "bytes": 560,
+      "retained_path": "raw/diagnostics/stale_content_type/command.json",
+      "sha256": "67f70af85327f9e886f0593095cd5b3ed53b773defabdb7c1de24a0c0f9bda3b",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/stale_content_type/command.json"
+    },
+    {
+      "bytes": 0,
+      "retained_path": "raw/diagnostics/stale_content_type/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/stale_content_type/stderr.txt"
+    },
+    {
+      "bytes": 6339,
+      "retained_path": "raw/diagnostics/stale_content_type/stdout.json",
+      "sha256": "3be288aeb1138b34877a3bd470bcb4a2f307808ce72d4dca2844b99d27ef6f5f",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/stale_content_type/stdout.json"
+    },
+    {
+      "bytes": 4177,
+      "retained_path": "raw/diagnostics/summary.json",
+      "sha256": "b479c55c1f1c5ac736f62e624dedc5cc4ed7350f55732c202ad40ff254573629",
+      "source": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/diagnostics/summary.json"
+    }
+  ],
+  "gates": {
+    "follow_up_diagnostic_lanes": 6,
+    "follow_up_diagnostics_all_exit": 0,
+    "host_probe": 0,
+    "matrix_correctness": 1,
+    "matrix_lanes_requested": 42,
+    "release_build": 0,
+    "release_preflight": 0,
+    "rust_regression_exit": 0,
+    "subsequent_individual_lanes_executed": 0,
+    "timing_capture": false,
+    "usr_bin_time": false
+  },
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "reason": "The corrected retained-baseline boundary removed the prior systematic metadata failures, but six matrix predicates still failed. Individual lane diagnostics were run only for those six lanes under the explicit follow-up authorization; none is admitted as a matrix result.",
+  "regression_target_directory": "/var/tmp/pptx-ink-actions-correctness-0090bc68f.7REGCX/regression-target",
+  "schema": "pptx-ink-actions-rejected-retention-v2",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "status": "rejected-matrix-six-lanes"
+}
