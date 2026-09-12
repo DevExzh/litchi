@@ -1,0 +1,2 @@
+source=/var/tmp/pptx-ink-actions-correctness-a8dff0f60-src.Zk6bXL
+capture_root=/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv

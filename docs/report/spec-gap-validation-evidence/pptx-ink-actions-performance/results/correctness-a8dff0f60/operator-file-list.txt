@@ -1,0 +1,4 @@
+operator-status.txt
+operator.stderr
+operator.stdout
+worktree-add.log
