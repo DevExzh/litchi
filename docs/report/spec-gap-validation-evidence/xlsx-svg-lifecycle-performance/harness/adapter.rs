@@ -492,11 +492,8 @@ fn picture_index(lane: &str) -> usize {
 }
 
 fn native_fixture() -> Result<Fixture> {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../../")
-        .canonicalize()?;
     let path =
-        root.join("3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx");
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../fixtures/tdf169496_hidden_graphic.xlsx");
     let bytes = fs::read(path)?;
     let input_bytes = u64::try_from(bytes.len())?;
     let input_hash = support::fnv1a64(&bytes);

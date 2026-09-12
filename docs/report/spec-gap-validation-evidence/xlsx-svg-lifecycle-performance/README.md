@@ -48,10 +48,13 @@ of the exact bounded input identity; the verifier requires those identities to
 remain stable across fresh processes.
 The native producer fixture is used for read/capture validation only:
 
-`3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx`
+[`fixtures/tdf169496_hidden_graphic.xlsx`](fixtures/tdf169496_hidden_graphic.xlsx)
 
 Its archive hash is the design hash
 `0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72`.
+The unchanged LibreOffice corpus file is retained in Git so a clean checkout
+does not depend on the ignored `3rdparty` tree. Its original path and retained
+license notices are documented in [the fixture provenance](fixtures/README.md).
 The adapter does not mutate that fixture. The
 `multi_picture_same_drawing_{16,64,256}` lanes stage several lifecycle changes
 on one drawing in one transaction. They retain the current composed-planner

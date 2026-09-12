@@ -187,7 +187,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/requirements.md" \
     --extra "$HERE/root-review.md" \
     --extra "$HERE/corpus-manifest.json" \
-    --extra "$ROOT/3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx" \
+    --extra "$HERE/fixtures/tdf169496_hidden_graphic.xlsx" \
     --extra "$ROOT/docs/GOAL.md" \
     --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md" \
     --git-commit "$CURRENT_COMMIT"
@@ -259,7 +259,7 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/requirements.md" \
     --extra "$HERE/root-review.md" \
     --extra "$HERE/corpus-manifest.json" \
-    --extra "$ROOT/3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx" \
+    --extra "$HERE/fixtures/tdf169496_hidden_graphic.xlsx" \
     --extra "$ROOT/docs/GOAL.md" \
     --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md" \
     --git-commit "$CURRENT_COMMIT"
