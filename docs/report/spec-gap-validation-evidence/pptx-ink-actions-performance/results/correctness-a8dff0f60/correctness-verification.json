@@ -1,0 +1,394 @@
+{
+  "capture_head": "a8dff0f606ea671ad2d648c80e6ec1a0d3a7ba80",
+  "commands": 53,
+  "expected_refusal_lanes": 9,
+  "failures": [],
+  "lane_summary": [
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_aggregate_exact",
+      "process_id": 2352820,
+      "recipe": "r22_limit_aggregate",
+      "topology": "distinct"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_aggregate_one_over",
+      "process_id": 2352821,
+      "recipe": "r22_limit_aggregate",
+      "topology": "distinct"
+    },
+    {
+      "actual_error_type": "Error::Limit",
+      "expected": "Error::Limit { resource: ink-action aggregate target bytes, limit: 32767 }",
+      "five_predicates": true,
+      "lane": "limit_aggregate_one_under",
+      "process_id": 2352819,
+      "recipe": "r22_limit_aggregate",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_anchor_exact",
+      "process_id": 2352814,
+      "recipe": "r20_limit_anchor",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_anchor_one_over",
+      "process_id": 2352815,
+      "recipe": "r20_limit_anchor",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": "Error::Limit",
+      "expected": "Error::Limit { resource: ink-action anchor count, limit: 7 }",
+      "five_predicates": true,
+      "lane": "limit_anchor_one_under",
+      "process_id": 2352813,
+      "recipe": "r20_limit_anchor",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_graph_exact",
+      "process_id": 2352823,
+      "recipe": "r23_limit_graph",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_graph_one_over",
+      "process_id": 2352824,
+      "recipe": "r23_limit_graph",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": "Error::Limit",
+      "expected": "Error::Limit { resource: ink-action relationship edges, limit: 7 }",
+      "five_predicates": true,
+      "lane": "limit_graph_one_under",
+      "process_id": 2352822,
+      "recipe": "r23_limit_graph",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_target_exact",
+      "process_id": 2352817,
+      "recipe": "r21_limit_target",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "limit_target_one_over",
+      "process_id": 2352818,
+      "recipe": "r21_limit_target",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": "Error::Limit",
+      "expected": "Error::Limit { resource: ink-action target bytes, limit: 16383 }",
+      "five_predicates": true,
+      "lane": "limit_target_one_under",
+      "process_id": 2352816,
+      "recipe": "r21_limit_target",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "opaque_mce_save_reopen",
+      "process_id": 2352810,
+      "recipe": "r14_opaque_unknown_external",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "opaque_mce_scalar_edit",
+      "process_id": 2352809,
+      "recipe": "r14_opaque_unknown_external",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_apply_medium_distinct",
+      "process_id": 2352754,
+      "recipe": "r05_medium_distinct",
+      "topology": "distinct"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_apply_medium_shared",
+      "process_id": 2352750,
+      "recipe": "r04_medium_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_inverse_case_equivalent",
+      "process_id": 2352756,
+      "recipe": "r12_case_equivalent_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_inverse_small_shared",
+      "process_id": 2352755,
+      "recipe": "r02_small_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_noop_small_shared",
+      "process_id": 2352748,
+      "recipe": "r02_small_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_large_distinct",
+      "process_id": 2349452,
+      "recipe": "r07_large_distinct",
+      "topology": "distinct"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_large_shared",
+      "process_id": 2349337,
+      "recipe": "r06_large_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_medium_shared",
+      "process_id": 2349318,
+      "recipe": "r04_medium_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_multislide_distinct",
+      "process_id": 2352745,
+      "recipe": "r11_multislide_distinct",
+      "topology": "distinct"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_multislide_shared",
+      "process_id": 2352744,
+      "recipe": "r10_multislide_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_near_distinct",
+      "process_id": 2352709,
+      "recipe": "r09_near_distinct",
+      "topology": "distinct"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_near_shared",
+      "process_id": 2349453,
+      "recipe": "r08_near_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_small_distinct",
+      "process_id": 2349336,
+      "recipe": "r03_small_distinct",
+      "topology": "distinct"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_read_tiny_shared",
+      "process_id": 2349316,
+      "recipe": "r01_tiny_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_save_medium_shared",
+      "process_id": 2352757,
+      "recipe": "r04_medium_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_save_reopen_medium_shared",
+      "process_id": 2352775,
+      "recipe": "r04_medium_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "package_scalar_edit_small_shared",
+      "process_id": 2352746,
+      "recipe": "r02_small_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "presentation_noop_small_shared",
+      "process_id": 2352749,
+      "recipe": "r02_small_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "presentation_read_small_shared",
+      "process_id": 2349317,
+      "recipe": "r02_small_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "presentation_scalar_edit_small_shared",
+      "process_id": 2352747,
+      "recipe": "r02_small_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": "Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)",
+      "expected": "Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)",
+      "five_predicates": true,
+      "lane": "signed_changed_refusal",
+      "process_id": 2352808,
+      "recipe": "r15_signed",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "signed_noop",
+      "process_id": 2352807,
+      "recipe": "r15_signed",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": "Error::ContentType",
+      "expected": "Error::ContentType",
+      "five_predicates": true,
+      "lane": "stale_content_type",
+      "process_id": 2352806,
+      "recipe": "r19_stale_content_type",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": "Error::StaleSource",
+      "expected": "Error::StaleSource",
+      "five_predicates": true,
+      "lane": "stale_owner",
+      "process_id": 2352803,
+      "recipe": "r16_stale_owner",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": "Error::StaleSource",
+      "expected": "Error::StaleSource",
+      "five_predicates": true,
+      "lane": "stale_owner_rels",
+      "process_id": 2352804,
+      "recipe": "r17_stale_owner_rels",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": "Error::StaleSource",
+      "expected": "Error::StaleSource",
+      "five_predicates": true,
+      "lane": "stale_target",
+      "process_id": 2352805,
+      "recipe": "r18_stale_target",
+      "topology": "none"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "strict_shared_edit",
+      "process_id": 2352812,
+      "recipe": "r13_strict_shared",
+      "topology": "shared"
+    },
+    {
+      "actual_error_type": null,
+      "expected": "success",
+      "five_predicates": true,
+      "lane": "unknown_outbound_read_edit",
+      "process_id": 2352811,
+      "recipe": "r14_opaque_unknown_external",
+      "topology": "shared"
+    }
+  ],
+  "lanes": 42,
+  "matrix_accepted_lanes": 42,
+  "matrix_failed_lanes": 0,
+  "production_source_baseline_commit": "2a2ffa1cae4e6b7070082768ce84483e5d411dc8",
+  "results": "/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv/capture-results/run",
+  "schema": "pptx-ink-actions-correctness-receipt-audit-v1",
+  "semantic_owner_commit": "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd",
+  "timing_wrapper_present": false
+}

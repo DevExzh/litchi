@@ -1,0 +1,4 @@
+SRC=/var/tmp/pptx-ink-actions-correctness-a8dff0f60-src.Zk6bXL
+RESULTS=/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv/capture-results/run
+TARGET=/var/tmp/pptx-ink-actions-correctness-a8dff0f60.l7raBv/capture-target-parent/target
+STATUS=0
