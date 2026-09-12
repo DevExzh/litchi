@@ -10,16 +10,52 @@ fi
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT=$(CDPATH= cd -- "$HERE/../../../../" && pwd)
 HARNESS="$HERE/harness/Cargo.toml"
+PROFILE_PINS="$HERE/profile_pins.py"
 RESULTS="$HERE/results/smoke"
 TARGET=${CARGO_TARGET_DIR:-/var/tmp/litchi-ink-action-edit-smoke-target}
-EXPECTED_COMMIT=079cbbcbfc00c8d2412a38586a9688ae7eb0009e
-declare -A EXPECTED_SOURCE_HASHES=(
-    ["$ROOT/crates/litchi-drawingml/src/ink/mod.rs"]=a9a55cf0c44b59afa00a7b7c472c0f010eef5c23e62a816d4bb0f27aa6f67ff7
-    ["$ROOT/crates/litchi-drawingml/src/ink/actions.rs"]=4e4731d59ab95679f205d424567dcf4d8e02f27c9318ed8ac955a8c163910628
-    ["$ROOT/crates/litchi-drawingml/src/ink/actions_edit.rs"]=b037eb7fae01b2e62c3c3a1050d9044466ad8d8e1a1402bb13533b2ba8bf9850
-    ["$ROOT/crates/litchi-drawingml/tests/ink_action_edit.rs"]=af92fe9d2923ac1197e4f152a5e34350217b5c782fa00365b82c141f69787640
-    ["$ROOT/crates/litchi-drawingml/tests/ink_action_id_boundaries.rs"]=f07b423989443d68ccba070aef5fed610bc39acb2c8b5a6adf14de8074afbf06
-)
+PROFILE_ARM=${PROFILE_ARM:-baseline}
+if [ ! -f "$PROFILE_PINS" ]; then
+    echo "profile source pin manifest is missing: $PROFILE_PINS" >&2
+    exit 1
+fi
+APPROVED_BASE_COMMIT=""
+PROFILE_SOURCE_PIN=""
+declare -A EXPECTED_SOURCE_HASHES=()
+while IFS=$'\t' read -r kind relative digest; do
+    case "$kind" in
+        base)
+            if [ -n "$APPROVED_BASE_COMMIT" ] || [ -z "$relative" ] || [ -n "$digest" ]; then
+                echo "malformed profile base pin manifest for arm $PROFILE_ARM" >&2
+                exit 2
+            fi
+            APPROVED_BASE_COMMIT="$relative"
+            ;;
+        pin)
+            if [ -n "$PROFILE_SOURCE_PIN" ] || [ -z "$relative" ] || [ -n "$digest" ]; then
+                echo "malformed profile source pin manifest for arm $PROFILE_ARM" >&2
+                exit 2
+            fi
+            PROFILE_SOURCE_PIN="$relative"
+            ;;
+        source)
+            if [ -z "$relative" ] || [ -z "$digest" ] || [ -n "${EXPECTED_SOURCE_HASHES[$ROOT/$relative]:-}" ]; then
+                echo "malformed profile source hash manifest for arm $PROFILE_ARM" >&2
+                exit 2
+            fi
+            EXPECTED_SOURCE_HASHES["$ROOT/$relative"]="$digest"
+            ;;
+        "")
+            ;;
+        *)
+            echo "unknown profile source pin manifest record: $kind" >&2
+            exit 2
+            ;;
+    esac
+done < <(python3 "$PROFILE_PINS" --arm "$PROFILE_ARM")
+if [ -z "$APPROVED_BASE_COMMIT" ] || [ -z "$PROFILE_SOURCE_PIN" ] || [ "${#EXPECTED_SOURCE_HASHES[@]}" -ne 5 ]; then
+    echo "incomplete profile source pin manifest for arm $PROFILE_ARM" >&2
+    exit 2
+fi
 EXPECTED_ACTIONS_EDIT_SHA256=${EXPECTED_SOURCE_HASHES["$ROOT/crates/litchi-drawingml/src/ink/actions_edit.rs"]}
 LANES="draft_opaque_64 scalar_edit_scaled_128 scalar_batch_scaled_128 scalar_batch_near_1024 scalar_coalesce_scaled_128 scalar_coalesce_near_1024 no_op_small_8 add_small_8 insert_batch_scaled_128 insert_batch_near_1024 remove_batch_scaled_128 remove_batch_near_1024 clear_batch_scaled_128 clear_batch_near_1024 move_batch_scaled_128 move_batch_near_1024 cap_refusal_small_8"
 
@@ -31,8 +67,12 @@ $ROOT/crates/litchi-drawingml/tests/ink_action_edit.rs
 $ROOT/crates/litchi-drawingml/tests/ink_action_id_boundaries.rs"
 
 CURRENT_COMMIT=$(git -C "$ROOT" rev-parse HEAD)
-if ! git -C "$ROOT" merge-base --is-ancestor "$EXPECTED_COMMIT" "$CURRENT_COMMIT"; then
+if ! git -C "$ROOT" merge-base --is-ancestor "$APPROVED_BASE_COMMIT" "$CURRENT_COMMIT"; then
     echo "approved InkAction smoke source commit is not in history" >&2
+    exit 1
+fi
+if ! git -C "$ROOT" merge-base --is-ancestor "$PROFILE_SOURCE_PIN" "$CURRENT_COMMIT"; then
+    echo "selected $PROFILE_ARM smoke source pin is not in history: $PROFILE_SOURCE_PIN" >&2
     exit 1
 fi
 for variable in RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP RUSTDOCFLAGS; do
@@ -83,7 +123,9 @@ write_source_inputs() {
     {
         printf 'base_commit='
         git -C "$ROOT" rev-parse HEAD
-        printf 'approved_base_commit=%s\n' "$EXPECTED_COMMIT"
+        printf 'profile_arm=%s\n' "$PROFILE_ARM"
+        printf 'source_pin=%s\n' "$PROFILE_SOURCE_PIN"
+        printf 'approved_base_commit=%s\n' "$APPROVED_BASE_COMMIT"
         printf 'source_sha256:\n'
         for path in $SOURCE_FILES; do
             sha256sum "$path"
@@ -112,11 +154,13 @@ rm -f "$RESULTS/source-inputs-before.txt" "$RESULTS/source-inputs-after.txt" \
     printf '%s\n' "root=$ROOT"
     printf '%s\n' "harness=$HARNESS"
     printf '%s\n' "target=$TARGET"
+    printf '%s\n' "profile_arm=$PROFILE_ARM"
+    printf '%s\n' "source_pin=$PROFILE_SOURCE_PIN"
     printf '%s\n' 'warmup=1'
     printf '%s\n' 'samples_per_lane=1'
     printf '%s\n' "lanes=$LANES"
     printf '%s\n' "approved_actions_edit_sha256=$EXPECTED_ACTIONS_EDIT_SHA256"
-    printf '%s\n' "approved_commit=$EXPECTED_COMMIT"
+    printf '%s\n' "approved_commit=$PROFILE_SOURCE_PIN"
 } >"$RESULTS/commands.txt"
 
 export CARGO_TARGET_DIR="$TARGET"
@@ -133,6 +177,8 @@ sha256sum "$BIN" >"$RESULTS/binary.sha256"
 {
     printf 'binary=%s\n' "$BIN"
     cat "$RESULTS/binary.sha256"
+    printf 'profile_arm=%s\n' "$PROFILE_ARM"
+    printf 'source_pin=%s\n' "$PROFILE_SOURCE_PIN"
     printf '%s\n' 'flags=none'
     printf '%s\n' 'cargo_incremental=0'
 } >"$RESULTS/build-provenance.txt"
@@ -151,12 +197,16 @@ cmp -s "$RESULTS/binary.sha256" "$RESULTS/binary-after.sha256"
 {
     printf 'base_commit='
     git -C "$ROOT" rev-parse HEAD
-    printf 'approved_base_commit=%s\n' "$EXPECTED_COMMIT"
+    printf 'profile_arm=%s\n' "$PROFILE_ARM"
+    printf 'source_pin=%s\n' "$PROFILE_SOURCE_PIN"
+    printf 'approved_base_commit=%s\n' "$APPROVED_BASE_COMMIT"
     printf 'source_inputs_before_sha256='
     sha256sum "$RESULTS/source-inputs-before.txt" | cut -d' ' -f1
     printf 'source_inputs_after_sha256='
     sha256sum "$RESULTS/source-inputs-after.txt" | cut -d' ' -f1
     printf 'approved_actions_edit_sha256=%s\n' "$EXPECTED_ACTIONS_EDIT_SHA256"
+    printf 'profile_pins_sha256='
+    sha256sum "$PROFILE_PINS" | cut -d' ' -f1
     printf 'git_status_relevant='
     git -C "$ROOT" status --short -- \
         crates/litchi-drawingml/src/ink crates/litchi-drawingml/tests/ink_action_edit.rs \

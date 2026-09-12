@@ -10,6 +10,13 @@ and its semantic tests are frozen. The run must satisfy all of these gates:
   untracked, or outside that checkout without a retained source snapshot;
 - the isolated harness `Cargo.lock` is the authoritative lockfile; the root
   `Cargo.lock` and `docs/GOAL.md` are not build inputs;
+- the selected `PROFILE_ARM` is one of the pinned baseline or candidate arms;
+  its source pin is an ancestor of the captured head and its five exact
+  production source hashes match `profile_pins.py`;
+- a matched candidate capture uses the isolated child of the clean baseline
+  pin with only the reviewed InkAction source change; both arms use the same
+  Rust/Cargo 1.95.0 toolchain, harness lockfile, fixtures, allocator, flags,
+  lanes, process count, warm-ups, and sample count;
 - all 34 lanes have exactly three fresh-process JSON receipts with twenty measured
   samples after two warm-ups;
 - allocator requested-byte accounting, reallocations, deallocations, live
