@@ -5,11 +5,12 @@ use super::{
     MAX_AGGREGATE_BYTES, MAX_DEPTH, MAX_OCCURRENCES, MAX_VALUE_BYTES, OFFICE, TEXT, XLINK, invalid,
     make_error,
 };
+use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Body, Part, Scope};
-use litchi_core::Result;
+use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 
@@ -55,6 +56,7 @@ pub(super) fn parse_part(
     references: &mut Vec<AlphabeticalIndexAutoMarkFile>,
     scopes: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
@@ -65,6 +67,10 @@ pub(super) fn parse_part(
     let mut pending: Option<PendingElement> = None;
 
     loop {
+        if let Some(budget) = budget {
+            budget.event(depth)?;
+        }
+        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|error| make_error(format!("invalid auto-mark-file XML: {error}")))?;
@@ -75,7 +81,7 @@ pub(super) fn parse_part(
                         "text:alphabetical-index-auto-mark-file cannot contain elements",
                     );
                 }
-                let namespace = namespace_uri(&namespace)?;
+                let namespace = namespace_uri(&namespace, decoder)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if is_auto_mark_file(namespace.as_deref(), &local) {
@@ -90,7 +96,7 @@ pub(super) fn parse_part(
                         );
                     }
                     register_reference(
-                        &reader, element, part, scope, references, scopes, aggregate,
+                        &reader, element, part, scope, references, scopes, aggregate, budget,
                     )?;
                     pending = Some(PendingElement { depth: depth + 1 });
                 }
@@ -116,10 +122,19 @@ pub(super) fn parse_part(
                         active.last_rank = active.last_rank.max(rank);
                     }
                 }
+                stack
+                    .try_reserve_exact(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "ODT auto-mark parser frame stack",
+                        source,
+                    })?;
                 stack.push(Frame { namespace, local });
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| make_error("auto-mark-file XML depth overflow"))?;
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth)?;
+                }
                 if depth > MAX_DEPTH {
                     return invalid(format!(
                         "auto-mark-file XML nesting exceeds {MAX_DEPTH} levels"
@@ -127,12 +142,15 @@ pub(super) fn parse_part(
                 }
             },
             Event::Empty(ref element) => {
+                if let Some(budget) = budget {
+                    budget.observe_depth(depth.saturating_add(1))?;
+                }
                 if pending.is_some() {
                     return invalid(
                         "text:alphabetical-index-auto-mark-file cannot contain elements",
                     );
                 }
-                let namespace = namespace_uri(&namespace)?;
+                let namespace = namespace_uri(&namespace, decoder)?;
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace.as_deref(), &local)?;
                 if is_auto_mark_file(namespace.as_deref(), &local) {
@@ -147,7 +165,7 @@ pub(super) fn parse_part(
                         );
                     }
                     register_reference(
-                        &reader, element, part, scope, references, scopes, aggregate,
+                        &reader, element, part, scope, references, scopes, aggregate, budget,
                     )?;
                 }
                 if let Some(active) = scope.as_mut()
@@ -213,6 +231,7 @@ fn register_reference(
     references: &mut Vec<AlphabeticalIndexAutoMarkFile>,
     scopes: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<()> {
     if scope.seen_auto_mark_file {
         return invalid("duplicate text:alphabetical-index-auto-mark-file in one office:text");
@@ -222,7 +241,7 @@ fn register_reference(
     }
     scope.seen_auto_mark_file = true;
 
-    let attributes = collect_attributes(reader, element, aggregate)?;
+    let attributes = collect_attributes(reader, element, aggregate, budget)?;
     reject_unexpected(&attributes)?;
     let href = required_nonempty(&attributes, XLINK, "href")?;
     match get(&attributes, XLINK, "type") {
@@ -235,6 +254,14 @@ fn register_reference(
     }
 
     let scope_value = Scope::Body(Body::Text);
+    if let Some(budget) = budget {
+        budget.check()?;
+        budget.consume_objects(1)?;
+    }
+    scopes.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "ODT auto-mark scopes",
+        source,
+    })?;
     if !scopes.insert((part, scope_value.clone())) {
         return invalid("duplicate text:alphabetical-index-auto-mark-file in one document part");
     }
@@ -243,6 +270,12 @@ fn register_reference(
             "document exceeds {MAX_OCCURRENCES} auto-mark-file references"
         ));
     }
+    references
+        .try_reserve_exact(1)
+        .map_err(|source| Error::Allocation {
+            resource: "ODT auto-mark references",
+            source,
+        })?;
     references.push(AlphabeticalIndexAutoMarkFile {
         part,
         scope: scope_value,
@@ -255,13 +288,20 @@ fn collect_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
+    budget: Option<&FlatMutationBudget>,
 ) -> Result<Attributes> {
     let mut attributes = HashMap::new();
     for attribute in element.attributes().with_checks(true) {
+        if let Some(budget) = budget {
+            budget.check()?;
+        }
         let attribute = attribute
             .map_err(|error| make_error(format!("invalid auto-mark-file attribute: {error}")))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-        let namespace = namespace_uri(&namespace)?.unwrap_or_default();
+        let namespace = namespace_uri(&namespace, reader.decoder())?.unwrap_or_default();
         let local = decode(local.as_ref(), "attribute name")?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
@@ -276,6 +316,12 @@ fn collect_attributes(
         if *aggregate > MAX_AGGREGATE_BYTES {
             return invalid("auto-mark-file metadata exceeds 16 MiB");
         }
+        attributes
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "ODT auto-mark attribute map",
+                source,
+            })?;
         if attributes.insert((namespace, local), value).is_some() {
             return invalid("duplicate expanded auto-mark-file attribute");
         }
@@ -318,19 +364,41 @@ fn required_nonempty(attributes: &Attributes, namespace: &str, local: &str) -> R
     }
 }
 
-fn namespace_uri(result: &ResolveResult<'_>) -> Result<Option<String>> {
-    match result {
-        ResolveResult::Bound(Namespace(value)) => Ok(Some(decode(value, "namespace URI")?)),
-        ResolveResult::Unbound => Ok(None),
-        ResolveResult::Unknown(prefix) => Err(make_error(format!(
-            "unbound namespace prefix '{}'",
-            String::from_utf8_lossy(prefix)
-        ))),
-    }
+fn namespace_uri(
+    result: &ResolveResult<'_>,
+    decoder: quick_xml::Decoder,
+) -> Result<Option<String>> {
+    crate::namespace::resolved_namespace_uri(result, decoder, "auto-mark-file")
+        .map(|namespace| namespace.map(|uri| uri.into_owned()))
 }
 
 fn decode(value: &[u8], description: &str) -> Result<String> {
     std::str::from_utf8(value)
         .map(str::to_string)
         .map_err(|_error| make_error(format!("invalid UTF-8 {description}")))
+}
+
+#[cfg(test)]
+mod namespace_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_entity_escaped_odf_namespace_uris() {
+        let xml = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office&#58;1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text&#58;1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><o:body><o:text><t:alphabetical-index-auto-mark-file xlink:type="simple" xlink:href="escaped.sdi"/></o:text></o:body></o:document-content>"#;
+        let mut references = Vec::new();
+        let mut scopes = HashSet::new();
+        let mut aggregate = 0;
+
+        parse_part(
+            xml,
+            Part::Content,
+            &mut references,
+            &mut scopes,
+            &mut aggregate,
+            None,
+        )
+        .expect("entity-escaped ODF namespace URIs should resolve semantically");
+        assert_eq!(references.len(), 1);
+        assert_eq!(references[0].href, "escaped.sdi");
+    }
 }

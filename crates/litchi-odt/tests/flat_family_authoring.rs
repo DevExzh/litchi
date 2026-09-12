@@ -360,13 +360,10 @@ fn flat_text_save_supports_near_name_max_destinations() {
 
 #[cfg(windows)]
 #[test]
-fn flat_text_save_refuses_windows_publication_without_atomic_primitive() {
+fn flat_text_save_publishes_windows_destination_atomically() {
     let directory = tempfile::tempdir().unwrap();
-    let destination = directory.path().join("unsupported.fodt");
+    let destination = directory.path().join("published.fodt");
     let source = Document::from_bytes(FLAT_TEXT.as_bytes().to_vec()).unwrap();
-    assert!(matches!(
-        source.save(&destination),
-        Err(litchi_core::Error::Unsupported(_))
-    ));
-    assert!(!destination.exists());
+    source.save(&destination).unwrap();
+    assert_eq!(std::fs::read(destination).unwrap(), source.as_bytes());
 }

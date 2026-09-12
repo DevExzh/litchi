@@ -20,7 +20,6 @@ use crate::core::{
 use litchi_core::{Error, ReadAt, Resource, ResourceLimit, Result, SourceVersion};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 #[cfg(test)]
 use std::cell::Cell;
@@ -278,14 +277,19 @@ fn with_flat_mime<T>(
 ) -> Result<Option<T>> {
     let mut reader = NsReader::from_reader(value);
     loop {
+        let decoder = reader.decoder();
         let (event_namespace, event) = match reader.read_resolved_event() {
             Ok(event) => event,
             Err(_) => return Ok(None),
         };
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                if !matches!(event_namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                    || element.local_name().as_ref() != b"document"
+                if !crate::namespace::namespace_matches(
+                    &event_namespace,
+                    OFFICE_NAMESPACE,
+                    decoder,
+                    "ODF flat detector",
+                )? || element.local_name().as_ref() != b"document"
                 {
                     return Ok(None);
                 }
@@ -293,10 +297,19 @@ fn with_flat_mime<T>(
                     let Ok(attribute) = raw_attribute else {
                         return Ok(None);
                     };
+                    if attribute.key.as_ref() == b"xmlns"
+                        || attribute.key.as_ref().starts_with(b"xmlns:")
+                    {
+                        continue;
+                    }
                     let (attribute_namespace, local_name) =
                         reader.resolver().resolve_attribute(attribute.key);
-                    if matches!(attribute_namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-                        && local_name.as_ref() == b"mimetype"
+                    if crate::namespace::namespace_matches(
+                        &attribute_namespace,
+                        OFFICE_NAMESPACE,
+                        decoder,
+                        "ODF flat detector",
+                    )? && local_name.as_ref() == b"mimetype"
                     {
                         let Ok(decoded_mimetype) = attribute.decoded_and_normalized_value(
                             XmlVersion::Implicit1_0,
@@ -1326,6 +1339,19 @@ mod tests {
             flat_mime(padded.as_bytes()).as_deref(),
             Some(constants::ODF_TEXT)
         );
+    }
+
+    #[test]
+    fn detects_flat_documents_with_entity_escaped_office_namespace_uri() {
+        let xml = format!(
+            r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:&#x31;.0" o:mimetype="{}"><o:body><o:text/></o:body></o:document>"#,
+            constants::ODF_TEXT,
+        );
+        assert_eq!(
+            flat_mime(xml.as_bytes()).as_deref(),
+            Some(constants::ODF_TEXT)
+        );
+        assert_eq!(flat(xml.as_bytes()), Some(Format::Odt));
     }
 
     #[test]
