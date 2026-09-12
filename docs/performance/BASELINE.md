@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0541: public XLSX planning first-error guards
+
+[0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. No
+timing baseline changes. Six public tests with 37 named fixture configurations establish
+the correctness prerequisite for sharing the worksheet traversal measured in 0540.
+Existing latency/allocation/profile gates remain required for any future candidate.
+
 ## 0540: XLSX validation/parser boundary attribution
 
 [0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.

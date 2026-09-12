@@ -1,0 +1,9 @@
+{
+  "final_stage": "attempt5",
+  "focused_test_count": 6,
+  "full_test_count": 1298,
+  "decision": "retain test-only first-error guard",
+  "performance_claim": "none",
+  "runtime_changed": false,
+  "rationale": "0540 measured duplicate worksheet traversal; these public integration tests establish validation/preprocessing/parser and selected-sheet ordering before a shared event-stream candidate. Final quality receipts are required by verifier before acceptance."
+}

@@ -1,0 +1,22 @@
+{
+  "attempt1": {
+    "disposition": "superseded",
+    "result": "focused compile failed with E0583: module path omitted the integration-test subdirectory",
+    "correction": "Added explicit #[path] and concrete Arc clone coercion; no runtime source changed."
+  },
+  "attempt2": {
+    "disposition": "superseded",
+    "result": "Focused run: three passed, one failed during malformed XML fixture construction in OPC publication",
+    "correction": "Used existing raw StreamingArchiveWriter test pattern to replace worksheet bytes without authored-XML validation."
+  },
+  "attempt3": {
+    "disposition": "superseded after review additions",
+    "result": "Four focused tests and 1,296 full tests passed; all six quality checks passed. Superseded only to incorporate independent review additions.",
+    "correction": "Review requested numeric materialization and valid-first/faulty-second coverage; root also pins cross-sheet workbook ordering."
+  },
+  "attempt4": {
+    "disposition": "superseded formatting only",
+    "result": "Six focused tests and 1,298 full tests passed, workspace check/targeted Clippy/rustdoc passed; formatting failed because the draft was formatted outside repository config. Boundary check was not started.",
+    "correction": "Apply repository rustfmt config; only five match-arm commas changed."
+  }
+}

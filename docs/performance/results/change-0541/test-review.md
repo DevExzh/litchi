@@ -4,6 +4,14 @@ This is an independent review of the public source-backed XLSX error-order
 tests. The review is limited to test scope and fixture semantics; no build or
 Rust test command was run here.
 
+The reviewed attempt 4 source at
+`crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs`
+was inspected read-only. Its SHA-256 is
+`05cf40a51c537bde5ff6c6c4d8e68bcf2ef2a791a050952d586844894a34bb50`.
+Its focused validation was confirmed as six passing test functions. Full
+quality was pending at review time; the root follow-up below records the final
+formatting-only revision and completed checks.
+
 ## Public path and error ownership
 
 The intended path is the right one: construct a `SourceBackedEditor` with
@@ -24,13 +32,16 @@ boundary.
 
 ## What the current matrix covers
 
-The 18 independent rows provide useful public-path coverage for:
+The proposed `raw_and_validator_cases` now has 19 independent worksheet rows:
+the original 18 plus an exact numeric materialization row. It provides useful
+public-path coverage for:
 
 - raw worksheet decoding and parser semantics: row/cell-reference mismatch,
   style lexical decoding, boolean decoding, formula syntax, and an unknown
   cell type that reaches scalar-cell materialization;
 - raw OOXML preprocessing: an MCE namespace marker plus a processing
-  instruction, with a typed `Error::MarkupCompatibility` assertion;
+  instruction, with a typed `Error::MarkupCompatibility` assertion; the
+  separate MCE test contributes three additional cases;
 - value-only validation: cell metadata, unsupported elements, mixed
   SpreadsheetML dialects, unqualified and qualified attributes, duplicate and
   malformed attributes, incomplete/mismatched markup, DTD refusal, and a
@@ -43,52 +54,57 @@ The retry and source-byte assertions are also appropriate. They demonstrate
 that an error is returned through the public editor operation and that the
 read-only source remains usable after the failed attempt.
 
-## Gaps to close before treating the matrix as complete
+The proposed revision also adds two valid-first/faulty-second worksheet cases
+and a two-fault workbook-order case. These cover reaching a bad second selected
+worksheet and the fact that `resolve_selectors` processes selected positions
+in workbook order, even when the caller supplies selectors in reverse order.
+
+## Coverage additions and pending verification
 
 1. **The MCE preprocessing pair is now present; retain its three-way shape.**
    `full_validation_precedes_mce_preprocessing_and_raw_parsing_errors` has an
-   independent marker-plus-PI case, a marker/PI before a raw cell error, and a
-   marker/PI plus a raw error and late `<mergeCells/>`. The first two should
+   independent marker-plus-PI case, a marker before a raw cell error whose PI
+   appears after that raw cell in byte order, and a marker/PI plus a raw error
+   and late `<mergeCells/>`. The first two should
    return typed `Error::MarkupCompatibility` with
    `mce::Error::NonConformant("DTD and processing instructions are rejected")`;
    the last must return the validator's exact `Error::Invalid` message. This
    proves validation wins before preprocessing, which in turn precedes raw
-   parsing. A focused run reported all three MCE cases passing.
+   parsing. The PI's position after the raw cell bytes does not change the
+   result: preprocessing runs before raw parser/materialization, so its MCE
+   error still wins. The final focused run reports all six test functions
+   passing, including these three MCE cases; full quality validation remains
+   pending.
 
    A PI without the MCE URI is a valid control and should remain in the
    namespace/PI acceptance test. Adding the URI to that control would change
    its expected result because the raw preprocessor deliberately rejects it.
 
-2. **Add an independent numeric materialization row.** The combined
-   raw-before-validator case uses `not-a-number`, but it does not independently
-   assert the raw error. Add a standalone `<v>not-a-number</v>` case with the
-   exact `Error::Invalid("invalid worksheet number 'not-a-number'")` result.
-   This makes the pair auditable instead of relying on the combined test to
-   establish the raw side. The existing boolean and unknown-cell rows cover
-   other decode/materialization classes; a date case is optional.
+2. **The independent numeric materialization row is now present.** The
+   proposed revision asserts the standalone `<v>not-a-number</v>` case as
+   exact `Error::Invalid("invalid worksheet number 'not-a-number'")` and adds
+   the same fault to the raw-before-late-validator cross-product. The existing
+   boolean and unknown-cell rows cover other decode/materialization classes; a
+   date case remains optional. The focused validation passed; full quality
+   validation remains pending.
 
-3. **Exercise the second selected sheet.** The matrix still puts every fault
-   in Sheet1 and makes Sheet2 valid. `assert_error_case` now retries Sheet1
-   and then successfully edits Sheet2 alone, which is a useful failed-state
-   isolation check, but it does not prove that the multi-sheet traversal
-   reaches a faulty second worksheet. Add the inverse arrangement: valid Sheet1,
-   faulty Sheet2, and `edit_sheets(["Sheet1", "Sheet2"])`. Assert the same
-   typed error and unchanged source on the first attempt and on retry. This
-   confirms that the selected-sheet loop reaches the second worksheet after
-   successfully materializing the first, and that no partial result is
-   published. A two-invalid-sheet case is useful only if its expected first
-   sheet is documented as workbook/selection order; it is not a substitute for
-   the valid-first/invalid-second case.
+3. **The second selected-sheet cases are now present.** The proposed
+   `later_selected_worksheet_failure_does_not_publish_the_first_snapshot`
+   test puts valid Sheet1 before raw-faulty or validator-faulty Sheet2 and
+   verifies recovery of Sheet1 after each failure. The proposed
+   `first_error_across_selected_worksheets_follows_workbook_order` test also
+   checks two faulty sheets with reversed caller selectors and independently
+   reaches Sheet2's validator error. This closes the prior traversal gap;
+   focused validation passed, while full quality validation remains pending.
 
-4. **Make combined rows traceable to independent owners.** For each named
+4. **Combined rows are now traceable to independent owners.** For each named
    combined pair, retain an independent raw/preprocessing fixture and an
    independent validator fixture with the same fault. The two existing order
    cases correctly check a raw fault before and after a late attribute error,
    and the MCE test now establishes the preprocessing owner independently and
-   in combination. The numeric raw fault should still have its own exact
-   standalone assertion. This avoids a matrix that reports the expected first
-   error without proving that both competing errors are independently
-   reachable.
+   in combination; the proposed numeric row does the same for numeric
+   materialization. This avoids a matrix that reports the expected first error
+   without proving that both competing errors are independently reachable.
 
 X14ac extension failures are not a good missing public pair here. The
 value-only validator rejects the qualified extension attributes that the raw
@@ -112,10 +128,10 @@ the validator error in either arrangement.
 | MCE-bearing processing instruction | late unsupported/dependency element | typed validator `Error::Invalid`, never MCE preprocessing |
 | unknown cell type reaching scalar validation | value-only metadata attribute | exact validator `Error::Invalid` |
 
-The matrix need not duplicate every row in both positions, but it should retain
-at least one parser/materialization-before-validator and one validator-before-
+The matrix need not duplicate every row in both positions, but it retains at
+least one parser/materialization-before-validator and one validator-before-
 parser/materialization ordering, plus the preprocessing pair. The second-sheet
-case should use one of these same pairs.
+cases use raw and validator faults from the same families.
 
 ## Assertion and implementation pitfalls
 
@@ -144,10 +160,23 @@ case should use one of these same pairs.
 
 ## Review disposition
 
-The current test direction is sound and the existing independent rows are
-valuable. The MCE preprocessing pair and failed-state isolation check are now
-in place. Before calling the combined matrix complete, add an independently
-asserted numeric raw case and the valid-first/invalid-second selected-sheet
-case. These additions directly test validation-first versus
-preprocessing/parser/materialization ownership while respecting the fact that
-OPC package validation precedes all worksheet-level checks.
+The proposed revision addresses the prior coverage gaps: 19 independent
+worksheet rows, three separate MCE cases, standalone and combined numeric
+materialization, valid-first/faulty-second traversal, and reversed-selector
+workbook-order checks. The focused result is confirmed as six passing test
+functions; the review is favorable subject to root's full quality receipts.
+No further semantic coverage findings remain. These additions directly test
+validation-first versus preprocessing/parser/materialization ownership while
+respecting the fact that OPC package validation precedes all worksheet-level
+checks.
+
+## Root formatting follow-up
+
+Attempt 5 differs from the reviewed attempt 4 only by the five match-arm
+commas required by the repository rustfmt configuration. The exact retained
+source comparison confirms that no fixture or assertion changed. Its focused
+run also passes all six tests. Final source SHA-256: `715a4d8f97a0ca03fc6c212cfe4d177805ef70c4e9e0fb6ec16cde44c1b080db`.
+
+Root final validation is complete: attempt 5 passes six focused tests, 1,298
+full-suite executions and all six quality checks. Exact command/source bindings
+are retained in its receipts; the earlier pending notes describe review time.

@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0541: public XLSX planning first-error guards
+
+[0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. Six
+test functions cover 37 named public planning fixtures. They pin validation before
+preprocessing/raw parsing within one worksheet, and workbook-order errors across
+worksheets, with retry and unaffected-sheet recovery. Five exact source attempts retain
+compile, fixture and formatting corrections. Production remains unchanged; no speedup is
+claimed.
+
 ## 0540: XLSX validation/parser boundary attribution
 
 [0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.

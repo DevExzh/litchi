@@ -1,0 +1,9 @@
+{
+  "created_utc": "2026-09-12T20:46:40.363155+00:00",
+  "files": {
+    "plan.json": "8c09362945623bcb2e314315932d21189f82c882a868b705bb886c4492e98996",
+    "run.py": "c26e67baed76f434410fd3cf08be2c584b6211e6adfbf90f1afac163ae27669b",
+    "quality-plan.json": "2bf596efa9b7273169bf03d7e2209f4b74c19b589757552625ad96178a9b5373",
+    "adr-manifest.json": "1ca582f160399de807ac1cd63840395f68daff4bd7de510b93497357a9f3a900"
+  }
+}

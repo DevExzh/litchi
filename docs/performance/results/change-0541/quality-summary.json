@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "final_stage": "attempt5",
+  "final_full_tests": 1298,
+  "final_focused_tests": 6,
+  "receipt_sha256": {
+    "attempt5/focused-tests.receipt.json": "7175d400ad341c68bc5741cc92180151a937236cc1954c4bebb0049fba8198ac",
+    "attempt5/quality-boundaries.receipt.json": "9e0bb081a373a89e4e0480e5f029f967400d581f2f38d026bcbb3dfc00cf9adc",
+    "attempt5/quality-check.receipt.json": "b90f752d3a587b1e5310173e2274db8ae81436374efba5e66574ea3053b5398a",
+    "attempt5/quality-clippy.receipt.json": "06feaca69ff528c1fc50ae0e398c087f54e770ccaa30415379be6da73d0a1607",
+    "attempt5/quality-fmt.receipt.json": "8be19c36ed71f5262dcae3987c6471e9443cd79ee3a9f959c28fb0b1291b4f57",
+    "attempt5/quality-rustdoc.receipt.json": "b230230b229ece54ebfeb921193478312eb003124a337b1cdc91c22f4773e69f",
+    "attempt5/quality-tests.receipt.json": "e04295bd2739a2cea69046382482259a548fa98ebec4d0b0149e812787b0fda5"
+  },
+  "prior_attempts_retained": true,
+  "performance_claim": "none"
+}

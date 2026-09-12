@@ -20,7 +20,6 @@ use litchi_xlsx::cell_values::{
 use litchi_xlsx::{Address, Cell, EditBlock, Error, ErrorValue, Formula, Number, Selector, Value};
 use soapberry_zip::office::ArchiveReader;
 
-#[path = "source_backed_cell_values/planning_error_order.rs"]
 mod planning_error_order;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -354,12 +353,6 @@ fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext
     .unwrap();
     let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
     (budget, cancellation_source, context)
-}
-
-fn managed_publication_memory(payload_bytes: u64) -> u64 {
-    payload_bytes
-        .checked_add(MANAGED_PUBLICATION_SCRATCH_BYTES)
-        .expect("managed publication memory fits in u64")
 }
 
 fn with_style_and_theme(bytes: &[u8]) -> Vec<u8> {
