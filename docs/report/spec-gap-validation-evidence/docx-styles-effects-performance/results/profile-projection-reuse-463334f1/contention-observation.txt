@@ -1,0 +1,6 @@
+schema=docx-styles-effects-profile-contention-observation-v1
+capture_start_host_receipt=host-before.txt
+observed_at_utc=2026-09-12T17:15:27Z
+observed_processes=cargo-fmt PID 3373108; rustfmt PID 3373198
+scope=operator observation immediately before the profile launch; not a continuous census
+interpretation=shared-host contention was present or recently present; timing remains bounded and uninterpretable for idle/uncontended claims
