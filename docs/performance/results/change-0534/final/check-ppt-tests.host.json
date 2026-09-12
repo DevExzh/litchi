@@ -1,0 +1,56 @@
+{
+  "observed_utc": "2026-09-12T17:16:36.199566+00:00",
+  "compiler_processes": [
+    {
+      "pid": 3381787,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3381806,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3383114,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3384375,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3385058,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3386078,
+      "comm": "rustc",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3386923,
+      "comm": "cargo",
+      "cwd": "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-frozen463"
+    },
+    {
+      "pid": 3390416,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-frozen463/crates/litchi-ooxml-common"
+    },
+    {
+      "pid": 3391629,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps"
+    },
+    {
+      "pid": 3391844,
+      "comm": "rustc",
+      "cwd": "/var/tmp/litchi-docx-styles-effects-profile-projection-reuse-d000-c4ac-frozen463/crates/litchi-drawingml"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

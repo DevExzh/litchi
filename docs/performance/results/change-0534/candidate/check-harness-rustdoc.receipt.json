@@ -1,0 +1,41 @@
+{
+  "command": [
+    "env",
+    "TMPDIR=/home/zhuhe/litchi-goal-0534-target/test-tmp",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0534-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "cargo",
+    "doc",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--features",
+    "allocator-metrics",
+    "--lib",
+    "--no-deps"
+  ],
+  "start_utc": "2026-09-12T17:00:53.576366+00:00",
+  "end_utc": "2026-09-12T17:00:57.212197+00:00",
+  "seconds": 3.63584656000603,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "232a89a94851140ddbe47b9f48387248be900ebbdb81f2c75b826740fa744252",
+  "binary_sha256": null,
+  "source_manifest_sha256": "232a89a94851140ddbe47b9f48387248be900ebbdb81f2c75b826740fa744252",
+  "script_sha256": "e69ded2a2d31853512c56d65dd3d49e1b884296ec820ae46e8db5e9a06fc5232",
+  "plan_sha256": "4e1a13bdfa7f7c0268065d52def107f085b07cc0587d39685d9587de181d40dc",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "check-harness-rustdoc.host.json": "b99f5f0158b5d6a72d2add6ed6be8223029eb1e7c7e00046f10f3c0c36f5c3c4",
+    "check-harness-rustdoc.stderr": "bd31427d4fec7cfec83506121af5617878e25a38f21de2d552a7a77cae252265",
+    "check-harness-rustdoc.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

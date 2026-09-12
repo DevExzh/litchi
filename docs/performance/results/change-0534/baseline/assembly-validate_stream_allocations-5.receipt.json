@@ -1,0 +1,30 @@
+{
+  "command": [
+    "objdump",
+    "-d",
+    "--disassemble=_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17h4d858c2c704bd558E",
+    "/tmp/litchi-goal-0534/baseline/normal"
+  ],
+  "start_utc": "2026-09-12T16:54:14.846025+00:00",
+  "end_utc": "2026-09-12T16:54:15.044976+00:00",
+  "seconds": 0.19897236498945858,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "ce5a705508299624c2611d525940ce1502b3b9f20196814cf449e9286f8f11d6",
+  "binary_sha256": "44c80a425a719441e0182d4a7932fcbe6309a84a816a75d75c764e90a0a13e0f",
+  "source_manifest_sha256": "ce5a705508299624c2611d525940ce1502b3b9f20196814cf449e9286f8f11d6",
+  "script_sha256": "e69ded2a2d31853512c56d65dd3d49e1b884296ec820ae46e8db5e9a06fc5232",
+  "plan_sha256": "4e1a13bdfa7f7c0268065d52def107f085b07cc0587d39685d9587de181d40dc",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "assembly-validate_stream_allocations-5.host.json": "e077b5628fbb2203cc32af52f4cedb4ae99cb85a1a56de21f18a46d48b5be5aa",
+    "assembly-validate_stream_allocations-5.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "assembly-validate_stream_allocations-5.stdout": "c1719b4d7d9e46fefd16c70873c42fe54d6336fb8bdff15db19f8d31b2f453e1"
+  }
+}

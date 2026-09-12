@@ -1,0 +1,116 @@
+{
+  "status": "pass",
+  "captures": [
+    {
+      "name": "hardware-r1-xls-owned",
+      "exit_code": 0,
+      "receipt_sha256": "77e2adb2f69328941129d9a600b7f54a7fc7eef591cf0b212cc362c187c641a9",
+      "events": {
+        "cycles": {
+          "status": "measured",
+          "value": 3549227730,
+          "event_runtime_ns": 830363269,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "status": "measured",
+          "value": 5262217187,
+          "event_runtime_ns": 830363269,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "status": "measured",
+          "value": 950070514,
+          "event_runtime_ns": 830363269,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "status": "measured",
+          "value": 2449535,
+          "event_runtime_ns": 830363269,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "status": "measured",
+          "value": 66213,
+          "event_runtime_ns": 830363269,
+          "running_percent": 100.0
+        },
+        "context-switches": {
+          "status": "measured",
+          "value": 71,
+          "event_runtime_ns": 830363269,
+          "running_percent": 100.0
+        },
+        "cpu-migrations": {
+          "status": "measured",
+          "value": 0,
+          "event_runtime_ns": 830363269,
+          "running_percent": 100.0
+        }
+      },
+      "identity_equal": true,
+      "group_valid": true,
+      "status": "measured",
+      "ipc": 1.4826372347203542,
+      "branch_miss_percent": 0.2578266522225739
+    },
+    {
+      "name": "hardware-r2-xls-owned",
+      "exit_code": 0,
+      "receipt_sha256": "b0ba9294c9f8a70115df77213a2c53e51e8d271225bef8f27ad1276d720a9726",
+      "events": {
+        "cycles": {
+          "status": "measured",
+          "value": 3487356956,
+          "event_runtime_ns": 783133667,
+          "running_percent": 100.0
+        },
+        "instructions": {
+          "status": "measured",
+          "value": 5256151649,
+          "event_runtime_ns": 783133667,
+          "running_percent": 100.0
+        },
+        "branches": {
+          "status": "measured",
+          "value": 949182162,
+          "event_runtime_ns": 783133667,
+          "running_percent": 100.0
+        },
+        "branch-misses": {
+          "status": "measured",
+          "value": 2492564,
+          "event_runtime_ns": 783133667,
+          "running_percent": 100.0
+        },
+        "page-faults": {
+          "status": "measured",
+          "value": 66213,
+          "event_runtime_ns": 783133667,
+          "running_percent": 100.0
+        },
+        "context-switches": {
+          "status": "measured",
+          "value": 69,
+          "event_runtime_ns": 783133667,
+          "running_percent": 100.0
+        },
+        "cpu-migrations": {
+          "status": "measured",
+          "value": 0,
+          "event_runtime_ns": 783133667,
+          "running_percent": 100.0
+        }
+      },
+      "identity_equal": true,
+      "group_valid": true,
+      "status": "measured",
+      "ipc": 1.5072020774807087,
+      "branch_miss_percent": 0.2626012265915296
+    }
+  ],
+  "scope": "Whole-child diagnostic including setup/copies/queries/oracles/drop/report; no operation-local hardware claim; unavailable or multiplexed groups cannot support claims",
+  "latency_samples_excluded_from_native": 2000,
+  "no_operation_local_hardware_or_speedup_claim": true
+}

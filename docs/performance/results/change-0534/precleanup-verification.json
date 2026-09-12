@@ -1,0 +1,102 @@
+{
+  "status": "pass",
+  "scope": "Full source/build/assembly/capture/native/allocation/profile/hardware/variation/quality/decision replay before cleanup",
+  "verifier_file": "verify.py",
+  "verifier_sha256": "4536a0a7de8450773b159c4ac33e7d3f7ce2d2e99c64fc9735ba151ad9f13104",
+  "receipt_inventory": {
+    "status": "pass",
+    "stages": {
+      "baseline": 45,
+      "candidate": 59,
+      "final": 14
+    },
+    "successful_receipts": 118,
+    "receipt_names_sha256": "cef9bac2d846e14279fe0dea82fdf46e5ac35cfec4046d013cdd2c6dc3a4911a"
+  },
+  "timeline": {
+    "status": "pass",
+    "serial_intervals": 118,
+    "first": "baseline/build-normal",
+    "last": "final/check-claims",
+    "native_abba": [
+      "baseline/native-r1-xls",
+      "baseline/native-r1-cfb",
+      "candidate/native-r1-xls",
+      "candidate/native-r1-cfb",
+      "candidate/native-r2-cfb",
+      "candidate/native-r2-xls",
+      "baseline/native-r2-cfb",
+      "baseline/native-r2-xls"
+    ]
+  },
+  "decision": {
+    "status": "pass",
+    "analysis": "6dbd00b9107e562d42da9e6fd326814db297b974460333ca5365af5f0766f55a",
+    "profiles": {
+      "baseline": "ca375510ab289c2381ca268ea647e3519e1d7f83484de979f4f842d81f11b217",
+      "candidate": "4aaaaf523e0e57ff14a7afcf8afba0096466a4ba6e1d1a3f8162179fee3b3658"
+    },
+    "quality": {
+      "status": "pass",
+      "stage": "final",
+      "checks": 14,
+      "executed_tests": 4382,
+      "sha256": "816f28d3926d119972dbc45de1ac8960d93cd6bc370eb1333dca802dfe6fb2b7"
+    },
+    "decision": {
+      "status": "pass",
+      "disposition": "rejected",
+      "final_source": "final",
+      "sha256": "bcb7f163fac9f373289cc55d3499b17fb2cebe575f56d0517cdb280f02b7bf3f",
+      "constructor_ir": [
+        {
+          "repeat": 1,
+          "baseline": 11317204,
+          "candidate": 10989365,
+          "change_percent": -2.896819744523471
+        },
+        {
+          "repeat": 2,
+          "baseline": 11319136,
+          "candidate": 10986774,
+          "change_percent": -2.936284182821025
+        }
+      ],
+      "physical_ir": [
+        {
+          "repeat": 1,
+          "group": "xls-owned",
+          "shape": null,
+          "baseline": 1991710,
+          "candidate": 1659795,
+          "change_percent": -16.664825702537012
+        },
+        {
+          "repeat": 1,
+          "group": "cfb-few-large",
+          "shape": "few-large",
+          "baseline": 1981930,
+          "candidate": 1651645,
+          "change_percent": -16.66481661814494
+        },
+        {
+          "repeat": 2,
+          "group": "xls-owned",
+          "shape": null,
+          "baseline": 1991710,
+          "candidate": 1659795,
+          "change_percent": -16.664825702537012
+        },
+        {
+          "repeat": 2,
+          "group": "cfb-few-large",
+          "shape": "few-large",
+          "baseline": 1981930,
+          "candidate": 1651645,
+          "change_percent": -16.66481661814494
+        }
+      ],
+      "physical_profile_gate": true
+    }
+  }
+}

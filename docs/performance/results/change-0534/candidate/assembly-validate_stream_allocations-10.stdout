@@ -1,0 +1,575 @@
+
+/tmp/litchi-goal-0534/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+000000000131a930 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E>:
+ 131a930:	55                   	push   %rbp
+ 131a931:	41 57                	push   %r15
+ 131a933:	41 56                	push   %r14
+ 131a935:	41 55                	push   %r13
+ 131a937:	41 54                	push   %r12
+ 131a939:	53                   	push   %rbx
+ 131a93a:	48 81 ec 58 01 00 00 	sub    $0x158,%rsp
+ 131a941:	48 89 3c 24          	mov    %rdi,(%rsp)
+ 131a945:	31 c0                	xor    %eax,%eax
+ 131a947:	48 3b 86 90 00 00 00 	cmp    0x90(%rsi),%rax
+ 131a94e:	71 58                	jno    131a9a8 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x78>
+ 131a950:	ff 15 7a a5 da 01    	call   *0x1daa57a(%rip)        # 30c4ed0 <_DYNAMIC+0x298>
+ 131a956:	bf 1c 00 00 00       	mov    $0x1c,%edi
+ 131a95b:	be 01 00 00 00       	mov    $0x1,%esi
+ 131a960:	ff 15 72 a5 da 01    	call   *0x1daa572(%rip)        # 30c4ed8 <_DYNAMIC+0x2a0>
+ 131a966:	48 85 c0             	test   %rax,%rax
+ 131a969:	0f 84 2e 08 00 00    	je     131b19d <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x86d>
+ 131a96f:	0f 10 05 1c 28 e7 fe 	movups -0x118d7e4(%rip),%xmm0        # 18d192 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x5b6>
+ 131a976:	0f 11 40 0c          	movups %xmm0,0xc(%rax)
+ 131a97a:	0f 10 05 05 28 e7 fe 	movups -0x118d7fb(%rip),%xmm0        # 18d186 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x5aa>
+ 131a981:	0f 11 00             	movups %xmm0,(%rax)
+ 131a984:	48 8b 0c 24          	mov    (%rsp),%rcx
+ 131a988:	48 c7 01 08 00 00 00 	movq   $0x8,(%rcx)
+ 131a98f:	48 c7 41 08 1c 00 00 	movq   $0x1c,0x8(%rcx)
+ 131a996:	00 
+ 131a997:	48 89 41 10          	mov    %rax,0x10(%rcx)
+ 131a99b:	48 c7 41 18 1c 00 00 	movq   $0x1c,0x18(%rcx)
+ 131a9a2:	00 
+ 131a9a3:	e9 7a 07 00 00       	jmp    131b122 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x7f2>
+ 131a9a8:	49 89 f5             	mov    %rsi,%r13
+ 131a9ab:	48 8b 9e 18 01 00 00 	mov    0x118(%rsi),%rbx
+ 131a9b2:	48 85 db             	test   %rbx,%rbx
+ 131a9b5:	0f 84 f2 07 00 00    	je     131b1ad <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x87d>
+ 131a9bb:	49 8b 85 d8 00 00 00 	mov    0xd8(%r13),%rax
+ 131a9c2:	41 8b 8d f0 00 00 00 	mov    0xf0(%r13),%ecx
+ 131a9c9:	48 89 c2             	mov    %rax,%rdx
+ 131a9cc:	48 09 da             	or     %rbx,%rdx
+ 131a9cf:	48 c1 ea 20          	shr    $0x20,%rdx
+ 131a9d3:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 131a9d8:	74 07                	je     131a9e1 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0xb1>
+ 131a9da:	31 d2                	xor    %edx,%edx
+ 131a9dc:	48 f7 f3             	div    %rbx
+ 131a9df:	eb 04                	jmp    131a9e5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0xb5>
+ 131a9e1:	31 d2                	xor    %edx,%edx
+ 131a9e3:	f7 f3                	div    %ebx
+ 131a9e5:	48 83 fa 01          	cmp    $0x1,%rdx
+ 131a9e9:	48 83 d8 ff          	sbb    $0xffffffffffffffff,%rax
+ 131a9ed:	4d 8b 7d 08          	mov    0x8(%r13),%r15
+ 131a9f1:	4d 8b 65 10          	mov    0x10(%r13),%r12
+ 131a9f5:	48 83 ec 08          	sub    $0x8,%rsp
+ 131a9f9:	4c 8d 0d e0 c0 de fe 	lea    -0x1213f20(%rip),%r9        # 106ae0 <anon.5ca5f20b9fdca7f493d32a9d8118f5d6.1532.llvm.7248067549047268336+0xd0>
+ 131aa00:	48 8d 7c 24 28       	lea    0x28(%rsp),%rdi
+ 131aa05:	4c 89 fe             	mov    %r15,%rsi
+ 131aa08:	4c 89 e2             	mov    %r12,%rdx
+ 131aa0b:	49 89 c0             	mov    %rax,%r8
+ 131aa0e:	6a 10                	push   $0x10
+ 131aa10:	ff 15 92 e2 da 01    	call   *0x1dae292(%rip)        # 30c8ca8 <_DYNAMIC+0x4070>
+ 131aa16:	48 83 c4 10          	add    $0x10,%rsp
+ 131aa1a:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+ 131aa1f:	48 8b 74 24 28       	mov    0x28(%rsp),%rsi
+ 131aa24:	4c 8b 74 24 30       	mov    0x30(%rsp),%r14
+ 131aa29:	48 8b 7c 24 38       	mov    0x38(%rsp),%rdi
+ 131aa2e:	48 83 f8 0b          	cmp    $0xb,%rax
+ 131aa32:	0f 85 28 01 00 00    	jne    131ab60 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x230>
+ 131aa38:	48 89 74 24 08       	mov    %rsi,0x8(%rsp)
+ 131aa3d:	4c 89 a4 24 00 01 00 	mov    %r12,0x100(%rsp)
+ 131aa44:	00 
+ 131aa45:	4c 89 bc 24 08 01 00 	mov    %r15,0x108(%rsp)
+ 131aa4c:	00 
+ 131aa4d:	48 89 9c 24 10 01 00 	mov    %rbx,0x110(%rsp)
+ 131aa54:	00 
+ 131aa55:	4d 8b bd 80 00 00 00 	mov    0x80(%r13),%r15
+ 131aa5c:	49 8b ad 88 00 00 00 	mov    0x88(%r13),%rbp
+ 131aa63:	48 89 7c 24 10       	mov    %rdi,0x10(%rsp)
+ 131aa68:	48 85 ff             	test   %rdi,%rdi
+ 131aa6b:	0f 84 10 01 00 00    	je     131ab81 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x251>
+ 131aa71:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 131aa76:	4c 8d 24 85 00 00 00 	lea    0x0(,%rax,4),%r12
+ 131aa7d:	00 
+ 131aa7e:	31 db                	xor    %ebx,%ebx
+ 131aa80:	41 8b 34 1e          	mov    (%r14,%rbx,1),%esi
+ 131aa84:	48 39 f5             	cmp    %rsi,%rbp
+ 131aa87:	76 1c                	jbe    131aaa5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x175>
+ 131aa89:	41 0f b6 04 37       	movzbl (%r15,%rsi,1),%eax
+ 131aa8e:	84 c0                	test   %al,%al
+ 131aa90:	75 5a                	jne    131aaec <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x1bc>
+ 131aa92:	41 c6 04 37 05       	movb   $0x5,(%r15,%rsi,1)
+ 131aa97:	48 83 c3 04          	add    $0x4,%rbx
+ 131aa9b:	49 39 dc             	cmp    %rbx,%r12
+ 131aa9e:	75 e0                	jne    131aa80 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x150>
+ 131aaa0:	e9 dc 00 00 00       	jmp    131ab81 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x251>
+ 131aaa5:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+ 131aaaa:	ba 05 00 00 00       	mov    $0x5,%edx
+ 131aaaf:	ff 15 fb e1 da 01    	call   *0x1dae1fb(%rip)        # 30c8cb0 <_DYNAMIC+0x4078>
+ 131aab5:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+ 131aaba:	48 8b 4c 24 28       	mov    0x28(%rsp),%rcx
+ 131aabf:	48 8d 7c 24 30       	lea    0x30(%rsp),%rdi
+ 131aac4:	48 8b 57 10          	mov    0x10(%rdi),%rdx
+ 131aac8:	48 8d b4 24 90 00 00 	lea    0x90(%rsp),%rsi
+ 131aacf:	00 
+ 131aad0:	48 89 56 10          	mov    %rdx,0x10(%rsi)
+ 131aad4:	0f 10 07             	movups (%rdi),%xmm0
+ 131aad7:	0f 11 06             	movups %xmm0,(%rsi)
+ 131aada:	48 89 84 24 80 00 00 	mov    %rax,0x80(%rsp)
+ 131aae1:	00 
+ 131aae2:	48 89 8c 24 88 00 00 	mov    %rcx,0x88(%rsp)
+ 131aae9:	00 
+ 131aaea:	eb 1e                	jmp    131ab0a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x1da>
+ 131aaec:	0f b6 d0             	movzbl %al,%edx
+ 131aaef:	48 8d bc 24 80 00 00 	lea    0x80(%rsp),%rdi
+ 131aaf6:	00 
+ 131aaf7:	b9 05 00 00 00       	mov    $0x5,%ecx
+ 131aafc:	ff 15 b6 e1 da 01    	call   *0x1dae1b6(%rip)        # 30c8cb8 <_DYNAMIC+0x4080>
+ 131ab02:	48 8b 84 24 80 00 00 	mov    0x80(%rsp),%rax
+ 131ab09:	00 
+ 131ab0a:	48 83 f8 0b          	cmp    $0xb,%rax
+ 131ab0e:	74 87                	je     131aa97 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x167>
+ 131ab10:	48 8d 8c 24 90 00 00 	lea    0x90(%rsp),%rcx
+ 131ab17:	00 
+ 131ab18:	0f 10 41 f8          	movups -0x8(%rcx),%xmm0
+ 131ab1c:	0f 10 49 08          	movups 0x8(%rcx),%xmm1
+ 131ab20:	48 8b 0c 24          	mov    (%rsp),%rcx
+ 131ab24:	0f 11 49 18          	movups %xmm1,0x18(%rcx)
+ 131ab28:	0f 11 41 08          	movups %xmm0,0x8(%rcx)
+ 131ab2c:	48 89 01             	mov    %rax,(%rcx)
+ 131ab2f:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+ 131ab34:	48 85 f6             	test   %rsi,%rsi
+ 131ab37:	0f 84 e5 05 00 00    	je     131b122 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x7f2>
+ 131ab3d:	48 c1 e6 02          	shl    $0x2,%rsi
+ 131ab41:	ba 04 00 00 00       	mov    $0x4,%edx
+ 131ab46:	4c 89 f7             	mov    %r14,%rdi
+ 131ab49:	48 81 c4 58 01 00 00 	add    $0x158,%rsp
+ 131ab50:	5b                   	pop    %rbx
+ 131ab51:	41 5c                	pop    %r12
+ 131ab53:	41 5d                	pop    %r13
+ 131ab55:	41 5e                	pop    %r14
+ 131ab57:	41 5f                	pop    %r15
+ 131ab59:	5d                   	pop    %rbp
+ 131ab5a:	ff 25 20 a3 da 01    	jmp    *0x1daa320(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131ab60:	48 8b 4c 24 40       	mov    0x40(%rsp),%rcx
+ 131ab65:	48 8b 14 24          	mov    (%rsp),%rdx
+ 131ab69:	48 89 72 08          	mov    %rsi,0x8(%rdx)
+ 131ab6d:	4c 89 72 10          	mov    %r14,0x10(%rdx)
+ 131ab71:	48 89 7a 18          	mov    %rdi,0x18(%rdx)
+ 131ab75:	48 89 02             	mov    %rax,(%rdx)
+ 131ab78:	48 89 4a 20          	mov    %rcx,0x20(%rdx)
+ 131ab7c:	e9 a1 05 00 00       	jmp    131b122 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x7f2>
+ 131ab81:	49 8b 75 30          	mov    0x30(%r13),%rsi
+ 131ab85:	48 85 f6             	test   %rsi,%rsi
+ 131ab88:	74 13                	je     131ab9d <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x26d>
+ 131ab8a:	49 8b 7d 38          	mov    0x38(%r13),%rdi
+ 131ab8e:	48 c1 e6 02          	shl    $0x2,%rsi
+ 131ab92:	ba 04 00 00 00       	mov    $0x4,%edx
+ 131ab97:	ff 15 e3 a2 da 01    	call   *0x1daa2e3(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131ab9d:	48 8b 44 24 08       	mov    0x8(%rsp),%rax
+ 131aba2:	49 89 45 30          	mov    %rax,0x30(%r13)
+ 131aba6:	4d 89 75 38          	mov    %r14,0x38(%r13)
+ 131abaa:	48 8b 44 24 10       	mov    0x10(%rsp),%rax
+ 131abaf:	49 89 45 40          	mov    %rax,0x40(%r13)
+ 131abb3:	49 8b 9d 20 01 00 00 	mov    0x120(%r13),%rbx
+ 131abba:	48 85 db             	test   %rbx,%rbx
+ 131abbd:	0f 84 f7 05 00 00    	je     131b1ba <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x88a>
+ 131abc3:	48 8b 44 24 18       	mov    0x18(%rsp),%rax
+ 131abc8:	48 89 c1             	mov    %rax,%rcx
+ 131abcb:	48 09 d9             	or     %rbx,%rcx
+ 131abce:	48 c1 e9 20          	shr    $0x20,%rcx
+ 131abd2:	74 0a                	je     131abde <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x2ae>
+ 131abd4:	31 d2                	xor    %edx,%edx
+ 131abd6:	48 f7 f3             	div    %rbx
+ 131abd9:	49 89 c6             	mov    %rax,%r14
+ 131abdc:	eb 07                	jmp    131abe5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x2b5>
+ 131abde:	31 d2                	xor    %edx,%edx
+ 131abe0:	f7 f3                	div    %ebx
+ 131abe2:	41 89 c6             	mov    %eax,%r14d
+ 131abe5:	48 83 fa 01          	cmp    $0x1,%rdx
+ 131abe9:	49 83 de ff          	sbb    $0xffffffffffffffff,%r14
+ 131abed:	48 8d 15 25 25 e7 fe 	lea    -0x118dadb(%rip),%rdx        # 18d119 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x53d>
+ 131abf4:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+ 131abf9:	b9 19 00 00 00       	mov    $0x19,%ecx
+ 131abfe:	4c 89 f6             	mov    %r14,%rsi
+ 131ac01:	ff 15 e9 e0 da 01    	call   *0x1dae0e9(%rip)        # 30c8cf0 <_DYNAMIC+0x40b8>
+ 131ac07:	48 8b 44 24 20       	mov    0x20(%rsp),%rax
+ 131ac0c:	0f 10 44 24 28       	movups 0x28(%rsp),%xmm0
+ 131ac11:	0f 29 84 24 80 00 00 	movaps %xmm0,0x80(%rsp)
+ 131ac18:	00 
+ 131ac19:	0f 10 44 24 38       	movups 0x38(%rsp),%xmm0
+ 131ac1e:	0f 29 84 24 90 00 00 	movaps %xmm0,0x90(%rsp)
+ 131ac25:	00 
+ 131ac26:	48 83 f8 0b          	cmp    $0xb,%rax
+ 131ac2a:	0f 85 62 03 00 00    	jne    131af92 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x662>
+ 131ac30:	0f 28 84 24 80 00 00 	movaps 0x80(%rsp),%xmm0
+ 131ac37:	00 
+ 131ac38:	0f 28 8c 24 90 00 00 	movaps 0x90(%rsp),%xmm1
+ 131ac3f:	00 
+ 131ac40:	0f 29 8c 24 d0 00 00 	movaps %xmm1,0xd0(%rsp)
+ 131ac47:	00 
+ 131ac48:	0f 29 84 24 c0 00 00 	movaps %xmm0,0xc0(%rsp)
+ 131ac4f:	00 
+ 131ac50:	48 c7 84 24 80 00 00 	movq   $0x0,0x80(%rsp)
+ 131ac57:	00 00 00 00 00 
+ 131ac5c:	48 c7 84 24 88 00 00 	movq   $0x4,0x88(%rsp)
+ 131ac63:	00 04 00 00 00 
+ 131ac68:	0f 57 c0             	xorps  %xmm0,%xmm0
+ 131ac6b:	0f 11 84 24 90 00 00 	movups %xmm0,0x90(%rsp)
+ 131ac72:	00 
+ 131ac73:	48 c7 84 24 a0 00 00 	movq   $0x8,0xa0(%rsp)
+ 131ac7a:	00 08 00 00 00 
+ 131ac7f:	0f 11 84 24 a8 00 00 	movups %xmm0,0xa8(%rsp)
+ 131ac86:	00 
+ 131ac87:	48 c7 44 24 20 00 00 	movq   $0x0,0x20(%rsp)
+ 131ac8e:	00 00 
+ 131ac90:	48 c7 44 24 28 04 00 	movq   $0x4,0x28(%rsp)
+ 131ac97:	00 00 
+ 131ac99:	0f 11 44 24 30       	movups %xmm0,0x30(%rsp)
+ 131ac9e:	48 c7 44 24 40 08 00 	movq   $0x8,0x40(%rsp)
+ 131aca5:	00 00 
+ 131aca7:	0f 11 44 24 48       	movups %xmm0,0x48(%rsp)
+ 131acac:	49 8b 45 58          	mov    0x58(%r13),%rax
+ 131acb0:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 131acb5:	48 85 c0             	test   %rax,%rax
+ 131acb8:	0f 84 f8 02 00 00    	je     131afb6 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x686>
+ 131acbe:	4c 89 74 24 08       	mov    %r14,0x8(%rsp)
+ 131acc3:	48 89 9c 24 f8 00 00 	mov    %rbx,0xf8(%rsp)
+ 131acca:	00 
+ 131accb:	49 8b 45 50          	mov    0x50(%r13),%rax
+ 131accf:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 131acd4:	49 8b 45 20          	mov    0x20(%r13),%rax
+ 131acd8:	48 89 84 24 f0 00 00 	mov    %rax,0xf0(%rsp)
+ 131acdf:	00 
+ 131ace0:	49 8b 45 28          	mov    0x28(%r13),%rax
+ 131ace4:	48 89 84 24 e8 00 00 	mov    %rax,0xe8(%rsp)
+ 131aceb:	00 
+ 131acec:	45 31 ed             	xor    %r13d,%r13d
+ 131acef:	eb 1d                	jmp    131ad0e <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x3de>
+ 131acf1:	66 66 66 66 66 66 2e 	data16 data16 data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 131acf8:	0f 1f 84 00 00 00 00 
+ 131acff:	00 
+ 131ad00:	49 ff c5             	inc    %r13
+ 131ad03:	4c 3b 6c 24 10       	cmp    0x10(%rsp),%r13
+ 131ad08:	0f 84 e9 02 00 00    	je     131aff7 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x6c7>
+ 131ad0e:	49 6b cd 68          	imul   $0x68,%r13,%rcx
+ 131ad12:	48 b8 00 00 00 00 00 	movabs $0x8000000000000000,%rax
+ 131ad19:	00 00 80 
+ 131ad1c:	48 8b 54 24 18       	mov    0x18(%rsp),%rdx
+ 131ad21:	48 39 04 0a          	cmp    %rax,(%rdx,%rcx,1)
+ 131ad25:	74 d9                	je     131ad00 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x3d0>
+ 131ad27:	48 03 4c 24 18       	add    0x18(%rsp),%rcx
+ 131ad2c:	80 79 65 02          	cmpb   $0x2,0x65(%rcx)
+ 131ad30:	75 ce                	jne    131ad00 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x3d0>
+ 131ad32:	44 8b 41 60          	mov    0x60(%rcx),%r8d
+ 131ad36:	48 8b 41 48          	mov    0x48(%rcx),%rax
+ 131ad3a:	80 79 64 00          	cmpb   $0x0,0x64(%rcx)
+ 131ad3e:	74 1b                	je     131ad5b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x42b>
+ 131ad40:	48 89 c1             	mov    %rax,%rcx
+ 131ad43:	48 8b b4 24 f8 00 00 	mov    0xf8(%rsp),%rsi
+ 131ad4a:	00 
+ 131ad4b:	48 09 f1             	or     %rsi,%rcx
+ 131ad4e:	48 c1 e9 20          	shr    $0x20,%rcx
+ 131ad52:	74 29                	je     131ad7d <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x44d>
+ 131ad54:	31 d2                	xor    %edx,%edx
+ 131ad56:	48 f7 f6             	div    %rsi
+ 131ad59:	eb 26                	jmp    131ad81 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x451>
+ 131ad5b:	48 89 c1             	mov    %rax,%rcx
+ 131ad5e:	48 8b b4 24 10 01 00 	mov    0x110(%rsp),%rsi
+ 131ad65:	00 
+ 131ad66:	48 09 f1             	or     %rsi,%rcx
+ 131ad69:	48 c1 e9 20          	shr    $0x20,%rcx
+ 131ad6d:	0f 84 ee 00 00 00    	je     131ae61 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x531>
+ 131ad73:	31 d2                	xor    %edx,%edx
+ 131ad75:	48 f7 f6             	div    %rsi
+ 131ad78:	e9 e8 00 00 00       	jmp    131ae65 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x535>
+ 131ad7d:	31 d2                	xor    %edx,%edx
+ 131ad7f:	f7 f6                	div    %esi
+ 131ad81:	48 83 fa 01          	cmp    $0x1,%rdx
+ 131ad85:	48 83 d8 ff          	sbb    $0xffffffffffffffff,%rax
+ 131ad89:	48 8d 7c 24 58       	lea    0x58(%rsp),%rdi
+ 131ad8e:	48 8d b4 24 80 00 00 	lea    0x80(%rsp),%rsi
+ 131ad95:	00 
+ 131ad96:	48 8b 94 24 f0 00 00 	mov    0xf0(%rsp),%rdx
+ 131ad9d:	00 
+ 131ad9e:	48 8b 8c 24 e8 00 00 	mov    0xe8(%rsp),%rcx
+ 131ada5:	00 
+ 131ada6:	49 89 c1             	mov    %rax,%r9
+ 131ada9:	6a 0b                	push   $0xb
+ 131adab:	48 8d 05 8e 23 e7 fe 	lea    -0x118dc72(%rip),%rax        # 18d140 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x564>
+ 131adb2:	50                   	push   %rax
+ 131adb3:	ff 15 3f df da 01    	call   *0x1dadf3f(%rip)        # 30c8cf8 <_DYNAMIC+0x40c0>
+ 131adb9:	48 83 c4 10          	add    $0x10,%rsp
+ 131adbd:	83 7c 24 58 0b       	cmpl   $0xb,0x58(%rsp)
+ 131adc2:	0f 85 fe 01 00 00    	jne    131afc6 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x696>
+ 131adc8:	48 8b 9c 24 90 00 00 	mov    0x90(%rsp),%rbx
+ 131adcf:	00 
+ 131add0:	48 85 db             	test   %rbx,%rbx
+ 131add3:	0f 84 27 ff ff ff    	je     131ad00 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x3d0>
+ 131add9:	4c 8b b4 24 88 00 00 	mov    0x88(%rsp),%r14
+ 131ade0:	00 
+ 131ade1:	48 c1 e3 02          	shl    $0x2,%rbx
+ 131ade5:	45 31 e4             	xor    %r12d,%r12d
+ 131ade8:	0f 1f 84 00 00 00 00 	nopl   0x0(%rax,%rax,1)
+ 131adef:	00 
+ 131adf0:	43 8b 14 26          	mov    (%r14,%r12,1),%edx
+ 131adf4:	89 94 24 bc 00 00 00 	mov    %edx,0xbc(%rsp)
+ 131adfb:	48 39 54 24 08       	cmp    %rdx,0x8(%rsp)
+ 131ae00:	0f 86 0b 02 00 00    	jbe    131b011 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x6e1>
+ 131ae06:	48 39 94 24 d8 00 00 	cmp    %rdx,0xd8(%rsp)
+ 131ae0d:	00 
+ 131ae0e:	76 25                	jbe    131ae35 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x505>
+ 131ae10:	89 d0                	mov    %edx,%eax
+ 131ae12:	c1 e8 06             	shr    $0x6,%eax
+ 131ae15:	48 3b 84 24 d0 00 00 	cmp    0xd0(%rsp),%rax
+ 131ae1c:	00 
+ 131ae1d:	73 16                	jae    131ae35 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x505>
+ 131ae1f:	48 8b 8c 24 c8 00 00 	mov    0xc8(%rsp),%rcx
+ 131ae26:	00 
+ 131ae27:	48 8b 04 c1          	mov    (%rcx,%rax,8),%rax
+ 131ae2b:	48 0f a3 d0          	bt     %rdx,%rax
+ 131ae2f:	0f 82 ff 02 00 00    	jb     131b134 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x804>
+ 131ae35:	48 8d 7c 24 58       	lea    0x58(%rsp),%rdi
+ 131ae3a:	48 8d b4 24 c0 00 00 	lea    0xc0(%rsp),%rsi
+ 131ae41:	00 
+ 131ae42:	ff 15 b8 de da 01    	call   *0x1dadeb8(%rip)        # 30c8d00 <_DYNAMIC+0x40c8>
+ 131ae48:	83 7c 24 58 0b       	cmpl   $0xb,0x58(%rsp)
+ 131ae4d:	0f 85 73 01 00 00    	jne    131afc6 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x696>
+ 131ae53:	49 83 c4 04          	add    $0x4,%r12
+ 131ae57:	4c 39 e3             	cmp    %r12,%rbx
+ 131ae5a:	75 94                	jne    131adf0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x4c0>
+ 131ae5c:	e9 9f fe ff ff       	jmp    131ad00 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x3d0>
+ 131ae61:	31 d2                	xor    %edx,%edx
+ 131ae63:	f7 f6                	div    %esi
+ 131ae65:	48 83 fa 01          	cmp    $0x1,%rdx
+ 131ae69:	48 83 d8 ff          	sbb    $0xffffffffffffffff,%rax
+ 131ae6d:	48 8d 7c 24 58       	lea    0x58(%rsp),%rdi
+ 131ae72:	48 8d 74 24 20       	lea    0x20(%rsp),%rsi
+ 131ae77:	48 8b 94 24 08 01 00 	mov    0x108(%rsp),%rdx
+ 131ae7e:	00 
+ 131ae7f:	48 8b 8c 24 00 01 00 	mov    0x100(%rsp),%rcx
+ 131ae86:	00 
+ 131ae87:	49 89 c1             	mov    %rax,%r9
+ 131ae8a:	6a 0e                	push   $0xe
+ 131ae8c:	48 8d 05 9f 22 e7 fe 	lea    -0x118dd61(%rip),%rax        # 18d132 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x556>
+ 131ae93:	50                   	push   %rax
+ 131ae94:	ff 15 5e de da 01    	call   *0x1dade5e(%rip)        # 30c8cf8 <_DYNAMIC+0x40c0>
+ 131ae9a:	48 83 c4 10          	add    $0x10,%rsp
+ 131ae9e:	83 7c 24 58 0b       	cmpl   $0xb,0x58(%rsp)
+ 131aea3:	0f 85 1d 01 00 00    	jne    131afc6 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x696>
+ 131aea9:	48 8b 5c 24 30       	mov    0x30(%rsp),%rbx
+ 131aeae:	48 85 db             	test   %rbx,%rbx
+ 131aeb1:	0f 84 49 fe ff ff    	je     131ad00 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x3d0>
+ 131aeb7:	4c 8b 74 24 28       	mov    0x28(%rsp),%r14
+ 131aebc:	48 c1 e3 02          	shl    $0x2,%rbx
+ 131aec0:	45 31 e4             	xor    %r12d,%r12d
+ 131aec3:	66 66 66 66 2e 0f 1f 	data16 data16 data16 cs nopw 0x0(%rax,%rax,1)
+ 131aeca:	84 00 00 00 00 00 
+ 131aed0:	43 8b 34 26          	mov    (%r14,%r12,1),%esi
+ 131aed4:	48 39 f5             	cmp    %rsi,%rbp
+ 131aed7:	76 1c                	jbe    131aef5 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x5c5>
+ 131aed9:	41 0f b6 04 37       	movzbl (%r15,%rsi,1),%eax
+ 131aede:	84 c0                	test   %al,%al
+ 131aee0:	75 5a                	jne    131af3c <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x60c>
+ 131aee2:	41 c6 04 37 06       	movb   $0x6,(%r15,%rsi,1)
+ 131aee7:	49 83 c4 04          	add    $0x4,%r12
+ 131aeeb:	4c 39 e3             	cmp    %r12,%rbx
+ 131aeee:	75 e0                	jne    131aed0 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x5a0>
+ 131aef0:	e9 0b fe ff ff       	jmp    131ad00 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x3d0>
+ 131aef5:	48 8d 7c 24 58       	lea    0x58(%rsp),%rdi
+ 131aefa:	ba 06 00 00 00       	mov    $0x6,%edx
+ 131aeff:	ff 15 ab dd da 01    	call   *0x1daddab(%rip)        # 30c8cb0 <_DYNAMIC+0x4078>
+ 131af05:	48 8b 44 24 58       	mov    0x58(%rsp),%rax
+ 131af0a:	48 8b 4c 24 60       	mov    0x60(%rsp),%rcx
+ 131af0f:	48 8d 7c 24 68       	lea    0x68(%rsp),%rdi
+ 131af14:	48 8b 57 10          	mov    0x10(%rdi),%rdx
+ 131af18:	48 8d b4 24 28 01 00 	lea    0x128(%rsp),%rsi
+ 131af1f:	00 
+ 131af20:	48 89 56 10          	mov    %rdx,0x10(%rsi)
+ 131af24:	0f 10 07             	movups (%rdi),%xmm0
+ 131af27:	0f 11 06             	movups %xmm0,(%rsi)
+ 131af2a:	48 89 84 24 18 01 00 	mov    %rax,0x118(%rsp)
+ 131af31:	00 
+ 131af32:	48 89 8c 24 20 01 00 	mov    %rcx,0x120(%rsp)
+ 131af39:	00 
+ 131af3a:	eb 1e                	jmp    131af5a <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x62a>
+ 131af3c:	0f b6 d0             	movzbl %al,%edx
+ 131af3f:	48 8d bc 24 18 01 00 	lea    0x118(%rsp),%rdi
+ 131af46:	00 
+ 131af47:	b9 06 00 00 00       	mov    $0x6,%ecx
+ 131af4c:	ff 15 66 dd da 01    	call   *0x1dadd66(%rip)        # 30c8cb8 <_DYNAMIC+0x4080>
+ 131af52:	48 8b 84 24 18 01 00 	mov    0x118(%rsp),%rax
+ 131af59:	00 
+ 131af5a:	48 83 f8 0b          	cmp    $0xb,%rax
+ 131af5e:	74 87                	je     131aee7 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x5b7>
+ 131af60:	48 8d 8c 24 28 01 00 	lea    0x128(%rsp),%rcx
+ 131af67:	00 
+ 131af68:	0f 10 41 f8          	movups -0x8(%rcx),%xmm0
+ 131af6c:	0f 10 49 08          	movups 0x8(%rcx),%xmm1
+ 131af70:	48 8b 0c 24          	mov    (%rsp),%rcx
+ 131af74:	0f 11 49 18          	movups %xmm1,0x18(%rcx)
+ 131af78:	0f 11 41 08          	movups %xmm0,0x8(%rcx)
+ 131af7c:	48 89 01             	mov    %rax,(%rcx)
+ 131af7f:	48 8b 74 24 20       	mov    0x20(%rsp),%rsi
+ 131af84:	48 85 f6             	test   %rsi,%rsi
+ 131af87:	0f 85 f7 00 00 00    	jne    131b084 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x754>
+ 131af8d:	e9 06 01 00 00       	jmp    131b098 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x768>
+ 131af92:	0f 28 84 24 80 00 00 	movaps 0x80(%rsp),%xmm0
+ 131af99:	00 
+ 131af9a:	0f 28 8c 24 90 00 00 	movaps 0x90(%rsp),%xmm1
+ 131afa1:	00 
+ 131afa2:	48 8b 0c 24          	mov    (%rsp),%rcx
+ 131afa6:	0f 11 49 18          	movups %xmm1,0x18(%rcx)
+ 131afaa:	0f 11 41 08          	movups %xmm0,0x8(%rcx)
+ 131afae:	48 89 01             	mov    %rax,(%rcx)
+ 131afb1:	e9 6c 01 00 00       	jmp    131b122 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x7f2>
+ 131afb6:	48 8b 04 24          	mov    (%rsp),%rax
+ 131afba:	48 c7 00 0b 00 00 00 	movq   $0xb,(%rax)
+ 131afc1:	e9 d2 00 00 00       	jmp    131b098 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x768>
+ 131afc6:	48 8b 44 24 78       	mov    0x78(%rsp),%rax
+ 131afcb:	48 8b 0c 24          	mov    (%rsp),%rcx
+ 131afcf:	48 89 41 20          	mov    %rax,0x20(%rcx)
+ 131afd3:	0f 10 44 24 58       	movups 0x58(%rsp),%xmm0
+ 131afd8:	0f 10 4c 24 68       	movups 0x68(%rsp),%xmm1
+ 131afdd:	0f 11 49 10          	movups %xmm1,0x10(%rcx)
+ 131afe1:	0f 11 01             	movups %xmm0,(%rcx)
+ 131afe4:	48 8b 74 24 20       	mov    0x20(%rsp),%rsi
+ 131afe9:	48 85 f6             	test   %rsi,%rsi
+ 131afec:	0f 85 92 00 00 00    	jne    131b084 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x754>
+ 131aff2:	e9 a1 00 00 00       	jmp    131b098 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x768>
+ 131aff7:	48 8b 74 24 20       	mov    0x20(%rsp),%rsi
+ 131affc:	48 8b 04 24          	mov    (%rsp),%rax
+ 131b000:	48 c7 00 0b 00 00 00 	movq   $0xb,(%rax)
+ 131b007:	48 85 f6             	test   %rsi,%rsi
+ 131b00a:	75 78                	jne    131b084 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x754>
+ 131b00c:	e9 87 00 00 00       	jmp    131b098 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x768>
+ 131b011:	ff 15 b9 9e da 01    	call   *0x1da9eb9(%rip)        # 30c4ed0 <_DYNAMIC+0x298>
+ 131b017:	bf 3b 00 00 00       	mov    $0x3b,%edi
+ 131b01c:	be 01 00 00 00       	mov    $0x1,%esi
+ 131b021:	ff 15 b1 9e da 01    	call   *0x1da9eb1(%rip)        # 30c4ed8 <_DYNAMIC+0x2a0>
+ 131b027:	48 85 c0             	test   %rax,%rax
+ 131b02a:	0f 84 97 01 00 00    	je     131b1c7 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x897>
+ 131b030:	0f 10 05 3f 21 e7 fe 	movups -0x118dec1(%rip),%xmm0        # 18d176 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x59a>
+ 131b037:	0f 11 40 2b          	movups %xmm0,0x2b(%rax)
+ 131b03b:	0f 10 05 29 21 e7 fe 	movups -0x118ded7(%rip),%xmm0        # 18d16b <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x58f>
+ 131b042:	0f 11 40 20          	movups %xmm0,0x20(%rax)
+ 131b046:	0f 10 05 0e 21 e7 fe 	movups -0x118def2(%rip),%xmm0        # 18d15b <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x57f>
+ 131b04d:	0f 11 40 10          	movups %xmm0,0x10(%rax)
+ 131b051:	0f 10 05 f3 20 e7 fe 	movups -0x118df0d(%rip),%xmm0        # 18d14b <anon.cb6274d4aee48d5d2f4f9651fa120bdd.16.llvm.12699844508696152788+0x56f>
+ 131b058:	0f 11 00             	movups %xmm0,(%rax)
+ 131b05b:	48 8b 0c 24          	mov    (%rsp),%rcx
+ 131b05f:	48 c7 01 08 00 00 00 	movq   $0x8,(%rcx)
+ 131b066:	48 c7 41 08 3b 00 00 	movq   $0x3b,0x8(%rcx)
+ 131b06d:	00 
+ 131b06e:	48 89 41 10          	mov    %rax,0x10(%rcx)
+ 131b072:	48 c7 41 18 3b 00 00 	movq   $0x3b,0x18(%rcx)
+ 131b079:	00 
+ 131b07a:	48 8b 74 24 20       	mov    0x20(%rsp),%rsi
+ 131b07f:	48 85 f6             	test   %rsi,%rsi
+ 131b082:	74 14                	je     131b098 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x768>
+ 131b084:	48 8b 7c 24 28       	mov    0x28(%rsp),%rdi
+ 131b089:	48 c1 e6 02          	shl    $0x2,%rsi
+ 131b08d:	ba 04 00 00 00       	mov    $0x4,%edx
+ 131b092:	ff 15 e8 9d da 01    	call   *0x1da9de8(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131b098:	48 8b 74 24 38       	mov    0x38(%rsp),%rsi
+ 131b09d:	48 85 f6             	test   %rsi,%rsi
+ 131b0a0:	74 14                	je     131b0b6 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x786>
+ 131b0a2:	48 8b 7c 24 40       	mov    0x40(%rsp),%rdi
+ 131b0a7:	48 c1 e6 03          	shl    $0x3,%rsi
+ 131b0ab:	ba 08 00 00 00       	mov    $0x8,%edx
+ 131b0b0:	ff 15 ca 9d da 01    	call   *0x1da9dca(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131b0b6:	48 8b b4 24 80 00 00 	mov    0x80(%rsp),%rsi
+ 131b0bd:	00 
+ 131b0be:	48 85 f6             	test   %rsi,%rsi
+ 131b0c1:	74 17                	je     131b0da <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x7aa>
+ 131b0c3:	48 8b bc 24 88 00 00 	mov    0x88(%rsp),%rdi
+ 131b0ca:	00 
+ 131b0cb:	48 c1 e6 02          	shl    $0x2,%rsi
+ 131b0cf:	ba 04 00 00 00       	mov    $0x4,%edx
+ 131b0d4:	ff 15 a6 9d da 01    	call   *0x1da9da6(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131b0da:	48 8b b4 24 98 00 00 	mov    0x98(%rsp),%rsi
+ 131b0e1:	00 
+ 131b0e2:	48 85 f6             	test   %rsi,%rsi
+ 131b0e5:	74 17                	je     131b0fe <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x7ce>
+ 131b0e7:	48 8b bc 24 a0 00 00 	mov    0xa0(%rsp),%rdi
+ 131b0ee:	00 
+ 131b0ef:	48 c1 e6 03          	shl    $0x3,%rsi
+ 131b0f3:	ba 08 00 00 00       	mov    $0x8,%edx
+ 131b0f8:	ff 15 82 9d da 01    	call   *0x1da9d82(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131b0fe:	48 8b b4 24 c0 00 00 	mov    0xc0(%rsp),%rsi
+ 131b105:	00 
+ 131b106:	48 85 f6             	test   %rsi,%rsi
+ 131b109:	74 17                	je     131b122 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x7f2>
+ 131b10b:	48 8b bc 24 c8 00 00 	mov    0xc8(%rsp),%rdi
+ 131b112:	00 
+ 131b113:	48 c1 e6 03          	shl    $0x3,%rsi
+ 131b117:	ba 08 00 00 00       	mov    $0x8,%edx
+ 131b11c:	ff 15 5e 9d da 01    	call   *0x1da9d5e(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131b122:	48 81 c4 58 01 00 00 	add    $0x158,%rsp
+ 131b129:	5b                   	pop    %rbx
+ 131b12a:	41 5c                	pop    %r12
+ 131b12c:	41 5d                	pop    %r13
+ 131b12e:	41 5e                	pop    %r14
+ 131b130:	41 5f                	pop    %r15
+ 131b132:	5d                   	pop    %rbp
+ 131b133:	c3                   	ret
+ 131b134:	48 8d 84 24 bc 00 00 	lea    0xbc(%rsp),%rax
+ 131b13b:	00 
+ 131b13c:	48 89 44 24 58       	mov    %rax,0x58(%rsp)
+ 131b141:	48 8b 05 48 a0 da 01 	mov    0x1daa048(%rip),%rax        # 30c5190 <_DYNAMIC+0x558>
+ 131b148:	48 89 44 24 60       	mov    %rax,0x60(%rsp)
+ 131b14d:	48 8d 35 40 af db fe 	lea    -0x12450c0(%rip),%rsi        # d6094 <anon.f26ca69abd5d73afa70d880a448fdc4d.83.llvm.1148991402920437335+0x9d>
+ 131b154:	48 8d bc 24 40 01 00 	lea    0x140(%rsp),%rdi
+ 131b15b:	00 
+ 131b15c:	48 8d 54 24 58       	lea    0x58(%rsp),%rdx
+ 131b161:	ff 15 d9 a0 da 01    	call   *0x1daa0d9(%rip)        # 30c5240 <_DYNAMIC+0x608>
+ 131b167:	48 8b 84 24 50 01 00 	mov    0x150(%rsp),%rax
+ 131b16e:	00 
+ 131b16f:	48 8b 0c 24          	mov    (%rsp),%rcx
+ 131b173:	48 89 41 18          	mov    %rax,0x18(%rcx)
+ 131b177:	0f 10 84 24 40 01 00 	movups 0x140(%rsp),%xmm0
+ 131b17e:	00 
+ 131b17f:	0f 11 41 08          	movups %xmm0,0x8(%rcx)
+ 131b183:	48 c7 01 08 00 00 00 	movq   $0x8,(%rcx)
+ 131b18a:	48 8b 74 24 20       	mov    0x20(%rsp),%rsi
+ 131b18f:	48 85 f6             	test   %rsi,%rsi
+ 131b192:	0f 85 ec fe ff ff    	jne    131b084 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x754>
+ 131b198:	e9 fb fe ff ff       	jmp    131b098 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x768>
+ 131b19d:	bf 01 00 00 00       	mov    $0x1,%edi
+ 131b1a2:	be 1c 00 00 00       	mov    $0x1c,%esi
+ 131b1a7:	ff 15 5b 9d da 01    	call   *0x1da9d5b(%rip)        # 30c4f08 <_DYNAMIC+0x2d0>
+ 131b1ad:	48 8d 3d a4 e0 d4 01 	lea    0x1d4e0a4(%rip),%rdi        # 3069258 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.15.llvm.12699844508696152788+0x100>
+ 131b1b4:	ff 15 a6 ab da 01    	call   *0x1daaba6(%rip)        # 30c5d60 <_DYNAMIC+0x1128>
+ 131b1ba:	48 8d 3d af e0 d4 01 	lea    0x1d4e0af(%rip),%rdi        # 3069270 <anon.cb6274d4aee48d5d2f4f9651fa120bdd.15.llvm.12699844508696152788+0x118>
+ 131b1c1:	ff 15 99 ab da 01    	call   *0x1daab99(%rip)        # 30c5d60 <_DYNAMIC+0x1128>
+ 131b1c7:	bf 01 00 00 00       	mov    $0x1,%edi
+ 131b1cc:	be 3b 00 00 00       	mov    $0x3b,%esi
+ 131b1d1:	ff 15 31 9d da 01    	call   *0x1da9d31(%rip)        # 30c4f08 <_DYNAMIC+0x2d0>
+ 131b1d7:	0f 0b                	ud2
+ 131b1d9:	eb 22                	jmp    131b1fd <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x8cd>
+ 131b1db:	48 89 c3             	mov    %rax,%rbx
+ 131b1de:	48 83 7c 24 08 00    	cmpq   $0x0,0x8(%rsp)
+ 131b1e4:	74 55                	je     131b23b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x90b>
+ 131b1e6:	48 8b 74 24 08       	mov    0x8(%rsp),%rsi
+ 131b1eb:	48 c1 e6 02          	shl    $0x2,%rsi
+ 131b1ef:	ba 04 00 00 00       	mov    $0x4,%edx
+ 131b1f4:	4c 89 f7             	mov    %r14,%rdi
+ 131b1f7:	eb 3c                	jmp    131b235 <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x905>
+ 131b1f9:	eb 02                	jmp    131b1fd <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x8cd>
+ 131b1fb:	eb 00                	jmp    131b1fd <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x8cd>
+ 131b1fd:	48 89 c3             	mov    %rax,%rbx
+ 131b200:	48 8d 7c 24 20       	lea    0x20(%rsp),%rdi
+ 131b205:	e8 36 ca 06 00       	call   1387c40 <_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17h9a5958d9c8d265faE>
+ 131b20a:	48 8d bc 24 80 00 00 	lea    0x80(%rsp),%rdi
+ 131b211:	00 
+ 131b212:	e8 29 ca 06 00       	call   1387c40 <_ZN4core3ptr57drop_in_place$LT$litchi_cfb..file..SectorChainScratch$GT$17h9a5958d9c8d265faE>
+ 131b217:	48 8b b4 24 c0 00 00 	mov    0xc0(%rsp),%rsi
+ 131b21e:	00 
+ 131b21f:	48 85 f6             	test   %rsi,%rsi
+ 131b222:	74 17                	je     131b23b <_ZN10litchi_cfb4file16OleFile$LT$R$GT$27validate_stream_allocations17hb28a4fef2970f817E+0x90b>
+ 131b224:	48 8b bc 24 c8 00 00 	mov    0xc8(%rsp),%rdi
+ 131b22b:	00 
+ 131b22c:	48 c1 e6 03          	shl    $0x3,%rsi
+ 131b230:	ba 08 00 00 00       	mov    $0x8,%edx
+ 131b235:	ff 15 45 9c da 01    	call   *0x1da9c45(%rip)        # 30c4e80 <_DYNAMIC+0x248>
+ 131b23b:	48 89 df             	mov    %rbx,%rdi
+ 131b23e:	e8 ad 0f d4 01       	call   305c1f0 <_Unwind_Resume@plt>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

@@ -3459,6 +3459,122 @@ mod tests {
         }
     }
 
+    #[test]
+    fn physical_layout_checks_every_role_and_fat_marker() {
+        let markers: [(u32, &str); 6] = [
+            (FREESECT, "FREESECT"),
+            (ENDOFCHAIN, "ENDOFCHAIN"),
+            (FATSECT, "FATSECT"),
+            (DIFSECT, "DIFSECT"),
+            (MAXREGSECT, "MAXREGSECT"),
+            (7, "ordinary"),
+        ];
+
+        for &(role, role_label) in &CLAIM_ROLES {
+            for &(marker, marker_label) in &markers {
+                let mut file = synthetic_fat_file(vec![marker], Vec::new());
+                file.sector_roles = vec![role];
+                let roles_before = file.sector_roles.clone();
+                let fat_before = file.fat.clone();
+                let result = file.validate_physical_sector_layout();
+                let case = format!("{role_label}/{marker_label}");
+
+                if role == PhysicalSectorRole::Unclaimed && marker != FREESECT {
+                    assert_claim_error(
+                        result,
+                        &format!("unclaimed physical sector 0 has FAT marker 0x{marker:08X}"),
+                    );
+                } else {
+                    assert!(result.is_ok(), "{case}: {result:?}");
+                }
+                assert_eq!(file.sector_roles, roles_before, "{case}");
+                assert_eq!(file.fat, fat_before, "{case}");
+            }
+        }
+    }
+
+    #[test]
+    fn physical_layout_preserves_prefix_order_and_padding_contract() {
+        let cases: [(&str, Vec<PhysicalSectorRole>, Vec<u32>, Option<&str>); 8] = [
+            ("empty", vec![], vec![], None),
+            (
+                "equal",
+                vec![
+                    PhysicalSectorRole::Unclaimed,
+                    PhysicalSectorRole::Fat,
+                    PhysicalSectorRole::Difat,
+                    PhysicalSectorRole::Directory,
+                    PhysicalSectorRole::MiniFat,
+                    PhysicalSectorRole::MiniStream,
+                    PhysicalSectorRole::RegularStream,
+                ],
+                vec![FREESECT, ENDOFCHAIN, FATSECT, DIFSECT, MAXREGSECT, 7, 9],
+                None,
+            ),
+            (
+                "short at zero",
+                vec![PhysicalSectorRole::Fat],
+                vec![],
+                Some("FAT does not contain an entry for physical sector 0"),
+            ),
+            (
+                "short after prefix",
+                vec![
+                    PhysicalSectorRole::Fat,
+                    PhysicalSectorRole::Directory,
+                    PhysicalSectorRole::RegularStream,
+                ],
+                vec![FATSECT],
+                Some("FAT does not contain an entry for physical sector 1"),
+            ),
+            (
+                "first missing before later role",
+                vec![
+                    PhysicalSectorRole::Directory,
+                    PhysicalSectorRole::RegularStream,
+                ],
+                vec![],
+                Some("FAT does not contain an entry for physical sector 0"),
+            ),
+            (
+                "prefix marker beats later missing",
+                vec![PhysicalSectorRole::Unclaimed, PhysicalSectorRole::Fat],
+                vec![ENDOFCHAIN],
+                Some("unclaimed physical sector 0 has FAT marker 0xFFFFFFFE"),
+            ),
+            (
+                "long padding",
+                vec![PhysicalSectorRole::Fat, PhysicalSectorRole::Unclaimed],
+                vec![
+                    FATSECT, FREESECT, ENDOFCHAIN, FATSECT, DIFSECT, MAXREGSECT, 7,
+                ],
+                None,
+            ),
+            (
+                "empty roles with long padding",
+                vec![],
+                vec![ENDOFCHAIN, MAXREGSECT, 7],
+                None,
+            ),
+        ];
+
+        for (case, roles, fat, expected_error) in cases {
+            let mut file = synthetic_fat_file(fat, Vec::new());
+            file.sector_roles = roles;
+            let roles_before = file.sector_roles.clone();
+            let fat_before = file.fat.clone();
+            let result = file.validate_physical_sector_layout();
+
+            if let Some(expected_error) = expected_error {
+                assert_claim_error(result, expected_error);
+            } else {
+                assert!(result.is_ok(), "{case}: {result:?}");
+            }
+            assert_eq!(file.sector_roles, roles_before, "{case}");
+            assert_eq!(file.fat, fat_before, "{case}");
+        }
+    }
+
     fn synthetic_minifat_file(minifat: Vec<u32>, ministream: Vec<u8>) -> OleFile<Cursor<Vec<u8>>> {
         OleFile {
             reader: Cursor::new(Vec::new()),

@@ -1,0 +1,77 @@
+{
+  "status": "pass",
+  "stage": "final",
+  "checks": [
+    {
+      "name": "check-boundaries.receipt.json",
+      "receipt_sha256": "28e0d7e56977c7ee4d76a09f88da65c9568a6ce8f4d8027a648fd760a06233b9",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-cfb-no-default-tests.receipt.json",
+      "receipt_sha256": "37249b81bdf6f243ce167973da2e9f629524a99a2c8f318b601a31a3d05bff7a",
+      "executed_tests": 310
+    },
+    {
+      "name": "check-cfb-tests.receipt.json",
+      "receipt_sha256": "47beb6962b9d7dc05e8f9f78415fee15e1e02228769fda0006e3728aceca1585",
+      "executed_tests": 310
+    },
+    {
+      "name": "check-claims.receipt.json",
+      "receipt_sha256": "8c86fdcb8208c694ae2b0cee4721a44148e4c17e483f5620dc645a2c9bc32abe",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-doc-tests.receipt.json",
+      "receipt_sha256": "cbe962a6c2f6ea421bbc75d8bde285fedae6c74064ffe46ce0674f04c5fcba60",
+      "executed_tests": 1187
+    },
+    {
+      "name": "check-fmt.receipt.json",
+      "receipt_sha256": "e5563a3338d48df2e16a857dd0c676b2d6c7bba2b28bc97881395612a7e44053",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-clippy.receipt.json",
+      "receipt_sha256": "c4009bd0c8e488ceb5611c993435aa1b59b974ecfa287900a1ef939b04cbad07",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-fmt.receipt.json",
+      "receipt_sha256": "0cbe00758ca741641e981178a6568678ee2430d427dbdf97f62e24a825f1e0d2",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-harness-rustdoc.receipt.json",
+      "receipt_sha256": "f70357726bcedadf2cc9f366b99dd5d904714e66c12ead3c99edaafb8dc11a8c",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-clippy.receipt.json",
+      "receipt_sha256": "154ca70b2c511938c8eea1119e648daf96656789d92ab0f66956e437f5934c72",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ole-rustdoc.receipt.json",
+      "receipt_sha256": "560d566433de16ebb366d47d23e0f9f6e267db320e25aa9309edd5b37fdc144f",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-ppt-tests.receipt.json",
+      "receipt_sha256": "a97edbeb89052d647c65511407099ae7b60f44ab5768e910d50ca351a9720664",
+      "executed_tests": 1230
+    },
+    {
+      "name": "check-workspace-check.receipt.json",
+      "receipt_sha256": "5472b4a7a8265fddc20ef8ae5db83d18a5276acb34cabc6d463c4e2ed6ff6f8d",
+      "executed_tests": 0
+    },
+    {
+      "name": "check-xls-tests.receipt.json",
+      "receipt_sha256": "f1c243ba3e92876159f62499be15a030e13f7a8459332eeef7e6781743201dbd",
+      "executed_tests": 1345
+    }
+  ],
+  "executed_tests": 4382
+}
