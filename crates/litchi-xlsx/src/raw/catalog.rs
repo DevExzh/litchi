@@ -664,7 +664,20 @@ fn optional_u32(
 ) -> Result<Option<u32>> {
     unqualified_attribute_value(element, name, decoder)?
         .map(|value| {
-            value
+            let lexical = value.trim_matches([' ', '\t', '\r', '\n']);
+            let (negative, digits) = match lexical.as_bytes().first().copied() {
+                Some(b'+') => (false, &lexical.as_bytes()[1..]),
+                Some(b'-') => (true, &lexical.as_bytes()[1..]),
+                _ => (false, lexical.as_bytes()),
+            };
+            if digits.is_empty()
+                || !digits.iter().all(u8::is_ascii_digit)
+                || (negative && digits.iter().any(|digit| *digit != b'0'))
+            {
+                return Err(invalid(format!("invalid {description} value '{value}'")));
+            }
+            std::str::from_utf8(digits)
+                .expect("unsigned workbook catalog digits are ASCII")
                 .parse::<u32>()
                 .map_err(|_source| invalid(format!("invalid {description} value '{value}'")))
         })

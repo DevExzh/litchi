@@ -28,6 +28,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, ReadResource, TargetMode,
 };
+use litchi_xlsx::pivot::server_formats::table_data::load as load_pivot_table_data;
 use litchi_xlsx::pivot::server_formats::{
     AttributeEdit, PivotTableSelector, ServerFormat, ServerFormatEdit, apply_patch, edit, load,
 };
@@ -888,6 +889,85 @@ fn replace_table_fragment(package: &mut OpcPackage, original: &str, replacement:
     table.set_blob(changed.into_bytes());
 }
 
+fn oversized_extension(owner_uri: &str, payload: &str) -> String {
+    format!(
+        r#"<ext uri="{owner_uri}">{payload}<!--{}--></ext>"#,
+        "x".repeat(1024 * 1024)
+    )
+}
+
+fn oversized_payload(payload: &str) -> String {
+    let close = payload
+        .rfind("</")
+        .expect("payload fixture must have an explicit closing tag");
+    format!(
+        "{}<!--{}-->{}",
+        &payload[..close],
+        "x".repeat(1024 * 1024),
+        &payload[close..]
+    )
+}
+
+fn append_owner_extension(package: &mut OpcPackage, part: &str, owner_uri: &str, duplicate: &str) {
+    let part_uri = PackURI::new(part).unwrap();
+    let target = package.get_part_mut(&part_uri).unwrap();
+    let mut source = String::from_utf8(target.blob().to_vec()).unwrap();
+    let owner_open = format!(r#"<ext uri="{owner_uri}">"#);
+    let owner_start = source
+        .find(&owner_open)
+        .unwrap_or_else(|| panic!("fixture source missing owner: {owner_uri}"));
+    let owner_end = owner_start
+        + source[owner_start..]
+            .find("</ext>")
+            .expect("fixture owner missing closing ext")
+        + "</ext>".len();
+    source.insert_str(owner_end, duplicate);
+    target.set_blob(source.into_bytes());
+}
+
+fn append_owner_payload(package: &mut OpcPackage, part: &str, owner_uri: &str, payload: &str) {
+    let part_uri = PackURI::new(part).unwrap();
+    let target = package.get_part_mut(&part_uri).unwrap();
+    let mut source = String::from_utf8(target.blob().to_vec()).unwrap();
+    let owner_open = format!(r#"<ext uri="{owner_uri}">"#);
+    let owner_start = source
+        .find(&owner_open)
+        .unwrap_or_else(|| panic!("fixture source missing owner: {owner_uri}"));
+    let owner_end = owner_start
+        + source[owner_start..]
+            .find("</ext>")
+            .expect("fixture owner missing closing ext");
+    source.insert_str(owner_end, payload);
+    target.set_blob(source.into_bytes());
+}
+
+fn assert_fragment_resource_limit<T>(result: Result<T, Error>, owner: &str) {
+    match result {
+        Err(Error::ResourceLimit(limit)) => {
+            assert!(
+                limit.observed > limit.limit,
+                "{owner} refusal must report an observed size above its limit: {limit:?}"
+            );
+            assert_eq!(
+                limit.limit,
+                1024 * 1024,
+                "{owner} refusal must carry the one MiB fragment limit: {limit:?}"
+            );
+            assert!(
+                limit
+                    .scope
+                    .to_ascii_lowercase()
+                    .contains(&owner.to_ascii_lowercase()),
+                "{owner} refusal lost its owner scope: {limit:?}"
+            );
+        },
+        Err(error) => {
+            panic!("expected typed resource refusal for oversized {owner} extension, got {error:?}")
+        },
+        Ok(_) => panic!("accepted oversized {owner} extension"),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 struct RelationshipInventory {
     parts: usize,
@@ -1087,6 +1167,84 @@ fn core_namespace_child_and_nested_server_format_content_are_rejected() {
         r#"<x15:serverFormat><![CDATA[text]]></x15:serverFormat><x15:serverFormat/>"#,
     );
     assert!(load(&cdata_leaf, "Pivot").is_err());
+}
+
+#[test]
+fn pivot_server_formats_parent_rejects_literal_cdata_references_as_content() {
+    for marker in ["<![CDATA[&#x20;]]>", "<![CDATA[&#x9;]]>"] {
+        let fixture = Fixture::build(FixtureOptions {
+            server_formats: format!(
+                r#"{marker}<x15:serverFormat culture="en-US"/><x15:serverFormat/>"#
+            ),
+            ..FixtureOptions::default()
+        });
+        assert!(
+            load(&fixture.package(), "Pivot").is_err(),
+            "accepted literal CDATA character-reference content: {marker}"
+        );
+    }
+}
+
+#[test]
+fn oversized_duplicate_pivot_table_references_owner_or_payload_is_refused_before_diagnostics() {
+    let fixture = Fixture::build(FixtureOptions::default());
+    let duplicate = oversized_extension(
+        PIVOT_TABLE_REFERENCES_URI,
+        r#"<x15:pivotTableReferences><x15:pivotTableReference r:id="rIdPivot"/></x15:pivotTableReferences>"#,
+    );
+    let mut package = fixture.package();
+    append_owner_extension(
+        &mut package,
+        WORKBOOK_URI,
+        PIVOT_TABLE_REFERENCES_URI,
+        &duplicate,
+    );
+    assert_fragment_resource_limit(load(&package, "Pivot"), "pivotTableReferences");
+
+    let mut payload_duplicate = fixture.package();
+    append_owner_payload(
+        &mut payload_duplicate,
+        WORKBOOK_URI,
+        PIVOT_TABLE_REFERENCES_URI,
+        &oversized_payload(
+            r#"<x15:pivotTableReferences><x15:pivotTableReference r:id="rIdPivot"/></x15:pivotTableReferences>"#,
+        ),
+    );
+    assert_fragment_resource_limit(load(&payload_duplicate, "Pivot"), "pivotTableReferences");
+}
+
+#[test]
+fn third_oversized_pivot_table_reference_payload_is_capped_in_diagnostic_mode() {
+    let payload = r#"<x15:pivotTableReferences><x15:pivotTableReference r:id="rIdPivot"/></x15:pivotTableReferences>"#;
+    let c444 = format!(
+        r#"<ext uri="{PIVOT_TABLE_DATA_URI}"><x15:pivotTableData rowCount="1" columnCount="1" cacheId="7"><x15:pivotRow r="0"><x15:c/></x15:pivotRow></x15:pivotTableData></ext>"#
+    );
+    let fixture = Fixture::build(FixtureOptions {
+        table_children: r#"<rowItems count="1"/><colItems count="1"/>"#.to_owned(),
+        pivot_table_outer_exts: c444,
+        ..FixtureOptions::default()
+    });
+    let mut package = fixture.package();
+    append_owner_payload(
+        &mut package,
+        WORKBOOK_URI,
+        PIVOT_TABLE_REFERENCES_URI,
+        payload,
+    );
+    append_owner_payload(
+        &mut package,
+        WORKBOOK_URI,
+        PIVOT_TABLE_REFERENCES_URI,
+        &oversized_payload(payload),
+    );
+
+    // C444 uses the shared graph's diagnostic/reference path, where duplicate
+    // C983 payloads are retained read-only.  The third recognized payload must
+    // still be charged before that diagnostic result is published.
+    assert_fragment_resource_limit(
+        load_pivot_table_data(&package, "Pivot"),
+        "pivotTableReferences",
+    );
 }
 
 #[test]

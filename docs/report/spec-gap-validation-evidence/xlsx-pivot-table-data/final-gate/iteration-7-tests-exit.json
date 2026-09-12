@@ -1,0 +1,1 @@
+{"command": ["cargo", "test", "--locked", "-p", "litchi-xlsx", "--offline", "--all-features", "--lib", "--test", "pivot_table_data", "--test", "pivot_server_formats", "--test", "cached_unique_names"], "exit_code": 0}

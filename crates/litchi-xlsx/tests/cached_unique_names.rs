@@ -14,6 +14,7 @@
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, ReadLimits, TargetMode};
+use litchi_xlsx::Error;
 use litchi_xlsx::pivot::cached_unique_names::{
     CacheSelector, CachedUniqueName, DiagnosticStatus, FieldSelector, PivotCacheId, Snapshot,
     Transaction,
@@ -33,6 +34,7 @@ const XML_NS: &str = "http://www.w3.org/XML/1998/namespace";
 
 const CACHED_UNIQUE_NAMES_URI: &str = "{4F2E5C28-24EA-4EB8-9CBF-B6C8F9C3D259}";
 const PIVOT_CACHE_ID_VERSION_URI: &str = "{ABF5C744-AB39-4b91-8756-CFA1BBC848D5}";
+const PIVOT_CACHE_DEFINITION_URI: &str = "{725AE2AE-9491-48BE-B2B4-4EB974FC3084}";
 const F057_URI: &str = "{F057638F-6D5F-4E77-A914-E7F072B9BCA8}";
 const DE250_URI: &str = "{DE250136-89BD-433C-8126-D09CA5730AF9}";
 const WRONG_URI: &str = "{00000000-0000-0000-0000-000000000000}";
@@ -891,6 +893,118 @@ fn cache_package_with_replacements(fixture: &Fixture, replacements: &[(&str, &st
     package
 }
 
+fn cache_package_with_appended_owner(
+    fixture: &Fixture,
+    owner_uri: &str,
+    duplicate: &str,
+) -> OpcPackage {
+    let mut package = fixture.package();
+    let mut source = String::from_utf8(cache_blob(&package)).unwrap();
+    let owner_open = format!(r#"<ext uri="{owner_uri}">"#);
+    let owner_start = source
+        .find(&owner_open)
+        .unwrap_or_else(|| panic!("fixture source missing owner: {owner_uri}"));
+    let owner_end = owner_start
+        + source[owner_start..]
+            .find("</ext>")
+            .expect("fixture owner missing closing ext")
+        + "</ext>".len();
+    source.insert_str(owner_end, duplicate);
+    package
+        .get_part_mut(&PackURI::new(CACHE_URI).unwrap())
+        .unwrap()
+        .set_blob(source.into_bytes());
+    package
+}
+
+fn cache_package_with_appended_payload(
+    fixture: &Fixture,
+    owner_uri: &str,
+    duplicate_payload: &str,
+) -> OpcPackage {
+    let mut package = fixture.package();
+    append_cache_payload(&mut package, owner_uri, duplicate_payload);
+    package
+}
+
+fn append_cache_payload(package: &mut OpcPackage, owner_uri: &str, payload: &str) {
+    let mut source = String::from_utf8(cache_blob(package)).unwrap();
+    let owner_open = format!(r#"<ext uri="{owner_uri}">"#);
+    let owner_start = source
+        .find(&owner_open)
+        .unwrap_or_else(|| panic!("fixture source missing owner: {owner_uri}"));
+    let owner_end = owner_start
+        + source[owner_start..]
+            .find("</ext>")
+            .expect("fixture owner missing closing ext");
+    source.insert_str(owner_end, payload);
+    package
+        .get_part_mut(&PackURI::new(CACHE_URI).unwrap())
+        .unwrap()
+        .set_blob(source.into_bytes());
+}
+
+fn cache_package_with_root_extensions(fixture: &Fixture, extensions: &str) -> OpcPackage {
+    let mut package = fixture.package();
+    let mut source = String::from_utf8(cache_blob(&package)).unwrap();
+    let root_close = "</extLst></pivotCacheDefinition>";
+    let root_close_start = source
+        .rfind(root_close)
+        .expect("fixture root extension list missing");
+    source.insert_str(root_close_start, extensions);
+    package
+        .get_part_mut(&PackURI::new(CACHE_URI).unwrap())
+        .unwrap()
+        .set_blob(source.into_bytes());
+    package
+}
+
+fn oversized_extension(owner_uri: &str, payload: &str) -> String {
+    format!(
+        r#"<ext uri="{owner_uri}">{payload}<!--{}--></ext>"#,
+        "x".repeat(1024 * 1024)
+    )
+}
+
+fn oversized_payload(payload: &str) -> String {
+    let close = payload
+        .rfind("</")
+        .expect("payload fixture must have an explicit closing tag");
+    format!(
+        "{}<!--{}-->{}",
+        &payload[..close],
+        "x".repeat(1024 * 1024),
+        &payload[close..]
+    )
+}
+
+fn assert_fragment_resource_limit<T>(result: Result<T, Error>, owner: &str) {
+    match result {
+        Err(Error::ResourceLimit(limit)) => {
+            assert!(
+                limit.observed > limit.limit,
+                "{owner} refusal must report an observed size above its limit: {limit:?}"
+            );
+            assert_eq!(
+                limit.limit,
+                1024 * 1024,
+                "{owner} refusal must carry the one MiB fragment limit: {limit:?}"
+            );
+            assert!(
+                limit
+                    .scope
+                    .to_ascii_lowercase()
+                    .contains(&owner.to_ascii_lowercase()),
+                "{owner} refusal lost its owner scope: {limit:?}"
+            );
+        },
+        Err(error) => {
+            panic!("expected typed resource refusal for oversized {owner} extension, got {error:?}")
+        },
+        Ok(_) => panic!("accepted oversized {owner} extension"),
+    }
+}
+
 fn connections_package_with_replacements(
     fixture: &Fixture,
     replacements: &[(&str, &str)],
@@ -1260,6 +1374,71 @@ fn opaque_cdata_comments_and_entity_encoded_xml_prefix_are_preserved() {
 }
 
 #[test]
+fn same_qname_under_unknown_or_inactive_mce_is_opaque_and_not_fragment_capped() {
+    let marker = "opaque-cached-unique-names-marker";
+    let unknown_payload = format!(
+        r#"<x15:cachedUniqueNames><x15:cachedUniqueName index="99" name="{marker}"/><!--{}--></x15:cachedUniqueNames>"#,
+        "u".repeat(1024 * 1024)
+    );
+    let unknown = cache_package_with_replacements(
+        &Fixture::build(FixtureOptions::default()),
+        &[(r#"<x15:opaque keep="yes"/>"#, unknown_payload.as_str())],
+    );
+
+    let inactive_mce = format!(
+        r#"<mc:AlternateContent><mc:Choice Requires="foo"><x15:cachedUniqueNames><x15:cachedUniqueName index="99" name="{marker}"/><!--{}--></x15:cachedUniqueNames></mc:Choice><mc:Fallback><x15:futureFallback/></mc:Fallback></mc:AlternateContent>"#,
+        "i".repeat(1024 * 1024)
+    );
+    let mce_binding_from = format!(r#"xmlns:x14="{X14_NS}""#);
+    let mce_binding_to =
+        format!(r#"xmlns:x14="{X14_NS}" xmlns:mc="{MCE_NS}" xmlns:foo="urn:inactive""#);
+    let inactive_fixture = Fixture::build(FixtureOptions::default());
+    let inactive = cache_package_with_replacements(
+        &inactive_fixture,
+        &[
+            (mce_binding_from.as_str(), mce_binding_to.as_str()),
+            (r#"<x15:opaque keep="yes"/>"#, inactive_mce.as_str()),
+        ],
+    );
+
+    for (label, mut package, expected_mce) in [
+        ("unknown URI", unknown, false),
+        ("inactive MCE", inactive, false),
+    ] {
+        let before = cache_blob(&package);
+        let snapshot = Snapshot::load(&package, cache_selector(), field_selector())
+            .unwrap_or_else(|error| panic!("{label} same-QName payload was inferred: {error:?}"));
+        assert_eq!(
+            snapshot.entries().len(),
+            2,
+            "{label} changed typed entry count"
+        );
+        assert_eq!(snapshot.has_ambiguous_mce_owner(), expected_mce);
+        assert!(
+            before
+                .windows(marker.len())
+                .any(|window| window == marker.as_bytes()),
+            "{label} opaque payload marker was not retained"
+        );
+        assert_eq!(snapshot.source_xml(), before.as_slice());
+
+        let commit = Transaction::new(&mut package, cache_selector(), field_selector())
+            .unwrap()
+            .commit()
+            .unwrap();
+        assert!(
+            !commit.changed(),
+            "{label} no-op unexpectedly changed source"
+        );
+        assert_eq!(
+            cache_blob(&package),
+            before,
+            "{label} opaque source changed"
+        );
+    }
+}
+
+#[test]
 fn malformed_opaque_qnames_text_and_reserved_namespace_bindings_are_rejected() {
     let fixture = Fixture::build(FixtureOptions::default());
     let cases = [
@@ -1501,6 +1680,141 @@ fn cached_unique_names_exact_grammar_rejects_unowned_mce_and_unknown_content() {
         assert!(
             Snapshot::load(&fixture.package(), cache_selector(), field_selector()).is_err(),
             "accepted malformed cachedUniqueNames payload: {payload:?}"
+        );
+    }
+}
+
+#[test]
+fn cached_unique_names_parent_sequence_requires_xml_whitespace_between_children() {
+    let fixture = Fixture::build(FixtureOptions::default());
+    let whitespace = cache_package_with_replacements(
+        &fixture,
+        &[(
+            r#"name="North &amp; South"/><x15:cachedUniqueName"#,
+            "name=\"North &amp; South\"/>\n\t  <x15:cachedUniqueName",
+        )],
+    );
+    let snapshot = Snapshot::load(&whitespace, cache_selector(), field_selector())
+        .expect("XML whitespace between cachedUniqueName children is legal");
+    assert_eq!(snapshot.entries().len(), 2);
+
+    for marker in ["payload", "<![CDATA[&#x20;]]>", "<![CDATA[&#x9;]]>"] {
+        let inserted = format!("<x15:cachedUniqueNames>{marker}<x15:cachedUniqueName");
+        let package = cache_package_with_replacements(
+            &fixture,
+            &[(
+                "<x15:cachedUniqueNames><x15:cachedUniqueName",
+                inserted.as_str(),
+            )],
+        );
+        assert!(
+            Snapshot::load(&package, cache_selector(), field_selector()).is_err(),
+            "accepted non-whitespace cachedUniqueNames parent content: {marker}"
+        );
+    }
+}
+
+#[test]
+fn cached_unique_name_leaves_are_attribute_only_and_empty_name_is_valid() {
+    let empty_name = Fixture::build(FixtureOptions {
+        names: vec![(0, String::new()), (7, "North &amp; South".to_owned())],
+        ..FixtureOptions::default()
+    });
+    let snapshot = Snapshot::load(&empty_name.package(), cache_selector(), field_selector())
+        .expect("an empty cachedUniqueName name attribute is valid");
+    assert_eq!(snapshot.entries()[0].name, "");
+
+    for marker in ["payload", "<![CDATA[payload]]>"] {
+        let inserted = format!(
+            r#"<x15:cachedUniqueName index="0" name="North &amp; South">{marker}</x15:cachedUniqueName>"#
+        );
+        let package = cache_package_with_replacements(
+            &Fixture::build(FixtureOptions::default()),
+            &[(
+                r#"<x15:cachedUniqueName index="0" name="North &amp; South"/>"#,
+                inserted.as_str(),
+            )],
+        );
+        assert!(
+            Snapshot::load(&package, cache_selector(), field_selector()).is_err(),
+            "accepted cachedUniqueName leaf text: {marker}"
+        );
+    }
+}
+
+#[test]
+fn oversized_duplicate_cache_extensions_are_refused_before_duplicate_diagnostics() {
+    let base = Fixture::build(FixtureOptions::default());
+    let d259 = oversized_extension(
+        CACHED_UNIQUE_NAMES_URI,
+        r#"<x15:cachedUniqueNames><x15:cachedUniqueName index="99" name="ignored"/></x15:cachedUniqueNames>"#,
+    );
+    let d259_payload = oversized_payload(
+        r#"<x15:cachedUniqueNames><x15:cachedUniqueName index="99" name="ignored"/></x15:cachedUniqueNames>"#,
+    );
+    let abf5 = oversized_extension(
+        PIVOT_CACHE_ID_VERSION_URI,
+        r#"<x15:pivotCacheIdVersion cacheIdSupportedVersion="15" cacheIdCreatedVersion="15"/>"#,
+    );
+    let abf5_payload = oversized_payload(
+        r#"<x15:pivotCacheIdVersion cacheIdSupportedVersion="15" cacheIdCreatedVersion="15"></x15:pivotCacheIdVersion>"#,
+    );
+    let f057 = oversized_extension(F057_URI, r#"<x14:sourceConnection name="canonical"/>"#);
+    let f057_payload =
+        oversized_payload(r#"<x14:sourceConnection name="canonical"></x14:sourceConnection>"#);
+    let definition = format!(
+        r#"<ext uri="{PIVOT_CACHE_DEFINITION_URI}"><x14:pivotCacheDefinition pivotCacheId="42"/></ext>{}"#,
+        oversized_extension(
+            PIVOT_CACHE_DEFINITION_URI,
+            r#"<x14:pivotCacheDefinition pivotCacheId="42"/>"#,
+        )
+    );
+    let definition_payload = format!(
+        r#"<ext uri="{PIVOT_CACHE_DEFINITION_URI}"><x14:pivotCacheDefinition pivotCacheId="42"></x14:pivotCacheDefinition>{}</ext>"#,
+        oversized_payload(
+            r#"<x14:pivotCacheDefinition pivotCacheId="42"></x14:pivotCacheDefinition>"#,
+        ),
+    );
+
+    let cases = [
+        (
+            "cachedUniqueNames",
+            cache_package_with_appended_owner(&base, CACHED_UNIQUE_NAMES_URI, &d259),
+        ),
+        (
+            "cachedUniqueNames",
+            cache_package_with_appended_payload(&base, CACHED_UNIQUE_NAMES_URI, &d259_payload),
+        ),
+        (
+            "pivotCacheIdVersion",
+            cache_package_with_appended_owner(&base, PIVOT_CACHE_ID_VERSION_URI, &abf5),
+        ),
+        (
+            "pivotCacheIdVersion",
+            cache_package_with_appended_payload(&base, PIVOT_CACHE_ID_VERSION_URI, &abf5_payload),
+        ),
+        (
+            "F057",
+            cache_package_with_appended_owner(&base, F057_URI, &f057),
+        ),
+        (
+            "F057",
+            cache_package_with_appended_payload(&base, F057_URI, &f057_payload),
+        ),
+        (
+            "pivotCacheDefinition",
+            cache_package_with_root_extensions(&base, &definition),
+        ),
+        (
+            "pivotCacheDefinition",
+            cache_package_with_root_extensions(&base, &definition_payload),
+        ),
+    ];
+
+    for (owner, package) in cases {
+        assert_fragment_resource_limit(
+            Snapshot::load(&package, cache_selector(), field_selector()),
+            owner,
         );
     }
 }

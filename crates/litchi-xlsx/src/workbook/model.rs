@@ -957,6 +957,53 @@ impl Workbook {
         self.pivot_table_server_formats_source(selector)
     }
 
+    /// Resolve the typed `pivotTableData` payload for one semantic
+    /// non-worksheet PivotTable.  A missing C444 owner is reported as `None`;
+    /// malformed or ambiguous owners remain fallible diagnostics.
+    pub fn pivot_table_data<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<Option<crate::pivot::PivotTableDataView>> {
+        crate::pivot::server_formats::table_data::view_workbook(self, selector)
+    }
+
+    /// Resolve C444 with a caller-lowered semantic resource policy.
+    pub fn pivot_table_data_with_limits<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+        limits: &crate::pivot::PivotTableDataLimits,
+    ) -> Result<Option<crate::pivot::PivotTableDataView>> {
+        crate::pivot::server_formats::table_data::view_workbook_with_limits(self, selector, limits)
+    }
+
+    /// Begin an ordinary semantic scalar edit of one `pivotTableData` owner.
+    pub fn edit_pivot_table_data<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+    ) -> Result<crate::pivot::PivotTableDataEdit> {
+        self.ensure_mutation_allowed("edit_pivot_table_data")?;
+        crate::pivot::server_formats::table_data::edit_workbook(self, selector)
+    }
+
+    /// Start a C444 edit with a caller-lowered semantic resource policy.
+    pub fn edit_pivot_table_data_with_limits<'a>(
+        &self,
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+        limits: &crate::pivot::PivotTableDataLimits,
+    ) -> Result<crate::pivot::PivotTableDataEdit> {
+        self.ensure_mutation_allowed("edit_pivot_table_data_with_limits")?;
+        crate::pivot::server_formats::table_data::edit_workbook_with_limits(self, selector, limits)
+    }
+
+    /// Apply an exact ordinary Workbook `pivotTableData` patch.
+    pub fn apply_pivot_table_data_patch(
+        &self,
+        patch: &crate::pivot::PivotTableDataWorkbookPatch,
+    ) -> Result<crate::pivot::PivotTableDataWorkbookCommit> {
+        self.ensure_mutation_allowed("apply_pivot_table_data_patch")?;
+        patch.apply(self)
+    }
+
     pub(crate) fn pivot_package(&self) -> &OpcPackage {
         &self.inner.package
     }
