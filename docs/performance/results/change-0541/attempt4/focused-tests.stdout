@@ -1,0 +1,11 @@
+
+running 6 tests
+test planning_error_order::first_error_across_selected_worksheets_follows_workbook_order ... ok
+test planning_error_order::full_validation_precedes_mce_preprocessing_and_raw_parsing_errors ... ok
+test planning_error_order::later_selected_worksheet_failure_does_not_publish_the_first_snapshot ... ok
+test planning_error_order::public_multi_sheet_edit_sheets_accepts_supported_namespace_forms_and_pi ... ok
+test planning_error_order::validator_error_wins_when_raw_error_is_earlier_or_later ... ok
+test planning_error_order::public_multi_sheet_error_matrix_preserves_typed_owner_and_source ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 1.35s
+

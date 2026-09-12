@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0541: public XLSX planning first-error guards
+
+[0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. Only
+integration tests change. Typed refusal order, validation-first semantics, source bytes
+and selected-sheet ordering are asserted through public APIs. Adversarial XML uses the
+existing ZIP test writer so OPC authored-output checks are not confused with input
+validation. No production boundary, dependency or performance claim changes.
+
 ## 0540: XLSX validation/parser boundary attribution
 
 [0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.

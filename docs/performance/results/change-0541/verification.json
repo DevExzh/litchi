@@ -1,0 +1,40 @@
+{
+  "adr_entries": 30,
+  "benchmark_builds": 0,
+  "cleanup": {
+    "owned_paths_absent": true,
+    "removed": [
+      "/home/zhuhe/litchi-goal-0541-target"
+    ],
+    "status": "pass"
+  },
+  "final_stage": "attempt5",
+  "focused_test_count": 6,
+  "full_test_count": 1298,
+  "performance_claim": "none",
+  "prior_focused_test_count": 13,
+  "profiles": 0,
+  "receipts": 22,
+  "scope": "Test-only XLSX planning error-order evidence; no performance claim",
+  "seal": {
+    "entries": 101,
+    "sha256": "1067218bd5cd4c775466250934f55f1331806e2c8d4b933525d5522ae49e18ca",
+    "status": "pass"
+  },
+  "source": {
+    "changed_files": [
+      "crates/litchi-xlsx/tests/source_backed_cell_values.rs",
+      "crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs"
+    ],
+    "entries": 8587,
+    "manifest_sha256": "f078271ea630710d384c6e72672b96dcde1698600420d4ff921731f90aa65513"
+  },
+  "stages": [
+    "attempt1",
+    "attempt2",
+    "attempt3",
+    "attempt4",
+    "attempt5"
+  ],
+  "status": "pass"
+}

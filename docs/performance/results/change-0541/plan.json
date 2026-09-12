@@ -1,0 +1,14 @@
+{
+  "revision": "cf15a9a209cb11029b99db32333b6f32d23469f1",
+  "created_utc": "2026-09-12T20:44:44.481805+00:00",
+  "scope": "Combined public source-backed XLSX planning first-error tests; no production optimization or performance claim.",
+  "priority": "OLE2/OOXML first; ODF deferred; iWork excluded",
+  "allowed_changes": [
+    "crates/litchi-xlsx/tests/source_backed_cell_values.rs",
+    "crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs"
+  ],
+  "owned_paths": [
+    "/home/zhuhe/litchi-goal-0541-target"
+  ],
+  "quality": "Focused integration assertions then full XLSX all-features tests, workspace all-features check, targeted integration Clippy, rustdoc, formatting, and boundary checks. Retain each attempted snapshot and failed command separately."
+}

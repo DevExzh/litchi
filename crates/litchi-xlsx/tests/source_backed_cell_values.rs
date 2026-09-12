@@ -20,6 +20,9 @@ use litchi_xlsx::cell_values::{
 use litchi_xlsx::{Address, Cell, EditBlock, Error, ErrorValue, Formula, Number, Selector, Value};
 use soapberry_zip::office::ArchiveReader;
 
+#[path = "source_backed_cell_values/planning_error_order.rs"]
+mod planning_error_order;
+
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const MAIN: &str = "/xl/workbook.xml";

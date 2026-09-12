@@ -1,0 +1,38 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs:61:
+     match (expected, error) {
+         (ExpectedError::Invalid(expected), Error::Invalid(actual)) => {
+             assert_eq!(actual, expected, "unexpected invalid error for {label}");
+[31m-        }
+[m[32m+        },
+[m         (ExpectedError::InvalidContaining(expected), Error::Invalid(actual)) => {
+             assert!(
+                 actual.contains(expected),
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs:68:
+                 "invalid error for {label} did not contain {expected:?}: {actual}"
+             );
+[31m-        }
+[m[32m+        },
+[m         (ExpectedError::Xml(expected), Error::Xml(actual)) => {
+             assert_eq!(
+                 actual.to_string(),
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs:74:
+                 expected,
+                 "unexpected XML error for {label}"
+             );
+[31m-        }
+[m[32m+        },
+[m         (
+             ExpectedError::MarkupCompatibility(expected),
+             Error::MarkupCompatibility(litchi_ooxml_common::mce::Error::NonConformant(actual)),
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs:81:
+         ) => {
+             assert_eq!(actual, expected, "unexpected MCE error for {label}");
+[31m-        }
+[m[32m+        },
+[m         (expected, actual) => {
+             panic!("wrong typed error for {label}: expected {expected:?}, got {actual:?}");
+[31m-        }
+[m[32m+        },
+[m     }
+ }
+ 

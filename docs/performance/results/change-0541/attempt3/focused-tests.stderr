@@ -1,0 +1,3 @@
+   Compiling litchi-xlsx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xlsx)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.10s
+     Running tests/source_backed_cell_values.rs (/home/zhuhe/litchi-goal-0541-target/debug/deps/source_backed_cell_values-673302ff623e0626)

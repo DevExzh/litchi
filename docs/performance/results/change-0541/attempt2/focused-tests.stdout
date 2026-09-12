@@ -1,0 +1,21 @@
+
+running 4 tests
+test planning_error_order::public_multi_sheet_edit_sheets_accepts_supported_namespace_forms_and_pi ... ok
+test planning_error_order::full_validation_precedes_mce_preprocessing_and_raw_parsing_errors ... ok
+test planning_error_order::validator_error_wins_when_raw_error_is_earlier_or_later ... ok
+test planning_error_order::public_multi_sheet_error_matrix_preserves_typed_owner_and_source ... FAILED
+
+failures:
+
+---- planning_error_order::public_multi_sheet_error_matrix_preserves_typed_owner_and_source stdout ----
+
+thread 'planning_error_order::public_multi_sheet_error_matrix_preserves_typed_owner_and_source' (379529) panicked at crates/litchi-xlsx/tests/source_backed_cell_values/planning_error_order.rs:46:39:
+called `Result::unwrap()` on an `Err` value: XmlPublication { part: "/xl/worksheets/sheet1.xml", source: Malformed { offset: 99, detail: "position 9: duplicated attribute, previous declaration at position 2" } }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    planning_error_order::public_multi_sheet_error_matrix_preserves_typed_owner_and_source
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 60 filtered out; finished in 0.99s
+

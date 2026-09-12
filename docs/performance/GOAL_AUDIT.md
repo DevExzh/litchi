@@ -1,5 +1,13 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0541: public XLSX planning first-error guards
+
+[0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. The
+shared-traversal prerequisite now has public first-error controls, combined
+validation/preprocessing/parser cases, retries and cross-sheet ordering. This adds tests
+rather than a runtime optimization. OLE2/OOXML remain active, ODF deferred and iWork
+excluded; native improvement is still unproven.
+
 ## 0540: XLSX validation/parser boundary attribution
 
 [0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.

@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0541: public XLSX planning first-error guards
+
+[0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. The
+large worksheet validation/parser traversal measured in 0540 now has combined
+first-error guards. A future shared reader must preserve per-worksheet validation
+precedence and workbook ordering across selected sheets, not globally prioritize a later
+sheet’s validator. Next is a bounded source-identity-gated implementation and fresh
+matched admission.
+
 ## 0540: XLSX validation/parser boundary attribution
 
 [0540](changes/0540-xlsx-validation-parser-boundary.md) records the fresh attribution.

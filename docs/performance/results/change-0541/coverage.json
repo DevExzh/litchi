@@ -1,0 +1,17 @@
+{
+  "test_functions": 6,
+  "named_fixture_configurations": 37,
+  "independent_error_rows": 19,
+  "same_worksheet_combined_rows": 9,
+  "valid_namespace_controls": 3,
+  "mce_rows": 3,
+  "second_selected_worksheet_rows": 2,
+  "cross_worksheet_order_fixture": 1,
+  "scope": "Public source-backed edit_sheets; each main failure row retries and recovers unaffected Sheet2. Second-sheet failures recover Sheet1. Cross-worksheet case asserts workbook ordering under forward/reverse selectors and independent Sheet2 validator failure.",
+  "limits": [
+    "Does not implement or differentially compare a fused candidate.",
+    "No measured latency/allocation improvement is claimed.",
+    "X14ac qualified attributes are normally refused by the public validator before raw extension capture; raw-owner tests retain that coverage.",
+    "Managed budget, source-version and cancellation behaviors remain covered by existing tests; this matrix does not exhaust all failure combinations."
+  ]
+}
