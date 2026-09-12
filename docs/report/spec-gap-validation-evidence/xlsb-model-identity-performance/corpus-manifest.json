@@ -1,0 +1,14 @@
+{
+  "schema": "xlsb-model-identity-corpus-v1",
+  "fixture_kind": "synthetic_complete_xldm140",
+  "host_feature_commit": "1b0d4864804d666aaf4ae5039bd6300996ca32a5",
+  "neutral_baseline_commit": "4f53be2d31e14b215d6eeaee56d11eefeae94107",
+  "recipe_source": "crates/litchi-xlsb/tests/data_model_identity.rs",
+  "scales_in_smoke": [
+    {"name": "tiny", "tables": 1, "relationships": 0},
+    {"name": "relationship", "tables": 1, "relationships": 1}
+  ],
+  "full_matrix_pending": "T=4,16,64 and R=0,T-1,2T,4T remain outside the bounded smoke run",
+  "native_acceptance_claim": false,
+  "native_evidence": "none"
+}

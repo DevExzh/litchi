@@ -270,6 +270,15 @@ worktree, or historical evidence. It must retain raw JSON, commands, source
 manifest, build provenance, and verifier output; a future measurement batch
 must clean only its own temporary artifacts.
 
+Before a sealed run, every local Cargo source, manifest, build script, fixture,
+and harness input must be tracked at the pinned Git commit and byte equal to
+that commit's `git cat-file` blob. This check must reject unstaged, staged,
+untracked, and `assume-unchanged` edits. The source manifest records the exact
+Cargo metadata digest and commit; the build receipt records the profile binary
+digest before and after the run, and verification must bind both digests back
+to those receipts. A provisional smoke result from a dirty or uncommitted
+checkout cannot be promoted to sealed evidence.
+
 The final report must provide p50/p95/p99 and an uncertainty summary for each
 matched lane, plus source/output bytes and allocation/peak-live distributions.
 Hardware counters, perf profiles, RSS, and syscall observations are supporting
