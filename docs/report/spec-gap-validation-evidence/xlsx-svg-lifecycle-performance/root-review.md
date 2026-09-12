@@ -79,15 +79,17 @@ The current root review has eleven adversarial Python verifier tests. They
 reject missing/nonempty stderr, missing/failed/duplicate exit-status records,
 changed or malformed executable digests, incorrect process identities, and
 input-size drift despite matching claimed hashes, and native receipts that
-disagree with the documented producer fixture. The separate seven-test runner
+disagree with the documented producer fixture. The separate eight-test runner
 suite proves missing or reused external output refusal, checkout/target/symlink
 separation, symlinked-checkout resolution, and owned-target cleanup while
-retaining failed-run diagnostics. Namespace tests reject missing, malformed,
+retaining failed-run diagnostics. It also checks that every explicitly declared
+manifest extra exists in Git HEAD, catching missing inputs before a build.
+Namespace tests reject missing, malformed,
 inconsistent, or changing first-refused binding counts. Caller-limit tests
 reject missing, floating-point, boolean, nonpositive, and cross-process-drift
 ceiling values. A separate five-test source-snapshot suite exercises real
 temporary Git trees, including untracked, assume-unchanged, and tampered
-path-source inputs. All 23 Python tests pass. Shell syntax and three early
+path-source inputs. All 24 Python tests pass. Shell syntax and three early
 refusal gates (unfrozen, unwired, insufficient process count) also pass without
 creating a Cargo target. These checks are verifier evidence, not lifecycle
 performance measurements or production acceptance.
@@ -117,3 +119,11 @@ the verifier checks the complete ordered set and cross-process agreement. The
 source guard binds all 15 files from `ac288a303` plus the reviewed OPC/source
 prerequisites and contextual `svg_blip.rs` blob. This is readiness evidence
 only; it contains no timing or performance claim.
+
+The clean-checkout follow-up at `a556f44da` passed all 76 correctness lanes
+using the newly retained native fixture without an external symlink. It also
+found that the runner still listed the untracked local `docs/GOAL.md` as a
+manifest extra. The manifest now binds the committed ADR 0001 and ADR 0005
+alongside this profile's committed requirements. The local goal remains task
+context; it is not required to build or execute the harness. The new declared
+input test reproduced this missing-file failure before the runner correction.

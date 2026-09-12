@@ -188,7 +188,8 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/root-review.md" \
     --extra "$HERE/corpus-manifest.json" \
     --extra "$HERE/fixtures/tdf169496_hidden_graphic.xlsx" \
-    --extra "$ROOT/docs/GOAL.md" \
+    --extra "$ROOT/docs/adr/0001-priorities-and-api-layers.md" \
+    --extra "$ROOT/docs/adr/0005-io-memory-and-performance.md" \
     --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md" \
     --git-commit "$CURRENT_COMMIT"
 
@@ -260,7 +261,8 @@ python3 "$MANIFEST_TOOL" \
     --extra "$HERE/root-review.md" \
     --extra "$HERE/corpus-manifest.json" \
     --extra "$HERE/fixtures/tdf169496_hidden_graphic.xlsx" \
-    --extra "$ROOT/docs/GOAL.md" \
+    --extra "$ROOT/docs/adr/0001-priorities-and-api-layers.md" \
+    --extra "$ROOT/docs/adr/0005-io-memory-and-performance.md" \
     --extra "$ROOT/docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-design.md" \
     --git-commit "$CURRENT_COMMIT"
 cmp -s "$RESULTS/source-manifest-before.txt" "$RESULTS/source-manifest-after.txt"

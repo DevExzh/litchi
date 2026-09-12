@@ -23,7 +23,7 @@ acceptance or speed fixture:
 
 | item | value |
 |---|---|
-| path | `3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx` |
+| retained path | `fixtures/tdf169496_hidden_graphic.xlsx` (unchanged LibreOffice corpus input; see `fixtures/README.md`) |
 | archive bytes | 12,470 |
 | archive SHA-256 | `0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72` |
 | drawing member | `xl/drawings/drawing1.xml` |
