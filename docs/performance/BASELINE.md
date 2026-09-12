@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0542: shared XLSX traversal rejected by late-error guard
+
+[0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) records 2,440 main native samples, 240 allocator samples per phase,
+and 960 standalone guard samples. The candidate passed all valid primary gates
+(23.5–26.4% planning p50 and 6.9–9.1% workflow p50 reduction) and ordinary
+memory gates, but three late-raw rows exceeded the fixed 2x latency envelope.
+Production is restored; only the measured guard enabler is retained.
+
 ## 0541: public XLSX planning first-error guards
 
 [0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. No

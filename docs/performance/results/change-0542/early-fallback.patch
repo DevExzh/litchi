@@ -1,0 +1,87 @@
+--- a/crates/litchi-xlsx/src/raw/worksheet/codec.rs
++++ b/crates/litchi-xlsx/src/raw/worksheet/codec.rs
+@@ -1118,9 +1118,10 @@
+ /// Traverse one eligible source with the ordinary parser while giving a
+ /// caller-owned validator a borrowed view of each event first.
+ ///
+-/// Parser failures are deliberately not returned here.  The source-backed
+-/// caller must finish validation and then repeat the established two-pass
+-/// path so the historical error text and precedence remain authoritative.
++/// Parser failures are deliberately not returned here. The source-backed
++/// caller repeats the established two-pass path so the historical error text
++/// and precedence remain authoritative. Returning immediately on any
++/// provisional failure drops the parser before fallback starts.
+ pub(super) fn parse_source_with_observer<'a, F, O>(
+     content: &[u8],
+     strings: F,
+@@ -1132,18 +1133,16 @@
+ {
+     let mut reader = NsReader::from_reader(content);
+     reader.config_mut().check_end_names = true;
+-    let mut parser = Some(Parser::new(x14ac::Values::default()));
++    let mut parser = Parser::new(x14ac::Values::default());
+     let mut stack = Vec::new();
+     let mut closed_root = false;
+     let mut event_count = 0usize;
+-    let mut provisional_failed = false;
+ 
+     loop {
+         let event = match reader.read_event() {
+             Ok(event) => event,
+             Err(_) => return super::SourceParseAttempt::ReaderFailed,
+         };
+-        let is_eof = matches!(&event, Event::Eof);
+         let event_limit_exceeded = match event_count.checked_add(1) {
+             Some(count) => {
+                 event_count = count;
+@@ -1156,37 +1155,25 @@
+         let resolver = reader.resolver();
+         let parser_allowed = observer(&namespace, &event);
+         if !parser_allowed || event_limit_exceeded {
+-            parser = None;
+-            stack = Vec::new();
+-            provisional_failed = true;
+-        } else if let Some(parser_state) = parser.as_mut()
+-            && parser_state
+-                .transition(
+-                    &mut stack,
+-                    &mut closed_root,
+-                    &namespace,
+-                    event,
+-                    decoder,
+-                    resolver,
+-                )
+-                .is_err()
+-        {
+-            parser = None;
+-            stack = Vec::new();
+-            provisional_failed = true;
++            return super::SourceParseAttempt::ProvisionalFailed;
+         }
+ 
+-        if is_eof {
++        let complete = match parser.transition(
++            &mut stack,
++            &mut closed_root,
++            &namespace,
++            event,
++            decoder,
++            resolver,
++        ) {
++            Ok(complete) => complete,
++            Err(_) => return super::SourceParseAttempt::ProvisionalFailed,
++        };
++        if complete {
+             break;
+         }
+     }
+ 
+-    if provisional_failed {
+-        return super::SourceParseAttempt::ProvisionalFailed;
+-    }
+-    let Some(parser) = parser else {
+-        return super::SourceParseAttempt::ProvisionalFailed;
+-    };
+     match parser.finish_parse(strings) {
+         Ok(store) => super::SourceParseAttempt::Parsed(store),
+         Err(_) => super::SourceParseAttempt::ProvisionalFailed,

@@ -1,5 +1,13 @@
 # Performance hotspot inventory
 
+## 0542: validated raw-error fallback repeats worksheet work
+
+[0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) demonstrates a substantial valid-path opportunity in shared worksheet
+traversal, but its post-EOF raw failure repeats validation/parsing and fails
+three refusal latency gates. Next is forwarding the validated materialization
+error through the existing x14ac retry, plus dropping validator state before
+fallback, under fresh matched evidence. OLE2/OOXML remain ahead of deferred ODF.
+
 ## 0541: public XLSX planning first-error guards
 
 [0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. The

@@ -1,5 +1,15 @@
 # Performance optimization ADR-compliance matrix
 
+## 0542: shared XLSX traversal candidate and refusal evidence
+
+[0542](changes/0542-xlsx-shared-traversal-refusal-rejected.md) retains a benchmark enabler, with no production optimization admitted.
+The candidate keeps source ownership, private dependency direction, validation
+precedence and publication fences; 8 MiB/event caps bound provisional state.
+Static review requires dropping retained validator state before fallback, and
+three measured late-error latency rows fail admission. No OOM, RSS or general
+adversarial-safety claim follows from allocator Region measurements. The next
+proposal must preserve post-EOF typed errors and x14ac retry precedence.
+
 ## 0541: public XLSX planning first-error guards
 
 [0541](changes/0541-xlsx-planning-error-order-guards.md) adds the behavioral guard. Only
