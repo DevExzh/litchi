@@ -2494,13 +2494,13 @@ fn ensure_unchanged_raster(before: &SvgFinalState, after: &SvgFinalState) -> Res
     Ok(())
 }
 
-/// Preflight a public operation before its borrowed payload is copied.  A
-/// detach with no admitted owner is an exact in-memory no-op.
 /// Preflight an operation against the source package plus operations already
 /// staged in this transaction.  The source scanner remains authoritative for
 /// the initial owner state; this small projection prevents a later detach
 /// from silently becoming a no-op after an earlier attach (and permits the
-/// corresponding detach-then-attach sequence).
+/// corresponding detach-then-attach sequence).  The returned transition is
+/// committed by the caller only after all later intent/payload admissions
+/// succeed, so a failed stage leaves both semantic maps unchanged.
 pub(super) fn preflight_with_pending(
     workbook: &Workbook,
     position: usize,
@@ -2508,21 +2508,25 @@ pub(super) fn preflight_with_pending(
     attach: bool,
     cache: &mut HashMap<(usize, usize), DrawingPreflight>,
     projected: &mut HashMap<(usize, PictureSelector), ProjectedSvgOwner>,
-) -> Result<bool> {
+) -> Result<PreparedSvgTransition> {
     projected
         .try_reserve(1)
         .map_err(|source| allocation("SVG lifecycle projected owner cache", source))?;
     let key = (position, selector_drawing(selector));
-    if !cache.contains_key(&key) {
+    let new_facts = if cache.contains_key(&key) {
+        None
+    } else {
         cache
             .try_reserve(1)
             .map_err(|source| allocation("SVG lifecycle preflight cache", source))?;
-        let facts = build_preflight_cache(workbook, position, selector)?;
-        cache.insert(key, facts);
-    }
-    let facts = cache
-        .get(&key)
-        .ok_or_else(|| invalid("SVG lifecycle preflight cache disappeared"))?;
+        Some(build_preflight_cache(workbook, position, selector)?)
+    };
+    let facts = match new_facts.as_ref() {
+        Some(facts) => facts,
+        None => cache
+            .get(&key)
+            .ok_or_else(|| invalid("SVG lifecycle preflight cache disappeared"))?,
+    };
     let part = workbook.inner.package.get_part(&facts.drawing_uri)?;
     let picture = facts
         .pictures
@@ -2532,14 +2536,16 @@ pub(super) fn preflight_with_pending(
     let owner = if let Some(owner) = projected.get(&(position, selector)) {
         *owner
     } else {
-        projected.insert((position, selector), picture.owner);
         picture.owner
     };
     match (attach, owner) {
-        (true, ProjectedSvgOwner::None | ProjectedSvgOwner::Opaque) => {
-            projected.insert((position, selector), ProjectedSvgOwner::Embedded);
-            Ok(true)
-        },
+        (true, ProjectedSvgOwner::None | ProjectedSvgOwner::Opaque) => Ok(PreparedSvgTransition {
+            cache_key: key,
+            new_facts,
+            projected_key: (position, selector),
+            projected_owner: ProjectedSvgOwner::Embedded,
+            effective: true,
+        }),
         (true, ProjectedSvgOwner::Embedded) => Err(invalid(
             "selected picture already has an embedded SVG owner",
         )),
@@ -2549,15 +2555,26 @@ pub(super) fn preflight_with_pending(
         (true, ProjectedSvgOwner::Ambiguous | ProjectedSvgOwner::Refused) => Err(invalid(
             "selected picture has an ambiguous or refused SVG owner",
         )),
-        (false, ProjectedSvgOwner::Embedded) => {
-            projected.insert((position, selector), ProjectedSvgOwner::None);
-            Ok(true)
-        },
+        (false, ProjectedSvgOwner::Embedded) => Ok(PreparedSvgTransition {
+            cache_key: key,
+            new_facts,
+            projected_key: (position, selector),
+            projected_owner: ProjectedSvgOwner::None,
+            effective: true,
+        }),
         (false, ProjectedSvgOwner::Linked) => Err(invalid("linked SVG owners cannot be detached")),
         (false, ProjectedSvgOwner::Ambiguous | ProjectedSvgOwner::Refused) => Err(invalid(
             "selected picture has an ambiguous or refused SVG owner",
         )),
-        (false, ProjectedSvgOwner::None | ProjectedSvgOwner::Opaque) => Ok(false),
+        (false, owner @ (ProjectedSvgOwner::None | ProjectedSvgOwner::Opaque)) => {
+            Ok(PreparedSvgTransition {
+                cache_key: key,
+                new_facts,
+                projected_key: (position, selector),
+                projected_owner: owner,
+                effective: false,
+            })
+        },
     }
 }
 
@@ -2605,6 +2622,31 @@ pub(super) enum ProjectedSvgOwner {
     Linked,
     Ambiguous,
     Refused,
+}
+
+pub(super) struct PreparedSvgTransition {
+    cache_key: (usize, usize),
+    new_facts: Option<DrawingPreflight>,
+    projected_key: (usize, PictureSelector),
+    projected_owner: ProjectedSvgOwner,
+    effective: bool,
+}
+
+impl PreparedSvgTransition {
+    pub(super) fn is_effective(&self) -> bool {
+        self.effective
+    }
+
+    pub(super) fn commit(
+        self,
+        cache: &mut HashMap<(usize, usize), DrawingPreflight>,
+        projected: &mut HashMap<(usize, PictureSelector), ProjectedSvgOwner>,
+    ) {
+        if let Some(facts) = self.new_facts {
+            cache.insert(self.cache_key, facts);
+        }
+        projected.insert(self.projected_key, self.projected_owner);
+    }
 }
 
 #[derive(Debug)]
@@ -5572,6 +5614,7 @@ const fn selector_picture(selector: PictureSelector) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::workbook::edit::SvgInput;
     use crate::workbook::edit::model::GraphChange;
 
     #[test]
@@ -5654,6 +5697,98 @@ mod tests {
         assert_eq!(
             chained.events,
             first.events - before_events + after_plan.event_count()
+        );
+    }
+
+    fn one_picture_workbook() -> Workbook {
+        let baseline = Workbook::new().unwrap();
+        let mut package = baseline.inner.package.clone();
+        let worksheet_uri = baseline.inner.sheets[0].part_uri.clone();
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .set_blob(
+                br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><dimension ref="A1:C3"/><sheetData/><drawing r:id="rIdDrawing"/></worksheet>"#.to_vec(),
+            );
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/drawings/drawing1.xml").unwrap(),
+                ct::OFC_DRAWING.to_owned(),
+                br#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><xdr:twoCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="1" name="Picture 1"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rIdRaster"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr/></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>"#.to_vec(),
+            )))
+            .unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/media/image1.png").unwrap(),
+                ct::PNG.to_owned(),
+                b"picture-bytes".to_vec(),
+            )))
+            .unwrap();
+        package
+            .get_part_mut(&worksheet_uri)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                rt::DRAWING.to_owned(),
+                "../drawings/drawing1.xml".to_owned(),
+                "rIdDrawing".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        package
+            .get_part_mut(&PackURI::new("/xl/drawings/drawing1.xml").unwrap())
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                rt::IMAGE.to_owned(),
+                "../media/image1.png".to_owned(),
+                "rIdRaster".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        Workbook::from_package(package).unwrap()
+    }
+
+    #[test]
+    fn failed_attach_admission_leaves_real_preflight_retryable() {
+        let mut edit = one_picture_workbook().edit().unwrap();
+        let selector = PictureSelector::new(0, 0);
+        let payload = SvgInput::borrowed(b"<svg/>");
+        assert!(
+            edit.stage_svg_attach_after_preflight_failure_for_test(0, selector, payload)
+                .is_err()
+        );
+        assert!(edit.svg_lifecycle.is_empty());
+        assert!(edit.svg_preflight.is_empty());
+        assert!(edit.svg_projected_owners.is_empty());
+
+        edit.sheet("Sheet1")
+            .unwrap()
+            .unwrap()
+            .attach_svg(selector, payload)
+            .unwrap();
+        assert_eq!(edit.svg_lifecycle.len(), 1);
+        assert_eq!(edit.svg_preflight.len(), 1);
+        assert_eq!(
+            edit.svg_projected_owners.get(&(0, selector)),
+            Some(&ProjectedSvgOwner::Embedded)
+        );
+    }
+
+    #[test]
+    fn no_op_detach_retains_real_preflight_cache() {
+        let mut edit = one_picture_workbook().edit().unwrap();
+        let selector = PictureSelector::new(0, 0);
+        edit.sheet("Sheet1")
+            .unwrap()
+            .unwrap()
+            .detach_svg(selector)
+            .unwrap();
+        assert!(edit.svg_lifecycle.is_empty());
+        assert_eq!(edit.svg_preflight.len(), 1);
+        assert_eq!(
+            edit.svg_projected_owners.get(&(0, selector)),
+            Some(&ProjectedSvgOwner::None)
         );
     }
 }
