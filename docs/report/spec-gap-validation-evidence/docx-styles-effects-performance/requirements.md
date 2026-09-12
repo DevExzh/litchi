@@ -200,11 +200,13 @@ replacement construction occur before the timed allocation window.
   owner relationship/content-type closure. A missing glossary document must
   refuse before mutation; an existing glossary must not gain a fifth seeded
   resource merely because the effects resource is added.
-* `inverse_replace_<owner>_<scale>` and `inverse_remove_add_<owner>_<scale>`:
-  publish a changed patch, start the inverse timer before reopening the
-  restored bytes, apply `patch.inverse()`, reopen the package, and require an
-  exact package-byte hash and owner-resource hash equal to the original. The
-  restored reopen belongs to the inverse phase, not to setup.
+* The current profile's `inverse_replace_main` and `inverse_remove_main` lanes
+  publish a changed patch, construct/apply `patch.inverse()` and serialize its
+  output under `inverse_ns`, then start `inverse_reopen_ns` immediately before
+  `Package::from_reader` and owner loading. Require an exact package-byte hash
+  and owner-resource hash equal to the original. The restored reopen belongs
+  to the observed inverse cost, not to setup; that cost is the sum of these
+  two disjoint clocks.
 * `stale_patch_<owner>` is a smoke-only refusal. Apply the same patch twice or
   apply it to a different owner/source and require a typed source/owner/graph
   precondition error plus complete source readback.

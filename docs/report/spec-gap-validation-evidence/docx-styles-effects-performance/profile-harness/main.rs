@@ -34,8 +34,8 @@ use support::{AllocSnapshot, begin_window};
 
 const DEFAULT_WARMUP: usize = 2;
 const DEFAULT_SAMPLES: usize = 20;
-const SOURCE_COMMIT: &str = "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119";
-const PROFILE_SCHEMA: &str = "docx-styles-effects-profile-scaffold-v1";
+const SOURCE_COMMIT: &str = "8702fd4db8723acceb7deb51bcb40ff66604bf10";
+const PROFILE_SCHEMA: &str = "docx-styles-effects-profile-scaffold-v2";
 
 const LANES: &[&str] = &[
     "capture_bug_main",
@@ -252,14 +252,39 @@ fn phases_json(result: &RunResult) -> Value {
         "stage_ns": result.phases.stage_ns,
         "commit_ns": result.phases.commit_ns,
         "publish_ns": result.phases.publish_ns,
+        "apply_ns": result.phases.apply_ns,
+        "serialize_ns": result.phases.serialize_ns,
         "reopen_ns": result.phases.reopen_ns,
         "inverse_reopen_ns": result.phases.inverse_reopen_ns,
         "inverse_ns": result.phases.inverse_ns,
+        "inverse_apply_ns": result.phases.inverse_apply_ns,
+        "inverse_serialize_ns": result.phases.inverse_serialize_ns,
         "projection_ns": result.phases.projection_ns,
         "opaque_ns": result.phases.opaque_ns,
         "graph_ns": result.phases.graph_ns,
         "readback_ns": result.phases.readback_ns,
         "validation_ns": result.phases.validation_ns,
+    })
+}
+
+fn allocation_json(value: Option<support::AllocDelta>) -> Value {
+    value.map_or(Value::Null, |delta| {
+        json!({
+            "direct_allocated_bytes": delta.direct,
+            "realloc_old_bytes": delta.realloc_old,
+            "realloc_new_bytes": delta.realloc_new,
+            "deallocated_bytes": delta.deallocated,
+            "requested_alloc_bytes": delta.requested(),
+            "live_before": delta.live_before,
+            "live_after": delta.live_after,
+            "peak_live_delta": delta.peak_delta,
+            "allocation_calls": delta.calls,
+            "reallocation_calls": delta.realloc_calls,
+            "deallocation_calls": delta.dealloc_calls,
+            "allocation_failed": delta.failed,
+            "alloc_balance_ok": delta.balanced(),
+            "alloc_invalid": delta.invalid,
+        })
     })
 }
 
@@ -279,6 +304,19 @@ fn phase_sum(result: &RunResult) -> u64 {
         .saturating_add(phases.graph_ns)
         .saturating_add(phases.readback_ns)
         .saturating_add(phases.validation_ns)
+}
+
+fn validate_attribution_delta(
+    label: &str,
+    value: Option<support::AllocDelta>,
+) -> Result<(), String> {
+    let Some(delta) = value else {
+        return Ok(());
+    };
+    if !delta.balanced() || delta.invalid || delta.failed != 0 {
+        return Err(format!("{label} allocator gate failed"));
+    }
+    Ok(())
 }
 
 fn sample_json(
@@ -307,6 +345,38 @@ fn sample_json(
             elapsed_ns
         ));
     }
+    if result
+        .phases
+        .apply_ns
+        .saturating_add(result.phases.serialize_ns)
+        > result.phases.publish_ns
+    {
+        return Err(format!(
+            "lane {lane} scale {} forward attribution exceeds publish: {} + {} > {}",
+            scale.label(),
+            result.phases.apply_ns,
+            result.phases.serialize_ns,
+            result.phases.publish_ns
+        ));
+    }
+    if result
+        .phases
+        .inverse_apply_ns
+        .saturating_add(result.phases.inverse_serialize_ns)
+        > result.phases.inverse_ns
+    {
+        return Err(format!(
+            "lane {lane} scale {} inverse attribution exceeds inverse: {} + {} > {}",
+            scale.label(),
+            result.phases.inverse_apply_ns,
+            result.phases.inverse_serialize_ns,
+            result.phases.inverse_ns
+        ));
+    }
+    validate_attribution_delta("apply", result.phases.apply_alloc)?;
+    validate_attribution_delta("serialize", result.phases.serialize_alloc)?;
+    validate_attribution_delta("inverse apply", result.phases.inverse_apply_alloc)?;
+    validate_attribution_delta("inverse serialize", result.phases.inverse_serialize_alloc)?;
     if !delta.balanced() || delta.invalid || delta.failed != 0 {
         return Err(format!(
             "lane {lane} scale {} allocator gate failed",
@@ -338,6 +408,10 @@ fn sample_json(
             .and_then(|value| value.parse::<u64>().ok()),
         "elapsed_ns": elapsed_ns,
         "phases": phases_json(result),
+        "apply_allocation": allocation_json(result.phases.apply_alloc),
+        "serialize_allocation": allocation_json(result.phases.serialize_alloc),
+        "inverse_apply_allocation": allocation_json(result.phases.inverse_apply_alloc),
+        "inverse_serialize_allocation": allocation_json(result.phases.inverse_serialize_alloc),
         "actual_success": result.actual_success,
         "semantic_ok": result.semantic_ok,
         "opaque_ok": result.opaque_ok,
@@ -486,5 +560,83 @@ fn main() -> ExitCode {
             eprintln!("profile scaffold operation failed: {error}");
             ExitCode::from(1)
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::support;
+
+    #[test]
+    fn allocator_subphase_peaks_reset_without_erasing_outer_peak() {
+        // The test runs with the same global allocator as the profile binary.
+        // Run it as a single test when replaying so no other test thread can
+        // interleave allocator traffic with these process-local counters.
+        support::reset_process_counters();
+        let outer_before = support::AllocSnapshot::now();
+
+        let retained = vec![0_u8; 4 * 1024];
+
+        support::begin_phase_window();
+        let phase_one_before = support::AllocSnapshot::now();
+        let mut growing = Vec::with_capacity(8);
+        growing.resize(64 * 1024, 0_u8);
+        growing.reserve_exact(128 * 1024);
+        growing.truncate(32);
+        growing.shrink_to_fit();
+        drop(growing);
+        let phase_one_after = support::AllocSnapshot::now();
+        let phase_one = phase_one_before.phase_delta(phase_one_after);
+
+        support::begin_phase_window();
+        let phase_two_before = support::AllocSnapshot::now();
+        let small = vec![0_u8; 128];
+        drop(small);
+        let phase_two_after = support::AllocSnapshot::now();
+        let phase_two = phase_two_before.phase_delta(phase_two_after);
+        let outer_after_phases = support::AllocSnapshot::now();
+
+        drop(retained);
+        let outer_after = support::AllocSnapshot::now();
+        let outer = outer_before.delta(outer_after);
+
+        assert!(
+            phase_one.realloc_calls > 0,
+            "growth/shrink did not exercise realloc"
+        );
+        assert!(phase_one.balanced());
+        assert!(phase_two.balanced());
+        assert!(outer.balanced());
+        assert!(!phase_one.invalid);
+        assert!(!phase_two.invalid);
+        assert!(!outer.invalid);
+        assert_eq!(phase_one.live_before, phase_one.live_after);
+        assert_eq!(phase_two.live_before, phase_two.live_after);
+        assert_eq!(phase_one.live_after, phase_two.live_before);
+        assert_eq!(phase_two.live_after, outer_after_phases.live);
+        assert_eq!(outer.live_before, outer.live_after);
+        assert!(phase_two.peak_delta > 0);
+        assert!(phase_one.peak_delta > phase_two.peak_delta);
+        assert!(outer_after_phases.peak >= phase_one_after.peak);
+        assert_eq!(outer_after.peak, outer_after_phases.peak);
+        assert!(outer.peak_delta > 0);
+        assert!(phase_one.calls.saturating_add(phase_two.calls) <= outer.calls);
+        assert!(
+            phase_one
+                .realloc_calls
+                .saturating_add(phase_two.realloc_calls)
+                <= outer.realloc_calls
+        );
+        assert!(
+            phase_one
+                .dealloc_calls
+                .saturating_add(phase_two.dealloc_calls)
+                <= outer.dealloc_calls
+        );
+        assert!(phase_one.direct.saturating_add(phase_two.direct) <= outer.direct);
+        assert!(phase_one.realloc_old.saturating_add(phase_two.realloc_old) <= outer.realloc_old);
+        assert!(phase_one.realloc_new.saturating_add(phase_two.realloc_new) <= outer.realloc_new);
+        assert!(phase_one.deallocated.saturating_add(phase_two.deallocated) <= outer.deallocated);
+        assert!(phase_one.failed.saturating_add(phase_two.failed) <= outer.failed);
     }
 }

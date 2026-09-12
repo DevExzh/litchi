@@ -13,6 +13,10 @@ from pathlib import Path
 
 
 SOURCE_COMMIT = "d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119"
+# The historical 52-lane smoke remains bound to SOURCE_COMMIT.  Profile
+# receipts use the separately approved attribution baseline so retaining the
+# smoke does not rewrite its source identity.
+PROFILE_SOURCE_COMMIT = "8702fd4db8723acceb7deb51bcb40ff66604bf10"
 MANIFEST_FORMAT = "docx-styles-effects-cargo-source-closure-v1"
 RECEIPT_SCHEMA = "docx-styles-effects-smoke-v1"
 U64_MAX = (1 << 64) - 1
@@ -222,8 +226,15 @@ def is_evidence_path(shown: str, evidence_root: str) -> bool:
     return shown.startswith(evidence_root + "/")
 
 
-def manifest_blob_commit(shown: str, evidence_root: str, manifest_head: str) -> str:
-    return manifest_head if is_evidence_path(shown, evidence_root) else SOURCE_COMMIT
+def manifest_blob_commit(
+    shown: str,
+    evidence_root: str,
+    manifest_head: str,
+    source_commit: str | None = None,
+) -> str:
+    if source_commit is None:
+        source_commit = SOURCE_COMMIT
+    return manifest_head if is_evidence_path(shown, evidence_root) else source_commit
 
 
 def verify_manifest_path(
@@ -234,7 +245,10 @@ def verify_manifest_path(
     manifest_head: str,
     retained_evidence: Path,
     context: str,
+    source_commit: str | None = None,
 ) -> None:
+    if source_commit is None:
+        source_commit = SOURCE_COMMIT
     require(
         not Path(shown).is_absolute()
         and all(part not in ("", ".", "..") for part in Path(shown).parts),
@@ -243,13 +257,22 @@ def verify_manifest_path(
     current = retained_input(root, shown, evidence_root, retained_evidence)
     require(current.is_file(), f"{context} missing: {shown}")
     require(sha256(current) == expected, f"{context} changed: {shown}")
-    commit = manifest_blob_commit(shown, evidence_root, manifest_head)
+    commit = manifest_blob_commit(shown, evidence_root, manifest_head, source_commit)
     committed = git_blob_sha256(root, commit, shown)
     require(committed is not None, f"{context} is absent at bound Git head: {shown}")
     require(committed == expected, f"{context} Git blob changed: {shown}")
 
 
-def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: Path) -> dict[str, object]:
+def verify_manifest(
+    path: Path,
+    root: Path,
+    metadata: Path,
+    retained_evidence: Path,
+    *,
+    source_commit: str | None = None,
+) -> dict[str, object]:
+    if source_commit is None:
+        source_commit = SOURCE_COMMIT
     lines = path.read_text().splitlines()
     require(lines and lines[0] == f"format={MANIFEST_FORMAT}", "source manifest format changed")
     fields: dict[str, str] = {}
@@ -266,7 +289,7 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
         elif "=" in line:
             key, value = line.split("=", 1)
             fields[key] = value
-    require(fields.get("source_commit") == SOURCE_COMMIT, "source commit changed")
+    require(fields.get("source_commit") == source_commit, "source commit changed")
     manifest_head = fields.get("git_head")
     require(
         manifest_head is not None
@@ -300,6 +323,7 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
             manifest_head,
             retained_evidence,
             "source input",
+            source_commit,
         )
         grouped.setdefault((package_name, version, manifest), []).append((shown, expected))
 
@@ -316,6 +340,7 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
             manifest_head,
             retained_evidence,
             "source extra",
+            source_commit,
         )
 
     package_keys: set[tuple[str, str, str]] = set()
@@ -335,6 +360,7 @@ def verify_manifest(path: Path, root: Path, metadata: Path, retained_evidence: P
             manifest_head,
             retained_evidence,
             "package manifest",
+            source_commit,
         )
         package_files = sorted(grouped.get(key, []))
         require(package_files, f"package has no file records: {name}")

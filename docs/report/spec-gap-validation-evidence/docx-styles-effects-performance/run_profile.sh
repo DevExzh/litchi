@@ -23,7 +23,7 @@ fi
 
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 ROOT=$(cd -- "$HERE/../../../.." && pwd -P)
-SOURCE_COMMIT=d1f299d00e0dd5cc5cd8ddf9811c4b1ad21d1119
+SOURCE_COMMIT=8702fd4db8723acceb7deb51bcb40ff66604bf10
 SMOKE_COMMIT=8444e88baaaca128eed50a2eed26e0ecd25063c9
 HARNESS=$HERE/profile-harness/Cargo.toml
 MANIFEST_TOOL=$HERE/source_manifest.py
