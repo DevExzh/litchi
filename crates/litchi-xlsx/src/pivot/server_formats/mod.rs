@@ -34,8 +34,10 @@ use std::sync::Arc;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, ReadLimits};
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
+use quick_xml::name::{LocalName, Prefix, PrefixDeclaration, QName};
+use quick_xml::reader::Reader;
+
+use litchi_ooxml_common::xml_name::is_qualified_name;
 
 use crate::Workbook;
 use crate::error::{Error, Result, invalid};
@@ -47,6 +49,8 @@ use crate::source_attributes::{
 
 mod relationships;
 use relationships::RelationshipIndex;
+
+pub mod cached_unique_names;
 
 const CORE_NS: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_CORE_NS: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -62,6 +66,7 @@ const PIVOT_TABLE_REFERENCES_URI: &str = "{983426D0-5260-488c-9760-48F4B6AC55F4}
 const PIVOT_CACHE_DEFINITION_URI: &str = "{725AE2AE-9491-48BE-B2B4-4EB974FC3084}";
 const PIVOT_CACHE_ID_VERSION_URI: &str = "{ABF5C744-AB39-4b91-8756-CFA1BBC848D5}";
 const CACHE_SOURCE_URI: &str = "{F057638F-6D5F-4E77-A914-E7F072B9BCA8}";
+const CONNECTION_MODEL_URI: &str = "{DE250136-89BD-433C-8126-D09CA5730AF9}";
 const CONNECTIONS_RELATIONSHIP: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections";
 const STRICT_CONNECTIONS_RELATIONSHIP: &str =
@@ -486,7 +491,7 @@ struct SourcePart {
     name: PackURI,
     content_type: String,
     bytes: Arc<Vec<u8>>,
-    relationships: OwnedRelationships,
+    relationships: Option<OwnedRelationships>,
     incoming: Vec<RelationshipState>,
 }
 
@@ -494,12 +499,14 @@ impl SourcePart {
     fn capture(index: &RelationshipIndex<'_>, part: &dyn Part) -> Result<Self> {
         let name = part.partname().clone();
         let relationships = if name.as_str() == "/" {
-            index.root_source().clone()
+            Some(index.root_source().clone())
         } else {
             index.source(&name)?
         };
         let source_ref = index.source_ref(&name)?;
-        if relationships.owner() != source_ref.owner() {
+        if let (Some(relationships), Some(source_ref)) = (relationships.as_ref(), source_ref)
+            && relationships.owner() != source_ref.owner()
+        {
             return Err(invalid("PivotTable relationship source owner mismatch"));
         }
         let incoming = index.capture_incoming(&name)?;
@@ -1429,6 +1436,7 @@ struct CacheInfo {
 struct ConnectionCatalog {
     by_id: HashMap<u32, String>,
     by_name: HashMap<String, u32>,
+    model_ids: HashSet<u32>,
 }
 
 struct PayloadInfo {
@@ -1474,7 +1482,7 @@ impl Graph {
             &catalog_mce_limits(package.read_limits()),
         )?;
         let (connections, connection_catalog) =
-            match load_connections(package, workbook_part, &relationship_index)? {
+            match load_connections(package, workbook_part, &relationship_index, false)? {
                 Some((source, catalog)) => (Some(source), Some(catalog)),
                 None => (None, None),
             };
@@ -2893,6 +2901,7 @@ fn load_connections(
     package: &OpcPackage,
     workbook: &dyn Part,
     relationship_index: &RelationshipIndex<'_>,
+    need_model_ids: bool,
 ) -> Result<Option<(SourcePart, ConnectionCatalog)>> {
     let mut matches = workbook.rels().iter().filter(|relationship| {
         matches!(
@@ -2935,7 +2944,9 @@ fn load_connections(
         .iter()
         .find(|element| element.parent_index.is_none())
         .ok_or_else(|| invalid("connections Part has no root"))?;
-    if root.ns != CORE_NS && root.ns != STRICT_CORE_NS || root.local != b"connections" {
+    if root.ns.as_ref() != CORE_NS && root.ns.as_ref() != STRICT_CORE_NS
+        || root.local != b"connections"
+    {
         return Err(invalid("connections Part has an invalid root"));
     }
     let mut by_id = HashMap::new();
@@ -2961,6 +2972,24 @@ fn load_connections(
             resource: "workbook connection name index",
             source,
         })?;
+    let model_candidates = if need_model_ids {
+        Some(scan_model_connection_candidates(
+            &scan,
+            root,
+            connection_count,
+        )?)
+    } else {
+        None
+    };
+    let mut model_ids = HashSet::new();
+    if need_model_ids {
+        model_ids
+            .try_reserve(connection_count)
+            .map_err(|source| Error::Allocation {
+                resource: "workbook model connection index",
+                source,
+            })?;
+    }
     for element in scan.elements.iter().filter(|element| {
         element.parent_index == Some(root.index)
             && element.ns == root.ns
@@ -2992,14 +3021,193 @@ fn load_connections(
                 *stored = name;
             }
         }
+        if need_model_ids
+            && is_model_connection(
+                &scan,
+                root,
+                element,
+                model_candidates
+                    .as_ref()
+                    .and_then(|candidates| candidates.get(&element.index)),
+            )?
+        {
+            model_ids.insert(id);
+        }
     }
     if by_id.is_empty() {
         return Err(invalid("connections Part has no connection entries"));
     }
     Ok(Some((
         SourcePart::capture(relationship_index, part)?,
-        ConnectionCatalog { by_id, by_name },
+        ConnectionCatalog {
+            by_id,
+            by_name,
+            model_ids,
+        },
     )))
+}
+
+#[derive(Default)]
+struct ModelConnectionCandidate {
+    extension_count: u8,
+    payload_count: u8,
+    extension_index: Option<usize>,
+    payload_index: Option<usize>,
+}
+
+/// Index the exact DE250 extension in one bounded pass over the already parsed
+/// connections Part.  The C510 owner does not request this index, so malformed
+/// optional model extensions cannot affect its ordinary connection scan.
+fn scan_model_connection_candidates(
+    scan: &XmlScan,
+    root: &XmlElement,
+    connection_count: usize,
+) -> Result<HashMap<usize, ModelConnectionCandidate>> {
+    let mut candidates: HashMap<usize, ModelConnectionCandidate> = HashMap::new();
+    candidates
+        .try_reserve(connection_count)
+        .map_err(|source| Error::Allocation {
+            resource: "workbook model connection candidate index",
+            source,
+        })?;
+    for element in &scan.elements {
+        if let Some(connection_index) = model_connection_owner(scan, root, element, false)
+            && element.ns == root.ns
+            && element.local == b"ext"
+        {
+            let candidate = candidates.entry(connection_index).or_default();
+            candidate.extension_count = candidate.extension_count.saturating_add(1);
+            if candidate.extension_count == 1 {
+                candidate.extension_index = Some(element.index);
+            }
+        }
+        if let Some(connection_index) = model_connection_owner(scan, root, element, true) {
+            let candidate = candidates.entry(connection_index).or_default();
+            candidate.payload_count = candidate.payload_count.saturating_add(1);
+            if candidate.payload_count == 1 {
+                candidate.payload_index = Some(element.index);
+            }
+        }
+    }
+    Ok(candidates)
+}
+
+/// Resolve a direct matching extension or payload to its owning root
+/// connection without walking the complete scan.  Parent indices are the
+/// parser's retained ancestry, so this is constant work per XML element.
+fn model_connection_owner(
+    scan: &XmlScan,
+    root: &XmlElement,
+    element: &XmlElement,
+    payload: bool,
+) -> Option<usize> {
+    let parent_index = element.parent_index?;
+    let parent = scan.elements.get(parent_index)?;
+    let extension = if payload {
+        if element.ns.as_ref() != EXT_NS || element.local != b"connection" {
+            return None;
+        }
+        parent
+    } else {
+        if element.ns != root.ns || element.local != b"ext" {
+            return None;
+        }
+        element
+    };
+    let ext_list = scan.elements.get(extension.parent_index?)?;
+    let connection = scan.elements.get(ext_list.parent_index?)?;
+    if ext_list.ns != root.ns
+        || ext_list.local != b"extLst"
+        || connection.parent_index != Some(root.index)
+        || connection.ns != root.ns
+        || connection.local != b"connection"
+        || extension.ns != root.ns
+        || extension.local != b"ext"
+        || !candidate_attr_once(extension, b"uri")
+            .is_some_and(|value| xml_token_eq(value, CONNECTION_MODEL_URI))
+    {
+        return None;
+    }
+    Some(connection.index)
+}
+
+/// Recognize one exact DE250 model-connection candidate after the one-pass
+/// ancestry index has identified its unique extension and payload.
+fn is_model_connection(
+    scan: &XmlScan,
+    _root: &XmlElement,
+    connection: &XmlElement,
+    candidate: Option<&ModelConnectionCandidate>,
+) -> Result<bool> {
+    let Some(candidate) = candidate else {
+        return Ok(false);
+    };
+    if candidate.extension_count != 1 || candidate.payload_count != 1 {
+        return Ok(false);
+    }
+    let Some(extension_index) = candidate.extension_index else {
+        return Ok(false);
+    };
+    let Some(extension) = scan.elements.get(extension_index) else {
+        return Ok(false);
+    };
+    let Some(payload_index) = candidate.payload_index else {
+        return Ok(false);
+    };
+    let Some(payload) = scan.elements.get(payload_index) else {
+        return Ok(false);
+    };
+    if connection.mce_context || extension.mce_context || payload.mce_context {
+        return Ok(false);
+    }
+    if payload.has_element_child || payload.has_text || payload.has_cdata {
+        return Ok(false);
+    }
+    let model = candidate_attr_once(payload, b"model")
+        .map(|value| parse_bool(value, "connection model"))
+        .transpose()
+        .ok()
+        .flatten()
+        .unwrap_or(false);
+    if !model {
+        return Ok(false);
+    }
+    let Some(connection_type) = candidate_attr_once(connection, b"type")
+        .map(|value| parse_u32(value, "connection type"))
+        .transpose()
+        .ok()
+        .flatten()
+    else {
+        return Ok(false);
+    };
+    if connection_type != 5 {
+        return Ok(false);
+    }
+    let Some(id) = candidate_attr_once(payload, b"id")
+        .map(decode_spreadsheet_text)
+        .transpose()
+        .ok()
+        .flatten()
+    else {
+        return Ok(false);
+    };
+    if !id.is_empty() {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn candidate_attr_once<'a>(element: &'a XmlElement, local: &[u8]) -> Option<&'a str> {
+    let mut found = None;
+    for attribute in &element.attrs {
+        if attribute.ns.is_empty() && attribute.local == local {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(attribute.value.as_str());
+        }
+    }
+    found
 }
 
 fn validate_table_incoming_closure(
@@ -3103,7 +3311,7 @@ fn parse_workbook_references(
     };
     let payloads = scan.elements.iter().filter(|candidate| {
         candidate.parent_index == Some(ext.index)
-            && candidate.ns == EXT_NS
+            && candidate.ns.as_ref() == EXT_NS
             && candidate.local == b"pivotTableReferences"
     });
     let mut payloads = payloads;
@@ -3118,7 +3326,7 @@ fn parse_workbook_references(
         .iter()
         .filter(|candidate| {
             candidate.parent_index == Some(references.index)
-                && candidate.ns == EXT_NS
+                && candidate.ns.as_ref() == EXT_NS
                 && candidate.local == b"pivotTableReference"
         })
         .count();
@@ -3142,7 +3350,7 @@ fn parse_workbook_references(
         })?;
     for child in scan.elements.iter().filter(|candidate| {
         candidate.parent_index == Some(references.index)
-            && candidate.ns == EXT_NS
+            && candidate.ns.as_ref() == EXT_NS
             && candidate.local == b"pivotTableReference"
     }) {
         let rid = required_rel_id(child, "pivotTableReference")?;
@@ -3257,7 +3465,7 @@ fn direct_exts<'a>(
                         .attrs
                         .iter()
                         .find(|attr| attr.ns.is_empty() && attr.local == b"uri")
-                        .is_some_and(|attr| attr.value == uri)
+                        .is_some_and(|attr| xml_token_eq(&attr.value, uri))
             })
     }) {
         result.try_reserve(1).map_err(|source| Error::Allocation {
@@ -3287,10 +3495,10 @@ fn is_owned_payload(scan: &XmlScan, root: &XmlElement, candidate: &XmlElement, u
                     .attrs
                     .iter()
                     .find(|attr| attr.ns.is_empty() && attr.local == b"uri")
-                    .is_some_and(|attr| attr.value == uri)
+                    .is_some_and(|attr| xml_token_eq(&attr.value, uri))
                 && (through_mce || candidate.parent_index == Some(parent.index));
         }
-        if parent.ns != MCE_NS {
+        if parent.ns.as_ref() != MCE_NS {
             return false;
         }
         through_mce = true;
@@ -3305,7 +3513,8 @@ mod tests;
 fn required_rel_id(element: &XmlElement, owner: &str) -> Result<String> {
     let mut value = None;
     for attr in &element.attrs {
-        if (attr.ns == REL_NS || attr.ns == STRICT_REL_NS) && attr.local == b"id" {
+        if (attr.ns.as_ref() == REL_NS || attr.ns.as_ref() == STRICT_REL_NS) && attr.local == b"id"
+        {
             if value.is_some() {
                 return Err(invalid(format!(
                     "{owner} has multiple strict/transitional r:id attributes"
@@ -3382,7 +3591,9 @@ fn scan_table_metadata_from_scan(scan: &XmlScan) -> Result<TableMeta> {
         .iter()
         .find(|element| element.parent_index.is_none())
         .ok_or_else(|| invalid("PivotTable Part has no root"))?;
-    if root.ns != CORE_NS && root.ns != STRICT_CORE_NS || root.local != b"pivotTableDefinition" {
+    if root.ns.as_ref() != CORE_NS && root.ns.as_ref() != STRICT_CORE_NS
+        || root.local != b"pivotTableDefinition"
+    {
         return Err(invalid("PivotTable Part has an invalid root"));
     }
     let name = root
@@ -3470,7 +3681,9 @@ fn validate_cache_closure(
         .iter()
         .find(|element| element.parent_index.is_none())
         .ok_or_else(|| invalid("PivotCache Part has no root"))?;
-    if root.ns != CORE_NS && root.ns != STRICT_CORE_NS || root.local != b"pivotCacheDefinition" {
+    if root.ns.as_ref() != CORE_NS && root.ns.as_ref() != STRICT_CORE_NS
+        || root.local != b"pivotCacheDefinition"
+    {
         return Err(invalid("PivotCache Part has an invalid root"));
     }
     if root
@@ -3497,7 +3710,7 @@ fn validate_cache_closure(
         }
         let definitions = scan.elements.iter().filter(|element| {
             element.parent_index == Some(definition_ext.index)
-                && element.ns == X14_NS
+                && element.ns.as_ref() == X14_NS
                 && element.local == b"pivotCacheDefinition"
         });
         let mut definitions = definitions;
@@ -3563,7 +3776,7 @@ fn validate_cache_closure(
     }
     let versions = scan.elements.iter().filter(|element| {
         element.parent_index == Some(version_ext.index)
-            && element.ns == EXT_NS
+            && element.ns.as_ref() == EXT_NS
             && element.local == b"pivotCacheIdVersion"
     });
     let mut versions = versions;
@@ -3634,7 +3847,7 @@ fn validate_external_source_connection(
                 .iter()
                 .find(|attr| attr.ns.is_empty() && attr.local == b"uri")
                 .map(|attr| attr.value.as_str());
-            if uri == Some(CACHE_SOURCE_URI) {
+            if uri.is_some_and(|value| xml_token_eq(value, CACHE_SOURCE_URI)) {
                 if f057_ext.replace(ext).is_some() {
                     return Err(invalid("cacheSource has duplicate F057 extensions"));
                 }
@@ -3649,7 +3862,7 @@ fn validate_external_source_connection(
     }
     let source_connections = scan.elements.iter().filter(|element| {
         element.parent_index == Some(ext.index)
-            && element.ns == X14_NS
+            && element.ns.as_ref() == X14_NS
             && element.local == b"sourceConnection"
     });
     let mut source_connections = source_connections;
@@ -3781,7 +3994,7 @@ fn parse_payload(scan: &XmlScan, source: &[u8]) -> Result<PayloadInfo> {
         .find(|element| element.parent_index.is_none())
         .ok_or_else(|| invalid("PivotTable Part has no root"))?;
     for element in &scan.elements {
-        if element.ns != EXT_NS || element.local != b"pivotTableServerFormats" {
+        if element.ns.as_ref() != EXT_NS || element.local != b"pivotTableServerFormats" {
             continue;
         }
         if !is_owned_payload(scan, root, element, PIVOT_TABLE_SERVER_FORMATS_URI) {
@@ -3828,7 +4041,7 @@ fn parse_payload(scan: &XmlScan, source: &[u8]) -> Result<PayloadInfo> {
         .iter()
         .filter(|candidate| candidate.parent_index == Some(payload.index))
     {
-        if element.ns != EXT_NS || element.local != b"serverFormat" {
+        if element.ns.as_ref() != EXT_NS || element.local != b"serverFormat" {
             return Err(invalid(
                 "pivotTableServerFormats contains an unexpected child",
             ));
@@ -3864,7 +4077,7 @@ fn parse_payload(scan: &XmlScan, source: &[u8]) -> Result<PayloadInfo> {
     let mut opaque_index_refs = false;
     let mut diagnostic = false;
     for element in &scan.elements {
-        if element.ns != EXT_NS || element.local != b"x" {
+        if element.ns.as_ref() != EXT_NS || element.local != b"x" {
             continue;
         }
         let Some((data_index, mce_context)) = owned_pivot_data_ancestor(scan, root, element) else {
@@ -3941,7 +4154,7 @@ fn owned_pivot_data_ancestor(
     let mut current = element.parent_index;
     while let Some(index) = current {
         let data = scan.elements.get(index)?;
-        if data.ns == EXT_NS
+        if data.ns.as_ref() == EXT_NS
             && data.local == b"pivotTableData"
             && is_owned_payload(scan, root, data, PIVOT_TABLE_DATA_URI)
         {
@@ -3959,13 +4172,13 @@ fn exact_pivot_value_cell_chain(scan: &XmlScan, element: &XmlElement, data: usiz
     else {
         return false;
     };
-    if cell.ns != EXT_NS || cell.local != b"c" {
+    if cell.ns.as_ref() != EXT_NS || cell.local != b"c" {
         return false;
     }
     let Some(row) = cell.parent_index.and_then(|index| scan.elements.get(index)) else {
         return false;
     };
-    if row.ns != EXT_NS || row.local != b"pivotRow" {
+    if row.ns.as_ref() != EXT_NS || row.local != b"pivotRow" {
         return false;
     }
     row.parent_index == Some(data)
@@ -4159,18 +4372,40 @@ fn is_xml_space(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
 }
 
+/// Compare a recognized OOXML extension URI using the XML Schema `token`
+/// whitespace facet.  The source value itself remains untouched in
+/// `XmlAttribute::value` and its lexical range; only this semantic comparison
+/// trims XML-S padding.  All recognized constants are URI tokens without
+/// internal whitespace, so allocation-free edge trimming is sufficient here.
+fn xml_token_eq(value: &str, expected: &str) -> bool {
+    value.trim_matches(|character| matches!(character, ' ' | '\t' | '\r' | '\n')) == expected
+}
+
 fn parse_u32(value: &str, owner: &str) -> Result<u32> {
     let value = value.trim_matches(|character| matches!(character, ' ' | '\t' | '\r' | '\n'));
-    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+    let bytes = value.as_bytes();
+    let (negative, digits) = match bytes.first().copied() {
+        Some(b'+') => (false, &bytes[1..]),
+        Some(b'-') => (true, &bytes[1..]),
+        _ => (false, bytes),
+    };
+    if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
         return Err(invalid(format!("{owner} is not an unsignedInt")));
     }
-    value
+    // XML Schema's unsignedInt lexical space admits a leading sign. A
+    // negative lexical form denotes zero only when every digit is zero.
+    if negative && digits.iter().any(|digit| *digit != b'0') {
+        return Err(invalid(format!("{owner} is not an unsignedInt")));
+    }
+    std::str::from_utf8(digits)
+        .expect("unsignedInt digits are ASCII")
         .parse::<u32>()
         .map_err(|_| invalid(format!("{owner} is not an unsignedInt")))
 }
 
 fn parse_bool(value: &str, owner: &str) -> Result<bool> {
-    match value.trim() {
+    let value = value.trim_matches([' ', '\t', '\r', '\n']);
+    match value {
         "true" | "1" => Ok(true),
         "false" | "0" => Ok(false),
         _ => Err(invalid(format!("{owner} is not an XML Schema boolean"))),
@@ -4185,17 +4420,70 @@ fn decode_spreadsheet_text(value: &str) -> Result<String> {
 struct XmlScan {
     elements: Vec<XmlElement>,
     limits: XmlScanLimits,
+    ignorable_scopes: Vec<IgnorableScope>,
+}
+
+type NamespaceRef = Arc<[u8]>;
+
+#[derive(Debug, Default)]
+struct NamespaceInterner {
+    values: HashSet<NamespaceRef>,
+}
+
+impl NamespaceInterner {
+    fn intern(&mut self, value: &[u8], limits: XmlScanLimits) -> Result<NamespaceRef> {
+        if value.len() > limits.namespace_bytes {
+            return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+        }
+        validate_xml_characters(value)?;
+        if let Some(existing) = self.values.get(value) {
+            return Ok(existing.clone());
+        }
+        self.values
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace interner",
+                source,
+            })?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(value.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace",
+                source,
+            })?;
+        owned.extend_from_slice(value);
+        let shared: NamespaceRef = Arc::from(owned);
+        self.values.insert(shared.clone());
+        Ok(shared)
+    }
+}
+
+#[derive(Debug)]
+struct IgnorableScope {
+    parent: Option<usize>,
+    namespaces: Vec<NamespaceRef>,
 }
 
 #[derive(Debug)]
 struct XmlElement {
     index: usize,
     parent_index: Option<usize>,
-    ns: Vec<u8>,
+    ns: NamespaceRef,
     local: Vec<u8>,
     start: Range<usize>,
     end: usize,
     attrs: Vec<XmlAttribute>,
+    /// MCE branch metadata is retained only so extension owners can apply the
+    /// first-supported Choice/Fallback rule without rescanning the Part.  The
+    /// branch grammar is parsed by the cache-field owner; the server-format
+    /// owner does not consult it.
+    mce_branch: Option<cached_unique_names::MceBranch>,
+    /// `mc:Ignorable` declarations made directly on this element.  The
+    /// cache-field owner walks the already-built ancestor chain when it needs
+    /// the effective set, so this scanner does not copy the inherited list at
+    /// every depth level.
+    ignorable_scope: usize,
     mce_context: bool,
     has_element_child: bool,
     has_cdata: bool,
@@ -4204,7 +4492,7 @@ struct XmlElement {
 
 #[derive(Debug)]
 struct XmlAttribute {
-    ns: Vec<u8>,
+    ns: NamespaceRef,
     local: Vec<u8>,
     value: String,
     value_range: Range<usize>,
@@ -4214,24 +4502,60 @@ struct XmlAttribute {
 #[derive(Debug)]
 struct OpenElement {
     index: usize,
-    ns: Vec<u8>,
+    ignorable_scope: usize,
     mce_context: bool,
 }
 
 fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Result<XmlScan> {
+    scan_xml_config(bytes, expected_root, read_limits, false)
+}
+
+/// Scan one Part with the cache-field owner's opt-in MCE branch metadata.
+/// Ordinary C510/workbook/connection scans intentionally keep their prior
+/// compatibility behavior and do not validate unrelated MCE branches.
+fn scan_xml_with_mce(
+    bytes: &[u8],
+    expected_root: &str,
+    read_limits: ReadLimits,
+) -> Result<XmlScan> {
+    scan_xml_config(bytes, expected_root, read_limits, true)
+}
+
+fn scan_xml_config(
+    bytes: &[u8],
+    expected_root: &str,
+    read_limits: ReadLimits,
+    parse_mce_branches: bool,
+) -> Result<XmlScan> {
     let limits = XmlScanLimits::from_read_limits(read_limits);
     if bytes.is_empty() || bytes.len() > limits.part_bytes {
         return Err(invalid("PivotTable XML exceeds its Part limit"));
     }
     validate_xml_characters(bytes)?;
-    let mut reader = NsReader::from_reader(bytes);
+    // Use the plain reader here instead of `NsReader`.  `NsReader` resolves
+    // namespace values before the owner can perform XML attribute-value
+    // normalization, which rejects a legal reserved `xml` binding written
+    // with character references.  The bounded resolver below applies the
+    // declarations after decoding their namespace URI and retains the same
+    // source offsets from the reader.
+    let mut reader = Reader::from_reader(bytes);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
-    reader
-        .resolver_mut()
-        .set_max_declarations_per_element(limits.namespace_declarations);
     let mut elements = Vec::<XmlElement>::new();
     let mut stack = Vec::<OpenElement>::new();
+    let mut namespace_interner = NamespaceInterner::default();
+    let mut resolver = NamespaceResolver::new(limits, &mut namespace_interner)?;
+    let mut ignorable_scopes = Vec::new();
+    ignorable_scopes
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable MCE scope table",
+            source,
+        })?;
+    ignorable_scopes.push(IgnorableScope {
+        parent: None,
+        namespaces: Vec::new(),
+    });
     let mut root_seen = false;
     let mut root_closed = false;
     let mut nodes = 0usize;
@@ -4256,19 +4580,15 @@ fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Resul
                 return Err(invalid("PivotTable XML node count exceeds limit"));
             }
         }
-        let resolver = reader.resolver().clone();
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let (ns, local) = resolved_name(&resolver, element.name(), limits)?;
-                if !root_seen {
-                    root_seen = true;
-                    if local.as_slice() != expected_root.as_bytes() {
-                        return Err(invalid(format!(
-                            "PivotTable XML root must be {expected_root}"
-                        )));
-                    }
-                } else if root_closed || stack.is_empty() {
+                // Reject impossible tree states and depth exhaustion before
+                // resolving any names or namespace declarations.  Besides
+                // preserving the event/depth accounting for empty elements,
+                // this keeps a second root from making unbounded namespace
+                // work before it is rejected.
+                if root_seen && (root_closed || stack.is_empty()) {
                     return Err(invalid("PivotTable XML has multiple roots"));
                 }
                 if stack.len() >= MAX_DEPTH {
@@ -4277,28 +4597,84 @@ fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Resul
                 if stack.len() >= limits.depth {
                     return Err(invalid("PivotTable XML depth exceeds caller limit"));
                 }
+                begin_namespace_scope(&mut resolver, &element, limits, &mut namespace_interner)?;
+                let (ns, local) = resolved_name(&resolver, element.name(), limits)?;
+                if !root_seen {
+                    root_seen = true;
+                    if local.as_slice() != expected_root.as_bytes() {
+                        return Err(invalid(format!(
+                            "PivotTable XML root must be {expected_root}"
+                        )));
+                    }
+                }
                 let parent = stack.last();
                 let index = elements.len();
                 let start = event_start_range(bytes, before, after, &element)?;
                 let element_end = start.end;
                 let attrs =
                     parse_attrs(bytes, &element, &resolver, reader.decoder(), &start, limits)?;
+                let local_ignorable = if parse_mce_branches {
+                    parse_ignorable_namespaces(&element, &resolver, reader.decoder(), limits)?
+                } else {
+                    Vec::new()
+                };
+                let parent_scope = parent
+                    .map(|parent| parent.ignorable_scope)
+                    .unwrap_or_default();
+                let ignorable_scope = if parse_mce_branches {
+                    extend_ignorable_scope(&mut ignorable_scopes, parent_scope, local_ignorable)?
+                } else {
+                    0
+                };
+                let parses_mce_branch = parse_mce_branches
+                    && ns.as_ref() == MCE_NS
+                    && matches!(local.as_slice(), b"Choice" | b"Fallback");
+                if parse_mce_branches
+                    && ns.as_ref() == MCE_NS
+                    && local.as_slice() == b"AlternateContent"
+                {
+                    cached_unique_names::validate_mce_alternate_content_attributes(
+                        &element,
+                        &resolver,
+                        ignorable_scope,
+                        &ignorable_scopes,
+                    )?;
+                }
+                let mce_branch = if parses_mce_branch {
+                    cached_unique_names::scan_mce_branch(
+                        ns.as_ref(),
+                        &element,
+                        &resolver,
+                        reader.decoder(),
+                        limits,
+                        ignorable_scope,
+                        &ignorable_scopes,
+                    )?
+                } else {
+                    None
+                };
                 if let Some(parent) = parent {
                     if let Some(parent_element) = elements.get_mut(parent.index) {
                         parent_element.has_element_child = true;
                     }
                 }
-                let mce_context = parent.map_or(ns.as_slice() == MCE_NS, |parent| {
-                    parent.mce_context || parent.ns.as_slice() == MCE_NS || ns.as_slice() == MCE_NS
+                let mce_context = parent.map_or(ns.as_ref() == MCE_NS, |parent| {
+                    parent.mce_context
+                        || elements
+                            .get(parent.index)
+                            .is_some_and(|parent| parent.ns.as_ref() == MCE_NS)
+                        || ns.as_ref() == MCE_NS
                 });
                 let info = XmlElement {
                     index,
                     parent_index: parent.map(|parent| parent.index),
                     ns: ns.clone(),
-                    local: local.clone(),
+                    local,
                     start,
                     end: element_end,
                     attrs,
+                    mce_branch,
+                    ignorable_scope,
                     mce_context,
                     has_element_child: false,
                     has_cdata: false,
@@ -4318,14 +4694,31 @@ fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Resul
                     })?;
                     stack.push(OpenElement {
                         index,
-                        ns,
+                        ignorable_scope,
                         mce_context,
                     });
                 } else if stack.is_empty() {
                     root_closed = true;
                 }
+                if !is_start {
+                    resolver.pop();
+                }
             },
-            Event::End(_) => {
+            Event::End(end_name) => {
+                validate_qname(
+                    end_name.name().as_ref(),
+                    limits,
+                    "PivotTable XML end element",
+                )?;
+                if end_name
+                    .name()
+                    .prefix()
+                    .is_some_and(|prefix| prefix.is_xmlns())
+                {
+                    return Err(invalid(
+                        "PivotTable XML end element uses the reserved xmlns prefix",
+                    ));
+                }
                 let Some(open) = stack.pop() else {
                     return Err(invalid("PivotTable XML has an unmatched end"));
                 };
@@ -4336,21 +4729,32 @@ fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Resul
                 if stack.is_empty() {
                     root_closed = true;
                 }
+                resolver.pop();
             },
             Event::Eof => break,
             Event::PI(_) | Event::DocType(_) => {
-                // PIs are preserved source material; DTDs/entities are not
-                // accepted by the bounded OOXML reader.
+                // PIs are preserved source material; DTDs are not accepted by
+                // the bounded OOXML reader.  Predefined and numeric character
+                // references are validated in the GeneralRef arm below.
                 if matches!(event, Event::DocType(_)) {
                     return Err(invalid("PivotTable XML DTD is not supported"));
                 }
             },
-            Event::GeneralRef(_) => {
-                return Err(invalid(
-                    "PivotTable XML entity references are not supported",
-                ));
+            Event::GeneralRef(reference) => {
+                validate_general_reference(reference.as_ref())?;
+                if let Some(open) = stack.last()
+                    && let Some(element) = elements.get_mut(open.index)
+                {
+                    element.has_text = true;
+                }
             },
             Event::Text(_) => {
+                if bytes
+                    .get(before..after)
+                    .is_some_and(|raw| raw.windows(3).any(|window| window == b"]]>"))
+                {
+                    return Err(invalid("PivotTable XML text contains raw ]]>"));
+                }
                 if let Some(open) = stack.last()
                     && let Some(element) = elements.get_mut(open.index)
                 {
@@ -4370,7 +4774,11 @@ fn scan_xml(bytes: &[u8], expected_root: &str, read_limits: ReadLimits) -> Resul
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("PivotTable XML is unterminated"));
     }
-    Ok(XmlScan { elements, limits })
+    Ok(XmlScan {
+        elements,
+        limits,
+        ignorable_scopes,
+    })
 }
 
 fn event_end_position(bytes: &[u8], before: usize, after: usize) -> usize {
@@ -4383,24 +4791,580 @@ fn event_end_position(bytes: &[u8], before: usize, after: usize) -> usize {
     bytes.len()
 }
 
-fn resolved_name(
-    resolver: &quick_xml::name::NamespaceResolver,
-    name: quick_xml::name::QName<'_>,
+fn validate_general_reference(reference: &[u8]) -> Result<()> {
+    if matches!(reference, b"amp" | b"lt" | b"gt" | b"apos" | b"quot") {
+        return Ok(());
+    }
+    let (radix, digits) = if let Some(hex) = reference
+        .strip_prefix(b"#x")
+        .or_else(|| reference.strip_prefix(b"#X"))
+    {
+        (16, hex)
+    } else if let Some(decimal) = reference.strip_prefix(b"#") {
+        (10, decimal)
+    } else {
+        return Err(invalid(
+            "PivotTable XML has an unsupported entity reference",
+        ));
+    };
+    if digits.is_empty() {
+        return Err(invalid("PivotTable XML character reference has no digits"));
+    }
+    let mut value = 0u32;
+    for digit in digits {
+        let digit = match digit {
+            b'0'..=b'9' => u32::from(digit - b'0'),
+            b'a'..=b'f' if radix == 16 => u32::from(digit - b'a' + 10),
+            b'A'..=b'F' if radix == 16 => u32::from(digit - b'A' + 10),
+            _ => return Err(invalid("PivotTable XML character reference is invalid")),
+        };
+        value = value
+            .checked_mul(radix)
+            .and_then(|value| value.checked_add(digit))
+            .ok_or_else(|| invalid("PivotTable XML character reference overflows"))?;
+    }
+    let character = char::from_u32(value)
+        .ok_or_else(|| invalid("PivotTable XML character reference is not a scalar"))?;
+    if matches!(
+        character,
+        '\t' | '\n' | '\r' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}'
+            | '\u{10000}'..='\u{10ffff}'
+    ) {
+        Ok(())
+    } else {
+        Err(invalid(
+            "PivotTable XML character reference is not an XML character",
+        ))
+    }
+}
+
+const XML_NAMESPACE_URI: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const XMLNS_NAMESPACE_URI: &[u8] = b"http://www.w3.org/2000/xmlns/";
+
+#[derive(Debug)]
+struct NamespaceBinding {
+    prefix: Arc<[u8]>,
+    namespace: NamespaceRef,
+    level: usize,
+}
+
+#[derive(Debug)]
+enum NamespaceResolution {
+    Bound(NamespaceRef),
+    Unknown(Vec<u8>),
+}
+
+/// A fallible, caller-bounded namespace resolver for the source scanner.
+///
+/// `quick_xml::name::NamespaceResolver` stores namespace bytes in private
+/// `Vec`s and appends with infallible `extend_from_slice`.  That is acceptable
+/// for ordinary parsing, but this owner promises caller-bounded allocations.
+/// Keeping the small equivalent here lets every index/binding growth go
+/// through the crate's fallible allocation path while retaining quick-xml's
+/// expanded-name semantics.  The active prefix index restores shadowed
+/// bindings on scope pop, and URI values are already interned by declaration.
+#[derive(Debug)]
+struct NamespaceResolver {
+    bindings: Vec<NamespaceBinding>,
+    by_prefix: HashMap<Arc<[u8]>, Vec<usize>>,
+    empty: NamespaceRef,
+    nesting_level: usize,
+    max_bindings: usize,
+}
+
+impl NamespaceResolver {
+    fn new(limits: XmlScanLimits, interner: &mut NamespaceInterner) -> Result<Self> {
+        let empty = interner.intern(&[], limits)?;
+        let xml_namespace = interner.intern(XML_NAMESPACE_URI, limits)?;
+        let xmlns_namespace = interner.intern(XMLNS_NAMESPACE_URI, limits)?;
+        let mut bindings = Vec::new();
+        bindings
+            .try_reserve_exact(2)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace bindings",
+                source,
+            })?;
+        let mut by_prefix = HashMap::new();
+        by_prefix
+            .try_reserve(2)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace prefix index",
+                source,
+            })?;
+        let xml_prefix = copy_namespace_prefix(b"xml")?;
+        let mut xml_stack = Vec::new();
+        xml_stack
+            .try_reserve_exact(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace prefix stack",
+                source,
+            })?;
+        xml_stack.push(0);
+        by_prefix.insert(xml_prefix.clone(), xml_stack);
+        bindings.push(NamespaceBinding {
+            prefix: xml_prefix,
+            namespace: xml_namespace,
+            level: 0,
+        });
+
+        let xmlns_prefix = copy_namespace_prefix(b"xmlns")?;
+        let mut xmlns_stack = Vec::new();
+        xmlns_stack
+            .try_reserve_exact(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace prefix stack",
+                source,
+            })?;
+        xmlns_stack.push(1);
+        by_prefix.insert(xmlns_prefix.clone(), xmlns_stack);
+        bindings.push(NamespaceBinding {
+            prefix: xmlns_prefix,
+            namespace: xmlns_namespace,
+            level: 0,
+        });
+
+        Ok(Self {
+            bindings,
+            by_prefix,
+            empty,
+            nesting_level: 0,
+            max_bindings: limits
+                .part_bytes
+                .checked_add(2)
+                .ok_or_else(|| invalid("PivotTable XML namespace binding count overflows"))?,
+        })
+    }
+
+    fn level(&self) -> usize {
+        self.nesting_level
+    }
+
+    fn set_level(&mut self, level: usize) {
+        self.nesting_level = level;
+    }
+
+    fn add(
+        &mut self,
+        prefix: PrefixDeclaration<'_>,
+        namespace: NamespaceRef,
+        limits: XmlScanLimits,
+    ) -> Result<()> {
+        let namespace_bytes = namespace.as_ref();
+        match prefix {
+            PrefixDeclaration::Default => {},
+            PrefixDeclaration::Named(prefix) if prefix == b"xml" => {
+                if namespace_bytes != XML_NAMESPACE_URI {
+                    return Err(invalid(
+                        "the namespace prefix 'xml' cannot be rebound to another URI",
+                    ));
+                }
+                // `xml` is already a fixed level-zero binding.
+                return Ok(());
+            },
+            PrefixDeclaration::Named(prefix) if prefix == b"xmlns" => {
+                return Err(invalid("the namespace prefix 'xmlns' cannot be declared"));
+            },
+            PrefixDeclaration::Named(_) if namespace_bytes == XML_NAMESPACE_URI => {
+                return Err(invalid(
+                    "a non-xml namespace prefix cannot bind the XML namespace",
+                ));
+            },
+            PrefixDeclaration::Named(_) if namespace_bytes == XMLNS_NAMESPACE_URI => {
+                return Err(invalid(
+                    "a namespace prefix cannot bind the XMLNS namespace",
+                ));
+            },
+            PrefixDeclaration::Named(_) => {},
+        }
+
+        if self.bindings.len() >= self.max_bindings {
+            return Err(invalid(
+                "PivotTable XML namespace binding count exceeds caller limit",
+            ));
+        }
+        let prefix_bytes = match prefix {
+            PrefixDeclaration::Default => &[][..],
+            PrefixDeclaration::Named(prefix) => prefix,
+        };
+        if prefix_bytes.len() > limits.name_bytes {
+            return Err(invalid(
+                "PivotTable XML namespace prefix exceeds caller limit",
+            ));
+        }
+        self.bindings
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace bindings",
+                source,
+            })?;
+        let existing_prefix = self
+            .by_prefix
+            .get_key_value(prefix_bytes)
+            .map(|(prefix, _)| Arc::clone(prefix));
+        let (prefix, is_new) = if let Some(prefix) = existing_prefix {
+            (prefix, false)
+        } else {
+            self.by_prefix
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "PivotTable XML namespace prefix index",
+                    source,
+                })?;
+            (copy_namespace_prefix(prefix_bytes)?, true)
+        };
+        let binding_index = self.bindings.len();
+        if is_new {
+            let mut stack = Vec::new();
+            stack
+                .try_reserve_exact(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "PivotTable XML namespace prefix stack",
+                    source,
+                })?;
+            stack.push(binding_index);
+            self.by_prefix.insert(prefix.clone(), stack);
+        } else {
+            let stack = self
+                .by_prefix
+                .get_mut(prefix_bytes)
+                .ok_or_else(|| invalid("PivotTable XML namespace prefix index is inconsistent"))?;
+            stack.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "PivotTable XML namespace prefix stack",
+                source,
+            })?;
+            stack.push(binding_index);
+        }
+        self.bindings.push(NamespaceBinding {
+            prefix,
+            namespace,
+            level: self.nesting_level,
+        });
+        Ok(())
+    }
+
+    fn pop(&mut self) {
+        self.nesting_level = self.nesting_level.saturating_sub(1);
+        let current_level = self.nesting_level;
+        while self.bindings.len() > 2
+            && self
+                .bindings
+                .last()
+                .is_some_and(|binding| binding.level > current_level)
+        {
+            let binding = self
+                .bindings
+                .pop()
+                .expect("namespace binding exists after length check");
+            let remove_prefix = if let Some(stack) = self.by_prefix.get_mut(binding.prefix.as_ref())
+            {
+                let _ = stack.pop();
+                stack.is_empty()
+            } else {
+                false
+            };
+            if remove_prefix {
+                self.by_prefix.remove(binding.prefix.as_ref());
+            }
+        }
+    }
+
+    fn resolve_element<'name>(
+        &self,
+        name: QName<'name>,
+    ) -> Result<(NamespaceResolution, LocalName<'name>)> {
+        self.resolve(name, true)
+    }
+
+    fn resolve_attribute<'name>(
+        &self,
+        name: QName<'name>,
+    ) -> Result<(NamespaceResolution, LocalName<'name>)> {
+        self.resolve(name, false)
+    }
+
+    fn resolve<'name>(
+        &self,
+        name: QName<'name>,
+        use_default: bool,
+    ) -> Result<(NamespaceResolution, LocalName<'name>)> {
+        let (local, prefix) = name.decompose();
+        Ok((self.resolve_prefix(prefix, use_default)?, local))
+    }
+
+    fn resolve_prefix(
+        &self,
+        prefix: Option<Prefix<'_>>,
+        use_default: bool,
+    ) -> Result<NamespaceResolution> {
+        if prefix.is_none() && !use_default {
+            return Ok(NamespaceResolution::Bound(Arc::clone(&self.empty)));
+        }
+        let prefix_bytes = match prefix {
+            Some(prefix) => prefix.into_inner(),
+            None => &[][..],
+        };
+        let Some(binding_index) = self
+            .by_prefix
+            .get(prefix_bytes)
+            .and_then(|stack| stack.last())
+            .copied()
+        else {
+            return if let Some(prefix) = prefix {
+                Ok(NamespaceResolution::Unknown(copy_unknown_prefix(prefix)?))
+            } else {
+                Ok(NamespaceResolution::Bound(Arc::clone(&self.empty)))
+            };
+        };
+        let binding = self
+            .bindings
+            .get(binding_index)
+            .ok_or_else(|| invalid("PivotTable XML namespace binding index is invalid"))?;
+        if let Some(prefix) = prefix
+            && binding.namespace.is_empty()
+        {
+            return Ok(NamespaceResolution::Unknown(copy_unknown_prefix(prefix)?));
+        }
+        Ok(NamespaceResolution::Bound(Arc::clone(&binding.namespace)))
+    }
+}
+
+fn copy_namespace_prefix(value: &[u8]) -> Result<Arc<[u8]>> {
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable XML namespace prefix",
+            source,
+        })?;
+    owned.extend_from_slice(value);
+    Ok(Arc::from(owned))
+}
+
+fn copy_unknown_prefix(prefix: Prefix<'_>) -> Result<Vec<u8>> {
+    let mut unknown = Vec::new();
+    unknown
+        .try_reserve_exact(prefix.as_ref().len())
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable XML unknown namespace prefix",
+            source,
+        })?;
+    unknown.extend_from_slice(prefix.as_ref());
+    Ok(unknown)
+}
+
+fn begin_namespace_scope(
+    resolver: &mut NamespaceResolver,
+    element: &BytesStart<'_>,
     limits: XmlScanLimits,
-) -> Result<(Vec<u8>, Vec<u8>)> {
-    let (resolved, local_name) = resolver.resolve_element(name);
+    interner: &mut NamespaceInterner,
+) -> Result<()> {
+    let level = resolver
+        .level()
+        .checked_add(1)
+        .ok_or_else(|| invalid("PivotTable XML namespace depth overflows"))?;
+    resolver.set_level(level);
+    let mut declarations = 0usize;
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        let key = attribute.key.as_ref();
+        validate_qname(key, limits, "PivotTable XML namespace declaration")?;
+        let Some(prefix) = attribute.key.as_namespace_binding() else {
+            continue;
+        };
+        declarations = declarations
+            .checked_add(1)
+            .ok_or_else(|| invalid("PivotTable XML namespace declaration count overflows"))?;
+        if declarations > limits.namespace_declarations {
+            return Err(invalid(
+                "PivotTable XML namespace declaration count exceeds limit",
+            ));
+        }
+        let prefix_bytes = match prefix {
+            PrefixDeclaration::Default => &[][..],
+            PrefixDeclaration::Named(prefix) => prefix,
+        };
+        if prefix_bytes.len() > limits.name_bytes {
+            return Err(invalid(
+                "PivotTable XML namespace prefix exceeds caller limit",
+            ));
+        }
+        if matches!(prefix, PrefixDeclaration::Named(prefix) if prefix.is_empty()) {
+            return Err(invalid(
+                "PivotTable XML has an empty prefixed namespace declaration",
+            ));
+        }
+        if attribute.value.as_ref().contains(&b'<') {
+            return Err(invalid("PivotTable XML namespace URI contains raw <"));
+        }
+        let namespace = decode_namespace_uri(attribute.value.as_ref(), limits)?;
+        if matches!(prefix, PrefixDeclaration::Named(_)) && namespace.is_empty() {
+            return Err(invalid(
+                "PivotTable XML cannot undeclare a prefixed namespace",
+            ));
+        }
+        if matches!(prefix, PrefixDeclaration::Default)
+            && (namespace.as_slice() == XML_NAMESPACE_URI
+                || namespace.as_slice() == XMLNS_NAMESPACE_URI)
+        {
+            return Err(invalid(
+                "PivotTable XML reserved namespace cannot be the default namespace",
+            ));
+        }
+        let namespace = interner.intern(&namespace, limits)?;
+        resolver.add(prefix, namespace, limits)?;
+    }
+    Ok(())
+}
+
+fn validate_qname(raw: &[u8], limits: XmlScanLimits, what: &str) -> Result<()> {
+    if raw.len() > limits.name_bytes {
+        return Err(invalid(format!("{what} name exceeds caller limit")));
+    }
+    let value = std::str::from_utf8(raw)
+        .map_err(|error| invalid(format!("{what} name is not UTF-8: {error}")))?;
+    if !is_qualified_name(value) {
+        return Err(invalid(format!("{what} name is not a valid QName")));
+    }
+    Ok(())
+}
+
+fn parse_ignorable_namespaces(
+    element: &BytesStart<'_>,
+    resolver: &NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    limits: XmlScanLimits,
+) -> Result<Vec<NamespaceRef>> {
+    let mut namespaces: Vec<NamespaceRef> = Vec::new();
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        let (resolved, local) = resolver.resolve_attribute(attribute.key)?;
+        if local.as_ref() != b"Ignorable" {
+            continue;
+        }
+        let NamespaceResolution::Bound(namespace) = resolved else {
+            continue;
+        };
+        if namespace.as_ref() != MCE_NS {
+            continue;
+        }
+        if attribute.value.len() > limits.attribute_bytes {
+            return Err(invalid("mc:Ignorable exceeds its text limit"));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| invalid(error.to_string()))?;
+        if value.len() > limits.attribute_bytes {
+            return Err(invalid("mc:Ignorable exceeds its text limit"));
+        }
+        for prefix in value.split([' ', '\t', '\r', '\n']) {
+            if prefix.is_empty() {
+                continue;
+            }
+            if !litchi_ooxml_common::xml_name::is_ncname(prefix) {
+                return Err(invalid("mc:Ignorable contains an invalid prefix"));
+            }
+            let mut qualified = Vec::new();
+            let qualified_len = prefix
+                .len()
+                .checked_add(2)
+                .ok_or_else(|| invalid("mc:Ignorable prefix length overflows"))?;
+            qualified
+                .try_reserve_exact(qualified_len)
+                .map_err(|source| Error::Allocation {
+                    resource: "PivotTable MCE ignorable prefix",
+                    source,
+                })?;
+            qualified.extend_from_slice(prefix.as_bytes());
+            qualified.extend_from_slice(b":x");
+            let resolved = resolver.resolve_element(QName(&qualified))?.0;
+            let namespace = match resolved {
+                NamespaceResolution::Bound(value) => value,
+                NamespaceResolution::Unknown(_) => {
+                    return Err(invalid("mc:Ignorable contains an unbound prefix"));
+                },
+            };
+            if namespace.as_ref() == MCE_NS {
+                return Err(invalid("mc:Ignorable cannot name the MCE namespace"));
+            }
+            if !namespaces
+                .iter()
+                .any(|known| known.as_ref() == namespace.as_ref())
+            {
+                if namespaces.len() >= limits.namespace_declarations {
+                    return Err(invalid(
+                        "PivotTable MCE ignorable namespace count exceeds limit",
+                    ));
+                }
+                namespaces
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "PivotTable MCE ignorable namespaces",
+                        source,
+                    })?;
+                namespaces.push(namespace);
+            }
+        }
+    }
+    Ok(namespaces)
+}
+
+fn extend_ignorable_scope(
+    scopes: &mut Vec<IgnorableScope>,
+    parent: usize,
+    namespaces: Vec<NamespaceRef>,
+) -> Result<usize> {
+    if namespaces.is_empty() {
+        return Ok(parent);
+    }
+    if parent >= scopes.len() {
+        return Err(invalid("PivotTable MCE parent scope is invalid"));
+    }
+    scopes.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "PivotTable MCE scope table",
+        source,
+    })?;
+    scopes.push(IgnorableScope {
+        parent: Some(parent),
+        namespaces,
+    });
+    Ok(scopes.len().saturating_sub(1))
+}
+
+fn scope_contains(scopes: &[IgnorableScope], mut scope: usize, namespace: &[u8]) -> bool {
+    while let Some(current) = scopes.get(scope) {
+        if current
+            .namespaces
+            .iter()
+            .any(|known| known.as_ref() == namespace)
+        {
+            return true;
+        }
+        let Some(parent) = current.parent else {
+            return false;
+        };
+        scope = parent;
+    }
+    false
+}
+
+fn resolved_name(
+    resolver: &NamespaceResolver,
+    name: QName<'_>,
+    limits: XmlScanLimits,
+) -> Result<(NamespaceRef, Vec<u8>)> {
+    validate_qname(name.as_ref(), limits, "PivotTable XML element")?;
+    if name.prefix().is_some_and(|prefix| prefix.is_xmlns()) {
+        return Err(invalid(
+            "PivotTable XML element uses the reserved xmlns prefix",
+        ));
+    }
+    let (resolved, local_name) = resolver.resolve_element(name)?;
     if local_name.as_ref().len() > limits.name_bytes {
         return Err(invalid("PivotTable XML local name exceeds caller limit"));
     }
     let ns = match resolved {
-        ResolveResult::Bound(value) => {
-            if value.as_ref().len() > limits.namespace_bytes {
-                return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
-            }
-            value.as_ref().to_vec()
-        },
-        ResolveResult::Unbound => Vec::new(),
-        ResolveResult::Unknown(prefix) => {
+        NamespaceResolution::Bound(value) => value,
+        NamespaceResolution::Unknown(prefix) => {
             if prefix.len() > limits.name_bytes {
                 return Err(invalid(
                     "PivotTable XML namespace prefix exceeds caller limit",
@@ -4409,7 +5373,15 @@ fn resolved_name(
             return Err(invalid("unbound XML namespace prefix"));
         },
     };
-    Ok((ns, local_name.as_ref().to_vec()))
+    let mut local = Vec::new();
+    local
+        .try_reserve_exact(local_name.as_ref().len())
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable XML element local name",
+            source,
+        })?;
+    local.extend_from_slice(local_name.as_ref());
+    Ok((ns, local))
 }
 
 #[allow(
@@ -4419,15 +5391,16 @@ fn resolved_name(
 fn parse_attrs(
     bytes: &[u8],
     element: &BytesStart<'_>,
-    resolver: &quick_xml::name::NamespaceResolver,
+    resolver: &NamespaceResolver,
     decoder: quick_xml::encoding::Decoder,
     start: &Range<usize>,
     limits: XmlScanLimits,
 ) -> Result<Vec<XmlAttribute>> {
-    let mut attrs = Vec::new();
+    let mut attrs = Vec::<XmlAttribute>::new();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
         let key_bytes = attribute.key.as_ref();
+        validate_qname(key_bytes, limits, "PivotTable XML attribute")?;
         if key_bytes.len() > limits.name_bytes {
             return Err(invalid(
                 "PivotTable XML qualified attribute name exceeds caller limit",
@@ -4442,14 +5415,22 @@ fn parse_attrs(
         {
             return Err(invalid("PivotTable attribute exceeds its text limit"));
         }
-        if let Some(prefix) = attribute.key.as_namespace_binding() {
-            let prefix = match prefix {
-                quick_xml::name::PrefixDeclaration::Default => &[][..],
-                quick_xml::name::PrefixDeclaration::Named(prefix) => prefix,
+        if let Some(prefix_declaration) = attribute.key.as_namespace_binding() {
+            let prefix = match prefix_declaration {
+                PrefixDeclaration::Default => &[][..],
+                PrefixDeclaration::Named(prefix) => prefix,
             };
             if prefix.len() > limits.name_bytes {
                 return Err(invalid(
                     "PivotTable XML namespace prefix exceeds caller limit",
+                ));
+            }
+            if matches!(
+                prefix_declaration,
+                PrefixDeclaration::Named(prefix) if prefix.is_empty()
+            ) {
+                return Err(invalid(
+                    "PivotTable XML has an empty prefixed namespace declaration",
                 ));
             }
             if attribute.value.len() > limits.namespace_bytes {
@@ -4457,27 +5438,36 @@ fn parse_attrs(
             }
             continue;
         }
+        if attribute
+            .key
+            .prefix()
+            .is_some_and(|prefix| prefix.is_xmlns())
+        {
+            return Err(invalid(
+                "PivotTable XML attribute uses the reserved xmlns prefix",
+            ));
+        }
         if attrs.len() >= MAX_NAMESPACE_DECLARATIONS {
             return Err(invalid("PivotTable XML attribute count exceeds limit"));
         }
-        let (resolved, local_name) = resolver.resolve_attribute(attribute.key);
+        let (resolved, local_name) = resolver.resolve_attribute(attribute.key)?;
         if local_name.as_ref().len() > limits.name_bytes {
             return Err(invalid(
                 "PivotTable XML attribute local name exceeds caller limit",
             ));
         }
-        let local_name = local_name.as_ref().to_vec();
+        let mut owned_local_name = Vec::new();
+        owned_local_name
+            .try_reserve_exact(local_name.as_ref().len())
+            .map_err(|source| Error::Allocation {
+                resource: "PivotTable XML attribute local name",
+                source,
+            })?;
+        owned_local_name.extend_from_slice(local_name.as_ref());
+        let local_name = owned_local_name;
         let ns = match resolved {
-            ResolveResult::Bound(value) => {
-                if value.as_ref().len() > limits.namespace_bytes {
-                    return Err(invalid(
-                        "PivotTable XML attribute namespace exceeds caller limit",
-                    ));
-                }
-                value.as_ref().to_vec()
-            },
-            ResolveResult::Unbound => Vec::new(),
-            ResolveResult::Unknown(prefix) => {
+            NamespaceResolution::Bound(value) => value,
+            NamespaceResolution::Unknown(prefix) => {
                 if prefix.len() > limits.name_bytes {
                     return Err(invalid(
                         "PivotTable XML attribute namespace prefix exceeds caller limit",
@@ -4486,6 +5476,17 @@ fn parse_attrs(
                 return Err(invalid("unbound XML attribute prefix"));
             },
         };
+        if attrs
+            .iter()
+            .any(|known| known.ns == ns && known.local == local_name)
+        {
+            return Err(invalid(
+                "PivotTable XML contains duplicate expanded attributes",
+            ));
+        }
+        if attribute.value.as_ref().contains(&b'<') {
+            return Err(invalid("PivotTable XML attribute contains raw <"));
+        }
         let value = attribute
             .decode_and_unescape_value(decoder)
             .map_err(|error| invalid(error.to_string()))?
@@ -4523,6 +5524,32 @@ fn parse_attrs(
     Ok(attrs)
 }
 
+fn decode_namespace_uri(value: &[u8], limits: XmlScanLimits) -> Result<Vec<u8>> {
+    if value.len() > limits.namespace_bytes {
+        return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+    }
+    let value = std::str::from_utf8(value).map_err(|error| {
+        invalid(format!(
+            "PivotTable XML namespace URI is not UTF-8: {error}"
+        ))
+    })?;
+    let decoded = quick_xml::escape::unescape(value)
+        .map_err(|error| invalid(format!("PivotTable XML namespace URI is invalid: {error}")))?;
+    validate_xml_characters(decoded.as_bytes())?;
+    if decoded.len() > limits.namespace_bytes {
+        return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+    }
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(decoded.len())
+        .map_err(|source| Error::Allocation {
+            resource: "PivotTable XML namespace URI",
+            source,
+        })?;
+    result.extend_from_slice(decoded.as_bytes());
+    Ok(result)
+}
+
 fn ptr_offset(bytes: &[u8], ptr: *const u8) -> Result<usize> {
     let start = bytes.as_ptr() as usize;
     let ptr = ptr as usize;
@@ -4558,7 +5585,7 @@ fn event_start_range(
             }
         }
     }
-    // `NsReader`'s buffer position is after the closing `>`; fall back to the
+    // The reader's buffer position is after the closing `>`; fall back to the
     // nearest `<` in the event window while still checking the raw token.
     let lower = before.saturating_sub(raw.len().saturating_add(3));
     for start in (lower..after.min(bytes.len())).rev() {

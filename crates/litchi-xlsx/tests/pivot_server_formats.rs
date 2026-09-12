@@ -727,6 +727,58 @@ fn u32_whitespace_and_strict_transitional_relationship_ids_are_accepted() {
 }
 
 #[test]
+fn c510_uri_token_padding_and_numeric_lexicals_survive_structural_rewrite() {
+    let padded_count = " \n2\t";
+    for padded_uri in [
+        " \n{C510F80B-63DE-4267-81D5-13C33094786E}\t ",
+        "&#x20;{C510F80B-63DE-4267-81D5-13C33094786E}&#x9;",
+    ] {
+        let fixture = Fixture::build(FixtureOptions {
+            server_uri: padded_uri,
+            server_count: padded_count,
+            ..FixtureOptions::default()
+        });
+        let mut package = fixture.package();
+        let before = table_blob(&package);
+        let source = String::from_utf8(before.clone()).unwrap();
+        assert!(source.contains(&format!(r#"uri="{padded_uri}""#)));
+        assert!(source.contains(&format!(r#"count="{padded_count}""#)));
+        assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 2);
+
+        let no_op = edit(&mut package, "Pivot").unwrap().commit().unwrap();
+        assert!(!no_op.changed());
+        assert_eq!(table_blob(&package), before);
+
+        let mut transaction = edit(&mut package, "Pivot").unwrap();
+        transaction.reorder_server_formats(&[1, 0]).unwrap();
+        let commit = transaction.commit().unwrap();
+        assert!(commit.changed());
+        let changed = String::from_utf8(table_blob(&package)).unwrap();
+        assert!(changed.contains(&format!(r#"uri="{padded_uri}""#)));
+        assert!(changed.contains(&format!(r#"count="{padded_count}""#)));
+        assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 2);
+
+        commit.patch().inverse().apply(&mut package).unwrap();
+        assert_eq!(table_blob(&package), before);
+    }
+}
+
+#[test]
+fn c510_uri_internal_whitespace_is_not_a_token_match() {
+    for server_uri in [
+        "{C510F80B-63DE-4267 81D5-13C33094786E}",
+        "{C510F80B-63DE-4267&#x20;81D5-13C33094786E}",
+    ] {
+        let fixture = Fixture::build(FixtureOptions {
+            server_uri,
+            ..FixtureOptions::default()
+        });
+        assert!(!fixture.table_xml.contains(SERVER_FORMATS_URI));
+        assert!(load(&fixture.package(), "Pivot").is_err());
+    }
+}
+
+#[test]
 fn unknown_ext_uri_with_the_same_qname_is_not_a_server_format_owner() {
     let fixture = Fixture::build(FixtureOptions {
         server_uri: "{UNKNOWN-SERVER-FORMAT-URI}",

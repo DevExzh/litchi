@@ -8,13 +8,15 @@
 //! relationship XML, event, and edge budgets on every call.
 //!
 //! [`RelationshipIndex`] performs that work once.  It retains one exact
-//! [`OwnedRelationships`] token for the package root and every part, indexes
-//! every internal edge by its canonical target part, and keeps the edge
-//! payload borrowed from the immutable package.  `SourcePart` can clone the
-//! selected token (the XML is shared) and materialize one selected incoming
-//! closure.  Unknown relationship types, external edges, and unusual lexical
-//! target spellings remain in the exact source token; no relationship is
-//! normalized by this helper.
+//! [`OwnedRelationships`] token for the package root and for each owner that
+//! has a relationship member; an absent owner is represented by `None` rather
+//! than a newly materialized canonical XML token.  It indexes every internal
+//! edge by its canonical target part and keeps the edge payload borrowed from
+//! the immutable package.  `SourcePart` can clone the selected token (the XML
+//! is shared) and materialize one selected incoming closure.  Unknown
+//! relationship types, external edges, and unusual lexical target spellings
+//! remain in the exact source token; no relationship is normalized by this
+//! helper.
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -70,7 +72,7 @@ pub(super) struct RelationshipIndex<'package> {
     part_names: Vec<&'package PackURI>,
     part_indices: HashMap<String, usize>,
     root_source: OwnedRelationships,
-    part_sources: Vec<OwnedRelationships>,
+    part_sources: Vec<Option<OwnedRelationships>>,
     incoming: Vec<Vec<RelationshipReference<'package>>>,
 }
 
@@ -146,6 +148,10 @@ impl<'package> RelationshipIndex<'package> {
             .try_reserve_exact(part_count)
             .map_err(|source| allocation("PivotTable relationship graph nodes", source))?;
         graph_seen.extend(std::iter::repeat_n(false, part_count));
+        let mut part_member_present = Vec::new();
+        part_member_present
+            .try_reserve_exact(part_count)
+            .map_err(|source| allocation("PivotTable relationship member presence", source))?;
         // The root relationship collection has no source Part and is always
         // represented by `/` in the borrowed edge inventory.
         let root = PackURI::new(PACKAGE_ROOT).map_err(OpcError::InvalidPackUri)?;
@@ -164,6 +170,7 @@ impl<'package> RelationshipIndex<'package> {
         for name in &part_names {
             let part = package.get_part(name)?;
             let plan = package.plan_source_relationships_with_limits(name, limits)?;
+            part_member_present.push(plan.member_present());
             budget.admit_plan(plan, limits)?;
             index_relationships(
                 part.rels().iter(),
@@ -180,12 +187,18 @@ impl<'package> RelationshipIndex<'package> {
         // aggregate admissions above have succeeded. Capture each owner
         // afresh so a descriptive plan can never authorize stale material.
         let root_source = package.source_relationships_with_limits(&root, limits)?;
-        for name in &part_names {
-            let source = package.source_relationships_with_limits(name, limits)?;
+        for (name, member_present) in part_names.iter().zip(part_member_present) {
+            let source = if member_present {
+                Some(package.source_relationships_with_limits(name, limits)?)
+            } else {
+                None
+            };
             // `part_sources` and `part_names` have the same canonical order.
             // Check the source owner so an accidental future reordering
             // cannot produce a stale token.
-            if source.owner().as_str() != name.as_str() {
+            if let Some(source) = source.as_ref()
+                && source.owner().as_str() != name.as_str()
+            {
                 return Err(invalid("PivotTable relationship source owner mismatch"));
             }
             part_sources.push(source);
@@ -211,11 +224,13 @@ impl<'package> RelationshipIndex<'package> {
     }
 
     /// Capture the exact relationship token for `owner`, retaining its
-    /// original XML bytes and member-presence flag.  A clone shares the XML
-    /// allocation and does not copy relationship XML.
-    pub(super) fn source(&self, owner: &PackURI) -> Result<OwnedRelationships> {
+    /// original XML bytes and member-presence flag.  An owner without a
+    /// relationship member returns `None`, preserving the absence proof
+    /// without allocating canonical XML. A clone shares the XML allocation
+    /// and does not copy relationship XML.
+    pub(super) fn source(&self, owner: &PackURI) -> Result<Option<OwnedRelationships>> {
         if owner.as_str() == PACKAGE_ROOT {
-            return Ok(self.root_source.clone());
+            return Ok(Some(self.root_source.clone()));
         }
         let index = self.part_index(owner)?;
         self.part_sources
@@ -226,14 +241,16 @@ impl<'package> RelationshipIndex<'package> {
 
     /// Return a borrowed exact source token for an owner known to be in the
     /// package.  This accessor is useful for readset checks that do not need
-    /// another cheap `OwnedRelationships` handle.
-    pub(super) fn source_ref(&self, owner: &PackURI) -> Result<&OwnedRelationships> {
+    /// another cheap `OwnedRelationships` handle; absent relationship members
+    /// return `None`.
+    pub(super) fn source_ref(&self, owner: &PackURI) -> Result<Option<&OwnedRelationships>> {
         if owner.as_str() == PACKAGE_ROOT {
-            return Ok(&self.root_source);
+            return Ok(Some(&self.root_source));
         }
         let index = self.part_index(owner)?;
         self.part_sources
             .get(index)
+            .map(Option::as_ref)
             .ok_or_else(|| invalid("PivotTable relationship source index is incomplete"))
     }
 
@@ -571,7 +588,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_opc::{ReadLimits, Relationships};
+    use litchi_opc::{BlobPart, ReadLimits, Relationships};
     use std::cmp::Ordering;
     use std::collections::HashMap;
 
@@ -674,5 +691,21 @@ mod tests {
         );
         assert_eq!(budget.graph_nodes, 1);
         assert!(budget.missing_nodes.is_empty());
+    }
+
+    #[test]
+    fn absent_part_relationships_keep_only_an_absence_token() {
+        let mut package = OpcPackage::new();
+        let owner = PackURI::new("/custom/no-rels.bin").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            owner.clone(),
+            "application/octet-stream".to_owned(),
+            Vec::new(),
+        )));
+
+        let index = RelationshipIndex::build(&package).unwrap();
+
+        assert!(index.source_ref(&owner).unwrap().is_none());
+        assert!(index.source(&owner).unwrap().is_none());
     }
 }

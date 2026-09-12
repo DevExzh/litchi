@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 pub mod cache;
+pub use server_formats::cached_unique_names;
 pub mod chart;
 pub mod fields;
 pub mod filters;
@@ -18,6 +19,16 @@ pub mod writer;
 pub use reader::{
     read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
     read_pivot_tables,
+};
+pub use server_formats::cached_unique_names::{
+    CacheSelector as PivotCacheSelector, CachedUniqueName, CachedUniqueNames,
+    Commit as CachedUniqueNamesCommit, DiagnosticStatus as CachedUniqueNamesDiagnosticStatus,
+    FieldSelector as PivotCacheFieldSelector, Patch as CachedUniqueNamesPatch,
+    PivotCacheEditHandle as PivotCacheEdit, PivotCacheFieldHandle, PivotCacheHandle, PivotCacheId,
+    Snapshot as CachedUniqueNamesSnapshot, Transaction as CachedUniqueNamesTransaction,
+    WorkbookCommit as CachedUniqueNamesWorkbookCommit,
+    WorkbookPatch as CachedUniqueNamesWorkbookPatch,
+    WorkbookTransaction as CachedUniqueNamesWorkbookTransaction,
 };
 pub use server_formats::{
     AttributeEdit as PivotServerFormatAttributeEdit, Commit as PivotServerFormatsCommit,
