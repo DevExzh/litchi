@@ -1,0 +1,7 @@
+{
+  "status": "corrected",
+  "initial_failure": "Raw edge mismatch for core::slice::<impl [T]>::sort_unstable_by: inherited annotation display parser treated the Rust slice bracket as the executable suffix.",
+  "correction": "Local0528 display-name adapter splits only the final bracketed executable suffix. Sealed prior helpers remain unchanged. Two regression tests pass; full raw-edge and annotation equations replay.",
+  "captures_changed": false,
+  "partial_annotations_reused_only_after_exact_text_equality": true
+}

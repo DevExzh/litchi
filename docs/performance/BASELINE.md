@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0528: new XLSX publication instruction baseline
+
+[0528](changes/0528-xlsx-publication-attribution.md) Four unchanged-source profiles isolate the publication method after five lifecycle calls. Overlay XML validation accounts for 53.8232–57.5571% of publication Ir; physical writing accounts for 41.8816–45.4039%. Returned-snapshot destruction is excluded from the method profile but included in native publication timing. No speedup is claimed.
+
 ## 0527: row-primary-arena pilot rejected
 
 [0527](changes/0527-xlsx-row-primary-arena-pilot.md) Fresh ABBA evidence covers 2,440 native durations and 40 allocation samples. Candidate total p50 reductions were 1.8214–3.5854%, commit p50 reductions 5.7713–8.0431%, and allocation-call reductions 18.9078–19.8814%. Dense repeat 2 missed the frozen 2% total median/mean gates. Production is restored; conditional profile/hardware/eager lanes are unmeasured.

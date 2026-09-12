@@ -1,0 +1,17 @@
+{
+  "binary_sha256": "b46a81550b74611cf3825308dd403d04574675593c8330310896eb2ab2f96c2f",
+  "command": [
+    "nm",
+    "-C",
+    "/tmp/litchi-goal-0528/baseline-normal"
+  ],
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+  "symbols": [
+    "0000000001277150 t litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "00000000012779b0 t litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "0000000001278210 t litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "0000000001278a70 t litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+    "00000000012792d0 t litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+  ],
+  "scope": "Five writer monomorphizations share this demangled owner name; positive incoming parent edges distinguish lifecycle and measured dumps."
+}

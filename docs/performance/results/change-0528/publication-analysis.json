@@ -1,0 +1,1730 @@
+{
+  "helper_sha256": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7",
+  "limitations": [
+    "Nested owners overlap; only immediate children of one owner are disjoint.",
+    "Call metadata outside positive selected edges may contain collection-off work and is not an allocation count.",
+    "Generated two-shape corpus, one measured owner call per child; no cold/range/scaling claim."
+  ],
+  "owner": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+  "plan_sha256": "259454bb139493e82da98ad28c09332e65bcecfb0e1fea165a6b1ee6370f9b1e",
+  "rows": [
+    {
+      "annotations": {
+        "baseline/profile-r1-medium.inclusive.txt": "1dfb882cd4467aad53c977606ef56aaa633297a371e982d904c1a993d8c2d0df",
+        "baseline/profile-r1-medium.self.txt": "f641d202985a66879522afbc32d2831a95778bf45b491df8667c8c71992a8449"
+      },
+      "owners": {
+        "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 24,
+            "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any": 45,
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "<litchi_opc::source_backed::SourceSnapshot as core::clone::Clone>::clone": 35,
+            "__memcpy_avx_unaligned_erms": 60,
+            "__memset_avx2_unaligned_erms": 65555,
+            "__rustc::__rust_dealloc": 231,
+            "alloc::boxed::box_new_uninit": 51,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 272,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 264,
+            "alloc::sync::Arc<T,A>::drop_slow": 53,
+            "alloc::vec::Vec<T,A>::resize": 69,
+            "core::iter::traits::iterator::Iterator::try_fold": 172,
+            "core::option::Option<T>::map_or": 39,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut std::fs::File>>>>": 42,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>": 26371,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>": 967,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationPlan>": 619,
+            "core::ptr::drop_in_place<std::sync::poison::mutex::MutexGuard<litchi_opc::source_backed::TransferSourceState>>": 14,
+            "core::slice::<impl [T]>::binary_search_by": 9442,
+            "core::slice::<impl [T]>::sort_unstable_by": 209,
+            "litchi_opc::source_backed::PartCache::check_context": 40,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 215,
+            "litchi_opc::source_backed::SourceSnapshot::monitor_publication": 3,
+            "litchi_opc::source_backed::finish_source_publication": 70,
+            "litchi_opc::source_backed::replacement_member_name": 210,
+            "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy": 82601,
+            "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": 43186316,
+            "soapberry_zip::preserve::PreservationPlan::push": 442,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_appended": 17,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_exact": 411,
+            "soapberry_zip::preserve::RegeneratedEntry::new_shared": 1183,
+            "std::sync::poison::mutex::Mutex<T>::lock": 26
+          },
+          "inclusive_ir": 43377863,
+          "self_ir": 1704
+        },
+        "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": {
+          "direct": {
+            "<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop": 2445,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 25,
+            "<core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::next": 328,
+            "<hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next": 195,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 5852,
+            "<usize as core::slice::cmp::SliceContains>::slice_contains": 462,
+            "__memcmp_avx2_movbe": 807,
+            "__memcpy_avx_unaligned_erms": 498,
+            "__rustc::__rust_dealloc": 508,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 536,
+            "alloc::vec::Vec<T,A>::push_mut": 559,
+            "core::iter::traits::iterator::Iterator::try_fold": 17,
+            "core::ptr::drop_in_place<alloc::vec::Vec<(litchi_opc::packuri::PackURI,alloc::string::String)>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::string::String>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>": 46,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::packuri::PackURI>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::ChangedOverlay>>": 131,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::PendingOverlay>>": 220,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::SourceSnapshot>>": 26,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::xml_splice::SourceXmlPart>>": 26,
+            "core::ptr::drop_in_place<core::option::Option<litchi_opc::content_type::ContentTypeMap>>": 9,
+            "core::ptr::drop_in_place<litchi_opc::members::PartNameIndex>": 5701,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>": 85,
+            "core::slice::<impl [T]>::sort_unstable_by": 28,
+            "core::slice::sort::shared::smallsort::insertion_sort_shift_left": 188,
+            "hashbrown::map::HashMap<K,V,S,A>::get": 300,
+            "hashbrown::map::HashMap<K,V,S,A>::insert": 4671,
+            "hashbrown::raw::RawTable<T,A>::reserve_rehash": 157,
+            "litchi_opc::members::PartNameIndex::insert": 72818,
+            "litchi_opc::members::PartNameIndex::try_with_capacity": 504,
+            "litchi_opc::rel::Relationship::target_partname": 30345,
+            "litchi_opc::source_backed::PartCache::check_context": 10,
+            "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup": 40568,
+            "litchi_opc::source_backed::SourceBackedPackage::check_topology_progress": 585,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceBackedPackage::has_signature_infrastructure": 12718,
+            "litchi_opc::source_backed::SourceBackedPackage::part_index": 3359,
+            "litchi_opc::source_backed::SourceBackedPackage::read_part": 1815,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_overlay_limits": 25634,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits": 224621,
+            "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": 43377863,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream::{{closure}}": 66,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 43,
+            "litchi_opc::source_backed::SourceTopologyPlan::introduces_signature_infrastructure": 554,
+            "litchi_opc::source_backed::folded_ascii_name": 247,
+            "litchi_opc::source_backed::folded_part_name": 5020,
+            "litchi_opc::source_backed::is_relationship_member_name": 4187,
+            "litchi_opc::source_backed::validate_overlay_xml": 51423084,
+            "std::thread::local::LocalKey<T>::with": 21,
+            "xml_minifier::audit::package::is_xml_part": 2448
+          },
+          "inclusive_ir": 95253619,
+          "self_ir": 3216
+        },
+        "litchi_opc::source_backed::validate_overlay_xml": {
+          "direct": {
+            "xml_minifier::audit::verify_authored": 51422724
+          },
+          "inclusive_ir": 51423084,
+          "self_ir": 360
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream": {
+          "direct": {
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 10008,
+            "__memcpy_avx_unaligned_erms": 173,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": 95253619,
+            "litchi_xlsx::cell_values::patch::MultiPatch::is_empty": 332,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::matches_source_backed": 200,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::topology_plan_from": 274998
+          },
+          "inclusive_ir": 95539471,
+          "self_ir": 126
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 3371771
+          },
+          "inclusive_ir": 6741761,
+          "self_ir": 3369990
+        },
+        "quick_xml::events::attributes::IterState::next": {
+          "direct": {
+            "quick_xml::events::attributes::IterState::check_for_duplicates": 2999365
+          },
+          "inclusive_ir": 6722771,
+          "self_ir": 3723406
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 3803577,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 6741761,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 900,
+            "quick_xml::reader::state::ReaderState::emit_end": 3434352,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 360,
+            "quick_xml::reader::state::ReaderState::emit_start": 3580819,
+            "quick_xml::reader::state::ReaderState::emit_text": 147552
+          },
+          "inclusive_ir": 27465857,
+          "self_ir": 9756536
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::prepare": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 156,
+            "__memcmp_avx2_movbe": 101,
+            "__memcpy_avx_unaligned_erms": 1020,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 626,
+            "alloc::vec::Vec<T,A>::resize_with": 82,
+            "soapberry_zip::preserve::PreservedEntry::raw_name_bytes": 70,
+            "soapberry_zip::preserve::generated_entry": 34626652
+          },
+          "inclusive_ir": 34631433,
+          "self_ir": 2726
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": {
+          "direct": {
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "__memcpy_avx_unaligned_erms": 30,
+            "__memset_avx2_unaligned_erms": 65555,
+            "core::ptr::drop_in_place<alloc::vec::Vec<soapberry_zip::preserve::PreparedEntry>>": 2026,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::OutputLayout>": 50,
+            "soapberry_zip::accounting::write_all_counted": 7027,
+            "soapberry_zip::preserve::PreparedCentral::bytes": 270,
+            "soapberry_zip::preserve::PreservationIndex<R>::prepare": 34631433,
+            "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout": 4644,
+            "soapberry_zip::preserve::write_prepared_local": 8465763,
+            "std::io::Write::write_all": 7691
+          },
+          "inclusive_ir": 43186316,
+          "self_ir": 1752
+        },
+        "soapberry_zip::preserve::generated_entry": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 900,
+            "__rustc::__rust_alloc": 1490,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 5,
+            "alloc::boxed::box_new_uninit": 1126,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 2287,
+            "flate2::deflate::write::DeflateEncoder<W>::finish": 585110,
+            "flate2::mem::Compress::new": 2222790,
+            "soapberry_zip::archive::ZipArchive<()>::from_slice": 1815,
+            "soapberry_zip::archive::ZipSliceArchive<T>::entries": 160,
+            "soapberry_zip::archive::ZipSliceEntries::next_entry": 1125,
+            "soapberry_zip::archive::slice_entry": 1420,
+            "soapberry_zip::writer::ZipArchiveWriter<W>::finish": 4612,
+            "soapberry_zip::writer::ZipDataWriter<W>::finish": 2379031,
+            "soapberry_zip::writer::ZipEntryWriter<W>::finish": 1160,
+            "soapberry_zip::writer::ZipFileBuilder<W>::start": 6442,
+            "std::io::Write::write_all": 29414954
+          },
+          "inclusive_ir": 34626652,
+          "self_ir": 2225
+        },
+        "soapberry_zip::preserve::write_prepared_local": {
+          "direct": {
+            "<litchi_opc::source_backed::SourceReader as soapberry_zip::reader_at::ReaderAt>::read_at": 4237649,
+            "soapberry_zip::accounting::write_all_counted": 4220446,
+            "soapberry_zip::reader_at::validate_read_count": 836,
+            "std::io::Write::write_all": 2725
+          },
+          "inclusive_ir": 8465763,
+          "self_ir": 4107
+        },
+        "std::io::Write::write_all": {
+          "direct": {
+            "<litchi_opc::source_backed::SourceCheckedSink<W> as std::io::Write>::write": 7870,
+            "__memcpy_avx_unaligned_erms": 854,
+            "crc32fast::Hasher::new_with_initial": 110,
+            "crc32fast::Hasher::update": 122689,
+            "flate2::zio::Writer<W,D>::write_with_status": 29291850,
+            "litchi_opc::source_backed::ContextCheckedSink<W>::check_before_write": 570
+          },
+          "inclusive_ir": 29428684,
+          "self_ir": 4741
+        },
+        "xml_minifier::audit::inspect_attributes": {
+          "direct": {
+            "__rustc::__rust_dealloc": 659505,
+            "quick_xml::events::attributes::IterState::next": 6715161
+          },
+          "inclusive_ir": 10593103,
+          "self_ir": 3218437
+        },
+        "xml_minifier::audit::verify_authored": {
+          "direct": {
+            "xml_minifier::audit::verify_with_policy": 51422654
+          },
+          "inclusive_ir": 51422724,
+          "self_ir": 70
+        },
+        "xml_minifier::audit::verify_with_policy": {
+          "direct": {
+            "__rustc::__rust_dealloc": 350,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 1593,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 40,
+            "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>": 997,
+            "core::str::converts::from_utf8": 236421,
+            "quick_xml::reader::Reader<R>::read_event_impl": 27456855,
+            "xml_minifier::audit::check_declaration": 4820,
+            "xml_minifier::audit::check_end": 1235364,
+            "xml_minifier::audit::check_start": 3708537,
+            "xml_minifier::audit::inspect_attributes": 10593103
+          },
+          "inclusive_ir": 51422654,
+          "self_ir": 8184574
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 10466075
+              }
+            ],
+            "inclusive_ir": 10466075,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.1",
+          "sha256": "b9fb5b850229a0e169874a0646eb2e9206183c39278b22acd90db2e635e9e90c",
+          "summary_ir": 10466075
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26405
+              }
+            ],
+            "inclusive_ir": 26405,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.2",
+          "sha256": "ae86a9b65b87d02a176ce3d857fdde42308088c2abd5e5a1435d30f7929bc7af",
+          "summary_ir": 26405
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 32615751
+              }
+            ],
+            "inclusive_ir": 32615751,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.3",
+          "sha256": "16c8c4bea91ceeb2f1b901c32bf948d68f33708ced2c31907a6ee42bc2d56041",
+          "summary_ir": 32615751
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26585
+              }
+            ],
+            "inclusive_ir": 26585,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.4",
+          "sha256": "feb1f4b4ca06d8473b8ad95832be6ca29238cfe9d72f28cfe4203bd9c9333d7c",
+          "summary_ir": 26585
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 32548223
+              }
+            ],
+            "inclusive_ir": 32548223,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.5",
+          "sha256": "dd927ca21897115c69331eee34605e98d69bd3a5a6f25714227f26d5cf2215c8",
+          "summary_ir": 32548223
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 95539471
+              }
+            ],
+            "inclusive_ir": 95539471,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-medium.callgrind.6",
+          "sha256": "1f1a680db01da4f5a5bdae71b01502aa933a2656466e23c1fab5c896d000ea12",
+          "summary_ir": 95539471
+        }
+      ],
+      "repeat": 1,
+      "selected": "baseline/profile-r1-medium.callgrind.6",
+      "shape": "medium",
+      "termination": {
+        "path": "baseline/profile-r1-medium.callgrind",
+        "sha256": "f4071de86cc925a8663fbe938ffbdc5cea2619c42cdba331b8f96c0673794623",
+        "summary_ir": 0
+      }
+    },
+    {
+      "annotations": {
+        "baseline/profile-r1-dense-sparse.inclusive.txt": "5b484078a8b2779b544b440512c43b045a367fc880ee8ef5d349a63a8059746b",
+        "baseline/profile-r1-dense-sparse.self.txt": "3e4ecaf3f357267bec68436b369b2047605c43b51a5d8d7a58ab8ce3e9af3456"
+      },
+      "owners": {
+        "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 24,
+            "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any": 45,
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "<litchi_opc::source_backed::SourceSnapshot as core::clone::Clone>::clone": 35,
+            "__memcpy_avx_unaligned_erms": 60,
+            "__memset_avx2_unaligned_erms": 65555,
+            "__rustc::__rust_dealloc": 240,
+            "alloc::boxed::box_new_uninit": 51,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 316,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 264,
+            "alloc::sync::Arc<T,A>::drop_slow": 53,
+            "alloc::vec::Vec<T,A>::resize": 69,
+            "core::iter::traits::iterator::Iterator::try_fold": 180,
+            "core::option::Option<T>::map_or": 39,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut std::fs::File>>>>": 42,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>": 26352,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>": 992,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationPlan>": 594,
+            "core::ptr::drop_in_place<std::sync::poison::mutex::MutexGuard<litchi_opc::source_backed::TransferSourceState>>": 14,
+            "core::slice::<impl [T]>::binary_search_by": 9480,
+            "core::slice::<impl [T]>::sort_unstable_by": 217,
+            "litchi_opc::source_backed::PartCache::check_context": 40,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 215,
+            "litchi_opc::source_backed::SourceSnapshot::monitor_publication": 3,
+            "litchi_opc::source_backed::finish_source_publication": 70,
+            "litchi_opc::source_backed::replacement_member_name": 210,
+            "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy": 82442,
+            "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": 72004016,
+            "soapberry_zip::preserve::PreservationPlan::push": 442,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_appended": 17,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_exact": 377,
+            "soapberry_zip::preserve::RegeneratedEntry::new_shared": 1108,
+            "std::sync::poison::mutex::Mutex<T>::lock": 26
+          },
+          "inclusive_ir": 72195383,
+          "self_ir": 1704
+        },
+        "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": {
+          "direct": {
+            "<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop": 2382,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 25,
+            "<core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::next": 328,
+            "<hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next": 195,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 5923,
+            "<usize as core::slice::cmp::SliceContains>::slice_contains": 462,
+            "__memcmp_avx2_movbe": 730,
+            "__memcpy_avx_unaligned_erms": 486,
+            "__rustc::__rust_dealloc": 561,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 692,
+            "alloc::vec::Vec<T,A>::push_mut": 569,
+            "core::iter::traits::iterator::Iterator::try_fold": 17,
+            "core::ptr::drop_in_place<alloc::vec::Vec<(litchi_opc::packuri::PackURI,alloc::string::String)>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::string::String>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>": 46,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::packuri::PackURI>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::ChangedOverlay>>": 131,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::PendingOverlay>>": 223,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::SourceSnapshot>>": 26,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::xml_splice::SourceXmlPart>>": 26,
+            "core::ptr::drop_in_place<core::option::Option<litchi_opc::content_type::ContentTypeMap>>": 9,
+            "core::ptr::drop_in_place<litchi_opc::members::PartNameIndex>": 5923,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>": 85,
+            "core::slice::<impl [T]>::sort_unstable_by": 28,
+            "core::slice::sort::shared::smallsort::insertion_sort_shift_left": 213,
+            "hashbrown::map::HashMap<K,V,S,A>::get": 300,
+            "hashbrown::map::HashMap<K,V,S,A>::insert": 4586,
+            "hashbrown::raw::RawTable<T,A>::reserve_rehash": 157,
+            "litchi_opc::members::PartNameIndex::insert": 74248,
+            "litchi_opc::members::PartNameIndex::try_with_capacity": 504,
+            "litchi_opc::rel::Relationship::target_partname": 30489,
+            "litchi_opc::source_backed::PartCache::check_context": 10,
+            "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup": 39765,
+            "litchi_opc::source_backed::SourceBackedPackage::check_topology_progress": 585,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceBackedPackage::has_signature_infrastructure": 12718,
+            "litchi_opc::source_backed::SourceBackedPackage::part_index": 3353,
+            "litchi_opc::source_backed::SourceBackedPackage::read_part": 1815,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_overlay_limits": 25470,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits": 224596,
+            "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": 72195383,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream::{{closure}}": 66,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 43,
+            "litchi_opc::source_backed::SourceTopologyPlan::introduces_signature_infrastructure": 554,
+            "litchi_opc::source_backed::folded_ascii_name": 247,
+            "litchi_opc::source_backed::folded_part_name": 4996,
+            "litchi_opc::source_backed::is_relationship_member_name": 4187,
+            "litchi_opc::source_backed::validate_overlay_xml": 99215092,
+            "std::thread::local::LocalKey<T>::with": 21,
+            "xml_minifier::audit::package::is_xml_part": 2448
+          },
+          "inclusive_ir": 171863997,
+          "self_ir": 3211
+        },
+        "litchi_opc::source_backed::validate_overlay_xml": {
+          "direct": {
+            "xml_minifier::audit::verify_authored": 99214732
+          },
+          "inclusive_ir": 99215092,
+          "self_ir": 360
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream": {
+          "direct": {
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 10129,
+            "__memcpy_avx_unaligned_erms": 161,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": 171863997,
+            "litchi_xlsx::cell_values::patch::MultiPatch::is_empty": 332,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::matches_source_backed": 200,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::topology_plan_from": 501959
+          },
+          "inclusive_ir": 172376919,
+          "self_ir": 126
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 6486003
+          },
+          "inclusive_ir": 12970233,
+          "self_ir": 6484230
+        },
+        "quick_xml::events::attributes::IterState::next": {
+          "direct": {
+            "quick_xml::events::attributes::IterState::check_for_duplicates": 5761803
+          },
+          "inclusive_ir": 13055949,
+          "self_ir": 7294146
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 7325433,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 12970233,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 908,
+            "quick_xml::reader::state::ReaderState::emit_end": 6611960,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 360,
+            "quick_xml::reader::state::ReaderState::emit_start": 6881193,
+            "quick_xml::reader::state::ReaderState::emit_text": 284768
+          },
+          "inclusive_ir": 52862367,
+          "self_ir": 18787512
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::prepare": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 156,
+            "__memcmp_avx2_movbe": 101,
+            "__memcpy_avx_unaligned_erms": 1020,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 677,
+            "alloc::vec::Vec<T,A>::resize_with": 82,
+            "soapberry_zip::preserve::PreservedEntry::raw_name_bytes": 70,
+            "soapberry_zip::preserve::generated_entry": 63400282
+          },
+          "inclusive_ir": 63405114,
+          "self_ir": 2726
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": {
+          "direct": {
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "__memcpy_avx_unaligned_erms": 30,
+            "__memset_avx2_unaligned_erms": 65555,
+            "core::ptr::drop_in_place<alloc::vec::Vec<soapberry_zip::preserve::PreparedEntry>>": 1987,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::OutputLayout>": 50,
+            "soapberry_zip::accounting::write_all_counted": 7027,
+            "soapberry_zip::preserve::PreparedCentral::bytes": 270,
+            "soapberry_zip::preserve::PreservationIndex<R>::prepare": 63405114,
+            "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout": 4644,
+            "soapberry_zip::preserve::write_prepared_local": 8509821,
+            "std::io::Write::write_all": 7691
+          },
+          "inclusive_ir": 72004016,
+          "self_ir": 1752
+        },
+        "soapberry_zip::preserve::generated_entry": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 900,
+            "__rustc::__rust_alloc": 1455,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 5,
+            "alloc::boxed::box_new_uninit": 717,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 2171,
+            "flate2::deflate::write::DeflateEncoder<W>::finish": 585125,
+            "flate2::mem::Compress::new": 2222710,
+            "soapberry_zip::archive::ZipArchive<()>::from_slice": 1815,
+            "soapberry_zip::archive::ZipSliceArchive<T>::entries": 160,
+            "soapberry_zip::archive::ZipSliceEntries::next_entry": 1125,
+            "soapberry_zip::archive::slice_entry": 1420,
+            "soapberry_zip::writer::ZipArchiveWriter<W>::finish": 4612,
+            "soapberry_zip::writer::ZipDataWriter<W>::finish": 1354964,
+            "soapberry_zip::writer::ZipEntryWriter<W>::finish": 1160,
+            "soapberry_zip::writer::ZipFileBuilder<W>::start": 6499,
+            "std::io::Write::write_all": 59213219
+          },
+          "inclusive_ir": 63400282,
+          "self_ir": 2225
+        },
+        "std::io::Write::write_all": {
+          "direct": {
+            "<litchi_opc::source_backed::SourceCheckedSink<W> as std::io::Write>::write": 7870,
+            "__memcpy_avx_unaligned_erms": 854,
+            "crc32fast::Hasher::new_with_initial": 132,
+            "crc32fast::Hasher::update": 231205,
+            "flate2::zio::Writer<W,D>::write_with_status": 58981541,
+            "litchi_opc::source_backed::ContextCheckedSink<W>::check_before_write": 570
+          },
+          "inclusive_ir": 59226949,
+          "self_ir": 4777
+        },
+        "xml_minifier::audit::inspect_attributes": {
+          "direct": {
+            "__rustc::__rust_dealloc": 1267665,
+            "quick_xml::events::attributes::IterState::next": 13048339
+          },
+          "inclusive_ir": 20509897,
+          "self_ir": 6193893
+        },
+        "xml_minifier::audit::verify_authored": {
+          "direct": {
+            "xml_minifier::audit::verify_with_policy": 99214662
+          },
+          "inclusive_ir": 99214732,
+          "self_ir": 70
+        },
+        "xml_minifier::audit::verify_with_policy": {
+          "direct": {
+            "__rustc::__rust_dealloc": 350,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 1817,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 40,
+            "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>": 860,
+            "core::str::converts::from_utf8": 445950,
+            "quick_xml::reader::Reader<R>::read_event_impl": 52853791,
+            "xml_minifier::audit::check_declaration": 4820,
+            "xml_minifier::audit::check_end": 2377476,
+            "xml_minifier::audit::check_start": 7249007,
+            "xml_minifier::audit::inspect_attributes": 20509897
+          },
+          "inclusive_ir": 99214662,
+          "self_ir": 15770654
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 10576861
+              }
+            ],
+            "inclusive_ir": 10576861,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.1",
+          "sha256": "1a1c279ffcf4c0b1eeb7d44333a7458717447800c936af6e4c2177c81370deab",
+          "summary_ir": 10576861
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26264
+              }
+            ],
+            "inclusive_ir": 26264,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.2",
+          "sha256": "252585d29308dc898c76f1ece77af0c64aa2d30a1139dbbbb0c24ba9b8994b16",
+          "summary_ir": 26264
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 159468745
+              }
+            ],
+            "inclusive_ir": 159468745,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.3",
+          "sha256": "c1da1f6cfa869e90dec14b1b8d491445f8ac0df10283965a2cf3f3c038aa33a8",
+          "summary_ir": 159468745
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26469
+              }
+            ],
+            "inclusive_ir": 26469,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.4",
+          "sha256": "618d0a9decebad74418f4ceb1c36769ed7bd2e5af753c888b2e61d0134d3d558",
+          "summary_ir": 26469
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 159465850
+              }
+            ],
+            "inclusive_ir": 159465850,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.5",
+          "sha256": "f13ba75d7f5253bcff0bc98b6b9de63b9a2889700621bb7ac704356122b58bce",
+          "summary_ir": 159465850
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 172376919
+              }
+            ],
+            "inclusive_ir": 172376919,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r1-dense-sparse.callgrind.6",
+          "sha256": "6900218f4d5b32f0ee338b204a1b31d348e99b14197ce494b002f4876489a57c",
+          "summary_ir": 172376919
+        }
+      ],
+      "repeat": 1,
+      "selected": "baseline/profile-r1-dense-sparse.callgrind.6",
+      "shape": "dense-sparse",
+      "termination": {
+        "path": "baseline/profile-r1-dense-sparse.callgrind",
+        "sha256": "16800b83e68c6a84dd3ee7c9d78548f2006fe767a94bb202dddd972fb9468342",
+        "summary_ir": 0
+      }
+    },
+    {
+      "annotations": {
+        "baseline/profile-r2-medium.inclusive.txt": "d81f9c12db388426760b8b137afbe712d48ac3005a01e3ff3363fd3bf10dc799",
+        "baseline/profile-r2-medium.self.txt": "f196be0d0454749272503c460ed91a79876590e3edaacb0c5c365f2a2fbfb845"
+      },
+      "owners": {
+        "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 24,
+            "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any": 45,
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "<litchi_opc::source_backed::SourceSnapshot as core::clone::Clone>::clone": 35,
+            "__memcpy_avx_unaligned_erms": 60,
+            "__memset_avx2_unaligned_erms": 65555,
+            "__rustc::__rust_dealloc": 231,
+            "alloc::boxed::box_new_uninit": 51,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 281,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 264,
+            "alloc::sync::Arc<T,A>::drop_slow": 53,
+            "alloc::vec::Vec<T,A>::resize": 69,
+            "core::iter::traits::iterator::Iterator::try_fold": 164,
+            "core::option::Option<T>::map_or": 39,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut std::fs::File>>>>": 42,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>": 26422,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>": 967,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationPlan>": 594,
+            "core::ptr::drop_in_place<std::sync::poison::mutex::MutexGuard<litchi_opc::source_backed::TransferSourceState>>": 14,
+            "core::slice::<impl [T]>::binary_search_by": 9368,
+            "core::slice::<impl [T]>::sort_unstable_by": 201,
+            "litchi_opc::source_backed::PartCache::check_context": 40,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 215,
+            "litchi_opc::source_backed::SourceSnapshot::monitor_publication": 3,
+            "litchi_opc::source_backed::finish_source_publication": 70,
+            "litchi_opc::source_backed::replacement_member_name": 210,
+            "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy": 82345,
+            "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": 43186006,
+            "soapberry_zip::preserve::PreservationPlan::push": 442,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_appended": 17,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_exact": 426,
+            "soapberry_zip::preserve::RegeneratedEntry::new_shared": 1221,
+            "std::sync::poison::mutex::Mutex<T>::lock": 26
+          },
+          "inclusive_ir": 43377295,
+          "self_ir": 1704
+        },
+        "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": {
+          "direct": {
+            "<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop": 2445,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 25,
+            "<core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::next": 328,
+            "<hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next": 195,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 5864,
+            "<usize as core::slice::cmp::SliceContains>::slice_contains": 462,
+            "__memcmp_avx2_movbe": 807,
+            "__memcpy_avx_unaligned_erms": 498,
+            "__rustc::__rust_dealloc": 511,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 531,
+            "alloc::vec::Vec<T,A>::push_mut": 557,
+            "core::iter::traits::iterator::Iterator::try_fold": 17,
+            "core::ptr::drop_in_place<alloc::vec::Vec<(litchi_opc::packuri::PackURI,alloc::string::String)>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::string::String>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>": 46,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::packuri::PackURI>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::ChangedOverlay>>": 131,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::PendingOverlay>>": 220,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::SourceSnapshot>>": 26,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::xml_splice::SourceXmlPart>>": 26,
+            "core::ptr::drop_in_place<core::option::Option<litchi_opc::content_type::ContentTypeMap>>": 9,
+            "core::ptr::drop_in_place<litchi_opc::members::PartNameIndex>": 5657,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>": 85,
+            "core::slice::<impl [T]>::sort_unstable_by": 28,
+            "core::slice::sort::shared::smallsort::insertion_sort_shift_left": 188,
+            "hashbrown::map::HashMap<K,V,S,A>::get": 300,
+            "hashbrown::map::HashMap<K,V,S,A>::insert": 4586,
+            "hashbrown::raw::RawTable<T,A>::reserve_rehash": 157,
+            "litchi_opc::members::PartNameIndex::insert": 72764,
+            "litchi_opc::members::PartNameIndex::try_with_capacity": 504,
+            "litchi_opc::rel::Relationship::target_partname": 30509,
+            "litchi_opc::source_backed::PartCache::check_context": 10,
+            "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup": 40640,
+            "litchi_opc::source_backed::SourceBackedPackage::check_topology_progress": 585,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceBackedPackage::has_signature_infrastructure": 12718,
+            "litchi_opc::source_backed::SourceBackedPackage::part_index": 3359,
+            "litchi_opc::source_backed::SourceBackedPackage::read_part": 1815,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_overlay_limits": 25634,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits": 224464,
+            "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": 43377295,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream::{{closure}}": 66,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 43,
+            "litchi_opc::source_backed::SourceTopologyPlan::introduces_signature_infrastructure": 554,
+            "litchi_opc::source_backed::folded_ascii_name": 247,
+            "litchi_opc::source_backed::folded_part_name": 5020,
+            "litchi_opc::source_backed::is_relationship_member_name": 4187,
+            "litchi_opc::source_backed::validate_overlay_xml": 51420862,
+            "std::thread::local::LocalKey<T>::with": 21,
+            "xml_minifier::audit::package::is_xml_part": 2448
+          },
+          "inclusive_ir": 95250733,
+          "self_ir": 3216
+        },
+        "litchi_opc::source_backed::validate_overlay_xml": {
+          "direct": {
+            "xml_minifier::audit::verify_authored": 51420502
+          },
+          "inclusive_ir": 51420862,
+          "self_ir": 360
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream": {
+          "direct": {
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9927,
+            "__memcpy_avx_unaligned_erms": 173,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": 95250733,
+            "litchi_xlsx::cell_values::patch::MultiPatch::is_empty": 332,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::matches_source_backed": 200,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::topology_plan_from": 275087
+          },
+          "inclusive_ir": 95536593,
+          "self_ir": 126
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 3371763
+          },
+          "inclusive_ir": 6741753,
+          "self_ir": 3369990
+        },
+        "quick_xml::events::attributes::IterState::next": {
+          "direct": {
+            "quick_xml::events::attributes::IterState::check_for_duplicates": 2999019
+          },
+          "inclusive_ir": 6722425,
+          "self_ir": 3723406
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 3803577,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 6741753,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 900,
+            "quick_xml::reader::state::ReaderState::emit_end": 3432665,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 360,
+            "quick_xml::reader::state::ReaderState::emit_start": 3580294,
+            "quick_xml::reader::state::ReaderState::emit_text": 147552
+          },
+          "inclusive_ir": 27463637,
+          "self_ir": 9756536
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::prepare": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 156,
+            "__memcmp_avx2_movbe": 95,
+            "__memcpy_avx_unaligned_erms": 1020,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 848,
+            "alloc::vec::Vec<T,A>::resize_with": 82,
+            "soapberry_zip::preserve::PreservedEntry::raw_name_bytes": 70,
+            "soapberry_zip::preserve::generated_entry": 34626129
+          },
+          "inclusive_ir": 34631126,
+          "self_ir": 2726
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": {
+          "direct": {
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "__memcpy_avx_unaligned_erms": 30,
+            "__memset_avx2_unaligned_erms": 65555,
+            "core::ptr::drop_in_place<alloc::vec::Vec<soapberry_zip::preserve::PreparedEntry>>": 2023,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::OutputLayout>": 50,
+            "soapberry_zip::accounting::write_all_counted": 7027,
+            "soapberry_zip::preserve::PreparedCentral::bytes": 270,
+            "soapberry_zip::preserve::PreservationIndex<R>::prepare": 34631126,
+            "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout": 4644,
+            "soapberry_zip::preserve::write_prepared_local": 8465763,
+            "std::io::Write::write_all": 7691
+          },
+          "inclusive_ir": 43186006,
+          "self_ir": 1752
+        },
+        "soapberry_zip::preserve::generated_entry": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 900,
+            "__rustc::__rust_alloc": 1490,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 5,
+            "alloc::boxed::box_new_uninit": 646,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 2173,
+            "flate2::deflate::write::DeflateEncoder<W>::finish": 585110,
+            "flate2::mem::Compress::new": 2222837,
+            "soapberry_zip::archive::ZipArchive<()>::from_slice": 1815,
+            "soapberry_zip::archive::ZipSliceArchive<T>::entries": 160,
+            "soapberry_zip::archive::ZipSliceEntries::next_entry": 1125,
+            "soapberry_zip::archive::slice_entry": 1420,
+            "soapberry_zip::writer::ZipArchiveWriter<W>::finish": 4612,
+            "soapberry_zip::writer::ZipDataWriter<W>::finish": 2379031,
+            "soapberry_zip::writer::ZipEntryWriter<W>::finish": 1160,
+            "soapberry_zip::writer::ZipFileBuilder<W>::start": 6400,
+            "std::io::Write::write_all": 29415020
+          },
+          "inclusive_ir": 34626129,
+          "self_ir": 2225
+        },
+        "soapberry_zip::preserve::write_prepared_local": {
+          "direct": {
+            "<litchi_opc::source_backed::SourceReader as soapberry_zip::reader_at::ReaderAt>::read_at": 4237649,
+            "soapberry_zip::accounting::write_all_counted": 4220446,
+            "soapberry_zip::reader_at::validate_read_count": 836,
+            "std::io::Write::write_all": 2725
+          },
+          "inclusive_ir": 8465763,
+          "self_ir": 4107
+        },
+        "std::io::Write::write_all": {
+          "direct": {
+            "<litchi_opc::source_backed::SourceCheckedSink<W> as std::io::Write>::write": 7870,
+            "__memcpy_avx_unaligned_erms": 854,
+            "crc32fast::Hasher::new_with_initial": 110,
+            "crc32fast::Hasher::update": 122689,
+            "flate2::zio::Writer<W,D>::write_with_status": 29291916,
+            "litchi_opc::source_backed::ContextCheckedSink<W>::check_before_write": 570
+          },
+          "inclusive_ir": 29428750,
+          "self_ir": 4741
+        },
+        "xml_minifier::audit::inspect_attributes": {
+          "direct": {
+            "__rustc::__rust_dealloc": 659505,
+            "quick_xml::events::attributes::IterState::next": 6714815
+          },
+          "inclusive_ir": 10592757,
+          "self_ir": 3218437
+        },
+        "xml_minifier::audit::verify_authored": {
+          "direct": {
+            "xml_minifier::audit::verify_with_policy": 51420432
+          },
+          "inclusive_ir": 51420502,
+          "self_ir": 70
+        },
+        "xml_minifier::audit::verify_with_policy": {
+          "direct": {
+            "__rustc::__rust_dealloc": 350,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 1644,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 40,
+            "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>": 860,
+            "core::str::converts::from_utf8": 236421,
+            "quick_xml::reader::Reader<R>::read_event_impl": 27455065,
+            "xml_minifier::audit::check_declaration": 4820,
+            "xml_minifier::audit::check_end": 1235364,
+            "xml_minifier::audit::check_start": 3708537,
+            "xml_minifier::audit::inspect_attributes": 10592757
+          },
+          "inclusive_ir": 51420432,
+          "self_ir": 8184574
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 10399234
+              }
+            ],
+            "inclusive_ir": 10399234,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.1",
+          "sha256": "9ceb50ddac06f0e4d8c17d5b7f8e703e97abc9e060997eb42a0d9e6955b88fa0",
+          "summary_ir": 10399234
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26592
+              }
+            ],
+            "inclusive_ir": 26592,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.2",
+          "sha256": "4fa2ed593ba0f36e02c7d0772b34ac41965ff058b1491c1fcbf1f9397b5e2612",
+          "summary_ir": 26592
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 32550216
+              }
+            ],
+            "inclusive_ir": 32550216,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.3",
+          "sha256": "31b4775e04ff9e68e1f1851b81963e597372dc106ee13e01c3cf530e689ea3b2",
+          "summary_ir": 32550216
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26252
+              }
+            ],
+            "inclusive_ir": 26252,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.4",
+          "sha256": "2ec4c80280351067d363fab3ddcb0a9e6b192f78d00ff0e3604cff52790ad56c",
+          "summary_ir": 26252
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 32548147
+              }
+            ],
+            "inclusive_ir": 32548147,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.5",
+          "sha256": "db703f7499cf98065a65ad76698b27773facc04b224429f3e6f6c9f2b19405a2",
+          "summary_ir": 32548147
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 95536593
+              }
+            ],
+            "inclusive_ir": 95536593,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-medium.callgrind.6",
+          "sha256": "c0e634bd6951c7355770bfff9354c8085321e6f31e4160897d39aa32859603c1",
+          "summary_ir": 95536593
+        }
+      ],
+      "repeat": 2,
+      "selected": "baseline/profile-r2-medium.callgrind.6",
+      "shape": "medium",
+      "termination": {
+        "path": "baseline/profile-r2-medium.callgrind",
+        "sha256": "29136fbc9fa6423a1dcf1838c9d52d933a8237cd092fe5813ca85edfddb8f21a",
+        "summary_ir": 0
+      }
+    },
+    {
+      "annotations": {
+        "baseline/profile-r2-dense-sparse.inclusive.txt": "9a699866d2bd8462bda7d2a67fe76ce3d7774fda0f3ce84a161c4f13a5e0329f",
+        "baseline/profile-r2-dense-sparse.self.txt": "b8dcbf66ce83255ca7ace7edd2d877442e5c8d8600bc8f8c7d791583bed431d4"
+      },
+      "owners": {
+        "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 24,
+            "<core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::any": 45,
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "<litchi_opc::source_backed::SourceSnapshot as core::clone::Clone>::clone": 35,
+            "__memcpy_avx_unaligned_erms": 60,
+            "__memset_avx2_unaligned_erms": 65555,
+            "__rustc::__rust_dealloc": 231,
+            "alloc::boxed::box_new_uninit": 51,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 316,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 264,
+            "alloc::sync::Arc<T,A>::drop_slow": 53,
+            "alloc::vec::Vec<T,A>::resize": 69,
+            "core::iter::traits::iterator::Iterator::try_fold": 164,
+            "core::option::Option<T>::map_or": 39,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::ContextCheckedSink<litchi_opc::source_backed::SourceCheckedSink<litchi_opc::source_backed::Counted<&mut std::fs::File>>>>": 42,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::SourceBackedPackage>": 26185,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationIndex<litchi_opc::source_backed::SourceReader>>": 992,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::PreservationPlan>": 594,
+            "core::ptr::drop_in_place<std::sync::poison::mutex::MutexGuard<litchi_opc::source_backed::TransferSourceState>>": 14,
+            "core::slice::<impl [T]>::binary_search_by": 9376,
+            "core::slice::<impl [T]>::sort_unstable_by": 201,
+            "litchi_opc::source_backed::PartCache::check_context": 40,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 215,
+            "litchi_opc::source_backed::SourceSnapshot::monitor_publication": 3,
+            "litchi_opc::source_backed::finish_source_publication": 70,
+            "litchi_opc::source_backed::replacement_member_name": 210,
+            "soapberry_zip::preserve::PreservationIndex<R>::new_with_limits_and_policy": 82145,
+            "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": 72003493,
+            "soapberry_zip::preserve::PreservationPlan::push": 442,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_appended": 17,
+            "soapberry_zip::preserve::PreservationPlan::try_reserve_exact": 381,
+            "soapberry_zip::preserve::RegeneratedEntry::new_shared": 1200,
+            "std::sync::poison::mutex::Mutex<T>::lock": 26
+          },
+          "inclusive_ir": 72194347,
+          "self_ir": 1704
+        },
+        "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": {
+          "direct": {
+            "<alloc::vec::Vec<T,A> as core::ops::drop::Drop>::drop": 2388,
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 25,
+            "<core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::next": 328,
+            "<hashbrown::map::Iter<K,V> as core::iter::traits::iterator::Iterator>::next": 195,
+            "<hashbrown::raw::RawTable<T,A> as core::ops::drop::Drop>::drop": 5905,
+            "<usize as core::slice::cmp::SliceContains>::slice_contains": 462,
+            "__memcmp_avx2_movbe": 730,
+            "__memcpy_avx_unaligned_erms": 486,
+            "__rustc::__rust_dealloc": 542,
+            "alloc::raw_vec::RawVecInner<A>::try_reserve_exact": 539,
+            "alloc::vec::Vec<T,A>::push_mut": 571,
+            "core::iter::traits::iterator::Iterator::try_fold": 17,
+            "core::ptr::drop_in_place<alloc::vec::Vec<(litchi_opc::packuri::PackURI,alloc::string::String)>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::string::String>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<alloc::sync::Arc<litchi_core::budget::Reservation>>>": 46,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::packuri::PackURI>>": 19,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::ChangedOverlay>>": 131,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::PendingOverlay>>": 198,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::source_backed::SourceSnapshot>>": 26,
+            "core::ptr::drop_in_place<alloc::vec::Vec<litchi_opc::xml_splice::SourceXmlPart>>": 26,
+            "core::ptr::drop_in_place<core::option::Option<litchi_opc::content_type::ContentTypeMap>>": 9,
+            "core::ptr::drop_in_place<litchi_opc::members::PartNameIndex>": 6017,
+            "core::ptr::drop_in_place<litchi_opc::source_backed::CachedPayload>": 85,
+            "core::slice::<impl [T]>::sort_unstable_by": 28,
+            "core::slice::sort::shared::smallsort::insertion_sort_shift_left": 188,
+            "hashbrown::map::HashMap<K,V,S,A>::get": 300,
+            "hashbrown::map::HashMap<K,V,S,A>::insert": 4639,
+            "hashbrown::raw::RawTable<T,A>::reserve_rehash": 157,
+            "litchi_opc::members::PartNameIndex::insert": 74571,
+            "litchi_opc::members::PartNameIndex::try_with_capacity": 504,
+            "litchi_opc::rel::Relationship::target_partname": 30376,
+            "litchi_opc::source_backed::PartCache::check_context": 10,
+            "litchi_opc::source_backed::SourceBackedPackage::build_physical_member_lookup": 41041,
+            "litchi_opc::source_backed::SourceBackedPackage::check_topology_progress": 585,
+            "litchi_opc::source_backed::SourceBackedPackage::disable_read_ahead_for_publication": 16,
+            "litchi_opc::source_backed::SourceBackedPackage::has_signature_infrastructure": 12718,
+            "litchi_opc::source_backed::SourceBackedPackage::part_index": 3365,
+            "litchi_opc::source_backed::SourceBackedPackage::read_part": 1815,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_overlay_limits": 25470,
+            "litchi_opc::source_backed::SourceBackedPackage::validate_topology_limits": 224268,
+            "litchi_opc::source_backed::SourceBackedPackage::write_changed_overlays_with_appended_inner": 72194347,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream::{{closure}}": 66,
+            "litchi_opc::source_backed::SourceSnapshot::ensure_current": 43,
+            "litchi_opc::source_backed::SourceTopologyPlan::introduces_signature_infrastructure": 554,
+            "litchi_opc::source_backed::folded_ascii_name": 247,
+            "litchi_opc::source_backed::folded_part_name": 5201,
+            "litchi_opc::source_backed::is_relationship_member_name": 4187,
+            "litchi_opc::source_backed::validate_overlay_xml": 99215390,
+            "std::thread::local::LocalKey<T>::with": 21,
+            "xml_minifier::audit::package::is_xml_part": 2448
+          },
+          "inclusive_ir": 171864549,
+          "self_ir": 3211
+        },
+        "litchi_opc::source_backed::validate_overlay_xml": {
+          "direct": {
+            "xml_minifier::audit::verify_authored": 99215030
+          },
+          "inclusive_ir": 99215390,
+          "self_ir": 360
+        },
+        "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream": {
+          "direct": {
+            "<alloc::boxed::Box<[T],A> as core::clone::Clone>::clone": 9956,
+            "__memcpy_avx_unaligned_erms": 161,
+            "litchi_opc::source_backed::SourceBackedPackage::check_execution": 15,
+            "litchi_opc::source_backed::SourceBackedPackage::write_topology_to_stream": 171864549,
+            "litchi_xlsx::cell_values::patch::MultiPatch::is_empty": 332,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::matches_source_backed": 200,
+            "litchi_xlsx::cell_values::snapshot::MultiSnapshot::topology_plan_from": 501847
+          },
+          "inclusive_ir": 172377186,
+          "self_ir": 126
+        },
+        "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": {
+          "direct": {
+            "memchr::arch::x86_64::avx2::memchr::Three::find_raw": 6485997
+          },
+          "inclusive_ir": 12970227,
+          "self_ir": 6484230
+        },
+        "quick_xml::events::attributes::IterState::next": {
+          "direct": {
+            "quick_xml::events::attributes::IterState::check_for_duplicates": 5762014
+          },
+          "inclusive_ir": 13056160,
+          "self_ir": 7294146
+        },
+        "quick_xml::reader::Reader<R>::read_event_impl": {
+          "direct": {
+            "memchr::arch::x86_64::memchr::memchr2_raw::find_avx2": 7325433,
+            "memchr::arch::x86_64::memchr::memchr3_raw::find_avx2": 12970227,
+            "memchr::arch::x86_64::memchr::memchr_raw::find_avx2": 898,
+            "quick_xml::reader::state::ReaderState::emit_end": 6612178,
+            "quick_xml::reader::state::ReaderState::emit_question_mark": 360,
+            "quick_xml::reader::state::ReaderState::emit_start": 6881356,
+            "quick_xml::reader::state::ReaderState::emit_text": 284768
+          },
+          "inclusive_ir": 52862732,
+          "self_ir": 18787512
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::prepare": {
+          "direct": {
+            "<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop": 156,
+            "__memcmp_avx2_movbe": 95,
+            "__memcpy_avx_unaligned_erms": 1020,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 649,
+            "alloc::vec::Vec<T,A>::resize_with": 82,
+            "soapberry_zip::preserve::PreservedEntry::raw_name_bytes": 70,
+            "soapberry_zip::preserve::generated_entry": 63399672
+          },
+          "inclusive_ir": 63404470,
+          "self_ir": 2726
+        },
+        "soapberry_zip::preserve::PreservationIndex<R>::write_to_with_accounting": {
+          "direct": {
+            "<litchi_opc::source_backed::Chunked<W> as std::io::Write>::flush": 75,
+            "__memcpy_avx_unaligned_erms": 30,
+            "__memset_avx2_unaligned_erms": 65555,
+            "core::ptr::drop_in_place<alloc::vec::Vec<soapberry_zip::preserve::PreparedEntry>>": 2108,
+            "core::ptr::drop_in_place<soapberry_zip::preserve::OutputLayout>": 50,
+            "soapberry_zip::accounting::write_all_counted": 7027,
+            "soapberry_zip::preserve::PreparedCentral::bytes": 270,
+            "soapberry_zip::preserve::PreservationIndex<R>::prepare": 63404470,
+            "soapberry_zip::preserve::PreservationIndex<R>::validate_output_layout": 4644,
+            "soapberry_zip::preserve::write_prepared_local": 8509821,
+            "std::io::Write::write_all": 7691
+          },
+          "inclusive_ir": 72003493,
+          "self_ir": 1752
+        },
+        "soapberry_zip::preserve::generated_entry": {
+          "direct": {
+            "__memcpy_avx_unaligned_erms": 900,
+            "__rustc::__rust_alloc": 1745,
+            "__rustc::__rust_no_alloc_shim_is_unstable_v2": 5,
+            "alloc::boxed::box_new_uninit": 599,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 2156,
+            "flate2::deflate::write::DeflateEncoder<W>::finish": 585125,
+            "flate2::mem::Compress::new": 2222744,
+            "soapberry_zip::archive::ZipArchive<()>::from_slice": 1815,
+            "soapberry_zip::archive::ZipSliceArchive<T>::entries": 160,
+            "soapberry_zip::archive::ZipSliceEntries::next_entry": 1125,
+            "soapberry_zip::archive::slice_entry": 1420,
+            "soapberry_zip::writer::ZipArchiveWriter<W>::finish": 4612,
+            "soapberry_zip::writer::ZipDataWriter<W>::finish": 1354962,
+            "soapberry_zip::writer::ZipEntryWriter<W>::finish": 1160,
+            "soapberry_zip::writer::ZipFileBuilder<W>::start": 6360,
+            "std::io::Write::write_all": 59212559
+          },
+          "inclusive_ir": 63399672,
+          "self_ir": 2225
+        },
+        "std::io::Write::write_all": {
+          "direct": {
+            "<litchi_opc::source_backed::SourceCheckedSink<W> as std::io::Write>::write": 7870,
+            "__memcpy_avx_unaligned_erms": 854,
+            "crc32fast::Hasher::new_with_initial": 132,
+            "crc32fast::Hasher::update": 231205,
+            "flate2::zio::Writer<W,D>::write_with_status": 58980881,
+            "litchi_opc::source_backed::ContextCheckedSink<W>::check_before_write": 570
+          },
+          "inclusive_ir": 59226289,
+          "self_ir": 4777
+        },
+        "xml_minifier::audit::inspect_attributes": {
+          "direct": {
+            "__rustc::__rust_dealloc": 1267665,
+            "quick_xml::events::attributes::IterState::next": 13048550
+          },
+          "inclusive_ir": 20510108,
+          "self_ir": 6193893
+        },
+        "xml_minifier::audit::verify_authored": {
+          "direct": {
+            "xml_minifier::audit::verify_with_policy": 99214960
+          },
+          "inclusive_ir": 99215030,
+          "self_ir": 70
+        },
+        "xml_minifier::audit::verify_with_policy": {
+          "direct": {
+            "__rustc::__rust_dealloc": 350,
+            "alloc::raw_vec::RawVecInner<A>::finish_grow": 1458,
+            "core::ptr::drop_in_place<quick_xml::events::Event>": 40,
+            "core::ptr::drop_in_place<quick_xml::reader::Reader<&[u8]>>": 860,
+            "core::str::converts::from_utf8": 445950,
+            "quick_xml::reader::Reader<R>::read_event_impl": 52854237,
+            "xml_minifier::audit::check_declaration": 4820,
+            "xml_minifier::audit::check_end": 2377476,
+            "xml_minifier::audit::check_start": 7249007,
+            "xml_minifier::audit::inspect_attributes": 20510108
+          },
+          "inclusive_ir": 99214960,
+          "self_ir": 15770654
+        }
+      },
+      "parts": [
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 10576991
+              }
+            ],
+            "inclusive_ir": 10576991,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.1",
+          "sha256": "d63d3936cde075f2f18fcc4a3ad10510e8ceb9d3bb81e2b99adba03cbb79ec5a",
+          "summary_ir": 10576991
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26311
+              }
+            ],
+            "inclusive_ir": 26311,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.2",
+          "sha256": "99471fe10a7932b29f5f507d9f61ae74261fc352e37747d1363d1098eb79b2f2",
+          "summary_ir": 26311
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 159468264
+              }
+            ],
+            "inclusive_ir": 159468264,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.3",
+          "sha256": "814d1a50c368066f3a58d27f621694c401519a331860484ea4c810a5c8640c83",
+          "summary_ir": 159468264
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 26520
+              }
+            ],
+            "inclusive_ir": 26520,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.4",
+          "sha256": "fe19d05bfc2c2671d7d73fff9175744331e2c1bd198958a5c9995052f31c8a9e",
+          "summary_ir": 26520
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+                "calls": 1,
+                "inclusive_ir": 159466653
+              }
+            ],
+            "inclusive_ir": 159466653,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.5",
+          "sha256": "0e74efca6b4a99617e8b03a6204e55db6eac60340a697bd4fc55538d3ddcc259",
+          "summary_ir": 159466653
+        },
+        {
+          "lifecycle_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_value_lifecycle_gates",
+            "calls": 0,
+            "edges": [],
+            "inclusive_ir": 0,
+            "positive_edge_count": 0,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "measured_parent": {
+            "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+            "calls": 1,
+            "edges": [
+              {
+                "callee": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream",
+                "caller": "litchi_perf_baseline::run_xlsx_cell_values_edit_save",
+                "calls": 1,
+                "inclusive_ir": 172377186
+              }
+            ],
+            "inclusive_ir": 172377186,
+            "positive_edge_count": 1,
+            "target": "litchi_xlsx::cell_values::source::SourceBackedEditor::publish_multi_commit_to_stream"
+          },
+          "path": "baseline/profile-r2-dense-sparse.callgrind.6",
+          "sha256": "3314ad28467d12e415d68c6b9528d26818f5e761622ac16ff17bdf7c7bd6fd9c",
+          "summary_ir": 172377186
+        }
+      ],
+      "repeat": 2,
+      "selected": "baseline/profile-r2-dense-sparse.callgrind.6",
+      "shape": "dense-sparse",
+      "termination": {
+        "path": "baseline/profile-r2-dense-sparse.callgrind",
+        "sha256": "31bbfb5f13ed79c7923a4f1ebc0de835858bcb2206ad69072fe923a5d07781d8",
+        "summary_ir": 0
+      }
+    }
+  ],
+  "scope": "Publication method Ir only. Returned snapshot destruction is outside the owner. Native phase times include that destruction. No latency improvement or production change is claimed.",
+  "status": "pass"
+}

@@ -1,0 +1,1021 @@
+{
+  "aggregate": {
+    "owners": {
+      "litchi_xlsx::cell_values::source::MultiSourceEdit::commit": {
+        "inclusive_ir": 782799138
+      },
+      "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": {
+        "direct": {
+          "__rustc::__rust_dealloc": 1995670,
+          "litchi_ooxml_common::xml::unqualified_attribute_value": 64582435,
+          "litchi_xlsx::raw::worksheet::validation::parse_a1": 9503978
+        },
+        "equation": {
+          "direct_sum_ir": 76082083,
+          "inclusive_ir": 79917219,
+          "self_ir": 3835136,
+          "self_plus_direct_ir": 79917219,
+          "verified": true
+        },
+        "inclusive_ir": 79917219,
+        "self_ir": 3835136,
+        "share_of_commit_percent": 10.20916032229969
+      },
+      "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": {
+        "direct": {
+          "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": 79917219,
+          "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag": 43468178
+        },
+        "equation": {
+          "direct_sum_ir": 123385397,
+          "inclusive_ir": 126302261,
+          "self_ir": 2916864,
+          "self_plus_direct_ir": 126302261,
+          "verified": true
+        },
+        "inclusive_ir": 126302261,
+        "self_ir": 2916864,
+        "share_of_commit_percent": 16.134695973566593
+      },
+      "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit": {
+        "direct": {
+          "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 19741,
+          "__memcmp_avx2_movbe": 272,
+          "__memcpy_avx_unaligned_erms": 2192,
+          "__rustc::__rust_dealloc": 560,
+          "__rustc::__rust_realloc": 15594283,
+          "alloc::raw_vec::RawVec<T,A>::grow_one": 8179777,
+          "alloc::vec::Vec<T,A>::into_boxed_slice": 208448,
+          "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>": 176,
+          "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 6844,
+          "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 13879184,
+          "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout": 14048,
+          "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position": 1854048,
+          "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension": 61767,
+          "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard": 23704144,
+          "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": 126302261,
+          "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row": 3967650,
+          "litchi_xlsx::raw::worksheet::edit::codec::wire::tag": 46334,
+          "quick_xml::events::BytesRef::decode": 6131372,
+          "quick_xml::name::NamespaceResolver::resolve_event": 31526144,
+          "quick_xml::name::NamespaceResolver::set_level": 2290720,
+          "quick_xml::name::QName::local_name": 28409696,
+          "quick_xml::reader::Reader<R>::read_event_impl": 80289669,
+          "quick_xml::reader::ns_reader::NsReader<R>::process_event": 31132640
+        },
+        "equation": {
+          "direct_sum_ir": 373621970,
+          "inclusive_ir": 416939582,
+          "self_ir": 43317612,
+          "self_plus_direct_ir": 416939582,
+          "verified": true
+        },
+        "inclusive_ir": 416939582,
+        "self_ir": 43317612,
+        "share_of_commit_percent": 53.262652161990495
+      }
+    },
+    "prior_0526_selected_owner_values_match": true,
+    "scanner_to_resolve_event": {
+      "call_counts_used_for_estimate": false,
+      "commit_inclusive_ir": 782799138,
+      "inclusive_ir": 31526144,
+      "raw_edge_matches_annotation_per_row": true,
+      "scan_inclusive_ir": 416939582,
+      "share_of_commit_percent": 4.027360592213631,
+      "share_of_scan_percent": 7.5613219183397185,
+      "upper_bound_only": true,
+      "upper_bound_scope": "complete scanner -> resolve_event edge; Start and Empty lookups remain required"
+    },
+    "scanner_to_start_cell_to_cell_address": {
+      "cell_address_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 64582435,
+          "name": "litchi_ooxml_common::xml::unqualified_attribute_value",
+          "rank": 1,
+          "share_of_cell_address_percent": 80.81166463012183
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 9503978,
+          "name": "litchi_xlsx::raw::worksheet::validation::parse_a1",
+          "rank": 2,
+          "share_of_cell_address_percent": 11.892278183503858
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 1995670,
+          "name": "__rustc::__rust_dealloc",
+          "rank": 3,
+          "share_of_cell_address_percent": 2.497171479402956
+        }
+      ],
+      "cell_address_inclusive_ir": 79917219,
+      "nested_costs_not_added_to_scanner_again": true,
+      "start_cell_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 79917219,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address",
+          "rank": 1,
+          "share_of_start_cell_percent": 63.27457510835851
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 43468178,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag",
+          "rank": 2,
+          "share_of_start_cell_percent": 34.4159935505826
+        }
+      ],
+      "start_cell_inclusive_ir": 126302261
+    }
+  },
+  "inputs": {
+    "frozen_inputs": {
+      "path": "docs/performance/results/change-0528/frozen-inputs.json",
+      "sha256": "bb10fb2ab63b0fa8a71ccb4b7ecf2f3502e40c1a4dc2f7ebcd955de1486a344b"
+    },
+    "helpers": {
+      "docs/performance/results/change-0519/analyze_profiles.py": "9587f5a776b55d423b720a98cd228708c79af0956100fd164d81713e0c90488e",
+      "docs/performance/results/change-0519/compare_profile_lanes.py": "a817bb19e1f6d1b5989e41a72dbcf3166b9d0178099781e5ed78c9e5f19f3c74",
+      "docs/performance/results/change-0521/analyze_profiles.py": "5a5ba155c9eb775cd8653f41b10ef9b3e52e8fc871ea3df01166fba2e5c269a7"
+    },
+    "plan": {
+      "path": "docs/performance/results/change-0528/plan.json",
+      "sha256": "259454bb139493e82da98ad28c09332e65bcecfb0e1fea165a6b1ee6370f9b1e"
+    },
+    "prior_0525_candidate_diff": {
+      "path": "docs/performance/results/change-0525/candidate/source-diff.json",
+      "sha256": "b332bb938c2a86b3a286c2f36fe2897f83c1273551c8d51b4297c9163319152f"
+    },
+    "prior_0525_candidate_manifest": {
+      "path": "docs/performance/results/change-0525/candidate/source-manifest.json",
+      "sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096"
+    },
+    "prior_0525_seal": {
+      "path": "docs/performance/results/change-0525/SHA256SUMS",
+      "sha256": "ae8834847914ef936b6206f621d0e19c02960f407b27f3e2db797177e0a8b1ab"
+    },
+    "prior_0526_profile_analysis": {
+      "path": "docs/performance/results/change-0526/profile-analysis.json",
+      "sha256": "9a7afead3b6ae723d75926f778289e834450837d8e606bd22553bef2a1cf29bd"
+    },
+    "prior_0526_source_binding": {
+      "path": "docs/performance/results/change-0526/source-binding.json",
+      "sha256": "11927890dbc7d6b02d64cae9c86a1b337e5a44472ca9d85b026cb2d053957b66"
+    },
+    "run": {
+      "path": "docs/performance/results/change-0528/run.py",
+      "sha256": "a3de8c50d682a579173e52dbf56512cb27e41b37d8f08f6b10cc2777876dbfdc"
+    }
+  },
+  "limitations": [
+    "The complete scanner -> resolve_event edge is an upper bound for End-only resolver work; Start and Empty lookups remain required.",
+    "Call metadata is collection-off polluted and no per-call split or estimate is reported.",
+    "Nested inclusive owners overlap and must not be added together.",
+    "Callgrind Ir is a mechanism diagnostic, not a native latency, RSS, allocation, I/O, or end-to-end speedup claim."
+  ],
+  "next_roi": {
+    "first": "Scanner::start_cell -> Scanner::cell_address",
+    "publication_phase_context_only": true,
+    "ranking_basis": "aggregate immediate-child inclusive Ir within each parent",
+    "resolver_ceiling_is_not_end_only": true,
+    "second": "Scanner::start_cell -> wire::cell_tag"
+  },
+  "phase_context": {
+    "medians_summed": false,
+    "phases": [
+      "open_ns",
+      "plan_ns",
+      "commit_ns",
+      "publication_ns"
+    ],
+    "rows": [
+      {
+        "formula": "phase_mean_share = sum_i(phase_i) / sum_i(sum_p(phase_p)); medians are not summed",
+        "input": {
+          "path": "docs/performance/results/change-0527/baseline/native-r1-primary-medium.json",
+          "sha256": "436e2cccf2df91e14ff61c9212850d8d5aa06c1a8577284214476634cacdc794"
+        },
+        "phase_mean_share_percent": {
+          "commit_ns": 36.320072008792025,
+          "open_ns": 0.4056729580051004,
+          "plan_ns": 32.55208467327584,
+          "publication_ns": 30.72217035992703
+        },
+        "phase_means_ns": {
+          "commit_ns": 8064649.925,
+          "open_ns": 90077.2,
+          "plan_ns": 7227991.375,
+          "publication_ns": 6821670.09
+        },
+        "phase_sample_sums_ns": {
+          "commit_ns": 1612929985,
+          "open_ns": 18015440,
+          "plan_ns": 1445598275,
+          "publication_ns": 1364334018
+        },
+        "reopen_excluded": true,
+        "repeat": 1,
+        "reported_elapsed_mean_ns": 22204388.590000007,
+        "sample_count": 200,
+        "shape": "medium",
+        "total_phase_mean_ns": 22204388.59,
+        "total_phase_sample_sum_ns": 4440877718,
+        "validated": true
+      },
+      {
+        "formula": "phase_mean_share = sum_i(phase_i) / sum_i(sum_p(phase_p)); medians are not summed",
+        "input": {
+          "path": "docs/performance/results/change-0527/baseline/native-r1-primary-dense-sparse.json",
+          "sha256": "bb1379ff0fe30bc885121b012a94a10bee23d14ae6c7b29dcc92aaf4a6fa18f0"
+        },
+        "phase_mean_share_percent": {
+          "commit_ns": 35.611748367290645,
+          "open_ns": 0.23682406841211298,
+          "plan_ns": 32.045814038303746,
+          "publication_ns": 32.105613525993505
+        },
+        "phase_means_ns": {
+          "commit_ns": 15239103.365,
+          "open_ns": 101342.58,
+          "plan_ns": 13713156.33,
+          "publication_ns": 13738745.935
+        },
+        "phase_sample_sums_ns": {
+          "commit_ns": 3047820673,
+          "open_ns": 20268516,
+          "plan_ns": 2742631266,
+          "publication_ns": 2747749187
+        },
+        "reopen_excluded": true,
+        "repeat": 1,
+        "reported_elapsed_mean_ns": 42792348.21000001,
+        "sample_count": 200,
+        "shape": "dense-sparse",
+        "total_phase_mean_ns": 42792348.21,
+        "total_phase_sample_sum_ns": 8558469642,
+        "validated": true
+      },
+      {
+        "formula": "phase_mean_share = sum_i(phase_i) / sum_i(sum_p(phase_p)); medians are not summed",
+        "input": {
+          "path": "docs/performance/results/change-0527/baseline/native-r2-primary-medium.json",
+          "sha256": "d85220b34c5d89bb9f9d485692cc7146324720595404726c1a93e6de19b55578"
+        },
+        "phase_mean_share_percent": {
+          "commit_ns": 36.656785367999255,
+          "open_ns": 0.39887295759954683,
+          "plan_ns": 32.237479209708496,
+          "publication_ns": 30.7068624646927
+        },
+        "phase_means_ns": {
+          "commit_ns": 8127452.65,
+          "open_ns": 88437.135,
+          "plan_ns": 7147614.915,
+          "publication_ns": 6808250.32
+        },
+        "phase_sample_sums_ns": {
+          "commit_ns": 1625490530,
+          "open_ns": 17687427,
+          "plan_ns": 1429522983,
+          "publication_ns": 1361650064
+        },
+        "reopen_excluded": true,
+        "repeat": 2,
+        "reported_elapsed_mean_ns": 22171755.02000001,
+        "sample_count": 200,
+        "shape": "medium",
+        "total_phase_mean_ns": 22171755.02,
+        "total_phase_sample_sum_ns": 4434351004,
+        "validated": true
+      },
+      {
+        "formula": "phase_mean_share = sum_i(phase_i) / sum_i(sum_p(phase_p)); medians are not summed",
+        "input": {
+          "path": "docs/performance/results/change-0527/baseline/native-r2-primary-dense-sparse.json",
+          "sha256": "9c4615ae9857c402b30b6c8e11be940cc1ac22fc6075603a0258700c5af05740"
+        },
+        "phase_mean_share_percent": {
+          "commit_ns": 35.55028129507637,
+          "open_ns": 0.21916179305252226,
+          "plan_ns": 31.839926951367865,
+          "publication_ns": 32.390629960503254
+        },
+        "phase_means_ns": {
+          "commit_ns": 15041621.73,
+          "open_ns": 92729.19,
+          "plan_ns": 13471739.735,
+          "publication_ns": 13704746.79
+        },
+        "phase_sample_sums_ns": {
+          "commit_ns": 3008324346,
+          "open_ns": 18545838,
+          "plan_ns": 2694347947,
+          "publication_ns": 2740949358
+        },
+        "reopen_excluded": true,
+        "repeat": 2,
+        "reported_elapsed_mean_ns": 42310837.44500001,
+        "sample_count": 200,
+        "shape": "dense-sparse",
+        "total_phase_mean_ns": 42310837.445,
+        "total_phase_sample_sum_ns": 8462167489,
+        "validated": true
+      }
+    ],
+    "scope": "per-sample vector means for open/plan/commit/publication; reopen is separate",
+    "source": "0527 sealed baseline native primary phase vectors"
+  },
+  "prior_0525_seal_entries": 550,
+  "rows": [
+    {
+      "cell_address_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 10611889,
+          "name": "litchi_ooxml_common::xml::unqualified_attribute_value",
+          "rank": 1,
+          "share_of_cell_address_percent": 80.74701509890623
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 1532544,
+          "name": "litchi_xlsx::raw::worksheet::validation::parse_a1",
+          "rank": 2,
+          "share_of_cell_address_percent": 11.661293621497375
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 343375,
+          "name": "__rustc::__rust_dealloc",
+          "rank": 3,
+          "share_of_cell_address_percent": 2.612777641152007
+        }
+      ],
+      "commit_inclusive_ir": 133217968,
+      "inputs": {
+        "docs/performance/results/change-0525/candidate/profile-r1-medium.callgrind.4": "13f46cdc6db542cfccb01100877c648a6d4cc3ec9f6be40c5d67b85302f68226",
+        "docs/performance/results/change-0525/candidate/profile-r1-medium.inclusive.txt": "9d88c032b424dd9108ac3a176f0efdf06637a6ae01723e25b555931fce3d2c89",
+        "docs/performance/results/change-0525/candidate/profile-r1-medium.self.txt": "7487727b505cc0fcbf4672ffd4dce0bf72cef0ed987c23665c4eb7258c12cad9"
+      },
+      "owners": {
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": {
+          "direct": {
+            "__rustc::__rust_dealloc": 343375,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 10611889,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 1532544
+          },
+          "equation": {
+            "direct_sum_ir": 12487808,
+            "inclusive_ir": 13142144,
+            "self_ir": 654336,
+            "self_plus_direct_ir": 13142144,
+            "verified": true
+          },
+          "inclusive_ir": 13142144,
+          "self_ir": 654336
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": {
+          "direct": {
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": 13142144,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag": 7330211
+          },
+          "equation": {
+            "direct_sum_ir": 20472355,
+            "inclusive_ir": 20970019,
+            "self_ir": 497664,
+            "self_plus_direct_ir": 20970019,
+            "verified": true
+          },
+          "inclusive_ir": 20970019,
+          "self_ir": 497664
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 4884,
+            "__memcmp_avx2_movbe": 68,
+            "__memcpy_avx_unaligned_erms": 548,
+            "__rustc::__rust_dealloc": 140,
+            "__rustc::__rust_realloc": 2667066,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 1563394,
+            "alloc::vec::Vec<T,A>::into_boxed_slice": 61323,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>": 44,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1826,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 2372198,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout": 3512,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position": 316768,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension": 15392,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard": 4051212,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": 20970019,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row": 770473,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::tag": 11608,
+            "quick_xml::events::BytesRef::decode": 1107794,
+            "quick_xml::name::NamespaceResolver::resolve_event": 5386720,
+            "quick_xml::name::NamespaceResolver::set_level": 391408,
+            "quick_xml::name::QName::local_name": 4852664,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13722535,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5297245
+          },
+          "equation": {
+            "direct_sum_ir": 63568841,
+            "inclusive_ir": 70969669,
+            "self_ir": 7400828,
+            "self_plus_direct_ir": 70969669,
+            "verified": true
+          },
+          "inclusive_ir": 70969669,
+          "self_ir": 7400828
+        }
+      },
+      "repeat": 1,
+      "resolver_edge": {
+        "annotation_direct_ir": 5386720,
+        "commit_inclusive_ir": 133217968,
+        "inclusive_ir": 5386720,
+        "raw_edge": {
+          "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+          "edges": [
+            {
+              "callee": "quick_xml::name::NamespaceResolver::resolve_event",
+              "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+              "inclusive_ir": 5386720
+            }
+          ],
+          "inclusive_ir": 5386720,
+          "positive_edge_count": 1,
+          "target": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        "raw_edge_matches_annotation": true,
+        "scan_inclusive_ir": 70969669,
+        "share_of_commit_percent": 4.0435386313654025,
+        "share_of_scan_percent": 7.590172077595571,
+        "upper_bound_only": true,
+        "upper_bound_scope": "complete scanner -> resolve_event edge; Start and Empty lookups remain required"
+      },
+      "shape": "medium",
+      "start_cell_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 13142144,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address",
+          "rank": 1,
+          "share_of_start_cell_percent": 62.67111155216407
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 7330211,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag",
+          "rank": 2,
+          "share_of_start_cell_percent": 34.95567171398367
+        }
+      ],
+      "validation": {
+        "call_counts_used_for_estimate": false,
+        "prior_0526_owner_values_match": true,
+        "raw_direct_edges_match_annotations": true,
+        "resolver_raw_edge_matches_annotation": true,
+        "scanner_to_start_cell_to_cell_address": true,
+        "self_plus_direct_equations": true
+      }
+    },
+    {
+      "cell_address_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 21678529,
+          "name": "litchi_ooxml_common::xml::unqualified_attribute_value",
+          "rank": 1,
+          "share_of_cell_address_percent": 80.84138999048558
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 3219445,
+          "name": "litchi_xlsx::raw::worksheet::validation::parse_a1",
+          "rank": 2,
+          "share_of_cell_address_percent": 12.005630492637154
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 654920,
+          "name": "__rustc::__rust_dealloc",
+          "rank": 3,
+          "share_of_cell_address_percent": 2.4422617942651375
+        }
+      ],
+      "commit_inclusive_ir": 258175362,
+      "inputs": {
+        "docs/performance/results/change-0525/candidate/profile-r1-dense-sparse.callgrind.4": "250ad9c32b9ef34011aa4a43aa019e584dc08f8fd0819ca3be1a02c5f98894f0",
+        "docs/performance/results/change-0525/candidate/profile-r1-dense-sparse.inclusive.txt": "b641d0996f107da9459fba061a3c624c98805d95d2adee2c5c69c7d02c378b8a",
+        "docs/performance/results/change-0525/candidate/profile-r1-dense-sparse.self.txt": "727d7553d6fc25850bf6d05cca1bd2668d60cf8be6a0bff3929d3a10ee5a7051"
+      },
+      "owners": {
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": {
+          "direct": {
+            "__rustc::__rust_dealloc": 654920,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 21678529,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 3219445
+          },
+          "equation": {
+            "direct_sum_ir": 25552894,
+            "inclusive_ir": 26816126,
+            "self_ir": 1263232,
+            "self_plus_direct_ir": 26816126,
+            "verified": true
+          },
+          "inclusive_ir": 26816126,
+          "self_ir": 1263232
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": {
+          "direct": {
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": 26816126,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag": 14404797
+          },
+          "equation": {
+            "direct_sum_ir": 41220923,
+            "inclusive_ir": 42181691,
+            "self_ir": 960768,
+            "self_plus_direct_ir": 42181691,
+            "verified": true
+          },
+          "inclusive_ir": 42181691,
+          "self_ir": 960768
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 5005,
+            "__memcmp_avx2_movbe": 68,
+            "__memcpy_avx_unaligned_erms": 548,
+            "__rustc::__rust_dealloc": 140,
+            "__rustc::__rust_realloc": 5130593,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 2522494,
+            "alloc::vec::Vec<T,A>::into_boxed_slice": 42818,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>": 44,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1711,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 4567357,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout": 3512,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position": 610256,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension": 15438,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard": 7800860,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": 42181691,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row": 1213579,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::tag": 11602,
+            "quick_xml::events::BytesRef::decode": 1957892,
+            "quick_xml::name::NamespaceResolver::resolve_event": 10376352,
+            "quick_xml::name::NamespaceResolver::set_level": 753952,
+            "quick_xml::name::QName::local_name": 9352184,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26422071,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10268984
+          },
+          "equation": {
+            "direct_sum_ir": 123239151,
+            "inclusive_ir": 137497129,
+            "self_ir": 14257978,
+            "self_plus_direct_ir": 137497129,
+            "verified": true
+          },
+          "inclusive_ir": 137497129,
+          "self_ir": 14257978
+        }
+      },
+      "repeat": 1,
+      "resolver_edge": {
+        "annotation_direct_ir": 10376352,
+        "commit_inclusive_ir": 258175362,
+        "inclusive_ir": 10376352,
+        "raw_edge": {
+          "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+          "edges": [
+            {
+              "callee": "quick_xml::name::NamespaceResolver::resolve_event",
+              "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+              "inclusive_ir": 10376352
+            }
+          ],
+          "inclusive_ir": 10376352,
+          "positive_edge_count": 1,
+          "target": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        "raw_edge_matches_annotation": true,
+        "scan_inclusive_ir": 137497129,
+        "share_of_commit_percent": 4.019110080690039,
+        "share_of_scan_percent": 7.546595391093584,
+        "upper_bound_only": true,
+        "upper_bound_scope": "complete scanner -> resolve_event edge; Start and Empty lookups remain required"
+      },
+      "shape": "dense-sparse",
+      "start_cell_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 26816126,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address",
+          "rank": 1,
+          "share_of_start_cell_percent": 63.57290417778651
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 14404797,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag",
+          "rank": 2,
+          "share_of_start_cell_percent": 34.14940619616222
+        }
+      ],
+      "validation": {
+        "call_counts_used_for_estimate": false,
+        "prior_0526_owner_values_match": true,
+        "raw_direct_edges_match_annotations": true,
+        "resolver_raw_edge_matches_annotation": true,
+        "scanner_to_start_cell_to_cell_address": true,
+        "self_plus_direct_equations": true
+      }
+    },
+    {
+      "cell_address_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 10627416,
+          "name": "litchi_ooxml_common::xml::unqualified_attribute_value",
+          "rank": 1,
+          "share_of_cell_address_percent": 80.77467688733776
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 1532544,
+          "name": "litchi_xlsx::raw::worksheet::validation::parse_a1",
+          "rank": 2,
+          "share_of_cell_address_percent": 11.648245106395398
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 342570,
+          "name": "__rustc::__rust_dealloc",
+          "rank": 3,
+          "share_of_cell_address_percent": 2.6037355704618412
+        }
+      ],
+      "commit_inclusive_ir": 133250185,
+      "inputs": {
+        "docs/performance/results/change-0525/candidate/profile-r2-medium.callgrind.4": "9029472bdc5d08ef872c7692a35bc47ccef8147cce2876e5684d41183d40e9d1",
+        "docs/performance/results/change-0525/candidate/profile-r2-medium.inclusive.txt": "3506aee924edbfcdf3428dfe05949279c519266f0933c0b34eaa5f927f3805ff",
+        "docs/performance/results/change-0525/candidate/profile-r2-medium.self.txt": "953702a948c227466200257748620facd8a97dc280f53917639256359c772eeb"
+      },
+      "owners": {
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": {
+          "direct": {
+            "__rustc::__rust_dealloc": 342570,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 10627416,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 1532544
+          },
+          "equation": {
+            "direct_sum_ir": 12502530,
+            "inclusive_ir": 13156866,
+            "self_ir": 654336,
+            "self_plus_direct_ir": 13156866,
+            "verified": true
+          },
+          "inclusive_ir": 13156866,
+          "self_ir": 654336
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": {
+          "direct": {
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": 13156866,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag": 7329891
+          },
+          "equation": {
+            "direct_sum_ir": 20486757,
+            "inclusive_ir": 20984421,
+            "self_ir": 497664,
+            "self_plus_direct_ir": 20984421,
+            "verified": true
+          },
+          "inclusive_ir": 20984421,
+          "self_ir": 497664
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 4895,
+            "__memcmp_avx2_movbe": 68,
+            "__memcpy_avx_unaligned_erms": 548,
+            "__rustc::__rust_dealloc": 140,
+            "__rustc::__rust_realloc": 2667062,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 1573984,
+            "alloc::vec::Vec<T,A>::into_boxed_slice": 61469,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>": 44,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1711,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 2372284,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout": 3512,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position": 316768,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension": 15500,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard": 4051212,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": 20984421,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row": 770709,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::tag": 11518,
+            "quick_xml::events::BytesRef::decode": 1107794,
+            "quick_xml::name::NamespaceResolver::resolve_event": 5386720,
+            "quick_xml::name::NamespaceResolver::set_level": 391408,
+            "quick_xml::name::QName::local_name": 4852664,
+            "quick_xml::reader::Reader<R>::read_event_impl": 13722895,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 5297425
+          },
+          "equation": {
+            "direct_sum_ir": 63594751,
+            "inclusive_ir": 70995579,
+            "self_ir": 7400828,
+            "self_plus_direct_ir": 70995579,
+            "verified": true
+          },
+          "inclusive_ir": 70995579,
+          "self_ir": 7400828
+        }
+      },
+      "repeat": 2,
+      "resolver_edge": {
+        "annotation_direct_ir": 5386720,
+        "commit_inclusive_ir": 133250185,
+        "inclusive_ir": 5386720,
+        "raw_edge": {
+          "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+          "edges": [
+            {
+              "callee": "quick_xml::name::NamespaceResolver::resolve_event",
+              "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+              "inclusive_ir": 5386720
+            }
+          ],
+          "inclusive_ir": 5386720,
+          "positive_edge_count": 1,
+          "target": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        "raw_edge_matches_annotation": true,
+        "scan_inclusive_ir": 70995579,
+        "share_of_commit_percent": 4.042560991566353,
+        "share_of_scan_percent": 7.587402026821979,
+        "upper_bound_only": true,
+        "upper_bound_scope": "complete scanner -> resolve_event edge; Start and Empty lookups remain required"
+      },
+      "shape": "medium",
+      "start_cell_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 13156866,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address",
+          "rank": 1,
+          "share_of_start_cell_percent": 62.698256006205746
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 7329891,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag",
+          "rank": 2,
+          "share_of_start_cell_percent": 34.9301560429044
+        }
+      ],
+      "validation": {
+        "call_counts_used_for_estimate": false,
+        "prior_0526_owner_values_match": true,
+        "raw_direct_edges_match_annotations": true,
+        "resolver_raw_edge_matches_annotation": true,
+        "scanner_to_start_cell_to_cell_address": true,
+        "self_plus_direct_equations": true
+      }
+    },
+    {
+      "cell_address_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 21664601,
+          "name": "litchi_ooxml_common::xml::unqualified_attribute_value",
+          "rank": 1,
+          "share_of_cell_address_percent": 80.83178087315079
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 3219445,
+          "name": "litchi_xlsx::raw::worksheet::validation::parse_a1",
+          "rank": 2,
+          "share_of_cell_address_percent": 12.011920864508927
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 654805,
+          "name": "__rustc::__rust_dealloc",
+          "rank": 3,
+          "share_of_cell_address_percent": 2.4431123506333443
+        }
+      ],
+      "commit_inclusive_ir": 258155623,
+      "inputs": {
+        "docs/performance/results/change-0525/candidate/profile-r2-dense-sparse.callgrind.4": "b1c2ff109102311456f25ef2a46f23f110a3f6026bd5df155e9e26eda139f991",
+        "docs/performance/results/change-0525/candidate/profile-r2-dense-sparse.inclusive.txt": "0e95976adc77f476922df0b3f8e611db117d2aa83d7a02cf47dcb439ad93c797",
+        "docs/performance/results/change-0525/candidate/profile-r2-dense-sparse.self.txt": "3207b15a65d3d6295129838cfaa58dea139dd581656cd63e2e27129d2e92b1df"
+      },
+      "owners": {
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": {
+          "direct": {
+            "__rustc::__rust_dealloc": 654805,
+            "litchi_ooxml_common::xml::unqualified_attribute_value": 21664601,
+            "litchi_xlsx::raw::worksheet::validation::parse_a1": 3219445
+          },
+          "equation": {
+            "direct_sum_ir": 25538851,
+            "inclusive_ir": 26802083,
+            "self_ir": 1263232,
+            "self_plus_direct_ir": 26802083,
+            "verified": true
+          },
+          "inclusive_ir": 26802083,
+          "self_ir": 1263232
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": {
+          "direct": {
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address": 26802083,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag": 14403279
+          },
+          "equation": {
+            "direct_sum_ir": 41205362,
+            "inclusive_ir": 42166130,
+            "self_ir": 960768,
+            "self_plus_direct_ir": 42166130,
+            "verified": true
+          },
+          "inclusive_ir": 42166130,
+          "self_ir": 960768
+        },
+        "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit": {
+          "direct": {
+            "<quick_xml::name::NamespaceResolver as core::default::Default>::default": 4957,
+            "__memcmp_avx2_movbe": 68,
+            "__memcpy_avx_unaligned_erms": 548,
+            "__rustc::__rust_dealloc": 140,
+            "__rustc::__rust_realloc": 5129562,
+            "alloc::raw_vec::RawVec<T,A>::grow_one": 2519905,
+            "alloc::vec::Vec<T,A>::into_boxed_slice": 42838,
+            "core::ptr::drop_in_place<core::option::Option<litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::PendingSheetData>>": 44,
+            "core::ptr::drop_in_place<quick_xml::reader::ns_reader::NsReader<&[u8]>>": 1596,
+            "litchi_xlsx::raw::namespace::is_spreadsheetml_name": 4567345,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::finish_layout": 3512,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::observe_merge_position": 610256,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::record_dimension": 15437,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::scan_guard": 7800860,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_cell": 42166130,
+            "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::start_row": 1212889,
+            "litchi_xlsx::raw::worksheet::edit::codec::wire::tag": 11606,
+            "quick_xml::events::BytesRef::decode": 1957892,
+            "quick_xml::name::NamespaceResolver::resolve_event": 10376352,
+            "quick_xml::name::NamespaceResolver::set_level": 753952,
+            "quick_xml::name::QName::local_name": 9352184,
+            "quick_xml::reader::Reader<R>::read_event_impl": 26422168,
+            "quick_xml::reader::ns_reader::NsReader<R>::process_event": 10268986
+          },
+          "equation": {
+            "direct_sum_ir": 123219227,
+            "inclusive_ir": 137477205,
+            "self_ir": 14257978,
+            "self_plus_direct_ir": 137477205,
+            "verified": true
+          },
+          "inclusive_ir": 137477205,
+          "self_ir": 14257978
+        }
+      },
+      "repeat": 2,
+      "resolver_edge": {
+        "annotation_direct_ir": 10376352,
+        "commit_inclusive_ir": 258155623,
+        "inclusive_ir": 10376352,
+        "raw_edge": {
+          "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+          "edges": [
+            {
+              "callee": "quick_xml::name::NamespaceResolver::resolve_event",
+              "caller": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::scan_with_limit",
+              "inclusive_ir": 10376352
+            }
+          ],
+          "inclusive_ir": 10376352,
+          "positive_edge_count": 1,
+          "target": "quick_xml::name::NamespaceResolver::resolve_event"
+        },
+        "raw_edge_matches_annotation": true,
+        "scan_inclusive_ir": 137477205,
+        "share_of_commit_percent": 4.019417388402189,
+        "share_of_scan_percent": 7.5476890878018645,
+        "upper_bound_only": true,
+        "upper_bound_scope": "complete scanner -> resolve_event edge; Start and Empty lookups remain required"
+      },
+      "shape": "dense-sparse",
+      "start_cell_direct_children_ranked": [
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 26802083,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::snapshot::scan::Scanner::cell_address",
+          "rank": 1,
+          "share_of_start_cell_percent": 63.563061158327784
+        },
+        {
+          "immediate_disjoint_child": true,
+          "inclusive_ir": 14403279,
+          "name": "litchi_xlsx::raw::worksheet::edit::codec::wire::cell_tag",
+          "rank": 2,
+          "share_of_start_cell_percent": 34.158408656426374
+        }
+      ],
+      "validation": {
+        "call_counts_used_for_estimate": false,
+        "prior_0526_owner_values_match": true,
+        "raw_direct_edges_match_annotations": true,
+        "resolver_raw_edge_matches_annotation": true,
+        "scanner_to_start_cell_to_cell_address": true,
+        "self_plus_direct_equations": true
+      }
+    }
+  ],
+  "schema": "litchi-0528-scanner-ceiling-audit-v1",
+  "scope": "Read-only sealed 0525 XLSX scanner attribution and 0527 phase context; no build, capture, latency, or production edit.",
+  "selected_owner": "litchi_xlsx::cell_values::source::MultiSourceEdit::commit",
+  "source_binding": {
+    "0525_production_changed_files": {
+      "crates/litchi-xlsx/src/cell.rs": {
+        "candidate_sha256": "7e807528568ebdd4a717382a3b1b249e178504b03e04d38147cb0159c5b567c7",
+        "current_sha256": "7e807528568ebdd4a717382a3b1b249e178504b03e04d38147cb0159c5b567c7"
+      },
+      "crates/litchi-xlsx/src/cell_values/source.rs": {
+        "candidate_sha256": "10c9a99892dea1cf5c0dd529f628313126c4908c0fdc6e3694439c1c3889213b",
+        "current_sha256": "10c9a99892dea1cf5c0dd529f628313126c4908c0fdc6e3694439c1c3889213b"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/mod.rs": {
+        "candidate_sha256": "ad57443eb60d48b175dc0669cb5298f34652129172ad4888f819a79cfe9f015c",
+        "current_sha256": "ad57443eb60d48b175dc0669cb5298f34652129172ad4888f819a79cfe9f015c"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot.rs": {
+        "candidate_sha256": "f1e4666ce3c08f4aaa6affe4e684e596b30453166f95c17576457a5b8491ea05",
+        "current_sha256": "f1e4666ce3c08f4aaa6affe4e684e596b30453166f95c17576457a5b8491ea05"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/model.rs": {
+        "candidate_sha256": "71e23d40e8ef116ae833b51fb77c11067461fc6d5fb69f05fb2bfbe61644a0bd",
+        "current_sha256": "71e23d40e8ef116ae833b51fb77c11067461fc6d5fb69f05fb2bfbe61644a0bd"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs": {
+        "candidate_sha256": "137a317c696e65043027007fbd04edf47f8407563bf0799b852c9be0d54996f8",
+        "current_sha256": "137a317c696e65043027007fbd04edf47f8407563bf0799b852c9be0d54996f8"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/mod.rs": {
+        "candidate_sha256": "8794651beee1843be650845d51d3056fb3b0b486feb29aa0587693f0a721b942",
+        "current_sha256": "8794651beee1843be650845d51d3056fb3b0b486feb29aa0587693f0a721b942"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/write/sheet_data.rs": {
+        "candidate_sha256": "71bf1f126205c97b9ca964c1c6f927481becf2195833488470b2823266b426a5",
+        "current_sha256": "71bf1f126205c97b9ca964c1c6f927481becf2195833488470b2823266b426a5"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/mod.rs": {
+        "candidate_sha256": "057fb8ea5a0aef76fffb0a21f678983fcdefb562dac5eaaf3159cd2beac6566c",
+        "current_sha256": "057fb8ea5a0aef76fffb0a21f678983fcdefb562dac5eaaf3159cd2beac6566c"
+      },
+      "crates/litchi-xlsx/src/raw/worksheet/edit/package.rs": {
+        "candidate_sha256": "b41af5d8c91a5c1e82f9030b8798a354ca4943072373846b8874c73996c03035",
+        "current_sha256": "b41af5d8c91a5c1e82f9030b8798a354ca4943072373846b8874c73996c03035"
+      }
+    },
+    "0527_test_only_source_observation": {
+      "crates/litchi-xlsx/src/cell_values/snapshot.rs": {
+        "candidate_sha256": "e974e6e94d4af3c4797d883a60410726b61081ca99adea46f786099485b6b4d6",
+        "current_sha256": "2f3f839adc91f0da204aefc83ebe2bb605cc02d269346759155b7bda54abc0e9"
+      }
+    },
+    "binding_sha256": "8a133620217daf78a9ed91500ebf551a7db56d341df3ab02127588430935361f",
+    "bound_source_files": {
+      "Cargo.toml": "911a52cf6932b81550bc9ffd6e522c327dec178297ee9bc46d2ccedb693d4885",
+      "crates/litchi-xlsx/src/cell_values/source.rs": "10c9a99892dea1cf5c0dd529f628313126c4908c0fdc6e3694439c1c3889213b",
+      "crates/litchi-xlsx/src/cell_values/validation.rs": "52e7d2d18f59e716c686f1c4c59b5835632fe6981dc6789ef7b06b555d136c0b",
+      "crates/litchi-xlsx/src/raw/worksheet/edit/codec/snapshot/scan.rs": "137a317c696e65043027007fbd04edf47f8407563bf0799b852c9be0d54996f8",
+      "crates/litchi-xlsx/src/raw/worksheet/validation.rs": "dc79e3e8dbb11943acdf68d0d68259cb4d05ff01616184a700e2f829b5f36bfa",
+      "docs/CRUD_Scenario_Checklist.md": "d3a63f3aa001ad6e3dda7627b6294230ae87b3b5aaa595c45c3327e026dbf02a",
+      "docs/GOAL.md": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+      "rust-toolchain.toml": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310",
+      "tools/perf-baseline/Cargo.lock": "13333f511914d8146c60282b5d6385693cf89c0f939fa52b12e4db821c9b8b36",
+      "tools/perf-baseline/src/lib.rs": "1d4f9ed81ffed0a65d3ff49572c50f2e8bf60867d4befeffc77d2174526fbafd"
+    },
+    "candidate_diff_sha256": "b332bb938c2a86b3a286c2f36fe2897f83c1273551c8d51b4297c9163319152f",
+    "candidate_manifest_contains_bound_sources": true,
+    "candidate_manifest_sha256": "0fab9bafc238611761659bcafdd2e7b5df2543aecb194ac5477c168a2d6e6096",
+    "dependency_inputs": {
+      "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/name.rs": {
+        "retained": "inputs/quick-xml-0.41.0-src-name.rs.txt",
+        "sha256": "f2ac828a48ca16d6d605949771d57a1eb00829a93a6556c682971cf5f28cb336"
+      },
+      "/home/zhuhe/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/quick-xml-0.41.0/src/reader/ns_reader.rs": {
+        "retained": "inputs/quick-xml-0.41.0-src-reader-ns_reader.rs.txt",
+        "sha256": "7ab687c3e93b896554f5754bd7c76042664f01d23cbfacb99605725c7ecc4a35"
+      }
+    },
+    "prior_seals": {
+      "docs/performance/results/change-0525": "ae8834847914ef936b6206f621d0e19c02960f407b27f3e2db797177e0a8b1ab",
+      "docs/performance/results/change-0527": "16f51d610116ecdd7872d606802b9253fb7e2dcd15094f6722172db626202923"
+    },
+    "production_unchanged_from_0525_candidate": true,
+    "revision": "11a14d2043f65b1a6a935beaa1b9c16d924b749c"
+  },
+  "status": "pass"
+}

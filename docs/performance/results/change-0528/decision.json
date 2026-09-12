@@ -1,0 +1,24 @@
+{
+  "schema": "litchi_0528_attribution_decision_v1",
+  "disposition": "attribution_complete",
+  "production_change_retained": false,
+  "performance_claim": "none",
+  "speedup_claim": false,
+  "plan_sha256": "259454bb139493e82da98ad28c09332e65bcecfb0e1fea165a6b1ee6370f9b1e",
+  "source_binding_sha256": "8a133620217daf78a9ed91500ebf551a7db56d341df3ab02127588430935361f",
+  "source_manifest_sha256": "9af673c4c13f2abb3aeaf5c4e31df6a613de6297abc104bf472931ff7733529f",
+  "binary_sha256": "b46a81550b74611cf3825308dd403d04574675593c8330310896eb2ab2f96c2f",
+  "publication_analysis_sha256": "a9568731fb89248cda69453762df2ecdba84074266c071de6ab52a08bd101f45",
+  "profile_analysis_sha256": "46441db4b084576712e40f8c59aa729d5edce703e0b8d467220bea3a32dbbcbc",
+  "profile_oracle_sha256": "27b2b2b8eab4a59ff44b0aa91ab16466b801765ca22d940d81044ca49acf742b",
+  "profile_oracles": {
+    "baseline/profile-r1-medium.json": "27b2b2b8eab4a59ff44b0aa91ab16466b801765ca22d940d81044ca49acf742b",
+    "baseline/profile-r1-dense-sparse.json": "1a0e685316ab32cf9a21d14c8be7a864af9af498fa5f80e0e42a2a7c91140934",
+    "baseline/profile-r2-medium.json": "82f24a12b6fb4cb6d788f48d1826cf025ae68f98f6990625a96fad432a3d4484",
+    "baseline/profile-r2-dense-sparse.json": "c68451ae848a2c175c942cb86066ca091c13ad9969e1c96d410a4cda1773980e"
+  },
+  "quality_reuse_sha256": "b0f7bf97df7fe6f3d8986620df24eea258f474ba517980842d2665531b7c90de",
+  "analyzer_tests_sha256": "887a252f9b9d9c97f4229781fb6cb3579e656bcd68799048fc05edb62546c9f9",
+  "observed_utc": "2026-09-12T11:47:35.328702+00:00",
+  "review": "Attribution complete with no production optimization or speedup claim. Fresh publication profiles identify OPC authored-XML validation as 56.2257% of aggregate publication Ir, with 11.6093% nested attribute inspection. Preserve both original/replacement audits and full source/execution/output contracts. The entire retained scanner resolver edge is 4.0274% of commit Ir and only part is removable; no End-only measurement claim. Next investigate allocation avoidance for at-most-one attribute with exact checked fallback, or resettable duplicate scratch, requiring fresh native and allocator evidence and differential malformed/limit tests. Five lifecycle dumps precede the uniquely selected sixth measured call. All four profile oracles pass; no runtime or harness source changed; existing 12 quality checks and 1,297 tests bind the identical manifest. OLE2/OOXML remains first, ODF deferred, iWork excluded; overall goal active."
+}

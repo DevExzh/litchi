@@ -1,5 +1,9 @@
 # Performance optimization ADR-compliance matrix
 
+## 0528: attribute publication without weakening validation
+
+[0528](changes/0528-xlsx-publication-attribution.md) No runtime source changes. Source/dependency and accepted ADR bindings accompany fresh publication profiles. OPC authored-XML audits have a different contract from XLSX semantic validation and cannot be skipped on that basis. Any attribute-scratch candidate must preserve duplicate/error precedence, limits, source/execution fences and output classification.
+
 ## 0527: rejected private-layout candidate, compatible tests retained
 
 [0527](changes/0527-xlsx-row-primary-arena-pilot.md) The candidate preserved all spans, both checked writer paths, complete XML validation, independent readback and existing source/execution/resource fences. It passed 1,294 candidate tests but failed a performance gate. Runtime source is restored to baseline; four compatible preservation/error regression tests remain. All accepted ADR/index bindings remain recorded.

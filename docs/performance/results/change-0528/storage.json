@@ -1,0 +1,5 @@
+{
+  "scratch": "/tmp/litchi-goal-0528",
+  "target": "/home/zhuhe/litchi-goal-0528-target/retained-binaries",
+  "reason": "Disk-backed retained binaries selected before builds because tmpfs user quota was exhausted in0527."
+}

@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## 0528: shared authored-XML audit is the next publication lead
+
+[0528](changes/0528-xlsx-publication-attribution.md) The complete scanner resolver edge is only 4.0274% of commit Ir and is not wholly removable. Fresh publication profiles identify validate_overlay_xml at 56.2257% aggregate publication Ir, including attribute inspection at 11.6093%. Investigate reusable attribute-check scratch while retaining both original/replacement audits and exact errors/limits. The prior scanner fusion and row arena remain rejected.
+
 ## 0527: row-primary storage fails the frozen total gate
 
 [0527](changes/0527-xlsx-row-primary-arena-pilot.md) The row-owned arena reduced measured allocation calls but dense repeat 2 delivered only 1.8214% total median and 1.8105% mean reduction, below both 2% gates. Reject the production draft and retain its evidence. Quantify another avoidable scanner cost, including the unused end-event namespace subset, before a fresh candidate; do not silently revive this layout patch.

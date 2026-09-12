@@ -1,5 +1,9 @@
 # Performance program phase report
 
+## 0528: publication profile redirects the next optimization
+
+[0528](changes/0528-xlsx-publication-attribution.md) Four source-bound captures locate 56.2257% of aggregate publication instructions in OPC overlay XML validation. Attribute inspection is a nested 11.6093%, not an additive fraction. The measured owner excludes returned-snapshot destruction; native phase context is separate. No production optimization, native gain, allocator reduction or scaling improvement is adopted.
+
 ## 0527: preserve a failed pilot without a production speedup claim
 
 [0527](changes/0527-xlsx-row-primary-arena-pilot.md) The XLSX row-primary-arena candidate was rejected by the frozen dense repeat-2 total-time gates despite lower commit medians and allocation calls. All 47 matched adverse and 71 same-build drift flags are retained. Four baseline-compatible regression tests remain, with restored-source quality and evidence replay recorded separately. No profile/hardware/eager claim is made.
