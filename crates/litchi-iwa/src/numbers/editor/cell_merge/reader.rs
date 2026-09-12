@@ -1,8 +1,8 @@
 //! Migration-only handoff from cached archives to semantic Numbers reads.
 
+#[cfg(test)]
 use std::sync::Arc;
 
-use litchi_iwa_archive::{ComponentCatalog, Limits};
 use litchi_numbers::{
     MergeReader, PackageReadOptions, PackageSemanticLimits, SheetSelector, TableMergesError,
     TableMergesLimitKind, TableSelector, table::merge::Region,
@@ -27,44 +27,9 @@ pub(crate) fn regions_in_editor(editor: &NumbersEditor, table_id: u64) -> Result
 }
 
 fn cached_reader(package: &IWorkPackage) -> Result<MergeReader> {
-    let source_limits = package.limits();
-    let limits = Limits::new(
-        source_limits.max_input_bytes(),
-        source_limits.max_entries(),
-        source_limits.max_entry_bytes(),
-        source_limits.max_total_bytes(),
-        source_limits.max_iwa_stream_bytes(),
-    )
-    .and_then(|limits| {
-        limits.with_archive_limits(
-            source_limits
-                .effective_archive_limits()
-                .map_err(|error| litchi_iwa_archive::Error::InvalidLimits(error.to_string()))?,
-        )
-    })
-    .map_err(map_catalog_error)?;
-    let mut records = Vec::new();
-    for name in package.iwa_entry_names() {
-        if records.len() >= limits.max_entries() {
-            return Err(TableMergesError::LimitExceeded {
-                kind: TableMergesLimitKind::Entries,
-                observed: records.len().saturating_add(1) as u64,
-                maximum: limits.max_entries() as u64,
-            }
-            .into());
-        }
-        records.try_reserve(1).map_err(|_| {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "Numbers shared merge components",
-                amount: 1,
-            })
-        })?;
-        records.push((name, package.parsed_archive(name)?));
-    }
-    let components =
-        ComponentCatalog::__from_shared_archives(records, limits).map_err(map_catalog_error)?;
+    let (components, limits) = package.shared_component_catalog(map_catalog_error)?;
     MergeReader::__from_shared_catalog(
-        Arc::new(components),
+        components,
         PackageReadOptions::new(limits, PackageSemanticLimits::default()),
     )
     .map_err(Error::from)

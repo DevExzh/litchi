@@ -12132,3 +12132,74 @@ violations in chart arrangement, image adjustment, chart fixture, and merge
 budget assertion code. The configured `cargo lint` release policy remains
 production-library lint plus separate workspace test execution; this batch
 does not claim an all-targets Clippy pass.
+
+### 2026-09-12: Pages and Keynote merge-reader native source receipts
+
+Computer Use opened disposable copies of the checked-in native merged-table
+fixtures in Pages and Keynote. Pages saved `Pages shared reader` in Table 1's
+C4:D4 merged cell; Keynote saved `Keynote shared reader` in Table 1's B4:C5
+merged cell on slide 1. Both applications closed and reopened their exact saved
+paths. Rendered grids retained the respective one-row/two-column and
+two-row/two-column geometry and marker text. As with the Numbers receipt,
+accessibility reports implausible column spans, so geometry evidence comes
+from the visible grid, with programmatic parity checked separately. The
+checked-in fixtures were not modified.
+
+The saved Pages source contains 140,633 bytes with SHA-256
+`787a3377ca851869f4dd07e8b5e0572bd12323ec0b2784e7faa386a09647a478`.
+The saved Keynote source contains 534,764 bytes with SHA-256
+`13875c7755276663410c4114a6358e7b4fbe41585d2a73768bd03f12b2249d51`.
+These receipts establish native source save/reopen; they do not claim that
+merge writers have moved out of the host or close any deletion gate.
+
+The focused format APIs now add standalone `MergeReader` entry points for
+Pages and Keynote alongside Numbers. Their private ingress children retain
+parsed component catalogs and resolve semantic selectors through bounded
+format-owned table proofs. Pages avoids constructing the complete semantic
+Document. Keynote reuses its existing lazy index state through a read-only
+component-selection entry; ordinary physical table selection still requires
+ZIP provenance for mutation paths. These changes do not migrate merge writers.
+
+A single private host `shared_component_catalog` helper now converts retained
+package limits, collects cached archive owners with fallible reservations, and
+constructs the checked shared catalog. Its error callback preserves each
+format's typed limit vocabulary. The Numbers handoff uses the same helper.
+The supported root facades expose the semantic readers, including explicit
+Numbers `MergeReader` and merge-error reexports, with consumer tests that
+require no migration-host API or native identifiers.
+
+The final native-source probe passed all eight handoff checks against these
+exact saved files; the checked-in handoff regression suite also passed all
+eight checks. Coverage includes reader/package/editor parity, unchanged source
+bytes, use after input-path removal, unrelated malformed tile isolation, and
+terminal selected merge errors. The shared catalog unit test additionally
+proves cached archive pointer identity, original custom limit retention, and
+ownership release after the last reader catalog is dropped. Three root-facade
+consumer tests pass without depending on the compatibility host.
+
+Host selector projections now account for aggregate metadata work and
+references before focused admission. Pages counts protobuf attachment items
+independently of ZIP member limits; Keynote retains only its existing typed
+UnsupportedDependency compatibility arm after admission. Source-built editor
+paths preserve their existing focused compatibility behavior. These read-path
+changes leave the eleven migration-debt items open.
+
+The Keynote legacy `UnsupportedDependency` arm is retained from its existing
+merge-read contract and remains explicitly guarded by the Keynote boundary
+regression. It is not an extension of the preceding Numbers handoff policy:
+removing this Keynote compatibility arm requires separate legacy model-role
+coverage. Other focused failures remain terminal. Parsed-catalog object
+ceilings continue to bound selector-index allocations; this batch does not
+claim a package-wide allocation-count or RSS bound.
+
+Review tightened the read admission further: the Pages host rejects the
+4,097th logical attachment against the same 4,096-table ceiling as the
+focused owner. Pages shared-catalog reads strictly validate text storage
+without constructing semantic strings or style runs, then inspect borrowed
+Buffa fragments for the selected UTF-16 placeholder positions; package
+mutation retains its original decoder and validation order. Keynote name
+selection shares a semantic reference ledger and charges projection work
+across slides. Regression coverage includes the attachment ceiling, a large
+trailing text fragment, invalid placeholders, and source-built compatibility.
+The 1,118 boundary tests and the live 64-package/241-edge audit pass.
+Workspace production lint also passes with warnings denied.

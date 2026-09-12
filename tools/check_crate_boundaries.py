@@ -69860,6 +69860,71 @@ NUMBERS_TABLE_MERGE_READER_PUBLIC_FIELD = re.compile(
     r"(?:^|,)[ \t\r\n]*pub(?:[ \t]*\([^()\r\n]*\))?[ \t]+"
     r"(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*:"
 )
+# Pages and Keynote expose the same focused merge-reader contract as Numbers.
+# Keep each child path explicit so the source-ingress implementation remains
+# private to its package owner while the format crate re-exports only the
+# checked semantic reader.
+PAGES_TABLE_MERGE_READER_SOURCE = Path(
+    "crates/litchi-pages/src/package/body_table_merges/reader.rs"
+)
+KEYNOTE_TABLE_MERGE_READER_SOURCE = Path(
+    "crates/litchi-keynote/src/package/slide_table_merges/reader.rs"
+)
+FOCUSED_TABLE_MERGE_READER_ALLOWED_METHODS = frozenset(
+    {
+        "open",
+        "open_with_limits",
+        "open_with_options",
+        "from_bytes",
+        "from_bytes_with_limits",
+        "from_bytes_with_options",
+        "from_shared_bytes",
+        "from_shared_bytes_with_limits",
+        "from_shared_bytes_with_options",
+        "table_merges",
+        "body_table_merges",
+        "slide_table_merges",
+        "read_options",
+        "__from_shared_catalog",
+    }
+)
+FOCUSED_TABLE_MERGE_READER_FORBIDDEN_TYPES = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"FormulaArchive|AstNodeArchive|AstNodeType|MergeRegionMapArchive|"
+    r"DocumentArchive|BodyArchive|ShowArchive|SlideArchive|SheetArchive|"
+    r"TableInfoArchive|TableModelArchive|"
+    r"BncCell|BncCellView|PreBncCellView|StoredValue|CachedScalar|"
+    r"numbers_formula_codec|numbers_table_cell_storage_codec|"
+    r"litchi_iwa_protos|prost|prost_types|buffa"
+    r")(?![A-Za-z0-9_])"
+)
+FOCUSED_TABLE_MERGE_READER_ARC_BYTES = re.compile(
+    r"\bArc[ \t]*<[ \t]*\[[ \t]*u8[ \t]*\][ \t]*>"
+)
+FOCUSED_TABLE_MERGE_READER_COMPONENT_CATALOG = re.compile(
+    r"\bArc[ \t]*<[ \t]*ComponentCatalog[ \t]*>"
+)
+FOCUSED_TABLE_MERGE_READER_PUBLIC_PHYSICAL_TYPES = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"Archive|ArchiveObject|ComponentCatalog|RawMessage|SourceCatalog|"
+    r"Package|Document|Body|Show|Slide|Sheet"
+    r")(?![A-Za-z0-9_])"
+)
+FOCUSED_TABLE_MERGE_READER_PATH_INPUT = re.compile(
+    r"\bAsRef[ \t]*<[ \t]*Path[ \t]*>"
+)
+FOCUSED_TABLE_MERGE_READER_BYTE_INPUT = re.compile(
+    r"&[ \t\r\n]*(?:'[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]+)?"
+    r"(?:mut[ \t\r\n]+)?\[[ \t]*u8[ \t]*\]"
+)
+FOCUSED_TABLE_MERGE_READER_MODEL_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"crate[ \t\r\n]*::[ \t\r\n]*Document|"
+    r"Document|Body|Show|Slide|Sheet|"
+    r"(?:full|semantic)[ \t_]*(?:document|model)|"
+    r"Document[ \t_]*(?:snapshot|model)"
+    r")(?![A-Za-z0-9_])",
+)
 PAGES_TABLE_MERGE_FORBIDDEN_MODULES = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
     r"litchi_iwa_protos|litchi_iwa|prost|buffa|"
@@ -69879,6 +69944,7 @@ IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
     {
         "format_name": "Pages",
         "source": Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs"),
+        "reader_source": Path("crates/litchi-iwa/src/pages/editor/tables/reader.rs"),
         "impl_type": "PagesEditor",
         "method": "table_cell_merges",
         "focused_method": "body_table_merges",
@@ -69890,6 +69956,7 @@ IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
     {
         "format_name": "Keynote",
         "source": Path("crates/litchi-iwa/src/keynote/editor/slide_tables.rs"),
+        "reader_source": Path("crates/litchi-iwa/src/keynote/editor/slide_tables/reader.rs"),
         "impl_type": "KeynoteEditor",
         "method": "slide_table_cell_merges",
         "focused_method": "slide_table_merges",
@@ -71141,9 +71208,8 @@ def _audit_focused_table_merge_source_topology(
                 f"{match.group(0)}: {relative_owner}:{line_number}"
             )
 
-    for declaration, line_number in _rust_public_declarations(
-        _mask_rust_cfg_test_items(focused_raw)
-    ):
+    focused_production = _mask_rust_cfg_test_items(focused_raw)
+    for declaration, line_number in _rust_public_declarations(focused_production):
         if RUST_BYTE_SLICE.search(declaration) is not None:
             violations.append(
                 f"{format_name} table-merge focused owner exposes raw bytes: "
@@ -71284,7 +71350,7 @@ def _audit_focused_table_merge_source_topology(
 def audit_pages_table_merge_source_topology(root: Path = ROOT) -> list[str]:
     """Keep Pages merged-cell reads selector-first and archive-free."""
 
-    return _audit_focused_table_merge_source_topology(
+    violations = _audit_focused_table_merge_source_topology(
         root,
         format_name="Pages",
         owner_path=PAGES_TABLE_MERGE_SOURCE,
@@ -71296,12 +71362,14 @@ def audit_pages_table_merge_source_topology(root: Path = ROOT) -> list[str]:
         public_method=PAGES_TABLE_MERGE_PUBLIC_METHOD,
         selector_types=PAGES_TABLE_MERGE_SELECTOR_TYPES,
     )
+    violations.extend(audit_pages_table_merge_reader_source_topology(root))
+    return sorted(set(violations))
 
 
 def audit_keynote_table_merge_source_topology(root: Path = ROOT) -> list[str]:
     """Keep Keynote merged-cell reads selector-first and archive-free."""
 
-    return _audit_focused_table_merge_source_topology(
+    violations = _audit_focused_table_merge_source_topology(
         root,
         format_name="Keynote",
         owner_path=KEYNOTE_TABLE_MERGE_SOURCE,
@@ -71312,6 +71380,328 @@ def audit_keynote_table_merge_source_topology(root: Path = ROOT) -> list[str]:
         table_module_pattern=KEYNOTE_TABLE_MERGE_COMMON_TABLE_MODULE,
         public_method=KEYNOTE_TABLE_MERGE_PUBLIC_METHOD,
         selector_types=KEYNOTE_TABLE_MERGE_SELECTOR_TYPES,
+    )
+    violations.extend(audit_keynote_table_merge_reader_source_topology(root))
+    return sorted(set(violations))
+
+
+def _audit_focused_table_merge_reader_source_topology(
+    root: Path,
+    *,
+    format_name: str,
+    owner_path: Path,
+    reader_path: Path,
+    query_method: str,
+    selector_types: frozenset[str],
+    limits_type: str,
+    options_type: str | None = None,
+) -> list[str]:
+    """Keep one focused merge reader source-facing and selector-first.
+
+    The package-level geometry ratchet remains responsible for ``Package``;
+    this helper owns only the private reader child's public constructors and
+    query.
+    """
+
+    owner_absolute = root / owner_path
+    reader_absolute = root / reader_path
+    owner_source = (
+        owner_absolute.read_text(encoding="utf-8")
+        if owner_absolute.is_file()
+        else ""
+    )
+    owner_reader_modules = (
+        _rust_root_level_module_declarations(owner_source, frozenset({"reader"}))
+        if owner_source
+        else ()
+    )
+    if not reader_absolute.is_file():
+        if owner_reader_modules or (
+            owner_source
+            and _rust_named_struct_body(owner_source, "MergeReader") is not None
+        ):
+            return [
+                f"{format_name} table-merge reader child is missing: {reader_path}"
+            ]
+        return []
+
+    violations: list[str] = []
+    if reader_absolute.is_file():
+        if not owner_absolute.is_file():
+            violations.append(
+                f"{format_name} table-merge reader child has no package owner: "
+                f"{owner_path}"
+            )
+        else:
+            module_declarations = owner_reader_modules
+            if not module_declarations:
+                violations.append(
+                    f"{format_name} table-merge reader child is not wired from its "
+                    f"private owner: {owner_path}"
+                )
+            elif any(
+                visibility is not None
+                for _name, visibility, *_rest in module_declarations
+            ):
+                violations.append(
+                    f"{format_name} table-merge reader child module must remain "
+                    f"private: {owner_path}"
+                )
+
+        reader_source = reader_absolute.read_text(encoding="utf-8")
+        relative_reader = reader_path
+
+    production_source = _mask_rust_cfg_test_items(reader_source)
+    code = _mask_rust_non_code(production_source)
+
+    struct = _rust_named_struct_body(production_source, "MergeReader")
+    if struct is None:
+        violations.append(
+            f"{format_name} table-merge reader is missing its MergeReader state: "
+            f"{relative_reader}"
+        )
+    else:
+        struct_body, body_offset = struct
+        if re.search(
+            r"(?m)^[ \t]*pub[ \t]+struct[ \t]+(?:r#)?MergeReader\b",
+            code,
+        ) is None:
+            violations.append(
+                f"{format_name} table-merge reader MergeReader must be public: "
+                f"{relative_reader}"
+            )
+        for match in NUMBERS_TABLE_MERGE_READER_PUBLIC_FIELD.finditer(struct_body):
+            line_number = code.count("\n", 0, body_offset + match.start()) + 1
+            violations.append(
+                f"{format_name} table-merge reader exposes a public MergeReader "
+                f"field: {relative_reader}:{line_number}"
+            )
+
+    # Generated/owned protobuf values, the complete semantic document model,
+    # and byte-returning escape hatches must stay below this boundary.  Byte
+    # parameters are checked separately and are allowed only for constructors.
+    for pattern, label in (
+        (
+            FOCUSED_TABLE_MERGE_READER_FORBIDDEN_TYPES,
+            "generated/owned protobuf, native, or semantic model type",
+        ),
+        (
+            FOCUSED_TABLE_MERGE_READER_MODEL_REFERENCE,
+            "full document model reference",
+        ),
+    ):
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"{format_name} table-merge reader contains {label} "
+                f"{match.group(0)}: {relative_reader}:{line_number}"
+            )
+
+    methods = _rust_public_methods_in_impl(production_source, "MergeReader")
+    method_lines = {line for _name, _declaration, line in methods}
+    method_names = {name for name, _declaration, _line in methods}
+    expected_internal = "__from_shared_catalog"
+    if expected_internal not in method_names:
+        violations.append(
+            f"{format_name} table-merge reader is missing its shared-catalog "
+            f"ingress: {relative_reader}"
+        )
+    if "open" not in method_names:
+        violations.append(
+            f"{format_name} table-merge reader is missing path ingress: "
+            f"{relative_reader}"
+        )
+    if "from_bytes" not in method_names:
+        violations.append(
+            f"{format_name} table-merge reader is missing byte ingress: "
+            f"{relative_reader}"
+        )
+    if query_method not in method_names:
+        violations.append(
+            f"{format_name} table-merge reader is missing its typed query: "
+            f"{relative_reader}"
+        )
+
+    # Every public item in this child belongs to the reader.
+    for declaration, line_number in _rust_public_declarations(production_source):
+        if re.search(r"\bstruct[ \t]+(?:r#)?MergeReader\b", declaration):
+            continue
+        function = NUMBERS_TABLE_MERGE_READER_FUNCTION_NAME.search(declaration)
+        if function is None:
+            violations.append(
+                f"{format_name} table-merge reader exposes an unsupported public "
+                f"declaration: {relative_reader}:{line_number}"
+            )
+            continue
+        if line_number not in method_lines:
+            violations.append(
+                f"{format_name} table-merge reader public method must be an "
+                f"associated MergeReader method ({function.group('name')}): "
+                f"{relative_reader}:{line_number}"
+            )
+
+    for name, declaration, line_number in methods:
+        arrow = declaration.find("->")
+        return_type = declaration[arrow + 2 :] if arrow >= 0 else ""
+        if (
+            RUST_BYTE_SLICE.search(return_type) is not None
+            or NUMBERS_TABLE_MERGE_READER_BYTE_RETURN.search(return_type) is not None
+            or FOCUSED_TABLE_MERGE_READER_ARC_BYTES.search(return_type) is not None
+        ):
+            violations.append(
+                f"{format_name} table-merge reader exposes raw bytes from public "
+                f"method {name}: {relative_reader}:{line_number}"
+            )
+
+        raw_id = IWA_FOCUSED_TABLE_MERGES_RAW_ID_PARAMETER.search(declaration)
+        if raw_id is not None:
+            violations.append(
+                f"{format_name} table-merge reader exposes a raw ID parameter "
+                f"{raw_id.group(0).strip()}: {relative_reader}:{line_number}"
+            )
+
+        if name != expected_internal:
+            physical_type = FOCUSED_TABLE_MERGE_READER_PUBLIC_PHYSICAL_TYPES.search(
+                declaration
+            )
+            if physical_type is not None:
+                violations.append(
+                    f"{format_name} table-merge reader exposes a physical or "
+                    f"semantic type {physical_type.group(0)} from public method "
+                    f"{name}: {relative_reader}:{line_number}"
+                )
+
+        if name not in FOCUSED_TABLE_MERGE_READER_ALLOWED_METHODS:
+            violations.append(
+                f"{format_name} table-merge reader exposes unsupported public "
+                f"method {name}: {relative_reader}:{line_number}"
+            )
+            continue
+
+        if name.endswith("_with_limits") and re.search(
+            rf"\b{re.escape(limits_type)}\b", declaration
+        ) is None:
+            violations.append(
+                f"{format_name} table-merge reader limits ingress must retain "
+                f"{limits_type} ({name}): {relative_reader}:{line_number}"
+            )
+        if name.endswith("_with_options") and options_type is not None and re.search(
+            rf"\b{re.escape(options_type)}\b", declaration
+        ) is None:
+            violations.append(
+                f"{format_name} table-merge reader options ingress must retain "
+                f"{options_type} ({name}): {relative_reader}:{line_number}"
+            )
+
+        if name in {
+            "open",
+            "open_with_limits",
+            "open_with_options",
+        }:
+            if FOCUSED_TABLE_MERGE_READER_PATH_INPUT.search(declaration) is None:
+                violations.append(
+                    f"{format_name} table-merge reader path ingress must accept "
+                    f"AsRef<Path> ({name}): {relative_reader}:{line_number}"
+                )
+        elif name in {"from_bytes", "from_bytes_with_limits", "from_bytes_with_options"}:
+            if FOCUSED_TABLE_MERGE_READER_BYTE_INPUT.search(declaration) is None:
+                violations.append(
+                    f"{format_name} table-merge reader byte ingress must accept "
+                    f"&[u8] ({name}): {relative_reader}:{line_number}"
+                )
+        elif name in {
+            "from_shared_bytes",
+            "from_shared_bytes_with_limits",
+            "from_shared_bytes_with_options",
+        }:
+            if FOCUSED_TABLE_MERGE_READER_ARC_BYTES.search(declaration) is None:
+                violations.append(
+                    f"{format_name} table-merge reader shared ingress must accept "
+                    f"Arc<[u8]> ({name}): {relative_reader}:{line_number}"
+                )
+        elif name == expected_internal:
+            if FOCUSED_TABLE_MERGE_READER_COMPONENT_CATALOG.search(declaration) is None:
+                violations.append(
+                    f"{format_name} table-merge reader shared-catalog ingress must "
+                    f"accept Arc<ComponentCatalog>: {relative_reader}:{line_number}"
+                )
+            if re.search(rf"\b{re.escape(limits_type)}\b", declaration) is None:
+                violations.append(
+                    f"{format_name} table-merge reader shared-catalog ingress must "
+                    f"retain {limits_type}: {relative_reader}:{line_number}"
+                )
+            method_match = re.search(
+                r"\bpub[ \t]+fn[ \t]+__from_shared_catalog\b",
+                production_source,
+            )
+            if method_match is not None:
+                attributes = _rust_attribute_block_before(
+                    production_source, method_match.start()
+                )
+                if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(attributes) is None:
+                    violations.append(
+                        f"{format_name} table-merge reader shared-catalog ingress "
+                        f"must be feature-gated: {relative_reader}:{line_number}"
+                    )
+                if IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is None:
+                    violations.append(
+                        f"{format_name} table-merge reader shared-catalog ingress "
+                        f"must be doc(hidden): {relative_reader}:{line_number}"
+                    )
+        elif name == query_method:
+            missing_selectors = sorted(
+                selector
+                for selector in selector_types
+                if re.search(rf"\b{re.escape(selector)}\b", declaration) is None
+            )
+            for selector in missing_selectors:
+                violations.append(
+                    f"{format_name} table-merge reader query must use typed "
+                    f"{selector}: {relative_reader}:{line_number}"
+                )
+            if re.search(r"\bRegion\b", declaration) is None:
+                violations.append(
+                    f"{format_name} table-merge reader query must return semantic "
+                f"Region values: {relative_reader}:{line_number}"
+                )
+
+        if name not in {query_method, "read_options"} and re.search(
+            r"\bResult[ \t]*<[ \t]*Self\b", return_type
+        ) is None:
+            violations.append(
+                f"{format_name} table-merge reader ingress method must return "
+                f"Result<Self, _> ({name}): {relative_reader}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_pages_table_merge_reader_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep Pages' focused merge-reader child private and ergonomic."""
+
+    return _audit_focused_table_merge_reader_source_topology(
+        root,
+        format_name="Pages",
+        owner_path=PAGES_TABLE_MERGE_SOURCE,
+        reader_path=PAGES_TABLE_MERGE_READER_SOURCE,
+        query_method="body_table_merges",
+        selector_types=PAGES_TABLE_MERGE_SELECTOR_TYPES,
+        limits_type="Limits",
+    )
+
+
+def audit_keynote_table_merge_reader_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep Keynote's focused merge-reader child private and ergonomic."""
+
+    return _audit_focused_table_merge_reader_source_topology(
+        root,
+        format_name="Keynote",
+        owner_path=KEYNOTE_TABLE_MERGE_SOURCE,
+        reader_path=KEYNOTE_TABLE_MERGE_READER_SOURCE,
+        query_method="slide_table_merges",
+        selector_types=KEYNOTE_TABLE_MERGE_SELECTOR_TYPES,
+        limits_type="ReadOptions",
+        options_type="ReadOptions",
     )
 
 
@@ -71663,6 +72053,16 @@ def audit_iwa_table_merge_host_read_delegation_source_topology(
                     f"{relative_path}:{line_number}"
                 )
 
+            if re.search(r"\breader\s*::\s*regions_in_editor\s*\(", code):
+                violations.extend(_audit_iwa_format_cached_merge_handoff(root, delegation))
+                routing_body = _rust_any_function_body(code, delegation["method"]) or ""
+                if re.fullmatch(
+                    r"\s*(?:super\s*::\s*)?reader\s*::\s*regions_in_editor\s*\(\s*self\s*,\s*"
+                    r"(?:slide_index\s*,\s*)?model_object_id\s*,?\s*\)\s*", routing_body
+                ) is None:
+                    violations.append(f"{method_label} must delegate directly to its cached merge reader: {relative_path}:{line_number}")
+                continue
+
             focused_call = IWA_TABLE_MERGE_HOST_FOCUSED_CALL.search(code)
             if focused_call is None or focused_call.group("method") != delegation[
                 "focused_method"
@@ -71692,7 +72092,71 @@ def audit_iwa_table_merge_host_read_delegation_source_topology(
                 )
 
     violations.extend(_audit_numbers_cached_merge_handoff(root))
+    violations.extend(_audit_iwa_shared_component_catalog(root))
     return sorted(set(violations))
+
+
+def _audit_iwa_format_cached_merge_handoff(root: Path, delegation: dict) -> list[str]:
+    relative = delegation["reader_source"]
+    path = root / relative
+    label = delegation["format_name"]
+    if not path.is_file():
+        return [f"{label} cached merge reader owner is missing: {relative}"]
+    source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+    entry = _rust_named_function_body(source, "regions_in_editor")
+    if entry is None:
+        violations.append(f"{label} cached merge reader entry is missing: {relative}")
+    else:
+        entry_code = _mask_rust_non_code(entry[0])
+        admitted = re.search(r"\b__from_shared_catalog\s*\(", entry_code)
+        if admitted is None:
+            violations.append(f"{label} cached merge reader has no shared admission: {relative}")
+        elif re.search(r"\b(?:focused_body_table_source|focused_table_package|legacy_regions|compatibility_slide_table_merge_regions)\s*\(", entry_code[admitted.end():]):
+            violations.append(f"{label} admitted merge errors must remain terminal: {relative}")
+    for required in ("shared_component_catalog", "__from_shared_catalog", delegation["focused_method"]):
+        if re.search(rf"\b{required}\s*\(", code) is None:
+            violations.append(f"{label} cached merge reader must use {required}: {relative}")
+    for name, pattern in delegation["selectors"]:
+        if pattern.search(code) is None:
+            violations.append(f"{label} cached merge reader must forward {name}::index: {relative}")
+    for forbidden in (
+        r"\b(?:TableModelArchive|TableInfoArchive)\b",
+        r"\blet\s+Ok\s*\(",
+        r"\bto_bytes\s*\(",
+        r"\b(?:package|editor\.package\(\))\s*\.\s*archive\s*\(",
+        r"\.\s*(?:tables|slide_tables|or_else)\s*\(",
+        r"\.\s*unwrap_or\s*\(\s*None\s*\)",
+        r"\bfrom_(?:shared_)?bytes(?:_with_(?:options|limits))?\s*\(",
+    ):
+        if re.search(forbidden, code):
+            violations.append(f"{label} cached merge reader reparses, materializes, or swallows errors: {relative}")
+    for call in IWA_TABLE_MERGE_HOST_LEGACY_READ.finditer(code):
+        if label == "Keynote" and _keynote_table_merge_legacy_fallback_is_allowed(code, call):
+            continue
+        violations.append(f"{label} cached merge reader has an unreviewed legacy fallback: {relative}")
+    return violations
+
+
+def _audit_iwa_shared_component_catalog(root: Path) -> list[str]:
+    relative = Path("crates/litchi-iwa/src/package.rs")
+    path = root / relative
+    if not path.is_file():
+        return []
+    source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    function = _rust_any_function_body(source, "shared_component_catalog")
+    if function is None:
+        return [f"iWork shared catalog handoff owner is missing: {relative}"]
+    body = _mask_rust_non_code(function)
+    violations: list[str] = []
+    for required in ("effective_archive_limits", "max_entries", "try_reserve", "parsed_archive", "__from_shared_archives", "map_catalog_error"):
+        if re.search(rf"\b{required}\s*\(", body) is None:
+            violations.append(f"iWork shared catalog handoff must retain {required}: {relative}")
+    for forbidden in (r"\bfrom_(?:shared_)?bytes(?:_with_options)?\s*\(", r"\bto_bytes\s*\(", r"\.\s*(?:archive|clone|ok|unwrap_or|or_else)\s*\(", r"\bparse_archive\s*\("):
+        if re.search(forbidden, body):
+            violations.append(f"iWork shared catalog handoff reparses, copies, or swallows ingress failures: {relative}")
+    return violations
 
 
 def _audit_numbers_cached_merge_handoff(root: Path) -> list[str]:
@@ -71725,7 +72189,7 @@ def _audit_numbers_cached_merge_handoff(root: Path) -> list[str]:
         violations.append(f"Numbers cached merge handoff has no cache reader: {reader_path}")
     else:
         body = _mask_rust_non_code(cached[0])
-        for required in ("parsed_archive", "__from_shared_archives", "__from_shared_catalog"):
+        for required in ("shared_component_catalog", "__from_shared_catalog"):
             if re.search(rf"\b{required}\s*\(", body) is None:
                 violations.append(f"Numbers cached merge handoff must use {required}: {reader_path}")
     entry = _rust_named_function_body(reader, "regions_in_editor")
@@ -74243,7 +74707,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_common_table_merge_source_topology()
         + audit_iwa_numbers_wire_table_merges_source_topology()
         + audit_pages_table_merge_source_topology()
+        + audit_pages_table_merge_reader_source_topology()
         + audit_keynote_table_merge_source_topology()
+        + audit_keynote_table_merge_reader_source_topology()
         + audit_numbers_table_merge_source_topology()
         + audit_iwa_table_merge_host_read_delegation_source_topology()
         + audit_pages_table_cells_source_topology()

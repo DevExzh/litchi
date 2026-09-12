@@ -22,6 +22,7 @@ mod conditional_highlight;
 mod formula;
 mod graph;
 mod hidden_axes;
+mod reader;
 mod storage;
 mod topology;
 
@@ -214,6 +215,36 @@ fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Packa
     litchi_keynote::Package::from_bytes_with_limits(&bytes, archive_limits).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
     })
+}
+
+/// Preserve the pre-catalog compatibility route for source-built packages.
+///
+/// These packages have no exact source allocation to hand to the shared
+/// catalog. Resolve the public slide ownership first, then use the existing
+/// focused package reader with its positional selector. This keeps detached
+/// model identifiers subject to the same slide ownership proof as the
+/// historical editor path.
+pub(super) fn compatibility_slide_table_merge_regions(
+    editor: &KeynoteEditor,
+    slide_index: usize,
+    model_object_id: u64,
+) -> Result<Vec<Region>> {
+    let tables = editor.slide_tables(slide_index)?;
+    let table_index = focused_table_index(&tables, slide_index, model_object_id)?;
+    let focused = focused_table_package(editor)?.slide_table_merges(
+        litchi_keynote::SlideSelector::index(slide_index),
+        litchi_keynote::TableSelector::index(table_index),
+    );
+    match focused {
+        Ok(regions) => Ok(regions),
+        // Keep the source-built migration behavior for legacy table-model
+        // roles. Ownership was already proved through the selected slide and
+        // table, so the bounded compatibility reader may inspect that model.
+        Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) => {
+            crate::numbers::editor::table_cell_merges_in_package(editor.package(), model_object_id)
+        },
+        Err(error) => Err(map_focused_keynote_merges_error(error)),
+    }
 }
 
 fn map_focused_keynote_cells_error(error: litchi_keynote::SlideTableCellsError) -> Error {
@@ -430,12 +461,7 @@ impl KeynoteEditor {
                 litchi_keynote::TableSelector::index(table_index),
             )
             .map_err(map_focused_keynote_cells_error)?;
-        let merges = focused
-            .slide_table_merges(
-                litchi_keynote::SlideSelector::index(slide_index),
-                litchi_keynote::TableSelector::index(table_index),
-            )
-            .map_err(map_focused_keynote_merges_error)?;
+        let merges = reader::regions_in_editor(self, slide_index, model_object_id)?;
         Ok(KeynoteSlideTable {
             info,
             table_read,
@@ -449,29 +475,7 @@ impl KeynoteEditor {
         slide_index: usize,
         model_object_id: u64,
     ) -> Result<Vec<Region>> {
-        let tables = self.slide_tables(slide_index)?;
-        let table_index = focused_table_index(&tables, slide_index, model_object_id)?;
-        let focused = focused_table_package(self)?.slide_table_merges(
-            litchi_keynote::SlideSelector::index(slide_index),
-            litchi_keynote::TableSelector::index(table_index),
-        );
-        match focused {
-            Ok(regions) => Ok(regions),
-            // Keynote's focused graph currently admits only canonical 6001
-            // table models. Preserve the migration-host reader for legacy
-            // 6000 models and merge-compatible dependency variants until
-            // their focused ownership proofs are implemented. The host
-            // catalog above still proves slide ownership, and the bounded
-            // fallback validates the selected merge payload. InvalidSource,
-            // UnsupportedTopology, and limit errors remain focused errors.
-            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) => {
-                crate::numbers::editor::table_cell_merges_in_package(
-                    self.package(),
-                    model_object_id,
-                )
-            },
-            Err(error) => Err(map_focused_keynote_merges_error(error)),
-        }
+        reader::regions_in_editor(self, slide_index, model_object_id)
     }
 
     /// Merge one non-overlapping slide-table rectangle transactionally.

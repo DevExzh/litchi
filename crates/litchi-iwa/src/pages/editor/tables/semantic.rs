@@ -145,54 +145,6 @@ fn map_focused_cells_limit(
     })
 }
 
-fn map_focused_merges_error(error: litchi_pages::BodyTableMergesError) -> Error {
-    match error {
-        litchi_pages::BodyTableMergesError::LimitExceeded {
-            kind,
-            observed,
-            maximum,
-        } => map_focused_merges_limit(kind, observed, maximum),
-        litchi_pages::BodyTableMergesError::Allocation { amount } => {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "Pages body-table merge read",
-                amount,
-            })
-        },
-        litchi_pages::BodyTableMergesError::TableNotFound
-        | litchi_pages::BodyTableMergesError::AmbiguousTableName
-        | litchi_pages::BodyTableMergesError::AmbiguousSelector => {
-            Error::ParseError(error.to_string())
-        },
-        litchi_pages::BodyTableMergesError::UnsupportedSource
-        | litchi_pages::BodyTableMergesError::InvalidSource => {
-            Error::InvalidFormat(format!("focused Pages table merges: {error}"))
-        },
-        error => Error::InvalidFormat(format!("focused Pages table merges: {error}")),
-    }
-}
-
-fn map_focused_merges_limit(
-    kind: litchi_pages::BodyTableMergesLimitKind,
-    observed: u64,
-    maximum: u64,
-) -> Error {
-    let Some(kind) = map_wire_limit_kind(kind) else {
-        return Error::InvalidFormat(format!(
-            "focused Pages table merges: {kind} limit exceeded: observed {observed}, maximum {maximum}"
-        ));
-    };
-    let (Ok(observed), Ok(maximum)) = (usize::try_from(observed), usize::try_from(maximum)) else {
-        return Error::InvalidFormat(format!(
-            "focused Pages table merges: {kind} limit values do not fit the host platform"
-        ));
-    };
-    Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
-        kind,
-        observed,
-        limit: maximum,
-    })
-}
-
 trait IntoWireLimitKind {
     fn into_wire_limit_kind(self) -> Option<LimitKind>;
 }
@@ -220,34 +172,11 @@ impl IntoWireLimitKind for litchi_pages::BodyTableCellsLimitKind {
     }
 }
 
-impl IntoWireLimitKind for litchi_pages::BodyTableMergesLimitKind {
-    fn into_wire_limit_kind(self) -> Option<LimitKind> {
-        match self {
-            Self::InputBytes | Self::WireBytes => Some(LimitKind::InputBytes),
-            Self::OutputBytes | Self::WireOutputBytes => Some(LimitKind::OutputBytes),
-            Self::WireFields => Some(LimitKind::Fields),
-            Self::WireNesting => Some(LimitKind::Nesting),
-            Self::WireWork => Some(LimitKind::RewriteWork),
-            Self::Entries
-            | Self::EntryBytes
-            | Self::TotalEntryBytes
-            | Self::PackageBytes
-            | Self::PayloadBytes
-            | Self::TotalPayloadBytes
-            | Self::PayloadObjects
-            | Self::PayloadMessages
-            | Self::PayloadItems
-            | Self::PayloadReferences => None,
-            _ => None,
-        }
-    }
-}
-
 fn map_wire_limit_kind(kind: impl IntoWireLimitKind) -> Option<LimitKind> {
     kind.into_wire_limit_kind()
 }
 
-fn focused_body_table_source(
+pub(super) fn focused_body_table_source(
     editor: &PagesEditor,
     model_object_id: u64,
 ) -> Result<(FocusedPagesPackage, usize, PagesTableInfo)> {
@@ -305,9 +234,7 @@ impl PagesEditor {
         Ok(PagesTable {
             info,
             table_read,
-            merges: focused
-                .body_table_merges(BodyTableSelector::index(table_position))
-                .map_err(map_focused_merges_error)?,
+            merges: super::reader::regions_in_editor(self, model_object_id)?,
         })
     }
 
@@ -3458,10 +3385,7 @@ impl PagesEditor {
 
     /// List native merged-cell rectangles in one reachable body table.
     pub fn table_cell_merges(&self, model_object_id: u64) -> Result<Vec<Region>> {
-        let (focused, table_position, _) = focused_body_table_source(self, model_object_id)?;
-        focused
-            .body_table_merges(BodyTableSelector::index(table_position))
-            .map_err(map_focused_merges_error)
+        super::reader::regions_in_editor(self, model_object_id)
     }
 
     /// Merge one non-overlapping body-table rectangle transactionally.

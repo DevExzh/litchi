@@ -82,6 +82,8 @@ fn clone_error(error: &Error) -> Error {
         Error::IwaCommon(error) => Error::IwaCommon(error.clone()),
         Error::PagesSemantic(error) => Error::PagesSemantic(error.clone()),
         Error::NumbersTableMerges(error) => Error::NumbersTableMerges(*error),
+        Error::PagesTableMerges(error) => Error::PagesTableMerges(*error),
+        Error::KeynoteSlideTableMerges(error) => Error::KeynoteSlideTableMerges(error.clone()),
         Error::TextHyperlink(error) => Error::TextHyperlink(*error),
         Error::TextHighlight(error) => Error::TextHighlight(*error),
         Error::TextNumberAttachment(error) => Error::TextNumberAttachment(*error),
@@ -792,6 +794,55 @@ impl IWorkPackage {
             .map_err(cache_error)
     }
 
+    /// Hand immutable cached component owners to a focused format reader.
+    /// Original ingress owns ZIP validation; the catalog rechecks parsed limits.
+    pub(crate) fn shared_component_catalog(
+        &self,
+        map_catalog_error: impl Fn(litchi_iwa_archive::Error) -> Error,
+    ) -> Result<(
+        Arc<litchi_iwa_archive::ComponentCatalog>,
+        litchi_iwa_archive::Limits,
+    )> {
+        use litchi_iwa_archive::{ComponentCatalog, LimitKind, Limits};
+
+        let source_limits = self.limits();
+        let limits = Limits::new(
+            source_limits.max_input_bytes(),
+            source_limits.max_entries(),
+            source_limits.max_entry_bytes(),
+            source_limits.max_total_bytes(),
+            source_limits.max_iwa_stream_bytes(),
+        )
+        .and_then(|limits| {
+            limits.with_archive_limits(
+                source_limits
+                    .effective_archive_limits()
+                    .map_err(|error| litchi_iwa_archive::Error::InvalidLimits(error.to_string()))?,
+            )
+        })
+        .map_err(&map_catalog_error)?;
+        let mut records = Vec::new();
+        for name in self.iwa_entry_names() {
+            if records.len() >= limits.max_entries() {
+                return Err(map_catalog_error(litchi_iwa_archive::Error::Limit {
+                    kind: LimitKind::Entries,
+                    observed: records.len().saturating_add(1) as u64,
+                    maximum: limits.max_entries() as u64,
+                }));
+            }
+            records.try_reserve(1).map_err(|_| {
+                map_catalog_error(litchi_iwa_archive::Error::Allocation {
+                    resource: "shared reader component records",
+                    amount: 1,
+                })
+            })?;
+            records.push((name, self.parsed_archive(name)?));
+        }
+        let catalog =
+            ComponentCatalog::__from_shared_archives(records, limits).map_err(map_catalog_error)?;
+        Ok((Arc::new(catalog), limits))
+    }
+
     fn parse_archive(
         &self,
         normalized: &str,
@@ -1413,6 +1464,49 @@ mod tests {
         let mut streamed = Vec::new();
         package.write_to(&mut streamed)?;
         assert_eq!(streamed, output);
+        Ok(())
+    }
+
+    #[test]
+    fn shared_component_catalog_retains_cache_identity_and_original_limits() -> crate::Result<()> {
+        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let source = zip(&[("Index/Document.iwa", &compressed)]);
+        let profile = PackageLimits::new_with_limits(8_192, 2, 1_024, 4_096, 2_048)?;
+        let package = IWorkPackage::from_bytes_with_limits(&source, profile)?;
+        let cached = package.parsed_archive("Index/Document.iwa")?;
+        let weak = Arc::downgrade(&cached);
+        let baseline = Arc::strong_count(&cached);
+        let (catalog, limits) = package.shared_component_catalog(Error::from)?;
+        let retained = catalog.get("Index/Document.iwa").unwrap().archive();
+        assert!(std::ptr::eq(retained, Arc::as_ptr(&cached)));
+        assert_eq!(Arc::strong_count(&cached), baseline + 1);
+        assert_eq!(limits.max_input_bytes(), package.limits().max_input_bytes());
+        assert_eq!(limits.max_entries(), package.limits().max_entries());
+        assert_eq!(limits.max_entry_bytes(), package.limits().max_entry_bytes());
+        assert_eq!(limits.max_total_bytes(), package.limits().max_total_bytes());
+        assert_eq!(
+            limits.max_iwa_stream_bytes(),
+            package.limits().max_iwa_stream_bytes()
+        );
+        assert_eq!(
+            limits.archive_limits(),
+            package.limits().effective_archive_limits()?
+        );
+        assert_eq!(package.to_bytes()?, source);
+        drop(cached);
+        drop(package);
+        assert!(weak.upgrade().is_some());
+        assert_eq!(
+            catalog
+                .get("Index/Document.iwa")
+                .unwrap()
+                .archive()
+                .objects
+                .len(),
+            1
+        );
+        drop(catalog);
+        assert!(weak.upgrade().is_none());
         Ok(())
     }
 
