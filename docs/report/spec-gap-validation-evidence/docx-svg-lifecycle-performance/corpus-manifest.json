@@ -1,0 +1,30 @@
+{
+  "schema": "docx-svg-lifecycle-corpus-v1",
+  "baseline_commit": "892441d95db29da4351390716ef5c65b4c7c97de",
+  "opc_baseline_label": "OPC57680dc86",
+  "fixtures": [
+    {
+      "name": "native_svg",
+      "source_path": "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx",
+      "copy_path": "fixtures/svg.docx",
+      "bytes": 74104,
+      "sha256": "1ce06ef88f89c5e14d1d22cd8e4b3a5f70951e7bd53e19053d4942873333d21d"
+    },
+    {
+      "name": "native_floating",
+      "source_path": "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx",
+      "copy_path": "fixtures/floating.docx",
+      "bytes": 302210,
+      "sha256": "569572dc2ec5dfee9334504ae331482ebb8188b80a0d3c93d44b8884cda29283"
+    }
+  ],
+  "synthetic_inputs": {
+    "generator": "harness/adapter.rs",
+    "opaque_marker": "docx-svg-profile-opaque-v1",
+    "owner_counts": [1, 16, 64],
+    "large_unchanged_media_bytes": 8388608,
+    "small_svg_bytes": 512,
+    "large_svg_bytes": 131072,
+    "small_raster_bytes": 1024
+  }
+}
