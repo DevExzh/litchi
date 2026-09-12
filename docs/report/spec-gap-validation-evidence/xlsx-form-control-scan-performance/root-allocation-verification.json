@@ -1,0 +1,777 @@
+{
+  "receipt_pairs": 294,
+  "correctness_pairs": 5,
+  "source_metrics_live_and_peak_equal": true,
+  "changed_rows": [
+    {
+      "fixture": "button-small",
+      "lane": "eager_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "source_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "eager_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "source_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "eager_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "source_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "eager_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "source_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "eager_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "source_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "eager_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "source_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "eager_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "button-small",
+      "lane": "source_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "eager_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "source_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "eager_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "source_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "eager_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "source_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "eager_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "source_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "eager_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "source_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "eager_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "source_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "eager_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "tdf60673-medium",
+      "lane": "source_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "eager_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "source_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "eager_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "source_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "eager_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "source_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "eager_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "source_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "eager_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "source_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "eager_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "source_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "eager_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "many-controls-16",
+      "lane": "source_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "eager_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "source_owner_projection",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "eager_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "source_owner_projection",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "eager_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "source_owner_projection",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "eager_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "source_owner_projection",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "eager_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "source_owner_projection",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "eager_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "source_owner_projection",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "eager_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "diagnostic-mirror",
+      "lane": "source_owner_projection",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -25,
+        "requested_event_bytes": -5901
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "eager_refusal",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "source_refusal",
+      "iteration": 0,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "eager_refusal",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "source_refusal",
+      "iteration": 1,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "eager_refusal",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "source_refusal",
+      "iteration": 2,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "eager_refusal",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "source_refusal",
+      "iteration": 3,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "eager_refusal",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "source_refusal",
+      "iteration": 4,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "eager_refusal",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "source_refusal",
+      "iteration": 5,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "eager_refusal",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    },
+    {
+      "fixture": "foreign-wrapper-refusal",
+      "lane": "source_refusal",
+      "iteration": 6,
+      "deltas": {
+        "alloc_calls": -8,
+        "dealloc_calls": -8,
+        "realloc_calls": -26,
+        "requested_event_bytes": -6117
+      }
+    }
+  ]
+}
