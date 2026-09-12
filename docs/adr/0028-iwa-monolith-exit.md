@@ -11982,3 +11982,74 @@ edit-only exact ceilings, signature refusals, byte equality, and post-drop
 budget release remain unchanged. Both corrected targets pass independently
 (59 cell-value tests and 17 row-visibility tests). No XLSX production policy
 changed.
+
+## 2026-09-12 Numbers merge metadata ingress without cell materialization
+
+The focused Numbers owner now provides `MergeReader`, an immutable reader for
+selector-first merged-cell geometry. Its physical ingress and compact object
+index are retained once and shared by clones. A query resolves exact sheet and
+table names or checked positions and reuses the bounded borrowed merge codec.
+It does not construct `Document`, semantic tables, or decoded cell/BNC values.
+The existing `Package` constructor and its full semantic validation remain in
+place; callers with a materialized package can continue using
+`Package::table_merges`.
+
+This is an explicit deferred-validation profile, not validation of the whole
+workbook. Physical framing and object indexing are checked at ingress; the
+query checks the metadata needed for selection and the selected merge path.
+Unrelated cell storage is not interpreted. The selected merge decoder retains
+its strict wire preflight and Buffa lazy view, including required storage
+fields, formula/index uniqueness, rectangle bounds, and overlap checks.
+Shared byte ingress avoids copying an existing immutable ZIP source allocation;
+it does not claim that physical ZIP/Snappy parsing or IWA payload retention is
+lazy or allocation-free.
+
+The migration-host handoff remains open. Its parsed cache already retains
+`Arc<Archive>`, but `ComponentCatalog` owns archives by value. Converting those
+cached values through the current catalog contract would clone payloads, while
+reopening shared ZIP bytes would repeat physical parsing. In addition, the
+existing host `focused_table_location` helper decodes generated table
+descriptors and cannot serve as the lazy read selector adapter. This turn adds
+no raw-ID bridge, dependency edge, archive ownership change, or Pages/Keynote
+routing through the Numbers owner. Host cache sharing and private legacy-ID to
+semantic-selector mapping require a separate parity-proven migration.
+
+A disposable native verification copied the checked-in Numbers merge fixture,
+opened it in Numbers 14.4 with Computer Use, entered `Lazy merge verified` into
+the merged anchor, saved, closed, and reopened the exact path. The reopened
+`Sheet 1` / `shared-model` table retained the visible B11:C12 rectangle and
+marker. The native accessibility span-count field remains unreliable, so the
+2-by-2 rectangle was also checked visually. The saved file was 138,678 bytes,
+SHA-256 `7c9ce4daa95747c40d52ff35ed90bdadda092972f5afb5b4fec5d04d42a70975`.
+This is native input/readback evidence, not promotion of a merge writer.
+
+Name selection now obtains exact traversal reports from the shared borrowed
+names codec and supplies residual field/work limits plus an aggregate input
+byte ceiling. Form-sheet decoding charges its outer and nested source before
+each scan, rather than performing an unbudgeted envelope preflight. A missing
+name query is covered explicitly: many unknown fields exhaust the field budget,
+while one large opaque field does not count each payload byte as a field.
+Repeated references to the selected sheet or table-info are rejected even when
+the aggregate archive metadata lists the target only once.
+
+Focused validation covers 20 merge tests, three source-lifetime/concurrent/path
+ownership tests, and four names-codec tests. The disposable native probe matched
+name/index `MergeReader` results to the full `Package` result and preserved all
+138,678 source bytes. Focused all-feature library lint passed. Full workspace
+format, lint, library/integration, and documentation checks remain the normal
+commit-hook gate. Validation retains assertions with
+`CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0` to
+avoid the previously diagnosed macOS artifact-directory bottleneck. Temporary
+probe files and generated build artifacts are cleaned after verification.
+
+The reader's physical ingress and borrowed name projection are isolated in the
+private `package/table_merges/reader.rs` child. The existing `table_merges.rs`
+geometry owner retains its stronger no-protobuf-import/no-byte-API boundary.
+The boundary audit covers the new ingress explicitly: package-source
+constructors are allowed, while raw-ID queries, byte-returning APIs, BNC values,
+and generated AST/owned-message imports remain forbidden. This separation
+adds an ingress owner without relaxing the geometry owner's existing guard.
+The existing nine private merge-budget regressions also pass after adapting
+their fixtures to the shared component/index interface. Boundary regression
+coverage verifies the new ingress allowance and rejects same-named byte-return
+constructors, public reader state, raw IDs, and generated-message imports.

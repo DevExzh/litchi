@@ -6,6 +6,10 @@
 //! Native object identifiers, archive members, and generated protobuf values
 //! never cross this module's public boundary.
 
+mod reader;
+
+pub use reader::MergeReader;
+
 use std::fmt;
 
 use litchi_iwa_common::{
@@ -19,7 +23,9 @@ use litchi_numbers_wire::table_merges::{
 };
 use thiserror::Error as ThisError;
 
-use super::{Error as PackageError, Package, Resolved, SemanticLimitKind};
+use super::{
+    Components, Error as PackageError, Index, Package, ReadOptions, Resolved, SemanticLimitKind,
+};
 use crate::table::merge::Region;
 use crate::{SheetSelector, TableSelector};
 
@@ -61,6 +67,10 @@ pub enum TableMergesLimitKind {
     PayloadItems,
     /// Native object references inspected.
     PayloadReferences,
+    /// Rooted sheets visited while resolving selectors.
+    Sheets,
+    /// Rooted tables visited while resolving selectors.
+    Tables,
     /// Bytes inspected by the selected merge wire path.
     WireBytes,
     /// Bytes produced by a merge wire rewrite (unused by this read).
@@ -96,6 +106,8 @@ impl fmt::Display for TableMergesLimitKind {
             Self::PayloadMessages => "payload messages",
             Self::PayloadItems => "payload items",
             Self::PayloadReferences => "payload references",
+            Self::Sheets => "sheets",
+            Self::Tables => "tables",
             Self::WireBytes => "wire bytes",
             Self::WireOutputBytes => "wire output bytes",
             Self::WireFields => "wire fields",
@@ -169,44 +181,54 @@ impl Package {
         let mut budget = Budget::new(self)?;
         let (sheet_position, table_position) =
             select_semantic_positions(self, sheet.into(), table.into(), &mut budget)?;
-        let model = resolve_model_payload(self, sheet_position, table_position, &mut budget)?;
-        let max_regions = merge_region_capacity(
-            budget.remaining_allocations()?,
-            budget.remaining_scratch()?,
-            budget.remaining_retained()?,
-            budget.remaining_regions()?,
-        );
-        let limits = merge_wire_limits(&budget, max_regions)?;
-        let read = merge_wire::read_table_merges(model, limits).map_err(|error| {
-            charge_attempted(&mut budget, &error);
-            map_merge_error(error)
-        })?;
-        budget.charge_wire_report(
-            read.report.input_bytes(),
-            read.report.fields(),
-            read.report.work(),
+        let model = resolve_model_payload(
+            &self.state.components,
+            &self.state.index,
+            sheet_position,
+            table_position,
+            &mut budget,
         )?;
-        budget.charge_regions(read.regions.len())?;
-        budget.charge_allocations(
-            read.regions
-                .len()
-                .checked_mul(MERGE_READER_ALLOCATIONS_PER_REGION)
-                .ok_or(TableMergesError::InvalidSource)?,
-        )?;
-        budget.charge_scratch(
-            read.regions
-                .len()
-                .checked_mul(MERGE_READER_SCRATCH_PER_REGION)
-                .ok_or(TableMergesError::InvalidSource)?,
-        )?;
-        budget.charge_retained(
-            read.regions
-                .len()
-                .checked_mul(REGION_BYTES)
-                .ok_or(TableMergesError::InvalidSource)?,
-        )?;
-        Ok(read.regions)
+        decode_model_merges(model, &mut budget)
     }
+}
+
+fn decode_model_merges(model: &[u8], budget: &mut Budget) -> Result<Vec<Region>, TableMergesError> {
+    let max_regions = merge_region_capacity(
+        budget.remaining_allocations()?,
+        budget.remaining_scratch()?,
+        budget.remaining_retained()?,
+        budget.remaining_regions()?,
+    );
+    let limits = merge_wire_limits(budget, max_regions)?;
+    let read = merge_wire::read_table_merges(model, limits).map_err(|error| {
+        charge_attempted(budget, &error);
+        map_merge_error(error)
+    })?;
+    budget.charge_wire_report(
+        read.report.input_bytes(),
+        read.report.fields(),
+        read.report.work(),
+    )?;
+    budget.charge_regions(read.regions.len())?;
+    budget.charge_allocations(
+        read.regions
+            .len()
+            .checked_mul(MERGE_READER_ALLOCATIONS_PER_REGION)
+            .ok_or(TableMergesError::InvalidSource)?,
+    )?;
+    budget.charge_scratch(
+        read.regions
+            .len()
+            .checked_mul(MERGE_READER_SCRATCH_PER_REGION)
+            .ok_or(TableMergesError::InvalidSource)?,
+    )?;
+    budget.charge_retained(
+        read.regions
+            .len()
+            .checked_mul(REGION_BYTES)
+            .ok_or(TableMergesError::InvalidSource)?,
+    )?;
+    Ok(read.regions)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -219,6 +241,8 @@ struct Budget {
     max_messages: usize,
     max_items: usize,
     max_references: usize,
+    max_sheets: usize,
+    max_tables: usize,
     max_allocations: usize,
     max_retained: usize,
     max_scratch: usize,
@@ -230,6 +254,8 @@ struct Budget {
     messages: usize,
     items: usize,
     references: usize,
+    sheets: usize,
+    tables: usize,
     allocations: usize,
     retained: usize,
     scratch: usize,
@@ -238,13 +264,15 @@ struct Budget {
 
 impl Budget {
     fn new(package: &Package) -> Result<Self, TableMergesError> {
-        let physical = package
-            .state
-            .options
+        Self::from_options(package.state.options)
+    }
+
+    fn from_options(options: ReadOptions) -> Result<Self, TableMergesError> {
+        let physical = options
             .archive()
             .effective_archive_limits()
             .map_err(map_archive_error)?;
-        let semantic = package.state.options.semantic();
+        let semantic = options.semantic();
         let stream = physical.max_archive_bytes().max(1);
         let wire_max_input = stream
             .saturating_mul(8)
@@ -281,6 +309,8 @@ impl Budget {
             max_messages,
             max_items,
             max_references: semantic.max_references(),
+            max_sheets: semantic.max_sheets(),
+            max_tables: semantic.max_tables(),
             max_allocations,
             max_retained: stream.min(WireLimits::MAX_OUTPUT_BYTES),
             max_scratch: stream.min(WireLimits::MAX_INPUT_BYTES),
@@ -292,6 +322,8 @@ impl Budget {
             messages: 0,
             items: 0,
             references: 0,
+            sheets: 0,
+            tables: 0,
             allocations: 0,
             retained: 0,
             scratch: 0,
@@ -399,6 +431,24 @@ impl Budget {
             amount,
             self.max_references,
             TableMergesLimitKind::PayloadReferences,
+        )
+    }
+
+    fn charge_sheets(&mut self, amount: usize) -> Result<(), TableMergesError> {
+        Self::add(
+            &mut self.sheets,
+            amount,
+            self.max_sheets,
+            TableMergesLimitKind::Sheets,
+        )
+    }
+
+    fn charge_tables(&mut self, amount: usize) -> Result<(), TableMergesError> {
+        Self::add(
+            &mut self.tables,
+            amount,
+            self.max_tables,
+            TableMergesLimitKind::Tables,
         )
     }
 
@@ -552,6 +602,7 @@ fn select_semantic_positions(
         SheetSelector::Name(name) => {
             let mut selected = None;
             for candidate in package.state.document.sheets() {
+                budget.charge_sheets(1)?;
                 budget.charge_work(candidate.name().len().saturating_add(1))?;
                 budget.charge_items(1)?;
                 if candidate.name() == name {
@@ -564,6 +615,7 @@ fn select_semantic_positions(
             selected.ok_or(TableMergesError::SheetNotFound)?
         },
         SheetSelector::Index(index) => {
+            budget.charge_sheets(1)?;
             budget.charge_work(1)?;
             package
                 .state
@@ -575,6 +627,7 @@ fn select_semantic_positions(
     };
     let table_position = match table_selector {
         TableSelector::Index(index) => {
+            budget.charge_tables(1)?;
             budget.charge_work(1)?;
             if sheet.tables().nth(index).is_none() {
                 return Err(TableMergesError::TableNotFound);
@@ -584,6 +637,7 @@ fn select_semantic_positions(
         TableSelector::Name(name) => {
             let mut first = None;
             for (index, candidate) in sheet.tables().enumerate() {
+                budget.charge_tables(1)?;
                 budget.charge_work(candidate.name().len().saturating_add(1))?;
                 budget.charge_items(1)?;
                 if candidate.name() != name {
@@ -807,14 +861,13 @@ fn unique_table_model<'source>(
 }
 
 fn resolve_model_payload<'source>(
-    package: &'source Package,
+    components: &'source Components,
+    index: &'source Index,
     sheet_position: usize,
     table_position: usize,
     budget: &mut Budget,
 ) -> Result<&'source [u8], TableMergesError> {
-    let document_archive = package
-        .state
-        .components
+    let document_archive = components
         .get_archive("Index/Document.iwa")
         .ok_or(TableMergesError::UnsupportedSource)?;
     // Archive::object performs a linear identifier scan.  Precharge the
@@ -851,7 +904,7 @@ fn resolve_model_payload<'source>(
     })?;
     let sheet_identifier = selected_sheet.ok_or(TableMergesError::InvalidSource)?;
     require_declared_reference(document, document_index, sheet_identifier, &[1], budget)?;
-    let sheet = resolve_object(package, sheet_identifier, budget)?;
+    let sheet = resolve_object(components, index, sheet_identifier, budget)?;
     let (sheet_message_index, sheet_message) = unique_sheet_message(sheet, budget)?;
     validate_message_metadata(sheet, sheet_message_index, budget)?;
 
@@ -865,7 +918,8 @@ fn resolve_model_payload<'source>(
             let payload = length_payload(field)?;
             let drawable_identifier = read_reference(payload, 1, budget)?;
             selected_model = inspect_drawable(
-                package,
+                components,
+                index,
                 sheet_identifier,
                 drawable_identifier,
                 table_position,
@@ -903,7 +957,8 @@ fn resolve_model_payload<'source>(
                 let payload = length_payload(field)?;
                 let drawable_identifier = read_reference(payload, 2, budget)?;
                 selected_model = inspect_drawable(
-                    package,
+                    components,
+                    index,
                     sheet_identifier,
                     drawable_identifier,
                     table_position,
@@ -928,14 +983,15 @@ fn resolve_model_payload<'source>(
 }
 
 fn inspect_drawable<'source>(
-    package: &'source Package,
+    components: &'source Components,
+    index: &'source Index,
     sheet_identifier: u64,
     drawable_identifier: u64,
     table_position: usize,
     semantic_table: &mut usize,
     budget: &mut Budget,
 ) -> Result<Option<&'source [u8]>, TableMergesError> {
-    let info_object = resolve_object(package, drawable_identifier, budget)?;
+    let info_object = resolve_object(components, index, drawable_identifier, budget)?;
     let Some((info_index, info_message)) = unique_table_info(info_object, budget)? else {
         return Ok(None);
     };
@@ -957,7 +1013,7 @@ fn inspect_drawable<'source>(
     {
         return Err(TableMergesError::InvalidSource);
     }
-    let model_object = resolve_object(package, model_identifier, budget)?;
+    let model_object = resolve_object(components, index, model_identifier, budget)?;
     let (model_index, model_message) = unique_table_model(model_object, budget)?;
     validate_message_metadata(model_object, model_index, budget)?;
     if model_object.archive_info.identifier != Some(model_identifier) {
@@ -967,21 +1023,18 @@ fn inspect_drawable<'source>(
 }
 
 fn resolve_object<'source>(
-    package: &'source Package,
+    components: &'source Components,
+    index: &'source Index,
     identifier: u64,
     budget: &mut Budget,
 ) -> Result<&'source ArchiveObject, TableMergesError> {
     budget.charge_objects(1)?;
-    budget.charge_work(package.state.index.lookup_work())?;
-    let resolved: Resolved<'source> = package
-        .state
-        .index
-        .resolve_ref_id(&package.state.components, identifier)
+    budget.charge_work(index.lookup_work())?;
+    let resolved: Resolved<'source> = index
+        .resolve_ref_id(components, identifier)
         .map_err(map_package_error)?
         .ok_or(TableMergesError::InvalidSource)?;
-    package
-        .state
-        .components
+    components
         .catalog()
         .get_index(resolved.component_index)
         .and_then(|component| component.archive().objects.get(resolved.object_index))
@@ -1340,9 +1393,9 @@ fn map_package_error(error: PackageError) -> TableMergesError {
                 SemanticLimitKind::FormulaRenderWork | SemanticLimitKind::FormulaWork => {
                     TableMergesLimitKind::WireWork
                 },
-                SemanticLimitKind::Sheets
-                | SemanticLimitKind::Tables
-                | SemanticLimitKind::MaterializedCells => TableMergesLimitKind::PayloadItems,
+                SemanticLimitKind::Sheets => TableMergesLimitKind::Sheets,
+                SemanticLimitKind::Tables => TableMergesLimitKind::Tables,
+                SemanticLimitKind::MaterializedCells => TableMergesLimitKind::PayloadItems,
             },
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1412,6 +1465,8 @@ mod tests {
             wire_max_work: 256,
             wire_max_nesting: 4,
             max_objects: 1,
+            max_sheets: 1,
+            max_tables: 1,
             max_messages: 1,
             max_items: 1,
             max_references: 1,
@@ -1423,6 +1478,8 @@ mod tests {
             fields: 0,
             work: 0,
             objects: 0,
+            sheets: 0,
+            tables: 0,
             messages: 0,
             items: 0,
             references: 0,

@@ -94,6 +94,21 @@ def write_cargo_manifest_fixture(root: Path, relative: str, source: str) -> Path
     return path
 
 
+def copy_numbers_table_merge_reader_fixture(root: Path) -> None:
+    """Copy the Numbers merge owner and its optional private reader child."""
+
+    for relative in (
+        boundaries.NUMBERS_TABLE_MERGE_SOURCE,
+        boundaries.NUMBERS_TABLE_MERGE_READER_SOURCE,
+    ):
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+
 def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
     """Create the complete evidence set needed by the root-reader ratchet."""
 
@@ -47956,6 +47971,9 @@ fn rewrite_movie_title_operation(
         )
         self.assertEqual(boundaries.audit_pages_table_merge_source_topology(), [])
         self.assertEqual(boundaries.audit_keynote_table_merge_source_topology(), [])
+        self.assertEqual(
+            boundaries.audit_numbers_table_merge_reader_source_topology(), []
+        )
         self.assertEqual(boundaries.audit_numbers_table_merge_source_topology(), [])
         self.assertEqual(
             boundaries.audit_iwa_table_merge_host_read_delegation_source_topology(), []
@@ -48297,6 +48315,75 @@ impl KeynoteEditor {
                 violations,
             )
             self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+
+    def test_numbers_table_merge_reader_boundary_accepts_only_checked_ingress(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_numbers_table_merge_reader_fixture(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_merge_reader_source_topology(root), []
+            )
+
+    def test_numbers_table_merge_reader_boundary_rejects_raw_byte_methods_and_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_numbers_table_merge_reader_fixture(root)
+            reader = root / boundaries.NUMBERS_TABLE_MERGE_READER_SOURCE
+            source = reader.read_text(encoding="utf-8").replace(
+                "    state: Arc<MergeReaderState>,",
+                "    pub source: Vec<u8>,\n    state: Arc<MergeReaderState>,",
+                1,
+            )
+            reader.write_text(
+                source + "\nimpl MergeReader {\n"
+                "    pub fn raw_payload(&self) -> Vec<u8> { Vec::new() }\n"
+                "    pub fn from_bytes(&self) -> Vec<u8> { Vec::new() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_reader_source_topology(root)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(
+                any("public MergeReader field" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("source ingress method" in item and "from_bytes" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_merge_reader_boundary_rejects_raw_ids_bnc_and_generated_imports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_numbers_table_merge_reader_fixture(root)
+            reader = root / boundaries.NUMBERS_TABLE_MERGE_READER_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8")
+                + "\nuse litchi_iwa_protos::other;\n"
+                "use prost::Message;\n"
+                "pub fn leaked_identity(table_id: u64) {}\n"
+                "pub fn leaked_bnc(_: BncCellView) {}\n"
+                "pub fn leaked_proto(_: FormulaArchive) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_reader_source_topology(root)
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+            self.assertTrue(
+                any("generated/owned protobuf or BNC type BncCellView" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated/owned protobuf or BNC type FormulaArchive" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("exact numbers_names_codec import" in item for item in violations),
+                violations,
+            )
 
     def test_numbers_table_merge_boundary_rejects_public_module_and_preserves_host_reader(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
