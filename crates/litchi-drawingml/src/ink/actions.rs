@@ -793,6 +793,21 @@ pub fn read(xml: &[u8]) -> Result<Actions> {
 /// `stroke`/`target` data names for reserved action types are deliberately not
 /// enforced here; this profile is inert and does not execute actions.
 pub fn read_profile(xml: &[u8]) -> Result<Profile> {
+    read_profile_with_source(xml, None)
+}
+
+/// Read a profile while reusing an already-owned source allocation.
+///
+/// This is crate-internal so the borrowed public reader keeps its existing
+/// source-copy contract.  Source-backed edits already own the emitted bytes;
+/// retaining that allocation avoids a second full-source copy during typed
+/// readback.
+pub(crate) fn read_profile_owned(source: Arc<[u8]>) -> Result<Profile> {
+    let xml = Arc::clone(&source);
+    read_profile_with_source(&xml, Some(source))
+}
+
+fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Result<Profile> {
     if xml.len() > MAX_SOURCE_BYTES {
         return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
     }
@@ -977,8 +992,12 @@ pub fn read_profile(xml: &[u8]) -> Result<Profile> {
         ));
     }
     let root = root.ok_or_else(|| invalid("ink actions profile root is missing"))?;
+    let source = match owned_source {
+        Some(source) => source,
+        None => copy_source(xml)?,
+    };
     Ok(Profile {
-        source: copy_source(xml)?,
+        source,
         xml_id: root.xml_id,
         length_unit: root.length_unit,
         time_unit: root.time_unit,

@@ -26,7 +26,7 @@ use crate::{Error, Result};
 use super::{
     ACTION_NAMESPACE, Action, ActionChild, ActionData, ActionDataGroup, ActionGroup,
     ActionProperty, ActionType, DataChild, LengthUnit, Profile, RootChild, SourceSpan, TimeUnit,
-    read_profile,
+    read_profile, read_profile_owned,
 };
 
 impl ActionType {
@@ -1196,8 +1196,8 @@ impl Edit {
             };
             return Ok(Commit { prepared, patch });
         }
-        let after = Arc::from(after.into_boxed_slice());
-        let profile = read_profile(&after)?;
+        let after: Arc<[u8]> = Arc::from(after.into_boxed_slice());
+        let profile = read_profile_owned(after.clone())?;
         validate_profile_limits(&profile, self.limits)?;
         ensure_unique_profile_ids(&profile)?;
         let prepared = Prepared {
