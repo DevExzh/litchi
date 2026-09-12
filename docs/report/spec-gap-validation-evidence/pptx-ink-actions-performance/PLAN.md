@@ -3,27 +3,34 @@
 Status: **implementation scaffold present; no release timing run has been performed**.
 
 This profile is a bounded absolute observation of the committed
-source-backed existing-target `iact:actions` owner at
-`cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`. Its initial set is exactly 23
+source-backed existing-target `iact:actions` owner at semantic commit
+`cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`. Production transitive source and
+workspace/build inputs are pinned to baseline
+`2a2ffa1cae4e6b7070082768ce84483e5d411dc8`; the later capture HEAD is recorded
+at runtime. Its initial set is exactly 23
 named recipes and 42 named lanes in `corpus-manifest.json`. There is no
 Cartesian expansion, generator-selected scale, or hidden lane. The profile
 does not make a blanket `docs/GOAL.md` performance claim; it may report scoped
 Litchi host observations for these recipes after the later run gate passes.
 
 Planning consulted the workspace `docs/GOAL.md` and follows accepted ADRs
-0001, 0003, 0005, and 0006. Because that GOAL file is untracked at the owner
-pin, it is recorded for context but excluded from the reproducible source
-input set; the committed `source-contract.json` is the profile contract. The
-owner contract is
-[`pptx-ink-actions-design.md`](../pptx-ink-actions-design.md). The owner is
+0001, 0003, 0005, and 0006. The ADRs are current capture context and are
+hashed against the runtime capture HEAD. Because that GOAL file is untracked,
+it is recorded for context but excluded from the reproducible source input
+set; the committed `source-contract.json` is the profile contract. The
+semantic-owner contract is the explicit
+[`pptx-ink-actions-design.md`](../pptx-ink-actions-design.md) input at Git blob
+`597400950b1027c47cd6e4cbbedd23915bc0980e` and SHA-256
+`30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d`. The owner is
 the slide MCE anchor plus its relationship, content-type, target, and inbound
 graph closure. The shared DrawingML profile is used only after that closure
 has been validated.
 
 ## Source and fixture authority
 
-The later run must use a clean isolated checkout pinned to the full owner
-commit above. The synthetic OPC helper retained in that commit is
+The later run must use a clean isolated checkout whose exact capture HEAD
+descends from both explicit pins above. The synthetic OPC helper retained in
+the semantic owner commit is
 `crates/litchi-pptx/tests/pptx_ink_actions.rs`; its committed SHA-256 is
 `bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e` and its
 Git blob ID is `ad7e43e8c2c362c1b9e1938806f59b9fb3ab1dea`. That helper is the

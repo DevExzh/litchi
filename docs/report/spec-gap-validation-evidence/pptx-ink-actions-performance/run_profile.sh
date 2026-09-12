@@ -38,7 +38,11 @@ SOURCE_MANIFEST="$HERE/source_manifest.py"
 COMMITTED_INPUTS="$HERE/committed_inputs.py"
 VERIFIER="$HERE/verify.py"
 CLEANUP_HELPER="$HERE/cleanup_target.sh"
-SOURCE_COMMIT=cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd
+SEMANTIC_OWNER_COMMIT=cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd
+PRODUCTION_SOURCE_BASELINE_COMMIT=2a2ffa1cae4e6b7070082768ce84483e5d411dc8
+SEMANTIC_OWNER_DESIGN_PATH=docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md
+SEMANTIC_OWNER_DESIGN_SHA256=30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d
+SEMANTIC_OWNER_DESIGN_GIT_BLOB=597400950b1027c47cd6e4cbbedd23915bc0980e
 HELPER_SHA256=bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e
 
 [[ -x "$CLEANUP_HELPER" ]] || {
@@ -76,8 +80,12 @@ SAMPLES=${PPTX_INK_ACTIONS_SAMPLES:-20}
 }
 
 HEAD=$(git -C "$ROOT" --no-replace-objects rev-parse HEAD)
-git -C "$ROOT" --no-replace-objects merge-base --is-ancestor "$SOURCE_COMMIT" "$HEAD" || {
-    echo "checkout does not descend from approved owner commit" >&2
+git -C "$ROOT" --no-replace-objects merge-base --is-ancestor "$SEMANTIC_OWNER_COMMIT" "$HEAD" || {
+    echo "checkout does not descend from semantic owner commit" >&2
+    exit 2
+}
+git -C "$ROOT" --no-replace-objects merge-base --is-ancestor "$PRODUCTION_SOURCE_BASELINE_COMMIT" "$HEAD" || {
+    echo "checkout does not descend from production source baseline" >&2
     exit 2
 }
 [[ -z "$(git -C "$ROOT" --no-replace-objects status --porcelain --untracked-files=all)" ]] || {
@@ -100,6 +108,7 @@ COMMANDS="$RESULTS/commands.jsonl"
 export CARGO_TARGET_DIR="$TARGET"
 export CARGO_INCREMENTAL=0
 export LC_ALL=C
+export PPTX_INK_ACTIONS_CAPTURE_HEAD="$HEAD"
 unset RUSTFLAGS CARGO_ENCODED_RUSTFLAGS RUSTC_BOOTSTRAP RUSTDOCFLAGS
 
 record_command_start() {
@@ -133,6 +142,7 @@ with pathlib.Path(output).open("a") as stream:
             "CARGO_TARGET_DIR": os.environ.get("CARGO_TARGET_DIR"),
             "CARGO_INCREMENTAL": os.environ.get("CARGO_INCREMENTAL"),
             "LC_ALL": os.environ.get("LC_ALL"),
+            "PPTX_INK_ACTIONS_CAPTURE_HEAD": os.environ.get("PPTX_INK_ACTIONS_CAPTURE_HEAD"),
             "RUSTFLAGS": None,
             "CARGO_ENCODED_RUSTFLAGS": None,
             "RUSTC_BOOTSTRAP": None,
@@ -171,6 +181,7 @@ with pathlib.Path(output).open("a") as stream:
             "CARGO_TARGET_DIR": os.environ.get("CARGO_TARGET_DIR"),
             "CARGO_INCREMENTAL": os.environ.get("CARGO_INCREMENTAL"),
             "LC_ALL": os.environ.get("LC_ALL"),
+            "PPTX_INK_ACTIONS_CAPTURE_HEAD": os.environ.get("PPTX_INK_ACTIONS_CAPTURE_HEAD"),
             "RUSTFLAGS": None,
             "CARGO_ENCODED_RUSTFLAGS": None,
             "RUSTC_BOOTSTRAP": None,
@@ -232,15 +243,19 @@ PINNED_PATHS=(
     crates/litchi-pptx/src/presentation/embedded/ink_actions/transaction.rs
     crates/litchi-pptx/tests/pptx_ink_actions.rs
 )
-GUARD_ARGS=(--root "$ROOT" --commit "$SOURCE_COMMIT" --helper \
+GUARD_ARGS=(--root "$ROOT" --semantic-owner-commit "$SEMANTIC_OWNER_COMMIT" \
+    --production-source-baseline-commit "$PRODUCTION_SOURCE_BASELINE_COMMIT" --helper \
     crates/litchi-pptx/tests/pptx_ink_actions.rs --helper-sha256 "$HELPER_SHA256" \
     --manifest-path "$HARNESS" --exclude-package litchi-pptx-ink-actions-performance)
 for path in "${PINNED_PATHS[@]}"; do GUARD_ARGS+=(--path "$path"); done
-OWNER_WORKSPACE_EXTRAS=(
+GUARD_ARGS+=(--semantic-owner-extra "$ROOT/$SEMANTIC_OWNER_DESIGN_PATH" \
+    --semantic-owner-extra-sha256 "$SEMANTIC_OWNER_DESIGN_SHA256" \
+    --semantic-owner-extra-blob "$SEMANTIC_OWNER_DESIGN_GIT_BLOB")
+PRODUCTION_WORKSPACE_EXTRAS=(
     "$ROOT/Cargo.toml" "$ROOT/rust-toolchain.toml" "$ROOT/.cargo/config.toml"
     "$ROOT/rustfmt.toml" "$ROOT/clippy.toml" "$ROOT/deny.toml"
 )
-for path in "${OWNER_WORKSPACE_EXTRAS[@]}"; do GUARD_ARGS+=(--owner-extra "$path"); done
+for path in "${PRODUCTION_WORKSPACE_EXTRAS[@]}"; do GUARD_ARGS+=(--production-extra "$path"); done
 run_recorded committed-inputs-guard --stdout "$RESULTS/committed-inputs-guard.stdout" \
     --stderr "$RESULTS/committed-inputs-guard.stderr" \
     python3 "$COMMITTED_INPUTS" "${GUARD_ARGS[@]}"
@@ -270,7 +285,13 @@ BUILD_LOG="$RESULTS/build.log"
 BIN="$TARGET/release/pptx-ink-actions-performance"
 
 printf '%s\n' \
-    "source_commit=$SOURCE_COMMIT" \
+    "source_commit=$SEMANTIC_OWNER_COMMIT" \
+    "semantic_owner_commit=$SEMANTIC_OWNER_COMMIT" \
+    "production_source_baseline_commit=$PRODUCTION_SOURCE_BASELINE_COMMIT" \
+    "semantic_owner_design_path=$SEMANTIC_OWNER_DESIGN_PATH" \
+    "semantic_owner_design_sha256=$SEMANTIC_OWNER_DESIGN_SHA256" \
+    "semantic_owner_design_git_blob=$SEMANTIC_OWNER_DESIGN_GIT_BLOB" \
+    "capture_head=$HEAD" \
     "git_head=$HEAD" \
     "processes=$PROCESSES" \
     "warmup=$WARMUP" \
@@ -289,14 +310,17 @@ run_recorded cargo-metadata-before --stdout "$METADATA_BEFORE" \
     --stderr "$RESULTS/cargo-metadata-before.stderr" \
     cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS"
 
-EXTRAS=(
-    "$ROOT/Cargo.toml" "$ROOT/rust-toolchain.toml" "$ROOT/.cargo/config.toml"
-    "$ROOT/rustfmt.toml" "$ROOT/clippy.toml" "$ROOT/deny.toml"
+CONTEXT_EXTRAS=(
+    # ADRs are current capture context, hashed against capture HEAD. The
+    # separately pinned design document is the semantic-owner authority.
     "$ROOT/docs/adr/0001-priorities-and-api-layers.md"
     "$ROOT/docs/adr/0003-snapshots-edits-and-patches.md"
     "$ROOT/docs/adr/0005-io-memory-and-performance.md"
     "$ROOT/docs/adr/0006-validation-security-and-compatibility.md"
-    "$ROOT/docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md"
+)
+EXTRAS=(
+    "$ROOT/Cargo.toml" "$ROOT/rust-toolchain.toml" "$ROOT/.cargo/config.toml"
+    "$ROOT/rustfmt.toml" "$ROOT/clippy.toml" "$ROOT/deny.toml"
     "$HARNESS" "$LOCKFILE" "$HERE/harness/main.rs" "$HERE/harness/adapter.rs"
     "$HERE/harness/support.rs" "$SOURCE_MANIFEST" "$COMMITTED_INPUTS"
     "$VERIFIER" "$CLEANUP_HELPER" "$HERE/run_profile.sh" "$HERE/README.md" "$HERE/PLAN.md"
@@ -305,10 +329,16 @@ EXTRAS=(
     "$HERE/root-review.md"
 )
 MANIFEST_ARGS=(python3 "$SOURCE_MANIFEST" --metadata "$METADATA_BEFORE" --root "$ROOT"
-    --output "$MANIFEST_BEFORE" --git-commit "$HEAD" --owner-commit "$SOURCE_COMMIT"
-    --owner-exclude-package litchi-pptx-ink-actions-performance)
+    --output "$MANIFEST_BEFORE" --git-commit "$HEAD"
+    --semantic-owner-commit "$SEMANTIC_OWNER_COMMIT"
+    --production-source-baseline-commit "$PRODUCTION_SOURCE_BASELINE_COMMIT"
+    --production-exclude-package litchi-pptx-ink-actions-performance)
+MANIFEST_ARGS+=(--semantic-owner-extra "$ROOT/$SEMANTIC_OWNER_DESIGN_PATH"
+    --semantic-owner-extra-sha256 "$SEMANTIC_OWNER_DESIGN_SHA256"
+    --semantic-owner-extra-blob "$SEMANTIC_OWNER_DESIGN_GIT_BLOB")
 for extra in "${EXTRAS[@]}"; do MANIFEST_ARGS+=(--extra "$extra"); done
-for extra in "${OWNER_WORKSPACE_EXTRAS[@]}"; do MANIFEST_ARGS+=(--owner-extra "$extra"); done
+for extra in "${CONTEXT_EXTRAS[@]}"; do MANIFEST_ARGS+=(--context-extra "$extra"); done
+for extra in "${PRODUCTION_WORKSPACE_EXTRAS[@]}"; do MANIFEST_ARGS+=(--production-extra "$extra"); done
 run_recorded source-manifest-before --stdout "$RESULTS/source-manifest-before.stdout" \
     --stderr "$RESULTS/source-manifest-before.stderr" "${MANIFEST_ARGS[@]}"
 
@@ -319,7 +349,13 @@ sha256sum "$BIN" > "$RESULTS/binary.sha256"
 {
     printf 'binary=%s\n' "$BIN"
     cat "$RESULTS/binary.sha256"
-    printf 'source_commit=%s\n' "$SOURCE_COMMIT"
+    printf 'source_commit=%s\n' "$SEMANTIC_OWNER_COMMIT"
+    printf 'semantic_owner_commit=%s\n' "$SEMANTIC_OWNER_COMMIT"
+    printf 'production_source_baseline_commit=%s\n' "$PRODUCTION_SOURCE_BASELINE_COMMIT"
+    printf 'semantic_owner_design_path=%s\n' "$SEMANTIC_OWNER_DESIGN_PATH"
+    printf 'semantic_owner_design_sha256=%s\n' "$SEMANTIC_OWNER_DESIGN_SHA256"
+    printf 'semantic_owner_design_git_blob=%s\n' "$SEMANTIC_OWNER_DESIGN_GIT_BLOB"
+    printf 'capture_head=%s\n' "$HEAD"
     printf 'git_head=%s\n' "$HEAD"
     printf 'rustc -vV:\n'; rustc -vV
     printf 'cargo=%s\n' "$(cargo -V)"
@@ -373,10 +409,16 @@ run_recorded cargo-metadata-after --stdout "$METADATA_AFTER" \
     --stderr "$RESULTS/cargo-metadata-after.stderr" \
     cargo metadata --format-version=1 --locked --offline --manifest-path "$HARNESS"
 MANIFEST_ARGS_AFTER=(python3 "$SOURCE_MANIFEST" --metadata "$METADATA_AFTER" --root "$ROOT"
-    --output "$MANIFEST_AFTER" --git-commit "$HEAD" --owner-commit "$SOURCE_COMMIT"
-    --owner-exclude-package litchi-pptx-ink-actions-performance)
+    --output "$MANIFEST_AFTER" --git-commit "$HEAD"
+    --semantic-owner-commit "$SEMANTIC_OWNER_COMMIT"
+    --production-source-baseline-commit "$PRODUCTION_SOURCE_BASELINE_COMMIT"
+    --production-exclude-package litchi-pptx-ink-actions-performance)
+MANIFEST_ARGS_AFTER+=(--semantic-owner-extra "$ROOT/$SEMANTIC_OWNER_DESIGN_PATH"
+    --semantic-owner-extra-sha256 "$SEMANTIC_OWNER_DESIGN_SHA256"
+    --semantic-owner-extra-blob "$SEMANTIC_OWNER_DESIGN_GIT_BLOB")
 for extra in "${EXTRAS[@]}"; do MANIFEST_ARGS_AFTER+=(--extra "$extra"); done
-for extra in "${OWNER_WORKSPACE_EXTRAS[@]}"; do MANIFEST_ARGS_AFTER+=(--owner-extra "$extra"); done
+for extra in "${CONTEXT_EXTRAS[@]}"; do MANIFEST_ARGS_AFTER+=(--context-extra "$extra"); done
+for extra in "${PRODUCTION_WORKSPACE_EXTRAS[@]}"; do MANIFEST_ARGS_AFTER+=(--production-extra "$extra"); done
 run_recorded source-manifest-after --stdout "$RESULTS/source-manifest-after.stdout" \
     --stderr "$RESULTS/source-manifest-after.stderr" "${MANIFEST_ARGS_AFTER[@]}"
 cmp -s "$MANIFEST_BEFORE" "$MANIFEST_AFTER"
@@ -392,6 +434,12 @@ git -C "$ROOT" status --porcelain --untracked-files=all > "$GIT_STATUS_AFTER"
     sha256sum "$ROOT/crates/litchi-pptx/tests/pptx_ink_actions.rs" | awk '{print $1}'
     printf 'host_sha256='
     sha256sum "$HOST" | awk '{print $1}'
+    printf 'semantic_owner_commit=%s\n' "$SEMANTIC_OWNER_COMMIT"
+    printf 'production_source_baseline_commit=%s\n' "$PRODUCTION_SOURCE_BASELINE_COMMIT"
+    printf 'semantic_owner_design_path=%s\n' "$SEMANTIC_OWNER_DESIGN_PATH"
+    printf 'semantic_owner_design_sha256=%s\n' "$SEMANTIC_OWNER_DESIGN_SHA256"
+    printf 'semantic_owner_design_git_blob=%s\n' "$SEMANTIC_OWNER_DESIGN_GIT_BLOB"
+    printf 'capture_head=%s\n' "$HEAD"
 } > "$RESULTS/source-provenance.txt"
 
 run_recorded verify --stdout "$RESULTS/verify.stdout" --stderr "$RESULTS/verify.stderr" \

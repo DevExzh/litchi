@@ -2,14 +2,29 @@
 
 Independent design review approved this bounded plan. Root verified the
 23-recipe/42-lane inventory, complete recipe use, and pinned helper hash.
+The semantic owner pin is
+`cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`; the production source and
+workspace/build baseline is
+`2a2ffa1cae4e6b7070082768ce84483e5d411dc8`. The later run records its exact
+capture HEAD separately and compares every transitive production input with
+the latter baseline.
 The unchecked items below remain implementation review and execution gates;
 the scaffold API is present, but design approval is not proof that those gates
 have passed. No release profile or timing capture is authorized by this
 document alone.
 
-- [ ] The full source pin is
-      `cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`, or a reviewed replacement
-      pin is recorded with its full source manifest.
+- [ ] The semantic owner pin is
+      `cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd` and the production source
+      baseline is `2a2ffa1cae4e6b7070082768ce84483e5d411dc8`; both are full
+      pins, and the exact runtime capture HEAD is recorded separately.
+- [ ] All transitive local path-package files and workspace/build inputs are
+      compared with the production baseline; semantic contract and fixture
+      authority paths are compared with the semantic owner.
+- [ ] The normative design input is explicitly pinned to semantic owner
+      `cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`, Git blob
+      `597400950b1027c47cd6e4cbbedd23915bc0980e`, and SHA-256
+      `30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d`;
+      accepted ADRs remain capture-head context.
 - [ ] The manifest has exactly 23 recipes and 42 lanes; no Cartesian or
       generator-selected point is added without a plan revision; every recipe
       is used and every lane resolves to a real recipe.

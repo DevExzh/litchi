@@ -2,12 +2,21 @@
 
 Status: **API and correctness scaffold implemented — no release profile or timing run performed**.
 
-The proposed profile is pinned to the full owner source commit
-`cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd`. It has exactly 23 named recipes
+The proposed profile uses semantic owner commit
+`cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd` for the public contract and
+fixture authority. Its complete transitive production source and workspace/
+build inputs use baseline
+`2a2ffa1cae4e6b7070082768ce84483e5d411dc8`; the exact capture HEAD is recorded
+at runtime and is never hardcoded as a self-hash. The normative design input is
+the semantic-owner `pptx-ink-actions-design.md`, Git blob
+`597400950b1027c47cd6e4cbbedd23915bc0980e`, SHA-256
+`30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d`.
+Accepted ADRs are capture-head context. It has exactly 23 named recipes
 and 42 named lanes in [`corpus-manifest.json`](corpus-manifest.json), with no
 Cartesian expansion; matrix preflight requires every recipe to be used and
 every lane to resolve to a real recipe. The retained fixture authority is the synthetic helper
-`crates/litchi-pptx/tests/pptx_ink_actions.rs`, SHA-256
+`crates/litchi-pptx/tests/pptx_ink_actions.rs`, retained at the semantic owner
+and SHA-256
 `bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e`. The
 retained bounded OPC generator is `harness/adapter.rs`, and the executable
 source/verifier tools plus isolated lockfile are present; no native PowerPoint

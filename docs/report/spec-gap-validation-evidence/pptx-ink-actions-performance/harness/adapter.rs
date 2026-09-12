@@ -35,7 +35,16 @@ type BoxError = Box<dyn StdError + Send + Sync>;
 type Result<T> = std::result::Result<T, BoxError>;
 
 const SCHEMA: &str = "pptx-ink-actions-performance-v1";
-const SOURCE_COMMIT: &str = "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd";
+const SEMANTIC_OWNER_COMMIT: &str = "cf6fdb8e91dd232d7d762596763d2e9d8a5b9dbd";
+const PRODUCTION_SOURCE_BASELINE_COMMIT: &str = "2a2ffa1cae4e6b7070082768ce84483e5d411dc8";
+const SEMANTIC_OWNER_DESIGN_PATH: &str =
+    "docs/report/spec-gap-validation-evidence/pptx-ink-actions-design.md";
+const SEMANTIC_OWNER_DESIGN_SHA256: &str =
+    "30b78cca84c4ca24ae44f3d3694c3097f54b5e5a1f2004af9ce5007bcaf4173d";
+const SEMANTIC_OWNER_DESIGN_GIT_BLOB: &str = "597400950b1027c47cd6e4cbbedd23915bc0980e";
+// `source_commit` remains a compatibility receipt field for the semantic
+// owner. It is never the production baseline or the runtime capture HEAD.
+const SOURCE_COMMIT: &str = SEMANTIC_OWNER_COMMIT;
 const HELPER_SHA256: &str = "bec6baafcf735d778216fb54fe6299312707e912dcaed5f89de988f7112bb58e";
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -62,12 +71,24 @@ const GENERATOR_SOURCE_BYTES: &[u8] = include_bytes!("adapter.rs");
 #[derive(Clone, Debug, Deserialize)]
 struct Manifest {
     schema: String,
+    semantic_owner_commit: String,
+    production_source_baseline_commit: String,
+    semantic_owner_design: SemanticOwnerDesign,
+    #[serde(default)]
     owner_commit: String,
     fixture_authority: FixtureAuthority,
     retained_opc_generator: GeneratorAuthority,
     recipes: Vec<RecipeSpec>,
     lanes: Vec<LaneSpec>,
     measurement_gate: MeasurementGate,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct SemanticOwnerDesign {
+    commit: String,
+    path: String,
+    sha256: String,
+    git_blob: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -476,6 +497,9 @@ struct Receipt {
     lane: String,
     recipe_id: String,
     source_commit: &'static str,
+    semantic_owner_commit: &'static str,
+    production_source_baseline_commit: &'static str,
+    capture_head: String,
     helper_sha256: &'static str,
     generator_sha256: Option<String>,
     fixture_path: String,
@@ -503,6 +527,7 @@ pub fn known_lanes() -> Vec<String> {
 pub fn run_lane(lane_id: &str, warmup: usize, samples: usize) -> Result<String> {
     let manifest = manifest();
     validate_manifest(&manifest)?;
+    let capture_head = capture_head()?;
     let lane = manifest
         .lanes
         .iter()
@@ -540,6 +565,9 @@ pub fn run_lane(lane_id: &str, warmup: usize, samples: usize) -> Result<String> 
         lane: lane.id,
         recipe_id: recipe.id,
         source_commit: SOURCE_COMMIT,
+        semantic_owner_commit: SEMANTIC_OWNER_COMMIT,
+        production_source_baseline_commit: PRODUCTION_SOURCE_BASELINE_COMMIT,
+        capture_head,
         helper_sha256: HELPER_SHA256,
         generator_sha256: Some(support::sha256_hex(GENERATOR_SOURCE_BYTES)),
         fixture_path: manifest.fixture_authority.path,
@@ -570,6 +598,7 @@ pub fn run_lane(lane_id: &str, warmup: usize, samples: usize) -> Result<String> 
 pub fn run_matrix() -> Result<String> {
     let manifest = manifest();
     validate_manifest(&manifest)?;
+    let capture_head = capture_head()?;
     let mut accepted = 0usize;
     let mut failed = Vec::new();
     let mut expected_refusals = 0usize;
@@ -607,6 +636,9 @@ pub fn run_matrix() -> Result<String> {
         "schema": "pptx-ink-actions-correctness-matrix-v1",
         "timings_collected": false,
         "source_commit": SOURCE_COMMIT,
+        "semantic_owner_commit": SEMANTIC_OWNER_COMMIT,
+        "production_source_baseline_commit": PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "capture_head": capture_head,
         "helper_sha256": HELPER_SHA256,
         "recipe_count": manifest.recipes.len(),
         "lane_count": manifest.lanes.len(),
@@ -620,6 +652,7 @@ pub fn run_matrix() -> Result<String> {
 pub fn host_probe() -> Result<String> {
     let manifest = manifest();
     validate_manifest(&manifest)?;
+    let capture_head = capture_head()?;
     let lane = manifest
         .lanes
         .iter()
@@ -727,6 +760,9 @@ pub fn host_probe() -> Result<String> {
     serde_json::to_string(&json!({
         "schema": "pptx-ink-actions-host-probe-v1",
         "source_commit": SOURCE_COMMIT,
+        "semantic_owner_commit": SEMANTIC_OWNER_COMMIT,
+        "production_source_baseline_commit": PRODUCTION_SOURCE_BASELINE_COMMIT,
+        "capture_head": capture_head,
         "helper_sha256": HELPER_SHA256,
         "package_route": "Package::ink_actions",
         "presentation_route": "Presentation::ink_actions",
@@ -752,8 +788,29 @@ fn validate_manifest(manifest: &Manifest) -> Result<()> {
     if manifest.schema != "pptx-ink-actions-performance-scaffold-v2" {
         return Err(format!("unexpected manifest schema: {}", manifest.schema).into());
     }
-    if manifest.owner_commit != SOURCE_COMMIT {
-        return Err(format!("manifest owner pin differs: {}", manifest.owner_commit).into());
+    if manifest.semantic_owner_commit != SEMANTIC_OWNER_COMMIT {
+        return Err(format!(
+            "manifest semantic owner pin differs: {}",
+            manifest.semantic_owner_commit
+        )
+        .into());
+    }
+    if manifest.production_source_baseline_commit != PRODUCTION_SOURCE_BASELINE_COMMIT {
+        return Err(format!(
+            "manifest production source baseline differs: {}",
+            manifest.production_source_baseline_commit
+        )
+        .into());
+    }
+    if manifest.owner_commit != SEMANTIC_OWNER_COMMIT {
+        return Err(format!("manifest owner alias differs: {}", manifest.owner_commit).into());
+    }
+    if manifest.semantic_owner_design.commit != SEMANTIC_OWNER_COMMIT
+        || manifest.semantic_owner_design.path != SEMANTIC_OWNER_DESIGN_PATH
+        || manifest.semantic_owner_design.sha256 != SEMANTIC_OWNER_DESIGN_SHA256
+        || manifest.semantic_owner_design.git_blob != SEMANTIC_OWNER_DESIGN_GIT_BLOB
+    {
+        return Err("manifest semantic owner design authority differs".into());
     }
     if manifest.fixture_authority.sha256 != HELPER_SHA256 {
         return Err("manifest helper hash differs from compiled provenance".into());
@@ -808,6 +865,15 @@ fn validate_manifest(manifest: &Manifest) -> Result<()> {
         return Err("lane operation text is empty".into());
     }
     Ok(())
+}
+
+fn capture_head() -> Result<String> {
+    let value = std::env::var("PPTX_INK_ACTIONS_CAPTURE_HEAD")
+        .map_err(|_| "PPTX_INK_ACTIONS_CAPTURE_HEAD is not set")?;
+    if value.len() != 40 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("PPTX_INK_ACTIONS_CAPTURE_HEAD is not a full commit id".into());
+    }
+    Ok(value)
 }
 
 fn operation_for(lane: &LaneSpec) -> Result<OperationKind> {
