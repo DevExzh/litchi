@@ -154,10 +154,30 @@ requires empty stderr, exit status zero, exact process identities, consistent
 input sizes and digests, and identical executable digests before and after
 measurement. The executable itself is disposable; retained digest receipts
 record its measured identity rather than promising later executable rehashing.
-Run `python3 -B -m unittest test_verify test_runner test_source_snapshot` from
-this directory to exercise the adversarial receipt, runner-output, and
-committed-source snapshot checks without compiling or measuring production
-code.
+Run this command from the directory to exercise the adversarial receipt,
+runner-output, committed-source snapshot, and derived-summary checks without
+compiling or measuring production code:
+
+```sh
+python3 -B -m unittest test_verify test_runner test_source_snapshot test_uncertainty
+```
+
+After `verify.py` accepts a retained run, `uncertainty.py` can produce a
+separate descriptive view without rewriting raw receipts:
+
+```sh
+python3 -B uncertainty.py \
+  --results /var/tmp/litchi-xlsx-svg-lifecycle-results \
+  --output /var/tmp/litchi-xlsx-svg-lifecycle-uncertainty.md \
+  --json-output /var/tmp/litchi-xlsx-svg-lifecycle-uncertainty.json
+```
+
+It requires exactly three fresh process receipts per lane, at least two
+warmups and twenty measured samples, and matching semantic, allocator, and
+typed-refusal gates. It reports each process median and min/max sample range,
+the range of those process medians, and the `/usr/bin/time -v` RSS values.
+The n=3 ranges are descriptive; the derived files do not provide confidence
+intervals or speedup, regression, causal, or scaling claims.
 
 Refusal lanes emit a typed expected-refusal outcome only after the public API
 returns a matching limit/owner error and the source bytes remain unchanged.
