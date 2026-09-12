@@ -178,6 +178,8 @@ typed-refusal gates. It reports each process median and min/max sample range,
 the range of those process medians, and the `/usr/bin/time -v` RSS values.
 The n=3 ranges are descriptive; the derived files do not provide confidence
 intervals or speedup, regression, causal, or scaling claims.
+Fresh `run_profile.sh` runs capture this tool in both source manifests and
+generate `uncertainty.md` and `uncertainty.json` after verification succeeds.
 
 Refusal lanes emit a typed expected-refusal outcome only after the public API
 returns a matching limit/owner error and the source bytes remain unchanged.
