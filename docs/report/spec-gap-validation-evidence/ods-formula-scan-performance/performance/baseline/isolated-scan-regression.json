@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "litchi-ods",
+    "--test",
+    "ods_formula_scan_regression",
+    "--",
+    "--nocapture"
+  ],
+  "cwd": "/var/tmp/ods-scan-worktree",
+  "target": "/var/tmp/ods-scan-target",
+  "status": 0,
+  "elapsed_seconds": 8.441470861434937,
+  "test_count": 6,
+  "source_formula": "4084ab6a41f61477aeaa15d3dbe896544a15147b75b2e1028d079569f52a0e0a",
+  "source_reference": "3707b3176e2714aa794bf28628eb27ec72923e001faaab22a987883b596bd27e"
+}

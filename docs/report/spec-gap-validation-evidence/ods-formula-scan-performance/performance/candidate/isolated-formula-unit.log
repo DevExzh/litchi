@@ -1,0 +1,57 @@
+
+running 49 tests
+test codec::formula::reference::iri::tests::accepts_absolute_schemes_and_authority_forms ... ok
+test codec::formula::reference::iri::tests::rejects_bad_percent_escapes_and_disallowed_delimiters ... ok
+test codec::formula::reference::iri::tests::rejects_invalid_first_segment_colons ... ok
+test codec::formula::reference::iri::tests::accepts_ipv6_and_ipvfuture_literals ... ok
+test codec::formula::reference::tests::applies_byte_and_component_limits_before_component_allocation ... ok
+test codec::formula::reference::tests::parses_inherited_and_cross_sheet_endpoints ... ok
+test codec::formula::reference::tests::parses_colon_rich_unquoted_sheet_name_without_range_split ... ok
+test codec::formula::reference::iri::tests::accepts_empty_relative_query_and_fragment_references ... ok
+test codec::formula::reference::tests::parses_source_and_keeps_reference_error_source_free ... ok
+test codec::formula::reference::tests::parses_whole_axis_ranges ... ok
+test codec::formula::reference::iri::tests::rejects_malformed_ip_literals_and_ports ... ok
+test codec::formula::reference::tests::parses_local_cell_and_preserves_absolute_metadata ... ok
+test codec::formula::reference::tests::parses_subtable_chain_and_quoted_names ... ok
+test codec::formula::reference::tests::rejects_non_normative_columns_and_second_endpoint_without_dot ... ok
+test codec::formula::reference::iri::tests::accepts_ucschar_and_private_query_characters_only_in_their_grammar_slots ... ok
+test codec::formula::tests::test_boolean_tokens ... ok
+test codec::formula::tests::test_cell_ref_equality ... ok
+test codec::formula::tests::test_cell_ref_parsing ... ok
+test codec::formula::tests::test_compact_cell_handoff_preserves_space_bearing_sheet_names ... ok
+test codec::formula::tests::test_complex_formula ... ok
+test codec::formula::tests::test_extract_cell_refs ... ok
+test codec::formula::tests::test_extract_cell_refs_projects_legacy_compatible_rich_cells ... ok
+test codec::formula::tests::test_formula_limits_forward_reference_limits ... ok
+test codec::formula::tests::test_formula_functions_catalog ... ok
+test codec::formula::tests::test_formula_struct ... ok
+test codec::formula::tests::test_extract_functions ... ok
+test codec::formula::tests::test_function_calls_take_precedence_over_cell_reference_shape ... ok
+test codec::formula::tests::test_function_lookup_is_bounded_and_case_insensitive_without_ascii_only_regression ... ok
+test codec::formula::tests::test_function_with_multiple_args ... ok
+test codec::formula::tests::test_is_valid_function ... ok
+test codec::formula::tests::test_mixed_references ... ok
+test codec::formula::tests::test_number_token ... ok
+test codec::formula::tests::test_nested_functions ... ok
+test codec::formula::tests::test_operators ... ok
+test codec::formula::tests::test_parentheses ... ok
+test codec::formula::tests::test_parse_canonical_odf_formula_without_normalizing_the_input ... ok
+test codec::formula::tests::test_parse_formula_without_equals ... ok
+test codec::formula::tests::test_parse_function_formula ... ok
+test codec::formula::tests::test_parse_absolute_reference ... ok
+test codec::formula::tests::test_parse_simple_formula ... ok
+test codec::formula::tests::test_range_ref_equality ... ok
+test codec::formula::tests::test_parse_odf_formula_with_quoted_sheet_reference ... ok
+test codec::formula::tests::test_every_part4_catalog_name_is_tokenized_as_a_function_call ... ok
+test codec::formula::tests::test_range_ref_parsing ... ok
+test codec::formula::tests::test_string_token ... ok
+test codec::formula::tests::test_string_literals_preserve_utf8_and_require_a_closing_quote ... ok
+test codec::formula::tests::test_token_variants ... ok
+test codec::formula::tests::test_whitespace_handling ... ok
+test codec::formula::tests::test_legacy_sheet_scan_cache_keeps_scan_work_linear ... ok
+
+test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 309 filtered out; finished in 0.00s
+
+   Compiling litchi-ods v0.0.1 (/var/tmp/ods-scan-worktree/crates/litchi-ods)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.72s
+     Running unittests src/lib.rs (/var/tmp/ods-scan-target/debug/deps/litchi_ods-44f6caee7193ba18)

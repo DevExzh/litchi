@@ -1,0 +1,6 @@
+{
+  "base_commit": "5fae21a34e163a3300fc0ac4f9c302f5731e3cbb",
+  "source_formula_sha256": "4084ab6a41f61477aeaa15d3dbe896544a15147b75b2e1028d079569f52a0e0a",
+  "source_reference_sha256": "f72ffeb06d5ab2354c747a96e6e13961d4325da81c5004529bf6df02bb4430d6",
+  "experiment": "annotation-removal-only"
+}

@@ -1,0 +1,13 @@
+
+running 6 tests
+test a_dot_after_a_long_suffix_uses_the_legacy_sheet_fallback ... ok
+test absolute_and_range_forms_retain_the_legacy_fallback_shape ... ok
+test contiguous_partial_cells_and_a_dot_tail_keep_legacy_tokens ... ok
+test formula_prefixes_normalize_for_scanning_but_retain_original_text ... ok
+test repeated_partial_cells_keep_boundaries_with_spaces_and_tabs ... ok
+test tabs_underscores_and_digit_boundaries_preserve_tokens_and_refusals ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running tests/ods_formula_scan_regression.rs (/var/tmp/ods-scan-target/debug/deps/ods_formula_scan_regression-0a701daa5ef5eb23)

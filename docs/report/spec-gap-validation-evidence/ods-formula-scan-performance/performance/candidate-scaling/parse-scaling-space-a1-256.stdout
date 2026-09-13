@@ -1,0 +1,2 @@
+config workload=parse case=scaling-space-a1-256 input_bytes=771 repeat=128 warmups=3 iterations=15 expected_success=true
+result mean_ns=2209801 p50_ns=2210300 p95_ns=2217591 p99_ns=2217591 alloc_calls_p50=33792 alloc_calls_max=33792 dealloc_calls_p50=33024 dealloc_calls_max=33024 requested_bytes_p50=7414144 requested_bytes_max=7414144 released_bytes_p50=7414144 released_bytes_max=7414144 live_before_p50=3663 live_after_p50=3663 live_after_max=3663 peak_live_delta_p50=29699 peak_live_delta_max=29699 successes_p50=128 successes_max=128 checksum_p50=131456 checksum_max=131456

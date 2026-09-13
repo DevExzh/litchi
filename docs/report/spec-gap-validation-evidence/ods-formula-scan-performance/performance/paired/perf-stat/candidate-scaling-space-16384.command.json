@@ -1,0 +1,28 @@
+{
+  "label": "candidate-scaling-space-16384",
+  "side": "candidate",
+  "lane": "scaling-space-16384",
+  "case": "scaling-space-a1-16384",
+  "repeat": 2,
+  "warmups": 3,
+  "iterations": 15,
+  "cpu_pin": "2",
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "binary": "docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate/ods-formula-reference-profile",
+  "binary_sha256": "507c989691190554711c023ebe19796e62388bdc27fe942ab8015e862c49689f",
+  "command": "/usr/bin/perf stat --no-big-num -x, -e cycles,instructions,branches,branch-misses,cache-misses -- taskset -c 2 docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/candidate/ods-formula-reference-profile --workload parse --case scaling-space-a1-16384 --warmups 3 --iterations 15 --repeat 2",
+  "status": 0,
+  "started_at": "2026-09-13T08:34:06Z",
+  "finished_at": "2026-09-13T08:34:06Z",
+  "elapsed_seconds": 0.055506229400634766,
+  "stdout": "candidate-scaling-space-16384.stdout",
+  "stderr": "candidate-scaling-space-16384.stderr",
+  "stdout_sha256": "f3f1b69b96b2aa82962cc82d1795c2d81d80ddf22d2b39f6fa5fd334f568362c",
+  "stderr_sha256": "44cc285a82a201d378434680afdeffe47911811c01afe79fcc47a841345cdd3e"
+}

@@ -1,0 +1,40 @@
+{
+  "group": "scaling",
+  "case_count": 8,
+  "cases": [
+    {
+      "case": "scaling-space-a1-256",
+      "repeat": 128
+    },
+    {
+      "case": "scaling-space-a1-1024",
+      "repeat": 32
+    },
+    {
+      "case": "scaling-space-a1-4096",
+      "repeat": 8
+    },
+    {
+      "case": "scaling-space-a1-16384",
+      "repeat": 2
+    },
+    {
+      "case": "scaling-contiguous-a1-256",
+      "repeat": 16
+    },
+    {
+      "case": "scaling-contiguous-a1-1024",
+      "repeat": 8
+    },
+    {
+      "case": "scaling-contiguous-a1-4096",
+      "repeat": 2
+    },
+    {
+      "case": "scaling-contiguous-a1-16384",
+      "repeat": 1
+    }
+  ],
+  "warmups": 3,
+  "iterations": 15
+}

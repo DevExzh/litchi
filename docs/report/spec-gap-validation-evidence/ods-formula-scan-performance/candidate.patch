@@ -1,0 +1,343 @@
+diff --git a/crates/litchi-ods/src/codec/formula.rs b/crates/litchi-ods/src/codec/formula.rs
+index 2085b53df..95a28af46 100644
+--- a/crates/litchi-ods/src/codec/formula.rs
++++ b/crates/litchi-ods/src/codec/formula.rs
+@@ -172,0 +173,6 @@ pub struct FormulaParser<'a> {
++    // The legacy sheet grammar scans `[A-Za-z0-9_ ]+` before deciding whether
++    // a dot follows. Keep the last immutable-input run so compact misses and
++    // adjacent cell-shaped names do not rescan the same suffix quadratically.
++    legacy_sheet_scan: Option<(usize, usize)>,
++    #[cfg(test)]
++    legacy_sheet_scan_work: usize,
+@@ -182,0 +189,3 @@ impl<'a> FormulaParser<'a> {
++            legacy_sheet_scan: None,
++            #[cfg(test)]
++            legacy_sheet_scan_work: 0,
+@@ -476,3 +485,2 @@ impl<'a> FormulaParser<'a> {
+-    /// method does not move `position` until a function or cell has passed all
+-    /// syntax checks, which also lets us defer fallible component copies until
+-    /// after the row has been parsed.
++    /// method restores `position` on a syntax miss, and defers fallible
++    /// component copies until after the row has been parsed.
+@@ -582 +590 @@ impl<'a> FormulaParser<'a> {
+-    fn has_spaced_sheet_qualifier(&self, end: usize) -> bool {
++    fn has_spaced_sheet_qualifier(&mut self, end: usize) -> bool {
+@@ -586,8 +594 @@ impl<'a> FormulaParser<'a> {
+-        let mut position = end;
+-        while self
+-            .input
+-            .get(position)
+-            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte == b' ')
+-        {
+-            position += 1;
+-        }
++        let position = self.legacy_sheet_scan_end(end);
+@@ -649,7 +650,2 @@ impl<'a> FormulaParser<'a> {
+-            while let Some(ch) = self.peek() {
+-                if ch.is_ascii_alphanumeric() || ch == b'_' || ch == b' ' {
+-                    self.advance();
+-                } else {
+-                    break;
+-                }
+-            }
++            let sheet_end = self.legacy_sheet_scan_end(start);
++            self.position = sheet_end;
+@@ -658 +654 @@ impl<'a> FormulaParser<'a> {
+-                sheet_range = Some((start, self.position));
++                sheet_range = Some((start, sheet_end));
+@@ -775,0 +772,27 @@ impl<'a> FormulaParser<'a> {
++
++    /// Return the end of the legacy unquoted sheet-name run beginning at
++    /// `start`. The input is immutable for a parser, so a cached run also
++    /// describes every suffix that starts inside it.
++    fn legacy_sheet_scan_end(&mut self, start: usize) -> usize {
++        if let Some((cached_start, cached_end)) = self.legacy_sheet_scan
++            && start >= cached_start
++            && start < cached_end
++        {
++            return cached_end;
++        }
++
++        let mut end = start;
++        while self
++            .input
++            .get(end)
++            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte == b' ')
++        {
++            #[cfg(test)]
++            {
++                self.legacy_sheet_scan_work += 1;
++            }
++            end += 1;
++        }
++        self.legacy_sheet_scan = Some((start, end));
++        end
++    }
+@@ -1359,0 +1383,95 @@ mod tests {
++    #[test]
++    fn test_legacy_sheet_scan_cache_keeps_scan_work_linear() {
++        fn tokenize_and_measure(source: &str) -> (usize, usize) {
++            let mut parser = FormulaParser::new(source);
++            // Keep the original formula prefix out of this private tokenizer
++            // loop; parse_with_limits makes the same body transition.
++            parser.position = 1;
++            let mut token_count = 0;
++            while !parser.is_at_end() {
++                parser.skip_whitespace();
++                if parser.is_at_end() {
++                    break;
++                }
++                parser
++                    .next_token()
++                    .expect("the generated legacy sequence should tokenize");
++                token_count += 1;
++            }
++            (parser.legacy_sheet_scan_work, token_count)
++        }
++
++        const CELLS: usize = 1_024;
++
++        let mut spaced = String::from("=");
++        for index in 0..CELLS {
++            if index != 0 {
++                spaced.push(' ');
++            }
++            spaced.push_str("A1");
++        }
++        let (spaced_work, spaced_tokens) = tokenize_and_measure(&spaced);
++        assert_eq!(spaced_tokens, CELLS);
++        assert!(
++            spaced_work <= spaced.len(),
++            "spaced sequence rescanned too much input: {spaced_work} > {}",
++            spaced.len()
++        );
++
++        let contiguous = format!("={}", "A1".repeat(CELLS));
++        let (contiguous_work, contiguous_tokens) = tokenize_and_measure(&contiguous);
++        assert_eq!(contiguous_tokens, CELLS);
++        assert!(
++            contiguous_work <= contiguous.len(),
++            "contiguous compact misses rescanned too much input: {contiguous_work} > {}",
++            contiguous.len()
++        );
++
++        let mut ranges = String::from("=");
++        for index in 0..CELLS {
++            if index != 0 {
++                ranges.push(' ');
++            }
++            ranges.push_str("A1:A1");
++        }
++        let (range_work, range_tokens) = tokenize_and_measure(&ranges);
++        assert_eq!(range_tokens, CELLS);
++        assert!(
++            range_work <= ranges.len(),
++            "range endpoint scans rescanned too much input: {range_work} > {}",
++            ranges.len()
++        );
++
++        let absolute = format!("={}", "$A$1 ".repeat(CELLS));
++        let (absolute_work, absolute_tokens) = tokenize_and_measure(&absolute);
++        assert_eq!(absolute_tokens, CELLS);
++        assert_eq!(
++            absolute_work, 0,
++            "absolute cells should not enter sheet scans"
++        );
++
++        // The first compact A1 is rejected as a possible space-bearing sheet
++        // reference, then the legacy parser starts earlier than that cached
++        // suffix. It must rescan only once before later suffixes reuse the
++        // new cache endpoint.
++        let mut backward = String::from("=A1 ");
++        for index in 0..CELLS {
++            if index != 0 {
++                backward.push(' ');
++            }
++            backward.push_str("Alias");
++        }
++        backward.push_str(".B2");
++        let (backward_work, backward_tokens) = tokenize_and_measure(&backward);
++        assert_eq!(backward_tokens, 1);
++        assert!(
++            backward_work > backward.len(),
++            "backward compact-to-legacy handoff did not exercise its second bounded scan"
++        );
++        assert!(
++            backward_work <= backward.len() * 2,
++            "backward handoff exceeded two linear scans: {backward_work} > {}",
++            backward.len() * 2
++        );
++    }
++
+diff --git a/crates/litchi-ods/tests/ods_formula_scan_regression.rs b/crates/litchi-ods/tests/ods_formula_scan_regression.rs
+new file mode 100644
+index 000000000..f03bf3f5f
+--- /dev/null
++++ b/crates/litchi-ods/tests/ods_formula_scan_regression.rs
+@@ -0,0 +1,166 @@
++//! Compatibility checks for the legacy formula scan boundaries.
++//!
++//! These cases exercise token and error semantics around inputs that can look
++//! like one compact identifier while the established parser intentionally
++//! emits several partial cell references.
++
++use litchi_core::Error;
++use litchi_ods::codec::formula::{CellRef, FormulaParser, Token};
++
++fn assert_cell(
++    token: &Token,
++    expected_sheet: Option<&str>,
++    expected_column: &str,
++    expected_row: u32,
++    expected_column_absolute: bool,
++    expected_row_absolute: bool,
++) {
++    let Token::CellRef(cell) = token else {
++        panic!("expected a cell token, got {token:?}");
++    };
++    assert_cell_ref(
++        cell,
++        expected_sheet,
++        expected_column,
++        expected_row,
++        expected_column_absolute,
++        expected_row_absolute,
++    );
++}
++
++fn assert_cell_ref(
++    cell: &CellRef,
++    expected_sheet: Option<&str>,
++    expected_column: &str,
++    expected_row: u32,
++    expected_column_absolute: bool,
++    expected_row_absolute: bool,
++) {
++    assert_eq!(cell.sheet.as_deref(), expected_sheet);
++    assert_eq!(cell.column, expected_column);
++    assert_eq!(cell.row, expected_row);
++    assert_eq!(cell.column_absolute, expected_column_absolute);
++    assert_eq!(cell.row_absolute, expected_row_absolute);
++}
++
++fn assert_invalid_format(source: &str) {
++    let error = FormulaParser::new(source)
++        .parse()
++        .expect_err("malformed legacy scan suffix should be rejected");
++    assert!(
++        matches!(error, Error::InvalidFormat(_)),
++        "unexpected error for {source:?}: {error}"
++    );
++}
++
++#[test]
++fn repeated_partial_cells_keep_boundaries_with_spaces_and_tabs() {
++    let source = "=A1 A1\tA1\nA1";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("whitespace-separated partial cells should remain independent");
++
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 4);
++    for token in &formula.tokens {
++        assert_cell(token, None, "A", 1, false, false);
++    }
++}
++
++#[test]
++fn contiguous_partial_cells_and_a_dot_tail_keep_legacy_tokens() {
++    let source = "=A1A1A1A1";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("contiguous cell-shaped text should retain partial-cell tokens");
++
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 4);
++    for token in &formula.tokens {
++        assert_cell(token, None, "A", 1, false, false);
++    }
++
++    let source = "=A1A1A1 .B2";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("a separated current-sheet dot tail should remain parseable");
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 1);
++    assert_cell(&formula.tokens[0], Some("A1A1A1 "), "B", 2, false, false);
++
++    let source = "=A1A1A1.A1";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("a dot directly after a partial-cell run should retain its sheet prefix");
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 1);
++    assert_cell(&formula.tokens[0], Some("A1A1A1"), "A", 1, false, false);
++}
++
++#[test]
++fn tabs_underscores_and_digit_boundaries_preserve_tokens_and_refusals() {
++    let source = "=A1\tSheet_2.C3+AA10 2";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("tab, underscore, and digit boundaries should parse");
++
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 5);
++    assert_cell(&formula.tokens[0], None, "A", 1, false, false);
++    assert_cell(&formula.tokens[1], Some("Sheet_2"), "C", 3, false, false);
++    assert!(matches!(formula.tokens[2], Token::Operator('+')));
++    assert_cell(&formula.tokens[3], None, "AA", 10, false, false);
++    assert!(matches!(formula.tokens[4], Token::Number(value) if value == 2.0));
++
++    for source in ["=A1_A2", "=A1.2", "=A1..B2"] {
++        assert_invalid_format(source);
++    }
++}
++
++#[test]
++fn a_dot_after_a_long_suffix_uses_the_legacy_sheet_fallback() {
++    let sheet = "VeryLongSheetName_0123456789";
++    let source = "=VeryLongSheetName_0123456789.A1";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("a long sheet prefix followed by a dot should parse");
++
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 1);
++    assert_cell(&formula.tokens[0], Some(sheet), "A", 1, false, false);
++}
++
++#[test]
++fn absolute_and_range_forms_retain_the_legacy_fallback_shape() {
++    let absolute = FormulaParser::new("=$a$1")
++        .parse()
++        .expect("absolute cell should use the legacy parser");
++    assert_eq!(absolute.tokens.len(), 1);
++    assert_cell(&absolute.tokens[0], None, "A", 1, true, true);
++
++    let source = "=Sheet_2.$a$1:.$B$2";
++    let formula = FormulaParser::new(source)
++        .parse()
++        .expect("absolute range should retain both fallback endpoints");
++    assert_eq!(formula.text, source);
++    assert_eq!(formula.tokens.len(), 1);
++    let Token::RangeRef(range) = &formula.tokens[0] else {
++        panic!("expected a range token, got {:?}", formula.tokens[0]);
++    };
++    assert_cell_ref(&range.start, Some("Sheet_2"), "A", 1, true, true);
++    assert_cell_ref(&range.end, None, "B", 2, true, true);
++}
++
++#[test]
++fn formula_prefixes_normalize_for_scanning_but_retain_original_text() {
++    for source in ["=A1+$b$2", "OF:=A1+$b$2", "  of:=A1+$b$2  "] {
++        let formula = FormulaParser::new(source)
++            .parse()
++            .expect("supported formula prefixes should share token semantics");
++        assert_eq!(formula.text, source);
++        assert_eq!(formula.tokens.len(), 3);
++        assert_cell(&formula.tokens[0], None, "A", 1, false, false);
++        assert!(matches!(formula.tokens[1], Token::Operator('+')));
++        assert_cell(&formula.tokens[2], None, "B", 2, true, true);
++    }
++}

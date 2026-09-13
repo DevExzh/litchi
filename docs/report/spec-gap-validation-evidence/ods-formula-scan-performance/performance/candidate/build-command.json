@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--locked",
+    "--offline",
+    "--release",
+    "--manifest-path",
+    "/var/tmp/ods-scan-worktree/docs/report/spec-gap-validation-evidence/ods-formula-scan-performance/performance/harness/Cargo.toml"
+  ],
+  "cwd": "/var/tmp/ods-scan-worktree",
+  "env": {
+    "CARGO_TARGET_DIR": "/var/tmp/ods-scan-target"
+  },
+  "status": 0,
+  "elapsed_seconds": 11.258634328842163
+}
