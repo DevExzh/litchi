@@ -1,0 +1,7 @@
+{
+  "scope": "Resolved missing-sheet reference-error operand regression on frozen draft30",
+  "result": "IFERROR([Missing.A1];valid-reference) wrongly typed-refuses as non-reference operand instead of catching resolved formula reference error",
+  "archive": "planner-reference-error-31.tar.gz",
+  "sha256": "8be783da6ff811d7989cb9ed765879342b8a2c14945f2b3941c9562c13dc6801",
+  "status": 101
+}
