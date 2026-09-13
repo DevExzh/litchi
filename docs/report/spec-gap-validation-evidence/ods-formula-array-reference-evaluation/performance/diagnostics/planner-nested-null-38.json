@@ -1,0 +1,6 @@
+{
+  "scope": "Nested empty-intersection Null as rangeoperand remains typed UnsupportedReferenceOperator at top-level and inside matrix lazy branch; concern cleared by public runtime regression.",
+  "archive": "planner-nested-null-38.tar.gz",
+  "sha256": "03487cfdd97fb358a2ccb867f48b84832c0ecc6ccf2d2a881a213f9a955992cf",
+  "status": 0
+}

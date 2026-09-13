@@ -1478,6 +1478,14 @@ enum ShapeFrame<'a> {
         node: super::Node<'a>,
         demand: ShapeDemand,
     },
+    /// Resolve a contiguous reference expression in one bounded pass.  Its
+    /// child operators are deliberately consumed by the reference evaluator
+    /// rather than scheduled as independent shape walks; otherwise a long
+    /// left-associated union would rebuild every prefix quadratically.
+    Reference {
+        node: super::Node<'a>,
+        operator: super::InfixOperator,
+    },
     /// The condition of a lazy handler is planned first.  Its shape value is
     /// left on the shape stack for this continuation, which then selects and
     /// schedules only the branches demanded by the discovered condition
@@ -1499,6 +1507,87 @@ enum ShapeFrame<'a> {
 enum ReferenceShapeFrame<'a> {
     Visit(super::Node<'a>),
     Apply(super::InfixOperator),
+    FinishError {
+        alternative: super::Node<'a>,
+        catches_not_available: bool,
+    },
+}
+
+/// Temporary stacks for reference geometry evaluation.
+///
+/// The vector is declared before its reservation so struct-field drop order
+/// destroys the retained elements before releasing the corresponding budget
+/// token.  This remains true for every early `?` return from the helper.
+struct ReferenceShapeScratch<'a> {
+    frames: Vec<ReferenceShapeFrame<'a>>,
+    frame_reservation: Option<Reservation>,
+    values: Vec<RuntimeValue<'a>>,
+    value_reservation: Option<Reservation>,
+}
+
+impl<'a> ReferenceShapeScratch<'a> {
+    fn new() -> Self {
+        Self {
+            frames: Vec::new(),
+            frame_reservation: None,
+            values: Vec::new(),
+            value_reservation: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReferenceOperandKind {
+    Scalar,
+    Reference,
+    Array,
+    Error(ScalarError),
+    Unknown,
+}
+
+enum ReferenceKindValue<'a> {
+    Known(ReferenceOperandKind),
+    Runtime(RuntimeValue<'a>),
+}
+
+#[derive(Clone, Copy)]
+enum ReferenceKindFrame<'a> {
+    Visit(super::Node<'a>),
+    Unary,
+    Infix(super::InfixOperator),
+    Function {
+        name: &'a str,
+        count: usize,
+    },
+    IfAfterCondition {
+        node: super::Node<'a>,
+        condition: super::Node<'a>,
+    },
+    IfErrorAfterValue {
+        node: super::Node<'a>,
+    },
+    UseChild,
+}
+
+/// The kind planner has the same ownership rule as the reference-value
+/// scratch machine: each vector is declared before its matching reservation so
+/// retained entries are dropped before budget tokens on every early return.
+struct ReferenceKindScratch<'a> {
+    frames: Vec<ReferenceKindFrame<'a>>,
+    frame_reservation: Option<Reservation>,
+    values: Vec<ReferenceKindValue<'a>>,
+    value_reservation: Option<Reservation>,
+}
+
+impl<'a> ReferenceKindScratch<'a> {
+    fn new() -> Self {
+        Self {
+            frames: Vec::new(),
+            frame_reservation: None,
+            values: Vec::new(),
+            value_reservation: None,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -3043,6 +3132,17 @@ where
                         })?;
                         continue;
                     }
+                    if let super::Kind::Infix(operator) = node.kind() {
+                        if matches!(
+                            operator,
+                            super::InfixOperator::Range
+                                | super::InfixOperator::Intersection
+                                | super::InfixOperator::Union
+                        ) {
+                            self.push_shape_frame(ShapeFrame::Reference { node, operator })?;
+                            continue;
+                        }
+                    }
                     let direct = match node.kind() {
                         super::Kind::Array(dimensions) => dimensions
                             .columns()
@@ -3096,6 +3196,10 @@ where
                         continue;
                     };
                     self.push_shape_children(node, demand, children)?;
+                },
+                ShapeFrame::Reference { node, operator } => {
+                    let shape = self.reference_operator_shape(node, operator)?;
+                    self.push_shape_value(shape)?;
                 },
                 ShapeFrame::Exit {
                     node,
@@ -3178,33 +3282,31 @@ where
         Ok(())
     }
 
-    /// Resolve geometry for a reference expression without reading cells.  The
-    /// small frame machine accepts parenthesized references and arbitrary
-    /// nesting of `:`, `!`, and `~`; the runtime reference module remains the
-    /// authority for their area/list semantics.  Its temporary area result is
-    /// dropped after extracting a bounded two-dimensional shape. A list or a
-    /// multi-plane result has no unambiguous broadcast shape and is deliberately
-    /// left unknown for the normal reference path.
+    /// Resolve geometry for a reference expression in one bounded pass.  The
+    /// small frame machine accepts parenthesized references, evaluated lazy
+    /// functions, and arbitrary nesting of `:`, `!`, and `~`; the runtime
+    /// reference module remains the authority for their area/list semantics.
+    /// Lazy conditions are scalar-probed when their branch is needed, while
+    /// unselected branches are never visited.  A list or a multi-plane result
+    /// has no unambiguous broadcast shape and is deliberately left unknown for
+    /// the normal reference path.
     fn reference_shape_value(
         &mut self,
         root: super::Node<'expr>,
     ) -> EvaluationResult<Option<RuntimeValue<'expr>>> {
-        let mut frames = Vec::new();
-        let mut frame_reservation = None;
-        let mut values = Vec::new();
-        let mut value_reservation = None;
+        let mut scratch = ReferenceShapeScratch::new();
         ensure_capacity(
-            &mut frames,
-            &mut frame_reservation,
+            &mut scratch.frames,
+            &mut scratch.frame_reservation,
             1,
             self.limits.scalar.max_stack_entries,
             self.execution,
             &self.storage_budget,
             "formula value reference shape frames",
         )?;
-        frames.push(ReferenceShapeFrame::Visit(root));
+        scratch.frames.push(ReferenceShapeFrame::Visit(root));
 
-        while let Some(frame) = frames.pop() {
+        while let Some(frame) = scratch.frames.pop() {
             self.scalar.step()?;
             match frame {
                 ReferenceShapeFrame::Visit(node) => match node.kind() {
@@ -3213,15 +3315,15 @@ where
                             "reference shape parentheses are empty",
                         ))?;
                         ensure_capacity(
-                            &mut frames,
-                            &mut frame_reservation,
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
                             1,
                             self.limits.scalar.max_stack_entries,
                             self.execution,
                             &self.storage_budget,
                             "formula value reference shape frames",
                         )?;
-                        frames.push(ReferenceShapeFrame::Visit(child));
+                        scratch.frames.push(ReferenceShapeFrame::Visit(child));
                     },
                     super::Kind::Reference(reference) => {
                         let value = match self.reference_value(reference) {
@@ -3233,15 +3335,25 @@ where
                             Err(error) => return Err(error),
                         };
                         ensure_capacity(
-                            &mut values,
-                            &mut value_reservation,
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
                             1,
                             self.limits.scalar.max_stack_entries,
                             self.execution,
                             &self.storage_budget,
                             "formula value reference shape values",
                         )?;
-                        values.push(value);
+                        scratch.values.push(value);
+                    },
+                    super::Kind::Function { name } if Self::is_reference_value_handler(name) => {
+                        self.schedule_reference_handler(
+                            node,
+                            name,
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                        )?;
                     },
                     super::Kind::Infix(operator)
                         if matches!(
@@ -3258,27 +3370,34 @@ where
                             "reference shape right operand is missing",
                         ))?;
                         ensure_capacity(
-                            &mut frames,
-                            &mut frame_reservation,
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
                             3,
                             self.limits.scalar.max_stack_entries,
                             self.execution,
                             &self.storage_budget,
                             "formula value reference shape frames",
                         )?;
-                        frames.push(ReferenceShapeFrame::Apply(operator));
-                        frames.push(ReferenceShapeFrame::Visit(right));
-                        frames.push(ReferenceShapeFrame::Visit(left));
+                        scratch.frames.push(ReferenceShapeFrame::Apply(operator));
+                        scratch.frames.push(ReferenceShapeFrame::Visit(right));
+                        scratch.frames.push(ReferenceShapeFrame::Visit(left));
                     },
                     _ => return Ok(None),
                 },
                 ReferenceShapeFrame::Apply(operator) => {
-                    let right = values.pop().ok_or(EvaluationFailure::InvalidExpression(
-                        "reference shape right value is missing",
-                    ))?;
-                    let left = values.pop().ok_or(EvaluationFailure::InvalidExpression(
-                        "reference shape left value is missing",
-                    ))?;
+                    let right =
+                        scratch
+                            .values
+                            .pop()
+                            .ok_or(EvaluationFailure::InvalidExpression(
+                                "reference shape right value is missing",
+                            ))?;
+                    let left = scratch
+                        .values
+                        .pop()
+                        .ok_or(EvaluationFailure::InvalidExpression(
+                            "reference shape left value is missing",
+                        ))?;
                     let value = match operator {
                         super::InfixOperator::Range => self.combine_range(left, right),
                         super::InfixOperator::Intersection => self.intersect_ranges(left, right),
@@ -3298,24 +3417,888 @@ where
                         Err(error) => return Err(error),
                     };
                     ensure_capacity(
-                        &mut values,
-                        &mut value_reservation,
+                        &mut scratch.values,
+                        &mut scratch.value_reservation,
                         1,
                         self.limits.scalar.max_stack_entries,
                         self.execution,
                         &self.storage_budget,
                         "formula value reference shape values",
                     )?;
-                    values.push(value);
+                    scratch.values.push(value);
+                },
+                ReferenceShapeFrame::FinishError {
+                    alternative,
+                    catches_not_available,
+                } => {
+                    let value =
+                        scratch
+                            .values
+                            .pop()
+                            .ok_or(EvaluationFailure::InvalidExpression(
+                                "reference error-handler value is missing",
+                            ))?;
+                    let caught = matches!(
+                        &value,
+                        RuntimeValue::Scalar(WorkingValue::Error(error))
+                            if !catches_not_available || *error == ScalarError::NotAvailable
+                    );
+                    if caught {
+                        self.push_reference_value(
+                            alternative,
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                        )?;
+                    } else {
+                        ensure_capacity(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            1,
+                            self.limits.scalar.max_stack_entries,
+                            self.execution,
+                            &self.storage_budget,
+                            "formula value reference shape values",
+                        )?;
+                        scratch.values.push(value);
+                    }
                 },
             }
         }
-        if values.len() != 1 {
+        if scratch.values.len() != 1 {
             return Err(EvaluationFailure::InvalidExpression(
                 "reference shape evaluator did not produce one value",
             ));
         }
-        Ok(values.pop())
+        Ok(scratch.values.pop())
+    }
+
+    fn is_reference_value_handler(name: &str) -> bool {
+        name.eq_ignore_ascii_case("IF")
+            || name.eq_ignore_ascii_case("IFERROR")
+            || name.eq_ignore_ascii_case("IFNA")
+    }
+
+    fn reference_candidate(&mut self, mut node: super::Node<'expr>) -> EvaluationResult<bool> {
+        loop {
+            match node.kind() {
+                super::Kind::Parenthesized => {
+                    self.scalar.charge_work(1)?;
+                    node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                        "reference candidate parentheses are empty",
+                    ))?;
+                },
+                super::Kind::Reference(_) => return Ok(true),
+                super::Kind::Function { name } if Self::is_reference_value_handler(name) => {
+                    return Ok(true);
+                },
+                super::Kind::Infix(
+                    super::InfixOperator::Range
+                    | super::InfixOperator::Intersection
+                    | super::InfixOperator::Union,
+                ) => {
+                    return Ok(true);
+                },
+                _ => return Ok(false),
+            }
+        }
+    }
+
+    fn reference_operand_kind_from_runtime(value: &RuntimeValue<'expr>) -> ReferenceOperandKind {
+        match value {
+            RuntimeValue::Areas(_) => ReferenceOperandKind::Reference,
+            RuntimeValue::Array(_) => ReferenceOperandKind::Array,
+            RuntimeValue::Scalar(WorkingValue::Error(error)) => ReferenceOperandKind::Error(*error),
+            RuntimeValue::Empty | RuntimeValue::Missing | RuntimeValue::Scalar(_) => {
+                ReferenceOperandKind::Scalar
+            },
+        }
+    }
+
+    fn reference_kind_value_kind(value: &ReferenceKindValue<'expr>) -> ReferenceOperandKind {
+        match value {
+            ReferenceKindValue::Known(kind) => *kind,
+            ReferenceKindValue::Runtime(value) => Self::reference_operand_kind_from_runtime(value),
+        }
+    }
+
+    fn reference_kind_value_into_kind(value: ReferenceKindValue<'expr>) -> ReferenceOperandKind {
+        match value {
+            ReferenceKindValue::Known(kind) => kind,
+            ReferenceKindValue::Runtime(value) => Self::reference_operand_kind_from_runtime(&value),
+        }
+    }
+
+    /// Classify one handler operand without materializing an array.  The
+    /// explicit frame stack carries this through arbitrary operators and
+    /// nested lazy handlers. `Reference` is kept distinct from `Array` so a
+    /// selected reference branch can still feed the reference geometry
+    /// evaluator; either kind is array-like when it is used as a handler's
+    /// condition or protected value.
+    fn reference_handler_operand_kind(
+        &mut self,
+        root: super::Node<'expr>,
+    ) -> EvaluationResult<ReferenceOperandKind> {
+        let mut scratch = ReferenceKindScratch::new();
+        ensure_capacity(
+            &mut scratch.frames,
+            &mut scratch.frame_reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value reference kind frames",
+        )?;
+        scratch.frames.push(ReferenceKindFrame::Visit(root));
+
+        while let Some(frame) = scratch.frames.pop() {
+            self.scalar.step()?;
+            match frame {
+                ReferenceKindFrame::Visit(node) => match node.kind() {
+                    super::Kind::Parenthesized => {
+                        let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                            "reference kind parentheses are empty",
+                        ))?;
+                        ensure_capacity(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            1,
+                            self.limits.scalar.max_stack_entries,
+                            self.execution,
+                            &self.storage_budget,
+                            "formula value reference kind frames",
+                        )?;
+                        scratch.frames.push(ReferenceKindFrame::Visit(child));
+                    },
+                    super::Kind::Number
+                    | super::Kind::String
+                    | super::Kind::Error
+                    | super::Kind::Missing => self.push_reference_kind_value(
+                        &mut scratch.values,
+                        &mut scratch.value_reservation,
+                        ReferenceOperandKind::Scalar,
+                    )?,
+                    super::Kind::Array(_) | super::Kind::ArrayRow => self
+                        .push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Array,
+                        )?,
+                    super::Kind::Reference(reference) => {
+                        let value = match self.reference_value(reference) {
+                            Ok(value) => value,
+                            Err(EvaluationFailure::Unsupported(
+                                super::UnsupportedKind::Reference,
+                            )) => {
+                                self.push_reference_kind_value(
+                                    &mut scratch.values,
+                                    &mut scratch.value_reservation,
+                                    ReferenceOperandKind::Unknown,
+                                )?;
+                                continue;
+                            },
+                            Err(error) => return Err(error),
+                        };
+                        self.push_reference_kind_runtime(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            value,
+                        )?;
+                    },
+                    super::Kind::Prefix(_) | super::Kind::Postfix(_) => {
+                        let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                            "reference kind unary operand is missing",
+                        ))?;
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Unary,
+                        )?;
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Visit(child),
+                        )?;
+                    },
+                    super::Kind::Infix(operator) => {
+                        if matches!(
+                            operator,
+                            super::InfixOperator::Range
+                                | super::InfixOperator::Intersection
+                                | super::InfixOperator::Union
+                        ) {
+                            let left =
+                                node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                                    "reference kind left operand is missing",
+                                ))?;
+                            let right =
+                                node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+                                    "reference kind right operand is missing",
+                                ))?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::Infix(operator),
+                            )?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::Visit(right),
+                            )?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::Visit(left),
+                            )?;
+                            continue;
+                        }
+                        let left = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                            "reference kind left operand is missing",
+                        ))?;
+                        let right = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+                            "reference kind right operand is missing",
+                        ))?;
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Infix(operator),
+                        )?;
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Visit(right),
+                        )?;
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Visit(left),
+                        )?;
+                    },
+                    super::Kind::Function { name } => {
+                        let count = node.child_count();
+                        if name.eq_ignore_ascii_case("IF") {
+                            if !(1..=3).contains(&count) {
+                                self.push_reference_kind_value(
+                                    &mut scratch.values,
+                                    &mut scratch.value_reservation,
+                                    ReferenceOperandKind::Scalar,
+                                )?;
+                                continue;
+                            }
+                            let condition =
+                                node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                                    "reference kind IF condition is missing",
+                                ))?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::IfAfterCondition { node, condition },
+                            )?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::Visit(condition),
+                            )?;
+                            continue;
+                        }
+                        if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA")
+                        {
+                            if count != 2 {
+                                self.push_reference_kind_value(
+                                    &mut scratch.values,
+                                    &mut scratch.value_reservation,
+                                    ReferenceOperandKind::Scalar,
+                                )?;
+                                continue;
+                            }
+                            let value =
+                                node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                                    "reference kind error-handler value is missing",
+                                ))?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::IfErrorAfterValue { node },
+                            )?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::Visit(value),
+                            )?;
+                            continue;
+                        }
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Function { name, count },
+                        )?;
+                        for index in (0..count).rev() {
+                            let child =
+                                node.child(index)
+                                    .ok_or(EvaluationFailure::InvalidExpression(
+                                        "reference kind function argument is missing",
+                                    ))?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::Visit(child),
+                            )?;
+                        }
+                    },
+                    super::Kind::NamedExpression { .. }
+                    | super::Kind::QuotedLabel
+                    | super::Kind::AutomaticIntersection => self.push_reference_kind_value(
+                        &mut scratch.values,
+                        &mut scratch.value_reservation,
+                        ReferenceOperandKind::Unknown,
+                    )?,
+                },
+                ReferenceKindFrame::Unary => {
+                    let child = self.pop_reference_kind_value(&mut scratch.values)?;
+                    let kind = match Self::reference_kind_value_into_kind(child) {
+                        ReferenceOperandKind::Array | ReferenceOperandKind::Reference => {
+                            ReferenceOperandKind::Array
+                        },
+                        kind => kind,
+                    };
+                    self.push_reference_kind_value(
+                        &mut scratch.values,
+                        &mut scratch.value_reservation,
+                        kind,
+                    )?;
+                },
+                ReferenceKindFrame::Infix(operator) => {
+                    let right_value = self.pop_reference_kind_value(&mut scratch.values)?;
+                    let left_value = self.pop_reference_kind_value(&mut scratch.values)?;
+                    let right = Self::reference_kind_value_kind(&right_value);
+                    let left = Self::reference_kind_value_kind(&left_value);
+                    if matches!(
+                        operator,
+                        super::InfixOperator::Range
+                            | super::InfixOperator::Intersection
+                            | super::InfixOperator::Union
+                    ) {
+                        let value = match (left, right) {
+                            (ReferenceOperandKind::Error(error), _)
+                            | (_, ReferenceOperandKind::Error(error)) => {
+                                ReferenceKindValue::Known(ReferenceOperandKind::Error(error))
+                            },
+                            (ReferenceOperandKind::Reference, ReferenceOperandKind::Reference) => {
+                                match (left_value, right_value) {
+                                    (
+                                        ReferenceKindValue::Runtime(left),
+                                        ReferenceKindValue::Runtime(right),
+                                    ) => {
+                                        let result = match operator {
+                                            super::InfixOperator::Range => {
+                                                self.combine_range(left, right)
+                                            },
+                                            super::InfixOperator::Intersection => {
+                                                self.intersect_ranges(left, right)
+                                            },
+                                            super::InfixOperator::Union => {
+                                                self.union_ranges(left, right)
+                                            },
+                                            _ => unreachable!("checked reference operator"),
+                                        };
+                                        match result {
+                                            Ok(value) => ReferenceKindValue::Runtime(value),
+                                            Err(EvaluationFailure::Unsupported(
+                                                super::UnsupportedKind::Reference
+                                                | super::UnsupportedKind::ReferenceOperator,
+                                            )) => ReferenceKindValue::Known(
+                                                ReferenceOperandKind::Unknown,
+                                            ),
+                                            Err(error) => return Err(error),
+                                        }
+                                    },
+                                    _ => ReferenceKindValue::Known(ReferenceOperandKind::Unknown),
+                                }
+                            },
+                            _ => ReferenceKindValue::Known(ReferenceOperandKind::Unknown),
+                        };
+                        self.push_reference_kind_entry(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            value,
+                        )?;
+                        continue;
+                    }
+                    let kind = if matches!(
+                        (left, right),
+                        (ReferenceOperandKind::Array, _)
+                            | (_, ReferenceOperandKind::Array)
+                            | (ReferenceOperandKind::Reference, _)
+                            | (_, ReferenceOperandKind::Reference)
+                    ) {
+                        ReferenceOperandKind::Array
+                    } else if matches!(
+                        (left, right),
+                        (ReferenceOperandKind::Unknown, _)
+                            | (_, ReferenceOperandKind::Unknown)
+                            | (ReferenceOperandKind::Error(_), _)
+                            | (_, ReferenceOperandKind::Error(_))
+                    ) {
+                        ReferenceOperandKind::Unknown
+                    } else {
+                        ReferenceOperandKind::Scalar
+                    };
+                    self.push_reference_kind_value(
+                        &mut scratch.values,
+                        &mut scratch.value_reservation,
+                        kind,
+                    )?;
+                },
+                ReferenceKindFrame::Function { name, count } => {
+                    let mut kind = ReferenceOperandKind::Scalar;
+                    for _ in 0..count {
+                        let child = self.pop_reference_kind_value(&mut scratch.values)?;
+                        if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") {
+                            continue;
+                        }
+                        kind = match (kind, Self::reference_kind_value_into_kind(child)) {
+                            (ReferenceOperandKind::Array, _)
+                            | (_, ReferenceOperandKind::Array)
+                            | (ReferenceOperandKind::Reference, _)
+                            | (_, ReferenceOperandKind::Reference) => ReferenceOperandKind::Array,
+                            (ReferenceOperandKind::Unknown, _)
+                            | (_, ReferenceOperandKind::Unknown) => ReferenceOperandKind::Unknown,
+                            _ => ReferenceOperandKind::Scalar,
+                        };
+                    }
+                    self.push_reference_kind_value(
+                        &mut scratch.values,
+                        &mut scratch.value_reservation,
+                        kind,
+                    )?;
+                },
+                ReferenceKindFrame::IfAfterCondition { node, condition } => {
+                    let condition_value = self.pop_reference_kind_value(&mut scratch.values)?;
+                    let condition_kind = Self::reference_kind_value_kind(&condition_value);
+                    if matches!(
+                        condition_kind,
+                        ReferenceOperandKind::Array | ReferenceOperandKind::Reference
+                    ) {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Array,
+                        )?;
+                        continue;
+                    }
+                    let condition = match condition_value {
+                        ReferenceKindValue::Runtime(value) => self.scalar_logical(value)?,
+                        ReferenceKindValue::Known(ReferenceOperandKind::Error(error)) => Err(error),
+                        ReferenceKindValue::Known(_) => {
+                            let value = self.evaluate_scalar_at(condition, Shape::new(1, 1)?, 0)?;
+                            self.scalar_logical(value)?
+                        },
+                    };
+                    let condition = match condition {
+                        Ok(value) => value,
+                        Err(error) => {
+                            self.push_reference_kind_value(
+                                &mut scratch.values,
+                                &mut scratch.value_reservation,
+                                ReferenceOperandKind::Error(error),
+                            )?;
+                            continue;
+                        },
+                    };
+                    let count = node.child_count();
+                    if count == 1 {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Scalar,
+                        )?;
+                        continue;
+                    }
+                    let branch = if condition {
+                        node.child(1)
+                    } else if count == 3 {
+                        node.child(2)
+                    } else {
+                        None
+                    };
+                    let Some(branch) = branch else {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Scalar,
+                        )?;
+                        continue;
+                    };
+                    if branch.is_missing() {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Scalar,
+                        )?;
+                    } else {
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::UseChild,
+                        )?;
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Visit(branch),
+                        )?;
+                    }
+                },
+                ReferenceKindFrame::IfErrorAfterValue { node } => {
+                    let value_value = self.pop_reference_kind_value(&mut scratch.values)?;
+                    let value_kind = Self::reference_kind_value_kind(&value_value);
+                    if matches!(
+                        value_kind,
+                        ReferenceOperandKind::Array | ReferenceOperandKind::Reference
+                    ) {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Array,
+                        )?;
+                        continue;
+                    }
+                    let value = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                        "reference kind error-handler value is missing",
+                    ))?;
+                    let alternative = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+                        "reference kind error-handler alternative is missing",
+                    ))?;
+                    let catches_not_available = node
+                        .function_name()
+                        .is_some_and(|name| name.eq_ignore_ascii_case("IFNA"));
+                    let mut uncaught_error = None;
+                    let catches = match value_kind {
+                        ReferenceOperandKind::Error(error) => {
+                            uncaught_error = Some(error);
+                            !catches_not_available || error == ScalarError::NotAvailable
+                        },
+                        _ => match value_value {
+                            ReferenceKindValue::Runtime(value) => match value {
+                                RuntimeValue::Scalar(WorkingValue::Error(error)) => {
+                                    uncaught_error = Some(error);
+                                    !catches_not_available || error == ScalarError::NotAvailable
+                                },
+                                _ => false,
+                            },
+                            ReferenceKindValue::Known(_) => {
+                                let value = self.evaluate_scalar_at(value, Shape::new(1, 1)?, 0)?;
+                                match value {
+                                    RuntimeValue::Scalar(WorkingValue::Error(error)) => {
+                                        uncaught_error = Some(error);
+                                        !catches_not_available || error == ScalarError::NotAvailable
+                                    },
+                                    _ => false,
+                                }
+                            },
+                        },
+                    };
+                    if alternative.is_missing() {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Scalar,
+                        )?;
+                    } else if catches {
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::UseChild,
+                        )?;
+                        self.push_reference_kind_frame(
+                            &mut scratch.frames,
+                            &mut scratch.frame_reservation,
+                            ReferenceKindFrame::Visit(alternative),
+                        )?;
+                    } else {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            uncaught_error
+                                .map_or(ReferenceOperandKind::Scalar, ReferenceOperandKind::Error),
+                        )?;
+                    }
+                },
+                ReferenceKindFrame::UseChild => {
+                    let value = self.pop_reference_kind_value(&mut scratch.values)?;
+                    self.push_reference_kind_entry(
+                        &mut scratch.values,
+                        &mut scratch.value_reservation,
+                        value,
+                    )?;
+                },
+            }
+        }
+        if scratch.values.len() != 1 {
+            return Err(EvaluationFailure::InvalidExpression(
+                "reference kind evaluator did not produce one value",
+            ));
+        }
+        scratch
+            .values
+            .pop()
+            .map(Self::reference_kind_value_into_kind)
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "reference kind evaluator value is missing",
+            ))
+    }
+
+    fn push_reference_kind_frame(
+        &mut self,
+        frames: &mut Vec<ReferenceKindFrame<'expr>>,
+        reservation: &mut Option<Reservation>,
+        frame: ReferenceKindFrame<'expr>,
+    ) -> EvaluationResult<()> {
+        ensure_capacity(
+            frames,
+            reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value reference kind frames",
+        )?;
+        frames.push(frame);
+        Ok(())
+    }
+
+    fn push_reference_kind_value(
+        &mut self,
+        values: &mut Vec<ReferenceKindValue<'expr>>,
+        reservation: &mut Option<Reservation>,
+        value: ReferenceOperandKind,
+    ) -> EvaluationResult<()> {
+        self.push_reference_kind_entry(values, reservation, ReferenceKindValue::Known(value))
+    }
+
+    fn push_reference_kind_runtime(
+        &mut self,
+        values: &mut Vec<ReferenceKindValue<'expr>>,
+        reservation: &mut Option<Reservation>,
+        value: RuntimeValue<'expr>,
+    ) -> EvaluationResult<()> {
+        self.push_reference_kind_entry(values, reservation, ReferenceKindValue::Runtime(value))
+    }
+
+    fn push_reference_kind_entry(
+        &mut self,
+        values: &mut Vec<ReferenceKindValue<'expr>>,
+        reservation: &mut Option<Reservation>,
+        value: ReferenceKindValue<'expr>,
+    ) -> EvaluationResult<()> {
+        ensure_capacity(
+            values,
+            reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value reference kind values",
+        )?;
+        values.push(value);
+        Ok(())
+    }
+
+    fn pop_reference_kind_value(
+        &mut self,
+        values: &mut Vec<ReferenceKindValue<'expr>>,
+    ) -> EvaluationResult<ReferenceKindValue<'expr>> {
+        values.pop().ok_or(EvaluationFailure::InvalidExpression(
+            "reference kind value stack underflow",
+        ))
+    }
+
+    fn push_reference_value(
+        &mut self,
+        node: super::Node<'expr>,
+        frames: &mut Vec<ReferenceShapeFrame<'expr>>,
+        frame_reservation: &mut Option<Reservation>,
+        values: &mut Vec<RuntimeValue<'expr>>,
+        value_reservation: &mut Option<Reservation>,
+    ) -> EvaluationResult<()> {
+        if node.is_missing() {
+            return self.push_reference_runtime_value(
+                RuntimeValue::Empty,
+                values,
+                value_reservation,
+            );
+        }
+        if matches!(
+            self.reference_handler_operand_kind(node)?,
+            ReferenceOperandKind::Array
+        ) {
+            return Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::ReferenceOperator,
+            ));
+        }
+        if self.reference_candidate(node)? {
+            ensure_capacity(
+                frames,
+                frame_reservation,
+                1,
+                self.limits.scalar.max_stack_entries,
+                self.execution,
+                &self.storage_budget,
+                "formula value reference shape frames",
+            )?;
+            frames.push(ReferenceShapeFrame::Visit(node));
+            return Ok(());
+        }
+        let value = self.evaluate_scalar_at(node, Shape::new(1, 1)?, 0)?;
+        self.push_reference_runtime_value(value, values, value_reservation)
+    }
+
+    fn push_reference_runtime_value(
+        &mut self,
+        value: RuntimeValue<'expr>,
+        values: &mut Vec<RuntimeValue<'expr>>,
+        value_reservation: &mut Option<Reservation>,
+    ) -> EvaluationResult<()> {
+        ensure_capacity(
+            values,
+            value_reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value reference shape values",
+        )?;
+        values.push(value);
+        Ok(())
+    }
+
+    fn schedule_reference_handler(
+        &mut self,
+        node: super::Node<'expr>,
+        name: &str,
+        frames: &mut Vec<ReferenceShapeFrame<'expr>>,
+        frame_reservation: &mut Option<Reservation>,
+        values: &mut Vec<RuntimeValue<'expr>>,
+        value_reservation: &mut Option<Reservation>,
+    ) -> EvaluationResult<()> {
+        let count = node.child_count();
+        if name.eq_ignore_ascii_case("IF") {
+            if !(1..=3).contains(&count) {
+                return self.push_reference_runtime_value(
+                    RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value)),
+                    values,
+                    value_reservation,
+                );
+            }
+            let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                "reference IF condition is missing",
+            ))?;
+            if matches!(
+                self.reference_handler_operand_kind(condition)?,
+                ReferenceOperandKind::Array | ReferenceOperandKind::Reference
+            ) {
+                return Err(EvaluationFailure::Unsupported(
+                    super::UnsupportedKind::ReferenceOperator,
+                ));
+            }
+            let condition = self.evaluate_scalar_at(condition, Shape::new(1, 1)?, 0)?;
+            let condition = match self.scalar_logical(condition)? {
+                Ok(value) => value,
+                Err(error) => {
+                    return self.push_reference_runtime_value(
+                        RuntimeValue::Scalar(WorkingValue::Error(error)),
+                        values,
+                        value_reservation,
+                    );
+                },
+            };
+            if count == 1 {
+                return self.push_reference_runtime_value(
+                    RuntimeValue::Scalar(WorkingValue::Logical(condition)),
+                    values,
+                    value_reservation,
+                );
+            }
+            let branch = if condition {
+                node.child(1)
+            } else if count == 3 {
+                node.child(2)
+            } else {
+                return self.push_reference_runtime_value(
+                    RuntimeValue::Scalar(WorkingValue::Logical(false)),
+                    values,
+                    value_reservation,
+                );
+            };
+            let branch = branch.ok_or(EvaluationFailure::InvalidExpression(
+                "reference IF branch is missing",
+            ))?;
+            return self.push_reference_value(
+                branch,
+                frames,
+                frame_reservation,
+                values,
+                value_reservation,
+            );
+        }
+
+        if count != 2 {
+            return self.push_reference_runtime_value(
+                RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value)),
+                values,
+                value_reservation,
+            );
+        }
+        let value = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+            "reference error-handler value is missing",
+        ))?;
+        let alternative = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+            "reference error-handler alternative is missing",
+        ))?;
+        if matches!(
+            self.reference_handler_operand_kind(value)?,
+            ReferenceOperandKind::Array | ReferenceOperandKind::Reference
+        ) {
+            return Err(EvaluationFailure::Unsupported(
+                super::UnsupportedKind::ReferenceOperator,
+            ));
+        }
+        if self.reference_candidate(value)? {
+            ensure_capacity(
+                frames,
+                frame_reservation,
+                2,
+                self.limits.scalar.max_stack_entries,
+                self.execution,
+                &self.storage_budget,
+                "formula value reference shape frames",
+            )?;
+            frames.push(ReferenceShapeFrame::FinishError {
+                alternative,
+                catches_not_available: name.eq_ignore_ascii_case("IFNA"),
+            });
+            frames.push(ReferenceShapeFrame::Visit(value));
+            Ok(())
+        } else {
+            let value = self.evaluate_scalar_at(value, Shape::new(1, 1)?, 0)?;
+            let caught = matches!(
+                &value,
+                RuntimeValue::Scalar(WorkingValue::Error(error))
+                    if !name.eq_ignore_ascii_case("IFNA")
+                        || *error == ScalarError::NotAvailable
+            );
+            if caught {
+                self.push_reference_value(
+                    alternative,
+                    frames,
+                    frame_reservation,
+                    values,
+                    value_reservation,
+                )
+            } else {
+                self.push_reference_runtime_value(value, values, value_reservation)
+            }
+        }
     }
 
     fn reference_operator_shape(
@@ -3391,7 +4374,12 @@ where
                         | super::InfixOperator::Intersection
                         | super::InfixOperator::Union
                 ) {
-                    return self.reference_operator_shape(node, operator);
+                    // Reference infixes are consumed by ShapeFrame::Reference
+                    // before their children are scheduled.  Re-entering the
+                    // complete geometry evaluator here would make a
+                    // left-associated reference chain quadratic if a future
+                    // frame path reached this fallback.
+                    return Ok(None);
                 }
                 Ok(match (shapes[0], shapes[1]) {
                     (Some(left), Some(right)) => broadcast_shape(left, right),
