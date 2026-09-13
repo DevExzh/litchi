@@ -493,6 +493,7 @@ fn parse_decimal_signed_value<'a>(
             negative: false,
             magnitude: Uint1024::from_u64(if value { 1 } else { 0 }),
         })),
+        WorkingValue::Complex(_) => Ok(Err(ScalarError::Value)),
         WorkingValue::Error(error) => Ok(Err(error)),
     }
 }
@@ -567,6 +568,7 @@ fn parse_fixed_value<'a>(
         WorkingValue::Logical(value) => {
             parse_fixed_text(evaluator, if value { "1" } else { "0" }, radix)
         },
+        WorkingValue::Complex(_) => Ok(Err(ScalarError::Value)),
         WorkingValue::Error(error) => Ok(Err(error)),
     }
 }

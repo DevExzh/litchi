@@ -171,6 +171,7 @@ pub(super) fn eager<'a>(
     .any(|function| name.eq_ignore_ascii_case(function))
         && !super::super::radix::is_radix_function(name)
         && !super::super::roman::is_roman_function(name)
+        && !super::super::complex::is_complex_function(name)
     {
         return Err(EvaluationFailure::Unsupported(UnsupportedKind::Function));
     }

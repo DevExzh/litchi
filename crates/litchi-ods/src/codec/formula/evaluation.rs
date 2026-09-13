@@ -8,8 +8,10 @@
 //! and `XOR`), the five bit-operation functions (`BITAND`, `BITLSHIFT`,
 //! `BITOR`, `BITRSHIFT`, and `BITXOR`), and the section 6.19 radix functions
 //! (`BASE`, `DECIMAL`, and the twelve `xxx2yyy` conversions), plus the
-//! `ARABIC` and `ROMAN` conversions.  References, arrays, names, labels, and
-//! other functions are reported as typed capability refusals.
+//! `ARABIC` and `ROMAN` conversions.  It also carries the complete section
+//! 6.8 complex-number family as a distinguished scalar value.  References,
+//! arrays, names, labels, and other functions are reported as typed capability
+//! refusals in this scalar profile.
 //!
 //! The profile makes the following deterministic choices for host-dependent
 //! scalar behavior:
@@ -32,6 +34,15 @@
 //!   right shift returns zero.  Integer conversion truncates toward zero;
 //!   unrepresentable data operands/results return `#NUM!` in this profile;
 //! * `0^0` is accepted as `1`, as permitted by this bounded profile.
+//! * complex values retain finite real and imaginary `f64` components and a
+//!   lowercase `i`/`j` suffix.  The section 6.8 functions accept Number,
+//!   Logical, and the documented complex Text forms; ordinary Number,
+//!   Logical, and ordering conversions reject complex values with
+//!   `#VALUE!`.  `IMSUM` ignores unconvertible Text and has a zero identity,
+//!   while `IMPRODUCT` requires at least one argument.  `IMARGUMENT(0)` is
+//!   zero, `IMPOWER` rejects a zero base, and `IMSQRT` uses the mathematical
+//!   principal branch.  `IMSECH` retains its complex result despite the
+//!   conflicting Number label in the local specification.
 //! * `BASE` and `DECIMAL` use a fixed 1024-bit unsigned magnitude so every
 //!   finite integer `f64` can be converted without narrowing through `u64`.
 //!   Decimal text is accumulated once and rounded to `f64` using a
@@ -83,6 +94,7 @@
 //! # }
 //! ```
 
+pub mod complex;
 mod radix;
 mod roman;
 pub mod value;
@@ -306,6 +318,8 @@ pub enum ScalarValue<'a> {
     Text(Cow<'a, str>),
     /// A formula-level Error value.
     Error(ScalarError),
+    /// A finite OpenFormula complex number.
+    Complex(complex::Complex),
 }
 
 /// A successful scalar result.  Owned text retains its memory reservation
@@ -528,6 +542,7 @@ enum WorkingValue<'a> {
     Logical(bool),
     Text(TextValue<'a>),
     Error(ScalarError),
+    Complex(complex::Complex),
 }
 
 #[derive(Debug)]
@@ -765,6 +780,10 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
     fn visit_function(&mut self, node: Node<'a>, name: &'a str) -> EvaluationResult<()> {
         self.charge_bytes(name.len())?;
 
+        if complex::is_complex_function(name) {
+            return self.schedule_eager_function(node);
+        }
+
         if name.eq_ignore_ascii_case("TRUE") || name.eq_ignore_ascii_case("FALSE") {
             if node.child_count() == 0 {
                 return self.push_value(WorkingValue::Logical(name.eq_ignore_ascii_case("TRUE")));
@@ -870,6 +889,9 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
     }
 
     fn apply_function(&mut self, node: Node<'a>, name: &str) -> EvaluationResult<()> {
+        if complex::is_complex_function(name) {
+            return complex::apply(self, node, name);
+        }
         if name.eq_ignore_ascii_case("IF") {
             return self.dispatch_if(node);
         }
@@ -1363,6 +1385,7 @@ impl<'a, 'ctx, 'exec> Evaluator<'a, 'ctx, 'exec> {
             WorkingValue::Text(value) => {
                 EvaluatedScalar::new(ScalarValue::Text(value.text), value.reservation)
             },
+            WorkingValue::Complex(value) => EvaluatedScalar::new(ScalarValue::Complex(value), None),
         }
     }
 }
@@ -1430,9 +1453,12 @@ fn apply_prefix<'a>(
 ) -> EvaluationResult<WorkingValue<'a>> {
     match operator {
         PrefixOperator::Plus => Ok(value),
-        PrefixOperator::Minus => match to_number(value, evaluator)? {
-            Ok(number) => Ok(finite_number(-number)),
-            Err(error) => Ok(WorkingValue::Error(error)),
+        PrefixOperator::Minus => match value {
+            WorkingValue::Complex(value) => Ok(WorkingValue::Complex(value.negate())),
+            value => match to_number(value, evaluator)? {
+                Ok(number) => Ok(finite_number(-number)),
+                Err(error) => Ok(WorkingValue::Error(error)),
+            },
         },
     }
 }
@@ -1502,6 +1528,7 @@ fn to_number<'a>(
             }
         },
         WorkingValue::Error(error) => Ok(Err(error)),
+        WorkingValue::Complex(_) => Ok(Err(ScalarError::Value)),
     }
 }
 
@@ -1643,6 +1670,7 @@ fn to_logical<'a>(
             Ok(Err(ScalarError::Value))
         },
         WorkingValue::Error(error) => Ok(Err(error)),
+        WorkingValue::Complex(_) => Ok(Err(ScalarError::Value)),
     }
 }
 
@@ -1699,6 +1727,7 @@ fn to_text<'a>(
             text.push_str(rendered);
             Ok(TextValue::owned(text, reservation))
         },
+        WorkingValue::Complex(value) => complex::to_text(evaluator, value),
         WorkingValue::Error(_) => Err(EvaluationFailure::InvalidExpression(
             "error reached text conversion after propagation check",
         )),
@@ -1809,6 +1838,9 @@ fn compare_equal(
                     == Ordering::Equal,
             )
         },
+        (WorkingValue::Complex(left), WorkingValue::Complex(right)) => {
+            Ok(left.real() == right.real() && left.imaginary() == right.imaginary())
+        },
         _ => Ok(false),
     }
 }
@@ -1838,6 +1870,9 @@ fn ordered_compare<'a>(
                 right.text.as_ref(),
                 case,
             )?)
+        },
+        (WorkingValue::Complex(_), WorkingValue::Complex(_)) => {
+            return Ok(WorkingValue::Error(ScalarError::Value));
         },
         _ => {
             return Ok(WorkingValue::Error(ScalarError::Value));

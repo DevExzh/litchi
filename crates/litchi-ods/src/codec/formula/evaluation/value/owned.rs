@@ -10,7 +10,8 @@
 //! to the result.
 
 use super::super::{
-    EvaluationFailure, EvaluationResult, ScalarError, WorkingValue, map_execution_error,
+    EvaluationFailure, EvaluationResult, ScalarError, WorkingValue, complex::Complex,
+    map_execution_error,
 };
 use super::{Area, Evaluated, Limits, RuntimeElement, RuntimeValue, Shape};
 use crate::codec::formula::reference::{
@@ -42,6 +43,9 @@ pub enum OwnedValueView<'a> {
     Empty,
     /// A finite numeric value.
     Number(f64),
+    /// A finite OpenFormula complex number, including its representation
+    /// suffix (`i` or `j`).
+    Complex(Complex),
     /// A logical value.
     Logical(bool),
     /// Text retained by the owned result.
@@ -64,6 +68,7 @@ impl OwnedValueView<'_> {
             Self::Array(array) => Some(array.shape()),
             Self::Empty
             | Self::Number(_)
+            | Self::Complex(_)
             | Self::Logical(_)
             | Self::Text(_)
             | Self::Error(_)
@@ -187,6 +192,7 @@ impl OwnedEvaluated {
             }),
             OwnedValue::Empty
             | OwnedValue::Number(_)
+            | OwnedValue::Complex(_)
             | OwnedValue::Logical(_)
             | OwnedValue::Text(_)
             | OwnedValue::Error(_)
@@ -202,6 +208,7 @@ impl OwnedEvaluated {
             OwnedValue::Reference(record) => Some(record.as_view()),
             OwnedValue::Empty
             | OwnedValue::Number(_)
+            | OwnedValue::Complex(_)
             | OwnedValue::Logical(_)
             | OwnedValue::Text(_)
             | OwnedValue::Error(_)
@@ -219,6 +226,7 @@ impl OwnedEvaluated {
             }),
             OwnedValue::Empty
             | OwnedValue::Number(_)
+            | OwnedValue::Complex(_)
             | OwnedValue::Logical(_)
             | OwnedValue::Text(_)
             | OwnedValue::Error(_)
@@ -304,6 +312,7 @@ fn reserve_storage(
 enum OwnedValue {
     Empty,
     Number(f64),
+    Complex(Complex),
     Logical(bool),
     Text(String),
     Error(ScalarError),
@@ -323,6 +332,7 @@ enum OwnedElement {
     Empty,
     Error(ScalarError),
     Number(f64),
+    Complex(Complex),
     Logical(bool),
     Text(String),
 }
@@ -343,6 +353,7 @@ impl OwnedValue {
         match self {
             Self::Empty => OwnedValueView::Empty,
             Self::Number(value) => OwnedValueView::Number(*value),
+            Self::Complex(value) => OwnedValueView::Complex(*value),
             Self::Logical(value) => OwnedValueView::Logical(*value),
             Self::Text(value) => OwnedValueView::Text(value),
             Self::Error(error) => OwnedValueView::Error(*error),
@@ -362,6 +373,7 @@ impl OwnedValue {
             Self::Array(array) => Some(array.shape),
             Self::Empty
             | Self::Number(_)
+            | Self::Complex(_)
             | Self::Logical(_)
             | Self::Text(_)
             | Self::Error(_)
@@ -377,6 +389,7 @@ impl OwnedElement {
             Self::Empty => OwnedValueView::Empty,
             Self::Error(error) => OwnedValueView::Error(*error),
             Self::Number(value) => OwnedValueView::Number(*value),
+            Self::Complex(value) => OwnedValueView::Complex(*value),
             Self::Logical(value) => OwnedValueView::Logical(*value),
             Self::Text(value) => OwnedValueView::Text(value),
         }
@@ -568,9 +581,10 @@ impl<'a> Measure<'a> {
 
     fn working(&mut self, value: &WorkingValue<'_>, text_value: bool) -> EvaluationResult<()> {
         match value {
-            WorkingValue::Number(_) | WorkingValue::Logical(_) | WorkingValue::Error(_) => {
-                self.item()
-            },
+            WorkingValue::Number(_)
+            | WorkingValue::Logical(_)
+            | WorkingValue::Error(_)
+            | WorkingValue::Complex(_) => self.item(),
             WorkingValue::Text(value) => self.string(value.text.as_ref(), text_value),
         }
     }
@@ -743,6 +757,7 @@ fn copy_working(
 ) -> EvaluationResult<OwnedValue> {
     match value {
         WorkingValue::Number(value) => Ok(OwnedValue::Number(*value)),
+        WorkingValue::Complex(value) => Ok(OwnedValue::Complex(*value)),
         WorkingValue::Logical(value) => Ok(OwnedValue::Logical(*value)),
         WorkingValue::Error(error) => Ok(OwnedValue::Error(*error)),
         WorkingValue::Text(value) => Ok(OwnedValue::Text(copy_string(
@@ -764,6 +779,7 @@ fn copy_element(
         RuntimeElement::Empty => Ok(OwnedElement::Empty),
         RuntimeElement::Missing => Ok(OwnedElement::Error(ScalarError::NotAvailable)),
         RuntimeElement::Present(WorkingValue::Number(value)) => Ok(OwnedElement::Number(*value)),
+        RuntimeElement::Present(WorkingValue::Complex(value)) => Ok(OwnedElement::Complex(*value)),
         RuntimeElement::Present(WorkingValue::Logical(value)) => Ok(OwnedElement::Logical(*value)),
         RuntimeElement::Present(WorkingValue::Error(error)) => Ok(OwnedElement::Error(*error)),
         RuntimeElement::Present(WorkingValue::Text(value)) => Ok(OwnedElement::Text(copy_string(

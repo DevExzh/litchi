@@ -1,10 +1,11 @@
 # OpenFormula complex functions
 
-The active implementation targets all 26 ODF 1.4 Part 4 §6.8 functions in the
+The implementation provides all 26 ODF 1.4 Part 4 §6.8 functions in the
 scalar and value evaluators. [Contract](contract.md) records exact local source
 hashes, conversion and sequence rules, selected interpretations of conflicting
 IMSQRT/IMSECH text, and independently computed extreme-value oracles.
-Implementation and final validation remain in progress.
+[Implementation profile](implementation-profile.md) records the public value,
+ordinary coercion, numeric, and resource policies.
 
 ## Missing-behavior baseline
 
@@ -31,10 +32,27 @@ All archive members and log hashes were verified before captures were moved
 out of scratch. The single existing disk-backed build workspace is retained;
 no temporary repository copy was created under /tmp or /var/tmp.
 
-## Remaining work
+## Candidate 09 validation
 
-Complete and review the fixed-size complex representation, scalar kernels,
-array/reference sequences, owned conversion, and ordinary scalar coercions.
-Then run focused and full ODS checks, execute the independent performance
-harness, and compare existing workloads. Passing the baseline's three existing
-resource checks does not establish bounded complex execution or support.
+[Focused capture](candidate-09/receipt.json) passes 30 tests: 10 conformance,
+12 resource/ownership/error tests, and 8 array/reference tests. The exact
+464-file dependency source closure and frozen capture/hash runners are in
+`candidate-09/source.tar.gz`. [Full gates](candidate-09/gates.json) match the
+canonical source before and after: 1,105 tests pass, Clippy passes with warnings
+denied, documentation passes with warnings denied, five doctests pass, and
+formatting passes. Full logs and the gate runner are in
+`candidate-09/gate-logs.tar.gz`.
+
+The final source incorporates independent reviews of public/owned values,
+streamed references, reservation lifetimes, numerical extremes, and scalar
+aggregate cancellation/error ordering. Tests include finite exponential and
+hyperbolic outputs whose naive scale overflows, mixed division preserving a
+subnormal denominator component, product cancellation, and signed-zero axes.
+Earlier candidate diagnostics retain compile errors and corrected test-oracle
+mistakes; they are not final gate results.
+
+[Performance report](performance/report.md) retains 225 successful new-family
+process runs and an existing-value comparison of 162 processes. Six RSS flags
+and one small allocation-byte change remain explicit review items; passing
+correctness checks is not broad performance acceptance. Database functions and
+other missing audit work remain outside this implemented family.

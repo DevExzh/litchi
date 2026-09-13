@@ -376,7 +376,9 @@ where
                 }
             },
             RuntimeValue::Scalar(WorkingValue::Error(error)) => return Ok(formula_error(error)),
-            RuntimeValue::Scalar(WorkingValue::Text(_)) | RuntimeValue::Missing => {
+            RuntimeValue::Scalar(WorkingValue::Text(_))
+            | RuntimeValue::Scalar(WorkingValue::Complex(_))
+            | RuntimeValue::Missing => {
                 return Ok(formula_error(ScalarError::Value));
             },
             RuntimeValue::Empty => 0.0,
@@ -532,7 +534,8 @@ where
                 RuntimeElement::Empty
                 | RuntimeElement::Missing
                 | RuntimeElement::Present(WorkingValue::Logical(_))
-                | RuntimeElement::Present(WorkingValue::Text(_)) => {
+                | RuntimeElement::Present(WorkingValue::Text(_))
+                | RuntimeElement::Present(WorkingValue::Complex(_)) => {
                     scan.invalid_value = true;
                 },
             }

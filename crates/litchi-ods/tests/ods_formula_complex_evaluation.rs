@@ -262,7 +262,64 @@ fn complex_domains_nonfinite_values_and_extreme_finite_values_are_typed() {
     // decimal oracle in the contract, with a relative tolerance suitable for
     // binary f64 evaluation.
     for (source, expected) in [
-        ("=IMREAL(IMLN(COMPLEX(1e308;1e308)))", 709.5427822324460),
+        ("=IMREAL(IMLN(COMPLEX(1e308;1e308)))", 709.542_782_232_446),
+        (
+            "=IMREAL(IMEXP(COMPLEX(710;0.7853981633974483)))",
+            1.5796728482882014e308,
+        ),
+        (
+            "=IMAGINARY(IMEXP(COMPLEX(710;0.7853981633974483)))",
+            1.5796728482882014e308,
+        ),
+        (
+            "=IMREAL(IMSIN(COMPLEX(0.7853981633974483;710.6)))",
+            1.439175797666178e308,
+        ),
+        (
+            "=IMAGINARY(IMCOS(COMPLEX(0.7853981633974483;710.6)))",
+            -1.439175797666178e308,
+        ),
+        (
+            "=IMREAL(IMSINH(COMPLEX(710.6;0.7853981633974483)))",
+            1.439175797666178e308,
+        ),
+        (
+            "=IMAGINARY(IMCOSH(COMPLEX(710.6;0.7853981633974483)))",
+            1.439175797666178e308,
+        ),
+        (
+            "=IMREAL(IMPRODUCT(COMPLEX(1.4e154;5.6e153);COMPLEX(1.4e154;5.6e153)))",
+            1.6464e308,
+        ),
+        (
+            "=IMAGINARY(IMPRODUCT(COMPLEX(1.4e154;5.6e153);COMPLEX(1.4e154;5.6e153)))",
+            1.568e308,
+        ),
+        ("=IMAGINARY(IMPRODUCT(COMPLEX(1e308;1e-308);1))", 1e-308),
+        ("=IMAGINARY(IMDIV(COMPLEX(1e308;1e-308);1))", 1e-308),
+        (
+            "=IMAGINARY(IMDIV(COMPLEX(1e308;0);COMPLEX(2;5e-324)))",
+            -1.235_164_114_603_116_4e-16,
+        ),
+        ("=IMAGINARY(IMTAN(COMPLEX(0;1000)))", 1.0),
+        ("=IMAGINARY(IMCOT(COMPLEX(0;1000)))", -1.0),
+        ("=IMREAL(IMSEC(COMPLEX(0;1000)))", 0.0),
+        ("=IMREAL(IMCSCH(COMPLEX(1000;0)))", 0.0),
+        (
+            "=IMREAL(IMLN(COMPLEX(1.7976931348623157e308;1.7976931348623157e308)))",
+            710.1292864836639,
+        ),
+        (
+            "=IMREAL(IMSQRT(COMPLEX(1.7976931348623157e308;1.7976931348623157e308)))",
+            1.4730945569055652e154,
+        ),
+        (
+            "=IMAGINARY(IMSQRT(COMPLEX(1.7976931348623157e308;1.7976931348623157e308)))",
+            6.1017574412827024e153,
+        ),
+        ("=IMAGINARY(IMSQRT(COMPLEX(1;1e-300)))", 5e-301),
+        ("=IMAGINARY(IMSQRT(COMPLEX(-1;-0)))", 1.0),
+        ("=IMREAL(IMDIV(COMPLEX(1e308;1e308);COMPLEX(1;1)))", 1e308),
         ("=IMABS(COMPLEX(1.2e308;1.2e308))", 1.697056274847714e308),
         (
             "=IMREAL(IMDIV(COMPLEX(1e308;1e308);COMPLEX(1e308;1e308)))",
@@ -280,7 +337,7 @@ fn complex_domains_nonfinite_values_and_extreme_finite_values_are_typed() {
     for (source, expected) in [
         (
             "=IMREAL(IMSQRT(COMPLEX(1e308;1e308)))",
-            1.098684113467810e154,
+            1.098_684_113_467_81e154,
         ),
         (
             "=IMAGINARY(IMSQRT(COMPLEX(1e308;1e308)))",
@@ -544,4 +601,38 @@ fn complex_evaluation_honors_cancellation_and_local_text_limits() {
         "wrong complex text limit error: {error:?}"
     );
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn complex_constructor_errors_and_numeric_equality_are_explicit() {
+    use evaluation::complex::{Complex, Error};
+    assert_eq!(Complex::new(f64::INFINITY, 0.0, 'i'), Err(Error::NonFinite));
+    assert_eq!(Complex::new(0.0, f64::NAN, 'i'), Err(Error::NonFinite));
+    assert_eq!(Complex::new(1.0, 2.0, 'I'), Err(Error::InvalidSuffix));
+    let i = Complex::new(1.0, 2.0, 'i').expect("finite complex");
+    let j = Complex::new(1.0, 2.0, 'j').expect("finite complex");
+    assert_eq!(i, j, "suffix is formatting metadata");
+    assert_eq!(i.to_string(), "1+2i");
+    assert_eq!(j.to_string(), "1+2j");
+    assert_eq!(
+        Complex::new(3.0, 0.0, 'j').expect("real only").to_string(),
+        "3"
+    );
+}
+
+#[test]
+fn complex_zero_axis_components_preserve_sign() {
+    for (source, negative) in [
+        ("=IMAGINARY(IMSIN(COMPLEX(0;-0)))", true),
+        ("=IMREAL(IMSINH(COMPLEX(-0;0)))", true),
+        ("=IMAGINARY(IMCOS(COMPLEX(0;-0)))", false),
+    ] {
+        let expression = parse(source);
+        let (_budget, _cancellation, execution) = new_execution("complex-signed-zero");
+        let result = evaluate(&expression, &execution, &EvaluationLimits::default())
+            .expect("finite zero-axis result");
+        let actual = number(&result);
+        assert_eq!(actual, 0.0, "{source}");
+        assert_eq!(actual.is_sign_negative(), negative, "{source}");
+    }
 }

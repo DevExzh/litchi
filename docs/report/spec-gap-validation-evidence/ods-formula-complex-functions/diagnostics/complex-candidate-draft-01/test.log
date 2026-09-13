@@ -1,0 +1,94 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error[E0425]: cannot find value `error` in this scope
+   --> crates/litchi-ods/src/codec/formula/evaluation/value/complex.rs:211:21
+    |
+208 |         Err(_error) if !fold.product && is_text => {
+    |             ------ `_error` defined here
+...
+211 |             let _ = error;
+    |                     ^^^^^
+    |
+help: the leading underscore in `_error` marks it as unused, consider renaming it to `error`
+    |
+208 -         Err(_error) if !fold.product && is_text => {
+208 +         Err(error) if !fold.product && is_text => {
+    |
+
+error[E0599]: no method named `get_mut` found for struct `ComplexArguments<'a>` in the current scope
+   --> crates/litchi-ods/src/codec/formula/evaluation/complex.rs:486:10
+    |
+ 48 |   struct ComplexArguments<'a> {
+    |   --------------------------- method `get_mut` not found for this struct
+...
+485 |       let left = values
+    |  ________________-
+486 | |         .get_mut(0)
+    | |         -^^^^^^^ method not found in `ComplexArguments<'_>`
+    | |_________|
+    |
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `get_mut`, perhaps you need to implement it:
+            candidate #1: `SliceIndex`
+help: one of the expressions' fields has a method of the same name
+    |
+486 |         .values.get_mut(0)
+    |          +++++++
+
+error[E0004]: non-exhaustive patterns: `WorkingValue::Complex(_)` not covered
+   --> crates/litchi-ods/src/codec/formula/evaluation/radix.rs:470:11
+    |
+470 |     match value {
+    |           ^^^^^ pattern `WorkingValue::Complex(_)` not covered
+    |
+note: `WorkingValue<'_>` defined here
+   --> crates/litchi-ods/src/codec/formula/evaluation.rs:540:6
+    |
+540 | enum WorkingValue<'a> {
+    |      ^^^^^^^^^^^^
+...
+545 |     Complex(complex::Complex),
+    |     ------- not covered
+    = note: the matched value is of type `WorkingValue<'_>`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+496 ~         WorkingValue::Error(error) => Ok(Err(error)),
+497 ~         WorkingValue::Complex(_) => todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `WorkingValue::Complex(_)` not covered
+   --> crates/litchi-ods/src/codec/formula/evaluation/radix.rs:548:11
+    |
+548 |     match value {
+    |           ^^^^^ pattern `WorkingValue::Complex(_)` not covered
+    |
+note: `WorkingValue<'_>` defined here
+   --> crates/litchi-ods/src/codec/formula/evaluation.rs:540:6
+    |
+540 | enum WorkingValue<'a> {
+    |      ^^^^^^^^^^^^
+...
+545 |     Complex(complex::Complex),
+    |     ------- not covered
+    = note: the matched value is of type `WorkingValue<'_>`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+570 ~         WorkingValue::Error(error) => Ok(Err(error)),
+571 ~         WorkingValue::Complex(_) => todo!(),
+    |
+
+error[E0621]: explicit lifetime required in the type of `evaluator`
+    --> crates/litchi-ods/src/codec/formula/evaluation.rs:1730:41
+     |
+1730 |         WorkingValue::Complex(value) => complex::to_text(evaluator, value),
+     |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ lifetime `'a` required
+     |
+help: add explicit lifetime `'a` to the type of `evaluator`
+     |
+1692 -     evaluator: &mut Evaluator<'_, '_, '_>,
+1692 +     evaluator: &mut Evaluator<'a, '_, '_>,
+     |
+
+Some errors have detailed explanations: E0004, E0425, E0599, E0621.
+For more information about an error, try `rustc --explain E0004`.
+error: could not compile `litchi-ods` (lib) due to 5 previous errors
