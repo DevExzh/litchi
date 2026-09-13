@@ -1,0 +1,7 @@
+{
+  "status": "failed-build-before-any-measurement",
+  "exit_code": 101,
+  "terminal_session": 98135,
+  "recorded_utc": "2026-09-13T03:01:53.436353+00:00",
+  "fix": "OptionalJSONhelper match isstatement followedbyOk; propagateSomeerrorwith? andNoneunit. Added explicitguardclippy+allcaseoracle smoke beforeexpensive mainbuild, withunchangedadmissiongates."
+}

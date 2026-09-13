@@ -1,0 +1,12 @@
+{
+  "docs/performance/ADR_COMPLIANCE.md": "62f2a28b0315f2837e8c7f25f22a829825a267554b891433f2f92a67f4e2cbe1",
+  "docs/performance/BASELINE.md": "d433326b13d630c02ea388da5e40d704142cc18946984d4e2cf1ff310581f803",
+  "docs/performance/GOAL_AUDIT.md": "0158b2755497fc524f9040cf1872b0f681cc3f871e94f0f2c5d35e3c2f88b82a",
+  "docs/performance/HOTSPOTS.md": "95e3e5ce3a6b462aa4502c3fca47c1047ad75e7c4599be56d09ac449ad840880",
+  "docs/performance/REPORT.md": "fc6b552b66ede116cf9254c97836af3f7eb88d8fd276e46c1e89de2e521df46c",
+  "docs/performance/changes/0548-ole2-checkpoint-collector-rejected.md": "a0c483cd42193a4b2cbf6f73cc60bfa9d30cdd87e2bdbdc2c09122de2d2b025c",
+  "docs/performance/results/change-0548/README.md": "da7bdfe7f9967d29f887f59b4f21e182fccc797f2cb0617d023095caccb4efd2",
+  "docs/performance/results/change-0548/adr-compliance.md": "d59013aa361e5ee267b66f43111342b13bbde8202ce1d7a9eb0ae5707dd42e2a",
+  "docs/performance/results/change-0548/protocol.md": "5bcd5a914fe93a8696025a4b121a7b6b1ea2952d3ecb476bf8ab737ab7020baa",
+  "docs/performance/results/change-0548/results-review.md": "c6623cc7cdf56cc039694b10b6464de12ae25f3e03154f0c1121722f67986c1f"
+}

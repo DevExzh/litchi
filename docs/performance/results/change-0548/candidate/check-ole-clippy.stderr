@@ -1,0 +1,78 @@
+    Checking zerocopy v0.8.56
+    Checking crypto-common v0.2.2
+    Checking der v0.7.10
+    Checking digest v0.11.3
+    Checking spki v0.7.3
+    Checking thiserror v2.0.18
+    Checking zerofrom v0.1.4
+    Checking serde_json v1.0.149
+    Checking yoke v0.7.4
+    Checking chrono v0.4.45
+    Checking pkcs8 v0.10.2
+    Checking sha2 v0.11.0
+    Checking zerovec v0.10.4
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+    Checking bitflags v2.13.1
+    Checking sec1 v0.7.3
+    Checking tinystr v0.7.6
+    Checking ppv-lite86 v0.2.21
+    Checking icu_locid v1.5.0
+    Checking elliptic-curve v0.13.8
+    Checking rand_chacha v0.3.1
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking num-integer v0.1.47
+    Checking icu_provider v1.5.0
+    Checking num-iter v0.1.46
+    Checking rand v0.8.8
+    Checking icu_locid_transform v1.5.0
+    Checking num-bigint-dig v0.8.6
+    Checking ecdsa v0.16.9
+    Checking primeorder v0.13.6
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking icu_collections v1.5.0
+    Checking pkcs1 v0.7.5
+    Checking inout v0.2.2
+    Checking zlib-rs v0.6.7
+    Checking icu_properties v1.5.1
+    Checking flate2 v1.1.10
+   Compiling phf_generator v0.14.0
+    Checking cipher v0.5.2
+    Checking rsa v0.9.10
+    Checking p256 v0.13.2
+    Checking x509-cert v0.2.5
+    Checking log v0.4.29
+    Checking pathfinder_geometry v0.5.1
+    Checking icu_normalizer v1.5.0
+    Checking rc4 v0.2.0
+   Compiling phf_macros v0.14.0
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking sha1 v0.11.0
+    Checking ouroboros v0.18.5
+    Checking rustix v1.1.4
+    Checking enumflags2 v0.7.12
+    Checking phf v0.14.0
+    Checking idna_adapter v1.2.0
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-odraw v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odraw)
+    Checking litchi-biff v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-biff)
+    Checking bytemuck v1.25.2
+    Checking allsorts v0.17.0
+    Checking roaring v0.11.1
+    Checking font-kit v0.14.3
+    Checking tempfile v3.27.0
+    Checking litchi-formula v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-formula)
+    Checking litchi-ograph v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ograph)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking idna v1.1.0
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking md-5 v0.11.0
+    Checking url v2.5.8
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-doc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-doc)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-ppt v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ppt)
+    Checking litchi-xls v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-xls)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.74s

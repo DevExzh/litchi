@@ -1,5 +1,14 @@
 # Performance program phase report
 
+## 0548: OLE2 checkpoint candidate rejected
+
+[0548](changes/0548-ole2-checkpoint-collector-rejected.md) rejects the bounded
+checkpoint candidate. One primary XLS repeat regresses 2.12% instead of
+improving at least 3%; constructor Ir rises 2.87–2.89% and collector self Ir
+rises about 5.86%. Allocation and malformed-input envelopes pass. Production
+is restored; the public guard and complete paired evidence remain. No retained
+runtime speedup is claimed.
+
 ## 0545: reject scanner replacement before workflow integration
 
 [0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) retains isolated diagnostic evidence, no runtime change. Exact-bound

@@ -1,0 +1,428 @@
+--------------------------------------------------------------------------------
+Profile data file '/home/zhuhe/code/litchi/docs/performance/results/change-0548/candidate/profile-r1-cfb-tiny.callgrind.2' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 210416 - 237646
+Trigger: --dump-after=litchi_cfb::file::OleFile<R>::open
+Profiled target:  /home/zhuhe/litchi-goal-0548-target/retained/candidate/normal --case cfb_open --warmup 0 --samples 5 --json /home/zhuhe/code/litchi/docs/performance/results/change-0548/candidate/profile-r1-cfb-tiny.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0548/candidate/profile-r1-cfb-tiny.catalog.json --shape tiny --payload incompressible (PID 2166201, part 2)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       100
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir     
+--------------------------------------------------------------------------------
+48,945  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir      file:function
+--------------------------------------------------------------------------------
+
+48,945  *  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+48,945  *  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+48,945  *  ???:(below main) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  *  ???:0x0000000000023cc0 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+
+48,945  *  ???:litchi_perf_baseline::main [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  *  ???:litchi_perf_baseline::run [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  *  ???:litchi_perf_baseline::run_case_with_config [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  *  ???:main [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  *  ???:std::rt::lang_start::{{closure}} [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  *  ???:std::rt::lang_start_internal [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  *  ???:std::sys::backtrace::__rust_begin_short_backtrace [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 4,115  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 4,115  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    93  < ???:litchi_cfb::file::OleFile<R>::read_sector_into (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    46  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    43  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    26  < ???:litchi_cfb::file::collect_sector_chain_exact (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    15  < ???:litchi_cfb::file::try_filled_vec (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    13  < ???:litchi_cfb::file::collect_directory_sector_chain (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 8,466  *  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+14,329  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 7,679  *  ???:litchi_cfb::directory_name::directory_name_data [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 2,728  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (228x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,452  >   ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend (5x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,144  >   ???:<core::char::ToUppercase as core::iter::traits::iterator::Iterator>::next (228x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,056  >   ???:core::unicode::unicode_data::conversions::to_upper (114x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   270  >   ???:core::slice::memchr::memchr_aligned (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 2,728  < ???:litchi_cfb::directory_name::directory_name_data (228x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   360  < ???:litchi_cfb::file::OleFile<R>::load_directory (12x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   240  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   154  < ???:litchi_cfb::file::OleFile<R>::read_sector_into (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   142  < ???:litchi_cfb::file::OleFile<R>::open (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   120  < ???:litchi_cfb::file::try_push (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    77  < ???:litchi_cfb::file::OleFile<R>::read_sectors_batched (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    60  < ???:alloc::vec::Vec<T,A>::resize (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    30  < ???:litchi_cfb::file::try_filled_vec (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    13  < ???:<alloc::string::String as core::clone::Clone>::clone (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    12  < ???:0x000000000794f680 (63x) [???]
+ 3,936  *  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+23,029  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 3,003  *  ???:litchi_cfb::file::OleFile<R>::validated_directory_entries [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+14,329  >   ???:litchi_cfb::directory_name::directory_name_data (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 2,716  >   ???:<alloc::string::String>::from_utf16 (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,033  >   ???:litchi_cfb::file::try_push (12x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   600  >   ???:<u16 as core::slice::cmp::SliceContains>::slice_contains (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   322  >   ???:litchi_cfb::directory_name::DirectoryNameData::compare (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   240  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (8x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   158  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   126  >   ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   106  >   ???:litchi_cfb::file::try_vec_with_capacity (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   105  >   ???:__rustc::__rust_dealloc (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    85  >   ???:litchi_cfb::file::OleFile<R>::validated_entry (5x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    80  >   ???:litchi_cfb::file::CheckedBitSet::insert (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    70  >   ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe (4x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    56  >   ???:<litchi_cfb::file::DirectoryNodeColor as core::convert::TryFrom<u8>>::try_from (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 3,300  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 2,848  *  ???:litchi_cfb::file::decode_utf16le [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   452  >   ???:<alloc::string::String>::try_reserve (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 9,479  < ???:litchi_cfb::file::OleFile<R>::open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 2,700  *  ???:litchi_cfb::file::OleFile<R>::load_minifat [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 4,115  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 2,048  >   ???:litchi_cfb::file::read_u32_le (128x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   318  >   ???:litchi_cfb::file::collect_sector_chain_exact (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   182  >   ???:litchi_cfb::file::OleFile<R>::read_sector_into (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    81  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 2,716  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 2,552  *  ???:<alloc::string::String>::from_utf16 [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   160  >   ???:__rustc::__rust_alloc (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     4  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 2,048  < ???:litchi_cfb::file::OleFile<R>::load_minifat (128x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   128  < ???:litchi_cfb::file::OleFile<R>::open (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    16  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 2,192  *  ???:litchi_cfb::file::read_u32_le [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 1,452  < ???:litchi_cfb::directory_name::directory_name_data (5x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,452  *  ???:<smallvec::SmallVec<A> as core::iter::traits::collect::Extend<<A as smallvec::Array>::Item>>::extend [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 1,144  < ???:litchi_cfb::directory_name::directory_name_data (228x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,144  *  ???:<core::char::ToUppercase as core::iter::traits::iterator::Iterator>::next [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 1,056  < ???:litchi_cfb::directory_name::directory_name_data (114x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,056  *  ???:core::unicode::unicode_data::conversions::to_upper [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 1,217  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,009  *  ???:litchi_cfb::file::SectorChainScratch::collect_exact [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   162  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    46  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (4x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   576  < ???:litchi_cfb::file::try_push (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   320  < ???:litchi_cfb::file::collect_sector_chain_exact (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   239  < ???:litchi_cfb::file::try_filled_vec (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   231  < ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   162  < ???:litchi_cfb::file::SectorChainScratch::collect_exact (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   162  < ???:litchi_cfb::file::try_vec_with_capacity (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   162  < ???:litchi_cfb::file::collect_directory_sector_chain (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   158  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    81  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    81  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    81  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    77  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   920  *  ???:alloc::raw_vec::RawVecInner<A>::finish_grow [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   852  >   ???:__rustc::__rust_alloc (28x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   536  >   ???:__rustc::__rust_realloc (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    22  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (28x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   902  < ???:__rustc::__rdl_alloc (55x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   902  *  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 3,171  < ???:litchi_cfb::file::OleFile<R>::open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   857  *  ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,217  >   ???:litchi_cfb::file::SectorChainScratch::collect_exact (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   480  >   ???:litchi_cfb::file::CheckedBitSet::insert (24x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   386  >   ???:litchi_cfb::file::collect_sector_chain_exact (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   126  >   ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   105  >   ???:__rustc::__rust_dealloc (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   660  < ???:__rustc::__rdl_dealloc (61x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   660  *  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   480  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (24x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    80  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    60  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   620  *  ???:litchi_cfb::file::CheckedBitSet::insert [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+30,556  < ???:litchi_cfb::file::OleFile<R>::open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   611  *  ???:litchi_cfb::file::OleFile<R>::load_directory [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+23,029  >   ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 4,046  >   ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   643  >   ???:litchi_cfb::file::try_filled_vec (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   625  >   ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   360  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (12x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   352  >   ???:litchi_cfb::file::collect_directory_sector_chain (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   210  >   ???:__rustc::__rust_dealloc (6x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   196  >   ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   173  >   ???:litchi_cfb::file::OleFile<R>::read_sectors_batched (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    81  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    61  >   ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    57  >   ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    43  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    23  >   ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>> (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    20  >   ???:core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>> (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    19  >   ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>> (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     7  >   ???:litchi_cfb::file::checked_directory_data_len (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   600  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   600  *  ???:<u16 as core::slice::cmp::SliceContains>::slice_contains [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 3,315  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   625  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   456  *  ???:litchi_cfb::file::OleFile<R>::parse_directory_entry [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 3,300  >   ???:litchi_cfb::file::decode_utf16le (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   184  >   ???:litchi_cfb::file::format_clsid (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 4,046  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   394  *  ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 3,315  >   ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   126  >   ???:litchi_cfb::file::CheckedBitSet::try_with_capacity (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    81  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    70  >   ???:__rustc::__rust_dealloc (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    60  >   ???:litchi_cfb::file::CheckedBitSet::insert (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 4,889  < ???:litchi_cfb::file::OleFile<R>::open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   341  *  ???:litchi_cfb::file::OleFile<R>::load_fat [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 4,115  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   189  >   ???:litchi_cfb::file::OleFile<R>::read_sector_into (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   116  >   ???:litchi_cfb::file::try_vec_with_capacity (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    77  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    16  >   ???:litchi_cfb::file::read_u32_le (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+ 1,033  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (12x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   337  *  ???:litchi_cfb::file::try_push [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   576  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   120  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (4x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   322  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   322  *  ???:litchi_cfb::directory_name::DirectoryNameData::compare [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+48,945  < ???:litchi_perf_baseline::run_cfb_open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   297  *  ???:litchi_cfb::file::OleFile<R>::open [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+30,556  >   ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 9,479  >   ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 4,889  >   ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 3,171  >   ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   142  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   133  >   ???:litchi_cfb::file::try_filled_vec (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   128  >   ???:litchi_cfb::file::read_u32_le (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    86  >   ???:litchi_cfb::file::OleFile<R>::validate_physical_sector_layout (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    64  >   ???:litchi_cfb::file::read_u16_le (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   351  < ???:litchi_cfb::file::try_filled_vec (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   291  *  ???:alloc::vec::Vec<T,A>::resize [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    60  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   386  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   318  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   288  *  ???:litchi_cfb::file::collect_sector_chain_exact [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   320  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    70  >   ???:__rustc::__rust_dealloc (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    26  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+ 1,181  < ???:__rustc::__rust_alloc (55x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   279  *  ???:__rustc::__rdl_alloc [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   902  >   ./malloc/./malloc/malloc.c:malloc (55x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   270  < ???:litchi_cfb::directory_name::directory_name_data (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   270  *  ???:core::slice::memchr::memchr_aligned [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   218  < ./malloc/./malloc/malloc.c:_int_realloc (7x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   187  *  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    31  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   452  < ???:litchi_cfb::file::decode_utf16le (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   160  *  ???:<alloc::string::String>::try_reserve [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   292  >   ???:<alloc::raw_vec::RawVecInner>::finish_grow (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   126  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   126  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   126  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   147  *  ???:litchi_cfb::file::CheckedBitSet::try_with_capacity [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   231  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   352  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   142  *  ???:litchi_cfb::file::collect_directory_sector_chain [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   162  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    13  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   643  < ???:litchi_cfb::file::OleFile<R>::load_directory (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   133  < ???:litchi_cfb::file::OleFile<R>::open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   141  *  ???:litchi_cfb::file::try_filled_vec [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   351  >   ???:alloc::vec::Vec<T,A>::resize (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   239  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    30  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    15  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   292  < ???:<alloc::string::String>::try_reserve (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   128  *  ???:<alloc::raw_vec::RawVecInner>::finish_grow [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   160  >   ???:__rustc::__rust_alloc (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     4  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    70  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    57  < ???:litchi_cfb::file::OleFile<R>::load_directory (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   127  *  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   189  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   182  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   124  *  ???:litchi_cfb::file::OleFile<R>::read_sector_into [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   154  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    93  >   ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   184  < ???:litchi_cfb::file::OleFile<R>::parse_directory_entry (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   112  *  ???:litchi_cfb::file::format_clsid [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    72  >   ???:litchi_core::simd::cmp::is_all_zero_avx2 (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   173  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    96  *  ???:litchi_cfb::file::OleFile<R>::read_sectors_batched [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    77  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    86  < ???:litchi_cfb::file::OleFile<R>::open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    86  *  ???:litchi_cfb::file::OleFile<R>::validate_physical_sector_layout [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    85  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (5x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    85  *  ???:litchi_cfb::file::OleFile<R>::validated_entry [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   122  < ./malloc/./malloc/malloc.c:_int_free_chunk (4x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    79  *  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    24  >   ./malloc/./malloc/malloc.c:_int_free_maybe_trim (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    19  >   ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    72  < ???:litchi_cfb::file::format_clsid (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    72  *  ???:litchi_core::simd::cmp::is_all_zero_avx2 [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   513  < ???:__rustc::__rdl_realloc (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    67  *  ./malloc/./malloc/malloc.c:realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   440  >   ./malloc/./malloc/malloc.c:_int_realloc (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   440  < ./malloc/./malloc/malloc.c:realloc (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    65  *  ./malloc/./malloc/malloc.c:_int_realloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   218  >   ./malloc/./malloc/malloc.c:_int_malloc (7x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   139  >   ./malloc/./malloc/malloc.c:_int_free_chunk (7x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    64  < ???:litchi_cfb::file::OleFile<R>::open (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    64  *  ???:litchi_cfb::file::read_u16_le [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   116  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   106  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    60  *  ???:litchi_cfb::file::try_vec_with_capacity [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   162  >   ???:alloc::raw_vec::RawVecInner<A>::finish_grow (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   196  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    59  *  ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   108  >   ???:<alloc::string::String as core::clone::Clone>::clone (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    29  >   ???:<T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    56  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    56  *  ???:<litchi_cfb::file::DirectoryNodeColor as core::convert::TryFrom<u8>>::try_from [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   108  < ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    54  *  ???:<alloc::string::String as core::clone::Clone>::clone [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    40  >   ???:__rustc::__rust_alloc (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    13  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (8x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+     1  >   ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    31  < ./malloc/./malloc/malloc.c:_int_malloc (2x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    19  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (1x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    50  *  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   852  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (28x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   160  < ???:<alloc::string::String>::from_utf16 (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   160  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    40  < ???:<alloc::string::String as core::clone::Clone>::clone (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    31  *  ???:__rustc::__rust_alloc [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+ 1,181  >   ???:__rustc::__rdl_alloc (55x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    22  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (28x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     4  < ???:<alloc::string::String>::from_utf16 (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     4  < ???:<alloc::raw_vec::RawVecInner>::finish_grow (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     1  < ???:<alloc::string::String as core::clone::Clone>::clone (8x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    31  *  ???:__rustc::__rust_no_alloc_shim_is_unstable_v2 [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    29  < ???:<litchi_cfb::file::DirectoryEntry as core::clone::Clone>::clone (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    29  *  ???:<T as alloc::slice::<impl [T]>::to_vec_in::ConvertVec>::to_vec [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    61  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    26  *  ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  >   ???:__rustc::__rust_dealloc (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    24  < ./malloc/./malloc/malloc.c:_int_free_merge_chunk (3x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    24  *  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+    23  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    23  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::file::DirectoryEntry>>> [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   535  < ???:__rustc::__rust_realloc (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    22  *  ???:__rustc::__rdl_realloc [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   513  >   ./malloc/./malloc/malloc.c:realloc (4x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   680  < ???:__rustc::__rust_dealloc (61x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    20  *  ???:__rustc::__rdl_dealloc [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   660  >   ./malloc/./malloc/malloc.c:free (61x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   210  < ???:litchi_cfb::file::OleFile<R>::load_directory (6x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   105  < ???:litchi_cfb::file::OleFile<R>::validated_directory_entries (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   105  < ???:litchi_cfb::file::OleFile<R>::validate_stream_allocations (3x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    70  < ???:litchi_cfb::file::collect_sector_chain_exact (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    70  < ???:litchi_cfb::file::OleFile<R>::build_storage_tree_iterative (2x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  < ???:litchi_cfb::file::OleFile<R>::load_minifat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  < ???:litchi_cfb::file::collect_directory_sector_chain (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  < ???:<alloc::vec::into_iter::IntoIter<T,A> as core::ops::drop::Drop>::drop (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    35  < ???:litchi_cfb::file::OleFile<R>::load_fat (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    20  *  ???:__rustc::__rust_dealloc [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   680  >   ???:__rustc::__rdl_dealloc (61x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    20  < ???:litchi_cfb::file::OleFile<R>::load_directory (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    20  *  ???:core::ptr::drop_in_place<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>> [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+    19  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+    19  *  ???:core::ptr::drop_in_place<alloc::vec::Vec<core::option::Option<litchi_cfb::directory_name::DirectoryNameData>>> [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+   139  < ./malloc/./malloc/malloc.c:_int_realloc (7x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    17  *  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+   122  >   ./malloc/./malloc/malloc.c:_int_free_merge_chunk (4x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+     7  < ???:litchi_cfb::file::OleFile<R>::load_directory (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     7  *  ???:litchi_cfb::file::checked_directory_data_len [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+     6  *  ./malloc/./malloc/arena.c:realloc
+
+     4  *  ./malloc/../string/bits/string_fortified.h:_int_realloc
+    14  >   ???:0x000000000794f680 (7x) [???]
+
+    14  < ./malloc/../string/bits/string_fortified.h:_int_realloc (7x)
+     2  *  ???:0x000000000794f680 [???]
+    12  >   ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms (63x) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+   536  < ???:alloc::raw_vec::RawVecInner<A>::finish_grow (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+     1  *  ???:__rustc::__rust_realloc [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+   535  >   ???:__rustc::__rdl_realloc (4x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+
+     .  *  ???:litchi_perf_baseline::run_cfb_open [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+48,945  >   ???:litchi_cfb::file::OleFile<R>::open (1x) [/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal]
+

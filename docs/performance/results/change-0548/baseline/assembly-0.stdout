@@ -1,0 +1,80 @@
+
+/home/zhuhe/litchi-goal-0548-target/retained/baseline/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f141d0 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE>:
+ 2f141d0:	41 57                	push   %r15
+ 2f141d2:	41 56                	push   %r14
+ 2f141d4:	41 55                	push   %r13
+ 2f141d6:	41 54                	push   %r12
+ 2f141d8:	53                   	push   %rbx
+ 2f141d9:	48 83 ec 20          	sub    $0x20,%rsp
+ 2f141dd:	48 89 f8             	mov    %rdi,%rax
+ 2f141e0:	48 89 f3             	mov    %rsi,%rbx
+ 2f141e3:	48 c1 eb 06          	shr    $0x6,%rbx
+ 2f141e7:	89 f7                	mov    %esi,%edi
+ 2f141e9:	83 e7 3f             	and    $0x3f,%edi
+ 2f141ec:	48 83 ff 01          	cmp    $0x1,%rdi
+ 2f141f0:	48 83 db ff          	sbb    $0xffffffffffffffff,%rbx
+ 2f141f4:	48 85 f6             	test   %rsi,%rsi
+ 2f141f7:	75 2f                	jne    2f14228 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0x58>
+ 2f141f9:	41 be 08 00 00 00    	mov    $0x8,%r14d
+ 2f141ff:	31 db                	xor    %ebx,%ebx
+ 2f14201:	31 c9                	xor    %ecx,%ecx
+ 2f14203:	48 89 58 08          	mov    %rbx,0x8(%rax)
+ 2f14207:	4c 89 70 10          	mov    %r14,0x10(%rax)
+ 2f1420b:	48 89 48 18          	mov    %rcx,0x18(%rax)
+ 2f1420f:	48 89 70 20          	mov    %rsi,0x20(%rax)
+ 2f14213:	48 c7 00 0b 00 00 00 	movq   $0xb,(%rax)
+ 2f1421a:	48 83 c4 20          	add    $0x20,%rsp
+ 2f1421e:	5b                   	pop    %rbx
+ 2f1421f:	41 5c                	pop    %r12
+ 2f14221:	41 5d                	pop    %r13
+ 2f14223:	41 5e                	pop    %r14
+ 2f14225:	41 5f                	pop    %r15
+ 2f14227:	c3                   	ret
+ 2f14228:	49 89 d5             	mov    %rdx,%r13
+ 2f1422b:	49 89 ce             	mov    %rcx,%r14
+ 2f1422e:	49 89 f4             	mov    %rsi,%r12
+ 2f14231:	49 89 c7             	mov    %rax,%r15
+ 2f14234:	48 8d 7c 24 08       	lea    0x8(%rsp),%rdi
+ 2f14239:	ba 08 00 00 00       	mov    $0x8,%edx
+ 2f1423e:	41 b8 08 00 00 00    	mov    $0x8,%r8d
+ 2f14244:	41 b9 08 00 00 00    	mov    $0x8,%r9d
+ 2f1424a:	31 f6                	xor    %esi,%esi
+ 2f1424c:	48 89 d9             	mov    %rbx,%rcx
+ 2f1424f:	e8 ec 2a 03 00       	call   2f46d40 <_ZN5alloc7raw_vec20RawVecInner$LT$A$GT$11finish_grow17h37c64ad1cb8e6711E.llvm.9576547150467988674>
+ 2f14254:	83 7c 24 08 01       	cmpl   $0x1,0x8(%rsp)
+ 2f14259:	75 1e                	jne    2f14279 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0xa9>
+ 2f1425b:	0f 10 44 24 10       	movups 0x10(%rsp),%xmm0
+ 2f14260:	4c 89 f8             	mov    %r15,%rax
+ 2f14263:	49 c7 07 01 00 00 00 	movq   $0x1,(%r15)
+ 2f1426a:	4d 89 6f 08          	mov    %r13,0x8(%r15)
+ 2f1426e:	4d 89 77 10          	mov    %r14,0x10(%r15)
+ 2f14272:	41 0f 11 47 18       	movups %xmm0,0x18(%r15)
+ 2f14277:	eb a1                	jmp    2f1421a <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0x4a>
+ 2f14279:	4c 8b 74 24 10       	mov    0x10(%rsp),%r14
+ 2f1427e:	b9 01 00 00 00       	mov    $0x1,%ecx
+ 2f14283:	4c 89 f0             	mov    %r14,%rax
+ 2f14286:	48 83 fb 02          	cmp    $0x2,%rbx
+ 2f1428a:	72 1e                	jb     2f142aa <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0xda>
+ 2f1428c:	48 8d 14 dd f8 ff ff 	lea    -0x8(,%rbx,8),%rdx
+ 2f14293:	ff 
+ 2f14294:	4c 89 f7             	mov    %r14,%rdi
+ 2f14297:	31 f6                	xor    %esi,%esi
+ 2f14299:	ff 15 f1 9e 1a 00    	call   *0x1a9ef1(%rip)        # 30be190 <memset@GLIBC_2.2.5>
+ 2f1429f:	49 8d 04 de          	lea    (%r14,%rbx,8),%rax
+ 2f142a3:	48 83 c0 f8          	add    $0xfffffffffffffff8,%rax
+ 2f142a7:	48 89 d9             	mov    %rbx,%rcx
+ 2f142aa:	48 c7 00 00 00 00 00 	movq   $0x0,(%rax)
+ 2f142b1:	4c 89 f8             	mov    %r15,%rax
+ 2f142b4:	4c 89 e6             	mov    %r12,%rsi
+ 2f142b7:	e9 47 ff ff ff       	jmp    2f14203 <_ZN10litchi_cfb4file13CheckedBitSet17try_with_capacity17ha8387c1c143b1f2dE+0x33>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

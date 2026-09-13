@@ -1,0 +1,12 @@
+{
+  "components": {
+    "precleanup": {
+      "error": "variation-review.json is missing or not a regular file",
+      "status": "incomplete"
+    }
+  },
+  "performance_claim": "candidate admission only; no broad format claim",
+  "schema": "litchi-0548-matched-verification-v1",
+  "scope": "precleanup",
+  "status": "incomplete"
+}

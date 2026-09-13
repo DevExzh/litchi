@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "latercycle",
+  "declared_chain_sectors": 128,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 65536,
+  "fat_entry_count": 256,
+  "input_sha256": "6db2d096448884be2cc476a95adc9dc6317f2d8bef8b86c5c2656609d1a37dd0",
+  "expected_error": "Cycle detected in regular stream chain at sector 64",
+  "observed_error": "Cycle detected in regular stream chain at sector 64",
+  "warmup_iterations": 20,
+  "sample_count": 200,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": false,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [1300, 1230, 1170, 1150, 1180, 1140, 1260, 1140, 1190, 1150, 1170, 1160, 1140, 1130, 1160, 1140, 1160, 1130, 1150, 1140, 1200, 1140, 1170, 1140, 1170, 1140, 1170, 1140, 1170, 1160, 1200, 1130, 1190, 1160, 1180, 1150, 1170, 1120, 1150, 1140, 1160, 1120, 1170, 1150, 1170, 1150, 1180, 1140, 1160, 1130, 1160, 1110, 1160, 1140, 1140, 1140, 1170, 1140, 1180, 1160, 1150, 1130, 1150, 1130, 1180, 1210, 1160, 1130, 1140, 1130, 1180, 1130, 1160, 1150, 1160, 1130, 1140, 1140, 1150, 1130, 1150, 1150, 1140, 1130, 1170, 1130, 1150, 1130, 1160, 1140, 1160, 1150, 1160, 1110, 1210, 1130, 1160, 1130, 1150, 1150, 1150, 1120, 1210, 1130, 1170, 1130, 1210, 1140, 1160, 1140, 1140, 1170, 1161, 1140, 1140, 1140, 1160, 1120, 1160, 1120, 1200, 1120, 1150, 1140, 1160, 1140, 1180, 1140, 1160, 1170, 1180, 1150, 1170, 1160, 1160, 1150, 1160, 1130, 1170, 1140, 1170, 1180, 1150, 1120, 1150, 1140, 1160, 1130, 1190, 1130, 1160, 1140, 1150, 1130, 1170, 1160, 1170, 1140, 1160, 1130, 1150, 1140, 1160, 1130, 1170, 1130, 1160, 1140, 1140, 1140, 1160, 1130, 1160, 1130, 1140, 1140, 1170, 1140, 1170, 1190, 1170, 1130, 1150, 1130, 1170, 1130, 1180, 1140, 1150, 1130, 1190, 1140, 1160, 1160, 1160, 1140, 1160, 1140, 1170, 1140]
+}

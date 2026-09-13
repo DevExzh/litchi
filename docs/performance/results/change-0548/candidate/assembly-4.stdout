@@ -1,0 +1,187 @@
+
+/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f22900 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE>:
+ 2f22900:	55                   	push   %rbp
+ 2f22901:	41 57                	push   %r15
+ 2f22903:	41 56                	push   %r14
+ 2f22905:	41 55                	push   %r13
+ 2f22907:	41 54                	push   %r12
+ 2f22909:	53                   	push   %rbx
+ 2f2290a:	48 81 ec 98 00 00 00 	sub    $0x98,%rsp
+ 2f22911:	48 89 3c 24          	mov    %rdi,(%rsp)
+ 2f22915:	0f 28 84 24 d0 00 00 	movaps 0xd0(%rsp),%xmm0
+ 2f2291c:	00 
+ 2f2291d:	0f 11 44 24 48       	movups %xmm0,0x48(%rsp)
+ 2f22922:	44 89 44 24 0c       	mov    %r8d,0xc(%rsp)
+ 2f22927:	45 89 c5             	mov    %r8d,%r13d
+ 2f2292a:	4c 39 e9             	cmp    %r13,%rcx
+ 2f2292d:	0f 86 bb 00 00 00    	jbe    2f229ee <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0xee>
+ 2f22933:	4d 89 ce             	mov    %r9,%r14
+ 2f22936:	44 89 c3             	mov    %r8d,%ebx
+ 2f22939:	49 89 cf             	mov    %rcx,%r15
+ 2f2293c:	48 89 f5             	mov    %rsi,%rbp
+ 2f2293f:	4c 8d 4e 30          	lea    0x30(%rsi),%r9
+ 2f22943:	48 89 54 24 58       	mov    %rdx,0x58(%rsp)
+ 2f22948:	0f 1f 84 00 00 00 00 	nopl   0x0(%rax,%rax,1)
+ 2f2294f:	00 
+ 2f22950:	4d 39 29             	cmp    %r13,(%r9)
+ 2f22953:	0f 86 f4 00 00 00    	jbe    2f22a4d <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x14d>
+ 2f22959:	4c 89 e8             	mov    %r13,%rax
+ 2f2295c:	48 c1 e8 06          	shr    $0x6,%rax
+ 2f22960:	48 3b 45 28          	cmp    0x28(%rbp),%rax
+ 2f22964:	0f 83 2a 01 00 00    	jae    2f22a94 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x194>
+ 2f2296a:	bf 01 00 00 00       	mov    $0x1,%edi
+ 2f2296f:	44 89 e9             	mov    %r13d,%ecx
+ 2f22972:	48 d3 e7             	shl    %cl,%rdi
+ 2f22975:	48 8b 4d 20          	mov    0x20(%rbp),%rcx
+ 2f22979:	48 8b 34 c1          	mov    (%rcx,%rax,8),%rsi
+ 2f2297d:	4c 0f a3 ee          	bt     %r13,%rsi
+ 2f22981:	0f 82 a1 01 00 00    	jb     2f22b28 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x228>
+ 2f22987:	4c 89 6c 24 38       	mov    %r13,0x38(%rsp)
+ 2f2298c:	48 09 3c c1          	or     %rdi,(%rcx,%rax,8)
+ 2f22990:	4c 8b 65 10          	mov    0x10(%rbp),%r12
+ 2f22994:	4c 3b 65 00          	cmp    0x0(%rbp),%r12
+ 2f22998:	75 12                	jne    2f229ac <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0xac>
+ 2f2299a:	48 89 ef             	mov    %rbp,%rdi
+ 2f2299d:	ff 15 1d 35 1a 00    	call   *0x1a351d(%rip)        # 30c5ec0 <_DYNAMIC+0x8a48>
+ 2f229a3:	4c 8d 4d 30          	lea    0x30(%rbp),%r9
+ 2f229a7:	48 8b 54 24 58       	mov    0x58(%rsp),%rdx
+ 2f229ac:	48 8b 45 08          	mov    0x8(%rbp),%rax
+ 2f229b0:	42 89 1c a0          	mov    %ebx,(%rax,%r12,4)
+ 2f229b4:	49 ff c4             	inc    %r12
+ 2f229b7:	4c 89 65 10          	mov    %r12,0x10(%rbp)
+ 2f229bb:	42 8b 1c aa          	mov    (%rdx,%r13,4),%ebx
+ 2f229bf:	89 5c 24 44          	mov    %ebx,0x44(%rsp)
+ 2f229c3:	49 ff ce             	dec    %r14
+ 2f229c6:	0f 84 9c 01 00 00    	je     2f22b68 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x268>
+ 2f229cc:	83 fb fe             	cmp    $0xfffffffe,%ebx
+ 2f229cf:	0f 84 a8 01 00 00    	je     2f22b7d <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x27d>
+ 2f229d5:	83 fb fa             	cmp    $0xfffffffa,%ebx
+ 2f229d8:	0f 83 c9 01 00 00    	jae    2f22ba7 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x2a7>
+ 2f229de:	89 5c 24 0c          	mov    %ebx,0xc(%rsp)
+ 2f229e2:	49 89 dd             	mov    %rbx,%r13
+ 2f229e5:	49 39 df             	cmp    %rbx,%r15
+ 2f229e8:	0f 87 62 ff ff ff    	ja     2f22950 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x50>
+ 2f229ee:	48 8d 44 24 0c       	lea    0xc(%rsp),%rax
+ 2f229f3:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 2f229f8:	48 8b 05 d1 af 19 00 	mov    0x19afd1(%rip),%rax        # 30bd9d0 <_DYNAMIC+0x558>
+ 2f229ff:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f22a04:	48 8d 44 24 48       	lea    0x48(%rsp),%rax
+ 2f22a09:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+ 2f22a0e:	48 8d 05 db 3e 02 00 	lea    0x23edb(%rip),%rax        # 2f468f0 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f22a15:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 2f22a1a:	48 8b 1c 24          	mov    (%rsp),%rbx
+ 2f22a1e:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+ 2f22a22:	48 8d 35 c0 57 19 fd 	lea    -0x2e6a840(%rip),%rsi        # b81e9 <anon.329804da5c085d6b9b3a63161478db6e.110.llvm.17923441514424368298+0xc9>
+ 2f22a29:	48 8d 54 24 10       	lea    0x10(%rsp),%rdx
+ 2f22a2e:	ff 15 4c b0 19 00    	call   *0x19b04c(%rip)        # 30bda80 <_DYNAMIC+0x608>
+ 2f22a34:	48 c7 03 08 00 00 00 	movq   $0x8,(%rbx)
+ 2f22a3b:	48 81 c4 98 00 00 00 	add    $0x98,%rsp
+ 2f22a42:	5b                   	pop    %rbx
+ 2f22a43:	41 5c                	pop    %r12
+ 2f22a45:	41 5d                	pop    %r13
+ 2f22a47:	41 5e                	pop    %r14
+ 2f22a49:	41 5f                	pop    %r15
+ 2f22a4b:	5d                   	pop    %rbp
+ 2f22a4c:	c3                   	ret
+ 2f22a4d:	4c 89 6c 24 38       	mov    %r13,0x38(%rsp)
+ 2f22a52:	48 8d 44 24 38       	lea    0x38(%rsp),%rax
+ 2f22a57:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 2f22a5c:	48 8b 05 9d af 19 00 	mov    0x19af9d(%rip),%rax        # 30bda00 <_DYNAMIC+0x588>
+ 2f22a63:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f22a68:	4c 89 4c 24 20       	mov    %r9,0x20(%rsp)
+ 2f22a6d:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 2f22a72:	48 8d 7c 24 68       	lea    0x68(%rsp),%rdi
+ 2f22a77:	48 8d 35 df 62 1d fd 	lea    -0x2e29d21(%rip),%rsi        # f8d5d <anon.174b9ad362507c35be27e1edecad7361.657.llvm.1243185114027788912+0x42e>
+ 2f22a7e:	48 8d 54 24 10       	lea    0x10(%rsp),%rdx
+ 2f22a83:	ff 15 f7 af 19 00    	call   *0x19aff7(%rip)        # 30bda80 <_DYNAMIC+0x608>
+ 2f22a89:	48 c7 44 24 60 08 00 	movq   $0x8,0x60(%rsp)
+ 2f22a90:	00 00 
+ 2f22a92:	eb 65                	jmp    2f22af9 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x1f9>
+ 2f22a94:	4c 89 6c 24 38       	mov    %r13,0x38(%rsp)
+ 2f22a99:	48 8d 44 24 38       	lea    0x38(%rsp),%rax
+ 2f22a9e:	48 89 84 24 88 00 00 	mov    %rax,0x88(%rsp)
+ 2f22aa5:	00 
+ 2f22aa6:	48 8b 05 53 af 19 00 	mov    0x19af53(%rip),%rax        # 30bda00 <_DYNAMIC+0x588>
+ 2f22aad:	48 89 84 24 90 00 00 	mov    %rax,0x90(%rsp)
+ 2f22ab4:	00 
+ 2f22ab5:	48 8d 7c 24 18       	lea    0x18(%rsp),%rdi
+ 2f22aba:	48 8d 35 91 9a 19 fd 	lea    -0x2e6656f(%rip),%rsi        # bc552 <anon.9071cc436848d4c224bfb75d8ba78491.0.llvm.14771778566165099828+0x6c>
+ 2f22ac1:	48 8d 94 24 88 00 00 	lea    0x88(%rsp),%rdx
+ 2f22ac8:	00 
+ 2f22ac9:	ff 15 b1 af 19 00    	call   *0x19afb1(%rip)        # 30bda80 <_DYNAMIC+0x608>
+ 2f22acf:	48 8b 44 24 18       	mov    0x18(%rsp),%rax
+ 2f22ad4:	0f 10 44 24 20       	movups 0x20(%rsp),%xmm0
+ 2f22ad9:	0f 11 44 24 70       	movups %xmm0,0x70(%rsp)
+ 2f22ade:	48 8b 4c 24 30       	mov    0x30(%rsp),%rcx
+ 2f22ae3:	48 89 8c 24 80 00 00 	mov    %rcx,0x80(%rsp)
+ 2f22aea:	00 
+ 2f22aeb:	48 c7 44 24 60 08 00 	movq   $0x8,0x60(%rsp)
+ 2f22af2:	00 00 
+ 2f22af4:	48 89 44 24 68       	mov    %rax,0x68(%rsp)
+ 2f22af9:	48 8b 84 24 80 00 00 	mov    0x80(%rsp),%rax
+ 2f22b00:	00 
+ 2f22b01:	48 8b 14 24          	mov    (%rsp),%rdx
+ 2f22b05:	48 89 42 20          	mov    %rax,0x20(%rdx)
+ 2f22b09:	48 8b 44 24 60       	mov    0x60(%rsp),%rax
+ 2f22b0e:	48 8b 4c 24 68       	mov    0x68(%rsp),%rcx
+ 2f22b13:	0f 10 44 24 70       	movups 0x70(%rsp),%xmm0
+ 2f22b18:	0f 11 42 10          	movups %xmm0,0x10(%rdx)
+ 2f22b1c:	48 89 02             	mov    %rax,(%rdx)
+ 2f22b1f:	48 89 4a 08          	mov    %rcx,0x8(%rdx)
+ 2f22b23:	e9 13 ff ff ff       	jmp    2f22a3b <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x13b>
+ 2f22b28:	48 8d 44 24 48       	lea    0x48(%rsp),%rax
+ 2f22b2d:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 2f22b32:	48 8d 05 b7 3d 02 00 	lea    0x23db7(%rip),%rax        # 2f468f0 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f22b39:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f22b3e:	48 8d 44 24 0c       	lea    0xc(%rsp),%rax
+ 2f22b43:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+ 2f22b48:	48 8b 05 81 ae 19 00 	mov    0x19ae81(%rip),%rax        # 30bd9d0 <_DYNAMIC+0x558>
+ 2f22b4f:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 2f22b54:	48 8b 1c 24          	mov    (%rsp),%rbx
+ 2f22b58:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+ 2f22b5c:	48 8d 35 0e c8 1b fd 	lea    -0x2e437f2(%rip),%rsi        # df371 <anon.11ca6b5cf59b4eac12e637e268c3da97.32.llvm.4812006772698152797+0xc6>
+ 2f22b63:	e9 c1 fe ff ff       	jmp    2f22a29 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x129>
+ 2f22b68:	83 fb fe             	cmp    $0xfffffffe,%ebx
+ 2f22b6b:	75 7a                	jne    2f22be7 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x2e7>
+ 2f22b6d:	48 8b 04 24          	mov    (%rsp),%rax
+ 2f22b71:	48 c7 00 0b 00 00 00 	movq   $0xb,(%rax)
+ 2f22b78:	e9 be fe ff ff       	jmp    2f22a3b <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x13b>
+ 2f22b7d:	48 8d 44 24 48       	lea    0x48(%rsp),%rax
+ 2f22b82:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 2f22b87:	48 8d 05 62 3d 02 00 	lea    0x23d62(%rip),%rax        # 2f468f0 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f22b8e:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f22b93:	48 8b 1c 24          	mov    (%rsp),%rbx
+ 2f22b97:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+ 2f22b9b:	48 8d 35 db 56 1b fd 	lea    -0x2e4a925(%rip),%rsi        # d827d <anon.329804da5c085d6b9b3a63161478db6e.106.llvm.17923441514424368298+0x119>
+ 2f22ba2:	e9 82 fe ff ff       	jmp    2f22a29 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x129>
+ 2f22ba7:	48 8d 44 24 44       	lea    0x44(%rsp),%rax
+ 2f22bac:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 2f22bb1:	48 8b 05 28 ae 19 00 	mov    0x19ae28(%rip),%rax        # 30bd9e0 <_DYNAMIC+0x568>
+ 2f22bb8:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f22bbd:	48 8d 44 24 48       	lea    0x48(%rsp),%rax
+ 2f22bc2:	48 89 44 24 20       	mov    %rax,0x20(%rsp)
+ 2f22bc7:	48 8d 05 22 3d 02 00 	lea    0x23d22(%rip),%rax        # 2f468f0 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f22bce:	48 89 44 24 28       	mov    %rax,0x28(%rsp)
+ 2f22bd3:	48 8b 1c 24          	mov    (%rsp),%rbx
+ 2f22bd7:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+ 2f22bdb:	48 8d 35 2c f5 60 fd 	lea    -0x29f0ad4(%rip),%rsi        # 53210e <anon.e0572dd12dce1d6d78420bf0a335603a.8.llvm.17154920839617733857+0x134b>
+ 2f22be2:	e9 42 fe ff ff       	jmp    2f22a29 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x129>
+ 2f22be7:	48 8d 44 24 48       	lea    0x48(%rsp),%rax
+ 2f22bec:	48 89 44 24 10       	mov    %rax,0x10(%rsp)
+ 2f22bf1:	48 8d 05 f8 3c 02 00 	lea    0x23cf8(%rip),%rax        # 2f468f0 <_ZN44_$LT$$RF$T$u20$as$u20$core..fmt..Display$GT$3fmt17hb52deec176681277E>
+ 2f22bf8:	48 89 44 24 18       	mov    %rax,0x18(%rsp)
+ 2f22bfd:	48 8b 1c 24          	mov    (%rsp),%rbx
+ 2f22c01:	48 8d 7b 08          	lea    0x8(%rbx),%rdi
+ 2f22c05:	48 8d 35 ab 2b 1a fd 	lea    -0x2e5d455(%rip),%rsi        # c57b7 <anon.174b9ad362507c35be27e1edecad7361.745.llvm.1243185114027788912+0x2da>
+ 2f22c0c:	e9 18 fe ff ff       	jmp    2f22a29 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE+0x129>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:

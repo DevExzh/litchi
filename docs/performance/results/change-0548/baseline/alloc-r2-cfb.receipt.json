@@ -1,0 +1,46 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/litchi-goal-0548-target/retained/baseline/alloc",
+    "--case",
+    "cfb_open",
+    "--warmup",
+    "3",
+    "--samples",
+    "30",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/baseline/alloc-r2-cfb.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/baseline/alloc-r2-cfb.catalog.json",
+    "--shape",
+    "tiny,many-small,few-large",
+    "--payload",
+    "incompressible"
+  ],
+  "start_utc": "2026-09-13T03:11:32.577464+00:00",
+  "end_utc": "2026-09-13T03:11:33.022516+00:00",
+  "seconds": 0.44507587800035253,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "binary_sha256": "66d6df498c785613503760f40e433d11409bb78527b2454fc6ad00ac31c564fe",
+  "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "script_sha256": "379f17feafa95db52811e1706c0876e25d56a06863d967090b9df19006685976",
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "alloc-r2-cfb.catalog.json": "2b3d33c17d51744390da43bc5f6aae8139ddee2e368525f1ba07af7d34cb85b5",
+    "alloc-r2-cfb.host.json": "055ce85fc15e68408e49b73bb323faece53f4ce11bd269df37252c02967bbe4b",
+    "alloc-r2-cfb.json": "1ee45260c3bbcb9d9e4690be71aa95615c57c5180915ae8cf8b32fe95690061c",
+    "alloc-r2-cfb.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "alloc-r2-cfb.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "invalidmarker",
+  "declared_chain_sectors": 16384,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 8388608,
+  "fat_entry_count": 16640,
+  "input_sha256": "7204da57f87e3e9a75752541af5bd22850e7319b47e77e78de555a1be0d8d725",
+  "expected_error": "Invalid sector marker 0xFFFFFFFD in regular stream chain",
+  "observed_error": "Invalid sector marker 0xFFFFFFFD in regular stream chain",
+  "warmup_iterations": 0,
+  "sample_count": 1,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": false,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [14970]
+}

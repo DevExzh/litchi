@@ -1,0 +1,52 @@
+{
+  "command": [
+    "taskset",
+    "-c",
+    "2",
+    "perf",
+    "stat",
+    "-x",
+    ",",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/baseline/hardware-r2-xls-owned.csv",
+    "-e",
+    "{cycles,instructions,branches,branch-misses},page-faults,context-switches,cpu-migrations",
+    "--",
+    "/home/zhuhe/litchi-goal-0548-target/retained/baseline/normal",
+    "--case",
+    "xls_owned_source_open_one_cell",
+    "--warmup",
+    "0",
+    "--samples",
+    "1000",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/baseline/hardware-r2-xls-owned.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/baseline/hardware-r2-xls-owned.catalog.json"
+  ],
+  "start_utc": "2026-09-13T03:11:29.030142+00:00",
+  "end_utc": "2026-09-13T03:11:29.984004+00:00",
+  "seconds": 0.9538828530057799,
+  "exit_code": 0,
+  "execution_stage": "baseline",
+  "execution_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "binary_sha256": "960ef0f2557ae1d81c958c06d17496a380ef51f75902c85ed5e76aa2ef8ebec5",
+  "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "script_sha256": "379f17feafa95db52811e1706c0876e25d56a06863d967090b9df19006685976",
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "hardware-r2-xls-owned.catalog.json": "ee0cac20bed3572a67f4bb837ca9f66545b2d4ee0779d2c537ba705f4c51a68a",
+    "hardware-r2-xls-owned.csv": "35be8b0074b5cf42129a0ee45dded703682b8daeb0bbfc17e6f69b3d706192d1",
+    "hardware-r2-xls-owned.host.json": "20bca044ea09506db0ec1a15b728b62e4f5c7e71bacd4e611d5e98ba890016a0",
+    "hardware-r2-xls-owned.json": "aca062bd7236ec8db742897cfd34d80bd779ddc88d365dfd1646e65f6c105586",
+    "hardware-r2-xls-owned.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hardware-r2-xls-owned.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

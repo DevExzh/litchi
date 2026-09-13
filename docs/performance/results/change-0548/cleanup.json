@@ -1,0 +1,29 @@
+{
+  "accessible_process_references": [],
+  "binary_sha256_by_kind": {
+    "baseline/alloc": "66d6df498c785613503760f40e433d11409bb78527b2454fc6ad00ac31c564fe",
+    "baseline/guard": "25261a1c47f239091033bbd34009277f967fddbcfb9d27c986d3beff2a2756c1",
+    "baseline/normal": "960ef0f2557ae1d81c958c06d17496a380ef51f75902c85ed5e76aa2ef8ebec5",
+    "candidate/alloc": "5fcc399381807b0e45c290954a5693281c336145c812328ddbbb433ebadfd6fa",
+    "candidate/guard": "eaaa500545e671cf7d9361d137252558d6ccfb6f6fa3c05ce0b2aaf58f327d02",
+    "candidate/normal": "48314e726a5d29c8c94f9a4c3fa90f379a6e2f628caabd77e17f89aa4988c069"
+  },
+  "input_sha256": {
+    "adr-manifest.json": "e815a51327a39956a3e5e3adfd3fc76b7942b1c65124c66189ab7b98f8bf6893",
+    "checks.py": "3c88676c3cc72c5d5d0eb9ee5bbfbfa3812859877a8c5ce74c721f1bd5b121d0",
+    "frozen-inputs.json": "19a438d4110445e20dadab0ce088616e4c03b5693f408ac3b61edf4a17bbf3e6",
+    "guard_run.py": "7dad09a089472f3e938deaf3032b25789b0f63dc37694f8cfa48274003898426",
+    "inspect_assembly.py": "56fa593cfbb2763d9adc5384890e26e949c9d1b5120693d582f3fd3641fc916b",
+    "plan.json": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+    "run.py": "379f17feafa95db52811e1706c0876e25d56a06863d967090b9df19006685976"
+  },
+  "observed_utc": "2026-09-13T03:46:48.454599+00:00",
+  "owned_paths_absent": true,
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "python_cache_absent": true,
+  "removed": [
+    "/home/zhuhe/litchi-goal-0548-target"
+  ],
+  "scope": "All capture, quality and analysis processes terminal; strict precleanup passes. Six retained binary hashes checked before removal; accessible process command/cwd/exe/fd scan found no owned-target references.",
+  "target": "/home/zhuhe/litchi-goal-0548-target"
+}

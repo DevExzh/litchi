@@ -1,0 +1,44 @@
+{
+  "command": [
+    "env",
+    "TMPDIR=/home/zhuhe/litchi-goal-0548-target/test-tmp",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0548-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "cargo",
+    "clippy",
+    "--locked",
+    "-p",
+    "litchi-cfb",
+    "--features",
+    "write",
+    "--example",
+    "perf_chain_guard",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "start_utc": "2026-09-13T03:20:50.757715+00:00",
+  "end_utc": "2026-09-13T03:20:58.292528+00:00",
+  "seconds": 7.534828554984415,
+  "exit_code": 0,
+  "execution_stage": "candidate",
+  "execution_manifest_sha256": "978f11e0c2155c9fa0830204ea98d1f31fcb884cd3c1a21f181397cde33aab6e",
+  "binary_sha256": null,
+  "source_manifest_sha256": "978f11e0c2155c9fa0830204ea98d1f31fcb884cd3c1a21f181397cde33aab6e",
+  "script_sha256": "379f17feafa95db52811e1706c0876e25d56a06863d967090b9df19006685976",
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "check-guard-clippy.host.json": "13e32f1acdfd3705bf78c94e992b1e4c6c5e31b6d2869b31526a99684340f7bf",
+    "check-guard-clippy.stderr": "f95d8a84644e1485126495df12bf68245341c53809f7c427b2dc5321f511be94",
+    "check-guard-clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

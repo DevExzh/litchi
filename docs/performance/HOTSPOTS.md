@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0548: checkpoint bookkeeping offsets visited-map instruction savings
+
+[0548](changes/0548-ole2-checkpoint-collector-rejected.md) tests the bounded
+checkpoint design against fresh OLE2 profiles and native controls. The exact
+collector executes about 5.86% more instructions, and one primary workflow
+repeat fails admission. Next investigate cheaper bounded checkpoint state
+under unchanged error, reservation and corruption guards; any replacement
+requires fresh full admission. OLE2/OOXML remain first; ODF is deferred.
+
 ## 0545: dense scanning gain loses sparse delimiter skipping
 
 [0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) proves exact-bound chunk counting is cheaper for dense diagnostic XML

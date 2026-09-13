@@ -1,0 +1,101 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.22
+   Compiling quote v1.0.44
+   Compiling serde_core v1.0.229
+   Compiling crossbeam-utils v0.8.22
+   Compiling typenum v1.20.1
+   Compiling libc v0.2.189
+   Compiling autocfg v1.5.1
+   Compiling hybrid-array v0.4.14
+   Compiling crossbeam-epoch v0.9.20
+   Compiling cfg-if v1.0.4
+   Compiling num-traits v0.2.19
+   Compiling syn v3.0.4
+   Compiling syn v2.0.114
+   Compiling serde v1.0.229
+   Compiling getrandom v0.4.3
+   Compiling crossbeam-deque v0.8.7
+   Compiling rand_core v0.10.1
+   Compiling zmij v1.0.19
+   Compiling cpufeatures v0.3.1
+   Compiling serde_derive v1.0.229
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling thiserror v2.0.18
+   Compiling const-oid v0.10.2
+   Compiling serde_json v1.0.149
+   Compiling zerocopy v0.8.56
+   Compiling rayon-core v1.13.0
+   Compiling digest v0.11.3
+   Compiling thiserror-impl v2.0.18
+   Compiling chacha20 v0.10.2
+   Compiling iana-time-zone v0.1.65
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling chrono v0.4.45
+   Compiling rand v0.10.2
+   Compiling sha2 v0.11.0
+   Compiling smallvec v1.16.0
+   Compiling either v1.18.0
+   Compiling once_cell v1.21.4
+   Compiling base64 v0.22.1
+   Compiling fast-float2 v0.2.4
+   Compiling rayon v1.12.0
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling zerocopy-derive v0.8.56
+   Compiling fixedbitset v0.5.7
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+error: invalid format string: unmatched `}` found
+   --> crates/litchi-cfb/examples/perf_chain_guard.rs:643:160
+    |
+643 | ...hecked\": {},\n    \"all_samples_match\": {}\n  },\n",
+    |                                                    ^ unmatched `}` in format string
+    |
+    = note: if you intended to print `}`, you can escape it using `}}`
+
+error[E0689]: can't call method `checked_div` on ambiguous numeric type `{integer}`
+   --> crates/litchi-cfb/examples/perf_chain_guard.rs:293:14
+    |
+293 |             .checked_div(4)
+    |              ^^^^^^^^^^^
+    |
+help: you must specify a type for this binding, like `i32`
+    |
+259 |         let sector_size: i32 = match sector_shift {
+    |                        +++++
+
+error[E0689]: can't call method `checked_mul` on ambiguous numeric type `{integer}`
+   --> crates/litchi-cfb/examples/perf_chain_guard.rs:303:46
+    |
+298 |             for entry_index in 0..entries_per_difat {
+    |                 ----------- you must specify a type for this binding, like `i32`
+...
+303 |                     .checked_add(entry_index.checked_mul(4).ok_or("DIFAT offset overflows")?)
+    |                                              ^^^^^^^^^^^
+
+error[E0308]: `match` arms have incompatible types
+   --> crates/litchi-cfb/examples/perf_chain_guard.rs:602:21
+    |
+600 | /         match value {
+601 | |             Some(value) => append_json_string(output, value),
+    | |                            --------------------------------- this is found to be of type `Result<(), std::fmt::Error>`
+602 | |             None => output.push_str("null"),
+    | |                     ^^^^^^^^^^^^^^^^^^^^^^^ expected `Result<(), Error>`, found `()`
+603 | |         }
+    | |_________- `match` arms have incompatible types
+    |
+    = note:   expected enum `Result<(), std::fmt::Error>`
+            found unit type `()`
+note: method `push_str` modifies its receiver in-place
+   --> crates/litchi-cfb/examples/perf_chain_guard.rs:602:28
+    |
+602 |             None => output.push_str("null"),
+    |                            ^^^^^^^^ this call modifies `output` in-place
+help: try wrapping the expression in `Ok`
+    |
+602 |             None => Ok(output.push_str("null")),
+    |                     +++                       +
+
+Some errors have detailed explanations: E0308, E0689.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `litchi-cfb` (example "perf_chain_guard") due to 4 previous errors

@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "lateexcess",
+  "declared_chain_sectors": 128,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 65536,
+  "fat_entry_count": 256,
+  "input_sha256": "997bce57fc859cfee726d354df212cc870cdd14aa6d2b076ed0765f56b943a74",
+  "expected_error": "regular stream chain exceeds its declared length",
+  "observed_error": "regular stream chain exceeds its declared length",
+  "warmup_iterations": 20,
+  "sample_count": 200,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": false,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [1340, 1180, 1230, 1220, 1230, 1250, 1210, 1210, 1220, 1240, 1210, 1210, 1250, 1170, 1190, 1170, 1170, 1160, 1170, 1160, 1230, 1200, 1160, 1200, 1250, 1240, 1250, 1200, 1240, 1200, 1190, 1210, 1220, 1190, 1220, 1170, 1230, 1190, 1210, 1190, 1200, 1200, 1200, 1210, 1230, 1220, 1210, 1180, 1220, 1210, 1240, 1210, 1210, 1190, 1170, 1180, 1180, 1190, 1220, 1200, 1180, 1220, 1210, 1181, 1180, 1200, 1180, 4900, 1270, 1290, 1210, 1200, 1280, 1250, 1230, 1220, 1200, 1170, 1240, 1210, 1210, 1200, 1190, 1200, 1190, 1210, 1200, 1220, 1230, 1210, 1220, 1210, 1220, 1210, 1220, 1200, 1200, 1200, 1170, 1180, 1180, 1220, 1210, 1210, 1200, 1220, 1220, 1220, 1230, 1200, 1210, 1250, 1220, 1210, 1180, 1210, 1210, 1230, 1240, 1190, 1180, 1210, 1200, 1210, 1220, 1200, 1180, 1160, 1230, 1190, 1220, 1190, 1170, 1220, 1200, 1150, 1220, 1190, 1180, 1210, 1200, 1160, 1210, 1210, 1240, 1180, 1200, 1210, 1240, 1220, 1200, 1180, 1230, 1200, 1250, 1240, 1190, 1210, 1210, 1210, 1220, 1190, 1200, 1170, 1170, 1170, 1190, 1170, 1180, 1160, 1180, 1180, 1210, 1160, 1170, 1200, 1230, 1200, 1220, 1190, 1150, 1170, 1220, 1180, 1230, 1200, 1200, 1220, 1200, 1190, 1190, 1200, 1200, 1230, 1180, 1210, 1180, 1200, 1230, 1230]
+}

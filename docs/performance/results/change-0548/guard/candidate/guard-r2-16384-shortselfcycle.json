@@ -1,0 +1,25 @@
+{
+  "schema": "litchi-cfb.perf-chain-guard.v1",
+  "case": "shortselfcycle",
+  "declared_chain_sectors": 16384,
+  "sector_size": 512,
+  "stream_start_sector": 0,
+  "stream_bytes": 8388608,
+  "fat_entry_count": 16640,
+  "input_sha256": "573a4374b6e8096bd994f2ce9a4ffaebafbd33cee3ce394dd3d934534c1d5806",
+  "expected_error": "Cycle detected in regular stream chain at sector 0",
+  "observed_error": "Cycle detected in regular stream chain at sector 0",
+  "warmup_iterations": 20,
+  "sample_count": 200,
+  "timed_operation": "OleFile::open(Cursor<&[u8]>)",
+  "cleanup_inside_timing": false,
+  "input_clone_outside_timing": true,
+  "allocation_counters": {"available": false, "reason": "not instrumented by this public example"},
+  "oracle": {
+    "expected_error_exact": true,
+    "valid_stream_content_checked": false,
+    "valid_reopen_checked": true,
+    "all_samples_match": true
+  },
+  "samples_ns": [4320, 4360, 4340, 4360, 4330, 4340, 4330, 4290, 4410, 4270, 4330, 4320, 4340, 4350, 4310, 4330, 4360, 4400, 4360, 4320, 4340, 4320, 4351, 4360, 4340, 4360, 4310, 4390, 4380, 4380, 4420, 4380, 4340, 4370, 4380, 4330, 4340, 4380, 4330, 4340, 4370, 4330, 4360, 4380, 4300, 4350, 4350, 4330, 4330, 4320, 4290, 4350, 4370, 4350, 4330, 4320, 4350, 4290, 4360, 4400, 4330, 4410, 4370, 4310, 4340, 4350, 4360, 4350, 4350, 4360, 4330, 4310, 4360, 4390, 4350, 4350, 4341, 4270, 4370, 4330, 4350, 4360, 4380, 4340, 4340, 4380, 4340, 4380, 14540, 4370, 4370, 4380, 4400, 4350, 4390, 4340, 4360, 4370, 4370, 4360, 4340, 4370, 4340, 4370, 4380, 4320, 4390, 4320, 4350, 4410, 4340, 4380, 4380, 4380, 4360, 4350, 4320, 4330, 4360, 4370, 4350, 4340, 4360, 4310, 4410, 4320, 4320, 4371, 4350, 4360, 4360, 4410, 4390, 4360, 4340, 4420, 4350, 4400, 4380, 4330, 4350, 4360, 4380, 4350, 4410, 4360, 4420, 4390, 4350, 4410, 4430, 4400, 4370, 4370, 4370, 4360, 4310, 4300, 4380, 4370, 4340, 4390, 4450, 4520, 4430, 4450, 4370, 4370, 4310, 4360, 4410, 4360, 4400, 4390, 4360, 4360, 4370, 4400, 4390, 4390, 4401, 4370, 4390, 4360, 4360, 4380, 4350, 4350, 4370, 4340, 4380, 4390, 4370, 4380, 4420, 4340, 4410, 4370, 4320, 4400]
+}

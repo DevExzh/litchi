@@ -1,0 +1,1407 @@
+
+running 1011 tests
+test body_text::source::tests::clx_fc_bounds_and_unicode_alignment_are_closed ... ok
+test body_text::source::tests::dop_protection_bit_40_is_not_misclassified_as_revision ... ok
+test body_text::source::tests::utf16_replacement_preserves_surrogate_units ... ok
+test body_text::source::tests::zero_builder_limits_are_rejected_before_open ... ok
+test body_text::source::tests::fib_limit_below_fixed_prefix_is_rejected_before_open ... ok
+test body_text::tests::profiled_open_native_dop_refusal_stays_strict_first ... ok
+test body_text::tests::profiled_open_matches_ordinary_open_and_balances_success_events ... ok
+test body_text::tests::accepted_and_rejected_projections_hide_text_revisions ... ok
+test body_text::tests::profiled_open_preflights_source_before_any_cfb_parse ... ok
+test body_text::source::tests::structural_units_are_closed ... ok
+test body_text::tests::profiled_open_matches_ordinary_error_and_closes_failed_phase ... ok
+test body_text::tests::patch_construction_and_same_lineage_apply_keep_fingerprint_lazy ... ok
+test body_text::tests::profiled_open_public_reader_error_closes_only_public_phase ... ok
+test body_text::tests::equal_fingerprint_collision_still_requires_exact_source_bytes ... ok
+test body_text::tests::independently_reopened_identical_source_uses_fingerprint_then_exact_bytes ... ok
+test body_text::source::tests::fib_fc_min_must_follow_the_complete_fib ... ok
+test body_text::tests::profiled_changed_commit_matches_ordinary_commit ... ok
+test body_text::tests::same_shape_body_edit_is_reversible_and_source_checked ... ok
+test body_text::tests::drawing_and_preview_dependencies_have_precise_atomic_refusals ... ok
+test body_text::source::tests::pending_capacity_grows_geometrically_and_stays_bounded ... ok
+test body_text::tests::failed_finish_phase_is_balanced_when_render_returns_error ... ok
+test bookmark::tests::identifies_hidden_bookmarks ... ok
+test comment::tests::exposes_comment_metadata_and_text ... ok
+test document::model::semantic::basics::tests::paragraph_count_skips_equal_reversed_and_wrapped_ranges ... ok
+test document::tests::owned_mtef_tests::malformed_multiple_formulas_are_independently_owned_and_dropped ... ok
+test embedded_object::tests::field_validation_rejects_orphan_and_unclosed_markers ... ok
+test document::tests::word_6_documents_report_their_version_not_a_missing_stream ... ok
+test embedded_object::tests::obj_info_preserves_undefined_bits_and_optional_presence ... ok
+test embedded_object::tests::object_pool_target_names_follow_decimal_storage_form ... ok
+test embedded_object::tests::obj_info_rejects_invalid_required_bits_without_ole_access ... ok
+test embedded_object::tests::obj_info_reads_the_doc_opaque_stream_shape ... ok
+test document::tests::opened_document_exposes_versioned_document_properties ... ok
+test body_text::tests::snapshot_clone_copies_initialized_fingerprint_without_extra_cache_allocation ... ok
+test body_text::tests::empty_and_same_text_commits_share_exact_source_allocations ... ok
+test body_text::tests::profiled_exact_noop_commit_matches_ordinary_and_skips_reopen ... ok
+test document::model::semantic::fields::navigation::tests::field_text_at_position_selects_the_innermost_nested_field ... ok
+test document::tests::test_image_data_with_invalid_offset ... ok
+test document::tests::test_extract_png_image_from_doc ... ok
+test body_text::tests::transaction_limits_fail_before_mutation ... ok
+test encryption::tests::binary_rc4_secret_matches_apache_poi_vector ... ok
+test embedded_object::tests::target_discovery_keeps_exact_object_pool_storage_names ... ok
+test encryption::tests::xor_accepts_lcid_ansi_password_conversion_and_truncates_to_fifteen_bytes ... ok
+test encryption::tests::xor_decrypts_all_streams_at_absolute_offsets_after_verification ... ok
+test body_text::source::tests::owned_bytes_open_reuses_the_validated_cfb_index ... ok
+test encryption::tests::stream_cipher_preserves_absolute_block_position ... ok
+test body_text::tests::length_changes_publish_while_structural_changes_are_refused ... ok
+test encryption::tests::xor_method_two_matches_poi_and_libreoffice_vectors ... ok
+test encryption::tests::cryptoapi_stream_rekeys_at_512_byte_boundaries ... ok
+test encryption::tests::cryptoapi_clear_prefix_offsets_are_consumed ... ok
+test footnote::tests::test_endnote_as_footnote_alias ... ok
+test footnote::tests::test_footnote_clone ... ok
+test footnote::tests::test_footnote_debug ... ok
+test footnote::tests::test_footnote_equality ... ok
+test footnote::tests::test_footnote_large_number ... ok
+test footnote::tests::test_footnote_large_position ... ok
+test footnote::tests::test_footnote_new ... ok
+test footnote::tests::test_footnote_paragraphs_method ... ok
+test footnote::tests::test_footnote_empty_text ... ok
+test footnote::tests::test_footnote_text_method ... ok
+test footnote::tests::test_footnote_with_multiple_paragraphs ... ok
+test footnote::tests::test_footnote_with_unicode ... ok
+test footnote::tests::test_multiple_footnotes ... ok
+test header_footer::tests::test_all_footer_types_are_footers ... ok
+test header_footer::tests::test_all_header_types_are_headers ... ok
+test header_footer::tests::test_empty_header ... ok
+test footnote::tests::test_footnote_with_nested_paragraphs ... ok
+test header_footer::tests::test_even_page_footer ... ok
+test header_footer::tests::test_even_page_header ... ok
+test header_footer::tests::test_first_page_header ... ok
+test header_footer::tests::test_header_footer_clone ... ok
+test header_footer::tests::test_header_footer_debug ... ok
+test body_text::tests::paragraph_commit_preserves_every_unmodeled_stream_payload ... ok
+test body_text::source::tests::ordinary_fixture_has_a_source_backed_paragraph ... ok
+test body_text::tests::multi_paragraph_text_and_bold_commit_reopens_and_inverts ... ok
+test header_footer::tests::test_first_page_footer ... ok
+test header_footer::tests::test_header_footer_paragraphs_method ... ok
+test header_footer::tests::test_header_footer_new ... ok
+test header_footer::tests::test_header_footer_text_method ... ok
+test header_footer::tests::test_odd_page_footer ... ok
+test header_footer::tests::test_odd_page_header ... ok
+test hyperlink::tests::test_hyperlink_clone ... ok
+test header_footer::tests::test_header_footer_with_multiple_paragraphs ... ok
+test hyperlink::tests::test_hyperlink_debug ... ok
+test header_footer::tests::test_header_footer_with_paragraphs ... ok
+test header_footer::tests::test_header_with_unicode ... ok
+test hyperlink::tests::test_hyperlink_display_text_method ... ok
+test hyperlink::tests::test_hyperlink_destination_method ... ok
+test hyperlink::tests::test_hyperlink_empty_fields ... ok
+test hyperlink::tests::test_hyperlink_from_internal_bookmark ... ok
+test hyperlink::tests::test_hyperlink_from_internal_email ... ok
+test hyperlink::tests::test_hyperlink_link_type_equality ... ok
+test hyperlink::tests::test_hyperlink_unicode ... ok
+test image::tests::image_data_rejects_negative_or_out_of_bounds_block_lengths ... ok
+test image::tests::test_block_type_conversion ... ok
+test image::tests::test_extract_image_returns_none_when_no_picture ... ok
+test image::tests::test_has_picture_returns_error_for_invalid_offset ... ok
+test image::tests::test_has_picture_returns_false_when_is_obj ... ok
+test image::tests::test_has_picture_returns_false_when_not_spec ... ok
+test hyperlink::tests::test_hyperlink_from_internal_file ... ok
+test image::tests::test_has_picture_returns_true_for_valid_image_block ... ok
+test image::tests::test_has_picture_with_end_of_special_marker ... ok
+test leniency::tests::a_fresh_report_is_clean ... ok
+test leniency::tests::recorded_defects_are_returned_in_discovery_order ... ok
+test leniency::tests::defects_past_the_bound_are_counted_not_stored ... ok
+test image::tests::test_has_picture_returns_false_for_wrong_text ... ok
+test hyperlink::tests::test_hyperlink_from_internal_url ... ok
+test leniency::tests::strict_is_the_default ... ok
+test embedded_object::tests::malformed_known_metadata_remains_lossless_unknown_bytes ... ok
+test mtef_extractor::tests::checks_stream_size_at_usize_boundary ... ok
+test body_text::tests::shared_physical_validation_preserves_candidate_semantics_and_opaque_streams ... ok
+test mtef_extractor::tests::accepts_exact_and_trims_trailing_stream_lengths ... ok
+test mtef_extractor::tests::malformed_input_is_inert_and_does_not_escape_a_borrow ... ok
+test mtef_extractor::tests::parsed_nodes_are_tied_to_the_arena_not_the_source_vec ... ok
+test mtef_extractor::tests::rejects_truncated_header_declared_payload ... ok
+test mtef_extractor::tests::reports_maximum_declared_payload_as_truncated_without_allocating_it ... ok
+test mtef_extractor::tests::test_mtef_extractor_creation ... ok
+test mtef_extractor::tests::test_ole_header_validation ... ok
+test package::tests::test_invalid_file ... ignored, requires an external DOC fixture
+test package::tests::test_open_package ... ignored, requires an external DOC fixture
+test paragraph::tests::resolves_run_revision_authors_and_timestamps ... ok
+test paragraph::tests::resolves_table_row_revision_authors_and_timestamps ... ok
+test paragraph::tests::test_paragraph_text ... ok
+test paragraph::tests::test_run_text ... ok
+test paragraph::tests::test_run_with_formatting ... ok
+test parts::annotation_bookmarks::tests::round_trip_preserves_opaque_tag_ids ... ok
+test parts::annotation_bookmarks::tests::parses_fib_range_and_rejects_invalid_atnbe_shapes ... ok
+test package::tests::ordinary_doc_exposes_an_empty_dataspaces_profile ... ok
+test parts::annotation_bookmarks::tests::transaction_is_atomic_and_reversible ... ok
+test parts::auto_summary::tests::parses_priority_ranges ... ok
+test package::property_set::tests::no_op_edits_return_the_exact_source_bytes ... ok
+test parts::auto_summary::tests::rejects_malformed_tables ... ok
+test parts::associated_strings::tests::rejects_malformed_header_lengths_utf16_and_trailing_data ... ok
+test parts::annotation_bookmarks::tests::package_noop_returns_exact_original_cfb_bytes ... ok
+test parts::auto_summary::tests::serializes_positions_before_asumy_elements ... ok
+test parts::associated_strings::tests::typed_unicode_slots_round_trip_exactly ... ok
+test parts::bookmarks::tests::parses_overlapping_and_column_bookmarks ... ok
+test parts::captions::tests::capi_rejects_invalid_domains ... ok
+test package::property_set::tests::signed_and_encrypted_sources_are_refused_before_mutation ... ok
+test parts::bookmarks::tests::rejects_malformed_standard_bookmark_tables ... ok
+test body_text::source::tests::length_change_and_partial_sink_are_typed_failures ... ok
+test parts::captions::tests::ignores_caption_pointers_in_non_template_documents ... ok
+test parts::captions::tests::label_table_rejects_malformed_header_payload_and_label ... ok
+test parts::captions::tests::label_table_round_trips_unicode_and_chapter_options ... ok
+test parts::captions::tests::capi_round_trips_and_preserves_ignored_bits ... ok
+test embedded_object::tests::snapshot_rejects_a_field_whose_objectpool_owner_was_removed ... ok
+test parts::captions::tests::semantic_facade_rejects_dangling_or_out_of_range_fib_tables ... ok
+test parts::chp::tests::chpx_position_hresi_effect_tests::decodes_all_values_boundaries_defaults_and_later_wins ... ok
+test parts::captions::tests::semantic_fib_facade_validates_cross_table_indexes ... ok
+test parts::chp::tests::chpx_position_hresi_effect_tests::rejects_out_of_range_and_dependent_operands ... ok
+test parts::chp::tests::ignores_non_character_sprms_in_mixed_piece_modifier ... ok
+test parts::chp::tests::parses_both_character_formatting_revision_sprms_strictly ... ok
+test parts::chp::tests::parses_complex_script_language_and_proofing_sprms ... ok
+test parts::chp::tests::parses_conditional_table_style_character_formatting_strictly ... ok
+test parts::chp::tests::parses_palette_character_border_and_shading ... ok
+test parts::chp::tests::parses_display_field_revision_strictly ... ok
+test parts::chp::tests::parses_insertion_and_deletion_revision_sprms ... ok
+test parts::chp::tests::parses_rgb_character_border_shading_and_underline ... ok
+test parts::chp::tests::preserves_ordered_character_revision_state ... ok
+test parts::chp::tests::preserves_reserved_character_format_values ... ok
+test parts::annotation_bookmarks::tests::package_edit_appends_and_clear_only_removes_the_fib_range ... ok
+test package::property_set::tests::typed_edits_preserve_unrelated_streams_and_publish_a_patch ... ok
+test parts::chp::tests::preserves_reserved_script_hint_values ... ok
+test parts::chp::tests::test_default_chp ... ok
+test parts::chp::tests::test_toggle_value ... ok
+test parts::chp::tests::test_underline_style ... ok
+test parts::chp::tests::test_vertical_position ... ok
+test parts::chp_bin_table::tests::indexed_range_query_matches_scalar_overlap_boundaries ... ok
+test parts::chp_bin_table::tests::indexed_range_query_preserves_run_identity_and_order ... ok
+test parts::command_bars::tests::absent_or_empty_fib_pointer_is_optional ... ok
+test body_text::tests::durable_patch_composition_and_history_are_bounded ... ok
+test parts::command_bars::tests::command_bar_snapshots_are_owned_and_failure_atomic ... ok
+test parts::command_bars::tests::rejects_truncated_tbc_specific_data_without_guessing_a_boundary ... ok
+test parts::command_bars::tests::rejects_unknown_records_without_guessing_boundaries ... ok
+test parts::command_bars::tests::rejects_invalid_tbc_command_type ... ok
+test parts::command_bars::tests::rejects_truncated_variable_strings_and_table_ranges ... ok
+test parts::command_bars::tests::rejects_invalid_command_string_and_macro_name_boundaries ... ok
+test parts::command_bars::tests::parses_optional_fib_pointer_and_writes_a_new_table_range ... ok
+test parts::command_bars::tests::rejects_bad_counts_reserved_words_and_relationships ... ok
+test parts::command_bars::tests::rejects_zero_length_combo_item_array_at_the_control_boundary ... ok
+test package::tests::opens_apache_poi_binary_rc4_document ... ok
+test body_text::tests::non_destructive_revision_disposition_is_durable_and_reversible ... ok
+test parts::comments::tests::parses_and_validates_extended_comment_metadata ... ok
+test embedded_object::tests::snapshot_transactions_keep_invalid_metadata_and_storage_edits_atomic ... ok
+test parts::comments::tests::parses_unicode_owners_and_descriptors ... ok
+test parts::command_bars::tests::round_trip_preserves_typed_records_and_opaque_bytes ... ok
+test parts::comments::tests::parses_complete_comment_tables_from_fib_pointers ... ok
+test parts::comments::tests::rejects_invalid_owner_arrays_and_descriptors ... ok
+test parts::captions::tests::auto_table_round_trips_and_rejects_invalid_strings ... ok
+test parts::command_bars::tests::round_trip_parses_ctb_controls_and_shared_general_metadata ... ok
+test parts::comments::tests::validates_comment_text_character_positions ... ok
+test parts::command_bars::tests::round_trip_preserves_menu_and_combo_specific_boundaries ... ok
+test parts::comments::tests::resolves_annotation_bookmark_tags_to_main_document_ranges ... ok
+test parts::document_properties::tests::parses_typed_base_fields_and_round_trips_extensions_losslessly ... ok
+test body_text::source::tests::stable_token_mutation_is_rejected_before_paragraph_and_commit_access ... ok
+test parts::document_properties::tests::dispatches_word_2013_to_the_complete_typed_extension ... ok
+test parts::document_properties::tests::rejects_reserved_values_invalid_dates_and_nonstandard_lengths ... ok
+test parts::document_properties::tests::typed_mutation_validates_note_view_and_protection_domains ... ok
+test parts::document_properties_2000::tests::parses_typed_web_xml_and_version_state ... ok
+test embedded_object::tests::inventory_exposes_inert_ole_metadata_and_unknown_streams ... ok
+test parts::document_properties_2000::tests::round_trip_preserves_undefined_bits_and_bytes ... ok
+test parts::document_properties_2002::tests::copts60_mirror_uses_base_offset_eight ... ok
+test parts::document_properties_2000::tests::validates_context_dependent_style_index ... ok
+test parts::document_properties_2000::tests::rejects_must_constraint_violations ... ok
+test parts::document_properties_2002::tests::parses_complete_typed_extension ... ok
+test parts::document_properties_2002::tests::rejects_invalid_line_ending_reverse_fold_and_cp ... ok
+test parts::document_properties_2002::tests::round_trip_preserves_undefined_prefix ... ok
+test parts::document_properties_2003::tests::parses_complete_typed_extension ... ok
+test parts::document_properties_2002::tests::validates_contextual_style_and_story_bounds ... ok
+test parts::document_properties_2003::tests::rejects_invalid_invariants_and_reserved_values ... ok
+test package::tests::opens_apache_poi_cryptoapi_document ... ok
+test parts::document_properties_2003::tests::round_trip_preserves_the_undefined_bit ... ok
+test parts::document_properties_2003::tests::writes_typed_mutations_and_checks_target_size ... ok
+test parts::document_properties_2007::tests::parses_and_writes_word_2007_and_math_settings_losslessly ... ok
+test parts::document_properties_2007::tests::writes_typed_mutations_and_preserves_undefined_bits ... ok
+test parts::document_properties_2010::tests::parses_round_trips_and_mutates_word_2010_settings ... ok
+test parts::document_properties_2007::tests::rejects_reserved_values_and_invalid_math_domains ... ok
+test parts::document_properties_2013::tests::parses_and_writes_chart_tracking_flag ... ok
+test parts::document_properties_2010::tests::rejects_invalid_document_id_reserved_bits_and_short_input ... ok
+test parts::document_properties_2013::tests::rejects_reserved_bits_and_short_input ... ok
+test parts::document_properties_97::tests::exposes_typed_fields_and_inert_security_metadata ... ok
+test parts::document_properties_97::tests::parses_and_writes_losslessly ... ok
+test parts::document_properties_97::tests::rejects_must_constraint_violations ... ok
+test parts::document_properties_97::tests::typography_strings_round_trip_as_utf16 ... ok
+test parts::document_properties_97::tests::validates_context_dependent_list_indices ... ok
+test parts::embedded_fonts::tests::honors_a_nonstandard_brgbst ... ok
+test parts::embedded_fonts::tests::parses_embedded_font_entries ... ok
+test parts::embedded_fonts::tests::rejects_malformed_tables ... ok
+test parts::envelope::tests::office6_uses_ansi_and_omits_unicode_only_fields ... ok
+test parts::envelope::tests::known_envelope_round_trips_all_typed_properties ... ok
+test parts::envelope::tests::fib_pointer_reads_envelope_from_table_stream ... ok
+test parts::envelope::tests::rejects_known_clsid_with_opaque_payload ... ok
+test parts::envelope::tests::unknown_clsid_round_trips_as_bounded_opaque_payload ... ok
+test parts::fib::tests::table_pointers_stop_at_the_declared_count ... ok
+test parts::envelope::tests::semantic_patch_is_clone_first_reversible_and_source_checked ... ok
+test parts::fib::tests::test_fib_magic_validation ... ok
+test parts::envelope::tests::rejects_unpaired_utf16_on_model_and_parse ... ok
+test parts::envelope::tests::rejects_malformed_version_flags_encoding_and_bounds ... ok
+test parts::fib::tests::test_fib_min_size ... ok
+test parts::fib::tests::test_fib_table_stream_flag ... ok
+test parts::fib::tests::test_fib_valid ... ok
+test parts::fib::tests::truncated_declared_table_pointer_array_is_unavailable ... ok
+test parts::fib::tests::word_95_uses_its_fixed_uncounted_pointer_array ... ok
+test parts::fields::tests::codec::field_text_rejects_unrepresentable_or_reversed_ranges ... ok
+test parts::fields::tests::codec::fields_table_extracts_text_from_each_field_story ... ok
+test parts::fields::tests::model::basic::active_content_fields_expose_opaque_metadata_without_activation ... ok
+test parts::fields::tests::model::basic::bidi_outline_fields_preserve_metadata_without_resolving_numbering_or_layout ... ok
+test parts::fields::tests::model::basic::barcode_fields_preserve_opaque_metadata_without_decoding_or_rendering ... ok
+test parts::fields::tests::model::basic::embed_fields_preserve_opaque_metadata_without_loading_or_activating_objects ... ok
+test parts::fields::tests::model::basic::field_text_keeps_instruction_and_cached_result_separate ... ok
+test parts::fields::tests::model::basic::field_text_reports_absent_separator_as_no_cached_result ... ok
+test parts::fields::tests::model::basic::legacy_form_fields_preserve_metadata_without_filling_or_executing ... ok
+test parts::fields::tests::model::basic::macro_button_field_exposes_stored_metadata_without_execution ... ok
+test parts::command_bars::tests::package_editor_publishes_command_bars_and_preserves_unrelated_bytes ... ok
+test parts::fields::tests::model::basic::print_fields_preserve_opaque_metadata_without_sending_printer_commands ... ok
+test parts::fields::tests::model::basic::shape_fields_preserve_metadata_without_linking_or_rendering_drawings ... ok
+test parts::fields::tests::model::conditions::compare_fields_expose_cached_metadata_without_evaluation ... ok
+test parts::fields::tests::model::conditions::if_fields_expose_cached_metadata_without_evaluation ... ok
+test parts::fields::tests::model::conditions::prompt_fields_expose_cached_metadata_without_displaying_prompts ... ok
+test parts::fields::tests::model::document::advance_fields_expose_metadata_without_changing_layout ... ok
+test parts::fields::tests::model::document::document_context_fields_expose_cached_metadata_without_reading_or_calculating_values ... ok
+test parts::fields::tests::model::document::document_variable_fields_expose_cached_metadata_without_resolution ... ok
+test parts::fields::tests::model::document::document_information_fields_expose_cached_metadata_without_resolution_or_calculation ... ok
+test parts::fields::tests::model::document::go_to_button_field_exposes_stored_metadata_without_navigation ... ok
+test parts::fields::tests::model::document::document_property_fields_expose_cached_metadata_without_resolution ... ok
+test parts::fields::tests::model::document::info_fields_expose_stored_metadata_without_property_resolution_or_updates ... ok
+test parts::fields::tests::model::indexing::index_fields_preserve_stored_configuration_without_generation ... ok
+test embedded_object::tests::replacing_a_storage_keeps_the_field_reference_and_reparses_opaque_payloads ... ok
+test parts::fields::tests::model::indexing::non_plcf_collection_classifies_all_five_excluded_types_once ... ok
+test parts::fields::tests::model::document::user_identity_fields_expose_metadata_without_reading_host_identity ... ok
+test parts::fields::tests::model::indexing::table_of_authorities_fields_preserve_stored_configuration_without_generation ... ok
+test parts::fields::tests::model::indexing::table_of_contents_fields_preserve_stored_configuration_without_generation ... ok
+test parts::fields::tests::model::mail_merge::conditional_mail_merge_controls_expose_metadata_without_merging ... ok
+test parts::fields::tests::model::mail_merge::auto_text_list_fields_preserve_metadata_without_selection ... ok
+test parts::fields::tests::model::mail_merge::auto_text_fields_preserve_entries_without_lookup_or_insertion ... ok
+test parts::fields::tests::model::mail_merge::dde_links_expose_cached_metadata_without_activation ... ok
+test parts::fields::tests::model::mail_merge::link_fields_expose_cached_metadata_without_activating_sources ... ok
+test parts::fields::tests::model::mail_merge::external_include_fields_expose_cached_metadata_without_opening_sources ... ok
+test parts::fields::tests::model::mail_merge::mail_merge_counters_expose_cached_metadata_without_merging ... ok
+test parts::fields::tests::model::mail_merge::recipient_fields_expose_layout_metadata_without_merging ... ok
+test parts::fields::tests::model::mail_merge::mail_merge_data_fields_expose_sources_without_opening_them ... ok
+test parts::fields::tests::model::references::automatic_number_fields_preserve_cached_metadata_without_calculating_numbers_or_layout ... ok
+test parts::fields::tests::model::mail_merge::mail_merge_next_fields_expose_cached_metadata_without_advancing_records ... ok
+test body_text::source::tests::exact_noop_keeps_snapshot_and_artifact_identity ... ok
+test parts::fields::tests::model::references::hyperlink_fields_preserve_stored_metadata_without_resolving_or_opening_targets ... ok
+test parts::fields::tests::model::references::list_number_fields_preserve_cached_metadata_without_reading_lists_or_calculating_numbers ... ok
+test parts::fields::tests::model::mail_merge::merge_field_exposes_stored_metadata_without_merging ... ok
+test parts::fields::tests::model::references::equation_fields_preserve_opaque_expressions_without_calculation_or_rendering ... ok
+test parts::fields::tests::model::references::set_fields_preserve_target_and_expression_without_evaluation_or_state_changes ... ok
+test parts::fields::tests::parse::all_end_flags_and_reserved_descriptor_bits_are_preserved ... ok
+test parts::fields::tests::parse::field_type_mapping_covers_specified_and_unknown_values ... ok
+test parts::fields::tests::parse::malformed_plcf_and_fieldlist_matrix_is_rejected ... ok
+test parts::fields::tests::model::references::reference_fields_preserve_metadata_without_resolution_or_navigation ... ok
+test parts::fields::tests::roundtrip::nested_fields_flags_and_roundtrip_are_exact ... ok
+test parts::fields::tests::model::references::sequence_fields_preserve_metadata_without_bookmark_lookup_or_numbering ... ok
+test parts::fields::tests::roundtrip::terminal_cp_regression_tests::terminal_cp_is_not_story_bounded_but_marker_cps_are ... ok
+test parts::envelope::tests::package_editor_appends_only_the_new_range_and_publishes_reversible_patches ... ok
+test parts::fields::tests::roundtrip::unrecognized_field_type_is_preserved_with_valid_boundaries ... ok
+test parts::fields::tests::model::references::formula_fields_preserve_stored_formulas_without_evaluation_or_cell_reads ... ok
+test parts::fkp::tests::test_chpx_fkp_basic_parsing ... ok
+test parts::fkp::tests::test_chpx_fkp_zero_bx ... ok
+test parts::fields::tests::model::references::style_reference_fields_preserve_metadata_without_style_or_layout_resolution ... ok
+test parts::fkp::tests::test_fkp_page_size ... ok
+test parts::fkp::tests::test_invalid_crun ... ok
+test parts::fields::tests::model::references::symbol_fields_preserve_cached_metadata_without_mapping_codes_or_inserting_glyphs ... ok
+test parts::fields::tests::model::references::quote_fields_preserve_cached_text_without_inserting_or_transforming_it ... ok
+test parts::fkp::tests::test_invalid_page_size ... ok
+test parts::fkp::tests::test_papx_fkp_zero_bx ... ok
+test parts::fkp::tests::test_papx_fkp_basic_parsing ... ok
+test parts::fkp::tests::test_papx_fkp_zero_size_encoding ... ok
+test parts::fkp::tests::test_paragraph_height_insufficient_data ... ok
+test parts::fkp::tests::test_paragraph_height_parsing ... ok
+test parts::footnotes::tests::parses_spec_terminal_note_character_positions ... ok
+test parts::footnotes::tests::rejects_malformed_note_character_positions ... ok
+test parts::footnotes::tests::test_footnote_descriptor_parsing ... ok
+test parts::footnotes::tests::test_footnote_reference ... ok
+test parts::form_fields::tests::parses_checkbox_field ... ok
+test parts::form_fields::tests::parses_dropdown_field ... ok
+test parts::form_fields::tests::parses_nil_picf_and_bin_data ... ok
+test parts::form_fields::tests::parses_text_field ... ok
+test parts::form_fields::tests::rejects_invalid_checkbox_and_dropdown_states ... ok
+test parts::form_fields::tests::rejects_invalid_text_kinds ... ok
+test parts::form_fields::tests::rejects_malformed_nil_picf_and_bin_data ... ok
+test parts::fields::tests::model::indexing::private_fields_reconstruct_omitted_field_markers ... ok
+test parts::format_consistency::tests::absent_tables_yield_none ... ok
+test parts::form_fields::tests::rejects_malformed_payloads ... ok
+test parts::fields::tests::model::indexing::referenced_documents_reconstruct_omitted_field_markers ... ok
+test parts::fields::tests::model::indexing::index_entries_reconstruct_omitted_field_markers ... ok
+test parts::format_consistency::tests::parses_format_consistency_marks ... ok
+test parts::glossary::tests::rejects_autocorrect_style_and_resource_limit_violations ... ok
+test parts::format_consistency::tests::rejects_partial_table_sets ... ok
+test parts::format_consistency::tests::rejects_malformed_tables ... ok
+test parts::fields::tests::model::indexing::table_of_contents_entries_reconstruct_omitted_field_markers ... ok
+test parts::glossary::tests::rejects_cross_table_and_lexical_inconsistencies ... ok
+test parts::grammar_cookies::tests::fcks_round_trips_exactly ... ok
+test parts::fields::tests::model::indexing::table_of_authorities_entries_reconstruct_omitted_field_markers ... ok
+test parts::glossary::tests::round_trips_all_three_parallel_tables ... ok
+test parts::grammar_cookies::tests::fcksold_validates_signed_ranges_and_zeroes_padding ... ok
+test parts::grammar_cookies::tests::parses_both_tables_through_fib_with_cookie_data_bounds ... ok
+test embedded_object::tests::snapshot_transactions_are_source_checked_and_preserve_opaque_object_data ... ok
+test parts::grammar_cookies::tests::plcfcookie_parses_and_round_trips ... ok
+test parts::grammar_cookies::tests::plcfcookieold_parses_and_round_trips ... ok
+test parts::grammar_cookies::tests::rejects_duplicate_checker_headers ... ok
+test parts::grammar_cookies::tests::rejects_cookie_cp_beyond_document_parts ... ok
+test parts::grammar_cookies::tests::rejects_icdb_outside_cookie_data ... ok
+test parts::grammar_cookies::tests::rejects_malformed_plc_shapes ... ok
+test parts::headers::tests::parses_section_slots_after_separator_stories ... ok
+test parts::headers::tests::rejects_malformed_header_character_positions ... ok
+test parts::headers::tests::test_header_footer_story ... ok
+test parts::headers::tests::test_header_footer_story_all_types ... ok
+test parts::envelope::tests::model_rejects_recipient_and_attachment_bounds_before_encoding ... ok
+test parts::headers::tests::test_header_footer_story_large_ranges ... ok
+test parts::headers::tests::test_header_footer_story_length ... ok
+test parts::headers::tests::test_header_footer_story_new ... ok
+test parts::headers::tests::test_header_footer_story_zero_length ... ok
+test parts::headers::tests::test_header_footer_type ... ok
+test parts::headers::tests::test_header_footer_type_all_variants ... ok
+test parts::headers::tests::test_header_footer_type_copy ... ok
+test parts::headers::tests::test_header_footer_story_clone ... ok
+test parts::headers::tests::test_header_footer_type_debug ... ok
+test parts::headers::tests::test_header_footer_type_discriminants ... ok
+test parts::headers::tests::test_header_footer_type_equality ... ok
+test parts::headers::tests::test_header_footer_type_is_footer ... ok
+test parts::headers::tests::test_header_footer_story_debug ... ok
+test parts::headers::tests::test_header_footer_type_is_header ... ok
+test parts::hyperlinks::tests::test_extract_destination ... ok
+test parts::hyperlinks::tests::test_hyperlink_clone ... ok
+test parts::hyperlinks::tests::test_hyperlink_creation ... ok
+test parts::hyperlinks::tests::test_hyperlink_debug ... ok
+test parts::headers::tests::test_header_footer_story_is_empty ... ok
+test parts::hyperlinks::tests::test_hyperlink_extract_destination_empty ... ok
+test parts::hyperlinks::tests::test_hyperlink_extract_destination_no_hyperlink_prefix ... ok
+test parts::hyperlinks::tests::test_hyperlink_extract_destination_no_quotes ... ok
+test parts::hyperlinks::tests::test_hyperlink_extract_destination_single_quotes ... ok
+test parts::hyperlinks::tests::test_hyperlink_extract_destination_with_special_chars ... ok
+test parts::hyperlinks::tests::test_hyperlink_length_zero ... ok
+test parts::hyperlinks::tests::test_hyperlink_length_large ... ok
+test parts::hyperlinks::tests::test_hyperlink_new_bookmark ... ok
+test parts::hyperlinks::tests::test_hyperlink_new_file ... ok
+test parts::hyperlinks::tests::test_hyperlink_new_https ... ok
+test parts::hyperlinks::tests::test_hyperlink_new_mailto ... ok
+test parts::hyperlinks::tests::test_hyperlink_type ... ok
+test parts::hyperlinks::tests::test_hyperlink_type_bookmark_variations ... ok
+test parts::hyperlinks::tests::test_hyperlink_type_clone ... ok
+test parts::hyperlinks::tests::test_hyperlink_type_email_variations ... ok
+test parts::hyperlinks::tests::test_hyperlink_type_equality ... ok
+test parts::hyperlinks::tests::test_hyperlink_type_file_variations ... ok
+test parts::hyperlinks::tests::test_hyperlink_type_unknown ... ok
+test parts::hyperlinks::tests::test_hyperlink_type_url_variations ... ok
+test parts::hyperlinks::tests::test_hyperlink_unicode ... ok
+test parts::hyperlinks::tests::test_hyperlinks_table_by_type ... ok
+test parts::hyperlinks::tests::test_hyperlinks_table_empty ... ok
+test parts::hyperlinks::tests::test_hyperlinks_table_find_at_position ... ok
+test parts::hyperlinks::tests::test_hyperlinks_table_find_at_position_overlapping ... ok
+test parts::hyperlinks::tests::test_hyperlinks_table_multiple ... ok
+test parts::hyperlinks::tests::test_hyperlinks_table_single ... ok
+test parts::images::tests::test_picture_descriptor_scaling ... ok
+test parts::images::tests::test_picture_mime_types ... ok
+test parts::images::tests::test_picture_type_detection ... ok
+test parts::list_names::tests::parses_and_round_trips_poi_reference_table ... ok
+test parts::list_names::tests::preserves_empty_parallel_slots_and_utf16 ... ok
+test parts::list_names::tests::rejects_duplicate_and_oversized_names ... ok
+test parts::list_names::tests::rejects_malformed_headers_lengths_and_encoding ... ok
+test parts::list_templates::tests::rejects_invalid_lengths_trailing_bytes_and_duplicate_user_ids ... ok
+test parts::list_templates::tests::table_round_trips_empty_and_complete_parallel_slots ... ok
+test parts::list_templates::tests::tplc_codes_round_trip_and_reject_unknown_built_ins ... ok
+test parts::mail_merge::tests::parses_minimal_pms ... ok
+test parts::mail_merge::tests::parses_full_pms ... ok
+test parts::mail_merge::tests::parses_odso_recipient_filters ... ok
+test parts::mail_merge::tests::parses_odso_field_map_info ... ok
+test parts::mail_merge::tests::parses_odso_recipient_info ... ok
+test parts::mail_merge::tests::parses_odso_sort_order ... ok
+test parts::mail_merge::tests::parses_odso_scalar_properties ... ok
+test parts::mail_merge::tests::parses_pmfs_flags_and_tokens ... ok
+test parts::mail_merge::tests::parses_pms_new_through_the_fib ... ok
+test parts::mail_merge::tests::parses_pms_with_sttbf_rfs ... ok
+test parts::mail_merge::tests::parses_rfs_flags ... ok
+test parts::mail_merge::tests::rejects_malformed_field_map_info ... ok
+test parts::mail_merge::tests::rejects_malformed_odso_bags ... ok
+test parts::mail_merge::tests::rejects_malformed_filters ... ok
+test parts::mail_merge::tests::rejects_malformed_recipient_info ... ok
+test parts::mail_merge::tests::rejects_malformed_pms ... ok
+test parts::numbering::tests::list_level_preserves_exotic_msonfc_and_rejects_reserved_values ... ok
+test parts::mail_merge::tests::rejects_malformed_sttbf_rfs ... ok
+test parts::numbering::tests::paragraph_binding_borrows_base_level_and_applies_start_override ... ok
+test parts::numbering::tests::paragraph_binding_borrows_formatting_override_and_rejects_sentinels ... ok
+test parts::numbering::tests::parses_parallel_lfo_and_lfo_data_arrays ... ok
+test parts::numbering::tests::rejects_truncated_list_tables ... ok
+test parts::numbering::tests::test_list_alignment ... ok
+test parts::numbering::tests::parses_split_plflst_header_and_level_array ... ok
+test parts::numbering::tests::test_list_alignment_clone ... ok
+test parts::numbering::tests::test_list_alignment_rejects_unknown ... ok
+test parts::numbering::tests::test_list_format_override_clone ... ok
+test parts::numbering::tests::test_list_format_override_creation ... ok
+test parts::numbering::tests::test_list_format_override_from_bytes_too_short ... ok
+test parts::numbering::tests::test_list_format_override_debug ... ok
+test parts::numbering::tests::test_list_format_override_from_bytes_valid ... ok
+test parts::numbering::tests::test_list_level_bullet ... ok
+test parts::numbering::tests::test_list_level_clone ... ok
+test parts::numbering::tests::test_list_level_creation ... ok
+test parts::numbering::tests::test_list_level_debug ... ok
+test parts::numbering::tests::test_list_level_from_bytes_bullet ... ok
+test parts::numbering::tests::test_list_level_from_bytes_minimal ... ok
+test parts::numbering::tests::test_list_level_from_bytes_too_short ... ok
+test parts::numbering::tests::test_list_level_from_bytes_with_text ... ok
+test parts::numbering::tests::test_list_level_negative_indent ... ok
+test parts::numbering::tests::test_list_level_none ... ok
+test parts::numbering::tests::test_list_structure_clone ... ok
+test parts::numbering::tests::test_list_structure_creation ... ok
+test parts::numbering::tests::test_list_structure_debug ... ok
+test parts::numbering::tests::test_list_structure_from_bytes_minimal ... ok
+test parts::numbering::tests::test_list_structure_from_bytes_too_short ... ok
+test parts::numbering::tests::test_list_structure_level_accessor ... ok
+test parts::numbering::tests::test_list_structure_simple ... ok
+test parts::numbering::tests::test_list_tables_empty ... ok
+test parts::numbering::tests::test_list_tables_find_override ... ok
+test parts::numbering::tests::test_list_tables_find_structure ... ok
+test parts::numbering::tests::test_list_tables_get_list_for_lfo ... ok
+test parts::numbering::tests::test_list_tables_get_list_for_lfo_no_override ... ok
+test parts::numbering::tests::test_list_tables_with_data ... ok
+test parts::numbering::tests::test_number_format ... ok
+test parts::numbering::tests::test_number_format_all_variants ... ok
+test parts::numbering::tests::test_number_format_clone ... ok
+test parts::numbering::tests::test_number_format_copy ... ok
+test parts::numbering::tests::test_number_format_debug ... ok
+test parts::numbering::tests::test_number_format_equality ... ok
+test parts::numbering::tests::test_number_format_rejects_unknown ... ok
+test parts::numbering::tests::test_numbering_with_unicode_number_text ... ok
+test parts::ole_controls::tests::editor_commit_round_trips_without_mutating_the_source_snapshot ... ok
+test parts::ole_controls::tests::enforces_cookie_uniqueness_and_record_shape ... ok
+test parts::ole_controls::tests::object_metadata_preserves_absent_and_zero_persist2 ... ok
+test parts::ole_controls::tests::object_metadata_rejects_invalid_domains_and_relationships ... ok
+test parts::ole_controls::tests::object_metadata_round_trips_exact_persist_words ... ok
+test parts::ole_controls::tests::object_pool_validates_inert_activex_stream_metadata ... ok
+test parts::ole_controls::tests::reads_the_fc_plcocx_table_pointer ... ok
+test parts::ole_controls::tests::rejects_invalid_story_and_fifld ... ok
+test parts::ole_controls::tests::round_trips_fixed_records_and_ignored_values ... ok
+test parts::ole_controls::tests::skips_unwritten_array_slots_left_by_real_producers ... ok
+test parts::ole_controls::tests::validates_story_specific_field_indices ... ok
+test parts::pap::tests::applies_style_level_increments_and_physical_justification_in_order ... ok
+test parts::pap::tests::applies_style_permutations_and_rejects_malformed_spp_operands ... ok
+test parts::pap::tests::parses_all_paragraph_formatting_revision_sprms_strictly ... ok
+test parts::pap::tests::parses_asian_and_frame_controls_strictly ... ok
+test parts::pap::tests::parses_conditional_table_style_paragraph_formatting_strictly ... ok
+test parts::pap::tests::parses_current_and_word97_paragraph_borders_strictly ... ok
+test parts::pap::tests::parses_current_character_relative_paragraph_layout_strictly ... ok
+test parts::pap::tests::parses_current_grid_table_depth_and_shading_strictly ... ok
+test parts::pap::tests::parses_current_paragraph_identity_and_revision_state_strictly ... ok
+test parts::pap::tests::parses_frame_wrap_height_drop_cap_and_distances_strictly ... ok
+test parts::pap::tests::parses_legacy_autonumber_descriptors_and_text_widths ... ok
+test parts::pap::tests::parses_outline_and_bidi_controls_strictly ... ok
+test parts::pap::tests::parses_numbering_revision_state_strictly ... ok
+test parts::pap::tests::parses_lists_indents_spacing_and_ordered_tab_changes_strictly ... ok
+test parts::pap::tests::parses_table_markers_and_frame_positioning_strictly ... ok
+test parts::pap::tests::preserves_and_resets_ordered_paragraph_revision_state ... ok
+test parts::pap::tests::parses_table_row_revision_state_strictly ... ok
+test parts::pap::tests::parses_word6_paragraph_borders_and_pagination_controls_strictly ... ok
+test parts::pap::tests::test_default_pap ... ok
+test parts::pap::tests::rejects_invalid_list_indent_spacing_and_tab_operands ... ok
+test parts::pap::tests::test_indent_conversion ... ok
+test parts::pap::tests::rejects_malformed_legacy_autonumber_descriptors ... ok
+test parts::pap::tests::test_justification ... ok
+test parts::pap::tests::test_line_spacing_type ... ok
+test parts::pap_bin_table::tests::applies_piece_modifiers_after_fkp_properties ... ok
+test parts::pap::tests::parses_legacy_paragraph_border_controls_strictly ... ok
+test parts::pap_bin_table::tests::rejects_cyclic_data_indirections ... ok
+test parts::pap_bin_table::tests::rejects_missing_or_truncated_papx_data_indirections ... ok
+test parts::paragraph_extractor::tests::cascades_table_character_defaults_before_paragraph_and_direct_properties ... ok
+test parts::pap_bin_table::tests::resolves_huge_papx_and_preserves_style ... ok
+test parts::pap_bin_table::tests::adjacent_style_cache_matches_scalar_cascade_and_rekeys ... ok
+test parts::paragraph_extractor::tests::cell_and_row_marks_form_structural_paragraph_boundaries ... ok
+test parts::paragraph_extractor::tests::consolidation_preserves_non_visual_character_metadata_boundaries ... ok
+test parts::paragraph_extractor::tests::ordinal_extraction_preserves_unmarked_text_fallback ... ok
+test parts::paragraph_extractor::tests::selects_table_text_conditions_in_specified_precedence ... ok
+test parts::paragraph_extractor::tests::shared_ranges_preserve_structural_and_rich_text_results ... ok
+test parts::piece_table::tests::conversions_near_the_numeric_limit_report_none_rather_than_wrap ... ok
+test parts::paragraph_extractor::tests::ordinal_extraction_matches_enumeration_without_materializing_neighbors ... ok
+test parts::piece_table::tests::fc_to_cp_does_not_wrap_past_the_numeric_limit ... ok
+test parts::paragraph_extractor::tests::paragraph_count_matches_extraction_without_parsing_runs ... ok
+test body_text::tests::embedded_display_metadata_uses_root_patch_and_durable_inverse ... ok
+test parts::piece_table::tests::indexed_ranges_match_scalar_for_overlapping_and_numeric_edge_intervals ... ok
+test parts::piece_table::tests::inverted_character_positions_report_no_length ... ok
+test parts::piece_table::tests::maps_fkp_ranges_across_discontiguous_text_pieces ... ok
+test parts::piece_table::tests::resolves_simple_and_complex_piece_modifiers ... ok
+test parts::piece_table::tests::test_text_piece_cp_to_fc ... ok
+test parts::piece_table::tests::test_text_piece_fc_to_cp ... ok
+test parts::proofing::tests::enforces_language_detection_state_restrictions ... ok
+test parts::proofing::tests::language_detection_slot_round_trips_through_set_and_remove ... ok
+test parts::proofing::tests::parses_and_round_trips_language_detection_table ... ok
+test parts::proofing::tests::parses_and_round_trips_poi_reference_tables ... ok
+test parts::proofing::tests::parses_language_detection_table_through_fib ... ok
+test parts::proofing::tests::preserves_duplicate_cp_point_ranges ... ok
+test parts::proofing::tests::rejects_invalid_spls_states_and_flags ... ok
+test parts::proofing::tests::rejects_language_detection_cp_beyond_document_parts ... ok
+test parts::proofing::tests::rejects_malformed_plc_shapes_and_positions ... ok
+test parts::protection::tests::bounds_large_encoded_counts_before_allocating ... ok
+test parts::protection::tests::accepts_reserved_public_bit_while_retaining_it ... ok
+test parts::protection::tests::parses_username_table_without_bookmark_tables ... ok
+test parts::protection::tests::parses_typed_range_level_protection ... ok
+test parts::protection::tests::preserves_unknown_selectors_modes_roles_and_reserved_words ... ok
+test parts::protection::tests::rejects_dangling_user_indexes_and_invalid_columns ... ok
+test parts::protection::tests::rejects_duplicate_or_dangling_end_indexes ... ok
+test parts::protection::tests::rejects_invalid_table_framing_and_truncation ... ok
+test parts::protection::tests::rejects_mismatched_parallel_counts ... ok
+test parts::protection::tests::rejects_partially_present_bookmark_tables ... ok
+test parts::protection::tests::reports_absent_tables_as_none ... ok
+test parts::repair_bookmarks::tests::absent_tables_yield_none ... ok
+test parts::protection::tests::rejects_reversed_and_out_of_range_cps ... ok
+test parts::repair_bookmarks::tests::constructor_round_trips_through_parser ... ok
+test parts::repair_bookmarks::tests::parses_repair_bookmarks_and_round_trips ... ok
+test parts::repair_bookmarks::tests::rejects_malformed_description_table ... ok
+test parts::repair_bookmarks::tests::rejects_partial_table_sets ... ok
+test parts::repair_bookmarks::tests::rejects_mismatched_table_counts ... ok
+test parts::repair_bookmarks::tests::rejects_malformed_plcs ... ok
+test parts::revisions::tests::parses_unicode_revision_authors ... ok
+test parts::repair_bookmarks::tests::rejects_start_beyond_end ... ok
+test parts::revisions::tests::rejects_invalid_revision_author_tables ... ok
+test parts::rmd_threading::tests::parses_messages_and_styles ... ok
+test parts::rmd_threading::tests::rejects_malformed_tables ... ok
+test parts::route_slip::tests::parses_from_fib_table_pointer_without_document_integration ... ok
+test parts::route_slip::tests::protected_route_metadata_rejects_semantic_edits ... ok
+test parts::route_slip::tests::rejects_invalid_bool_dirty_enum_counts_and_relationships ... ok
+test parts::route_slip::tests::rejects_truncation_trailing_bytes_and_invalid_signed_lengths ... ok
+test parts::route_slip::tests::round_trip_preserves_narrow_bytes_and_entry_ids ... ok
+test parts::route_slip::tests::selectors_reject_ambiguous_names_and_out_of_bounds_indices ... ok
+test parts::route_slip::tests::transaction_rollback_and_commit_produce_reversible_semantic_patch ... ok
+test parts::route_slip::tests::validates_models_before_serializing ... ok
+test parts::rsids::tests::parses_identifier_table ... ok
+test parts::rsids::tests::rejects_malformed_tables ... ok
+test parts::saved_by::tests::rejects_malformed_headers_counts_strings_and_ranges ... ok
+test parts::saved_by::tests::unicode_save_history_round_trips_exactly ... ok
+test parts::sections::tests::page_border_defaults_and_later_operands_win ... ok
+test parts::sections::tests::parses_defaults_all_breaks_and_binary_lookup ... ok
+test parts::sections::tests::parses_even_and_unequal_columns ... ok
+test parts::sections::tests::parses_orientation_signed_margins_and_later_wins ... ok
+test parts::sections::tests::parses_page_grid_text_flow_defaults_and_later_overrides ... ok
+test parts::sections::tests::parses_section_behavior_and_paper_settings ... ok
+test parts::sections::tests::parses_section_page_line_and_note_numbering ... ok
+test parts::sections::tests::rejects_invalid_section_behavior_booleans ... ok
+test parts::sections::tests::rejects_invalid_section_numbering_operands ... ok
+test parts::sections::tests::rejects_malformed_page_border_operands ... ok
+test parts::sections::tests::rejects_malformed_page_grid_and_text_flow_operands ... ok
+test parts::sections::tests::rejects_malformed_tables_properties_and_columns ... ok
+test parts::sections::tests::rejects_out_of_count_and_final_column_spacing_operands ... ok
+test parts::sections::tests::retains_section_property_revisions ... ok
+test parts::sections::tests::unequal_columns_are_order_independent_and_later_indexed_values_win ... ok
+test parts::sections::tests::opens_poi_bug53453_section_layout ... ok
+test parts::smart_tags::tests::accepts_independent_recognizer_ranges ... ok
+test parts::smart_tags::tests::maps_representative_lcids_to_ansi_codepages ... ok
+test parts::smart_tags::tests::rejects_invalid_recognizer_states_and_reserved_bits ... ok
+test parts::repair_bookmarks::tests::rejects_constructor_violations ... ok
+test parts::smart_tags::tests::validates_overlapping_and_empty_bookmark_depths ... ok
+test parts::spa::tests::plcf_spa_round_trip_count ... ok
+test parts::spa::tests::spa_parse_reads_all_fields ... ok
+test parts::route_slip::tests::package_lifecycle_appends_route_data_and_clears_only_fib_pointer ... ok
+test parts::spa::tests::spa_parse_rejects_short_data ... ok
+test parts::spa::tests::spa_to_bytes_round_trips_through_parse ... ok
+test parts::structured_tags::tests::absent_tables_yield_none ... ok
+test parts::structured_tags::tests::parses_structured_document_tags ... ok
+test parts::smart_tags::transaction_tests::no_op_and_failed_edits_are_atomic ... ok
+test parts::smart_tags::transaction_tests::package_editor_publishes_only_source_checked_transactions ... ok
+test parts::structured_tags::tests::rejects_partial_table_sets ... ok
+test parts::structured_tags::tests::rejects_malformed_tables ... ok
+test parts::styles::tests::flattens_table_text_conditions_in_position_precedence_order ... ok
+test parts::smart_tags::transaction_tests::edits_are_source_checked_and_preserve_opaque_table_bytes ... ok
+test parts::styles::tests::enforces_kind_specific_style_sprm_restrictions ... ok
+test parts::styles::tests::applies_table_styles_in_direct_sprm_order_and_preserves_sizing ... ok
+test parts::styles::tests::parses_post_2000_metadata_and_preserves_stshi_extensions ... ok
+test parts::styles::tests::parses_styles_and_preserves_raw_upx ... ok
+test parts::styles::tests::parses_the_writer_stylesheet ... ok
+test parts::styles::tests::rejects_invalid_semantics_and_padding ... ok
+test parts::styles::tests::rejects_malformed_record_framing ... ok
+test body_text::source::tests::first_paragraph_scans_a_giant_piece_in_bounded_chunks ... ok
+test parts::styles::tests::rejects_malformed_table_text_style_property_sets_when_resolved ... ok
+test parts::styles::tests::validates_revision_marked_style_nested_records ... ok
+test parts::styles::tests::resolves_table_style_inheritance_and_default_fallback ... ok
+test parts::styles::tests::resolves_table_text_style_inheritance_conditions_and_fallback ... ok
+test parts::subdocuments::tests::invalid_candidates_are_rejected_without_partial_publish ... ok
+test parts::styles::tests::resolves_paragraph_and_character_style_property_arrays ... ok
+test parts::subdocuments::tests::no_op_snapshot_round_trip_preserves_ignored_and_unused_bytes ... ok
+test parts::subdocuments::tests::candidate_adds_renumbers_updates_and_moves_subdocuments ... ok
+test parts::subdocuments::tests::parses_file_name_table_without_subdocuments ... ok
+test parts::subdocuments::tests::parses_master_document_tables ... ok
+test parts::subdocuments::tests::rejects_invalid_plcf_wkb_framing ... ok
+test parts::subdocuments::tests::rejects_invalid_fnif_values ... ok
+test parts::subdocuments::tests::rejects_invalid_cps ... ok
+test parts::subdocuments::tests::rejects_invalid_sttb_fnm_framing ... ok
+test parts::subdocuments::tests::rejects_pre_word97_fibs ... ok
+test parts::subdocuments::tests::rejects_invalid_wkb_fields ... ok
+test parts::subdocuments::tests::rejects_subdocuments_without_file_name_table ... ok
+test parts::subdocuments::tests::failed_package_publication_keeps_editor_unchanged ... ok
+test parts::subdocuments::tests::reports_absent_tables_as_none ... ok
+test parts::subdocuments::tests::relative_path_uses_utf16_code_unit_offsets ... ok
+test parts::subdocuments::tests::package_noop_returns_exact_cfb_source ... ok
+test parts::table_char_cache::tests::parses_canonical_deprecated_cache_through_fib ... ok
+test parts::subdocuments::tests::table_patch_is_source_checked_preserves_unrelated_bytes_and_inverts ... ok
+test parts::table_char_cache::tests::plcftch_parses_and_round_trips ... ok
+test parts::subdocuments::tests::terminal_cp_and_independent_wire_lengths_follow_candidate_context ... ok
+test parts::table_char_cache::tests::rejects_cache_cp_beyond_main_document ... ok
+test parts::table_char_cache::tests::tch_round_trips_and_ignores_unused_bits ... ok
+test parts::table_char_cache::tests::rejects_malformed_plc_shapes_and_positions ... ok
+test parts::tap::tests::matches_bands_and_logical_columns_for_rtl_tables ... ok
+test parts::tap::tests::test_cell_merge_status ... ok
+test parts::tap::tests::test_default_tap ... ok
+test parts::tap::tests::test_vertical_alignment ... ok
+test parts::tap::tests::test_table_definition ... ok
+test parts::tap_parser::tests::decodes_tc80_layout_bits_and_width_type ... ok
+test parts::tap_parser::tests::parses_all_table_style_conditions ... ok
+test parts::tap_parser::tests::applies_core_row_geometry_and_pagination_strictly ... ok
+test parts::tap_parser::tests::parses_and_resets_default_cell_spacing ... ok
+test parts::tap_parser::tests::parses_cell_border_type_prefix_overrides ... ok
+test parts::tap_parser::tests::parses_cell_range_layout_overrides ... ok
+test parts::tap_parser::tests::applies_structural_cell_modifiers_in_sequence ... ok
+test parts::tap_parser::tests::parses_default_and_cell_range_padding ... ok
+test parts::tap_parser::tests::parses_floating_table_position_and_wrap_distances ... ok
+test parts::tap_parser::tests::parses_full_color_range_and_raw_shading ... ok
+test parts::tap_parser::tests::parses_scalar_table_style_defaults ... ok
+test parts::tap_parser::tests::parses_row_range_diagonal_and_color_borders ... ok
+test parts::tap_parser::tests::parses_spec_cn_operand_length_and_rejects_disallowed_nested_properties ... ok
+test parts::tap_parser::tests::parses_table_look_style_direction_and_overlap ... ok
+test parts::tap_parser::tests::parses_table_sizing_and_fit_properties ... ok
+test parts::tap_parser::tests::parses_table_row_revision_state_strictly ... ok
+test parts::subdocuments::tests::package_publication_appends_tables_and_relocates_only_owned_pointers ... ok
+test parts::tap_parser::tests::parses_visual_table_style_defaults ... ok
+test parts::tap_parser::tests::rejects_invalid_tc80_layout_values ... ok
+test parts::tap_parser::tests::rejects_malformed_cell_border_type_prefixes ... ok
+test parts::subdocuments::tests::package_publication_preserves_undefined_fields_and_rejects_source_conflicts ... ok
+test parts::tap_parser::tests::rejects_malformed_cell_padding_and_shading ... ok
+test parts::tap_parser::tests::rejects_malformed_cell_range_layout_overrides ... ok
+test parts::tap_parser::tests::rejects_malformed_full_color_shading ... ok
+test parts::tap_parser::tests::rejects_malformed_core_row_geometry_and_pagination ... ok
+test parts::tap_parser::tests::rejects_malformed_floating_table_position ... ok
+test parts::tap_parser::tests::rejects_malformed_modern_table_borders ... ok
+test parts::tap_parser::tests::rejects_malformed_scalar_table_style_defaults ... ok
+test parts::tap_parser::tests::rejects_malformed_table_look_and_direction ... ok
+test parts::tap_parser::tests::rejects_malformed_table_definitions ... ok
+test parts::tap_parser::tests::rejects_malformed_structural_cell_modifiers ... ok
+test parts::tap_parser::tests::rejects_malformed_table_sizing_and_fit_properties ... ok
+test parts::tap_parser::tests::resolves_physical_and_logical_table_justification ... ok
+test parts::tap_parser::tests::rejects_malformed_visual_table_style_defaults ... ok
+test parts::tap_parser::tests::test_border_code_parsing ... ok
+test parts::tap_parser::tests::test_tap_parser_creation ... ok
+test parts::text::tests::shared_text_and_cp_map_retain_one_decoded_source ... ok
+test parts::text::tests::test_clx_parsing_structure ... ok
+test parts::text::tests::test_windows_1252_conversion ... ok
+test parts::text::tests::text_ranges_are_utf16_code_unit_positions ... ok
+test parts::text::tests::unicode_piece_preserves_surrogate_pairs_in_cp_domain ... ok
+test parts::text_services::tests::guid_table_parses_and_round_trips ... ok
+test parts::text_services::tests::parses_both_tables_through_fib_with_guid_and_stream_bounds ... ok
+test parts::text_services::tests::plcfuim_preserves_unsorted_and_duplicate_cps ... ok
+test parts::text_services::tests::rejects_guid_index_outside_guid_table ... ok
+test parts::text_services::tests::rejects_malformed_plc_shapes ... ok
+test parts::envelope::tests::office8_accepts_the_full_u16_character_length_without_confusing_bytes_and_chars ... ok
+test parts::text_services::tests::uim_round_trips_exactly ... ok
+test parts::text_services::tests::rejects_payload_outside_table_stream_and_cps_beyond_parts ... ok
+test parts::textbox::tests::parse_plcf_txbx_txt_rejects_bad_length ... ok
+test parts::textbox::tests::parse_plcf_txbx_txt_skips_spare_and_reads_ranges ... ok
+test parts::textbox_breaks::tests::break_table_parses_and_round_trips ... ok
+test parts::textbox_breaks::tests::parses_both_tables_through_fib_with_ftxbxs_bounds ... ok
+test parts::textbox_breaks::tests::rejects_break_cp_beyond_textbox_subdocument ... ok
+test parts::textbox_breaks::tests::rejects_duplicate_cps_and_bad_shapes ... ok
+test parts::textbox_breaks::tests::rejects_itxbxs_beyond_ftxbxs_table ... ok
+test parts::textbox_breaks::tests::tbkd_round_trips_and_ignores_deprecated_fields ... ok
+test parts::xml_schemas::tests::absent_custom_xml_transform_yields_none ... ok
+test parts::xml_schemas::tests::absent_table_yields_none ... ok
+test parts::xml_schemas::tests::parses_custom_xml_transform_path ... ok
+test parts::xml_schemas::tests::parses_empty_schema_list ... ok
+test parts::xml_schemas::tests::rejects_malformed_custom_xml_transform ... ok
+test parts::sections::tests::exposes_layout_after_doc_decryption ... ok
+test parts::xml_schemas::tests::parses_schema_references ... ok
+test plcf::tests::parses_without_copying_properties ... ok
+test parts::xml_schemas::tests::rejects_malformed_tables ... ok
+test plcf::tests::rejects_invalid_layouts_and_indices_without_panicking ... ok
+test parts::xml_schemas::tests::skips_sttb_extra_data ... ok
+test revision::tests::validates_revision_reason_range ... ok
+test shape::codec::tests::deeply_nested_groups_keep_all_children ... ok
+test shape::codec::tests::multiple_children_keep_their_order ... ok
+test shape::codec::tests::nested_groups_keep_source_order ... ok
+test shape::codec::tests::projection_retains_exact_standalone_container_bytes ... ok
+test shape::codec::tests::shape_clone_is_owned ... ok
+test shape::codec::tests::projection_retains_unknown_primary_secondary_and_tertiary_properties ... ok
+test shape::codec::tests::shape_creation_preserves_contextual_fields ... ok
+test shape::codec::tests::projection_exposes_group_identity_and_both_anchor_spaces ... ok
+test shape::codec::tests::shape_debug_is_contextual ... ok
+test shape::model::tests::bounds_keep_signed_wire_coordinates ... ok
+test shape::model::tests::unknown_record_round_trips_exact_wire_bytes ... ok
+test sprm::tests::long_variable_sprm_decodes_adjusted_word_length ... ok
+test sprm::tests::rejects_invalid_variable_lengths ... ok
+test sprm::tests::rejects_truncated_fixed_and_variable_operands ... ok
+test sprm::tests::rejects_truncated_opcode_without_returning_a_prefix ... ok
+test sprm::tests::test_find_sprm ... ok
+test sprm::tests::tab_change_sprm_handles_byte_and_extended_lengths ... ok
+test sprm::tests::test_get_bool_from_sprm ... ok
+test sprm::tests::test_parse_sprms ... ok
+test sprm::tests::test_sprm_operation_from ... ok
+test sprm::tests::variable_sprm_excludes_length_and_preserves_following_sprm ... ok
+test sprm_operations::tests::current_high_paragraph_sprms_match_ms_doc ... ok
+test sprm_operations::tests::table_sprm_constants_use_canonical_word_2000_opcodes ... ok
+test sprm_operations::tests::test_sprm_operation_extraction ... ok
+test sprm_operations::tests::test_sprm_size_code_extraction ... ok
+test sprm_operations::tests::test_sprm_special_flag ... ok
+test sprm_operations::tests::test_sprm_type_extraction ... ok
+test table::tests::exposes_table_row_revision_metadata ... ok
+test table::tests::applies_table_style_cells_with_conditions_and_direct_overrides ... ok
+test parts::mail_merge::tests::parses_odso_large_and_unknown_properties ... ok
+test table::tests::test_cell_text ... ok
+test table::tests::test_row_cell_count ... ok
+test table::tests::test_table_dimensions ... ok
+test tracked_revision::codec::papx_cache_tests::cached_state_matches_strict_reverse_lookup_for_duplicate_sequences ... ok
+test tracked_revision::codec::papx_cache_tests::papx_run_cache_is_send_sync ... ok
+test tracked_revision::codec::papx_cache_tests::papx_cache_stays_paired_through_sort_and_serialization ... ok
+test tracked_revision::codec::papx_cache_tests::papx_table_state_is_absent_single_and_last_duplicate ... ok
+test tracked_revision::codec::papx_cache_tests::papx_table_state_rejects_malformed_grpprl_before_caching ... ok
+test tracked_revision::codec::papx_cache_tests::restoring_before_wall_recomputes_table_state_and_keeps_wire_prefix ... ok
+test tracked_revision::codec::papx_cache_tests::split_transform_papx_is_atomic_when_a_later_run_is_malformed ... ok
+test tracked_revision::package::containment_tests::indexed_papx_containment_matches_scalar_boundaries ... ok
+test tracked_revision::codec::papx_cache_tests::split_transform_papx_updates_cache_only_after_strict_success ... ok
+test tracked_revision::package::containment_tests::indexed_piece_containment_matches_scalar_boundaries ... ok
+test tracked_revision::tests::metadata_builder_is_composable ... ok
+test tracked_revision::tests::replacement_retains_unmodeled_sprm_bytes ... ok
+test tracked_revision::tests::revision_kinds_are_copyable_and_distinct ... ok
+test user_defined_hyperlinks::tests::matching_index_is_only_a_candidate_until_the_caller_resolves_it ... ok
+test user_defined_hyperlinks::tests::canonicalizes_only_resolved_entries_by_story_and_descending_index ... ok
+test user_defined_hyperlinks::tests::resolution_rejects_missing_wrong_and_repeated_candidates ... ok
+test user_defined_hyperlinks::tests::same_index_across_stories_retains_every_candidate ... ok
+test vba::tests::discovers_complete_vba_storage_from_directory_names_only ... ok
+test vba::tests::ignores_ovba_roots_outside_the_ms_doc_macros_storage ... ok
+test writer::comments::tests::creates_unicode_comment_entry ... ok
+test writer::core::tests::document::content::test_add_formatted_paragraph ... ok
+test writer::core::tests::document::content::test_add_multiple_paragraphs ... ok
+test writer::core::tests::annotations::bookmarks::rejects_invalid_standard_bookmarks ... ok
+test writer::core::tests::document::content::test_add_paragraph ... ok
+test tracked_revision::package::papx_cache_tests::editor_table_queries_use_cached_state_and_track_edits ... ok
+test vba::tests::reports_incomplete_projects_and_never_opens_macro_streams ... ok
+test tracked_revision::package::papx_cache_tests::editor_table_queries_preserve_absent_state_and_malformed_open_errors ... ok
+test writer::core::tests::document::content::test_add_paragraph_runs ... ok
+test writer::core::tests::document::lifecycle::test_create_writer ... ok
+test writer::core::tests::document::content::test_add_paragraph_with_character_formatting ... ok
+test writer::core::tests::document::styles::rejects_undefined_or_wrong_kind_style_references ... ok
+test writer::core::tests::formatting::character::properties::test_character_formatting_default ... ok
+test writer::core::tests::document::lifecycle::test_set_property ... ok
+test writer::core::tests::formatting::character::properties::test_line_spacing_default ... ok
+test writer::core::tests::formatting::character::properties::test_paragraph_formatting_default ... ok
+test writer::core::tests::formatting::paragraph::round_trip::encodes_paragraph_revision_save_id ... ok
+test writer::core::tests::formatting::paragraph::round_trip::encodes_physical_and_logical_paragraph_justification_compatibly ... ok
+test writer::core::tests::formatting::paragraph::round_trip::test_line_spacing_constructors_and_sprm_encoding ... ok
+test writer::core::tests::document::lifecycle::test_write_to_memory ... ok
+test tracked_revision::package::papx_cache_tests::public_table_cell_extraction_remains_indirectly_regressed ... ok
+test tracked_revision::tests::failed_metadata_replacement_is_atomic_and_equal_replacement_is_a_noop ... ok
+test writer::core::tests::formatting::paragraph::validation::rejects_invalid_current_paragraph_layout_values ... ok
+test writer::core::tests::subdocuments::headers::header_kind_tests::header_kinds_map_to_plcfhdd_slots ... ok
+test writer::core::tests::subdocuments::comments::rejects_comment_metadata_outside_binary_limits ... ok
+test writer::core::tests::document::lifecycle::test_empty_document_write ... ok
+test writer::core::tests::subdocuments::comments::rejects_invalid_comment_ranges_timestamps_and_reply_trees ... ok
+test writer::core::tests::subdocuments::headers::header_kind_tests::header_shape_ids_use_the_header_cluster ... ok
+test writer::core::tests::subdocuments::notes::test_endnotes ... ok
+test writer::core::tests::subdocuments::headers::test_headers_and_footers ... ok
+test writer::core::tests::revisions::metadata::rejects_invalid_writer_revision_metadata ... ok
+test writer::core::tests::subdocuments::notes::test_footnotes ... ok
+test writer::core::tests::tables::editing::test_add_table ... ok
+test writer::core::tests::tables::editing::test_set_table_cell ... ok
+test writer::core::tests::document::styles::writes_revision_marked_style_and_author_table ... ok
+test writer::core::tests::formatting::character::effects::chpx_position_hresi_effect_writer_tests::emits_canonical_typed_sprms_and_round_trips_package ... ok
+test writer::core::tests::tables::editing::test_set_table_cell_multiple ... ok
+test writer::core::tests::formatting::paragraph::round_trip::preserves_ordered_paragraph_property_revision_state ... ok
+test writer::core::tests::document::styles::writes_custom_styles_into_document_stylesheet ... ok
+test writer::core::tests::tables::validation::test_add_table_invalid_dimensions ... ok
+test writer::core::tests::tables::validation::rejects_invalid_table_row_formatting ... ok
+test writer::core::tests::tables::validation::test_set_table_cell_invalid_indices ... ok
+test writer::fib::tests::template_and_secondary_fib_page_are_serialized ... ok
+test writer::dop::tests::upgrades_dop_and_sets_factoid_preservation_only_when_requested ... ok
+test writer::fib::tests::test_fib_default ... ok
+test writer::fib::tests::test_fib_generation ... ok
+test writer::core::tests::revisions::character::preserves_ordered_character_property_revision_state ... ok
+test writer::fib::tests::test_fib_with_bin_tables ... ok
+test writer::fib::tests::test_fib_with_comments ... ok
+test writer::fib::tests::test_fib_with_document_properties ... ok
+test writer::fib::tests::test_fib_with_endnotes ... ok
+test writer::core::tests::numbering::list_tables_round_trip_through_fib_indices ... ok
+test writer::fib::tests::test_fib_with_field_table ... ok
+test writer::core::tests::formatting::paragraph::round_trip::test_paragraph_formatting_writer_reader_round_trip ... ok
+test writer::fib::tests::test_fib_with_footnotes ... ok
+test writer::core::tests::formatting::paragraph::unicode::supplementary_unicode_uses_utf16_code_unit_character_positions ... ok
+test writer::fib::tests::test_fib_with_font_table ... ok
+test writer::fib::tests::test_fib_with_headers_footers ... ok
+test writer::fib::tests::test_fib_with_list_tables ... ok
+test writer::fib::tests::test_fib_with_piece_table ... ok
+test body_text::tests::stories_cells_fields_format_merge_transfer_and_durable_reopen ... ok
+test writer::fib::tests::test_fib_with_section_table ... ok
+test writer::fib::tests::test_fib_with_stylesheet ... ok
+test writer::fib::validation::tests::accepts_the_word_2002_layout ... ok
+test writer::fib::validation::tests::rejects_a_truncated_layout ... ok
+test writer::fields::tests::rejects_malformed_marker_graphs_and_positions ... ok
+test writer::fkp::tests::test_chpx_fkp ... ok
+test writer::fields::tests::emits_native_types_nested_flags_and_text_only_exclusions ... ok
+test writer::fkp::tests::test_chpx_fkp_default ... ok
+test writer::fkp::tests::test_chpx_fkp_empty ... ok
+test writer::fkp::tests::test_chpx_fkp_multiple_entries ... ok
+test writer::fkp::tests::test_chpx_fkp_single_entry ... ok
+test writer::fkp::tests::test_fkp_pages_collection ... ok
+test writer::fkp::tests::test_multi_page_chpx ... ok
+test writer::fkp::tests::test_multi_page_papx ... ok
+test writer::fkp::tests::test_papx_fkp ... ok
+test writer::fkp::tests::test_papx_fkp_default ... ok
+test writer::fkp::tests::test_papx_fkp_empty ... ok
+test writer::fkp::tests::test_papx_fkp_multiple_entries ... ok
+test writer::fkp::tests::test_papx_fkp_single_entry ... ok
+test writer::footnotes::tests::counts_supplementary_characters_as_two_utf16_code_units ... ok
+test writer::footnotes::tests::cp_sum_accepts_the_boundary_and_rejects_overflow ... ok
+test tracked_revision::tests::no_op_inverse_and_stale_source_checks_preserve_exact_bytes ... ok
+test body_text::source::tests::piece_relative_payload_readback_uses_a_later_paragraph ... ok
+test writer::headers::tests::cp_sum_accepts_the_boundary_and_rejects_overflow ... ok
+test writer::footnotes::tests::orders_references_and_text_stories_together ... ok
+test writer::headers::tests::test_add_header ... ok
+test writer::headers::tests::supplementary_text_uses_utf16_cps_and_duplicate_empty_story_cps ... ok
+test writer::headers::tests::test_add_entry ... ok
+test writer::headers::tests::test_all_header_footer_types ... ok
+test writer::headers::tests::test_build_plcfhdd_empty ... ok
+test writer::headers::tests::test_build_subdocument_text_empty ... ok
+test writer::headers::tests::test_build_plcfhdd_with_entries ... ok
+test writer::headers::tests::test_build_subdocument_text_multiple ... ok
+test tracked_revision::tests::transaction_supports_revision_metadata_crud_and_replacement ... ok
+test writer::headers::tests::test_char_count_multiple ... ok
+test writer::headers::tests::test_build_subdocument_text_single ... ok
+test writer::headers::tests::test_header_footer_entry_clone ... ok
+test writer::headers::tests::test_header_footer_entry_debug ... ok
+test writer::headers::tests::test_header_footer_entry_new ... ok
+test writer::headers::tests::test_header_footer_entry_with_string ... ok
+test writer::headers::tests::test_header_footer_type_variants ... ok
+test writer::headers::tests::test_headers_writer_debug ... ok
+test writer::headers::tests::test_headers_writer_default ... ok
+test writer::headers::tests::test_headers_writer_new ... ok
+test writer::headers::tests::test_is_empty_with_entries ... ok
+test writer::hyperlinks::tests::test_add_hyperlink ... ok
+test writer::hyperlinks::tests::test_add_multiple_hyperlinks ... ok
+test writer::hyperlinks::tests::test_all_hyperlink_types_in_writer ... ok
+test writer::hyperlinks::tests::test_field_code_with_special_chars ... ok
+test writer::hyperlinks::tests::test_hyperlink_entry_bookmark ... ok
+test writer::hyperlinks::tests::test_hyperlink_entry_clone ... ok
+test writer::hyperlinks::tests::test_hyperlink_entry_debug ... ok
+test writer::hyperlinks::tests::test_hyperlink_entry_email ... ok
+test writer::hyperlinks::tests::test_hyperlink_entry_url ... ok
+test writer::hyperlinks::tests::test_hyperlink_type_variants ... ok
+test writer::hyperlinks::tests::test_hyperlinks_sorted ... ok
+test writer::hyperlinks::tests::test_hyperlinks_sorted_empty ... ok
+test writer::hyperlinks::tests::test_hyperlinks_writer_default ... ok
+test writer::hyperlinks::tests::test_hyperlinks_writer_debug ... ok
+test writer::hyperlinks::tests::test_hyperlinks_writer_new ... ok
+test writer::hyperlinks::tests::test_to_field_code_bookmark ... ok
+test writer::hyperlinks::tests::test_to_field_code_email ... ok
+test writer::hyperlinks::tests::test_to_field_code_url ... ok
+test writer::images::tests::doc_picture_new_derives_dimensions_at_96_dpi ... ok
+test writer::images::tests::dgg_info_layout_matches_ms_odraw ... ok
+test writer::images::tests::dgg_info_bse_blips_parse_with_crate_reader ... ok
+test writer::images::tests::floating_position_builder_defaults ... ok
+test writer::images::tests::doc_picture_rejects_unknown_format_and_bad_dimensions ... ok
+test writer::images::tests::dgg_info_with_header_drawing_uses_own_cluster ... ok
+test writer::images::tests::jpeg_pixel_dimensions_reads_sof0 ... ok
+test writer::images::tests::picture_block_layout_matches_ms_doc ... ok
+test writer::images::tests::picture_block_bse_parses_with_crate_reader ... ok
+test writer::images::tests::plcf_spa_layout_matches_ms_doc ... ok
+test writer::images::tests::picture_uid_is_the_md4_digest_of_blip_data ... ok
+test writer::images::tests::png_pixel_dimensions_reads_ihdr ... ok
+test writer::images::tests::sniff_kind_detects_png_and_jpeg ... ok
+test writer::images::tests::spid_max_rounds_up_to_next_cluster ... ok
+test writer::numbering::tests::test_build_plflfo_empty ... ok
+test writer::numbering::tests::test_build_plflst_empty ... ok
+test writer::numbering::tests::test_build_plflfo_with_overrides ... ok
+test writer::numbering::tests::test_all_number_formats_to_bytes ... ok
+test writer::numbering::tests::test_list_format_override_clone ... ok
+test writer::numbering::tests::test_build_plflst_with_lists ... ok
+test writer::numbering::tests::test_list_format_override_new ... ok
+test writer::numbering::tests::test_list_format_override_to_bytes ... ok
+test writer::numbering::tests::test_list_level_bullet_format ... ok
+test writer::numbering::tests::test_list_level_clone ... ok
+test writer::numbering::tests::test_list_level_custom_indent ... ok
+test writer::numbering::tests::test_list_level_debug ... ok
+test writer::numbering::tests::test_list_level_multi_level_placeholder ... ok
+test writer::numbering::tests::test_list_level_new ... ok
+test writer::numbering::tests::test_list_level_to_bytes_basic ... ok
+test writer::numbering::tests::test_list_level_with_level_placeholder ... ok
+test writer::numbering::tests::test_list_structure_add_level ... ok
+test writer::numbering::tests::test_list_structure_clone ... ok
+test writer::numbering::tests::test_list_structure_debug ... ok
+test writer::numbering::tests::test_list_structure_levels_to_bytes ... ok
+test writer::numbering::tests::test_list_structure_max_levels ... ok
+test writer::numbering::tests::test_list_structure_new ... ok
+test writer::numbering::tests::test_list_structure_simple_list_flag ... ok
+test writer::numbering::tests::test_list_structure_to_bytes ... ok
+test writer::numbering::tests::test_number_format_variants ... ok
+test writer::numbering::tests::test_multiple_lists ... ok
+test writer::numbering::tests::test_numbering_writer_add_list ... ok
+test writer::numbering::tests::test_numbering_writer_add_override ... ok
+test writer::numbering::tests::test_numbering_writer_default ... ok
+test writer::numbering::tests::test_numbering_writer_debug ... ok
+test writer::numbering::tests::test_numbering_writer_new ... ok
+test writer::numbering::tests::writes_complete_lfo_data_and_formatting_override ... ok
+test writer::numbering::tests::writes_lossless_list_definition_metadata_and_property_payloads ... ok
+test writer::ole_metadata::tests::class_id_round_trips_without_allocation ... ok
+test writer::ole_metadata::tests::comp_obj_codec_preserves_the_existing_wire_profile ... ok
+test writer::ole_metadata::tests::default_metadata_is_the_word_document_profile ... ok
+test writer::ole_metadata::tests::ole_codec_preserves_the_existing_wire_profile ... ok
+test writer::ole_metadata::tests::public_generators_match_the_typed_codecs ... ok
+test writer::ole_metadata::tests::validation_rejects_truncation_and_reserved_byte_changes ... ok
+test writer::piece_table::tests::test_piece_creation ... ok
+test writer::piece_table::tests::test_piece_empty ... ok
+test writer::piece_table::tests::test_piece_non_unicode ... ok
+test writer::piece_table::tests::test_piece_table_builder_default ... ok
+test writer::piece_table::tests::test_piece_table_empty ... ok
+test writer::piece_table::tests::test_piece_table_generation ... ok
+test writer::piece_table::tests::test_piece_table_multiple_pieces ... ok
+test writer::piece_table::tests::test_piece_table_single_piece ... ok
+test writer::piece_table::tests::test_piece_unicode ... ok
+test writer::section::tests::page_border_default_is_omitted_and_nondefault_is_canonical ... ok
+test writer::shapes::tests::client_textbox_txid_encodes_ftxbxs_index ... ok
+test writer::shapes::tests::color_ref_uses_office_byte_order ... ok
+test writer::shapes::tests::new_shape_is_an_outline_by_default ... ok
+test writer::shapes::tests::shape_kind_msospt_values_match_spec ... ok
+test writer::shapes::tests::plcf_txbx_txt_layout_matches_ms_doc ... ok
+test writer::shapes::tests::write_shape_opt_emits_colors_and_disable_flags ... ok
+test writer::smart_tags::tests::rejects_invalid_ranges_columns_and_recognizer_gaps ... ok
+test writer::sprm::tests::test_build_chp_sprms ... ok
+test writer::sprm::tests::test_build_chp_sprms_no_bold ... ok
+test writer::smart_tags::tests::builds_overlapping_empty_and_recognizer_tables ... ok
+test writer::sprm::tests::test_build_chp_sprms_no_font_size ... ok
+test writer::sprm::tests::test_build_chp_sprms_no_italic ... ok
+test writer::sprm::tests::test_build_chp_sprms_none ... ok
+test writer::sprm::tests::test_sprm_builder ... ok
+test writer::sprm::tests::test_sprm_builder_add_bool_false ... ok
+test writer::sprm::tests::test_sprm_builder_add_bool_true ... ok
+test writer::sprm::tests::test_sprm_builder_add_byte ... ok
+test writer::sprm::tests::test_sprm_builder_add_dword ... ok
+test writer::sprm::tests::test_sprm_builder_add_word ... ok
+test writer::sprm::tests::test_sprm_builder_empty ... ok
+test writer::sprm::tests::test_sprm_builder_multiple_sprms ... ok
+test writer::stylesheet::tests::minimal_stylesheet_round_trips ... ok
+test writer::tap::tests::rejects_invalid_scalar_table_style_defaults ... ok
+test writer::stylesheet::tests::revision_marked_character_style_round_trips_nested_upx ... ok
+test writer::stylesheet::tests::custom_table_style_round_trips_all_conditional_domains ... ok
+test writer::tap::tests::rejects_invalid_visual_table_style_defaults ... ok
+test writer::stylesheet::tests::revision_marked_paragraph_style_round_trips_nested_upx ... ok
+test writer::stylesheet::tests::rejects_invalid_custom_styles ... ok
+test writer::tap::tests::round_trips_cell_border_type_prefix_overrides ... ok
+test writer::tap::tests::rejects_unrepresentable_rows ... ok
+test writer::tap::tests::round_trips_logical_justification_for_rtl_tables ... ok
+test writer::tap::tests::round_trips_row_identity_metadata ... ok
+test writer::tap::tests::round_trips_scalar_table_style_defaults ... ok
+test writer::tap::tests::round_trips_table_row_revision_state ... ok
+test writer::tap::tests::test_create_simple_table ... ok
+test writer::tap::tests::test_create_simple_table_large ... ok
+test writer::tap::tests::round_trips_table_sizing_and_fit_properties ... ok
+test writer::tap::tests::test_create_simple_table_single_cell ... ok
+test writer::tap::tests::test_table_row_count ... ok
+test writer::tap::tests::round_trips_visual_table_style_defaults ... ok
+test writer::tap::tests::test_tap_builder_empty ... ok
+test writer::tap::tests::test_tap_builder_multiple_rows ... ok
+test writer::tap::tests::test_tap_builder ... ok
+test writer::tap::tests::writes_full_color_shading_across_all_cell_chunks ... ok
+test body_text::tests::embedded_transfer_closes_field_preview_storage_merge_and_history ... ok
+test parts::smart_tags::tests::parses_real_word_smart_tag_fixtures ... ok
+test writer::core::tests::document::lifecycle::file_and_seekable_outputs_are_byte_identical ... ok
+test writer::core::tests::annotations::bookmarks::standard_bookmarks_round_trip_through_both_output_paths ... ok
+test writer::core::tests::annotations::smart_tags::smart_tags_round_trip_through_both_output_paths ... ok
+test writer::core::tests::subdocuments::comments::comments_round_trip_with_other_subdocuments ... ok
+test writer::core::tests::revisions::text::tracked_text_revisions_round_trip_through_both_output_paths ... ok
+test writer::core::tests::tables::round_trip::tables_round_trip_through_both_output_paths ... ok
+test body_text::source::tests::fixture_replacement_is_reversible_and_same_width ... ok
+test parts::piece_table::tests::indexed_ranges_match_scalar_for_adversarial_piece_orders ... ok
+test tracked_revision::package::picture_group_tests::nested_single_image_group_is_a_closed_rehomed_graph ... ok
+test tracked_revision::package::picture_group_tests::nested_image_group_transfers_through_the_body_transaction ... ok
+test body_text::tests::picture_transfer_rehomes_shared_pictures_beside_main_and_header_drawings ... ok
+test body_text::tests::canonical_inline_and_floating_picture_graphs_transfer_and_reopen ... ok
+
+test result: ok. 1009 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+
+running 1 test
+test doc_facade_discovers_unsigned_signature_state ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test apache_poi_associated_strings_integrate_and_round_trip_exactly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test authoring_round_trips_the_complete_plcf_asumy ... ok
+test constructors_enforce_positive_levels_and_signed_wire_bounds ... ok
+test parser_rejects_duplicate_and_non_increasing_cps ... ok
+test checked_edits_cover_push_insert_replace_remove ... ok
+test failed_edits_are_atomic ... ok
+test documents_without_asumy_report_none ... ok
+test document_api_reports_none_without_asumy ... ok
+test constructor_enforces_the_one_million_entry_cap ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 6 tests
+test real_multi_generation_docs_resize_and_fully_reopen ... ok
+test durable_stale_source_is_rejected_without_mutation ... ok
+test real_story_field_and_table_targets_fully_reopen ... ok
+test genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage ... ok
+test genuine_word97_noncanonical_picture_graphs_are_typed_refusals ... ok
+test genuine_receivers_accept_pictures_beside_main_and_header_drawings ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+
+running 4 tests
+test facade_exposes_contextual_caption_types_without_repeated_prefixes ... ok
+test package_editor_rejects_caption_ranges_on_ordinary_documents ... ok
+test package_editor_publishes_caption_crud_without_rewriting_unrelated_table_bytes ... ok
+test package_editor_rejects_stale_transactions_and_keeps_noop_bytes_exact ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test documents_without_the_table_report_none ... ok
+test reads_empty_font_table_with_a_nonstandard_brgbst ... ok
+test exposes_embedded_fonts_through_the_document_api ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test malformed_add_and_reorder_leave_editor_state_unchanged ... ok
+test managed_objects_add_reorder_remove_and_reopen_transactionally ... ok
+test producer_fixtures_append_only_when_their_layout_is_supported ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+
+running 7 tests
+test apache_poi_reference_plcfs_cover_all_seven_story_tables ... ok
+test poi_hyperlink_fixture_retains_inert_hyperlink_field ... ok
+test generated_ta_document_discovers_table_of_authorities_entries ... ok
+test generated_tc_document_discovers_table_of_contents_entries ... ok
+test generated_rd_document_discovers_referenced_documents ... ok
+test generated_xe_document_discovers_index_entries ... ok
+test generated_private_document_discovers_private_fields ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test parses_ffdata_from_the_data_stream ... ok
+test exposes_form_data_through_the_document_api ... ok
+test documents_without_form_fields_report_none ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 4 tests
+test structural_defects_stay_fatal_when_tolerating_stylesheet_defects ... ok
+test a_conforming_document_records_no_repairs ... ok
+test duplicate_style_names_are_rejected_by_default ... ok
+test opting_in_recovers_the_document_and_records_the_repair ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test reads_pms_from_a_mail_merge_document ... ok
+test exposes_mail_merge_state_through_the_document_api ... ok
+test documents_without_merge_state_report_none ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test rejects_malformed_or_oversized_equation_native_envelopes ... ok
+test authors_native_equation_object_and_preserves_storage_clsid ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test custom_limits_reject_values_above_every_safety_ceiling ... ok
+test typed_password_is_redacted_and_moves_into_open_options ... ok
+test per_read_limits_cannot_widen_package_limits ... ok
+test fixed_buffer_counting_fallback_accepts_n_and_rejects_n_plus_one ... ok
+test payload_io_failure_after_preflight_is_not_reported_as_a_missing_stream ... ok
+test default_limits_are_bounded_and_package_open_options_apply_them ... ok
+test already_parsed_ole_enforces_exact_package_limit ... ok
+test aggregate_limit_accepts_exact_size_and_failed_read_is_atomic ... ok
+test stream_limit_accepts_exact_size_and_failed_read_is_retryable ... ok
+test package_limit_accepts_exact_size_and_rejects_one_less ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test paragraph_count_matches_independent_materialized_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test word_2002_document_without_protection_tables_reports_none ... ok
+test word_97_document_predating_the_tables_reports_none ... ok
+test exposes_no_protected_ranges_through_the_document_api ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test reads_single_author_threading_from_a_word_produced_document ... ok
+test reads_multi_author_threading_from_a_word_produced_document ... ok
+test exposes_threading_through_the_document_api ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test failed_removal_does_not_change_a_single_recipient_snapshot ... ok
+test selectors_are_typed_and_protected_transactions_roll_back ... ok
+test protected_package_lifecycle_edit_is_rejected_atomically ... ok
+test package_editor_round_trips_document_facade_and_exact_fib_payload ... ok
+test lifecycle_edits_are_snapshot_based_and_clear_the_fib_range ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test reads_plrsid_from_a_word_produced_document ... ok
+test documents_without_plrsid_report_none ... ok
+test exposes_rsids_through_the_document_api ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test apache_poi_saved_by_table_is_exact_and_round_trips ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test mutation_rejects_invalid_counts_widths_and_spacing_dependencies ... ok
+test unequal_width_and_spacing_arrays_round_trip_without_rtl_reversal ... ok
+test omitted_layout_reads_as_the_normative_single_column_default ... ok
+test equal_columns_rtl_and_vertical_flow_round_trip ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test art_codes_report_typed_validation_errors ... ok
+test setter_is_atomic_and_rejects_out_of_range_spacing ... ok
+test later_set_replaces_and_clear_restores_omission ... ok
+test four_edges_art_and_shared_placement_round_trip ... ok
+test omitted_and_explicit_default_borders_emit_the_normative_default ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test paragraph_at_matches_materialized_paragraphs_and_preserves_runs ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 14 tests
+test garbage_bytes_are_rejected_without_panicking ... ok
+test reads_endnote_from_poi_endingnote ... ok
+test reads_url_hyperlink_with_display_text ... ok
+test rejects_comment_references_that_are_not_annotation_characters ... ok
+test returns_no_stories_when_document_has_no_headers ... ok
+test reads_range_comment_with_author_and_metadata ... ok
+test reads_odd_page_header_from_poi_three_col_head ... ok
+test reads_first_page_stories_from_poi_diff_first_page ... ok
+test truncated_table_stream_is_rejected_without_panicking ... ok
+test reads_footnote_and_endnote_from_the_same_document ... ok
+test reads_odd_page_footer_from_poi_three_col_foot ... ok
+test reads_all_six_story_kinds_per_section_from_libreoffice_fixture ... ok
+test reads_footnotes_from_libreoffice_fixture ... ok
+test reads_multiple_endnotes_in_reference_order ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test word_produced_document_without_master_document_tables_reports_none ... ok
+test word97_era_document_without_master_document_tables_reports_none ... ok
+test exposes_subdocuments_through_the_document_api ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 5 tests
+test malformed_ranges_controls_and_failed_updates_roll_back ... ok
+test shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair ... ok
+test accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid ... ok
+test lists_authors_and_mutates_insertions_and_deletions_transactionally ... ok
+test bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test complete_project_round_trips_from_the_macros_storage ... ok
+test failed_build_is_atomic_and_project_can_be_cleared ... ok
+test project_storage_remains_clear_when_document_streams_are_encrypted ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test writer_mutations_are_atomic_and_clearable ... ok
+test write_to_emits_the_mandatory_default_associated_string_table ... ok
+test associated_strings_and_saved_by_round_trip_through_write_to ... ok
+test associated_strings_and_saved_by_round_trip_through_file_save ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test salts_are_nondeterministic_and_setter_validation_is_atomic ... ok
+test all_profiles_round_trip_all_document_streams_and_exact_headers ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 12 tests
+test invalid_attached_glossary_configuration_is_atomic ... ok
+test mismatched_main_story_length_is_rejected_before_output_changes ... ok
+test glossary_only_document_round_trips_through_write_to ... ok
+test template_secondary_fib_exposes_passive_attached_glossary ... ok
+test glossary_utf16_ranges_round_trip_non_bmp_text_and_reject_split_pairs ... ok
+test attached_glossary_exposes_typed_inert_fields ... ok
+test distinct_attached_glossary_round_trips_through_public_writer ... ok
+test attached_glossary_reconstructs_all_fields_excluded_from_plcfld ... ok
+test malformed_attached_fib_topologies_are_deferred_and_rejected ... ok
+test attached_glossary_round_trips_inside_encrypted_template ... ok
+test glossary_only_document_round_trips_through_file_save_and_can_be_cleared ... ok
+test attached_glossary_preserves_shared_data_and_drawing_graphs ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+
+running 3 tests
+test even_and_first_headers_set_section_flags ... ok
+test even_and_first_page_header_text_boxes_round_trip ... ok
+test header_picture_round_trips_with_byte_identical_payload ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 3 tests
+test header_text_box_writes_two_drawing_layers ... ok
+test document_with_header_but_no_boxes_has_empty_header_story_tables ... ok
+test header_text_box_round_trips_through_doc_reader ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test rich_header_api_rejects_ambiguous_or_unbounded_structure ... ok
+test writes_header_and_note_plcfs_through_fib_pointers ... ok
+test inert_header_field_round_trips_with_structural_markers ... ok
+test formatted_multi_paragraph_header_round_trips_through_plcfhdd ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 7 tests
+test doc_picture_new_sniffs_format_and_dimensions ... ok
+test document_without_pictures_keeps_empty_data_stream ... ok
+test bmp_is_normalized_to_dib_and_explicit_formats_are_validated ... ok
+test png_and_jpeg_pictures_round_trip_through_doc_reader ... ok
+test native_officeart_picture_family_round_trips_without_reencoding ... ok
+test floating_picture_writes_valid_dgg_info ... ok
+test inline_and_floating_pictures_round_trip_through_doc_reader ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 4 tests
+test paired_constructor_rejects_feature_slot_mismatches ... ok
+test output_rejects_out_of_document_proofing_cps_before_writing ... ok
+test spelling_and_grammar_tables_round_trip_through_write_to ... ok
+test proofing_tables_round_trip_through_file_save_and_can_be_cleared ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 4 tests
+test genuine_word_floating_pictures_extract_from_dgg_info ... ok
+test document_with_only_shapes_has_no_picture_data ... ok
+test primitive_shapes_extract_with_type_geometry_and_colors ... ok
+test primitive_shapes_round_trip_through_doc_reader ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 4 tests
+test document_without_text_boxes_has_empty_story ... ok
+test genuine_word_text_boxes_parse_via_crate_reader ... ok
+test text_boxes_write_valid_client_textbox_links ... ok
+test text_boxes_round_trip_text_and_shapes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test public_owner_editor_keeps_the_source_snapshot_immutable ... ok
+test public_owner_round_trips_typed_object_metadata ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test doc_facade_exposes_standard_property_sets ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 8 tests
+test inert_hyperlinks_keep_source_order_and_no_op_commits_exact_bytes ... ok
+test contextualized_reads_use_real_plcf_fields_and_explicit_limits ... ok
+test removing_hyperlinks_is_targeted_and_rollback_recovers_the_exact_source ... ok
+test stored_hash_mismatch_is_inert_and_an_exact_noop_preserves_it ... ok
+test unresolved_candidates_refuse_changed_mutation_without_staging_or_commit_side_effects ... ok
+test overlay_limits_reject_reads_and_resolved_puts_without_mutation ... ok
+test resolved_metadata_creates_a_codepage_for_a_missing_user_defined_section ... ok
+test immutable_authoring_collection_recontexts_replaces_and_round_trips ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 26 tests
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::table_count (line 56) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/links.rs - document::model::semantic::links::Document::hyperlinks (line 17) ... ignored
+test crates/litchi-doc/src/document/model/semantic/media.rs - document::model::semantic::media::Document::image_data (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/numbering.rs - document::model::semantic::numbering::Document::list_tables (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/headers.rs - document::model::semantic::subdocuments::headers::Document::headers_footers (line 16) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::endnotes (line 51) ... ignored
+test crates/litchi-doc/src/document/model/semantic/subdocuments/notes.rs - document::model::semantic::subdocuments::notes::Document::footnotes (line 15) ... ignored
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::paragraph_count (line 29) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::tables (line 193) - compile ... ok
+test crates/litchi-doc/src/document/model/state.rs - document::model::state::Document (line 54) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::elements (line 217) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::document (line 151) - compile ... ok
+test crates/litchi-doc/src/lib.rs - (line 97) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/basics.rs - document::model::semantic::basics::Document::text (line 10) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<File>::open (line 22) - compile ... ok
+test crates/litchi-doc/src/document/model/semantic/layout.rs - document::model::semantic::layout::Document::paragraphs (line 46) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_ole_file (line 124) - compile ... ok
+test crates/litchi-doc/src/package/codec.rs - package::codec::Package<R>::from_reader (line 57) - compile ... ok
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph (line 17) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Paragraph::formulas_as_latex (line 247) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run (line 279) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run::formula_as_latex (line 609) ... ignored
+test crates/litchi-doc/src/paragraph/model.rs - paragraph::model::Run::image (line 651) ... ignored
+test crates/litchi-doc/src/table.rs - table::Table (line 17) ... ignored
+test crates/litchi-doc/src/package/model.rs - package::model::Package (line 521) - compile ... ok
+test crates/litchi-doc/src/writer/mod.rs - writer::core (line 57) - compile ... ok
+
+test result: ok. 14 passed; 0 failed; 12 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.34s; merged doctests compilation took 0.34s

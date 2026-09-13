@@ -1,0 +1,16 @@
+{
+  "observed_utc": "2026-09-13T03:11:31.082516+00:00",
+  "compiler_processes": [
+    {
+      "pid": 2150059,
+      "comm": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-dde-transactions"
+    },
+    {
+      "pid": 2150079,
+      "comm": "rustc",
+      "cwd": "/var/tmp/ods-dde-candidate-5347801fc/crates/litchi-ods"
+    }
+  ],
+  "scope": "Accessible compiler processes; no host quiescence guarantee"
+}

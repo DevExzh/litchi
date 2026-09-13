@@ -1,0 +1,23 @@
+{
+  "artifacts": {
+    "inputs.json": "191f3e4644f8211e5f8f0c12dd96d51c631c5a120566766c818dbe27e2a9c817",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout": "dad9dc5433479ddc50244ae78e4b8044570261ad26c6f1b1829b64ee8aa8bf95"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/decide.py",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/decision.json"
+  ],
+  "end_utc": "2026-09-13T03:41:19.313709+00:00",
+  "exit_code": 0,
+  "inputs_sha256": "191f3e4644f8211e5f8f0c12dd96d51c631c5a120566766c818dbe27e2a9c817",
+  "output": "decision.json",
+  "output_sha256": "b57ab8c9962935b8a5e48bf21227c5f3b7f558a3a9e7137e20b7b95fac637e33",
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "script_sha256": "826eb00fe7a3d0fb9906a8197327ae70c8eb09eee60f8320e42585d16fce7566",
+  "seconds": 0.1422752320067957,
+  "start_utc": "2026-09-13T03:41:19.171428+00:00"
+}

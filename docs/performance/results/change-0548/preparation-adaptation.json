@@ -1,0 +1,7 @@
+{
+  "scope": "Before any build/capture; root narrowed candidatecomment asreviewrequired (onlyscratchgrowthallocationclaim); guardtimer ends immediatelyafteropen before oracle/drop, pure initialselfcycleatstreamstart, driverenumeratesall8cases.",
+  "original_candidate_sha256": "421a1c4fd23a4bd7571e71e032caa297f842c50509d0fd3ef1d9e80af2886156",
+  "final_candidate_sha256": "c773ab45a0d6b0fe0918406432933e52f7e7e2432d0897c3a4d3f877081ec427",
+  "original_patch_sha256": "f4cf091a2168b18a7b5d929f25b779db1f925104307e277e556f25c7dbe91945",
+  "final_patch_sha256": "4a4168a097d6490ba399b71101ecb05d3ede7dec29273ef26c8bf1c4163d8d65"
+}

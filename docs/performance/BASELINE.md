@@ -1,5 +1,14 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0548: fresh paired OLE2 baseline and rejected checkpoint candidate
+
+[0548](changes/0548-ole2-checkpoint-collector-rejected.md) retains two-repeat
+ABBA native/guard captures, separate allocation vectors and positive-owner
+instruction profiles. The final runtime-plus-test manifest equals the measured
+baseline, including the common guard example. Candidate instruction increases
+and one primary latency failure prevent retention. No candidate gain updates
+the production baseline.
+
 ## 0545: isolated exact-count scan, no workflow baseline change
 
 [0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) records 2,800 samples over seven inputs in frozen ABBA order. Dense
