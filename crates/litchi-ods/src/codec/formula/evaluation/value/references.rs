@@ -551,7 +551,7 @@ where
                                 });
                                 pair_started = true;
                             }
-                            result.areas.push(area);
+                            result.push_raw(area, self)?;
                             result.append_record_area(&area, self)?;
                         } else {
                             result.push(area, self)?;
@@ -594,13 +594,10 @@ where
             .ok_or_else(|| self.reference_limit_error(usize::MAX))?;
         self.check_reference_areas(area_count)?;
         self.check_reference_areas(record_count)?;
-        let mut planned_cells = 0usize;
-        for area in left.areas.iter().chain(right.areas.iter()) {
-            self.scalar.charge_work(1)?;
-            planned_cells = planned_cells
-                .checked_add(area.rect.count()?)
-                .ok_or_else(|| self.reference_limit_error(usize::MAX))?;
-        }
+        let planned_cells = left
+            .cell_count
+            .checked_add(right.cell_count)
+            .ok_or_else(|| self.reference_limit_error(usize::MAX))?;
         self.check_reference_cells(planned_cells)?;
         left.append_set(right, self)?;
         Ok(RuntimeValue::Areas(left))
@@ -616,6 +613,7 @@ where
                 Ok(RuntimeAreaSet {
                     areas: Vec::new(),
                     records: Vec::new(),
+                    cell_count: 0,
                     area_reservation: None,
                     record_reservation: None,
                     is_list: false,
