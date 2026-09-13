@@ -18,7 +18,9 @@ implicit intersection rules of its input reference. Error elements retain
 their positions after transposition; a scalar Error argument propagates.
 
 `MUNIT` uses Number parameter conversion followed by truncation toward zero.
-The resulting integer must be positive. Array-valued input to its scalar
+Logical values convert to zero or one, Empty converts to zero, and Text
+produces a formula `Value` error, including numeric-looking text. The
+resulting integer must be positive. Array-valued input to its scalar
 parameter supplies the first element rather than triggering repeated calls
 that would create an array of matrices (§3.3, rule 2.2.1). Non-finite numeric
 results produce a formula `Number` error. Checked dimensions and cell-count

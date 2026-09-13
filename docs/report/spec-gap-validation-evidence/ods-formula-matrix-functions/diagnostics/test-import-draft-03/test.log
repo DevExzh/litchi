@@ -1,0 +1,11 @@
+   Compiling litchi-ods v0.0.1 (/home/zhuhe/code/litchi-array-worktree/crates/litchi-ods)
+error: unused import: `EvaluationLimits`
+  --> crates/litchi-ods/tests/ods_formula_matrix_limits.rs:18:37
+   |
+18 |     evaluation::{EvaluationFailure, EvaluationLimits},
+   |                                     ^^^^^^^^^^^^^^^^
+   |
+   = note: `-D unused-imports` implied by `-D unused`
+   = help: to override `-D unused` add `#[allow(unused_imports)]`
+
+error: could not compile `litchi-ods` (test "ods_formula_matrix_limits") due to 1 previous error
