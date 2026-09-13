@@ -1,0 +1,24 @@
+{
+  "name": "R1-A1-baseline-owned-readat-list",
+  "command": [
+    "/usr/bin/taskset",
+    "-c",
+    "17",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/0db5c175-cade-4685-8f04-7ebb02a30b4a/scratchpad/candidate/xls_source_attribution",
+    "--input",
+    "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "--mode",
+    "owned-readat",
+    "--operation",
+    "list",
+    "--warmups",
+    "20",
+    "--samples",
+    "100"
+  ],
+  "returncode": 0,
+  "started_unix": 1789314519.3467047,
+  "finished_unix": 1789314519.380963,
+  "stdout": "R1-A1-baseline-owned-readat-list.stdout",
+  "stderr": "R1-A1-baseline-owned-readat-list.stderr"
+}

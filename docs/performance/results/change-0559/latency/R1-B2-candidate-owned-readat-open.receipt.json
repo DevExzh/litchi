@@ -1,0 +1,24 @@
+{
+  "name": "R1-B2-candidate-owned-readat-open",
+  "command": [
+    "/usr/bin/taskset",
+    "-c",
+    "17",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/0db5c175-cade-4685-8f04-7ebb02a30b4a/scratchpad/stage2/xls_source_attribution",
+    "--input",
+    "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "--mode",
+    "owned-readat",
+    "--operation",
+    "open",
+    "--warmups",
+    "20",
+    "--samples",
+    "100"
+  ],
+  "returncode": 0,
+  "started_unix": 1789314519.9001415,
+  "finished_unix": 1789314519.934056,
+  "stdout": "R1-B2-candidate-owned-readat-open.stdout",
+  "stderr": "R1-B2-candidate-owned-readat-open.stderr"
+}

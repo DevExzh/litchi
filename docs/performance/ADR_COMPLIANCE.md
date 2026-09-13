@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0559: exhaustive equivalence, no contract movement
+
+[0559](0559-cfb-ascii-simple-uppercase.md) changes only how the `[MS-CFB]` 2.6.4
+simple uppercase mapping is computed. Comparison keys, ordering, duplicate
+detection, refusals, ownership, dependency direction and public API are
+unchanged, and per-scalar exhaustive tests in `litchi-cfb` and
+`litchi-ole-common` prove the ASCII branch equals the Unicode path for every
+code point. No ADR exception is needed.
+
 ## 0558: fence discipline restated for the shared CFB reader
 
 [0558](0558-ole2-single-read-fence.md) keeps one source-version fence per shared
