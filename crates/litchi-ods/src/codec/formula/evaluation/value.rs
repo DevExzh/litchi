@@ -1540,6 +1540,7 @@ impl<'a> ReferenceShapeScratch<'a> {
 enum ReferenceOperandKind {
     Scalar,
     Reference,
+    ReferenceList,
     Array,
     Error(ScalarError),
     Unknown,
@@ -3438,6 +3439,16 @@ where
                             .ok_or(EvaluationFailure::InvalidExpression(
                                 "reference error-handler value is missing",
                             ))?;
+                    // A reference list is a reference-sequence value, but it is
+                    // not a scalar error-handler operand.  The scalar profile
+                    // turns it into #VALUE! here so IFERROR can catch it while
+                    // IFNA correctly leaves the error uncaught.
+                    let value = match value {
+                        RuntimeValue::Areas(areas) if areas.is_list => {
+                            RuntimeValue::Scalar(WorkingValue::Error(ScalarError::Value))
+                        },
+                        value => value,
+                    };
                     let caught = matches!(
                         &value,
                         RuntimeValue::Scalar(WorkingValue::Error(error))
@@ -3507,6 +3518,7 @@ where
 
     fn reference_operand_kind_from_runtime(value: &RuntimeValue<'expr>) -> ReferenceOperandKind {
         match value {
+            RuntimeValue::Areas(areas) if areas.is_list => ReferenceOperandKind::ReferenceList,
             RuntimeValue::Areas(_) => ReferenceOperandKind::Reference,
             RuntimeValue::Array(_) => ReferenceOperandKind::Array,
             RuntimeValue::Scalar(WorkingValue::Error(error)) => ReferenceOperandKind::Error(*error),
@@ -3760,6 +3772,9 @@ where
                         ReferenceOperandKind::Array | ReferenceOperandKind::Reference => {
                             ReferenceOperandKind::Array
                         },
+                        ReferenceOperandKind::ReferenceList => {
+                            ReferenceOperandKind::Error(ScalarError::Value)
+                        },
                         kind => kind,
                     };
                     self.push_reference_kind_value(
@@ -3784,37 +3799,40 @@ where
                             | (_, ReferenceOperandKind::Error(error)) => {
                                 ReferenceKindValue::Known(ReferenceOperandKind::Error(error))
                             },
-                            (ReferenceOperandKind::Reference, ReferenceOperandKind::Reference) => {
-                                match (left_value, right_value) {
-                                    (
-                                        ReferenceKindValue::Runtime(left),
-                                        ReferenceKindValue::Runtime(right),
-                                    ) => {
-                                        let result = match operator {
-                                            super::InfixOperator::Range => {
-                                                self.combine_range(left, right)
-                                            },
-                                            super::InfixOperator::Intersection => {
-                                                self.intersect_ranges(left, right)
-                                            },
-                                            super::InfixOperator::Union => {
-                                                self.union_ranges(left, right)
-                                            },
-                                            _ => unreachable!("checked reference operator"),
-                                        };
-                                        match result {
-                                            Ok(value) => ReferenceKindValue::Runtime(value),
-                                            Err(EvaluationFailure::Unsupported(
-                                                super::UnsupportedKind::Reference
-                                                | super::UnsupportedKind::ReferenceOperator,
-                                            )) => ReferenceKindValue::Known(
-                                                ReferenceOperandKind::Unknown,
-                                            ),
-                                            Err(error) => return Err(error),
-                                        }
-                                    },
-                                    _ => ReferenceKindValue::Known(ReferenceOperandKind::Unknown),
-                                }
+                            (
+                                ReferenceOperandKind::Reference
+                                | ReferenceOperandKind::ReferenceList,
+                                ReferenceOperandKind::Reference
+                                | ReferenceOperandKind::ReferenceList,
+                            ) => match (left_value, right_value) {
+                                (
+                                    ReferenceKindValue::Runtime(left),
+                                    ReferenceKindValue::Runtime(right),
+                                ) => {
+                                    let result = match operator {
+                                        super::InfixOperator::Range => {
+                                            self.combine_range(left, right)
+                                        },
+                                        super::InfixOperator::Intersection => {
+                                            self.intersect_ranges(left, right)
+                                        },
+                                        super::InfixOperator::Union => {
+                                            self.union_ranges(left, right)
+                                        },
+                                        _ => unreachable!("checked reference operator"),
+                                    };
+                                    match result {
+                                        Ok(value) => ReferenceKindValue::Runtime(value),
+                                        Err(EvaluationFailure::Unsupported(
+                                            super::UnsupportedKind::Reference
+                                            | super::UnsupportedKind::ReferenceOperator,
+                                        )) => {
+                                            ReferenceKindValue::Known(ReferenceOperandKind::Unknown)
+                                        },
+                                        Err(error) => return Err(error),
+                                    }
+                                },
+                                _ => ReferenceKindValue::Known(ReferenceOperandKind::Unknown),
                             },
                             _ => ReferenceKindValue::Known(ReferenceOperandKind::Unknown),
                         };
@@ -3832,7 +3850,17 @@ where
                             | (ReferenceOperandKind::Reference, _)
                             | (_, ReferenceOperandKind::Reference)
                     ) {
+                        // Matrix mapping converts reference lists to a scalar
+                        // error, then broadcasts that error with any array or
+                        // ordinary reference operand.  Preserve that result
+                        // shape even when the list appears on either side.
                         ReferenceOperandKind::Array
+                    } else if matches!(
+                        (left, right),
+                        (ReferenceOperandKind::ReferenceList, _,)
+                            | (_, ReferenceOperandKind::ReferenceList,)
+                    ) {
+                        ReferenceOperandKind::Error(ScalarError::Value)
                     } else if matches!(
                         (left, right),
                         (ReferenceOperandKind::Unknown, _)
@@ -3862,6 +3890,16 @@ where
                             | (_, ReferenceOperandKind::Array)
                             | (ReferenceOperandKind::Reference, _)
                             | (_, ReferenceOperandKind::Reference) => ReferenceOperandKind::Array,
+                            (ReferenceOperandKind::ReferenceList, _)
+                            | (_, ReferenceOperandKind::ReferenceList) => {
+                                ReferenceOperandKind::Error(ScalarError::Value)
+                            },
+                            (_, ReferenceOperandKind::Error(error)) => {
+                                ReferenceOperandKind::Error(error)
+                            },
+                            (ReferenceOperandKind::Error(error), _) => {
+                                ReferenceOperandKind::Error(error)
+                            },
                             (ReferenceOperandKind::Unknown, _)
                             | (_, ReferenceOperandKind::Unknown) => ReferenceOperandKind::Unknown,
                             _ => ReferenceOperandKind::Scalar,
@@ -3876,6 +3914,14 @@ where
                 ReferenceKindFrame::IfAfterCondition { node, condition } => {
                     let condition_value = self.pop_reference_kind_value(&mut scratch.values)?;
                     let condition_kind = Self::reference_kind_value_kind(&condition_value);
+                    if condition_kind == ReferenceOperandKind::ReferenceList {
+                        self.push_reference_kind_value(
+                            &mut scratch.values,
+                            &mut scratch.value_reservation,
+                            ReferenceOperandKind::Error(ScalarError::Value),
+                        )?;
+                        continue;
+                    }
                     if matches!(
                         condition_kind,
                         ReferenceOperandKind::Array | ReferenceOperandKind::Reference
@@ -3952,6 +3998,40 @@ where
                 ReferenceKindFrame::IfErrorAfterValue { node } => {
                     let value_value = self.pop_reference_kind_value(&mut scratch.values)?;
                     let value_kind = Self::reference_kind_value_kind(&value_value);
+                    if value_kind == ReferenceOperandKind::ReferenceList {
+                        let alternative =
+                            node.child(1).ok_or(EvaluationFailure::InvalidExpression(
+                                "reference kind error-handler alternative is missing",
+                            ))?;
+                        if alternative.is_missing() {
+                            self.push_reference_kind_value(
+                                &mut scratch.values,
+                                &mut scratch.value_reservation,
+                                ReferenceOperandKind::Scalar,
+                            )?;
+                        } else if node
+                            .function_name()
+                            .is_some_and(|name| name.eq_ignore_ascii_case("IFERROR"))
+                        {
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::UseChild,
+                            )?;
+                            self.push_reference_kind_frame(
+                                &mut scratch.frames,
+                                &mut scratch.frame_reservation,
+                                ReferenceKindFrame::Visit(alternative),
+                            )?;
+                        } else {
+                            self.push_reference_kind_value(
+                                &mut scratch.values,
+                                &mut scratch.value_reservation,
+                                ReferenceOperandKind::Error(ScalarError::Value),
+                            )?;
+                        }
+                        continue;
+                    }
                     if matches!(
                         value_kind,
                         ReferenceOperandKind::Array | ReferenceOperandKind::Reference

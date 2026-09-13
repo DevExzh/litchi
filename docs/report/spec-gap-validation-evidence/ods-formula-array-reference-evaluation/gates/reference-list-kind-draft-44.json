@@ -1,0 +1,17 @@
+{
+  "archive": "reference-list-kind-draft-44.tar.gz",
+  "sha256": "2ef74b428fdae5c82f223eaafb54993ce158c5f6b3f4675d89e8a4422c3db497",
+  "description": "Array/list precedence correction passes all62 tests including direct IFNA error priority (43). Additional nested IFNA error-priority control passes targeted typed-refusal test (44).",
+  "source_sha256": "1ddaf1adcf4157c3f84bdbae62aa882867037da85a97aab1bd9a9a225eda7e5e",
+  "test_snapshot": "Exact44 source;43 predates the one additional nested IFNA control.",
+  "statuses": {
+    "43": 0,
+    "44": 0
+  },
+  "files": {
+    "crates/litchi-ods/src/codec/formula/evaluation/value.rs": "1ddaf1adcf4157c3f84bdbae62aa882867037da85a97aab1bd9a9a225eda7e5e",
+    "crates/litchi-ods/tests/ods_formula_array_reference_evaluation.rs": "387acf362db631322b8b58c379a8346a24e6eab83262d0396c773c6f94b4a7d1",
+    "list-kind-43.log": "d566942194f3683e4091574eb7c7a00c30cf5803eeb17e200287dfb422cd9435",
+    "list-kind-44.log": "98ba90dff52fa1c5f9f675576df5ab12855044623559419b0fe73278427bda65"
+  }
+}
