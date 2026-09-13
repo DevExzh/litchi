@@ -1,0 +1,12 @@
+{
+  "schema": "xlsx_merge_0556_preparation_v1",
+  "base_revision": "3210f07ac7a9daa2686e781645f6539a156a26ce",
+  "production_source": "crates/litchi-xlsx/src/cell.rs",
+  "production_sha256": "7e807528568ebdd4a717382a3b1b249e178504b03e04d38147cb0159c5b567c7",
+  "baseline_source_sha256": "cceee48350176b00813b2211df0bb027911e39c284acd717129d22152ed3712e",
+  "cargo_lock_sha256": "9111221ee9d100daf90328a544613cb3f70287611dcc55a37d3b1b7a5d99c91a",
+  "adr_manifest_sha256": "63b2ce2853c7c548182cb4545cca7c490de914fa4a6791c939518e68a0871b59",
+  "adr_continuity_verified": true,
+  "status": "candidate preparation; no adoption or performance claim",
+  "target": "/home/zhuhe/litchi-goal-0556-target"
+}

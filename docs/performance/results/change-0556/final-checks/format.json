@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "fmt",
+    "--all",
+    "--",
+    "--check"
+  ],
+  "exit_code": 0,
+  "start_utc": "2026-09-13T13:27:46.547914+00:00",
+  "end_utc": "2026-09-13T13:28:04.292659+00:00",
+  "seconds": 17.744752355996752,
+  "source_stable": true,
+  "inputs_sha256": "2b271ef2f42b42b6f7bdb64e860ec0e500a9a9cd8e8acb451a00ffb1fe11ea83",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

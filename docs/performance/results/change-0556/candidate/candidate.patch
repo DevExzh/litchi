@@ -1,0 +1,545 @@
+--- a/crates/litchi-xlsx/src/cell.rs
++++ b/crates/litchi-xlsx/src/cell.rs
+@@ -760,6 +760,19 @@
+             )));
+         }
+ 
++        Self::from_sorted(cells, rows, columns, defaults, merges, declared)
++    }
++
++    /// Assemble indexes and extents from cell and row sequences that have
++    /// already been checked for strict address/index order by their caller.
++    fn from_sorted(
++        cells: Vec<Stored>,
++        rows: Vec<row::Stored>,
++        columns: Box<[column::Stored]>,
++        defaults: Option<Defaults>,
++        merges: Vec<Rect>,
++        declared: Option<Rect>,
++    ) -> Result<Self> {
+         let mut stored = Bounds::default();
+         let mut content = Bounds::default();
+         let mut styled = Bounds::default();
+@@ -832,16 +845,46 @@
+             extents,
+             ..
+         } = parsed;
+-        cells.extend(parsed_cells.into_vec());
+-        for entry in omitted_entries(&source.cells, omitted) {
+-            cells.push(entry.clone());
+-        }
++        let mut parsed_cells = parsed_cells.into_iter().peekable();
++        let mut omitted_cells = omitted_entries(&source.cells, omitted).peekable();
++        let mut previous_address = None;
++        loop {
++            let take_parsed = match (parsed_cells.peek(), omitted_cells.peek()) {
++                (Some(parsed), Some(source)) => match parsed.address.cmp(&source.address) {
++                    std::cmp::Ordering::Less => true,
++                    std::cmp::Ordering::Equal => return Ok(None),
++                    std::cmp::Ordering::Greater => false,
++                },
++                (Some(_), None) => true,
++                (None, Some(_)) => false,
++                (None, None) => break,
++            };
++            let entry = if take_parsed {
++                let Some(entry) = parsed_cells.next() else {
++                    return Ok(None);
++                };
++                entry
++            } else {
++                let Some(entry) = omitted_cells.next() else {
++                    return Ok(None);
++                };
++                entry.clone()
++            };
++            if previous_address.is_some_and(|previous| previous >= entry.address) {
++                return Ok(None);
++            }
++            previous_address = Some(entry.address);
++            cells.push(entry);
++        }
++        // Release the reduced-parser allocation before rebuilding merge
++        // indexes; `IntoIter` retains its original buffer after exhaustion.
++        drop(parsed_cells);
+         let mut merge_ranges = Vec::new();
+         merge_ranges
+             .try_reserve_exact(merges.as_slice().len())
+             .map_err(|source| allocation("merged worksheet ranges", source))?;
+         merge_ranges.extend_from_slice(merges.as_slice());
+-        Self::from_unsorted(
++        Self::from_sorted(
+             cells,
+             rows.into_vec(),
+             columns,
+@@ -1069,6 +1112,9 @@
+ 
+ #[cfg(test)]
+ mod tests {
++    use crate::layout;
++    use crate::outline::Outline;
++
+     use super::*;
+ 
+     fn empty_store(addresses: &[(u32, u32)]) -> Store {
+@@ -1090,6 +1136,460 @@
+             .expect("valid cell store")
+     }
+ 
++    fn merge_via_unsorted(
++        parsed: Store,
++        source: &Store,
++        omitted: &[Rect],
++    ) -> Result<Option<Store>> {
++        if omitted.is_empty() || !omitted_ranges_are_ordered(omitted) {
++            return Ok(None);
++        }
++        let source_count = omitted_entries(&source.cells, omitted).count();
++        if source_count == 0 || omitted_entries(&parsed.cells, omitted).next().is_some() {
++            return Ok(None);
++        }
++        let total = parsed
++            .cells
++            .len()
++            .checked_add(source_count)
++            .ok_or_else(|| invalid("merged worksheet cell count overflows usize"))?;
++        let mut cells = Vec::new();
++        cells
++            .try_reserve_exact(total)
++            .map_err(|source| allocation("merged worksheet cells", source))?;
++        let Store {
++            cells: parsed_cells,
++            rows,
++            columns,
++            defaults,
++            merges,
++            extents,
++            ..
++        } = parsed;
++        cells.extend(parsed_cells.into_vec());
++        for entry in omitted_entries(&source.cells, omitted) {
++            cells.push(entry.clone());
++        }
++        let mut merge_ranges = Vec::new();
++        merge_ranges
++            .try_reserve_exact(merges.as_slice().len())
++            .map_err(|source| allocation("merged worksheet ranges", source))?;
++        merge_ranges.extend_from_slice(merges.as_slice());
++        Store::from_unsorted(
++            cells,
++            rows.into_vec(),
++            columns,
++            defaults,
++            merge_ranges,
++            extents.declared,
++        )
++        .map(Some)
++    }
++
++    fn rich_stored(address: &str, tag: u32, cell: Cell) -> Stored {
++        let formula_range = Rect::from_a1("A1:B2").expect("valid formula range");
++        Stored {
++            address: Address::from_a1(address).expect("valid test address"),
++            cell,
++            style: Some(tag),
++            shared_string: Some(tag as usize),
++            inline_rich: tag % 2 == 0,
++            formula_range: Some(formula_range),
++            shared_formula: Some(SharedFormulaStorage {
++                index: tag,
++                range: formula_range,
++                reference: format!("R{tag}C").into_boxed_str(),
++                master: tag % 2 == 1,
++            }),
++            cell_metadata: Some(tag + 10),
++            value_metadata: Some(tag + 20),
++        }
++    }
++
++    fn rich_rows(shape: u32) -> Vec<row::Stored> {
++        let properties = row::Properties {
++            height: Some(row::Height::new(12.5 + f64::from(shape)).expect("valid row height")),
++            descent: Some(layout::Descent::new(1.5 + f64::from(shape)).expect("valid descent")),
++            style: Some(7 + shape),
++            outline: Outline::new((2 + shape) as u8).expect("valid outline"),
++            flags: row::Flags::HIDDEN
++                | row::Flags::CUSTOM_HEIGHT
++                | row::Flags::COLLAPSED
++                | row::Flags::THICK_TOP
++                | row::Flags::THICK_BOTTOM
++                | row::Flags::PHONETIC
++                | row::Flags::CUSTOM_FORMAT,
++        };
++        vec![
++            row::Stored::new(RowIndex::new(1).expect("valid row"), properties),
++            row::Stored::new(RowIndex::new(0).expect("valid row"), properties),
++        ]
++    }
++
++    fn rich_columns(shape: u32) -> Box<[column::Stored]> {
++        let properties = column::Properties {
++            width: Some(column::Width::new(18.5 + f64::from(shape)).expect("valid column width")),
++            style: Some(8 + shape),
++            outline: Outline::new((3 + shape) as u8).expect("valid outline"),
++            flags: column::Flags::HIDDEN
++                | column::Flags::BEST_FIT
++                | column::Flags::CUSTOM_WIDTH
++                | column::Flags::PHONETIC
++                | column::Flags::COLLAPSED,
++        };
++        vec![column::Stored {
++            first: ColumnIndex::new(1).expect("valid column"),
++            last: ColumnIndex::new(3).expect("valid column"),
++            properties,
++        }]
++        .into_boxed_slice()
++    }
++
++    fn rich_defaults(shape: u32) -> Defaults {
++        Defaults {
++            base_width: Some(11 + shape as u8),
++            width: Some(layout::Width::new(22.5 + f64::from(shape)).expect("valid default width")),
++            height: layout::Height::new(15.0 + f64::from(shape)).expect("valid default height"),
++            descent: Some(
++                layout::Descent::new(2.0 + f64::from(shape)).expect("valid default descent"),
++            ),
++            row_outline: Some(Outline::new((4 + shape) as u8).expect("valid outline")),
++            column_outline: Some(Outline::new((5 + shape) as u8).expect("valid outline")),
++            flags: layout::Flags::CUSTOM_HEIGHT
++                | layout::Flags::HIDDEN
++                | layout::Flags::THICK_TOP
++                | layout::Flags::THICK_BOTTOM,
++            present: layout::Flags::CUSTOM_HEIGHT
++                | layout::Flags::HIDDEN
++                | layout::Flags::THICK_TOP
++                | layout::Flags::THICK_BOTTOM,
++        }
++    }
++
++    fn rich_store_with_shape(cells: Vec<Stored>, shape: u32) -> Store {
++        Store::from_unsorted(
++            cells,
++            rich_rows(shape),
++            rich_columns(shape),
++            Some(rich_defaults(shape)),
++            if shape == 1 {
++                vec![
++                    Rect::from_a1("A1:B1").expect("valid merge"),
++                    Rect::from_a1("C2:D2").expect("valid merge"),
++                ]
++            } else {
++                vec![
++                    Rect::from_a1("A1:C1").expect("valid merge"),
++                    Rect::from_a1("D2:E2").expect("valid merge"),
++                ]
++            },
++            Some(if shape == 1 {
++                Rect::from_a1("A1:F3").expect("valid dimension")
++            } else {
++                Rect::from_a1("A1:G4").expect("valid dimension")
++            }),
++        )
++        .expect("valid structured store")
++    }
++
++    fn rich_store(cells: Vec<Stored>) -> Store {
++        rich_store_with_shape(cells, 0)
++    }
++
++    fn assert_stores_equal(actual: &Store, expected: &Store) {
++        assert_eq!(actual.cells.len(), expected.cells.len(), "cell count");
++        for (index, (actual, expected)) in actual.cells.iter().zip(&expected.cells).enumerate() {
++            assert_eq!(actual.address, expected.address, "address at {index}");
++            assert_eq!(actual.cell, expected.cell, "cell at {index}");
++            assert_eq!(actual.style, expected.style, "style at {index}");
++            assert_eq!(
++                actual.shared_string, expected.shared_string,
++                "shared string at {index}"
++            );
++            assert_eq!(
++                actual.inline_rich, expected.inline_rich,
++                "inline-rich provenance at {index}"
++            );
++            assert_eq!(
++                actual.formula_range, expected.formula_range,
++                "formula range at {index}"
++            );
++            assert_eq!(
++                actual.shared_formula, expected.shared_formula,
++                "shared-formula provenance at {index}"
++            );
++            assert_eq!(
++                actual.cell_metadata, expected.cell_metadata,
++                "cell metadata at {index}"
++            );
++            assert_eq!(
++                actual.value_metadata, expected.value_metadata,
++                "value metadata at {index}"
++            );
++        }
++        assert_eq!(
++            actual.cell_rows.len(),
++            expected.cell_rows.len(),
++            "cell-row count"
++        );
++        for (index, (actual, expected)) in
++            actual.cell_rows.iter().zip(&expected.cell_rows).enumerate()
++        {
++            assert_eq!(actual.row, expected.row, "cell-row key at {index}");
++            assert_eq!(actual.start, expected.start, "cell-row offset at {index}");
++        }
++        assert_eq!(actual.rows, expected.rows, "row records");
++        assert_eq!(actual.columns, expected.columns, "column records");
++        assert_eq!(actual.defaults, expected.defaults, "defaults");
++        assert_eq!(
++            actual.merges.as_slice(),
++            expected.merges.as_slice(),
++            "merges"
++        );
++        assert_eq!(actual.extents, expected.extents, "extents");
++    }
++
++    #[test]
++    fn sorted_merge_matches_original_constructor_for_all_provenance_and_structure() {
++        let source = rich_store_with_shape(
++            vec![
++                rich_stored("A1", 1, Cell::Empty),
++                rich_stored("C1", 2, Cell::Value(Value::Text("source text".into()))),
++                rich_stored(
++                    "E1",
++                    3,
++                    Cell::Formula(Formula::new("SUM(A1)").expect("valid formula")),
++                ),
++                rich_stored(
++                    "B2",
++                    4,
++                    Cell::Unknown(Unknown::new(
++                        "vendor",
++                        Some("opaque value".to_owned()),
++                        Some("opaque formula".to_owned()),
++                    )),
++                ),
++            ],
++            1,
++        );
++        let omitted = [
++            Rect::from_a1("A1").expect("valid omission"),
++            Rect::from_a1("C1").expect("valid omission"),
++            Rect::from_a1("E1").expect("valid omission"),
++            Rect::from_a1("B2").expect("valid omission"),
++        ];
++        let parsed_cells = vec![
++            rich_stored(
++                "B1",
++                11,
++                Cell::Value(Value::Number(Number::new("7.00").unwrap())),
++            ),
++            rich_stored("D1", 12, Cell::Value(Value::Bool(true))),
++            rich_stored(
++                "A2",
++                13,
++                Cell::Formula(Formula::new("A1+B1").expect("valid formula")),
++            ),
++            rich_stored("D2", 14, Cell::Value(Value::Error(ErrorValue::DivZero))),
++        ];
++
++        let expected = merge_via_unsorted(
++            rich_store_with_shape(parsed_cells.clone(), 2),
++            &source,
++            &omitted,
++        )
++        .expect("original merge path must not refuse")
++        .expect("original merge path must produce a store");
++        let actual =
++            Store::merge_omitted_cells(rich_store_with_shape(parsed_cells, 2), &source, &omitted)
++                .expect("sorted merge must not fail")
++                .expect("sorted merge must produce a store");
++        assert_stores_equal(&actual, &expected);
++        let parsed_structure = rich_store_with_shape(Vec::new(), 2);
++        assert_eq!(actual.rows, parsed_structure.rows, "parsed row authority");
++        assert_eq!(
++            actual.columns, parsed_structure.columns,
++            "parsed column authority"
++        );
++        assert_eq!(
++            actual.defaults, parsed_structure.defaults,
++            "parsed default authority"
++        );
++        assert_eq!(
++            actual.merge_ranges(),
++            parsed_structure.merge_ranges(),
++            "parsed merge authority"
++        );
++        assert_ne!(
++            actual.merge_ranges(),
++            source.merge_ranges(),
++            "source merge metadata must not replace parsed metadata"
++        );
++        let parsed_merge = Rect::from_a1("A1:C1").expect("valid parsed merge");
++        assert_eq!(
++            actual.view(Address::from_a1("B1").expect("valid address")),
++            View::Covered(parsed_merge)
++        );
++        assert_eq!(
++            actual
++                .cells(Rect::from_a1("A1:E2").expect("valid traversal range"))
++                .map(|(address, _cell)| address)
++                .collect::<Vec<_>>(),
++            ["A1", "B1", "C1", "D1", "E1", "A2", "B2", "D2"]
++                .into_iter()
++                .map(|address| Address::from_a1(address).expect("valid address"))
++                .collect::<Vec<_>>()
++        );
++    }
++
++    #[test]
++    fn sorted_merge_matches_original_for_empty_parsed_and_boundary_omissions() {
++        let source = rich_store_with_shape(
++            vec![
++                rich_stored("A1", 1, Cell::Empty),
++                rich_stored("B1", 2, Cell::Value(Value::Bool(true))),
++                rich_stored("C1", 3, Cell::Value(Value::Text("adjacent".into()))),
++                rich_stored(
++                    "D1",
++                    4,
++                    Cell::Value(Value::Number(Number::new("4").unwrap())),
++                ),
++                rich_stored(
++                    "XFD1",
++                    5,
++                    Cell::Value(Value::Number(Number::new("5").unwrap())),
++                ),
++                rich_stored(
++                    "XFD1048576",
++                    6,
++                    Cell::Unknown(Unknown::new("edge", None, None)),
++                ),
++            ],
++            1,
++        );
++        let omitted = [
++            Rect::from_a1("A1:B1").expect("valid adjacent omission"),
++            Rect::from_a1("C1:D1").expect("valid adjacent omission"),
++            Rect::from_a1("XFD1").expect("valid boundary omission"),
++            Rect::from_a1("XFD1048576").expect("valid boundary omission"),
++        ];
++        let expected = merge_via_unsorted(rich_store_with_shape(Vec::new(), 2), &source, &omitted)
++            .expect("original merge path must not refuse")
++            .expect("original merge path must produce a store");
++        let actual =
++            Store::merge_omitted_cells(rich_store_with_shape(Vec::new(), 2), &source, &omitted)
++                .expect("sorted merge must not fail")
++                .expect("sorted merge must produce a store");
++        assert_stores_equal(&actual, &expected);
++        assert_eq!(actual.cells.len(), 6, "all omitted source cells retained");
++        assert_eq!(
++            actual
++                .cells(Rect::from_a1("A1:XFD1048576").expect("valid full-grid range"))
++                .count(),
++            6
++        );
++    }
++
++    #[test]
++    fn sorted_merge_refuses_invalid_order_and_omission_edges() {
++        let source = rich_store(vec![
++            rich_stored(
++                "A1",
++                1,
++                Cell::Value(Value::Number(Number::new("1").unwrap())),
++            ),
++            rich_stored(
++                "B1",
++                2,
++                Cell::Value(Value::Number(Number::new("2").unwrap())),
++            ),
++        ]);
++        let parsed = rich_store(vec![rich_stored(
++            "C1",
++            3,
++            Cell::Value(Value::Number(Number::new("3").unwrap())),
++        )]);
++
++        let no_omission = Store::merge_omitted_cells(parsed, &source, &[]);
++        assert!(
++            matches!(no_omission, Ok(None)),
++            "empty omission must refuse"
++        );
++
++        let parsed = rich_store(vec![rich_stored(
++            "C1",
++            3,
++            Cell::Value(Value::Number(Number::new("3").unwrap())),
++        )]);
++        let reversed = [
++            Rect::from_a1("B1").expect("valid omission"),
++            Rect::from_a1("A1").expect("valid omission"),
++        ];
++        assert!(matches!(
++            Store::merge_omitted_cells(parsed, &source, &reversed),
++            Ok(None)
++        ));
++
++        let parsed = rich_store(vec![rich_stored(
++            "A1",
++            3,
++            Cell::Value(Value::Number(Number::new("3").unwrap())),
++        )]);
++        let collision = [Rect::from_a1("A1").expect("valid omission")];
++        assert!(matches!(
++            Store::merge_omitted_cells(parsed, &source, &collision),
++            Ok(None)
++        ));
++
++        let valid_source = rich_store(vec![
++            rich_stored(
++                "A1",
++                1,
++                Cell::Value(Value::Number(Number::new("1").unwrap())),
++            ),
++            rich_stored(
++                "B1",
++                2,
++                Cell::Value(Value::Number(Number::new("2").unwrap())),
++            ),
++        ]);
++        let malformed_parsed = Store {
++            cells: vec![
++                rich_stored("B1", 3, Cell::Empty),
++                rich_stored("A1", 4, Cell::Empty),
++            ]
++            .into_boxed_slice(),
++            ..Store::default()
++        };
++        let omitted = [Rect::from_a1("A1").expect("valid omission")];
++        assert!(matches!(
++            Store::merge_omitted_cells(malformed_parsed, &valid_source, &omitted),
++            Ok(None)
++        ));
++
++        let malformed_source = Store {
++            cells: vec![
++                rich_stored("B1", 5, Cell::Empty),
++                rich_stored("A1", 6, Cell::Empty),
++            ]
++            .into_boxed_slice(),
++            ..Store::default()
++        };
++        let empty_parsed = rich_store(Vec::new());
++        let adjacent = [Rect::from_a1("A1:B1").expect("valid adjacent omission")];
++        assert!(matches!(
++            Store::merge_omitted_cells(empty_parsed, &malformed_source, &adjacent),
++            Ok(None)
++        ));
++
++        let empty_source = rich_store(Vec::new());
++        let parsed = rich_store(vec![rich_stored("C1", 3, Cell::Empty)]);
++        assert!(matches!(
++            Store::merge_omitted_cells(parsed, &empty_source, &omitted),
++            Ok(None)
++        ));
++    }
++
+     #[test]
+     fn range_cells_skip_columns_outside_each_selected_row() {
+         let store = empty_store(&[

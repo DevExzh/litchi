@@ -1,0 +1,20 @@
+{
+  "status": "pass",
+  "rows": [
+    {
+      "name": "boundaries",
+      "receipt_sha256": "269dee41193c3a322683b72a6579b8fd56ccea143b1deedc5bb48a9f47ed3546",
+      "exit_code": 0
+    },
+    {
+      "name": "claims",
+      "receipt_sha256": "73a6c08232ca639cb259fb34b9caec5012f6b35b7eeabe02a253c00324b26360",
+      "exit_code": 0
+    },
+    {
+      "name": "format",
+      "receipt_sha256": "ea1d14ef09d2526881e829c1659851d6748edb20c78a829fc068d022ff8b0f95",
+      "exit_code": 0
+    }
+  ]
+}

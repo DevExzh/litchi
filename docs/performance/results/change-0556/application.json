@@ -1,0 +1,6 @@
+{
+  "utc": "2026-09-13T13:15:48.862776+00:00",
+  "patch_sha256": "2b91feb2003f646741956f3510eddf046e34dd6801084cd4593d7fd2993872b8",
+  "source_sha256": "fc3ede23ee3ff9b7c68b0f11d73bc95ff168105a44a8ad409f7116f92c4b196e",
+  "purpose": "temporary candidate correctness validation; no production adoption"
+}

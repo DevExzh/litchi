@@ -1,5 +1,9 @@
 # Performance hotspot inventory
 
+## Change 0556: XLSX sorted merge candidate prepared
+
+The [checked linear merge candidate](0556-xlsx-sorted-merge-preparation.md) passed differential and public XLSX tests, with private constructor invariants independently reviewed. Production source is restored pending measurement. The parsed iterator is released before index rebuilding, but merge-time buffer overlap still requires allocation/peak evidence. Fresh four-shape workflow measurements and target attribution are next; the retained 4.64–6.03% merge instruction share is not a removable fraction. ODF remains deferred.
+
 ## Change 0555: physical-marker bookkeeping adds more work than it removes
 
 The [matched OLE2 experiment](0555-ole2-physical-accounting.md) rejects the allocation-free pending-role representation. Across five positive XLS timed dumps per repeat, final reconciliation self Ir fell from 1,991,710 to 829,930 while FAT-loading self Ir rose from 250,505 to 3,728,720. Total owner Ir increased about 20.5%; native XLS and few-large CFB controls regressed. These exclusive rows remain separate from overlapping inclusive totals. A shorter final pass does not establish lower constructor cost.

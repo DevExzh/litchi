@@ -1,0 +1,29 @@
+{
+  "schema": "ole2_0556_quality_v1",
+  "status": "failed",
+  "stage": "candidate",
+  "mode": "targeted",
+  "source_manifest_sha256": "8b20f558237e2fe866adf98965b7561402b3534e0c2440e429363bc50844f2b5",
+  "inputs_sha256": "2dfb3cff27a321f13fca2646a558937bf7d77cf4199a35f87942b673face9ca1",
+  "completed_utc": "2026-09-13T13:17:14.735182+00:00",
+  "rows": [
+    {
+      "name": "xlsx-tests",
+      "path": "quality-attempts/candidate-01/xlsx-tests",
+      "receipt_sha256": "315a88a08144b131507365db587f53a5c7cdcbcf58bc769727d94060a1ab127c",
+      "exit_code": 0
+    },
+    {
+      "name": "xlsx-clippy",
+      "path": "quality-attempts/candidate-01/xlsx-clippy",
+      "receipt_sha256": "248666d70fe6778a1c6e1a52d9ba3be58effba8baa82597106c3e95503c13d3c",
+      "exit_code": 0
+    },
+    {
+      "name": "format",
+      "path": "quality-attempts/candidate-01/format",
+      "receipt_sha256": "8f42f1720db6e88c470828bab965442418636e1fe0734b3453e5d5744a6f28b0",
+      "exit_code": 1
+    }
+  ]
+}

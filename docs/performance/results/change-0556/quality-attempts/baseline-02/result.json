@@ -1,0 +1,29 @@
+{
+  "schema": "ole2_0556_quality_v1",
+  "status": "pass",
+  "stage": "baseline",
+  "mode": "commands",
+  "source_manifest_sha256": "cceee48350176b00813b2211df0bb027911e39c284acd717129d22152ed3712e",
+  "inputs_sha256": "da16affaa49e18b2342408c314ee8033ae539ae1c1880218da25adefc2712768",
+  "completed_utc": "2026-09-13T13:06:18.152812+00:00",
+  "rows": [
+    {
+      "name": "workspace-check",
+      "path": "quality-attempts/baseline-02/workspace-check",
+      "receipt_sha256": "dd89088ba48d647426882c9b4089cc4da7cce4a80b734be08daf02c70e81b1b2",
+      "exit_code": 0
+    },
+    {
+      "name": "xlsx-doc",
+      "path": "quality-attempts/baseline-02/xlsx-doc",
+      "receipt_sha256": "a4241ff94e5a78d923eb84cd4492b928455ecf120193555492ae6ec43b4ed522",
+      "exit_code": 0
+    },
+    {
+      "name": "xlsx-minimal",
+      "path": "quality-attempts/baseline-02/xlsx-minimal",
+      "receipt_sha256": "c0ec791bc1cc619b22eed1762d053d62d72a4b25ddfc65c3f5ba53da485a7a53",
+      "exit_code": 0
+    }
+  ]
+}

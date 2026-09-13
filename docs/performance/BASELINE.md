@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0556: XLSX candidate correctness preparation
+
+The [0556 packet](0556-xlsx-sorted-merge-preparation.md) retains a tested linear provenance merge candidate and a prospective measurement plan. Baseline and candidate passed 1,313 and 1,316 XLSX tests respectively, plus feature/lint/documentation checks. This packet adds no performance measurements and does not replace the retained baseline. Production source is restored; matched native, allocation, and profile evidence remains pending.
+
 ## Change 0555: OLE2 physical-marker accounting rejected
 
 The [0555 record](0555-ole2-physical-accounting.md) retains fresh matched native, allocation and constructor-profile evidence for a pending-role representation. All eight primary XLS p50 rows regressed (+8.66% to +23.49%); few-large CFB p50 regressed +44.81%/+31.49%. All 72 allocation metrics were unchanged and all four group-process RSS controls passed. The role-only final scan became cheaper, but FAT-decoding self instructions increased enough to raise total XLS owner instructions about 20.5%. Exact baseline Rust source is restored; no production speedup is claimed.

@@ -1,0 +1,35 @@
+{
+  "schema": "ole2_0556_quality_receipt_v1",
+  "command": [
+    "cargo",
+    "clippy",
+    "-p",
+    "litchi-xlsx",
+    "--all-features",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "start_utc": "2026-09-13T13:19:54.481450+00:00",
+  "end_utc": "2026-09-13T13:20:09.351278+00:00",
+  "seconds": 14.869836404977832,
+  "exit_code": 0,
+  "source_stable": true,
+  "source_manifest_sha256": "bd27facf728d65356eb4ab6c1a97c5ba354fe8df4fa2b07e206c62311f07bca9",
+  "inputs_sha256": "f9f054062bb7d75be54c06913b602ff0b5ac3c551ed39bfc4886587ff54e30c0",
+  "environment": {
+    "TMPDIR": "/home/zhuhe/litchi-goal-0556-target/tmp",
+    "CARGO_TARGET_DIR": "/home/zhuhe/litchi-goal-0556-target",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "RUSTDOCFLAGS": "-D warnings",
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null
+  },
+  "artifacts": {
+    "stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr": "6877a39404078b74dce2842b0c4ff4abe8cbf0ca2f69511cc8f4dba89004a31d"
+  }
+}

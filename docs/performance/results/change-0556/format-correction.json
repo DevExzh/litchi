@@ -1,0 +1,10 @@
+{
+  "before_source_sha256": "fc3ede23ee3ff9b7c68b0f11d73bc95ff168105a44a8ad409f7116f92c4b196e",
+  "after_source_sha256": "f7fa882fcf4ccd4909950660f0b614760c7b96eaccf44341129506db3f00e68c",
+  "production_code_identical": true,
+  "receipt": "candidate-attempts/before-format/format-apply.json",
+  "receipt_sha256": "055b15301699e8be27f796df1dca3be56b53901978dbaf9f5f7e558dc177e3e1",
+  "failed_check": "quality-attempts/candidate-01/format/receipt.json",
+  "failed_check_sha256": "8f42f1720db6e88c470828bab965442418636e1fe0734b3453e5d5744a6f28b0",
+  "after_patch_sha256": "d8f509ecbeaac1b2346f490fe22c0e73a5c3074c7ed82418bc88c198642eba8c"
+}

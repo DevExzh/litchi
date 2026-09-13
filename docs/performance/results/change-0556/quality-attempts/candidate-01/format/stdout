@@ -1,0 +1,255 @@
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1228:
+ 
+     fn rich_columns(shape: u32) -> Box<[column::Stored]> {
+         let properties = column::Properties {
+[31m-            width: Some(
+[m[31m-                column::Width::new(18.5 + f64::from(shape)).expect("valid column width"),
+[m[31m-            ),
+[m[32m+            width: Some(column::Width::new(18.5 + f64::from(shape)).expect("valid column width")),
+[m             style: Some(8 + shape),
+             outline: Outline::new((3 + shape) as u8).expect("valid outline"),
+             flags: column::Flags::HIDDEN
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1250:
+     fn rich_defaults(shape: u32) -> Defaults {
+         Defaults {
+             base_width: Some(11 + shape as u8),
+[31m-            width: Some(
+[m[31m-                layout::Width::new(22.5 + f64::from(shape)).expect("valid default width"),
+[m[31m-            ),
+[m[31m-            height: layout::Height::new(15.0 + f64::from(shape))
+[m[31m-                .expect("valid default height"),
+[m[32m+            width: Some(layout::Width::new(22.5 + f64::from(shape)).expect("valid default width")),
+[m[32m+            height: layout::Height::new(15.0 + f64::from(shape)).expect("valid default height"),
+[m             descent: Some(
+                 layout::Descent::new(2.0 + f64::from(shape)).expect("valid default descent"),
+             ),
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1332:
+                 "value metadata at {index}"
+             );
+         }
+[31m-        assert_eq!(actual.cell_rows.len(), expected.cell_rows.len(), "cell-row count");
+[m[32m+        assert_eq!(
+[m[32m+            actual.cell_rows.len(),
+[m[32m+            expected.cell_rows.len(),
+[m[32m+            "cell-row count"
+[m[32m+        );
+[m         for (index, (actual, expected)) in
+             actual.cell_rows.iter().zip(&expected.cell_rows).enumerate()
+         {
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1342:
+         assert_eq!(actual.rows, expected.rows, "row records");
+         assert_eq!(actual.columns, expected.columns, "column records");
+         assert_eq!(actual.defaults, expected.defaults, "defaults");
+[31m-        assert_eq!(actual.merges.as_slice(), expected.merges.as_slice(), "merges");
+[m[32m+        assert_eq!(
+[m[32m+            actual.merges.as_slice(),
+[m[32m+            expected.merges.as_slice(),
+[m[32m+            "merges"
+[m[32m+        );
+[m         assert_eq!(actual.extents, expected.extents, "extents");
+     }
+ 
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1349:
+     #[test]
+     fn sorted_merge_matches_original_constructor_for_all_provenance_and_structure() {
+[31m-        let source = rich_store_with_shape(vec![
+[m[31m-            rich_stored("A1", 1, Cell::Empty),
+[m[31m-            rich_stored("C1", 2, Cell::Value(Value::Text("source text".into()))),
+[m[31m-            rich_stored(
+[m[31m-                "E1",
+[m[31m-                3,
+[m[31m-                Cell::Formula(Formula::new("SUM(A1)").expect("valid formula")),
+[m[31m-            ),
+[m[31m-            rich_stored(
+[m[31m-                "B2",
+[m[31m-                4,
+[m[31m-                Cell::Unknown(Unknown::new(
+[m[31m-                    "vendor",
+[m[31m-                    Some("opaque value".to_owned()),
+[m[31m-                    Some("opaque formula".to_owned()),
+[m[31m-                )),
+[m[31m-            ),
+[m[31m-        ], 1);
+[m[32m+        let source = rich_store_with_shape(
+[m[32m+            vec![
+[m[32m+                rich_stored("A1", 1, Cell::Empty),
+[m[32m+                rich_stored("C1", 2, Cell::Value(Value::Text("source text".into()))),
+[m[32m+                rich_stored(
+[m[32m+                    "E1",
+[m[32m+                    3,
+[m[32m+                    Cell::Formula(Formula::new("SUM(A1)").expect("valid formula")),
+[m[32m+                ),
+[m[32m+                rich_stored(
+[m[32m+                    "B2",
+[m[32m+                    4,
+[m[32m+                    Cell::Unknown(Unknown::new(
+[m[32m+                        "vendor",
+[m[32m+                        Some("opaque value".to_owned()),
+[m[32m+                        Some("opaque formula".to_owned()),
+[m[32m+                    )),
+[m[32m+                ),
+[m[32m+            ],
+[m[32m+            1,
+[m[32m+        );
+[m         let omitted = [
+             Rect::from_a1("A1").expect("valid omission"),
+             Rect::from_a1("C1").expect("valid omission"),
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1373:
+             Rect::from_a1("B2").expect("valid omission"),
+         ];
+         let parsed_cells = vec![
+[31m-            rich_stored("B1", 11, Cell::Value(Value::Number(Number::new("7.00").unwrap()))),
+[m[32m+            rich_stored(
+[m[32m+                "B1",
+[m[32m+                11,
+[m[32m+                Cell::Value(Value::Number(Number::new("7.00").unwrap())),
+[m[32m+            ),
+[m             rich_stored("D1", 12, Cell::Value(Value::Bool(true))),
+             rich_stored(
+                 "A2",
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1380:
+                 13,
+                 Cell::Formula(Formula::new("A1+B1").expect("valid formula")),
+             ),
+[31m-            rich_stored(
+[m[31m-                "D2",
+[m[31m-                14,
+[m[31m-                Cell::Value(Value::Error(ErrorValue::DivZero)),
+[m[31m-            ),
+[m[32m+            rich_stored("D2", 14, Cell::Value(Value::Error(ErrorValue::DivZero))),
+[m         ];
+ 
+[31m-        let expected =
+[m[31m-            merge_via_unsorted(rich_store_with_shape(parsed_cells.clone(), 2), &source, &omitted)
+[m[31m-            .expect("original merge path must not refuse")
+[m[31m-            .expect("original merge path must produce a store");
+[m[31m-        let actual = Store::merge_omitted_cells(
+[m[31m-            rich_store_with_shape(parsed_cells, 2),
+[m[32m+        let expected = merge_via_unsorted(
+[m[32m+            rich_store_with_shape(parsed_cells.clone(), 2),
+[m             &source,
+             &omitted,
+         )
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1399:
+[31m-            .expect("sorted merge must not fail")
+[m[31m-            .expect("sorted merge must produce a store");
+[m[32m+        .expect("original merge path must not refuse")
+[m[32m+        .expect("original merge path must produce a store");
+[m[32m+        let actual =
+[m[32m+            Store::merge_omitted_cells(rich_store_with_shape(parsed_cells, 2), &source, &omitted)
+[m[32m+                .expect("sorted merge must not fail")
+[m[32m+                .expect("sorted merge must produce a store");
+[m         assert_stores_equal(&actual, &expected);
+         let parsed_structure = rich_store_with_shape(Vec::new(), 2);
+         assert_eq!(actual.rows, parsed_structure.rows, "parsed row authority");
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1443:
+                 rich_stored("A1", 1, Cell::Empty),
+                 rich_stored("B1", 2, Cell::Value(Value::Bool(true))),
+                 rich_stored("C1", 3, Cell::Value(Value::Text("adjacent".into()))),
+[31m-                rich_stored("D1", 4, Cell::Value(Value::Number(Number::new("4").unwrap()))),
+[m[31m-                rich_stored("XFD1", 5, Cell::Value(Value::Number(Number::new("5").unwrap()))),
+[m                 rich_stored(
+[32m+                    "D1",
+[m[32m+                    4,
+[m[32m+                    Cell::Value(Value::Number(Number::new("4").unwrap())),
+[m[32m+                ),
+[m[32m+                rich_stored(
+[m[32m+                    "XFD1",
+[m[32m+                    5,
+[m[32m+                    Cell::Value(Value::Number(Number::new("5").unwrap())),
+[m[32m+                ),
+[m[32m+                rich_stored(
+[m                     "XFD1048576",
+                     6,
+                     Cell::Unknown(Unknown::new("edge", None, None)),
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1459:
+             Rect::from_a1("XFD1").expect("valid boundary omission"),
+             Rect::from_a1("XFD1048576").expect("valid boundary omission"),
+         ];
+[31m-        let expected = merge_via_unsorted(
+[m[31m-            rich_store_with_shape(Vec::new(), 2),
+[m[31m-            &source,
+[m[31m-            &omitted,
+[m[31m-        )
+[m[31m-        .expect("original merge path must not refuse")
+[m[31m-        .expect("original merge path must produce a store");
+[m[31m-        let actual = Store::merge_omitted_cells(
+[m[31m-            rich_store_with_shape(Vec::new(), 2),
+[m[31m-            &source,
+[m[31m-            &omitted,
+[m[31m-        )
+[m[31m-        .expect("sorted merge must not fail")
+[m[31m-        .expect("sorted merge must produce a store");
+[m[32m+        let expected = merge_via_unsorted(rich_store_with_shape(Vec::new(), 2), &source, &omitted)
+[m[32m+            .expect("original merge path must not refuse")
+[m[32m+            .expect("original merge path must produce a store");
+[m[32m+        let actual =
+[m[32m+            Store::merge_omitted_cells(rich_store_with_shape(Vec::new(), 2), &source, &omitted)
+[m[32m+                .expect("sorted merge must not fail")
+[m[32m+                .expect("sorted merge must produce a store");
+[m         assert_stores_equal(&actual, &expected);
+         assert_eq!(actual.cells.len(), 6, "all omitted source cells retained");
+         assert_eq!(
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1486:
+     #[test]
+     fn sorted_merge_refuses_invalid_order_and_omission_edges() {
+         let source = rich_store(vec![
+[31m-            rich_stored("A1", 1, Cell::Value(Value::Number(Number::new("1").unwrap()))),
+[m[31m-            rich_stored("B1", 2, Cell::Value(Value::Number(Number::new("2").unwrap()))),
+[m[32m+            rich_stored(
+[m[32m+                "A1",
+[m[32m+                1,
+[m[32m+                Cell::Value(Value::Number(Number::new("1").unwrap())),
+[m[32m+            ),
+[m[32m+            rich_stored(
+[m[32m+                "B1",
+[m[32m+                2,
+[m[32m+                Cell::Value(Value::Number(Number::new("2").unwrap())),
+[m[32m+            ),
+[m         ]);
+         let parsed = rich_store(vec![rich_stored(
+             "C1",
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1496:
+         )]);
+ 
+         let no_omission = Store::merge_omitted_cells(parsed, &source, &[]);
+[31m-        assert!(matches!(no_omission, Ok(None)), "empty omission must refuse");
+[m[32m+        assert!(
+[m[32m+            matches!(no_omission, Ok(None)),
+[m[32m+            "empty omission must refuse"
+[m[32m+        );
+[m 
+         let parsed = rich_store(vec![rich_stored(
+             "C1",
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1524:
+         ));
+ 
+         let valid_source = rich_store(vec![
+[31m-            rich_stored("A1", 1, Cell::Value(Value::Number(Number::new("1").unwrap()))),
+[m[31m-            rich_stored("B1", 2, Cell::Value(Value::Number(Number::new("2").unwrap()))),
+[m[32m+            rich_stored(
+[m[32m+                "A1",
+[m[32m+                1,
+[m[32m+                Cell::Value(Value::Number(Number::new("1").unwrap())),
+[m[32m+            ),
+[m[32m+            rich_stored(
+[m[32m+                "B1",
+[m[32m+                2,
+[m[32m+                Cell::Value(Value::Number(Number::new("2").unwrap())),
+[m[32m+            ),
+[m         ]);
+         let malformed_parsed = Store {
+             cells: vec![
+Diff in /home/zhuhe/code/litchi/crates/litchi-xlsx/src/cell.rs:1557:
+         ));
+ 
+         let empty_source = rich_store(Vec::new());
+[31m-        let parsed = rich_store(vec![rich_stored(
+[m[31m-            "C1",
+[m[31m-            3,
+[m[31m-            Cell::Empty,
+[m[31m-        )]);
+[m[32m+        let parsed = rich_store(vec![rich_stored("C1", 3, Cell::Empty)]);
+[m         assert!(matches!(
+             Store::merge_omitted_cells(parsed, &empty_source, &omitted),
+             Ok(None)
