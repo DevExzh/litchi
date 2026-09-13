@@ -37,9 +37,11 @@ const VALUE_CHECK_CHUNK: usize = 4096;
 // consuming operator/function chooses a target type.
 #[allow(dead_code)]
 mod geometry;
+mod owned;
 mod references;
 mod scalar;
 use geometry::Cuboid;
+pub use owned::{OwnedArrayView, OwnedEvaluated, OwnedReferenceListView, OwnedValueView};
 
 /// The caller's current cell, used for sheet-relative references and
 /// implicit intersection.
@@ -420,21 +422,29 @@ impl Limits {
         self
     }
 
-    /// Set the maximum cells in one rectangular result or reference.
+    /// Set the maximum cells in one materialized rectangular array.
     #[must_use]
     pub const fn with_max_array_cells(mut self, value: usize) -> Self {
         self.max_array_cells = value;
         self
     }
 
-    /// Set the maximum cells fetched from one or more references.
+    /// Bound both admitted reference geometry and cumulative provider reads.
+    ///
+    /// Each constructed reference result must fit this logical cell count;
+    /// reference lists include duplicate areas in that count. Separately, all
+    /// provider cell reads in one evaluation share this cumulative maximum.
+    /// A bare matrix reference or scalar projection can therefore be refused
+    /// for its full geometry before any provider cell is read.
     #[must_use]
     pub const fn with_max_reference_cells(mut self, value: usize) -> Self {
         self.max_reference_cells = value;
         self
     }
 
-    /// Set the maximum number of union/intersection areas retained at once.
+    /// Set the maximum reference records and resolved sheet planes retained
+    /// at once. A 3-D reference can contain several physical sheet planes even
+    /// when its public view represents them as one cuboid.
     #[must_use]
     pub const fn with_max_reference_areas(mut self, value: usize) -> Self {
         self.max_reference_areas = value;
@@ -453,13 +463,13 @@ impl Limits {
         self.max_array_cells
     }
 
-    /// Maximum reference cell count.
+    /// Maximum admitted reference geometry and cumulative provider-read count.
     #[must_use]
     pub const fn max_reference_cells(self) -> usize {
         self.max_reference_cells
     }
 
-    /// Maximum retained reference-area count.
+    /// Maximum retained reference record or sheet-plane count.
     #[must_use]
     pub const fn max_reference_areas(self) -> usize {
         self.max_reference_areas
@@ -611,7 +621,7 @@ pub struct ReferenceListView<'a> {
 
 impl PartialEq for ReferenceListView<'_> {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.records, other.records)
+        self.iter().eq(other.iter())
     }
 }
 
@@ -648,6 +658,10 @@ impl<'a> ReferenceListView<'a> {
 
 /// A borrowed value view.  Array elements are borrowed through
 /// [`ArrayView::cell`], so inspection never clones the retained result.
+/// Rust equality compares stored values and reference metadata structurally,
+/// preserving array shape and record order. Array/list comparisons are linear
+/// in the inspected cells and metadata, allocate nothing, and are separate
+/// from OpenFormula's comparison and coercion rules.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Value<'a> {
@@ -695,7 +709,12 @@ pub struct ArrayView<'a> {
 
 impl PartialEq for ArrayView<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.shape == other.shape && std::ptr::eq(self.cells, other.cells)
+        self.shape == other.shape
+            && self
+                .cells
+                .iter()
+                .map(RuntimeElement::as_ref)
+                .eq(other.cells.iter().map(RuntimeElement::as_ref))
     }
 }
 
@@ -806,6 +825,27 @@ impl<'a> Evaluated<'a> {
             | RuntimeValue::Scalar(_)
             | RuntimeValue::Array(_) => None,
         }
+    }
+
+    /// Copy this result into lifetime-free, fallibly admitted storage.
+    ///
+    /// The returned value owns all text, array cells, and reference metadata,
+    /// so it remains usable after the parsed expression and resolver are
+    /// dropped.  The caller supplies the execution context and limits for
+    /// the copy operation; no ambient workbook or resolver is consulted.
+    /// Storage, text, array, reference-record/plane and work limits constrain
+    /// the copy. Reference-cell read/admission and VM-stack limits do not apply:
+    /// the copy neither reads cells nor expands or evaluates references.
+    ///
+    /// # Errors
+    /// Returns typed cancellation, resource-limit or allocation failures.
+    /// Failure drops all partial owned storage and leaves this result intact.
+    pub fn to_owned(
+        &self,
+        execution: &ExecutionContext,
+        limits: &Limits,
+    ) -> EvaluationResult<OwnedEvaluated> {
+        owned::from_evaluated(self, execution, limits)
     }
 }
 
@@ -1393,20 +1433,25 @@ struct ShapeMask {
 }
 
 #[derive(Clone, Copy)]
-enum StaticError {
-    NoError,
-    Error(ScalarError),
-}
-
-#[derive(Clone, Copy)]
 enum ShapeFrame<'a> {
     Enter {
         node: super::Node<'a>,
         demand: ShapeDemand,
     },
+    /// The condition of a lazy handler is planned first.  Its shape value is
+    /// left on the shape stack for this continuation, which then selects and
+    /// schedules only the branches demanded by the discovered condition
+    /// shape.  Keeping this as a frame makes nested handlers use the same
+    /// bounded planner rather than a recursive or shallow probe.
+    LazyCondition {
+        node: super::Node<'a>,
+        condition: super::Node<'a>,
+        demand: ShapeDemand,
+    },
     Exit {
         node: super::Node<'a>,
         children: usize,
+        base: Option<Shape>,
     },
 }
 
@@ -1423,6 +1468,7 @@ struct LazyShapeChildren<'a> {
     first_mask: Option<usize>,
     second_mask: Option<usize>,
     len: usize,
+    shape: Shape,
 }
 
 #[derive(Clone, Copy)]
@@ -2820,69 +2866,26 @@ where
             self.scalar.step()?;
             match frame {
                 ShapeFrame::Enter { node, demand } => {
-                    // Static branch discovery is safe only when every output
-                    // position is demanded.  A nested handler inherits an
-                    // ancestor mask; evaluating its whole literal condition
-                    // would otherwise inspect positions where that ancestor
-                    // branch can never run.
-                    if demand.mask.is_none()
-                        && let Some(children) = self.lazy_shape_children(node)?
-                    {
-                        let child_count = children.len;
-                        self.push_shape_frame(ShapeFrame::Exit {
-                            node,
-                            children: child_count,
-                        })?;
-                        if let Some(child) = children.second {
-                            self.push_shape_frame(ShapeFrame::Enter {
-                                node: child,
-                                demand: ShapeDemand {
-                                    shape: demand.shape,
-                                    mask: children.second_mask.or(demand.mask),
-                                },
-                            })?;
-                        }
-                        if let Some(child) = children.first {
-                            self.push_shape_frame(ShapeFrame::Enter {
-                                node: child,
-                                demand: ShapeDemand {
-                                    shape: demand.shape,
-                                    mask: children.first_mask.or(demand.mask),
-                                },
-                            })?;
-                        }
-                        continue;
-                    }
                     if Self::is_lazy_handler(node) {
-                        let Some(children) = self.deferred_lazy_children(node, demand)? else {
-                            // Invalid arity is already a scalar formula error;
-                            // it has no branch whose shape can contribute.
+                        let Some(condition) = self.lazy_condition(node)? else {
+                            // Invalid arity is reported by the ordinary value
+                            // VM.  It has no branch whose shape can contribute.
                             self.push_shape_value(Some(Shape::new(1, 1)?))?;
                             continue;
                         };
-                        let child_count = children.len;
-                        self.push_shape_frame(ShapeFrame::Exit {
+                        // Plan the condition with the same continuation stack
+                        // used for every other node.  The LazyCondition frame
+                        // resumes only after that complete traversal has
+                        // produced its shape value.
+                        self.push_shape_frame(ShapeFrame::LazyCondition {
                             node,
-                            children: child_count,
+                            condition,
+                            demand,
                         })?;
-                        if let Some(child) = children.second {
-                            self.push_shape_frame(ShapeFrame::Enter {
-                                node: child,
-                                demand: ShapeDemand {
-                                    shape: demand.shape,
-                                    mask: children.second_mask.or(demand.mask),
-                                },
-                            })?;
-                        }
-                        if let Some(child) = children.first {
-                            self.push_shape_frame(ShapeFrame::Enter {
-                                node: child,
-                                demand: ShapeDemand {
-                                    shape: demand.shape,
-                                    mask: children.first_mask.or(demand.mask),
-                                },
-                            })?;
-                        }
+                        self.push_shape_frame(ShapeFrame::Enter {
+                            node: condition,
+                            demand,
+                        })?;
                         continue;
                     }
                     let direct = match node.kind() {
@@ -2907,7 +2910,11 @@ where
                     } else if children == 0 {
                         self.push_shape_value(Some(Shape::new(1, 1)?))?;
                     } else {
-                        self.push_shape_frame(ShapeFrame::Exit { node, children })?;
+                        self.push_shape_frame(ShapeFrame::Exit {
+                            node,
+                            children,
+                            base: None,
+                        })?;
                         for index in (0..children).rev() {
                             let child =
                                 node.child(index)
@@ -2921,8 +2928,26 @@ where
                         }
                     }
                 },
-                ShapeFrame::Exit { node, children } => {
-                    let shape = self.combine_planned_children(node, children)?;
+                ShapeFrame::LazyCondition {
+                    node,
+                    condition,
+                    demand,
+                } => {
+                    let condition_shape = self.pop_shape_value()?.unwrap_or(demand.shape);
+                    let Some(children) =
+                        self.deferred_lazy_children(node, demand, condition, condition_shape)?
+                    else {
+                        self.push_shape_value(Some(Shape::new(1, 1)?))?;
+                        continue;
+                    };
+                    self.push_shape_children(node, demand, children)?;
+                },
+                ShapeFrame::Exit {
+                    node,
+                    children,
+                    base,
+                } => {
+                    let shape = self.combine_planned_children(node, children, base)?;
                     self.push_shape_value(shape)?;
                 },
             }
@@ -2940,13 +2965,71 @@ where
         Ok(result)
     }
 
+    fn lazy_condition(
+        &self,
+        node: super::Node<'expr>,
+    ) -> EvaluationResult<Option<super::Node<'expr>>> {
+        let super::Kind::Function { name } = node.kind() else {
+            return Ok(None);
+        };
+        let count = node.child_count();
+        let valid = if name.eq_ignore_ascii_case("IF") {
+            (1..=3).contains(&count)
+        } else if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
+            count == 2
+        } else {
+            false
+        };
+        if !valid {
+            return Ok(None);
+        }
+        node.child(0)
+            .map(Some)
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "lazy handler condition is missing",
+            ))
+    }
+
+    fn push_shape_children(
+        &mut self,
+        node: super::Node<'expr>,
+        demand: ShapeDemand,
+        children: LazyShapeChildren<'expr>,
+    ) -> EvaluationResult<()> {
+        self.push_shape_frame(ShapeFrame::Exit {
+            node,
+            children: children.len,
+            base: Some(children.shape),
+        })?;
+        if let Some(child) = children.second {
+            self.push_shape_frame(ShapeFrame::Enter {
+                node: child,
+                demand: ShapeDemand {
+                    shape: children.shape,
+                    mask: children.second_mask.or(demand.mask),
+                },
+            })?;
+        }
+        if let Some(child) = children.first {
+            self.push_shape_frame(ShapeFrame::Enter {
+                node: child,
+                demand: ShapeDemand {
+                    shape: children.shape,
+                    mask: children.first_mask.or(demand.mask),
+                },
+            })?;
+        }
+        Ok(())
+    }
+
     fn combine_planned_children(
         &mut self,
         node: super::Node<'expr>,
         children: usize,
+        base: Option<Shape>,
     ) -> EvaluationResult<Option<Shape>> {
         let mut shapes = [None, None];
-        let mut combined = None;
+        let mut combined = base;
         for (index, shape_slot) in shapes.iter_mut().enumerate() {
             if index >= children {
                 break;
@@ -3087,75 +3170,49 @@ where
         Ok(Some(index))
     }
 
-    fn lazy_shape_children(
+    fn demand_mask_for_shape(
         &mut self,
-        node: super::Node<'expr>,
-    ) -> EvaluationResult<Option<LazyShapeChildren<'expr>>> {
-        let super::Kind::Function { name } = node.kind() else {
+        demand: ShapeDemand,
+        shape: Shape,
+    ) -> EvaluationResult<Option<ShapeMask>> {
+        let Some(mask) = demand.mask else {
             return Ok(None);
         };
-        if name.eq_ignore_ascii_case("IF") {
-            let count = node.child_count();
-            if !(1..=3).contains(&count) {
-                return Ok(None);
-            }
-            let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                "IF condition is missing",
+        let source = self.copy_shape_mask_id(mask)?;
+        self.expand_shape_mask(source, demand.shape, shape)
+            .map(Some)
+    }
+
+    fn copy_shape_mask_id(&mut self, index: usize) -> EvaluationResult<ShapeMask> {
+        let (shape, length) = self
+            .shape_masks
+            .get(index)
+            .map(|mask| (mask.shape, mask.indexes.len()))
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "shape demand mask is missing",
             ))?;
-            if count == 1 {
-                return Ok(Some(LazyShapeChildren {
-                    first: Some(condition),
-                    second: None,
-                    first_mask: None,
-                    second_mask: None,
-                    len: 1,
-                }));
-            }
-            let Some((first_selected, second_selected)) =
-                self.static_if_selection(condition, count == 3)?
-            else {
-                return Ok(None);
-            };
-            let first = first_selected.then(|| node.child(1)).flatten();
-            let second = second_selected.then(|| node.child(2)).flatten();
-            let len = usize::from(first.is_some())
-                .checked_add(usize::from(second.is_some()))
+        let mut copy = self.new_shape_mask(shape)?;
+        ensure_capacity(
+            &mut copy.indexes,
+            &mut copy.reservation,
+            length,
+            self.limits.max_array_cells,
+            self.execution,
+            &self.storage_budget,
+            "formula value shape demand mask",
+        )?;
+        for offset in 0..length {
+            self.scalar.charge_work(1)?;
+            let value = self
+                .shape_masks
+                .get(index)
+                .and_then(|mask| mask.indexes.get(offset).copied())
                 .ok_or(EvaluationFailure::InvalidExpression(
-                    "lazy shape child count overflow",
+                    "shape demand mask changed during copy",
                 ))?;
-            return Ok(Some(LazyShapeChildren {
-                first,
-                second,
-                first_mask: None,
-                second_mask: None,
-                len,
-            }));
+            copy.indexes.push(value);
         }
-        if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
-            if node.child_count() != 2 {
-                return Ok(None);
-            }
-            let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                "error handler value is missing",
-            ))?;
-            let alternative = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
-                "error handler alternative is missing",
-            ))?;
-            let catches_not_available = name.eq_ignore_ascii_case("IFNA");
-            let Some(alternative_selected) =
-                self.static_error_selection(condition, catches_not_available)?
-            else {
-                return Ok(None);
-            };
-            return Ok(Some(LazyShapeChildren {
-                first: None,
-                second: alternative_selected.then_some(alternative),
-                first_mask: None,
-                second_mask: None,
-                len: usize::from(alternative_selected),
-            }));
-        }
-        Ok(None)
+        Ok(copy)
     }
 
     fn is_lazy_handler(node: super::Node<'expr>) -> bool {
@@ -3171,6 +3228,8 @@ where
         &mut self,
         node: super::Node<'expr>,
         demand: ShapeDemand,
+        condition: super::Node<'expr>,
+        condition_shape: Shape,
     ) -> EvaluationResult<Option<LazyShapeChildren<'expr>>> {
         let super::Kind::Function { name } = node.kind() else {
             return Ok(None);
@@ -3180,27 +3239,39 @@ where
             if !(1..=3).contains(&count) {
                 return Ok(None);
             }
-            let condition = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                "IF condition is missing",
-            ))?;
+            let effective_shape = broadcast_shape(demand.shape, condition_shape).ok_or(
+                EvaluationFailure::InvalidExpression("incompatible condition shapes"),
+            )?;
+            let effective_mask = self.demand_mask_for_shape(demand, effective_shape)?;
+            let effective_mask = effective_mask
+                .map(|mask| self.install_shape_mask(mask))
+                .transpose()?
+                .flatten();
+            let effective_demand = ShapeDemand {
+                shape: effective_shape,
+                mask: effective_mask,
+            };
             if count == 1 {
                 return Ok(Some(LazyShapeChildren {
                     first: Some(condition),
                     second: None,
-                    first_mask: demand.mask,
+                    first_mask: effective_mask,
                     second_mask: None,
                     len: 1,
+                    shape: effective_shape,
                 }));
             }
-            let cells = self.demand_len(demand)?;
+            let cells = self.demand_len(effective_demand)?;
             let mut first_selected = false;
             let mut second_selected = false;
-            let mut first_mask = self.new_shape_mask(demand.shape)?;
-            let mut second_mask = self.new_shape_mask(demand.shape)?;
+            let mut first_mask = self.new_shape_mask(effective_shape)?;
+            let mut second_mask = self.new_shape_mask(effective_shape)?;
             for ordinal in 0..cells {
-                let index = self.demand_index(demand, ordinal)?;
+                let index = self.demand_index(effective_demand, ordinal)?;
                 self.charge_cell_work(index)?;
-                let value = self.evaluate_scalar_at(condition, demand.shape, index)?;
+                let value =
+                    self.condition_value_at(condition, condition_shape, effective_shape, index)?;
+                self.condition_cache_put(condition, effective_shape, index, &value)?;
                 match self.scalar_logical(value)? {
                     Ok(true) => {
                         first_selected = true;
@@ -3226,28 +3297,40 @@ where
                 first_mask: self.install_shape_mask(first_mask)?,
                 second_mask: self.install_shape_mask(second_mask)?,
                 len,
+                shape: effective_shape,
             }));
         }
         if name.eq_ignore_ascii_case("IFERROR") || name.eq_ignore_ascii_case("IFNA") {
             if node.child_count() != 2 {
                 return Ok(None);
             }
-            let value = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                "error handler value is missing",
-            ))?;
             let alternative = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
                 "error handler alternative is missing",
             ))?;
             let catches_not_available = name.eq_ignore_ascii_case("IFNA");
-            let cells = self.demand_len(demand)?;
-            let mut alternative_mask = self.new_shape_mask(demand.shape)?;
+            let effective_shape = broadcast_shape(demand.shape, condition_shape).ok_or(
+                EvaluationFailure::InvalidExpression("incompatible handler shapes"),
+            )?;
+            let effective_mask = self.demand_mask_for_shape(demand, effective_shape)?;
+            let effective_mask = effective_mask
+                .map(|mask| self.install_shape_mask(mask))
+                .transpose()?
+                .flatten();
+            let effective_demand = ShapeDemand {
+                shape: effective_shape,
+                mask: effective_mask,
+            };
+            let cells = self.demand_len(effective_demand)?;
+            let mut alternative_mask = self.new_shape_mask(effective_shape)?;
             let mut alternative_selected = false;
             for ordinal in 0..cells {
-                let index = self.demand_index(demand, ordinal)?;
+                let index = self.demand_index(effective_demand, ordinal)?;
                 self.charge_cell_work(index)?;
-                let value = self.evaluate_scalar_at(value, demand.shape, index)?;
+                let evaluated =
+                    self.condition_value_at(condition, condition_shape, effective_shape, index)?;
+                self.condition_cache_put(condition, effective_shape, index, &evaluated)?;
                 let caught = matches!(
-                    value,
+                    evaluated,
                     RuntimeValue::Scalar(WorkingValue::Error(error))
                         if !catches_not_available || error == ScalarError::NotAvailable
                 );
@@ -3262,203 +3345,10 @@ where
                 first_mask: None,
                 second_mask: self.install_shape_mask(alternative_mask)?,
                 len: usize::from(alternative_selected),
+                shape: effective_shape,
             }));
         }
         Ok(None)
-    }
-
-    fn static_if_selection(
-        &mut self,
-        condition: super::Node<'expr>,
-        has_else: bool,
-    ) -> EvaluationResult<Option<(bool, bool)>> {
-        let condition = self.unwrap_shape_parentheses(condition)?;
-        match condition.kind() {
-            super::Kind::Array(dimensions) => {
-                let Some(columns) = dimensions.columns() else {
-                    return Ok(None);
-                };
-                let rows = dimensions.rows();
-                if condition.child_count() != rows {
-                    return Ok(None);
-                }
-                let mut then_selected = false;
-                let mut else_selected = false;
-                let cells =
-                    rows.checked_mul(columns)
-                        .ok_or(EvaluationFailure::InvalidExpression(
-                            "lazy condition cell count overflow",
-                        ))?;
-                for index in 0..cells {
-                    self.charge_cell_work(index)?;
-                    let row = index / columns;
-                    let column = index % columns;
-                    let Some(row_node) = condition.child(row) else {
-                        return Ok(None);
-                    };
-                    if row_node.child_count() != columns {
-                        return Ok(None);
-                    }
-                    let Some(cell) = row_node.child(column) else {
-                        return Ok(None);
-                    };
-                    let Some(value) = self.static_logical_literal(cell)? else {
-                        return Ok(None);
-                    };
-                    match value {
-                        Ok(true) => then_selected = true,
-                        Ok(false) if has_else => else_selected = true,
-                        Ok(false) | Err(_) => {},
-                    }
-                }
-                Ok(Some((then_selected, else_selected)))
-            },
-            _ => {
-                let Some(value) = self.static_logical_literal(condition)? else {
-                    return Ok(None);
-                };
-                Ok(Some(match value {
-                    Ok(true) => (true, false),
-                    Ok(false) if has_else => (false, true),
-                    Ok(false) | Err(_) => (false, false),
-                }))
-            },
-        }
-    }
-
-    fn static_logical_literal(
-        &mut self,
-        root: super::Node<'expr>,
-    ) -> EvaluationResult<Option<Result<bool, ScalarError>>> {
-        let mut node = root;
-        let mut invert = false;
-        loop {
-            match node.kind() {
-                super::Kind::Parenthesized => {
-                    self.scalar.charge_work(1)?;
-                    node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                        "shape condition parentheses are empty",
-                    ))?;
-                },
-                super::Kind::Function { name }
-                    if name.eq_ignore_ascii_case("TRUE") || name.eq_ignore_ascii_case("FALSE") =>
-                {
-                    if node.child_count() != 0 {
-                        return Ok(Some(Err(ScalarError::Value)));
-                    }
-                    let value = name.eq_ignore_ascii_case("TRUE");
-                    return Ok(Some(Ok(if invert { !value } else { value })));
-                },
-                super::Kind::Function { name } if name.eq_ignore_ascii_case("NOT") => {
-                    if node.child_count() != 1 {
-                        return Ok(Some(Err(ScalarError::Value)));
-                    }
-                    invert = !invert;
-                    node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                        "shape NOT argument is missing",
-                    ))?;
-                },
-                super::Kind::Number => {
-                    let value = self.scalar.parse_number(node.text())?;
-                    let value = match scalar::logical(&mut self.scalar, scalar::Slot::Value(value))?
-                    {
-                        Ok(value) => Ok(if invert { !value } else { value }),
-                        Err(error) => Err(error),
-                    };
-                    return Ok(Some(value));
-                },
-                super::Kind::String => {
-                    let Some(value) = self.probe_scalar_atom(node)? else {
-                        return Ok(None);
-                    };
-                    let value = self.scalar_logical(value)?;
-                    return Ok(Some(match value {
-                        Ok(value) => Ok(if invert { !value } else { value }),
-                        Err(error) => Err(error),
-                    }));
-                },
-                super::Kind::Infix(operator)
-                    if !matches!(
-                        operator,
-                        super::InfixOperator::Range
-                            | super::InfixOperator::Intersection
-                            | super::InfixOperator::Union
-                    ) =>
-                {
-                    let Some(left) = node.child(0) else {
-                        return Ok(None);
-                    };
-                    let Some(right) = node.child(1) else {
-                        return Ok(None);
-                    };
-                    let Some(left) = self.probe_scalar_atom(left)? else {
-                        return Ok(None);
-                    };
-                    let Some(right) = self.probe_scalar_atom(right)? else {
-                        return Ok(None);
-                    };
-                    let left = self.value_to_slot(left)?;
-                    let right = self.value_to_slot(right)?;
-                    let value = self.scalar_apply_infix(operator, left, right)?;
-                    let value = self.scalar_logical(value)?;
-                    return Ok(Some(match value {
-                        Ok(value) => Ok(if invert { !value } else { value }),
-                        Err(error) => Err(error),
-                    }));
-                },
-                super::Kind::Error => {
-                    return Ok(Some(Err(parse_error(node.text()))));
-                },
-                super::Kind::Missing => return Ok(Some(Err(ScalarError::Value))),
-                super::Kind::Reference(Reference::Error) => {
-                    return Ok(Some(Err(ScalarError::Reference)));
-                },
-                super::Kind::Reference(_) => return Ok(None),
-                _ => return Ok(None),
-            }
-        }
-    }
-
-    fn probe_scalar_atom(
-        &mut self,
-        root: super::Node<'expr>,
-    ) -> EvaluationResult<Option<RuntimeValue<'expr>>> {
-        let mut node = root;
-        loop {
-            match node.kind() {
-                super::Kind::Parenthesized => {
-                    self.scalar.charge_work(1)?;
-                    node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                        "shape scalar parentheses are empty",
-                    ))?;
-                },
-                super::Kind::Number => {
-                    return Ok(Some(RuntimeValue::Scalar(
-                        self.scalar.parse_number(node.text())?,
-                    )));
-                },
-                super::Kind::String => {
-                    return Ok(Some(RuntimeValue::Scalar(
-                        self.scalar.parse_string(node.text())?,
-                    )));
-                },
-                super::Kind::Error => {
-                    self.scalar.charge_bytes(node.text().len())?;
-                    return Ok(Some(RuntimeValue::Scalar(WorkingValue::Error(
-                        parse_error(node.text()),
-                    ))));
-                },
-                super::Kind::Missing => {
-                    return Ok(Some(RuntimeValue::Missing));
-                },
-                super::Kind::Reference(reference)
-                    if Self::cacheable_condition_reference(reference) =>
-                {
-                    return self.probe_reference_value(node, reference).map(Some);
-                },
-                _ => return Ok(None),
-            }
-        }
     }
 
     fn evaluate_scalar_at(
@@ -3559,119 +3449,19 @@ where
         result
     }
 
-    fn probe_reference_value(
+    fn condition_value_at(
         &mut self,
-        node: super::Node<'expr>,
-        reference: &'expr Reference,
+        root: super::Node<'expr>,
+        condition_shape: Shape,
+        demand: Shape,
+        index: usize,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
-        if Self::cacheable_condition_reference(reference) {
-            if let Some(value) = self.demand_cache_get(node)? {
-                return Ok(value);
-            }
-        }
-        let value = self.reference_value(reference)?;
-        let value = self.project_scalar(value)?;
-        if Self::cacheable_condition_reference(reference) {
-            self.demand_cache_put(node, &value)?;
-        }
-        Ok(value)
-    }
-
-    fn static_error_selection(
-        &mut self,
-        root: super::Node<'expr>,
-        catches_not_available: bool,
-    ) -> EvaluationResult<Option<bool>> {
-        let node = self.unwrap_shape_parentheses(root)?;
-        match node.kind() {
-            super::Kind::Array(dimensions) => {
-                let Some(columns) = dimensions.columns() else {
-                    return Ok(None);
-                };
-                let rows = dimensions.rows();
-                if node.child_count() != rows {
-                    return Ok(None);
-                }
-                let cells =
-                    rows.checked_mul(columns)
-                        .ok_or(EvaluationFailure::InvalidExpression(
-                            "error condition cell count overflow",
-                        ))?;
-                let mut selected = false;
-                for index in 0..cells {
-                    self.charge_cell_work(index)?;
-                    let row = index / columns;
-                    let column = index % columns;
-                    let Some(row_node) = node.child(row) else {
-                        return Ok(None);
-                    };
-                    if row_node.child_count() != columns {
-                        return Ok(None);
-                    }
-                    let Some(cell) = row_node.child(column) else {
-                        return Ok(None);
-                    };
-                    let Some(error) = self.static_error_leaf(cell)? else {
-                        return Ok(None);
-                    };
-                    if self.error_is_caught(error, catches_not_available) {
-                        selected = true;
-                    }
-                }
-                Ok(Some(selected))
-            },
-            _ => Ok(self
-                .static_error_leaf(node)?
-                .map(|error| self.error_is_caught(error, catches_not_available))),
-        }
-    }
-
-    fn static_error_leaf(
-        &mut self,
-        root: super::Node<'expr>,
-    ) -> EvaluationResult<Option<StaticError>> {
-        let node = self.unwrap_shape_parentheses(root)?;
-        match node.kind() {
-            super::Kind::Error => Ok(Some(StaticError::Error(parse_error(node.text())))),
-            super::Kind::Number | super::Kind::String => Ok(Some(StaticError::NoError)),
-            super::Kind::Function { name }
-                if (name.eq_ignore_ascii_case("TRUE") || name.eq_ignore_ascii_case("FALSE"))
-                    && node.child_count() == 0 =>
-            {
-                Ok(Some(StaticError::NoError))
-            },
-            super::Kind::Missing => Ok(Some(StaticError::Error(ScalarError::Value))),
-            super::Kind::Reference(Reference::Error) => {
-                Ok(Some(StaticError::Error(ScalarError::Reference)))
-            },
-            super::Kind::Reference(_) => Ok(None),
-            _ => Ok(None),
-        }
-    }
-
-    fn error_is_caught(&self, error: StaticError, catches_not_available: bool) -> bool {
-        match error {
-            StaticError::NoError => false,
-            StaticError::Error(error) => {
-                !catches_not_available || error == ScalarError::NotAvailable
-            },
-        }
-    }
-
-    fn unwrap_shape_parentheses(
-        &mut self,
-        root: super::Node<'expr>,
-    ) -> EvaluationResult<super::Node<'expr>> {
-        let mut node = root;
-        loop {
-            if !matches!(node.kind(), super::Kind::Parenthesized) {
-                return Ok(node);
-            }
-            self.scalar.charge_work(1)?;
-            node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
-                "shape parentheses are empty",
-            ))?;
-        }
+        let Some(condition_index) = projected_array_index(condition_shape, demand, index) else {
+            let value = RuntimeValue::Scalar(WorkingValue::Error(ScalarError::NotAvailable));
+            self.condition_cache_put(root, demand, index, &value)?;
+            return Ok(value);
+        };
+        self.evaluate_scalar_at(root, condition_shape, condition_index)
     }
 
     fn reference_shape_hint(

@@ -1740,6 +1740,145 @@ fn nested_if_selected_branches_broadcast_to_their_combined_shape() {
 }
 
 #[test]
+fn independently_evaluated_views_compare_structurally_in_source_order() {
+    for (left, right, equal) in [
+        ("={1;2}", "={1;2}", true),
+        ("={1;2}", "={1;3}", false),
+        ("={1;2}", "={1|2}", false),
+        ("=([.A1]~[.B1])", "=([.A1]~[.B1])", true),
+        ("=([.A1]~[.B1])", "=([.B1]~[.A1])", false),
+        ("=([.A1]~[.A1])", "=([.A1]~[.B1])", false),
+    ] {
+        let resolver = FixtureResolver::new();
+        let (_budget, _cancellation, execution) = make_execution("ods-value-view-equality");
+        let left_expression = parse(left);
+        let right_expression = parse(right);
+        let limits = Limits::default();
+        let left_value = evaluate_at(
+            &left_expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &limits,
+        )
+        .expect("left evaluation");
+        let right_value = evaluate_at(
+            &right_expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &limits,
+        )
+        .expect("right evaluation");
+        assert_eq!(
+            left_value.value() == right_value.value(),
+            equal,
+            "{left} vs {right}"
+        );
+    }
+}
+
+#[test]
+fn reference_geometry_admission_precedes_matrix_and_scalar_cell_reads() {
+    for mode in [Mode::Matrix, Mode::Scalar] {
+        let mut resolver = FixtureResolver::new();
+        resolver.set("Main", 3, 0, FixtureCell::Number(7.0));
+        let (budget, _cancellation, execution) = make_execution("ods-reference-admission");
+        let expression = parse("=[.A1:.A8]");
+        let error = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            3,
+            0,
+            mode,
+            &Limits::default().with_max_reference_cells(1),
+        )
+        .expect_err("full reference geometry exceeds admission limit");
+        assert!(matches!(error, EvaluationFailure::ResourceLimit(limit)
+            if limit.resource == Resource::Objects && limit.observed == 8 && limit.limit == 1));
+        assert_eq!(resolver.reads(), 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        let result = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            3,
+            0,
+            mode,
+            &Limits::default()
+                .with_max_reference_cells(8)
+                .with_max_array_cells(1),
+        )
+        .expect("admitted reference needs no array materialization");
+        match mode {
+            Mode::Matrix => {
+                assert!(matches!(result.value(), Value::Reference(_)));
+                assert_eq!(resolver.reads(), 0);
+            },
+            Mode::Scalar => {
+                assert_eq!(result.value(), Value::Number(7.0));
+                assert_eq!(resolver.reads(), 1);
+            },
+            _ => unreachable!("the fixture enumerates only matrix and scalar modes"),
+        }
+    }
+}
+
+#[test]
+fn composed_array_conditions_keep_shape_through_operators_and_lazy_handlers() {
+    let cases: [(&str, &[f64]); 4] = [
+        (
+            "=IF({TRUE()};IF(({TRUE();FALSE()}+0)=1;7;9);0)",
+            &[7.0, 9.0],
+        ),
+        (
+            "=IF({TRUE()};IF(IF({TRUE();TRUE()};TRUE();[Missing.A1:.Z100]);7;9);0)",
+            &[7.0, 7.0],
+        ),
+        (
+            "=IF({TRUE()};IF(IFERROR({TRUE();#DIV/0!};FALSE());7;9);0)",
+            &[7.0, 9.0],
+        ),
+        (
+            "=IF({TRUE()};IF(IFNA({TRUE();#N/A};FALSE());7;9);0)",
+            &[7.0, 9.0],
+        ),
+    ];
+    for (formula, expected) in cases {
+        let mut resolver = FixtureResolver::new();
+        resolver.fail_missing_metadata();
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-composed-array-condition");
+        let expression = parse(formula);
+        let result = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &Limits::default(),
+        )
+        .unwrap_or_else(|error| panic!("{formula}: {error}"));
+        let array = result.as_array().expect("composed condition result array");
+        assert_eq!(
+            (array.shape().rows(), array.shape().columns()),
+            (1, 2),
+            "{formula}",
+        );
+        assert_array_numbers(array, expected);
+        assert_eq!(resolver.reads(), 0, "{formula}");
+        assert_eq!(resolver.missing_metadata_calls(), 0, "{formula}");
+    }
+}
+
+#[test]
 fn computed_nested_conditions_preserve_selected_shape_without_metadata_probe() {
     // A computed scalar comparison must still let the selected nested array
     // contribute its shape.  The unreachable reference is configured to fail
