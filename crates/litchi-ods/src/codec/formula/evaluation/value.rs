@@ -1442,6 +1442,20 @@ struct ConditionCacheShape {
     shape: Shape,
 }
 
+/// Result of looking up one condition coordinate.
+///
+/// `key` is the canonical source coordinate to use if the value has to be
+/// evaluated and cached.  It is absent when the requested coordinate lies
+/// outside the source shape already established for this condition.  Such a
+/// coordinate must still be evaluated (it may be a real error value), but it
+/// must not be inserted under the consumer's widened demand shape: that
+/// would turn an out-of-shape `#N/A` into a cache entry for later output
+/// coordinates.
+struct ConditionCacheLookup<'a> {
+    value: Option<RuntimeValue<'a>>,
+    key: Option<(Shape, usize)>,
+}
+
 #[derive(Clone, Copy)]
 enum ConditionCacheValue<'a> {
     Empty,
@@ -1809,7 +1823,7 @@ where
 
     fn visit(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
         if let Some((demand, index)) = self.projection {
-            if let Some(value) = self.condition_cache_get(node, demand, index)? {
+            if let Some(value) = self.condition_cache_get(node, demand, index)?.value {
                 return self.push_value(value);
             }
         }
@@ -2687,39 +2701,52 @@ where
         node: super::Node<'expr>,
         demand: Shape,
         index: usize,
-    ) -> EvaluationResult<Option<RuntimeValue<'expr>>> {
-        if self.condition_cache.is_empty() {
-            return Ok(None);
-        }
+    ) -> EvaluationResult<ConditionCacheLookup<'expr>> {
         let (shape_position, shape_present) =
             self.condition_cache_shape_position(node.arena_index())?;
-        let source_shape = if shape_present {
-            Some(self.condition_cache_shapes[shape_position].shape)
+        let key = if shape_present {
+            let source_shape = self.condition_cache_shapes[shape_position].shape;
+            let Some(source_index) = projected_array_index(source_shape, demand, index) else {
+                // Do not fall back to the consumer coordinate here.  A raw
+                // entry under that coordinate could be an alias created by
+                // a widened demand, and an out-of-shape value is not a
+                // source coordinate that can be reused safely.
+                return Ok(ConditionCacheLookup {
+                    value: None,
+                    key: None,
+                });
+            };
+            (source_shape, source_index)
         } else {
-            None
+            (demand, index)
         };
-        let (demand, index) = source_shape
-            .and_then(|shape| {
-                projected_array_index(shape, demand, index).map(|index| (shape, index))
-            })
-            .unwrap_or((demand, index));
-        let (position, present) = self.condition_cache_position(node, demand, index)?;
+        let (position, present) = self.condition_cache_position(node, key.0, key.1)?;
         if !present {
-            return Ok(None);
+            return Ok(ConditionCacheLookup {
+                value: None,
+                key: Some(key),
+            });
         }
         let value = self.condition_cache[position].value;
-        Ok(Some(match value {
-            ConditionCacheValue::Empty => RuntimeValue::Empty,
-            ConditionCacheValue::Missing => RuntimeValue::Missing,
-            ConditionCacheValue::Number(value) => RuntimeValue::Scalar(WorkingValue::Number(value)),
-            ConditionCacheValue::Logical(value) => {
-                RuntimeValue::Scalar(WorkingValue::Logical(value))
-            },
-            ConditionCacheValue::Text(value) => {
-                RuntimeValue::Scalar(WorkingValue::Text(TextValue::borrowed(value)))
-            },
-            ConditionCacheValue::Error(error) => RuntimeValue::Scalar(WorkingValue::Error(error)),
-        }))
+        Ok(ConditionCacheLookup {
+            value: Some(match value {
+                ConditionCacheValue::Empty => RuntimeValue::Empty,
+                ConditionCacheValue::Missing => RuntimeValue::Missing,
+                ConditionCacheValue::Number(value) => {
+                    RuntimeValue::Scalar(WorkingValue::Number(value))
+                },
+                ConditionCacheValue::Logical(value) => {
+                    RuntimeValue::Scalar(WorkingValue::Logical(value))
+                },
+                ConditionCacheValue::Text(value) => {
+                    RuntimeValue::Scalar(WorkingValue::Text(TextValue::borrowed(value)))
+                },
+                ConditionCacheValue::Error(error) => {
+                    RuntimeValue::Scalar(WorkingValue::Error(error))
+                },
+            }),
+            key: Some(key),
+        })
     }
 
     fn condition_cache_put(
@@ -3658,7 +3685,8 @@ where
         demand: Shape,
         index: usize,
     ) -> EvaluationResult<RuntimeValue<'expr>> {
-        if let Some(value) = self.condition_cache_get(root, demand, index)? {
+        let cache_lookup = self.condition_cache_get(root, demand, index)?;
+        if let Some(value) = cache_lookup.value {
             return Ok(value);
         }
         let position = self.offset_position(index, demand)?;
@@ -3715,9 +3743,12 @@ where
             .run_from(probe_root)
             .and_then(|value| self.project_scalar(value));
         let result = match result {
-            Ok(value) => self
-                .condition_cache_put(root, demand, index, &value)
-                .map(|()| value),
+            Ok(value) => match cache_lookup.key {
+                Some((cache_demand, cache_index)) => self
+                    .condition_cache_put(root, cache_demand, cache_index, &value)
+                    .map(|()| value),
+                None => Ok(value),
+            },
             Err(error) => Err(error),
         };
 
