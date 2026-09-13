@@ -1,0 +1,9 @@
+crates/litchi-ods/src/authoring/mutable.rs: OK
+crates/litchi-ods/src/facade/mod.rs: OK
+crates/litchi-ods/src/facade/source.rs: OK
+crates/litchi-ods/src/model/dde/lexical.rs: OK
+crates/litchi-ods/src/model/dde/source_backed.rs: OK
+crates/litchi-ods/src/model/dde/transaction.rs: OK
+crates/litchi-ods/src/model/dde.rs: OK
+crates/litchi-ods/tests/ods_dde_facades.rs: OK
+crates/litchi-ods/tests/ods_dde_transactions.rs: OK

@@ -1,0 +1,40 @@
+{
+  "content_sha256": "c325938c04decebaf32eb0296ade4189a9da3a5d7d8df50c50e8db3659d631b8",
+  "schema_sha256": "4034ec6be29205d5fc1ee5f42468ac6ef824287b3aba6d9289032af4fafbda7f",
+  "whole_content_valid": true,
+  "whole_content_diagnostics": [],
+  "owners": [
+    {
+      "definition": "office-dde-source",
+      "ordinal": 0,
+      "valid": true,
+      "diagnostics": []
+    },
+    {
+      "definition": "office-dde-source",
+      "ordinal": 1,
+      "valid": true,
+      "diagnostics": []
+    },
+    {
+      "definition": "table-dde-links",
+      "ordinal": 0,
+      "valid": true,
+      "diagnostics": []
+    }
+  ],
+  "cache_semantics": [
+    {
+      "ordinal": 0,
+      "valid": true,
+      "diagnostics": [],
+      "reference": "ODF 1.4 Part 3 14.7.4"
+    },
+    {
+      "ordinal": 1,
+      "valid": true,
+      "diagnostics": [],
+      "reference": "ODF 1.4 Part 3 14.7.4"
+    }
+  ]
+}

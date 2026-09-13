@@ -1,0 +1,10 @@
+[package]
+name = "ods-dde-profile"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-ods = { path = "../../../../../crates/litchi-ods" }

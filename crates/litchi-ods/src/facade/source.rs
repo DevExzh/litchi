@@ -414,6 +414,43 @@ impl SourceBackedSpreadsheet {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
+    /// Capture inert DDE metadata bound to this live source owner.
+    ///
+    /// The returned snapshot supports exact-source edits and sequential package
+    /// publication. DDE declarations and cached data are never refreshed.
+    pub fn dde(&self) -> Result<crate::dde::SourceSnapshot<'_>> {
+        crate::dde::SourceSnapshot::from_owner(
+            self,
+            crate::dde::Limits::default(),
+            &crate::dde::default_context(),
+            false,
+        )
+    }
+
+    /// Capture source-bound DDE metadata under explicit limits and context.
+    pub fn dde_with(
+        &self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::dde::SourceSnapshot<'_>> {
+        crate::dde::SourceSnapshot::from_owner(self, limits, context, true)
+    }
+
+    /// Begin an inert DDE metadata edit against this live source.
+    pub fn edit_dde(&self) -> Result<crate::dde::SourceEdit<'_>> {
+        self.dde()?.edit()
+    }
+
+    /// Apply a DDE patch against this owner's current metadata snapshot.
+    ///
+    /// The patch must belong to this live owner and match its exact source XML.
+    pub fn apply_dde_patch<'source>(
+        &'source self,
+        patch: &crate::dde::SourcePatch<'source>,
+    ) -> Result<crate::dde::SourceCommit<'source>> {
+        patch.apply(&self.dde()?)
+    }
+
     /// Capture source-bound, inert scenario declarations without applying
     /// values, evaluating formulas, or refreshing external data.
     pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {

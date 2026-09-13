@@ -1,0 +1,104 @@
+utc=2026-09-13T03:52:22.867080+00:00
+pid=2285153
+[/proc/loadavg]
+2.07 1.60 1.82 1/1520 2285153
+
+[/proc/meminfo]
+MemTotal:       129447068 kB
+MemFree:        23637612 kB
+MemAvailable:   68033804 kB
+[lscpu]
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  32
+On-line CPU(s) list:                     0-31
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD EPYC 9R45
+CPU family:                              26
+Model:                                   2
+Thread(s) per core:                      1
+Core(s) per socket:                      32
+Socket(s):                               1
+Stepping:                                1
+BogoMIPS:                                5200.00
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d
+Hypervisor vendor:                       KVM
+Virtualization type:                     full
+L1d cache:                               1.5 MiB (32 instances)
+L1i cache:                               1 MiB (32 instances)
+L2 cache:                                32 MiB (32 instances)
+L3 cache:                                128 MiB (4 instances)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-31
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP disabled; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+
+[top-cpu]
+    PID PSR %CPU %MEM STAT COMMAND         COMMAND
+2285152  27 50.0  0.0 Ss   bash            /bin/bash -c python3 - <<'PY' from pathlib import Path from datetime import datetime, timezone import os, subprocess root=Path('docs/report/spec-gap-validation-evidence/ods-dde-transactions/baseline') now=datetime.now(timezone.utc).isoformat() lines=[f'utc={now}',f'pid={os.getpid()}'] for path in ('/proc/loadavg','/proc/meminfo'):  d=Path(path).read_text()  if path=='/proc/meminfo': d='\n'.join(x for x in d.splitlines() if x.startswith(('MemTotal:','MemAvailable:','MemFree:')))  lines += [f'[{path}]',d] try: lines += ['[lscpu]',subprocess.check_output(['lscpu'],text=True,stderr=subprocess.STDOUT)] except Exception as e: lines += [f'lscpu_error={e!r}'] try: lines += ['[top-cpu]',subprocess.check_output(['ps','-eo','pid,psr,pcpu,pmem,stat,comm,args','--sort=-pcpu'],text=True,stderr=subprocess.STDOUT)[:12000]] except Exception as e: lines += [f'ps_error={e!r}'] (root/'host-start.txt').write_text('\n'.join(lines)+'\n') (root/'host-run-start.txt').write_text('\n'.join(lines)+'\n') print(now) PY sha256sum /var/tmp/ods-dde-baseline-target/release/ods-dde-profile 2>/dev/null || true cat docs/report/spec-gap-validation-evidence/ods-dde-transactions/baseline/build-final.status
+2285153  12 50.0  0.0 S    python3         python3 -
+ 984164  27 11.1  0.8 Sl   MainThread      /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/bootstrap-fork --type=fileWatcher
+1637553  20  3.4  0.5 Sl+  codex           codex --yolo
+1636218  31  2.2  0.8 Sl+  codex           codex --yolo resume 01a09123-b7df-7022-b34a-b3ef1e911be4
+ 560353   2  1.2  0.0 Sl   peculiar_shell  /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=gpu-process --gpu-recent-crash-count=0 --no-sandbox --headless=old --ozone-platform=headless --use-angle=swiftshader-webgl --enable-unsafe-swiftshader --gpu-preferences=YAAAAAAAAAAgAAAEAAAAAAAAAAAAAGAASAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAMAAAAAQAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190708988185955192
+1280864  10  0.9  0.0 Ssl+ lazygit         /home/zhuhe/go/bin/lazygit
+   2276  31  0.9  0.0 Ss   tmux: server    tmux new -s office
+ 560330  28  0.8  0.0 Ssl  peculiar_shell  /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --peculiar-browser-child --disable-background-networking --disable-quic --proxy-server=127.0.0.1:33165 --disable-features=DnsOverHttpsUpgrade --host-resolver-rules=MAP * ^NOTFOUND, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE <loopback> --disable-component-update --disable-default-apps --disable-sync --enable-unsafe-swiftshader --enable-features=PeculiarOnDemandSoftwareDisplay --enable-bfcache --metrics-recording-only --no-default-browser-check --no-first-run --no-sandbox --no-system-proxy-config-service --enable-unsafe-webgpu --window-size=1920x1080
+2278814  29  0.6  0.1 Sl   MainThread      node /home/zhuhe/.npm/_npx/99336612077b7094/node_modules/.bin/xcodebuildmcp mcp
+ 985679  11  0.5  0.0 Sl   peculiar_shell  /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=renderer --headless=old --no-sandbox --enable-unsafe-webgpu --allow-pre-commit-input --ozone-platform=headless --disable-gpu-compositing --lang=en-US@posix --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=68 --launch-time-ticks=27709959429 --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190709050030717226
+ 159285  15  0.4  0.3 Sl+  kimi-code       kimi-code
+ 409803   7  0.3  0.0 S    run-pipeline3   /usr/local/bin/python3.9 /usr/local/bin/run-pipeline3 --disable-web-server pipeline.py --concurrent 5 DevExzh
+2278723   0  0.2  0.0 Sl   npm exec xcodeb npm exec xcodebuildmcp@latest mcp
+1629327   7  0.2  0.0 Ssl  nvim            nvim --embed .
+    249   8  0.2  0.0 S    kswapd0         [kswapd0]
+ 163348  22  0.2  0.0 Ss   nvim            nvim --embed .
+2284744   6  0.1  0.0 S    wget-at         ./wget-at -nv --no-hsts --host-lookups dns --hosts-file /dev/null --resolvconf-file /dev/null --dns-servers 9.9.9.10,149.112.112.10,2620:fe::10,2620:fe::fe:10 --reject-reserved-subnets --content-on-error --lua-script sinavideo.lua -o /grab/data/17892715228d7449b33b82483a-11956/d1264a7928d1d82643ba1550cc9e6256fed2e8bc/wget.log --output-document /grab/data/17892715228d7449b33b82483a-11956/d1264a7928d1d82643ba1550cc9e6256fed2e8bc/wget.tmp --truncate-output -e robots=off --recursive --level=inf --no-parent --page-requisites --timeout 60 --connect-timeout 10 --tries inf --domains iask.com,sina.cn,sina.com,sina.com.cn,sina.net,sina.net.cn,sinaapp.com,sinacloud.net,sincloud.net,sinaedge.com,sinaimg.cn,sinajs.cn,weibo.cn,weibo.com,weibo.com.cn,weibocdn.com --span-hosts --waitretry 30 --warc-file /grab/data/17892715228d7449b33b82483a-11956/d1264a7928d1d82643ba1550cc9e6256fed2e8bc/sinavideo-d1264a7928d1d82643ba1550cc9e6256fed2e8bc-20260913-035202 --warc-header operator: Archive Team --warc-header x-wget-at-project-version: 20260911.01 --warc-header x-wget-at-project-name: sinavideo --warc-dedup-url-agnostic --impersonate firefox148-h1 --header Accept-Encoding: identity --user-agent Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:148.0) Gecko/20100101 Firefox/148.0 --warc-header x-wget-at-project-item-name: video:233122459 item-name://video:233122459 --warc-header sinavideo-video: 233122459 https://api.ivideo.sina.com.cn/public/video/info?video_id=233122459&appname=sinaplayer_pc&appver=V11220.210521.03&applt=web&tags=sinaplayer_pc
+ 160297   3  0.1  0.0 Sl   code-08d4889f9e /home/zhuhe/.vscode-server/code-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5 command-shell --cli-data-dir /home/zhuhe/.vscode-server/cli --parent-process-id 160279 --on-host=127.0.0.1 --on-port
+ 984149   7  0.1  0.1 Sl   MainThread      /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node --dns-result-order=ipv4first /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/bootstrap-fork --type=extensionHost --transformURIs --useHostProxy=false
+1639013   1  0.1  0.0 Sl   codex-code-mode /home/zhuhe/.codex/packages/standalone/releases/0.154.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host
+    224   8  0.1  0.0 S    kcompactd0      [kcompactd0]
+2203705  15  0.0  0.0 I    kworker/u130:3- [kworker/u130:3-events_unbound]
+ 160429   3  0.0  0.1 Sl   MainThread      /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/server-main.js --connection-token=remotessh --accept-server-license-terms --agent-host-bridge-port=34263 --agent-host-bridge-host=127.0.0.1 --agent-host-bridge-connection-token=d07ba42c-c27f-4949-b74e-6778ed84ca5d --start-server --enable-remote-auto-shutdown --socket-path=/tmp/code-193ac877-cb3f-4dd4-8a57-a67c3eacebd1
+1637356   8  0.0  0.0 Sl   codex-code-mode /home/zhuhe/.codex/packages/standalone/releases/0.154.0-x86_64-unknown-linux-musl/bin/codex-code-mode-host
+   1276  16  0.0  0.0 Ssl  containerd      /usr/bin/containerd
+   2146  24  0.0  0.0 S    sshd-session    sshd-session: zhuhe@pts/0
+2162228  19  0.0  0.0 I    kworker/u131:3- [kworker/u131:3-events_unbound]
+2191857  29  0.0  0.0 I    kworker/u132:3- [kworker/u132:3-events_unbound]
+2157022   3  0.0  0.1 Sl   MainThread      node /home/zhuhe/.npm/_npx/99336612077b7094/node_modules/.bin/xcodebuildmcp mcp
+     16   9  0.0  0.0 I    rcu_sched       [rcu_sched]
+ 463387   2  0.0  0.0 Sl   peculiar_shell  /home/zhuhe/code/peculiar/target/peculiar-linux-x64/peculiar_shell
+   1391  23  0.0  0.0 Ssl  dockerd         /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+2205683  21  0.0  0.0 I    kworker/u131:1- [kworker/u131:1-events_unbound]
+2147074  15  0.0  0.0 I    kworker/u130:1- [kworker/u130:1-flush-259:0]
+2222730  30  0.0  0.0 I    kworker/u132:1- [kworker/u132:1-events_unbound]
+ 160625   2  0.0  0.0 Sl   MainThread      /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/node /home/zhuhe/.vscode-server/cli/servers/Stable-08d4889f9ec4a1685d257b9b95de036c8e1ce1e5/server/out/bootstrap-fork --type=ptyHost --logsPath /home/zhuhe/.vscode-server/data/logs/20260911T064718
+    472  12  0.0  0.0 Ss   systemd-resolve /usr/lib/systemd/systemd-resolved
+2101347  31  0.0  0.1 Sl   MainThread      node /home/zhuhe/.npm/_npx/99336612077b7094/node_modules/.bin/xcodebuildmcp mcp
+2092439  30  0.0  0.1 Sl   MainThread      node /home/zhuhe/.npm/_npx/99336612077b7094/node_modules/.bin/xcodebuildmcp mcp
+2192876   1  0.0  0.0 I    kworker/u129:0- [kworker/u129:0-events_unbound]
+ 560378  25  0.0  0.0 Sl   peculiar_shell  /home/zhuhe/code/peculiar/target/tmp-service/peculiar-runtime-SPF2PM/peculiar_shell --type=utility --utility-sub-type=network.mojom.NetworkService --lang=en-US@posix --service-sandbox-type=none --host-resolver-rules=MAP * ^NOTFOUND, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE <loopback> --no-sandbox --use-angle=swiftshader-webgl --use-gl=angle --disable-quic --headless=old --shared-files --field-trial-handle=3,i,17875282983276018628,2709091972832008174,262144 --enable-features=PeculiarOnDemandSoftwareDisplay --disable-features=DnsOverHttpsUpgrade,PaintHolding --variations-seed-version --pseudonymization-salt-handle=7,i,11458559994724806018,9062978855751633139,4 --trace-process-track-uuid=3190708989122997041
+2176848  22  0.0  0.0 I    kworker/u131:0- [kworker/u131:0-writeback]
+2076997  11  0.0  0.0 I    kworker/u130:0- [kworker/u130:0-events_unbound]
+2157007  19  0.0  0.0 Sl   npm exec xcodeb npm exec xcodebuildmcp@latest mcp
+2019806  10  0.0  0.1 Sl   MainThread      node /home/zhuhe/.npm/_npx/99336612077b7094/node_modules/.bin/xcodebuildmcp mcp
+2029226   7  0.0  0.1 Sl   MainThread      node /home/zhuhe/.npm/_npx/99336612077b7094/node_modules/.bin/xcodebuildmcp mcp
+2271753  19  0.0  0.0 S    wget-at         ./wget-at -nv --no-hsts --host-lookups dns --hosts-file /dev/null --resolvconf-file /dev/null --dns-servers 9.9.9.10,149.112.112.10,2620:fe::10,2620:fe::fe:10 --reject-reserved-subnets --content-on-error --lua-script sinavideo.lua -o /grab/data/17892712531c4a1ef02b78f50a-11953/fecf08dd7742e1937cf8aecdf964d33730e29189/wget.log --output-document /grab/data/17892712531c4a1ef02b78f50a-11953/fecf08dd7742e1937cf8aecdf964d33730e29189/wget.tmp --truncate-output -e robots=off --recursive --level=inf --no-parent --page-requisites --timeout 60 --connect-timeout 10 --tries inf --domains iask.com,sina.cn,sina.com,sina.com.cn,sina.net,sina.net.cn,sinaapp.com,sinacloud.net,sincloud.net,sinaedge.com,sinaimg.cn,sinajs.cn,weibo.cn,weibo.com,weibo.com.cn,weibocdn.com --span-hosts --waitretry 30 --warc-file /grab/data/17892712531c4a1ef02b78f50a-11953/fecf08dd7742e1937cf8aecdf964d33730e29189/sinavideo-fecf08dd7742e1937cf8aecdf964d33730e29189-20260913-034733 --warc-header operator: Archive Team --warc-header x-wget-at-project-version: 20260911.01 --warc-header x-wget-at-project-name: sinavideo --warc-dedup-url-agnostic --impersonate firefox148-h1 --header Accept-Encoding: identity --user-agent Mozill

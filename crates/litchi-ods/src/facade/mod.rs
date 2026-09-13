@@ -454,11 +454,93 @@ impl Spreadsheet {
     /// Returns an error when the content XML has invalid or over-budget DDE
     /// metadata.
     pub fn dde(&self) -> Result<crate::dde::Snapshot> {
-        crate::dde::Snapshot::parse(self.package.content_xml()).map_err(|error| {
-            litchi_core::Error::InvalidFormat(format!(
-                "ODS DDE metadata inspection failed: {error}"
-            ))
-        })
+        crate::dde::Snapshot::parse(self.package.content_xml()).map_err(Into::into)
+    }
+
+    /// Capture inert DDE declarations and cached tables under explicit limits.
+    pub fn dde_with(
+        &self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+    ) -> Result<crate::dde::Snapshot> {
+        crate::dde::Snapshot::parse_with_context(self.package.content_xml(), limits, context)
+            .map_err(Into::into)
+    }
+
+    /// Stage and publish a failure-atomic DDE metadata transaction.
+    ///
+    /// Sources remain inert; publication never refreshes cached data.
+    pub fn edit_dde<F>(&mut self, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        self.edit_dde_with_context(
+            crate::dde::Limits::default(),
+            &crate::dde::default_context(),
+            update,
+        )
+    }
+
+    /// Edit DDE metadata with explicit parsing, staging, and readback budgets.
+    ///
+    /// Package replacement and facade rehydration use the package policy. The
+    /// supplied context is checked after rehydration and before publication.
+    pub fn edit_dde_with_context<F>(
+        &mut self,
+        limits: crate::dde::Limits,
+        context: &litchi_core::ExecutionContext,
+        update: F,
+    ) -> Result<()>
+    where
+        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+    {
+        let snapshot = self.dde_with(limits, context)?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit(context)?;
+        if commit.changed() {
+            self.ensure_dde_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            let candidate = Self::from_package(package)?;
+            context.check().map_err(map_sheet_metadata_execution)?;
+            *self = candidate;
+        }
+        Ok(())
+    }
+
+    /// Apply an exact-source DDE patch and rehydrate the accepted package.
+    pub fn apply_dde_patch(&mut self, patch: &crate::dde::Patch) -> Result<()> {
+        let context = crate::dde::default_context();
+        let snapshot = self.dde_with(crate::dde::Limits::default(), &context)?;
+        let commit = patch.apply(&snapshot)?;
+        if commit.changed() {
+            self.ensure_dde_publication_allowed()?;
+            let package = self
+                .package
+                .replace_content_xml(commit.snapshot().source_xml())?;
+            let candidate = Self::from_package(package)?;
+            context.check().map_err(map_sheet_metadata_execution)?;
+            *self = candidate;
+        }
+        Ok(())
+    }
+
+    fn ensure_dde_publication_allowed(&self) -> Result<()> {
+        if self
+            .package
+            .package()
+            .files()?
+            .into_iter()
+            .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path))
+        {
+            return Err(litchi_core::Error::Unsupported(
+                "signed-source refusal: changed ODS DDE metadata requires explicit unsign/resign policy"
+                    .to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Inspect typed scenario declarations without applying their values.
