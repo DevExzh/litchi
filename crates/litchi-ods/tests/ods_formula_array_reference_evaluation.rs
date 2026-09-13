@@ -413,6 +413,40 @@ fn left_associated_duplicate_unions_keep_order_and_use_linear_work() {
 }
 
 #[test]
+fn large_union_geometry_planning_stays_within_default_work_budget() {
+    const COUNT: usize = 4_096;
+    let union = repeated_union_source(&["[.A1]"], COUNT);
+    let union_body = union
+        .strip_prefix('=')
+        .expect("repeated union source starts with an equals sign");
+    let source = format!("=IF({{TRUE()}};({union_body}:[.A1]);0)");
+    let expression = parse(&source);
+    let resolver = FixtureResolver::new();
+    let (budget, _cancellation, execution) = make_execution("ods-formula-value-large-union-shape");
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &Limits::default(),
+    )
+    .unwrap_or_else(|error| panic!("large union geometry should stay bounded: {error}"));
+    let array = result
+        .as_array()
+        .expect("the collapsed one-cell range should materialize as an array");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (1, 1));
+    assert!(matches!(array.get(0), Some(Value::Empty)));
+    assert_eq!(resolver.reads(), 1);
+    let work = budget.used(Resource::Work);
+    assert!(
+        work <= (COUNT as u64).saturating_mul(128).saturating_add(65_536),
+        "large union shape planning used {work} work units"
+    );
+}
+
+#[test]
 fn union_cell_limit_includes_intersection_left_operand_before_provider_reads() {
     let resolver = FixtureResolver::new();
     let (budget, _cancellation, execution) =
@@ -668,6 +702,204 @@ fn scalar_condition_broadcast_over_reference_shape_does_not_consume_alias_stack(
     );
     let expected_order: Vec<_> = (0..ROWS).map(|row| ("Main".to_owned(), row, 0)).collect();
     assert_eq!(resolver.read_order(), expected_order);
+}
+
+#[test]
+fn if_without_a_branch_keeps_reference_operand_refusal_typed() {
+    for source in ["=([.A1]:IF(TRUE()))", "=IF({TRUE()};([.A1]:IF(TRUE()));0)"] {
+        let mut resolver = FixtureResolver::new();
+        resolver.set("Main", 0, 0, FixtureCell::Number(10.0));
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-if-single-condition-reference");
+        let expression = parse(source);
+        let error = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &Limits::default(),
+        )
+        .expect_err("a scalar IF result is a typed reference-operator refusal");
+        assert!(
+            matches!(
+                error,
+                EvaluationFailure::Unsupported(UnsupportedKind::ReferenceOperator)
+            ),
+            "{source:?} returned {error:?}"
+        );
+    }
+}
+
+#[test]
+fn matrix_reference_operator_operands_keep_their_typed_refusal() {
+    for operand in [
+        "IF({TRUE();FALSE()};[.C1:.D1];[.E1:.F1])",
+        "IFERROR({#DIV/0!;1};[.C1:.D1])",
+        "IFNA({#N/A;1};[.C1:.D1])",
+        "IF({TRUE()};[.C1:.D1];0)",
+        "IFERROR([.C1:.D1];0)",
+        "IFNA([.C1:.D1];0)",
+    ] {
+        for source in [
+            format!("=([.A1]:{operand})"),
+            format!("=IF({{TRUE()}};([.A1]:{operand});[Missing.A1:.Z100])"),
+        ] {
+            let mut resolver = FixtureResolver::new();
+            resolver.fail_missing_metadata();
+            let (_budget, _cancellation, execution) =
+                make_execution("ods-formula-value-matrix-reference-operand");
+            let expression = parse(&source);
+            let error = evaluate_at(
+                &expression,
+                &resolver,
+                &execution,
+                0,
+                0,
+                Mode::Matrix,
+                &Limits::default(),
+            )
+            .expect_err("matrix results must not be coerced into reference operands");
+            assert!(
+                matches!(
+                    error,
+                    EvaluationFailure::Unsupported(UnsupportedKind::ReferenceOperator)
+                ),
+                "{source:?} returned {error:?}"
+            );
+            assert_eq!(
+                resolver.missing_metadata_calls(),
+                0,
+                "unselected Missing branch was inspected for {source:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn finite_inner_condition_does_not_cache_out_of_shape_broadcast_positions() {
+    const ROWS: usize = 33;
+    let mut resolver = FixtureResolver::new();
+    resolver.sheets[0].1 = SheetExtent::new(ROWS, 8);
+    for row in 0..ROWS {
+        resolver.set("Main", row, 1, FixtureCell::Number((100 + row) as f64));
+    }
+    let (_budget, _cancellation, execution) =
+        make_execution("ods-formula-value-finite-condition-alias");
+    let expression = parse("=IF({TRUE();FALSE()};IF(IF({TRUE()|TRUE()};1;0);1;2);[.B1:.B33])");
+    let limits = Limits::default()
+        .with_max_array_cells(66)
+        .with_max_stack_entries(32);
+    let result = evaluate_at(
+        &expression,
+        &resolver,
+        &execution,
+        0,
+        0,
+        Mode::Matrix,
+        &limits,
+    )
+    .expect("finite condition shape should not require per-output aliases");
+    let array = result.as_array().expect("broadcast result array");
+    assert_eq!((array.shape().rows(), array.shape().columns()), (ROWS, 2));
+    for row in 0..ROWS {
+        if row < 2 {
+            assert_number(array.get(row * 2).expect("true-column value"), 1.0);
+        } else {
+            assert_error(
+                array.get(row * 2).expect("out-of-shape true-column value"),
+                ScalarError::NotAvailable,
+            );
+        }
+        assert_number(
+            array.get(row * 2 + 1).expect("reference-column value"),
+            (100 + row) as f64,
+        );
+    }
+    assert_eq!(resolver.reads(), ROWS);
+    let expected_order: Vec<_> = (0..ROWS).map(|row| ("Main".to_owned(), row, 1)).collect();
+    assert_eq!(resolver.read_order(), expected_order);
+}
+
+#[test]
+fn lazy_reference_operands_provide_full_range_shape_and_skip_missing_alternatives() {
+    for source in [
+        "=IF({TRUE()};([.A1]:IF(TRUE();[.C1:.D1];[Missing.A1:.Z100]));0)",
+        "=IF({TRUE()};([.A1]:IFERROR(1/0;[.C1:.D1]));0)",
+        "=IF({TRUE()};([.A1]:IFNA(#N/A;[.C1:.D1]));0)",
+    ] {
+        let mut resolver = FixtureResolver::new();
+        for (column, value) in [10.0, 11.0, 12.0, 13.0].into_iter().enumerate() {
+            resolver.set("Main", 0, column, FixtureCell::Number(value));
+        }
+        resolver.fail_missing_metadata();
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-lazy-reference-operand");
+        let expression = parse(source);
+        let result = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &Limits::default(),
+        )
+        .unwrap_or_else(|error| {
+            panic!("{source:?} should preserve evaluated reference shape: {error}")
+        });
+        let array = result
+            .as_array()
+            .expect("range over selected reference should produce an array");
+        assert_eq!((array.shape().rows(), array.shape().columns()), (1, 4));
+        assert_array_numbers(array, &[10.0, 11.0, 12.0, 13.0]);
+        assert_eq!(
+            resolver.read_order(),
+            vec![
+                ("Main".to_owned(), 0, 0),
+                ("Main".to_owned(), 0, 1),
+                ("Main".to_owned(), 0, 2),
+                ("Main".to_owned(), 0, 3),
+            ],
+            "only the selected reference range should be materialized: {source:?}"
+        );
+        assert_eq!(resolver.missing_metadata_calls(), 0, "{source:?}");
+    }
+}
+
+#[test]
+fn lazy_reference_lists_and_multiplane_references_are_not_flattened() {
+    for source in [
+        "=IF({TRUE()};IF(TRUE();([.A1]~[.C1]);[Missing.A1:.Z100]);0)",
+        "=IF({TRUE()};IFERROR(1/0;[Main.A1:Archive.A1]);0)",
+    ] {
+        let mut resolver = FixtureResolver::new();
+        resolver.fail_missing_metadata();
+        let (_budget, _cancellation, execution) =
+            make_execution("ods-formula-value-lazy-reference-refusal");
+        let expression = parse(source);
+        let error = evaluate_at(
+            &expression,
+            &resolver,
+            &execution,
+            0,
+            0,
+            Mode::Matrix,
+            &Limits::default(),
+        )
+        .expect_err("non-rectangular or multi-plane reference results must stay typed");
+        assert!(matches!(
+            error,
+            EvaluationFailure::Unsupported(UnsupportedKind::Reference)
+        ));
+        assert_eq!(
+            resolver.reads(),
+            0,
+            "reference refusal must precede reads: {source:?}"
+        );
+        assert_eq!(resolver.missing_metadata_calls(), 0, "{source:?}");
+    }
 }
 
 #[test]

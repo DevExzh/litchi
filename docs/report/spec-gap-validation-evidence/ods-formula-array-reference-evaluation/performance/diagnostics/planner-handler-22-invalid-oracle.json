@@ -1,0 +1,6 @@
+{
+  "scope": "Withdrawn test oracle: ordinary non-reference range operands correctly return Unsupported(ReferenceOperator), not formula VALUE. This run does not prove production regression.",
+  "archive": "planner-handler-22-invalid-oracle.tar.gz",
+  "sha256": "032e98fd5808d5a5bf9520ddabb5a8984e761f6f4451bbbd016a11d6de2c2c43",
+  "status": 101
+}
