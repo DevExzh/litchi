@@ -344,13 +344,13 @@ impl<'a> EvaluatedScalar<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UnsupportedKind {
-    /// A bracketed or rich reference requires a resolver/context.
+    /// A reference requires a resolver/context or exceeds the selected profile.
     Reference,
     /// A resolved cell contains a value outside the supported evaluation profile.
     CellValue,
-    /// A range, intersection, or union reference operator requires a resolver.
+    /// A reference operator requires a resolver or has unsupported operand values.
     ReferenceOperator,
-    /// An inline array requires non-scalar evaluation.
+    /// An array requires matrix evaluation or has an unsupported shape.
     Array,
     /// A named expression requires a definition resolver.
     NamedExpression,
@@ -358,21 +358,27 @@ pub enum UnsupportedKind {
     Label,
     /// A missing function parameter outside a function's defined defaults.
     MissingArgument,
-    /// A standard or host-defined function outside this scalar profile.
+    /// A standard or host-defined function outside the selected profile.
     Function,
 }
 
 impl Display for UnsupportedKind {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            Self::Reference => "ODS scalar evaluation does not resolve references",
+            Self::Reference => "ODS formula evaluation profile does not support this reference",
             Self::CellValue => "ODS formula evaluation does not support this cell value",
-            Self::ReferenceOperator => "ODS scalar evaluation does not resolve reference operators",
-            Self::Array => "ODS scalar evaluation does not evaluate arrays",
-            Self::NamedExpression => "ODS scalar evaluation does not resolve named expressions",
-            Self::Label => "ODS scalar evaluation does not resolve labels",
-            Self::MissingArgument => "ODS scalar evaluation does not evaluate missing arguments",
-            Self::Function => "ODS scalar evaluation does not implement this function",
+            Self::ReferenceOperator => {
+                "ODS formula evaluation profile does not support this reference operation"
+            },
+            Self::Array => "ODS formula evaluation profile does not support this array",
+            Self::NamedExpression => {
+                "ODS formula evaluation profile does not resolve named expressions"
+            },
+            Self::Label => "ODS formula evaluation profile does not resolve labels",
+            Self::MissingArgument => {
+                "ODS formula evaluation profile does not support this missing argument"
+            },
+            Self::Function => "ODS formula evaluation profile does not implement this function",
         })
     }
 }
