@@ -33,10 +33,11 @@ source manifest and rejects changes to it during capture; this binds the supplie
 manifest, while the caller remains responsible for the binary build provenance.
 Warmups are capped at 100, iterations at 1,000, and executable repeats at 4,096.
 
-Current debug validation is diagnostic: 48 of 54 lanes pass with the independent
-oracle. The six 4,096-entry reference-list lanes exceed the production evaluator's
-default preparation work budget. These failures remain visible; no limits or
-corpus entries were changed to conceal them. See
-[the retained preflight receipt](../diagnostics/owned-preflight-03.json).
+Current debug validation is diagnostic: all 54 lanes pass against the isolated
+union-count and planner-mask fixes. The former six 4,096-entry reference-list
+preparation failures are resolved without increasing production limits or changing
+the corpus. See [the source-bound receipt](../../gates/reference-union-count-fix.json)
+and [the earlier failure receipt](../diagnostics/owned-preflight-03.json).
+These successful debug checks do not establish release performance acceptance.
 The default 15 samples provide coarse p95/p99 estimates and do not establish
 stable tail latency.
