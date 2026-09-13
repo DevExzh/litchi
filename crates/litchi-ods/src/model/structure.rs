@@ -218,8 +218,261 @@ pub(crate) fn validate_cell_range_addresses(ranges: &[String]) -> Result<()> {
                 "invalid individual table cell range '{range}'"
             )));
         }
+        validate_cell_range_address(range)?;
     }
     Ok(())
+}
+
+/// Validate one ODF `cellAddress` lexically.
+pub(crate) fn validate_cell_address(value: &str) -> Result<()> {
+    if value.is_empty() || value.trim() != value {
+        return Err(Error::InvalidFormat(format!(
+            "invalid cell address surrounding whitespace '{value}'"
+        )));
+    }
+    let mut cursor = 0usize;
+    parse_sheet_qualifier(value, &mut cursor)?;
+    if parse_first_range_endpoint(value, &mut cursor)? != CellRangeKind::Cell
+        || cursor != value.len()
+    {
+        return Err(Error::InvalidFormat(format!(
+            "invalid cell address '{value}'"
+        )));
+    }
+    Ok(())
+}
+
+/// Validate one ODF `cellRangeAddress` lexically.
+///
+/// ODF permits cell, column, and row ranges.  Each endpoint still requires
+/// the dot separator (`.A1`, `Sheet.A1`, or `Sheet.A1:.A2`); a bare `A1` or
+/// shorthand `Sheet.A1:A2` is not an ODF address.  This parser intentionally
+/// does not resolve sheet names or impose spreadsheet dimension limits.
+fn validate_cell_range_address(value: &str) -> Result<()> {
+    if value.is_empty() || value.trim() != value {
+        return Err(Error::InvalidFormat(format!(
+            "invalid cell range address surrounding whitespace '{value}'"
+        )));
+    }
+    let mut cursor = 0usize;
+    parse_sheet_qualifier(value, &mut cursor)?;
+    let kind = parse_first_range_endpoint(value, &mut cursor)?;
+    match kind {
+        CellRangeKind::Cell => {
+            if cursor == value.len() {
+                return Ok(());
+            }
+            expect_char(value, &mut cursor, ':')?;
+            parse_sheet_qualifier(value, &mut cursor)?;
+            parse_cell_endpoint(value, &mut cursor)?;
+        },
+        CellRangeKind::Column => {
+            expect_char(value, &mut cursor, ':')?;
+            parse_sheet_qualifier(value, &mut cursor)?;
+            parse_column_endpoint(value, &mut cursor)?;
+        },
+        CellRangeKind::Row => {
+            expect_char(value, &mut cursor, ':')?;
+            parse_sheet_qualifier(value, &mut cursor)?;
+            parse_row_endpoint(value, &mut cursor)?;
+        },
+    }
+    if cursor != value.len() {
+        return Err(Error::InvalidFormat(format!(
+            "invalid cell range address trailing characters '{value}'"
+        )));
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CellRangeKind {
+    Cell,
+    Column,
+    Row,
+}
+
+fn parse_sheet_qualifier(value: &str, cursor: &mut usize) -> Result<()> {
+    if char_at(value, *cursor) == Some('.') {
+        *cursor += 1;
+        return Ok(());
+    }
+
+    // `$` is ambiguous for a sheet literally named `$`: when it is followed
+    // by the separator it is the sheet name, not an absolute marker.
+    if char_at(value, *cursor) == Some('$') && char_at(value, *cursor + 1) != Some('.') {
+        *cursor += 1;
+    }
+    match char_at(value, *cursor) {
+        Some('\'') => {
+            *cursor += 1;
+            let mut has_content = false;
+            loop {
+                let Some(character) = char_at(value, *cursor) else {
+                    return Err(Error::InvalidFormat(
+                        "unterminated quoted sheet name in cell range address".to_string(),
+                    ));
+                };
+                if character != '\'' {
+                    *cursor += character.len_utf8();
+                    has_content = true;
+                    continue;
+                }
+                if char_at(value, *cursor + character.len_utf8()) == Some('\'') {
+                    *cursor += character.len_utf8() * 2;
+                    has_content = true;
+                    continue;
+                }
+                *cursor += character.len_utf8();
+                if !has_content {
+                    return Err(Error::InvalidFormat(
+                        "empty quoted sheet name in cell range address".to_string(),
+                    ));
+                }
+                break;
+            }
+        },
+        Some(character) if character != ' ' && character != '\'' && character != '.' => {
+            let mut has_content = false;
+            while let Some(character) = char_at(value, *cursor) {
+                if character == '.' {
+                    break;
+                }
+                if character == ' ' || character == '\'' {
+                    return Err(Error::InvalidFormat(
+                        "invalid unquoted sheet name in cell range address".to_string(),
+                    ));
+                }
+                *cursor += character.len_utf8();
+                has_content = true;
+            }
+            if !has_content {
+                return Err(Error::InvalidFormat(
+                    "empty sheet name in cell range address".to_string(),
+                ));
+            }
+        },
+        _ => {
+            return Err(Error::InvalidFormat(
+                "cell range address requires a sheet separator".to_string(),
+            ));
+        },
+    }
+    expect_char(value, cursor, '.')
+}
+
+fn parse_first_range_endpoint(value: &str, cursor: &mut usize) -> Result<CellRangeKind> {
+    consume_optional_dollar(value, cursor);
+    match char_at(value, *cursor) {
+        Some(character) if character.is_ascii_uppercase() => {
+            parse_uppercase_run(value, cursor);
+            if char_at(value, *cursor) == Some('$') {
+                *cursor += 1;
+                parse_digits(value, cursor)?;
+                Ok(CellRangeKind::Cell)
+            } else if char_at(value, *cursor).is_some_and(|value| value.is_ascii_digit()) {
+                parse_digits(value, cursor)?;
+                Ok(CellRangeKind::Cell)
+            } else if char_at(value, *cursor) == Some(':') {
+                Ok(CellRangeKind::Column)
+            } else {
+                Err(Error::InvalidFormat(
+                    "invalid cell or row endpoint in cell range address".to_string(),
+                ))
+            }
+        },
+        Some(character) if character.is_ascii_digit() => {
+            parse_digits(value, cursor)?;
+            if char_at(value, *cursor) != Some(':') {
+                return Err(Error::InvalidFormat(
+                    "row range address requires two endpoints".to_string(),
+                ));
+            }
+            Ok(CellRangeKind::Row)
+        },
+        _ => Err(Error::InvalidFormat(
+            "invalid endpoint in cell range address".to_string(),
+        )),
+    }
+}
+
+fn parse_cell_endpoint(value: &str, cursor: &mut usize) -> Result<()> {
+    consume_optional_dollar(value, cursor);
+    if !char_at(value, *cursor).is_some_and(|value| value.is_ascii_uppercase()) {
+        return Err(Error::InvalidFormat(
+            "cell range address requires uppercase cell columns".to_string(),
+        ));
+    }
+    parse_uppercase_run(value, cursor);
+    consume_optional_dollar(value, cursor);
+    parse_digits(value, cursor)
+}
+
+fn parse_column_endpoint(value: &str, cursor: &mut usize) -> Result<()> {
+    consume_optional_dollar(value, cursor);
+    if !char_at(value, *cursor).is_some_and(|value| value.is_ascii_uppercase()) {
+        return Err(Error::InvalidFormat(
+            "cell range address requires uppercase column letters".to_string(),
+        ));
+    }
+    parse_uppercase_run(value, cursor);
+    Ok(())
+}
+
+fn parse_row_endpoint(value: &str, cursor: &mut usize) -> Result<()> {
+    consume_optional_dollar(value, cursor);
+    if !char_at(value, *cursor).is_some_and(|value| value.is_ascii_digit()) {
+        return Err(Error::InvalidFormat(
+            "cell range address requires decimal row digits".to_string(),
+        ));
+    }
+    parse_digits(value, cursor)
+}
+
+fn parse_uppercase_run(value: &str, cursor: &mut usize) {
+    while let Some(character) = char_at(value, *cursor) {
+        if !character.is_ascii_uppercase() {
+            break;
+        }
+        *cursor += character.len_utf8();
+    }
+}
+
+fn parse_digits(value: &str, cursor: &mut usize) -> Result<()> {
+    let start = *cursor;
+    while let Some(character) = char_at(value, *cursor) {
+        if !character.is_ascii_digit() {
+            break;
+        }
+        *cursor += character.len_utf8();
+    }
+    if *cursor == start {
+        return Err(Error::InvalidFormat(
+            "cell range address requires decimal digits".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn consume_optional_dollar(value: &str, cursor: &mut usize) {
+    if char_at(value, *cursor) == Some('$') {
+        *cursor += 1;
+    }
+}
+
+fn expect_char(value: &str, cursor: &mut usize, expected: char) -> Result<()> {
+    if char_at(value, *cursor) == Some(expected) {
+        *cursor += expected.len_utf8();
+        Ok(())
+    } else {
+        Err(Error::InvalidFormat(format!(
+            "cell range address expected '{expected}'"
+        )))
+    }
+}
+
+fn char_at(value: &str, cursor: usize) -> Option<char> {
+    value.get(cursor..)?.chars().next()
 }
 
 fn write_escaped_attribute(out: &mut String, name: &str, value: &str) {
@@ -542,18 +795,80 @@ mod tests {
     #[test]
     fn splits_quoted_print_ranges_and_rejects_unterminated_names() {
         let ranges = split_cell_range_addresses(
-            "$Sheet1.$A$1:$B$2 'Q1 Sales'.$C$3:$D$4 'Bob''s Sheet'.$E$5:$F$6",
+            "$Sheet1.$A$1:.$B$2 'Q1 Sales'.$C$3:.$D$4 'Bob''s Sheet'.$E$5:.$F$6",
         )
         .expect("test fixture or operation should succeed");
         assert_eq!(
             ranges,
             [
-                "$Sheet1.$A$1:$B$2",
-                "'Q1 Sales'.$C$3:$D$4",
-                "'Bob''s Sheet'.$E$5:$F$6",
+                "$Sheet1.$A$1:.$B$2",
+                "'Q1 Sales'.$C$3:.$D$4",
+                "'Bob''s Sheet'.$E$5:.$F$6",
             ]
         );
         assert!(split_cell_range_addresses("'Unclosed Sheet.$A$1").is_err());
+    }
+
+    #[test]
+    fn validates_odf_cell_range_address_alternatives_and_endpoint_qualification() {
+        for value in [
+            ".A1",
+            ".A1:.B2",
+            ".$A$1",
+            "$Sheet.$A$1",
+            "$.A1",
+            "$.A1:$.A1",
+            "$.1:$.1",
+            "$.A:$.A",
+            "$.$A$1",
+            "'Q1 Sales'.$C$3:.$D$4",
+            "Sheet.A1:Other.B2",
+            ".1:.3",
+            "$Sheet.$1:$Other.$3",
+            ".A:.C",
+            "'$A''B'.$A:'Q1 Sales'.$C",
+            // The RNG is lexical here (`[0-9]+`); row numbering semantics are
+            // resolved by the consumer, so row zero remains accepted.
+            ".A0",
+        ] {
+            assert!(
+                validate_cell_range_addresses(&[value.to_string()]).is_ok(),
+                "rejected valid ODF address {value}"
+            );
+        }
+        for value in [
+            "A1",
+            "A1:A2",
+            "Sheet.A1:A2",
+            "Sheet.A1:B2",
+            // Part 3 §9.2.1 describes subtable references, but the v1.4
+            // `cellAddress`/`cellRangeAddress` RNG datatype used by these
+            // attributes has only one table/cell separator.  Keep this
+            // schema-bound owner validator aligned with that datatype until
+            // a dedicated subtable owner is introduced.
+            "Sheet.A1.B2",
+            "Sheet.A1:Sheet.B2:",
+            ".a1",
+            ".A",
+            ".1",
+            ".A1:.B",
+            ".A1:.1",
+            ".A:.1",
+            ".1:.A",
+            "Sheet A.A1",
+            "'' .A1",
+            "'Unclosed.A1",
+            ".A1:.B2:",
+            ".A1 .B2",
+            " .A1",
+            ".A1 ",
+            "\t.A1",
+        ] {
+            assert!(
+                validate_cell_range_addresses(&[value.to_string()]).is_err(),
+                "accepted invalid ODF address {value}"
+            );
+        }
     }
 
     #[test]
@@ -567,7 +882,7 @@ mod tests {
                 ..StyleUsage::default()
             },
         };
-        let print = PrintSettings::new(false, vec!["'Q1 Sales'.$A$1:$B$2".to_string()])
+        let print = PrintSettings::new(false, vec!["'Q1 Sales'.$A$1:.$B$2".to_string()])
             .expect("test fixture or operation should succeed");
         let mut xml = String::new();
         write_sheet_formatting_attributes(&mut xml, &style, &print)
@@ -577,6 +892,6 @@ mod tests {
         assert!(xml.contains(r#"table:use-first-row-styles="true""#));
         assert!(xml.contains(r#"table:use-banding-columns-styles="false""#));
         assert!(xml.contains(r#"table:print="false""#));
-        assert!(xml.contains(r#"table:print-ranges="&apos;Q1 Sales&apos;.$A$1:$B$2""#));
+        assert!(xml.contains(r#"table:print-ranges="&apos;Q1 Sales&apos;.$A$1:.$B$2""#));
     }
 }

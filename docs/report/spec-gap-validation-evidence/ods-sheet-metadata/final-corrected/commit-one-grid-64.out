@@ -1,0 +1,2 @@
+config workload=CommitOne sheets=1 rows=64 columns=64 source_bytes=338634 warmups=3 iterations=15
+result mean_ns=6429666 p50_ns=6458548 p95_ns=6492228 p99_ns=6492228 memory_delta_p50=7912416 memory_delta_max=7912416 memory_final_p50=15823048 memory_final_max=15823048 work_delta_p50=1536721 work_delta_max=1536721 work_final_p50=2734211 work_final_max=2734211 probes=15

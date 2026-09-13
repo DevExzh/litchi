@@ -1,0 +1,96 @@
+UTC_START=2026-09-13T02:04:18Z
+CANDIDATE=/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/worktree
+RUNNER=/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/native_roundtrip-final-freeze-0202
+RUNNER_SHA256=11c36b7fde1ecf64f415d3a9ab50a0e7ecc1ecd76019a8439a1b84ccd5f2a8bc
+TEMPLATE=/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/worktree/test-data/odf/corpus/calc-two-sheets.ods
+TEMPLATE_SHA256=67ed3f8831aa078a849badd8f2a15bdee7cf965a628ff4eb73740aa96ba0d4c0
+OUTPUT_ROOT=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ
+SOURCE_HASH_MANIFEST=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/source-hashes-final-freeze-0202.sha256
+COMMAND=TMPDIR=/var/tmp/litchi-ods-metadata-root-final2-20260913T003524Z/tmp timeout 180s native_roundtrip candidate template output_root
+
+injected_input:bytes=40393 content_bytes=7058 consolidation=true label_ranges=1 cell_range_source=true detective=true raw_tokens={consolidation:1,label_range:3,cell_range_source:1,detective:2}
+injected_input:typed.consolidation=Some(Options { function: "sum", source_cell_range_addresses: ["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"], target_cell_address: "sheet1.C1", use_labels: Some(Both), link_to_source_data: None })
+injected_input:typed.label_ranges.present=true values=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Row }]
+injected_input:typed.cell_metadata=Some(Physical(CellMetadata { source: Some(CellRange { name: "NativeImport", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None }), detective: Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.B1:sheet1.B2"), direction: FromSameTable, contains_error: Some(false) } }], operations: [Operation { kind: TracePrecedents, index: 0 }] }), location: PhysicalLocation { row: 0, column: 0, row_repeat: 1, column_repeat: 1, merge: None }, kind: TableCell }))
+injected_input:typed.cell_range_source=Some(CellRange { name: "NativeImport", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None })
+injected_input:typed.cell_range_source.scalars={name:"NativeImport",href:"source.ods#sheet1.A1:sheet1.B2",rows:2,columns:2,actuate_on_request:false,filter_name:None,filter_options:None,refresh_delay:None}
+injected_input:typed.detective=Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.B1:sheet1.B2"), direction: FromSameTable, contains_error: Some(false) } }], operations: [Operation { kind: TracePrecedents, index: 0 }] })
+injected_input:typed.detective.highlighted[0]={address:Some("sheet1.B1:sheet1.B2"),direction:Some(FromSameTable),contains_error:Some(false),marked_invalid:None}
+injected_input:typed.detective.operation[0]={kind:TracePrecedents,index:0}
+api_changed_input:bytes=8805 content_bytes=7358 consolidation=true label_ranges=1 cell_range_source=true detective=true raw_tokens={consolidation:1,label_range:3,cell_range_source:1,detective:2}
+api_changed_input:typed.consolidation=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"], target_cell_address: "sheet1.C1", use_labels: Some(Both), link_to_source_data: None })
+api_changed_input:typed.label_ranges.present=true values=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }]
+api_changed_input:typed.cell_metadata=Some(Physical(CellMetadata { source: Some(CellRange { name: "NativeImportChanged", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None }), detective: Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }], operations: [Operation { kind: TraceErrors, index: 0 }] }), location: PhysicalLocation { row: 0, column: 0, row_repeat: 1, column_repeat: 1, merge: None }, kind: TableCell }))
+api_changed_input:typed.cell_range_source=Some(CellRange { name: "NativeImportChanged", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None })
+api_changed_input:typed.cell_range_source.scalars={name:"NativeImportChanged",href:"source.ods#sheet1.A1:sheet1.B2",rows:2,columns:2,actuate_on_request:false,filter_name:None,filter_options:None,refresh_delay:None}
+api_changed_input:typed.detective=Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }], operations: [Operation { kind: TraceErrors, index: 0 }] })
+api_changed_input:typed.detective.highlighted[0]={address:Some("sheet1.C1:sheet1.C2"),direction:Some(FromSameTable),contains_error:Some(true),marked_invalid:None}
+api_changed_input:typed.detective.operation[0]={kind:TraceErrors,index:0}
+api_changed_input:expected.consolidation expected=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"], target_cell_address: "sheet1.C1", use_labels: Some(Both), link_to_source_data: None }) observed=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"], target_cell_address: "sheet1.C1", use_labels: Some(Both), link_to_source_data: None }) status=preserved
+api_changed_input:expected.consolidation.function expected=Some("average") observed=Some("average") status=preserved
+api_changed_input:expected.consolidation.source_cell_range_addresses expected=Some(["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"]) observed=Some(["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"]) status=preserved
+api_changed_input:expected.consolidation.target_cell_address expected=Some("sheet1.C1") observed=Some("sheet1.C1") status=preserved
+api_changed_input:expected.consolidation.use_labels expected=Some(Both) observed=Some(Both) status=preserved
+api_changed_input:expected.label_ranges expected=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }] observed=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }] status=preserved
+api_changed_input:expected.label_ranges[0].orientation expected=Some(Column) observed=Some(Column) status=preserved
+api_changed_input:expected.cell_range_source expected=Some(CellRange { name: "NativeImportChanged", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None }) observed=Some(CellRange { name: "NativeImportChanged", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None }) status=preserved
+api_changed_input:expected.cell_range_source.name expected=Some("NativeImportChanged") observed=Some("NativeImportChanged") status=preserved
+api_changed_input:expected.cell_range_source.href expected=Some("source.ods#sheet1.A1:sheet1.B2") observed=Some("source.ods#sheet1.A1:sheet1.B2") status=preserved
+api_changed_input:expected.cell_range_source.dimensions expected=Some((2, 2)) observed=Some((2, 2)) status=preserved
+api_changed_input:expected.detective expected=Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }], operations: [Operation { kind: TraceErrors, index: 0 }] }) observed=Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }], operations: [Operation { kind: TraceErrors, index: 0 }] }) status=preserved
+api_changed_input:expected.detective.highlighted_ranges expected=Some([HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }]) observed=Some([HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }]) status=preserved
+api_changed_input:expected.detective.operations expected=Some([Operation { kind: TraceErrors, index: 0 }]) observed=Some([Operation { kind: TraceErrors, index: 0 }]) status=preserved
+api_changed_input:typed_expected_overall=preserved
+convert /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/ods_metadata_native_input.ods as a Calc document -> /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/save1/ods_metadata_native_input.ods using filter : calc8
+after_libreoffice_save1:bytes=9232 content_bytes=7019 consolidation=true label_ranges=1 cell_range_source=false detective=true raw_tokens={consolidation:1,label_range:3,cell_range_source:0,detective:2}
+after_libreoffice_save1:typed.consolidation=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2"], target_cell_address: "sheet1.C1", use_labels: None, link_to_source_data: None })
+after_libreoffice_save1:typed.label_ranges.present=true values=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }]
+after_libreoffice_save1:typed.cell_metadata=Some(Physical(CellMetadata { source: None, detective: Some(Detective { highlighted_ranges: [], operations: [Operation { kind: TraceErrors, index: 0 }] }), location: PhysicalLocation { row: 0, column: 0, row_repeat: 1, column_repeat: 1, merge: None }, kind: TableCell }))
+after_libreoffice_save1:typed.cell_range_source=None
+after_libreoffice_save1:typed.detective=Some(Detective { highlighted_ranges: [], operations: [Operation { kind: TraceErrors, index: 0 }] })
+after_libreoffice_save1:typed.detective.operation[0]={kind:TraceErrors,index:0}
+after_libreoffice_save1:expected.consolidation expected=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"], target_cell_address: "sheet1.C1", use_labels: Some(Both), link_to_source_data: None }) observed=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2"], target_cell_address: "sheet1.C1", use_labels: None, link_to_source_data: None }) status=changed
+after_libreoffice_save1:expected.consolidation.function expected=Some("average") observed=Some("average") status=preserved
+after_libreoffice_save1:expected.consolidation.source_cell_range_addresses expected=Some(["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"]) observed=Some(["sheet1.A1:sheet1.A2"]) status=changed
+after_libreoffice_save1:expected.consolidation.target_cell_address expected=Some("sheet1.C1") observed=Some("sheet1.C1") status=preserved
+after_libreoffice_save1:expected.consolidation.use_labels expected=Some(Both) observed=None status=changed
+after_libreoffice_save1:expected.label_ranges expected=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }] observed=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }] status=preserved
+after_libreoffice_save1:expected.label_ranges[0].orientation expected=Some(Column) observed=Some(Column) status=preserved
+after_libreoffice_save1:expected.cell_range_source expected=Some(CellRange { name: "NativeImportChanged", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None }) observed=None status=changed
+after_libreoffice_save1:expected.cell_range_source.name expected=Some("NativeImportChanged") observed=None status=changed
+after_libreoffice_save1:expected.cell_range_source.href expected=Some("source.ods#sheet1.A1:sheet1.B2") observed=None status=changed
+after_libreoffice_save1:expected.cell_range_source.dimensions expected=Some((2, 2)) observed=None status=changed
+after_libreoffice_save1:expected.detective expected=Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }], operations: [Operation { kind: TraceErrors, index: 0 }] }) observed=Some(Detective { highlighted_ranges: [], operations: [Operation { kind: TraceErrors, index: 0 }] }) status=changed
+after_libreoffice_save1:expected.detective.highlighted_ranges expected=Some([HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }]) observed=Some([]) status=changed
+after_libreoffice_save1:expected.detective.operations expected=Some([Operation { kind: TraceErrors, index: 0 }]) observed=Some([Operation { kind: TraceErrors, index: 0 }]) status=preserved
+after_libreoffice_save1:typed_expected_overall=changed
+convert /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/save1/ods_metadata_native_input.ods as a Calc document -> /home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/save2/ods_metadata_native_input.ods using filter : calc8
+after_libreoffice_save2_reopen:bytes=9136 content_bytes=7019 consolidation=true label_ranges=1 cell_range_source=false detective=true raw_tokens={consolidation:1,label_range:3,cell_range_source:0,detective:2}
+after_libreoffice_save2_reopen:typed.consolidation=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2"], target_cell_address: "sheet1.C1", use_labels: None, link_to_source_data: None })
+after_libreoffice_save2_reopen:typed.label_ranges.present=true values=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }]
+after_libreoffice_save2_reopen:typed.cell_metadata=Some(Physical(CellMetadata { source: None, detective: Some(Detective { highlighted_ranges: [], operations: [Operation { kind: TraceErrors, index: 0 }] }), location: PhysicalLocation { row: 0, column: 0, row_repeat: 1, column_repeat: 1, merge: None }, kind: TableCell }))
+after_libreoffice_save2_reopen:typed.cell_range_source=None
+after_libreoffice_save2_reopen:typed.detective=Some(Detective { highlighted_ranges: [], operations: [Operation { kind: TraceErrors, index: 0 }] })
+after_libreoffice_save2_reopen:typed.detective.operation[0]={kind:TraceErrors,index:0}
+after_libreoffice_save2_reopen:expected.consolidation expected=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"], target_cell_address: "sheet1.C1", use_labels: Some(Both), link_to_source_data: None }) observed=Some(Options { function: "average", source_cell_range_addresses: ["sheet1.A1:sheet1.A2"], target_cell_address: "sheet1.C1", use_labels: None, link_to_source_data: None }) status=changed
+after_libreoffice_save2_reopen:expected.consolidation.function expected=Some("average") observed=Some("average") status=preserved
+after_libreoffice_save2_reopen:expected.consolidation.source_cell_range_addresses expected=Some(["sheet1.A1:sheet1.A2", "sheet1.B1:sheet1.B2"]) observed=Some(["sheet1.A1:sheet1.A2"]) status=changed
+after_libreoffice_save2_reopen:expected.consolidation.target_cell_address expected=Some("sheet1.C1") observed=Some("sheet1.C1") status=preserved
+after_libreoffice_save2_reopen:expected.consolidation.use_labels expected=Some(Both) observed=None status=changed
+after_libreoffice_save2_reopen:expected.label_ranges expected=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }] observed=[Range { label_cell_range_address: "sheet1.A1:sheet1.A2", data_cell_range_address: "sheet1.B1:sheet1.B2", orientation: Column }] status=preserved
+after_libreoffice_save2_reopen:expected.label_ranges[0].orientation expected=Some(Column) observed=Some(Column) status=preserved
+after_libreoffice_save2_reopen:expected.cell_range_source expected=Some(CellRange { name: "NativeImportChanged", href: "source.ods#sheet1.A1:sheet1.B2", last_row_spanned: 2, last_column_spanned: 2, actuate_on_request: false, filter_name: None, filter_options: None, refresh_delay: None }) observed=None status=changed
+after_libreoffice_save2_reopen:expected.cell_range_source.name expected=Some("NativeImportChanged") observed=None status=changed
+after_libreoffice_save2_reopen:expected.cell_range_source.href expected=Some("source.ods#sheet1.A1:sheet1.B2") observed=None status=changed
+after_libreoffice_save2_reopen:expected.cell_range_source.dimensions expected=Some((2, 2)) observed=None status=changed
+after_libreoffice_save2_reopen:expected.detective expected=Some(Detective { highlighted_ranges: [HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }], operations: [Operation { kind: TraceErrors, index: 0 }] }) observed=Some(Detective { highlighted_ranges: [], operations: [Operation { kind: TraceErrors, index: 0 }] }) status=changed
+after_libreoffice_save2_reopen:expected.detective.highlighted_ranges expected=Some([HighlightedRange { kind: Valid { cell_range_address: Some("sheet1.C1:sheet1.C2"), direction: FromSameTable, contains_error: Some(true) } }]) observed=Some([]) status=changed
+after_libreoffice_save2_reopen:expected.detective.operations expected=Some([Operation { kind: TraceErrors, index: 0 }]) observed=Some([Operation { kind: TraceErrors, index: 0 }]) status=preserved
+after_libreoffice_save2_reopen:typed_expected_overall=changed
+input_path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/ods_metadata_native_input.ods
+save1_path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/save1/ods_metadata_native_input.ods
+save2_path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/save2/ods_metadata_native_input.ods
+profile_path=/home/zhuhe/code/litchi-spec-gaps/docs/report/spec-gap-validation-evidence/ods-sheet-metadata/native-run-final-freeze-0202-N9FJ/libreoffice-profile
+
+UTC_END=2026-09-13T02:04:19Z
+EXIT=0

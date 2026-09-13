@@ -1,0 +1,2 @@
+config workload=CommitBatch sheets=1 rows=64 columns=64 source_bytes=338634 warmups=3 iterations=15
+result mean_ns=24310735 p50_ns=24193476 p95_ns=24934609 p99_ns=24934609 memory_delta_p50=16457932 memory_delta_max=16457932 memory_final_p50=28676504 memory_final_max=28676504 work_delta_p50=9666661 work_delta_max=9666661 work_final_p50=17417663 work_final_max=17417663 probes=61440

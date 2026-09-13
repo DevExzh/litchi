@@ -1,0 +1,7 @@
+cf4733fef62b053cb9a2497c8885b7ef2dd017002702a624d03da18867a8f57c  crates/litchi-ods/src/sheet_metadata/mod.rs
+a42191cd1cd782c33852cd40e77cde8d7c79ef3cecae1fac25e505f4708dc2f8  crates/litchi-ods/src/sheet_metadata/index.rs
+61b2996ca9fac56da836bd84a8f5285c1bd6fb9a4b696e230d9a5e44180db5e2  crates/litchi-ods/src/sheet_metadata/detective.rs
+dcde1604544f8a4c689f80d77602d50baf8e5c765f995cde3707854c0f765460  crates/litchi-ods/tests/ods_sheet_metadata_transactions.rs
+971aa69ce8f36f9f82c33c379dc9642b07d3bf5374990722d2108d5314cc7d56  docs/report/spec-gap-validation-evidence/ods-sheet-metadata/harness/Cargo.toml
+1708ade2ea086093f3c5fc3839865aeef483596b8f34ff050a1c4c8479a95f0b  docs/report/spec-gap-validation-evidence/ods-sheet-metadata/harness/Cargo.lock
+d343a60db836dc8b6e6fa6d3b48dcef71c895df31ebeed4b9de5e4bf942ae1ff  docs/report/spec-gap-validation-evidence/ods-sheet-metadata/harness/src/main.rs
