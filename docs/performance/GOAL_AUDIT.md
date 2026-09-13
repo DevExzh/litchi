@@ -1,5 +1,14 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0548: measured rejection; OLE2/OOXML goal stays active
+
+[0548](changes/0548-ole2-checkpoint-collector-rejected.md) adds a public malformed
+CFB guard and rejects the checkpoint implementation on frozen native and
+instruction gates. Exact baseline production is restored while candidate
+snapshots and all evidence remain available. This is diagnostic and validation
+progress, not a runtime performance gain. ODF remains deferred until the
+OLE2/OOXML optimization goal completes; iWork is excluded.
+
 ## 0545: bounded diagnostic progress, broad goal remains active
 
 [0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) rejects a dense-only scanner win using sparse and early-exit evidence

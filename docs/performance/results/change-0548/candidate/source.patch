@@ -1,0 +1,376 @@
+diff --git a/crates/litchi-cfb/src/file.rs b/crates/litchi-cfb/src/file.rs
+index 9441de203..e87135228 100644
+--- a/crates/litchi-cfb/src/file.rs
++++ b/crates/litchi-cfb/src/file.rs
+@@ -2766,6 +2766,69 @@ struct SectorChainScratch {
+     visited: CheckedBitSet,
+ }
+ 
++/// Scalar Brent-style checkpoint state for the successful exact chain walk.
++///
++/// The checkpoint schedule is at positions `0, 1, 3, 7, ...`.  A checkpoint
++/// hit proves that a valid sector has repeated, but it is never reported
++/// directly: the prepared authoritative walk is replayed so that the current
++/// cycle/error precedence remains exact.  The counters are private and are
++/// bounded by the declared chain length; checked arithmetic falls back to the
++/// authoritative walk if an impossible state would exceed that bound.
++#[derive(Debug)]
++struct SectorChainCheckpoint {
++    checkpoint: Option<u32>,
++    power: usize,
++    distance: usize,
++}
++
++impl Default for SectorChainCheckpoint {
++    fn default() -> Self {
++        Self {
++            checkpoint: None,
++            power: 1,
++            distance: 0,
++        }
++    }
++}
++
++impl SectorChainCheckpoint {
++    #[inline(always)]
++    fn matches(&self, sector: u32) -> bool {
++        self.checkpoint == Some(sector)
++    }
++
++    /// Advance after the current sector's successor has passed marker checks.
++    ///
++    /// `false` means that checked counter arithmetic could not maintain the
++    /// bounded state.  The caller must replay the prepared authoritative walk
++    /// in that case; no new diagnostic is manufactured here.
++    #[inline(always)]
++    fn advance(&mut self, sector: u32, expected_count: usize) -> bool {
++        if self.checkpoint.is_none() {
++            self.checkpoint = Some(sector);
++            return true;
++        }
++
++        let Some(next_distance) = self.distance.checked_add(1) else {
++            return false;
++        };
++        if next_distance > expected_count {
++            return false;
++        }
++        self.distance = next_distance;
++
++        if self.distance == self.power {
++            self.checkpoint = Some(sector);
++            self.distance = 0;
++            self.power = match self.power.checked_mul(2) {
++                Some(next_power) => next_power.min(expected_count),
++                None => expected_count,
++            };
++        }
++        true
++    }
++}
++
+ impl SectorChainScratch {
+     fn sectors(&self) -> &[u32] {
+         &self.sectors
+@@ -2796,6 +2859,80 @@ impl SectorChainScratch {
+         Ok(())
+     }
+ 
++    /// Walk an already prepared chain with the original visited-bit checks.
++    ///
++    /// The caller has performed preflight, exact reservations, and
++    /// `prepare_visited` in that order.  This helper deliberately performs no
++    /// fallible scratch-buffer allocation or growth, so a replay cannot move
++    /// that allocation boundary or change its resource label. Existing
++    /// formatted corruption errors can still allocate their diagnostic text.
++    #[cold]
++    #[inline(never)]
++    fn walk_prepared_authority(
++        &mut self,
++        allocation_table: &[u32],
++        start_sector: u32,
++        expected_count: usize,
++        table_name: &str,
++    ) -> Result<(), OleError> {
++        let mut sector = start_sector;
++        for index in 0..expected_count {
++            let slot = usize::try_from(sector).map_err(|_err| {
++                OleError::CorruptedFile(format!("Invalid sector index {sector} in {table_name}"))
++            })?;
++            if slot >= allocation_table.len() {
++                return Err(OleError::CorruptedFile(format!(
++                    "Invalid sector index {sector} in {table_name}"
++                )));
++            }
++            if self.visited.contains(slot) {
++                return Err(OleError::CorruptedFile(format!(
++                    "Cycle detected in {table_name} chain at sector {sector}"
++                )));
++            }
++            self.visited.insert(slot)?;
++            // Exact reservation in `collect_exact` covers every push here.
++            self.sectors.push(sector);
++            let next = *allocation_table.get(slot).ok_or_else(|| {
++                OleError::CorruptedFile(format!("Invalid sector index {sector} in {table_name}"))
++            })?;
++            if index + 1 == expected_count {
++                if next != ENDOFCHAIN {
++                    return Err(OleError::CorruptedFile(format!(
++                        "{table_name} chain exceeds its declared length"
++                    )));
++                }
++            } else {
++                if next == ENDOFCHAIN {
++                    return Err(OleError::CorruptedFile(format!(
++                        "{table_name} chain ends before its declared length"
++                    )));
++                }
++                if next >= MAXREGSECT {
++                    return Err(OleError::CorruptedFile(format!(
++                        "Invalid sector marker 0x{next:08X} in {table_name} chain"
++                    )));
++                }
++                sector = next;
++            }
++        }
++        Ok(())
++    }
++
++    /// Discard the speculative prefix and replay the prepared authority.
++    #[cold]
++    #[inline(never)]
++    fn replay_exact_prepared(
++        &mut self,
++        allocation_table: &[u32],
++        start_sector: u32,
++        expected_count: usize,
++        table_name: &str,
++    ) -> Result<(), OleError> {
++        self.sectors.clear();
++        self.walk_prepared_authority(allocation_table, start_sector, expected_count, table_name)
++    }
++
+     fn collect_exact(
+         &mut self,
+         allocation_table: &[u32],
+@@ -2833,49 +2970,86 @@ impl SectorChainScratch {
+                     .map_err(|source| OleError::allocation("sector-chain entries", source))?;
+             }
+             self.prepare_visited(allocation_table.len())?;
++
++            // The successful path uses scalar checkpoint state instead of a
++            // visited load/mask/store on every sector.  Any checkpoint or
++            // structural failure replays the prepared authoritative walk so
++            // all existing diagnostics and error precedence remain exact.
++            let mut checkpoint = SectorChainCheckpoint::default();
+             let mut sector = start_sector;
+             for index in 0..expected_count {
+-                let slot = usize::try_from(sector).map_err(|_err| {
+-                    OleError::CorruptedFile(format!(
+-                        "Invalid sector index {sector} in {table_name}"
+-                    ))
+-                })?;
++                let slot = match usize::try_from(sector) {
++                    Ok(slot) => slot,
++                    Err(_err) => {
++                        return self.replay_exact_prepared(
++                            allocation_table,
++                            start_sector,
++                            expected_count,
++                            table_name,
++                        );
++                    },
++                };
+                 if slot >= allocation_table.len() {
+-                    return Err(OleError::CorruptedFile(format!(
+-                        "Invalid sector index {sector} in {table_name}"
+-                    )));
++                    return self.replay_exact_prepared(
++                        allocation_table,
++                        start_sector,
++                        expected_count,
++                        table_name,
++                    );
+                 }
+-                if self.visited.contains(slot) {
+-                    return Err(OleError::CorruptedFile(format!(
+-                        "Cycle detected in {table_name} chain at sector {sector}"
+-                    )));
++                if checkpoint.matches(sector) {
++                    return self.replay_exact_prepared(
++                        allocation_table,
++                        start_sector,
++                        expected_count,
++                        table_name,
++                    );
+                 }
+-                self.visited.insert(slot)?;
+                 // The fallible exact reservation above covers this loop's
+-                // exactly `expected_count` pushes; keep allocation failure at
+-                // that established boundary.
++                // exactly `expected_count` pushes; the checkpoint fast path
++                // and the authoritative replay both stay at that boundary.
+                 self.sectors.push(sector);
+-                let next = *allocation_table.get(slot).ok_or_else(|| {
+-                    OleError::CorruptedFile(format!(
+-                        "Invalid sector index {sector} in {table_name}"
+-                    ))
+-                })?;
++                let Some(&next) = allocation_table.get(slot) else {
++                    return self.replay_exact_prepared(
++                        allocation_table,
++                        start_sector,
++                        expected_count,
++                        table_name,
++                    );
++                };
+                 if index + 1 == expected_count {
+                     if next != ENDOFCHAIN {
+-                        return Err(OleError::CorruptedFile(format!(
+-                            "{table_name} chain exceeds its declared length"
+-                        )));
++                        return self.replay_exact_prepared(
++                            allocation_table,
++                            start_sector,
++                            expected_count,
++                            table_name,
++                        );
+                     }
+                 } else {
+                     if next == ENDOFCHAIN {
+-                        return Err(OleError::CorruptedFile(format!(
+-                            "{table_name} chain ends before its declared length"
+-                        )));
++                        return self.replay_exact_prepared(
++                            allocation_table,
++                            start_sector,
++                            expected_count,
++                            table_name,
++                        );
+                     }
+                     if next >= MAXREGSECT {
+-                        return Err(OleError::CorruptedFile(format!(
+-                            "Invalid sector marker 0x{next:08X} in {table_name} chain"
+-                        )));
++                        return self.replay_exact_prepared(
++                            allocation_table,
++                            start_sector,
++                            expected_count,
++                            table_name,
++                        );
++                    }
++                    if !checkpoint.advance(sector, expected_count) {
++                        return self.replay_exact_prepared(
++                            allocation_table,
++                            start_sector,
++                            expected_count,
++                            table_name,
++                        );
+                     }
+                     sector = next;
+                 }
+@@ -3328,6 +3502,104 @@ mod tests {
+         }
+     }
+ 
++    fn enumerate_exhaustive_chain_tables(
++        table: &mut [u32],
++        values: &[u32],
++        depth: usize,
++        scratch: &mut SectorChainScratch,
++    ) {
++        if depth < table.len() {
++            for &value in values {
++                table[depth] = value;
++                enumerate_exhaustive_chain_tables(table, values, depth + 1, scratch);
++            }
++            return;
++        }
++
++        for &start_sector in values {
++            for expected_count in 0..=table.len() + 1 {
++                let expected =
++                    collect_sector_chain_exact(table, start_sector, expected_count, "exhaustive")
++                        .map_err(|error| error.to_string());
++                let actual_result =
++                    scratch.collect_exact(table, start_sector, expected_count, "exhaustive");
++                let actual = actual_result
++                    .map(|()| scratch.sectors().to_vec())
++                    .map_err(|error| error.to_string());
++
++                assert_eq!(
++                    actual, expected,
++                    "table {table:?}, start {start_sector}, count {expected_count}"
++                );
++                match expected {
++                    Ok(sectors) => {
++                        assert_eq!(scratch.sectors(), sectors.as_slice());
++                        if expected_count == 0 {
++                            assert_eq!(scratch.visited.bit_len, 0);
++                        } else {
++                            assert_eq!(scratch.visited.bit_len, table.len());
++                            assert!(
++                                scratch.visited.words.iter().all(|word| *word == 0),
++                                "terminal success must leave no speculative visited bits"
++                            );
++                        }
++                    },
++                    Err(_) => {
++                        assert!(scratch.sectors.is_empty());
++                        assert_eq!(scratch.visited.bit_len, 0);
++                    },
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn scratch_exhaustively_matches_owned_helper_for_small_tables() {
++        for length in 0..=4 {
++            let mut values: Vec<u32> = (0..length).map(|value| value as u32).collect();
++            values.extend([
++                length as u32,
++                ENDOFCHAIN,
++                MAXREGSECT,
++                MAXREGSECT + 2,
++                u32::MAX,
++            ]);
++            let mut table = vec![ENDOFCHAIN; length];
++            let mut scratch = SectorChainScratch::default();
++            enumerate_exhaustive_chain_tables(&mut table, &values, 0, &mut scratch);
++        }
++    }
++
++    #[test]
++    fn checkpoint_counter_boundaries_are_checked_without_overflow() {
++        let mut power_overflow = SectorChainCheckpoint {
++            checkpoint: Some(7),
++            power: usize::MAX / 2 + 1,
++            distance: usize::MAX / 2,
++        };
++        assert!(power_overflow.advance(11, usize::MAX));
++        assert_eq!(power_overflow.checkpoint, Some(11));
++        assert_eq!(power_overflow.distance, 0);
++        assert_eq!(power_overflow.power, usize::MAX);
++
++        let mut distance_overflow = SectorChainCheckpoint {
++            checkpoint: Some(7),
++            power: usize::MAX,
++            distance: usize::MAX,
++        };
++        assert!(!distance_overflow.advance(11, usize::MAX));
++        assert_eq!(distance_overflow.checkpoint, Some(7));
++        assert_eq!(distance_overflow.power, usize::MAX);
++        assert_eq!(distance_overflow.distance, usize::MAX);
++
++        let mut count_bound = SectorChainCheckpoint {
++            checkpoint: Some(7),
++            power: 8,
++            distance: 7,
++        };
++        assert!(!count_bound.advance(11, 7));
++    }
++
+     #[test]
+     fn malformed_large_declarations_do_not_unwind() {
+         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

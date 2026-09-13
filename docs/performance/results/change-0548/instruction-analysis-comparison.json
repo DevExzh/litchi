@@ -1,0 +1,62 @@
+{
+  "job_matrix": [
+    "profile-r1-cfb-few-large",
+    "profile-r1-cfb-many-small",
+    "profile-r1-cfb-tiny",
+    "profile-r1-xls-owned",
+    "profile-r2-cfb-few-large",
+    "profile-r2-cfb-many-small",
+    "profile-r2-cfb-tiny",
+    "profile-r2-xls-owned"
+  ],
+  "performance_claim": null,
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "schema": "litchi-ole2-change-0548-instruction-comparison-v1",
+  "scope": "Matched stage instruction mapping for collect_exact; Ir and call metadata remain diagnostic",
+  "stages": {
+    "baseline": {
+      "assembly": {
+        "chain_error_rows": 0,
+        "chain_error_symbols": [],
+        "collector_instruction_count": 313,
+        "collector_rows": 1,
+        "collector_symbols": [
+          "_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17h6a8f4566950984e2E"
+        ],
+        "insert_rows": 1,
+        "insert_symbols": [
+          "_ZN10litchi_cfb4file13CheckedBitSet6insert17hd0819a41161dc860E"
+        ],
+        "rows": 9
+      },
+      "binary_sha256": "960ef0f2557ae1d81c958c06d17496a380ef51f75902c85ed5e76aa2ef8ebec5",
+      "report_stage": "baseline",
+      "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163"
+    },
+    "candidate": {
+      "assembly": {
+        "chain_error_rows": 0,
+        "chain_error_symbols": [],
+        "collector_instruction_count": 280,
+        "collector_rows": 1,
+        "collector_symbols": [
+          "_ZN10litchi_cfb4file18SectorChainScratch13collect_exact17hec2bee91abf1c273E"
+        ],
+        "insert_rows": 1,
+        "insert_symbols": [
+          "_ZN10litchi_cfb4file13CheckedBitSet6insert17hd0819a41161dc860E"
+        ],
+        "rows": 11
+      },
+      "binary_sha256": "48314e726a5d29c8c94f9a4c3fa90f379a6e2f628caabd77e17f89aa4988c069",
+      "report_stage": "candidate",
+      "source_manifest_sha256": "978f11e0c2155c9fa0830204ea98d1f31fcb884cd3c1a21f181397cde33aab6e"
+    }
+  },
+  "validation": {
+    "matched_job_matrix": true,
+    "no_static_instruction_latency_claim": true,
+    "optional_private_helper_name_not_required": true,
+    "stage_reports_valid": true
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "utc": "2026-09-13T03:12:08.983768+00:00",
+  "files": {
+    "candidate.patch": "4a4168a097d6490ba399b71101ecb05d3ede7dec29273ef26c8bf1c4163d8d65",
+    "candidate-sources/file.rs": "c773ab45a0d6b0fe0918406432933e52f7e7e2432d0897c3a4d3f877081ec427",
+    "candidate-sources/source-note.md": "74fcc7e45d5265fcff6ca2941f3615c3af696b9898f24a08db384082c1ce6ffd",
+    "source-review.md": "10e76b78ca01986989b5601496e018907c3225f9ded3304bc57ec3d6afc4e0ed",
+    "baseline/source-manifest.json": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+    "frozen-inputs.json": "19a438d4110445e20dadab0ce088616e4c03b5693f408ac3b61edf4a17bbf3e6"
+  },
+  "scope": "Reviewed candidate frozen after successful complete baseline phase, before production application; performance admission remains pending."
+}

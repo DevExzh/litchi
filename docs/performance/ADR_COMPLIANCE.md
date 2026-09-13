@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## 0548: bounded CFB experiment preserves owner and refusal contracts
+
+[0548](changes/0548-ole2-checkpoint-collector-rejected.md) keeps validation in
+CFB, preserves reservation/error ordering and tests exact authoritative replay.
+The accepted ADR/index inventory is unchanged. Frozen performance gates reject
+the candidate; exact baseline production is restored. See the
+[batch matrix](results/change-0548/adr-compliance.md) for scope and verification
+limits. No ADR exception is required.
+
 ## 0545: safe scanner experiment remains outside production
 
 [0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) checks the exact 0544 cap predicate using bounded adjacent-pair sums,

@@ -1,0 +1,6 @@
+{
+  "utc": "2026-09-13T03:01:53.476769+00:00",
+  "scope": "Before any guardtimingcapture; gate thresholds already frozen inmainplan; quantileslinear(n-1)*p/mean unchanged acrossstages",
+  "script_sha256": "28bd6fd44b607ce0e2d9d2c3cdbb040049045c8a6f6eb33424093f18b718b602",
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9"
+}

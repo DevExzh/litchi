@@ -1,0 +1,71 @@
+{
+  "adoption_allowed": false,
+  "adverse_review_complete": true,
+  "adverse_review_sha256": "016c05eeb883c2ae3e1d246d1d5d056e1f79937f4fcdcef9df783f5ab8356e52",
+  "collector_ir": [
+    {
+      "baseline": 5601140,
+      "candidate": 5929110,
+      "change_percent": 5.85541514763066,
+      "group": "xls-owned",
+      "repeat": 1,
+      "shape": null
+    },
+    {
+      "baseline": 5571945,
+      "candidate": 5899090,
+      "change_percent": 5.871289109996591,
+      "group": "cfb-few-large",
+      "repeat": 1,
+      "shape": "few-large"
+    },
+    {
+      "baseline": 5601140,
+      "candidate": 5929110,
+      "change_percent": 5.85541514763066,
+      "group": "xls-owned",
+      "repeat": 2,
+      "shape": null
+    },
+    {
+      "baseline": 5571945,
+      "candidate": 5899090,
+      "change_percent": 5.871289109996591,
+      "group": "cfb-few-large",
+      "repeat": 2,
+      "shape": "few-large"
+    }
+  ],
+  "collector_profile_gate": false,
+  "comparison_sha256": "07a60d2b047dcb29536c2f9a58109f1c41820865dba349032bf19409916d900c",
+  "constructor_ir": [
+    {
+      "baseline": 11318644,
+      "candidate": 11642932,
+      "change_percent": 2.865078184277192,
+      "repeat": 1
+    },
+    {
+      "baseline": 11317729,
+      "candidate": 11644947,
+      "change_percent": 2.891198402082251,
+      "repeat": 2
+    }
+  ],
+  "disposition": "rejected",
+  "final_source": "final",
+  "final_source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "guard_analysis_sha256": "5728f25660cee85fdd0c17faef443151b25c7130ad436d32a4d7403b46738402",
+  "guard_gate": true,
+  "memory_gate": true,
+  "native_primary_gate": false,
+  "other_rejection_reason": "Reject candidate adoption: native XLS source-backed one-cell p50 improves only 3.701809% in repeat 2 and regresses 2.116582% in repeat 1, so the required 3% improvement does not pass all four cases in both repeats; required profile gates also fail because XLS-owned constructor inclusive Ir rises 2.865078%/2.891198% and collector self Ir rises 5.855415% for XLS and 5.871289% for CFB few-large. Allocation and public-guard envelope gates pass, but those passes cannot offset the primary/profile failures or the individually reviewed adverse rows.",
+  "profile_gate": false,
+  "profiles_sha256": {
+    "baseline": "32111b693e42f85d2f8f754fb8c5bc45eac0f447bce196ba7facdc144823a011",
+    "candidate": "b88d141e367038433e52f183e5c5c90715267fab4bc954f7c698e52d703d240b"
+  },
+  "quality_gates": 15,
+  "quality_summary_sha256": "61fd0884653ef333c2ff38097238b4d9428eeaee626a394b2798336314164783",
+  "scope": "Matched CFB bounded checkpoint cycle validation experiment; OLE2/OOXML active, ODF deferred, iWork excluded"
+}

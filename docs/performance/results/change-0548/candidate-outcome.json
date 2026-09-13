@@ -1,0 +1,19 @@
+{
+  "observed_utc": "2026-09-13T03:23:22.361543+00:00",
+  "disposition": "rejected",
+  "native_primary_gate": false,
+  "profile_gate": false,
+  "collector_profile_gate": false,
+  "memory_gate": true,
+  "guard_gate": true,
+  "reason": "The frozen native requirement fails one primary repeat, and both constructor and collector instruction gates fail both repeats. No recapture to seek admission. Restore exact measured baseline once the running candidate quality stream terminates.",
+  "quality_status": "candidate checks still running; final restored source requires all 15 checks",
+  "inputs": {
+    "comparison.json": "07a60d2b047dcb29536c2f9a58109f1c41820865dba349032bf19409916d900c",
+    "baseline/profile-analysis.json": "32111b693e42f85d2f8f754fb8c5bc45eac0f447bce196ba7facdc144823a011",
+    "candidate/profile-analysis.json": "b88d141e367038433e52f183e5c5c90715267fab4bc954f7c698e52d703d240b",
+    "guard-analysis.json": "5728f25660cee85fdd0c17faef443151b25c7130ad436d32a4d7403b46738402",
+    "candidate/source-manifest.json": "978f11e0c2155c9fa0830204ea98d1f31fcb884cd3c1a21f181397cde33aab6e",
+    "baseline/source-manifest.json": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163"
+  }
+}

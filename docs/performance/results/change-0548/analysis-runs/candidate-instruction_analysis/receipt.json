@@ -1,0 +1,25 @@
+{
+  "artifacts": {
+    "inputs.json": "5f06b2c0aa530c485c19716ff880d657e5a7f917ed42562417f15aafa4a1039f",
+    "stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout": "06b01b98e86996658043e55d6792efe8fbc53a3856d3c840665ac7f0b862665b"
+  },
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/instruction_analysis.py",
+    "--stage",
+    "candidate",
+    "--output",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0548/candidate/instruction-analysis.json"
+  ],
+  "end_utc": "2026-09-13T03:20:28.100652+00:00",
+  "exit_code": 0,
+  "inputs_sha256": "5f06b2c0aa530c485c19716ff880d657e5a7f917ed42562417f15aafa4a1039f",
+  "output": "candidate/instruction-analysis.json",
+  "output_sha256": "a5795cc15e2a9064cc34d1924d1edff4ce0e3cf01caa453223f7e304c8a855a0",
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "script_sha256": "c5009e2d404c2c95d79f4cada8977abf98cc350c3e5c0bbe0e600b7b9c43e3a8",
+  "seconds": 0.7520084310090169,
+  "start_utc": "2026-09-13T03:20:27.348651+00:00"
+}

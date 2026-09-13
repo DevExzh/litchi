@@ -1,0 +1,38 @@
+{
+  "command": [
+    "env",
+    "TMPDIR=/home/zhuhe/litchi-goal-0548-target/test-tmp",
+    "CARGO_TARGET_DIR=/home/zhuhe/litchi-goal-0548-target",
+    "CARGO_BUILD_JOBS=2",
+    "CARGO_INCREMENTAL=0",
+    "RUSTDOCFLAGS=-D warnings",
+    "cargo",
+    "test",
+    "--locked",
+    "-p",
+    "litchi-ppt",
+    "--all-features"
+  ],
+  "start_utc": "2026-09-13T03:33:31.906764+00:00",
+  "end_utc": "2026-09-13T03:34:01.275768+00:00",
+  "seconds": 29.36901740398025,
+  "exit_code": 0,
+  "execution_stage": "final",
+  "execution_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "binary_sha256": null,
+  "source_manifest_sha256": "fa85f76972a37f52644c60b955c9125ed80e4d78e2434ec54b77c3cb19e64163",
+  "script_sha256": "379f17feafa95db52811e1706c0876e25d56a06863d967090b9df19006685976",
+  "plan_sha256": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+  "environment": {
+    "RUSTFLAGS": null,
+    "CARGO_ENCODED_RUSTFLAGS": null,
+    "LD_PRELOAD": null,
+    "MALLOC_CONF": null,
+    "GLIBC_TUNABLES": null
+  },
+  "artifacts": {
+    "check-ppt-tests.host.json": "b08f54f1e2233c5bcf3f78db4a8e791cd508701a46cbbb39e1b6d18752848046",
+    "check-ppt-tests.stderr": "38b66dc185db7206b2ff5617a6cd2912a1dda5612127884afe7eb404eb08db17",
+    "check-ppt-tests.stdout": "17e80088d5a2a439f9e33863ee8dc8ee23cfeacbf2e521f93bc8cbdbcd78aa4c"
+  }
+}

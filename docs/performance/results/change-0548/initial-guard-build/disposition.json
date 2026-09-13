@@ -1,0 +1,7 @@
+{
+  "status": "failed-build-before-any-measurement",
+  "exit_code": 101,
+  "terminal_session": 51282,
+  "recorded_utc": "2026-09-13T02:56:44.504698+00:00",
+  "fix": "Guardexampleformatbrace, explicitusize arithmetic andoptionalJSON-result type; no productioncandidate change or gate changes. Initialsource/receipts preserved; ownedtarget removed before fresh baselinefreeze."
+}

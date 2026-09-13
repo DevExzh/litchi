@@ -1,0 +1,18 @@
+{
+  "utc": "2026-09-13T03:01:53.476486+00:00",
+  "files": {
+    "plan.json": "575316305da224ab1a4c673a9d14c0912e600e473e18d8f61bf4c32dc4339fa9",
+    "run.py": "379f17feafa95db52811e1706c0876e25d56a06863d967090b9df19006685976",
+    "guard_run.py": "7dad09a089472f3e938deaf3032b25789b0f63dc37694f8cfa48274003898426",
+    "baseline_phase.py": "7218d914a1547b6de5374c87e4c0ac00f0428a905569f920599da44e17c6dafd",
+    "candidate_phase.py": "8d58511ccba94184d60c608b9234b410ac2f8c9526412b98b1cceccc3337c338",
+    "checks.py": "3c88676c3cc72c5d5d0eb9ee5bbfbfa3812859877a8c5ce74c721f1bd5b121d0",
+    "inspect_assembly.py": "56fa593cfbb2763d9adc5384890e26e949c9d1b5120693d582f3fd3641fc916b",
+    "protocol.md": "5bcd5a914fe93a8696025a4b121a7b6b1ea2952d3ecb476bf8ab737ab7020baa",
+    "adr-manifest.json": "e815a51327a39956a3e5e3adfd3fc76b7942b1c65124c66189ab7b98f8bf6893",
+    "host.json": "df4a0767839f35170c04df60656ae2c5e4acab019690d641d83eaa8b9cc01f29"
+  },
+  "enabler_sha256": "578e2f5e4d8193fbb4d443d5c72181f725b4db29a8bb6645c57d0a2531e03189",
+  "scope": "Before firstbuild/capture; fullsource manifest frozen bybaseline_phase before anychild",
+  "supersedes": "second-guard-build/frozen-inputs.json; failedguardcompile beforemeasurements"
+}

@@ -1,0 +1,16 @@
+
+/home/zhuhe/litchi-goal-0548-target/retained/candidate/normal:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000002f228f0 <_ZN10litchi_cfb4file18SectorChainScratch21replay_exact_prepared17hb5f817ac293eca34E>:
+ 2f228f0:	48 c7 46 10 00 00 00 	movq   $0x0,0x10(%rsi)
+ 2f228f7:	00 
+ 2f228f8:	e9 03 00 00 00       	jmp    2f22900 <_ZN10litchi_cfb4file18SectorChainScratch23walk_prepared_authority17he8365eda766b332fE>
+
+Disassembly of section .init:
+
+Disassembly of section .fini:
+
+Disassembly of section .plt:
