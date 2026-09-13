@@ -1,5 +1,12 @@
 # Performance optimization ADR-compliance matrix
 
+## 0561: attribution only, no contract movement
+
+[0561](0561-opc-repeated-positional-reads.md) changes no production code. It
+records that ADR 0011 makes `litchi-opc` the only OPC-to-ZIP translator and ADR
+0010 keeps archive types out of the facade, so reads-per-entry-read belongs to
+`soapberry-zip` and read policy to `litchi-opc`. No ADR exception is needed.
+
 ## 0560: one observation, unchanged proof and error identity
 
 [0560](0560-xls-single-observation-freshness.md) collapses observations that had
