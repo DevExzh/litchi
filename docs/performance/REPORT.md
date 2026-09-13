@@ -1,5 +1,17 @@
 # Performance program phase report
 
+## 0563: warm OPC part reads observe the source twice
+
+[0563](0563-opc-single-warm-part-observation.md) removes the cache loop's
+leading source observation and relocates it to the two places it was
+load-bearing. A warm-cache part read falls from three observations to two with
+source reads unchanged; a cold read keeps its complete five-observation
+bracket. Three counted tests pin the result, two of which fail without the
+change, and one pins a `SourceChanged` over `PartNotFound` ordering that two
+downstream crates depend on and that no test asserted before. No latency gain
+is claimed — change 0493 already measured that removing reads from a warm local
+source is worth about nothing.
+
 ## 0562: one descriptor read per verified entry read
 
 [0562](0562-zip-descriptor-read-once.md) memoizes the observation

@@ -1,5 +1,38 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0563: the OOXML syscall line of work, and what it is worth
+
+[0563](0563-opc-single-warm-part-observation.md) removes one source observation
+from every warm OPC part read and pins the warm and cold counts as enforced
+invariants. It is a real work reduction, but the batch's more important result
+is a steer for the goal itself.
+
+Change [0493](changes/0493-managed-opc-source-read-ahead.md) had already built
+and measured the coalescing mechanism the 0561 traces point at, as an opt-in
+`litchi-opc` forward-start window. It collapsed physical reads from 19 to 3 per
+DOCX lifecycle and measured +0.98%/−2.01% p50 on a zero-delay local source
+against −84.87%/−82.17% on a 1 ms-service range source, concluding that the
+local arm "is not evidence of a useful local-source speedup".
+
+So the OOXML repeated-read finding is exact as a count and close to worthless as
+a local-latency target. The goal's own list of required scenarios includes "a
+simulated high-latency range source with configurable latency, bandwidth,
+request overhead, and maximum range size", and that is where this work pays.
+The next OOXML step should therefore be to measure the existing
+`SourceReadPolicy::forward_start` window on the file-source selectors against
+that transport — which costs no production code — rather than to remove more
+warm-cache syscalls. Enabling it is a policy decision, not a default change:
+`crates/litchi-opc/tests/source_read_ahead.rs:433` pins `exact()` as the default
+and requires existing constructors to stay uninstrumented.
+
+Still required by the goal and unchanged by this batch: cold-cache and physical
+device distributions, peak RSS and allocation accounting for these paths,
+concurrency scaling, real-producer breadth, and cross-platform confirmation. A
+file-backed repeated-part-read selector is a newly identified coverage gap.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0561-0562: the OOXML read pattern, attributed and first fix
 
 [0561](0561-opc-repeated-positional-reads.md) and

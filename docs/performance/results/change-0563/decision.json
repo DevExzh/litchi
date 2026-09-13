@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-decision",
+  "change_id": "0563-opc-single-warm-part-observation",
+  "decision": "retained",
+  "code_state": "landed",
+  "performance_claim": "none",
+  "claim_registry_entry": false,
+  "reason_codes": [
+    "zero_read_observation_collapse_with_relocated_precedence",
+    "counted_invariants_fail_without_the_change",
+    "closes_an_untested_cross_crate_error_ordering",
+    "no_latency_gain_claimed_or_expected"
+  ],
+  "accepted_evidence": {
+    "warm_part_read_observations": [
+      3,
+      2
+    ],
+    "cold_part_read_observations": [
+      5,
+      5
+    ],
+    "warm_part_read_source_reads": 0,
+    "statx_change_percent": {
+      "docx_file_source_open": -3.85,
+      "docx_file_source_full_text": -3.64,
+      "pptx_file_source_open": -0.06,
+      "pptx_file_source_selected_slide": -0.06
+    },
+    "pread64_unchanged": true,
+    "non_regression_matrix": {
+      "children": 16,
+      "cells": 4,
+      "improve_both": 2,
+      "adverse_both_over_5_percent": 0
+    }
+  },
+  "explicitly_not_claimed": {
+    "latency": "change 0493 measured a far larger collapse at +0.98%/-2.01% on a local source; the two DOCX cells that improve in both directions are reported without attribution",
+    "warm_path_end_to_end": "no file-backed repeated-part-read selector exists in the harness"
+  },
+  "accepted_behavioural_change": "a cold read against an already-changed source now creates and fails a load flight, so cold_loads and failed_loads each increment where they previously did not",
+  "revision": "dd985c53b4cba57bb46093904ff7dcf8de2ae41a"
+}

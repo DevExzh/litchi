@@ -1,5 +1,18 @@
 # Performance optimization ADR-compliance matrix
 
+## 0563: unchanged precedence, unchanged ownership
+
+[0563](0563-opc-single-warm-part-observation.md) collapses observations with no
+`read_at` between them, so the proof obligation is unchanged, and it preserves
+change 0317's documented precedence — source-version failure, then execution
+failure, then the mapped ZIP error — by observing on the cache-entry error path
+rather than deleting the observation. The cold path keeps its opening bracket
+inside the load closure so a `SourceChanged` return still unwinds through
+flight completion. `part()`'s missing-Part branch observes before reporting, so
+the cross-crate contract documented in `litchi-xlsx` and relied on by
+`litchi-pptx` and `litchi-docx` is intact. Ownership, dependency direction and
+public API are unchanged. No ADR exception is needed.
+
 ## 0562: ZIP grammar owner, unchanged contract
 
 [0562](0562-zip-descriptor-read-once.md) changes only `soapberry-zip`, which ADR

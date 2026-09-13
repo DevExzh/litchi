@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0563: warm and cold OPC observation counts established
+
+The [0563 packet](0563-opc-single-warm-part-observation.md) establishes the observation counts for a source-backed OPC part read as counted invariants rather than estimates: a warm-cache read takes two observations and zero source reads, a cold read takes five. Whole-child `statx` and `pread64` baselines for the four OOXML file-source captures are retained alongside the candidate counts.
+
 ## Change 0562: post-change OOXML read baseline
 
 The [0562 packet](0562-zip-descriptor-read-once.md) retains post-change `strace` captures for the same four cases change 0561 captured, summarized by the same script so the two are computed identically, plus the A/G/G/A latency children. `pptx_file_source_open` falls from 13,592 to 10,216 positional reads over an unchanged 1,262 distinct ranges.

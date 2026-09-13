@@ -153,8 +153,38 @@ targets follow:
    central directory, the detection probes and the structural members. ADR 0011
    makes this `litchi-opc`'s to own, not `soapberry-zip`'s.
 
-Neither is implemented or measured. The counts above are properties of the
+Neither is implemented or measured here. The counts above are properties of the
 retained traces; the coalescing figure is a span model, not a result.
+
+### What removing these reads is already known to be worth
+
+Change [0493](changes/0493-managed-opc-source-read-ahead.md) already built and
+measured the coalescing mechanism, as an opt-in `litchi-opc` forward-start
+window rather than inside the ZIP grammar. It collapsed physical reads from 19
+to 3 per DOCX lifecycle at the cost of 37.29% more source bytes, and measured
+the result on two transports:
+
+| Transport | exact p50 | read-ahead p50 | change |
+| --- | ---: | ---: | ---: |
+| zero delay | 0.386977 ms | 0.390782 ms | +0.98% |
+| zero delay, repeat 2 | 0.393277 ms | 0.385357 ms | −2.01% |
+| 1 ms service plus 100 MiB/s | 23.563178 ms | 3.565722 ms | −84.87% |
+| 1 ms service, repeat 2 | 20.466051 ms | 3.649518 ms | −82.17% |
+
+Its own conclusion about the local arm is that ±2% "is not evidence of a useful
+local-source speedup".
+
+That is the governing fact for everything in this record. The repeated reads are
+real and the counts here are exact, but on a **warm local file** collapsing them
+is already measured to be worth nothing. Their value is on a latency-bearing
+source, where the same collapse is worth about 85%. Any future work here should
+therefore be justified against a range-source measurement, not against the
+warm-cache syscall count — and the first step is to measure the existing
+`SourceReadPolicy::forward_start` window on these selectors, which costs no
+production code. Note that
+`crates/litchi-opc/tests/source_read_ahead.rs:433` contractually pins `exact()`
+as the default and requires existing constructors to stay uninstrumented, so
+enabling it is a policy decision, not a default change.
 
 ## Limitations
 
