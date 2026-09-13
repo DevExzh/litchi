@@ -1,0 +1,10 @@
+{
+  "runner_sha256": "d0e8d91ee993eae3c49beb0aef009007f452846d12ea08ee4bf379aa03d95298",
+  "scope": "Root Python integration checks; source mutation uses a mocked child, RSS fixture is actual GNU time output. Not runtime performance evidence.",
+  "checks": [
+    "GNU time tab-indented RSS parsed from actual child capture",
+    "All four out-of-range counter inputs refused before output creation",
+    "Manifest mutation during mocked child capture is rejected and original manifest retained"
+  ],
+  "status": "passed"
+}
