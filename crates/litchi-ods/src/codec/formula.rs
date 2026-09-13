@@ -22,6 +22,8 @@ use litchi_core::{Error, Resource, ResourceLimit, Result};
 use smallvec::SmallVec;
 use std::{borrow::Cow, convert::TryFrom, sync::Arc};
 
+/// Strict, inert OpenFormula 1.4 expression grammar and flat syntax tree.
+pub mod expression;
 mod functions;
 pub mod reference;
 
@@ -148,7 +150,7 @@ pub enum Token {
     RParen,
     /// Comma (function argument separator)
     Comma,
-    /// Semicolon (array row separator)
+    /// Semicolon (function-parameter or inline-array-column separator)
     Semicolon,
 }
 
