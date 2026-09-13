@@ -40,3 +40,16 @@ separate from the reproduced and corrected list/array classification bug.
 This closes the reproduced list-kind regression for the tested profile. It does
 not establish complete formula support or performance acceptance. The retained
 release-03 capture predates this fix and is not performance evidence for it.
+
+## Follow-up review
+
+The reviewer independently checked the validated `1ddaf` snapshot and confirmed
+that list-plus-array precedence matches `map_binary` and `map_function` in both
+operand orders. No confirmed public `IFNA` blocker remains in current call paths.
+The kind fold can report a different scalar error order than ordinary `XOR`, but
+its current callers use it for shape rejection and recompute scalar values.
+
+A separate source-only concern remains unproven: the geometry helper maps omitted
+handler alternatives to `Empty`, whereas ordinary evaluation preserves `Missing`.
+The reviewer did not establish an externally visible mismatch. Neither concern
+is presented as a reproduced failure or as evidence of complete VM acceptance.
