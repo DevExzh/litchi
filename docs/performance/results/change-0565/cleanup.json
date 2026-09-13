@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "record_kind": "litchi-perf-change-cleanup",
+  "captured_utc": "2026-09-13T22:27:46Z",
+  "batch": [
+    "0565-xls-globals-single-pass",
+    "0566-xls-worksheet-window-design",
+    "0567-ooxml-single-index-per-open"
+  ],
+  "removed": [
+    "the session scratchpad in full, 19,379,394,381 bytes: the staged baseline and candidate release binaries, both isolated cargo target directories, every build and gate log, the raw strace working directories, the OOXML probe cargo packages and their 5.2 GiB of build output, and the working copies of the reports whose content the records carry",
+    "two detached git worktrees created for measurement, one per leg, removed with git worktree remove and pruned",
+    "crates/litchi-xls/tests/tmp_measure_0565.rs, a temporary measurement test that never entered a commit"
+  ],
+  "retained_in_the_repository": [
+    "every latency child and its receipt, the matrix and the analysis for the 40-child A1/B1/B2/A2 run",
+    "the strace -f -c isolation pairs for both sides, six operations each",
+    "the deterministic counter summaries for both sides",
+    "the corpus survey, its generator and its README, which reproduce byte-identically and from which both the chosen and the rejected fill sizes replay",
+    "the capture and analysis drivers, so both sides recompute from the same scripts",
+    "for change 0567, the per-process construction attribution and its generator, which replays from traces change 0562 already published, plus the resolved dynamic-loader stack recaptured for this record"
+  ],
+  "repository_state": "clean; no untracked or modified files remain after the batch commit",
+  "background_tasks": "no measurement process remains; every subagent has completed",
+  "notes": [
+    "target/ is 463 GiB of gitignored build output for the main workspace and is retained as ordinary build state rather than temporary files",
+    "tools/perf-baseline/target is absent; both measurement builds used isolated target directories inside the scratchpad, which were removed with it"
+  ],
+  "revision": "c1d2caf856fdbfa3b60b6de6cb2e85dc9ee9abab"
+}
