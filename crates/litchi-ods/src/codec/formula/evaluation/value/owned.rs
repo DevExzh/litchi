@@ -505,6 +505,9 @@ impl<'a> Measure<'a> {
         match value {
             RuntimeValue::Empty | RuntimeValue::Missing => Ok(()),
             RuntimeValue::Scalar(value) => self.working(value, true),
+            RuntimeValue::ScalarCell(_) => Err(EvaluationFailure::InvalidExpression(
+                "scalar cell token escaped evaluation",
+            )),
             RuntimeValue::Array(array) => {
                 let expected =
                     array
@@ -681,6 +684,9 @@ fn copy_value(
         RuntimeValue::Empty => Ok(OwnedValue::Empty),
         RuntimeValue::Missing => Ok(OwnedValue::Error(ScalarError::Value)),
         RuntimeValue::Scalar(value) => copy_working(value, execution, limits),
+        RuntimeValue::ScalarCell(_) => Err(EvaluationFailure::InvalidExpression(
+            "scalar cell token escaped evaluation",
+        )),
         RuntimeValue::Array(array) => {
             execution.check().map_err(map_execution_error)?;
             let mut cells =

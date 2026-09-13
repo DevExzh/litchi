@@ -791,6 +791,7 @@ impl<'a> Evaluated<'a> {
             RuntimeValue::Empty
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
+            | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Areas(_) => None,
         }
     }
@@ -809,6 +810,7 @@ impl<'a> Evaluated<'a> {
             RuntimeValue::Empty
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
+            | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_)
             | RuntimeValue::Areas(_) => None,
         }
@@ -825,6 +827,7 @@ impl<'a> Evaluated<'a> {
             RuntimeValue::Empty
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
+            | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_) => None,
         }
     }
@@ -1166,6 +1169,10 @@ enum RuntimeValue<'a> {
     Empty,
     Missing,
     Scalar(WorkingValue<'a>),
+    /// A scalar-demand reference token.  The cell geometry is retained until
+    /// its consuming operation projects it, which preserves sibling resolver
+    /// ordering without allocating first-class reference metadata vectors.
+    ScalarCell(RuntimeArea<'a>),
     Array(RuntimeArrayValue<'a>),
     Areas(RuntimeAreaSet<'a>),
 }
@@ -1229,6 +1236,10 @@ impl<'a> RuntimeValue<'a> {
             Self::Scalar(WorkingValue::Logical(value)) => Value::Logical(*value),
             Self::Scalar(WorkingValue::Text(value)) => Value::Text(value.text.as_ref()),
             Self::Scalar(WorkingValue::Error(error)) => Value::Error(*error),
+            // The evaluator consumes this private token before constructing
+            // `Evaluated`; keep a defensive projection for any future frame
+            // path that reaches the borrowed inspection boundary.
+            Self::ScalarCell(_) => Value::Error(ScalarError::Value),
             Self::Array(array) => Value::Array(ArrayView {
                 shape: array.shape,
                 cells: &array.cells,
@@ -1249,7 +1260,11 @@ impl<'a> RuntimeValue<'a> {
     fn shape(&self) -> Option<Shape> {
         match self {
             Self::Array(array) => Some(array.shape),
-            Self::Empty | Self::Missing | Self::Scalar(_) | Self::Areas(_) => None,
+            Self::Empty
+            | Self::Missing
+            | Self::Scalar(_)
+            | Self::ScalarCell(_)
+            | Self::Areas(_) => None,
         }
     }
 }
@@ -1363,6 +1378,7 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
 #[derive(Clone, Copy)]
 enum ValueFrame<'a> {
     Visit(super::Node<'a>),
+    VisitScalar(super::Node<'a>),
     VisitArgument(super::Node<'a>),
     Apply(super::Node<'a>),
     IfAfterCondition(super::Node<'a>),
@@ -1661,11 +1677,32 @@ where
     }
 
     fn run_from(&mut self, root: super::Node<'expr>) -> EvaluationResult<RuntimeValue<'expr>> {
-        self.push_frame(ValueFrame::Visit(root))?;
+        self.run_from_with_demand(root, self.mode == Mode::Scalar)
+    }
+
+    fn run_from_without_scalar_demand(
+        &mut self,
+        root: super::Node<'expr>,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        self.run_from_with_demand(root, false)
+    }
+
+    fn run_from_with_demand(
+        &mut self,
+        root: super::Node<'expr>,
+        scalar_demand: bool,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        let frame = if scalar_demand {
+            ValueFrame::VisitScalar(root)
+        } else {
+            ValueFrame::Visit(root)
+        };
+        self.push_frame(frame)?;
         while let Some(frame) = self.frames.pop() {
             self.scalar.step()?;
             match frame {
                 ValueFrame::Visit(node) => self.visit(node)?,
+                ValueFrame::VisitScalar(node) => self.visit_scalar(node)?,
                 ValueFrame::VisitArgument(node) => self.visit_argument(node)?,
                 ValueFrame::Apply(node) => self.apply(node)?,
                 ValueFrame::IfAfterCondition(node) => self.finish_if(node)?,
@@ -1696,7 +1733,12 @@ where
             // A bare reference is a first-class result in matrix mode.  A
             // consuming operator/function calls `materialize_for_array` (or
             // `project_scalar`) explicitly when it needs cell values.
-            Mode::Matrix => Ok(value),
+            Mode::Matrix => match value {
+                RuntimeValue::ScalarCell(_) => Err(EvaluationFailure::InvalidExpression(
+                    "scalar cell token escaped matrix evaluation",
+                )),
+                value => Ok(value),
+            },
             Mode::Scalar => self.project_scalar(value),
         }
     }
@@ -1734,9 +1776,9 @@ where
             RuntimeValue::Empty => Ok(RuntimeElement::Empty),
             RuntimeValue::Missing => Ok(RuntimeElement::Missing),
             RuntimeValue::Scalar(value) => Ok(RuntimeElement::Present(value)),
-            RuntimeValue::Array(_) | RuntimeValue::Areas(_) => Err(EvaluationFailure::Unsupported(
-                super::UnsupportedKind::Array,
-            )),
+            RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => Err(
+                EvaluationFailure::Unsupported(super::UnsupportedKind::Array),
+            ),
         }
     }
 
@@ -1746,6 +1788,7 @@ where
     ) -> EvaluationResult<RuntimeValue<'expr>> {
         match value {
             RuntimeValue::Scalar(_) | RuntimeValue::Empty => Ok(value),
+            RuntimeValue::ScalarCell(area) => self.project_scalar_cell(area),
             RuntimeValue::Missing => Ok(RuntimeValue::Scalar(WorkingValue::Error(
                 ScalarError::Value,
             ))),
@@ -1755,6 +1798,24 @@ where
             },
             RuntimeValue::Areas(areas) => self.project_area_value(&areas),
         }
+    }
+
+    fn project_scalar_cell(
+        &mut self,
+        area: RuntimeArea<'expr>,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        // Keep the same current-sheet probe and read/conversion sequence as
+        // `project_area_value`.  A scalar cell has one area, so the probe is
+        // intentionally not used to reject a named endpoint on another
+        // sheet; the ordinary single-area projection has the same behavior.
+        let _ = self
+            .resolver
+            .sheet_index(self.position.sheet, self.execution)?;
+        self.scalar.charge_work(1)?;
+        let read =
+            self.read_reference_cell(area.sheet, area.rect.row_start, area.rect.column_start)?;
+        let element = self.read_to_element(read)?;
+        self.element_to_runtime(element)
     }
 
     fn project_array_element(
@@ -1912,6 +1973,22 @@ where
     }
 
     fn visit(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+        self.visit_with_demand(node, false)
+    }
+
+    /// Visit a value that is known to be consumed as one scalar.  This demand
+    /// is deliberately propagated only through grouping, unary and ordinary
+    /// arithmetic nodes.  Reference operators and generic function arguments
+    /// still use `visit`, because they require first-class areas/sequences.
+    fn visit_scalar(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+        self.visit_with_demand(node, true)
+    }
+
+    fn visit_with_demand(
+        &mut self,
+        node: super::Node<'expr>,
+        scalar_demand: bool,
+    ) -> EvaluationResult<()> {
         if let Some((demand, index)) = self.projection {
             if let Some(value) = self.condition_cache_get(node, demand, index)?.value {
                 return self.push_value(value);
@@ -1930,15 +2007,26 @@ where
                 self.scalar.charge_bytes(node.text().len())?;
                 self.push_scalar(WorkingValue::Error(parse_error(node.text())))
             },
-            super::Kind::Parenthesized => self.push_frame(ValueFrame::Visit(node.child(0).ok_or(
-                EvaluationFailure::InvalidExpression("parenthesized value node has no child"),
-            )?)),
+            super::Kind::Parenthesized => {
+                let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                    "parenthesized value node has no child",
+                ))?;
+                self.push_frame(if scalar_demand {
+                    ValueFrame::VisitScalar(child)
+                } else {
+                    ValueFrame::Visit(child)
+                })
+            },
             super::Kind::Prefix(_) | super::Kind::Postfix(_) => {
                 let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
                     "unary value node has no child",
                 ))?;
                 self.push_frame(ValueFrame::Apply(node))?;
-                self.push_frame(ValueFrame::Visit(child))
+                self.push_frame(if scalar_demand {
+                    ValueFrame::VisitScalar(child)
+                } else {
+                    ValueFrame::Visit(child)
+                })
             },
             super::Kind::Infix(operator) => {
                 let left = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
@@ -1948,8 +2036,21 @@ where
                     "infix value node has no right child",
                 ))?;
                 self.push_frame(ValueFrame::Apply(node))?;
-                self.push_frame(ValueFrame::Visit(right))?;
-                self.push_frame(ValueFrame::Visit(left))?;
+                let reference_operator = matches!(
+                    operator,
+                    super::InfixOperator::Range
+                        | super::InfixOperator::Intersection
+                        | super::InfixOperator::Union
+                );
+                let frame = |node| {
+                    if scalar_demand && !reference_operator {
+                        ValueFrame::VisitScalar(node)
+                    } else {
+                        ValueFrame::Visit(node)
+                    }
+                };
+                self.push_frame(frame(right))?;
+                self.push_frame(frame(left))?;
                 // Operators are handled in `apply`, including the three
                 // reference operators.  Keep this match binding so a future
                 // operation-specific admission can be added without another
@@ -1964,7 +2065,11 @@ where
                         return self.push_value(value);
                     }
                 }
-                let value = self.reference_value(reference)?;
+                let value = if scalar_demand && self.mode == Mode::Scalar {
+                    self.reference_scalar_value(reference)?
+                } else {
+                    self.reference_value(reference)?
+                };
                 self.push_value(value)
             },
             super::Kind::Array(dimensions) => self.visit_array(node, dimensions),
@@ -2647,6 +2752,7 @@ where
             RuntimeValue::Scalar(WorkingValue::Logical(value)) => DemandCacheValue::Logical(*value),
             RuntimeValue::Scalar(WorkingValue::Error(error)) => DemandCacheValue::Error(*error),
             RuntimeValue::Scalar(WorkingValue::Text(_))
+            | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_)
             | RuntimeValue::Areas(_) => return Ok(()),
         };
@@ -2862,7 +2968,9 @@ where
                 ConditionCacheValue::Text(text)
             },
             RuntimeValue::Scalar(WorkingValue::Error(error)) => ConditionCacheValue::Error(*error),
-            RuntimeValue::Array(_) | RuntimeValue::Areas(_) => return Ok(()),
+            RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => {
+                return Ok(());
+            },
         };
         self.condition_cache_set_shape(node, demand)?;
         let (position, present) = self.condition_cache_position(node, demand, index)?;
@@ -3522,9 +3630,10 @@ where
             RuntimeValue::Areas(_) => ReferenceOperandKind::Reference,
             RuntimeValue::Array(_) => ReferenceOperandKind::Array,
             RuntimeValue::Scalar(WorkingValue::Error(error)) => ReferenceOperandKind::Error(*error),
-            RuntimeValue::Empty | RuntimeValue::Missing | RuntimeValue::Scalar(_) => {
-                ReferenceOperandKind::Scalar
-            },
+            RuntimeValue::Empty
+            | RuntimeValue::Missing
+            | RuntimeValue::Scalar(_)
+            | RuntimeValue::ScalarCell(_) => ReferenceOperandKind::Scalar,
         }
     }
 
@@ -4411,6 +4520,7 @@ where
             RuntimeValue::Empty
             | RuntimeValue::Missing
             | RuntimeValue::Scalar(_)
+            | RuntimeValue::ScalarCell(_)
             | RuntimeValue::Array(_) => Ok(Some(Shape::new(1, 1)?)),
         }
     }
@@ -4808,7 +4918,7 @@ where
         self.position = position;
         self.projection = Some((demand, index));
         let result = self
-            .run_from(probe_root)
+            .run_from_without_scalar_demand(probe_root)
             .and_then(|value| self.project_scalar(value));
         let result = match result {
             Ok(value) => match cache_lookup.key {
@@ -4973,9 +5083,10 @@ where
             RuntimeValue::Areas(_) => Err(EvaluationFailure::Unsupported(
                 super::UnsupportedKind::Reference,
             )),
-            RuntimeValue::Empty | RuntimeValue::Missing | RuntimeValue::Scalar(_) => {
-                Shape::new(1, 1)
-            },
+            RuntimeValue::Empty
+            | RuntimeValue::Missing
+            | RuntimeValue::Scalar(_)
+            | RuntimeValue::ScalarCell(_) => Shape::new(1, 1),
         }
     }
 
@@ -5005,6 +5116,10 @@ where
             RuntimeValue::Empty => Ok(RuntimeElement::Empty),
             RuntimeValue::Missing => Ok(RuntimeElement::Missing),
             RuntimeValue::Scalar(value) => self.clone_working(value).map(RuntimeElement::Present),
+            RuntimeValue::ScalarCell(area) => {
+                let value = self.project_scalar(RuntimeValue::ScalarCell(*area))?;
+                self.runtime_to_element(value)
+            },
             RuntimeValue::Array(array) => array_element_for(array, output, index)
                 .map(|element| self.clone_element(element))
                 .transpose()?
@@ -5249,6 +5364,31 @@ where
                         &mut result,
                         &mut error,
                     )?;
+                },
+                RuntimeValue::ScalarCell(area) => {
+                    let projected = self.project_scalar(RuntimeValue::ScalarCell(area))?;
+                    match projected {
+                        RuntimeValue::Scalar(value) => self.accumulate_scalar_sequence(
+                            value,
+                            argument_index,
+                            conjunction,
+                            &mut result,
+                            &mut error,
+                        )?,
+                        RuntimeValue::Empty => {},
+                        RuntimeValue::Missing => {
+                            if error.is_none() {
+                                error = Some(ScalarError::Value);
+                            }
+                        },
+                        RuntimeValue::ScalarCell(_)
+                        | RuntimeValue::Array(_)
+                        | RuntimeValue::Areas(_) => {
+                            return Err(EvaluationFailure::InvalidExpression(
+                                "scalar cell projection remained non-scalar",
+                            ));
+                        },
+                    }
                 },
             }
         }
@@ -5527,7 +5667,9 @@ where
                 RuntimeValue::Empty => RuntimeElement::Empty,
                 RuntimeValue::Missing => RuntimeElement::Missing,
                 RuntimeValue::Scalar(value) => RuntimeElement::Present(value),
-                RuntimeValue::Array(_) | RuntimeValue::Areas(_) => RuntimeElement::Missing,
+                RuntimeValue::ScalarCell(_) | RuntimeValue::Array(_) | RuntimeValue::Areas(_) => {
+                    RuntimeElement::Missing
+                },
             })
     }
 
@@ -5749,6 +5891,10 @@ where
                 Ok(scalar::Slot::Value(WorkingValue::Error(ScalarError::Value)))
             },
             RuntimeValue::Scalar(value) => Ok(scalar::Slot::Value(value)),
+            RuntimeValue::ScalarCell(area) => {
+                let projected = self.project_scalar(RuntimeValue::ScalarCell(area))?;
+                self.value_to_slot(projected)
+            },
             RuntimeValue::Array(array) => {
                 let projected = self.project_scalar(RuntimeValue::Array(array))?;
                 self.value_to_slot(projected)
@@ -5769,6 +5915,10 @@ where
             RuntimeValue::Missing => Ok(Err(ScalarError::Value)),
             RuntimeValue::Scalar(value) => {
                 scalar::logical(&mut self.scalar, scalar::Slot::Value(value))
+            },
+            RuntimeValue::ScalarCell(area) => {
+                let projected = self.project_scalar(RuntimeValue::ScalarCell(area))?;
+                self.scalar_logical(projected)
             },
             RuntimeValue::Array(_) | RuntimeValue::Areas(_) => Ok(Err(ScalarError::Value)),
         }
@@ -5823,6 +5973,10 @@ where
             RuntimeValue::Empty => Ok(RuntimeElement::Empty),
             RuntimeValue::Missing => Ok(RuntimeElement::Missing),
             RuntimeValue::Scalar(value) => Ok(RuntimeElement::Present(self.clone_working(value)?)),
+            RuntimeValue::ScalarCell(area) => {
+                let projected = self.project_scalar(RuntimeValue::ScalarCell(*area))?;
+                self.element_for_value(&projected, shape, index)
+            },
             RuntimeValue::Array(array) => array_element_for(array, shape, index)
                 .map(|element| self.clone_element(element))
                 .transpose()
@@ -5890,6 +6044,7 @@ where
                 WorkingValue::Error(ScalarError::Value),
             )),
             RuntimeValue::Areas(areas) => self.materialize_areas(areas).map(RuntimeValue::Array),
+            RuntimeValue::ScalarCell(area) => self.project_scalar(RuntimeValue::ScalarCell(area)),
             other => Ok(other),
         }
     }
