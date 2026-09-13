@@ -1,0 +1,1299 @@
+{
+  "schema_version": 1,
+  "analysis_kind": "litchi-perf-change-0558-analysis",
+  "gates": {
+    "one_semantic_projection_per_cell": true,
+    "one_input_identity": true,
+    "read_work_identical_per_cell": true,
+    "one_binary_per_stage": true,
+    "stages_differ": true
+  },
+  "deterministic_counters": [
+    {
+      "mode": "file-source",
+      "operation": "open",
+      "baseline_version_calls": 1266,
+      "candidate_version_calls": 644,
+      "version_calls_change_percent": -49.13112164296998,
+      "read_calls": 655,
+      "read_calls_unchanged": true,
+      "read_bytes": 567685,
+      "read_bytes_unchanged": true
+    },
+    {
+      "mode": "file-source",
+      "operation": "list",
+      "baseline_version_calls": 1266,
+      "candidate_version_calls": 644,
+      "version_calls_change_percent": -49.13112164296998,
+      "read_calls": 655,
+      "read_calls_unchanged": true,
+      "read_bytes": 567685,
+      "read_bytes_unchanged": true
+    },
+    {
+      "mode": "file-source",
+      "operation": "one-cell",
+      "baseline_version_calls": 1813,
+      "candidate_version_calls": 925,
+      "version_calls_change_percent": -48.97959183673469,
+      "read_calls": 921,
+      "read_calls_unchanged": true,
+      "read_bytes": 569398,
+      "read_bytes_unchanged": true
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "open",
+      "baseline_version_calls": 1266,
+      "candidate_version_calls": 644,
+      "version_calls_change_percent": -49.13112164296998,
+      "read_calls": 655,
+      "read_calls_unchanged": true,
+      "read_bytes": 567685,
+      "read_bytes_unchanged": true
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "list",
+      "baseline_version_calls": 1266,
+      "candidate_version_calls": 644,
+      "version_calls_change_percent": -49.13112164296998,
+      "read_calls": 655,
+      "read_calls_unchanged": true,
+      "read_bytes": 567685,
+      "read_bytes_unchanged": true
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "baseline_version_calls": 1813,
+      "candidate_version_calls": 925,
+      "version_calls_change_percent": -48.97959183673469,
+      "read_calls": 921,
+      "read_calls_unchanged": true,
+      "read_bytes": 569398,
+      "read_bytes_unchanged": true
+    }
+  ],
+  "syscalls": [
+    {
+      "mode": "file-source",
+      "operation": "open",
+      "baseline": {
+        "statx": 7630,
+        "pread64": 3934,
+        "read": 13,
+        "openat": 44
+      },
+      "candidate": {
+        "statx": 3898,
+        "pread64": 3934,
+        "read": 13,
+        "openat": 44
+      },
+      "statx_change_percent": -48.91218872870249,
+      "pread64_unchanged": true
+    },
+    {
+      "mode": "file-source",
+      "operation": "list",
+      "baseline": {
+        "statx": 7630,
+        "pread64": 3934,
+        "read": 13,
+        "openat": 44
+      },
+      "candidate": {
+        "statx": 3898,
+        "pread64": 3934,
+        "read": 13,
+        "openat": 44
+      },
+      "statx_change_percent": -48.91218872870249,
+      "pread64_unchanged": true
+    },
+    {
+      "mode": "file-source",
+      "operation": "one-cell",
+      "baseline": {
+        "statx": 10912,
+        "pread64": 5530,
+        "read": 13,
+        "openat": 44
+      },
+      "candidate": {
+        "statx": 5584,
+        "pread64": 5530,
+        "read": 13,
+        "openat": 44
+      },
+      "statx_change_percent": -48.82697947214076,
+      "pread64_unchanged": true
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "open",
+      "baseline": {
+        "statx": 4,
+        "pread64": 4,
+        "read": 13,
+        "openat": 38
+      },
+      "candidate": {
+        "statx": 4,
+        "pread64": 4,
+        "read": 13,
+        "openat": 38
+      },
+      "statx_change_percent": 0.0,
+      "pread64_unchanged": true
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "list",
+      "baseline": {
+        "statx": 4,
+        "pread64": 4,
+        "read": 13,
+        "openat": 38
+      },
+      "candidate": {
+        "statx": 4,
+        "pread64": 4,
+        "read": 13,
+        "openat": 38
+      },
+      "statx_change_percent": 0.0,
+      "pread64_unchanged": true
+    },
+    {
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "baseline": {
+        "statx": 4,
+        "pread64": 4,
+        "read": 13,
+        "openat": 38
+      },
+      "candidate": {
+        "statx": 4,
+        "pread64": 4,
+        "read": 12,
+        "openat": 38
+      },
+      "statx_change_percent": 0.0,
+      "pread64_unchanged": true
+    }
+  ],
+  "latency_comparisons": [
+    {
+      "repeat": "R1",
+      "mode": "file-source",
+      "operation": "open",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 504602.0,
+            "candidate_ns": 368977.0,
+            "change_percent": -26.877618400244152
+          },
+          "mean": {
+            "baseline_ns": 505026.09,
+            "candidate_ns": 370828.08,
+            "change_percent": -26.572490542023285
+          },
+          "p95": {
+            "baseline_ns": 510184.0,
+            "candidate_ns": 376303.0,
+            "change_percent": -26.241708873661267
+          },
+          "p99": {
+            "baseline_ns": 519767.50000000076,
+            "candidate_ns": 377153.89999999997,
+            "change_percent": -27.43796024183901
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 507112.5,
+            "candidate_ns": 366692.0,
+            "change_percent": -27.69020680815401
+          },
+          "mean": {
+            "baseline_ns": 506233.5,
+            "candidate_ns": 367723.87,
+            "change_percent": -27.360818673596278
+          },
+          "p95": {
+            "baseline_ns": 512657.5,
+            "candidate_ns": 374224.5,
+            "change_percent": -27.003018584532555
+          },
+          "p99": {
+            "baseline_ns": 525460.8,
+            "candidate_ns": 374770.49,
+            "change_percent": -28.677745323723492
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R1",
+      "mode": "file-source",
+      "operation": "list",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 505957.0,
+            "candidate_ns": 364966.5,
+            "change_percent": -27.866103245928013
+          },
+          "mean": {
+            "baseline_ns": 504612.78,
+            "candidate_ns": 366595.75,
+            "change_percent": -27.351076998089507
+          },
+          "p95": {
+            "baseline_ns": 509525.0,
+            "candidate_ns": 372234.0,
+            "change_percent": -26.94489966144939
+          },
+          "p99": {
+            "baseline_ns": 512119.39,
+            "candidate_ns": 372709.60000000003,
+            "change_percent": -27.22212685600519
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 507488.0,
+            "candidate_ns": 366712.0,
+            "change_percent": -27.73976921621792
+          },
+          "mean": {
+            "baseline_ns": 506323.57,
+            "candidate_ns": 367510.77,
+            "change_percent": -27.41582818275673
+          },
+          "p95": {
+            "baseline_ns": 512195.5,
+            "candidate_ns": 372814.5,
+            "change_percent": -27.212460866993172
+          },
+          "p99": {
+            "baseline_ns": 514055.5000000001,
+            "candidate_ns": 374202.0,
+            "change_percent": -27.205914536465436
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R1",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 686338.5,
+            "candidate_ns": 489793.0,
+            "change_percent": -28.63681696422392
+          },
+          "mean": {
+            "baseline_ns": 685737.81,
+            "candidate_ns": 488921.5,
+            "change_percent": -28.701393904472038
+          },
+          "p95": {
+            "baseline_ns": 691694.55,
+            "candidate_ns": 494435.5,
+            "change_percent": -28.518231060227382
+          },
+          "p99": {
+            "baseline_ns": 695017.6900000001,
+            "candidate_ns": 495696.51,
+            "change_percent": -28.678576512203602
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 687168.5,
+            "candidate_ns": 491757.5,
+            "change_percent": -28.437130048889024
+          },
+          "mean": {
+            "baseline_ns": 686771.04,
+            "candidate_ns": 491313.24,
+            "change_percent": -28.46040217420933
+          },
+          "p95": {
+            "baseline_ns": 692438.5,
+            "candidate_ns": 497582.05,
+            "change_percent": -28.14061465386457
+          },
+          "p99": {
+            "baseline_ns": 696414.29,
+            "candidate_ns": 508156.7900000001,
+            "change_percent": -27.032400498272363
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R1",
+      "mode": "owned-readat",
+      "operation": "open",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 209651.5,
+            "candidate_ns": 178721.0,
+            "change_percent": -14.753292964753411
+          },
+          "mean": {
+            "baseline_ns": 211650.58,
+            "candidate_ns": 180784.72,
+            "change_percent": -14.583404401726652
+          },
+          "p95": {
+            "baseline_ns": 218232.0,
+            "candidate_ns": 187822.45,
+            "change_percent": -13.934505480406168
+          },
+          "p99": {
+            "baseline_ns": 219247.60000000012,
+            "candidate_ns": 200274.6,
+            "change_percent": -8.653686516979025
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 208886.0,
+            "candidate_ns": 178561.0,
+            "change_percent": -14.517488007812872
+          },
+          "mean": {
+            "baseline_ns": 211463.99,
+            "candidate_ns": 180326.1,
+            "change_percent": -14.724913683885369
+          },
+          "p95": {
+            "baseline_ns": 219152.0,
+            "candidate_ns": 186880.5,
+            "change_percent": -14.72562422428269
+          },
+          "p99": {
+            "baseline_ns": 229358.30000000002,
+            "candidate_ns": 189600.8000000001,
+            "change_percent": -17.334232072700186
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R1",
+      "mode": "owned-readat",
+      "operation": "list",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 209711.0,
+            "candidate_ns": 179415.5,
+            "change_percent": -14.446309444902747
+          },
+          "mean": {
+            "baseline_ns": 211430.46,
+            "candidate_ns": 180789.13,
+            "change_percent": -14.49239149363814
+          },
+          "p95": {
+            "baseline_ns": 217822.05,
+            "candidate_ns": 187467.0,
+            "change_percent": -13.935710365410658
+          },
+          "p99": {
+            "baseline_ns": 220441.6,
+            "candidate_ns": 187874.30000000002,
+            "change_percent": -14.773663410173029
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 210226.0,
+            "candidate_ns": 179660.5,
+            "change_percent": -14.539352886893154
+          },
+          "mean": {
+            "baseline_ns": 212237.58,
+            "candidate_ns": 181273.62,
+            "change_percent": -14.589291868103658
+          },
+          "p95": {
+            "baseline_ns": 219182.05,
+            "candidate_ns": 188048.0,
+            "change_percent": -14.204653163888187
+          },
+          "p99": {
+            "baseline_ns": 221384.21000000014,
+            "candidate_ns": 189575.6,
+            "change_percent": -14.368057234072888
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R1",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 266181.0,
+            "candidate_ns": 223641.0,
+            "change_percent": -15.981606500839654
+          },
+          "mean": {
+            "baseline_ns": 268061.96,
+            "candidate_ns": 225165.67,
+            "change_percent": -16.00237870378923
+          },
+          "p95": {
+            "baseline_ns": 274313.5,
+            "candidate_ns": 230946.05,
+            "change_percent": -15.809447949153071
+          },
+          "p99": {
+            "baseline_ns": 276253.10000000003,
+            "candidate_ns": 231944.60000000003,
+            "change_percent": -16.03909603186353
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 266326.0,
+            "candidate_ns": 222626.5,
+            "change_percent": -16.408274070124584
+          },
+          "mean": {
+            "baseline_ns": 268529.88,
+            "candidate_ns": 224841.24,
+            "change_percent": -16.26956374463803
+          },
+          "p95": {
+            "baseline_ns": 274329.5,
+            "candidate_ns": 232965.95,
+            "change_percent": -15.078053946075793
+          },
+          "p99": {
+            "baseline_ns": 292406.51,
+            "candidate_ns": 237770.80000000005,
+            "change_percent": -18.684847338043177
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R2",
+      "mode": "file-source",
+      "operation": "open",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 510407.0,
+            "candidate_ns": 366442.0,
+            "change_percent": -28.205921940725737
+          },
+          "mean": {
+            "baseline_ns": 511379.48,
+            "candidate_ns": 368249.09,
+            "change_percent": -27.98907574468963
+          },
+          "p95": {
+            "baseline_ns": 520638.5,
+            "candidate_ns": 374610.5,
+            "change_percent": -28.047868146516247
+          },
+          "p99": {
+            "baseline_ns": 531710.1,
+            "candidate_ns": 376239.1,
+            "change_percent": -29.239805676062954
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 515677.5,
+            "candidate_ns": 366242.0,
+            "change_percent": -28.97847976690858
+          },
+          "mean": {
+            "baseline_ns": 514570.2,
+            "candidate_ns": 367871.86,
+            "change_percent": -28.508907045141758
+          },
+          "p95": {
+            "baseline_ns": 521489.55,
+            "candidate_ns": 374543.0,
+            "change_percent": -28.178234827524346
+          },
+          "p99": {
+            "baseline_ns": 523649.89,
+            "candidate_ns": 376092.0,
+            "change_percent": -28.178730258111962
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R2",
+      "mode": "file-source",
+      "operation": "list",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 505588.0,
+            "candidate_ns": 364936.5,
+            "change_percent": -27.81939049186294
+          },
+          "mean": {
+            "baseline_ns": 504664.89,
+            "candidate_ns": 366508.36,
+            "change_percent": -27.375894923064692
+          },
+          "p95": {
+            "baseline_ns": 509459.5,
+            "candidate_ns": 372249.5,
+            "change_percent": -26.932464700334375
+          },
+          "p99": {
+            "baseline_ns": 510997.9,
+            "candidate_ns": 372998.8,
+            "change_percent": -27.005805699005812
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 506652.5,
+            "candidate_ns": 365312.0,
+            "change_percent": -27.89693132867202
+          },
+          "mean": {
+            "baseline_ns": 505621.49,
+            "candidate_ns": 367344.38,
+            "change_percent": -27.34794955016647
+          },
+          "p95": {
+            "baseline_ns": 511558.44999999995,
+            "candidate_ns": 374053.0,
+            "change_percent": -26.87971433176404
+          },
+          "p99": {
+            "baseline_ns": 514408.7,
+            "candidate_ns": 375553.19,
+            "change_percent": -26.99322736959931
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R2",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 686273.5,
+            "candidate_ns": 490487.5,
+            "change_percent": -28.528859121035566
+          },
+          "mean": {
+            "baseline_ns": 685906.52,
+            "candidate_ns": 489690.29,
+            "change_percent": -28.606847183782424
+          },
+          "p95": {
+            "baseline_ns": 692010.05,
+            "candidate_ns": 494822.0,
+            "change_percent": -28.49496911208154
+          },
+          "p99": {
+            "baseline_ns": 693851.0900000001,
+            "candidate_ns": 497479.81,
+            "change_percent": -28.3016461068037
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 684743.0,
+            "candidate_ns": 492813.0,
+            "change_percent": -28.02949427741503
+          },
+          "mean": {
+            "baseline_ns": 684119.73,
+            "candidate_ns": 492172.22,
+            "change_percent": -28.057590153115452
+          },
+          "p95": {
+            "baseline_ns": 689970.0,
+            "candidate_ns": 497682.0,
+            "change_percent": -27.86903778425149
+          },
+          "p99": {
+            "baseline_ns": 692046.5,
+            "candidate_ns": 508600.8,
+            "change_percent": -26.507712993274296
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R2",
+      "mode": "owned-readat",
+      "operation": "open",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 209391.5,
+            "candidate_ns": 178591.0,
+            "change_percent": -14.709527368589463
+          },
+          "mean": {
+            "baseline_ns": 211546.98,
+            "candidate_ns": 180176.73,
+            "change_percent": -14.82897557790709
+          },
+          "p95": {
+            "baseline_ns": 218593.0,
+            "candidate_ns": 186874.0,
+            "change_percent": -14.510528699455152
+          },
+          "p99": {
+            "baseline_ns": 224810.30000000005,
+            "candidate_ns": 188922.20000000013,
+            "change_percent": -15.963725861315034
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 209781.0,
+            "candidate_ns": 178621.0,
+            "change_percent": -14.853585405732645
+          },
+          "mean": {
+            "baseline_ns": 211544.67,
+            "candidate_ns": 180203.54,
+            "change_percent": -14.815372091388548
+          },
+          "p95": {
+            "baseline_ns": 219376.5,
+            "candidate_ns": 187544.0,
+            "change_percent": -14.510442093843235
+          },
+          "p99": {
+            "baseline_ns": 223735.30000000002,
+            "candidate_ns": 191397.19999999998,
+            "change_percent": -14.453731708854184
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R2",
+      "mode": "owned-readat",
+      "operation": "list",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 209731.0,
+            "candidate_ns": 179625.5,
+            "change_percent": -14.35433960644826
+          },
+          "mean": {
+            "baseline_ns": 211385.28,
+            "candidate_ns": 181175.44,
+            "change_percent": -14.29136409119878
+          },
+          "p95": {
+            "baseline_ns": 217692.0,
+            "candidate_ns": 187836.5,
+            "change_percent": -13.714560020579533
+          },
+          "p99": {
+            "baseline_ns": 219019.61000000002,
+            "candidate_ns": 189028.90000000008,
+            "change_percent": -13.69316199585961
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 209926.0,
+            "candidate_ns": 179601.0,
+            "change_percent": -14.44556653296876
+          },
+          "mean": {
+            "baseline_ns": 211617.5,
+            "candidate_ns": 180948.54,
+            "change_percent": -14.492638841305656
+          },
+          "p95": {
+            "baseline_ns": 218161.05,
+            "candidate_ns": 187453.5,
+            "change_percent": -14.075633574370855
+          },
+          "p99": {
+            "baseline_ns": 220588.51000000004,
+            "candidate_ns": 189588.09,
+            "change_percent": -14.05350623203359
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    {
+      "repeat": "R2",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "directions": {
+        "first": {
+          "p50": {
+            "baseline_ns": 266426.5,
+            "candidate_ns": 222756.0,
+            "change_percent": -16.391199824341797
+          },
+          "mean": {
+            "baseline_ns": 268479.78,
+            "candidate_ns": 224572.15,
+            "change_percent": -16.35416641059525
+          },
+          "p95": {
+            "baseline_ns": 274439.45,
+            "candidate_ns": 231261.45,
+            "change_percent": -15.7331608119751
+          },
+          "p99": {
+            "baseline_ns": 278409.9900000001,
+            "candidate_ns": 234336.49,
+            "change_percent": -15.830430510054649
+          }
+        },
+        "second": {
+          "p50": {
+            "baseline_ns": 266131.5,
+            "candidate_ns": 223126.5,
+            "change_percent": -16.1593047046291
+          },
+          "mean": {
+            "baseline_ns": 268254.38,
+            "candidate_ns": 224839.35,
+            "change_percent": -16.184276282832734
+          },
+          "p95": {
+            "baseline_ns": 275440.5,
+            "candidate_ns": 231963.0,
+            "change_percent": -15.784715755308316
+          },
+          "p99": {
+            "baseline_ns": 277537.7000000001,
+            "candidate_ns": 234770.5,
+            "change_percent": -15.40951013141642
+          }
+        }
+      },
+      "improves_both_directions": {
+        "p50": true,
+        "mean": true,
+        "p95": true,
+        "p99": true
+      }
+    }
+  ],
+  "same_binary_stability": [
+    {
+      "repeat": "R1",
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": 0.4975208183875609,
+        "mean": 0.2390787374965072,
+        "p95": 0.48482508271525565,
+        "p99": 1.0953551347476096
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": 0.30259488454552463,
+        "mean": 0.3390302560311649,
+        "p95": 0.5241155978607527,
+        "p99": 0.3780583273755954
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": 0.12093158113671315,
+        "mean": 0.15067420593301997,
+        "p95": 0.10755470026472717,
+        "p99": 0.20094452559905007
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": -0.3651297510392246,
+        "mean": -0.08815945602416801,
+        "p95": 0.42156970563437074,
+        "p99": 4.61154420846563
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": 0.2455760546657066,
+        "mean": 0.38174253605653385,
+        "p95": 0.6243628686811092,
+        "p99": 0.42760077952624714
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": 0.05447421115706982,
+        "mean": 0.1745566584680585,
+        "p95": 0.005832742464370146,
+        "p99": 5.847322618280111
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": -0.6192797925073921,
+        "mean": -0.8371021957129086,
+        "p95": -0.5523474434166085,
+        "p99": -0.6319462691490064
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": 0.4782630734601669,
+        "mean": 0.24959918384215274,
+        "p95": 0.15595028933412852,
+        "p99": 0.40041898571970375
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": 0.40108780648151365,
+        "mean": 0.48918691446377194,
+        "p95": 0.6363924111436149,
+        "p99": 2.5136912906649442
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": -0.08952501384840059,
+        "mean": -0.253682944001017,
+        "p95": -0.5015108683759645,
+        "p99": -5.329582483250447
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": 0.13655453402855383,
+        "mean": 0.26798624452697495,
+        "p95": 0.30992121280011947,
+        "p99": 0.9055522761761392
+      }
+    },
+    {
+      "repeat": "R1",
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": -0.45362880688245893,
+        "mean": -0.14408501971016366,
+        "p95": 0.8746198516926457,
+        "p99": 2.511892926155647
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": 1.032607311420102,
+        "mean": 0.6239436905055381,
+        "p95": 0.16346274814482378,
+        "p99": -1.5159031208923741
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": 0.2105469275378371,
+        "mean": 0.18955152596408614,
+        "p95": 0.4119954579313868,
+        "p99": 0.6674782812218971
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": -0.22301604243789103,
+        "mean": -0.26050051251882506,
+        "p95": -0.2948006318694427,
+        "p99": -0.26008318297807725
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": 0.1860151916386291,
+        "mean": -0.0010919560279223422,
+        "p95": 0.35842867795400585,
+        "p99": -0.4781809374392672
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": 0.09297624099441666,
+        "mean": 0.10985627759889487,
+        "p95": 0.21546496885507432,
+        "p99": 0.7163285515849577
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": -0.11072472145225794,
+        "mean": -0.08395418083254659,
+        "p95": 0.36476169880095166,
+        "p99": -0.3133113147268813
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": -0.054578896523870074,
+        "mean": -0.10243881390176403,
+        "p95": -0.01801871543910275,
+        "p99": -0.039097478172783404
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": 0.10289461317242862,
+        "mean": 0.22810393738358892,
+        "p95": 0.48448688312543065,
+        "p99": 0.6848252594914552
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": 0.4741201355793981,
+        "mean": 0.5068366783421401,
+        "p95": 0.5779856190711004,
+        "p99": 2.235465596081174
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "open",
+      "same_binary_drift_percent": {
+        "p50": 0.016798158921782175,
+        "mean": 0.014879834926517798,
+        "p95": 0.3585303466506844,
+        "p99": 1.3100630841689611
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "list",
+      "same_binary_drift_percent": {
+        "p50": -0.013639488825361654,
+        "mean": -0.12523772537822686,
+        "p95": -0.203900732818169,
+        "p99": 0.2958224906349848
+      }
+    },
+    {
+      "repeat": "R2",
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "same_binary_drift_percent": {
+        "p50": 0.1663254861821904,
+        "mean": 0.11898180606990298,
+        "p95": 0.3033579526548797,
+        "p99": 0.18520803140817263
+      }
+    }
+  ],
+  "cross_repeat_drift": [
+    {
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "open",
+      "drift_percent": {
+        "p50": 1.150411611527501,
+        "mean": 1.2580320355330465,
+        "p95": 2.0491626550421023,
+        "p99": 2.2976811747558674
+      }
+    },
+    {
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "list",
+      "drift_percent": {
+        "p50": -0.07293109888785015,
+        "mean": 0.010326730131564647,
+        "p95": -0.012855110151611795,
+        "p99": -0.21898995076128452
+      }
+    },
+    {
+      "stage": "baseline",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "drift_percent": {
+        "p50": -0.009470545510706451,
+        "mean": 0.024602697640365306,
+        "p95": 0.04561261903827347,
+        "p99": -0.16785184273510745
+      }
+    },
+    {
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "open",
+      "drift_percent": {
+        "p50": -0.1240153302027412,
+        "mean": -0.04894860198350353,
+        "p95": 0.16542028666739983,
+        "p99": 2.5371771458387324
+      }
+    },
+    {
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "list",
+      "drift_percent": {
+        "p50": 0.009536934161775016,
+        "mean": -0.021368728044196195,
+        "p95": -0.059704699317625724,
+        "p99": -0.6450642709905893
+      }
+    },
+    {
+      "stage": "baseline",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "drift_percent": {
+        "p50": 0.09223047475214234,
+        "mean": 0.15586694956643865,
+        "p95": 0.045914619586717983,
+        "p99": 0.780765899097629
+      }
+    },
+    {
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "open",
+      "drift_percent": {
+        "p50": -0.6870346932193605,
+        "mean": -0.6954678297285337,
+        "p95": -0.4497705306627904,
+        "p99": -0.24255350402050424
+      }
+    },
+    {
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "list",
+      "drift_percent": {
+        "p50": -0.008219932514354057,
+        "mean": -0.02383824689730145,
+        "p95": 0.004164047346561572,
+        "p99": 0.07759392298989706
+      }
+    },
+    {
+      "stage": "candidate",
+      "mode": "file-source",
+      "operation": "one-cell",
+      "drift_percent": {
+        "p50": 0.14179459485946103,
+        "mean": 0.15724201124310938,
+        "p95": 0.07816995341151678,
+        "p99": 0.3597564162797895
+      }
+    },
+    {
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "open",
+      "drift_percent": {
+        "p50": -0.07273907375182548,
+        "mean": -0.33630607719501443,
+        "p95": -0.5049715835354143,
+        "p99": -5.668417263097705
+      }
+    },
+    {
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "list",
+      "drift_percent": {
+        "p50": 0.11704674345304614,
+        "mean": 0.21367988219203093,
+        "p95": 0.1971013565054116,
+        "p99": 0.6145598413407602
+      }
+    },
+    {
+      "stage": "candidate",
+      "mode": "owned-readat",
+      "operation": "one-cell",
+      "drift_percent": {
+        "p50": -0.39572350329322437,
+        "mean": -0.263592580520831,
+        "p95": 0.13656869212529216,
+        "p99": 1.0312333203704485
+      }
+    }
+  ]
+}

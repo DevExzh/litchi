@@ -1,5 +1,9 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0558: file-source CFB read cost attributed and halved
+
+The [0558 packet](0558-ole2-single-read-fence.md) retains a 48-child ABBA latency capture, a 12-child `strace` syscall matrix, a 56-row OLE2 guardrail matrix, per-function Callgrind branch attribution, and the frozen plan and environment. The frozen baseline records that one selective XLS open over `FileSource` issued 1,266 `version()` observations and 655 positional reads, and that observation time was roughly half of elapsed. CPU 17 was pinned because CPU 2 was 93.97% busy; host quiescence is not established.
+
 ## Change 0557: XLSX instrumentation retained; noise gate stopped
 
 The [0557 record](0557-xlsx-allocation-noise.md) adds tested staging/commit allocation boundaries and a fresh 16-child, 16,000-sample baseline pilot. Maximum paired p50 drift was 9.7872%, above the preregistered 5% limit. The candidate was never applied or measured; no production speedup is claimed. The combined allocation interval remains intact. OLE2/OOXML remain first priority; ODF is deferred.

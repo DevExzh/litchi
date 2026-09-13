@@ -1,0 +1,24 @@
+{
+  "name": "R1-B2-candidate-file-source-one-cell",
+  "command": [
+    "/usr/bin/taskset",
+    "-c",
+    "17",
+    "/tmp/claude-1001/-home-zhuhe-code-litchi/0db5c175-cade-4685-8f04-7ebb02a30b4a/scratchpad/candidate/xls_source_attribution",
+    "--input",
+    "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "--mode",
+    "file-source",
+    "--operation",
+    "one-cell",
+    "--warmups",
+    "20",
+    "--samples",
+    "100"
+  ],
+  "returncode": 0,
+  "started_unix": 1789313956.5524018,
+  "finished_unix": 1789313956.6244109,
+  "stdout": "R1-B2-candidate-file-source-one-cell.stdout",
+  "stderr": "R1-B2-candidate-file-source-one-cell.stderr"
+}

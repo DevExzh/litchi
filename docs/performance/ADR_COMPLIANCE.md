@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## 0558: fence discipline restated for the shared CFB reader
+
+[0558](0558-ole2-single-read-fence.md) keeps one source-version fence per shared
+CFB read instead of two. ADR 0005's rule that mutation during a read returns
+`SourceChanged` is preserved by the retained trailing fence, which also keeps
+`SourceChanged` precedence over a racing read or chain error. Operation
+boundaries, cancellation granularity, physical read count and read bytes are
+unchanged; nothing is coalesced and nothing is read ahead. The record states the
+two costs: the reverted-mutation window widens to the interval the trailing
+fences bound, which `litchi_core::FileVersionPolicy` already documents as not
+visible, and the reported error changes when the fence itself cannot observe the
+source while the payload read also fails. The change-0277 matrix row's
+"before/after" wording is superseded for `read_stream_range` and
+`SharedOleStreamCursor::read_exact`; its other statements stand. No ADR
+exception is needed.
+
 ## 0551: source proof must retain the complete edit contract
 
 [0551](changes/0551-xlsx-layout-handoff-feasibility.md) preserves the current

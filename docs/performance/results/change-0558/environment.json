@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "captured_utc": "2026-09-13T15:40:09Z",
+  "uname": "Linux ip-172-31-39-190 7.0.0-1012-aws #12-Ubuntu SMP PREEMPT Tue Aug 11 15:33:41 UTC 2026 x86_64 GNU/Linux",
+  "cpu_model": "AMD EPYC 9R45",
+  "cpu_count": 32,
+  "mem_total": "129447068 kB",
+  "loadavg_at_capture": "5.22 7.12 8.33 5/2583 322125",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "strace": "strace -- version 6.19",
+  "valgrind": "valgrind-3.26.0",
+  "perf_event_paranoid": "1",
+  "python": "3.14.4",
+  "build_profile": "release, --locked --offline, CARGO_BUILD_JOBS unset, -j 8",
+  "allocator": "system (no custom global allocator in the normal binary)",
+  "quiescence": "NOT established. The host ran unrelated concurrent workloads for the whole session; mpstat sampled CPU 2 (the program's usual pin) at 93.97% busy, so this capture pinned CPU 17, sampled at 97.50% idle. Absolute latencies are therefore host-specific; the accepted evidence is paired and repeated in both ABBA directions."
+}
