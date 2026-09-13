@@ -1973,7 +1973,7 @@ where
     }
 
     fn visit(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
-        self.visit_with_demand(node, false)
+        self.visit_with_demand::<false>(node)
     }
 
     /// Visit a value that is known to be consumed as one scalar.  This demand
@@ -1981,13 +1981,12 @@ where
     /// arithmetic nodes.  Reference operators and generic function arguments
     /// still use `visit`, because they require first-class areas/sequences.
     fn visit_scalar(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
-        self.visit_with_demand(node, true)
+        self.visit_with_demand::<true>(node)
     }
 
-    fn visit_with_demand(
+    fn visit_with_demand<const SCALAR_DEMAND: bool>(
         &mut self,
         node: super::Node<'expr>,
-        scalar_demand: bool,
     ) -> EvaluationResult<()> {
         if let Some((demand, index)) = self.projection {
             if let Some(value) = self.condition_cache_get(node, demand, index)?.value {
@@ -2011,7 +2010,7 @@ where
                 let child = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
                     "parenthesized value node has no child",
                 ))?;
-                self.push_frame(if scalar_demand {
+                self.push_frame(if SCALAR_DEMAND {
                     ValueFrame::VisitScalar(child)
                 } else {
                     ValueFrame::Visit(child)
@@ -2022,7 +2021,7 @@ where
                     "unary value node has no child",
                 ))?;
                 self.push_frame(ValueFrame::Apply(node))?;
-                self.push_frame(if scalar_demand {
+                self.push_frame(if SCALAR_DEMAND {
                     ValueFrame::VisitScalar(child)
                 } else {
                     ValueFrame::Visit(child)
@@ -2043,7 +2042,7 @@ where
                         | super::InfixOperator::Union
                 );
                 let frame = |node| {
-                    if scalar_demand && !reference_operator {
+                    if SCALAR_DEMAND && !reference_operator {
                         ValueFrame::VisitScalar(node)
                     } else {
                         ValueFrame::Visit(node)
@@ -2065,7 +2064,7 @@ where
                         return self.push_value(value);
                     }
                 }
-                let value = if scalar_demand && self.mode == Mode::Scalar {
+                let value = if SCALAR_DEMAND && self.mode == Mode::Scalar {
                     self.reference_scalar_value(reference)?
                 } else {
                     self.reference_value(reference)?
