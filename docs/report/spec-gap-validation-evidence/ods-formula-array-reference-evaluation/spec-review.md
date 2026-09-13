@@ -121,6 +121,45 @@ The vector examples in §3.3 also establish the orientation used here:
 (vertical) vector. Do not infer the opposite orientation from the `Nx1`
 notation in the prose.
 
+### Cross-sheet intersection and final projection
+
+An explicit sheet locator supplies the sheet of the selected cell; the
+evaluation position supplies the row or column coordinate used by the
+shape-specific vector rule. Therefore a formula in `Main.B2` with
+`[Data.A1:.A3]` has a column vector on `Data` and selects `Data.A2` under
+§3.3. The dual example, `Main.B2` with `[Data.A1:.C1]`, selects `Data.B1`.
+The standard gives no same-sheet restriction in either vector clause. This is
+the cross-sheet reading of the explicit vector rule and should not be replaced
+by a literal set intersection that first discards the other sheet.
+
+A multi-sheet cuboid has no first-sheet fallback in scalar conversion. For
+`[Sheet1.A1:Sheet3.A3]`, an ordinary scalar conversion applies the current
+formula row and column union from §6.3.3 and intersects that set with the
+cuboid. Under the sheet-local cell model, only cells on the formula's current
+sheet can be candidates: exactly one candidate returns its value; no candidate
+returns `#N/A` or a more specific Error; and multiple candidates return an
+Error. For example, `Sheet2.A1` with `[Sheet1.A1:Sheet3.A1]` can select
+`Sheet2.A1`, while a formula on a sheet outside the cuboid cannot select from
+its first sheet. A formula at `Sheet2.B2` with the 3-by-3 cuboid has multiple
+current-row/current-column candidates and therefore fails the exact-one test.
+
+`ForceArray` and matrix evaluation do not define a generic 3-D-reference to
+2-D-Array projection. Section 6.3.4 permits iterating a multi-cell reference,
+but §4.11.12's sheet/row/column order is a sequence rule, not an Array shape
+rule. A bounded implementation should preserve a cuboid as a Reference and
+return a typed unsupported result (or a documented, function-specific
+per-sheet projection) rather than silently selecting the first sheet or
+flattening sheets into rows.
+
+Finally, §3.2.2 returns a bare Reference as a Reference. Implicit intersection
+is applied when an operator/function needs one non-reference value, or when an
+explicit display/scalar projection is requested; it is not an automatic
+mutation of the expression's natural result. Keep `evaluate -> Reference`
+separate from `project_scalar(position) -> cell value`, and apply the display
+area rules to an Array only at the display boundary. A reference-producing
+`:`/`!`/`~` expression must remain reference-valued until such a consumer asks
+for a scalar.
+
 ### Logical sequence versus matrix semantics
 
 The logical family has an explicit non-scalar exception. `AND` (§6.15.2) and
@@ -148,6 +187,21 @@ context still contributes element `(0,0)` through §3.3. Only the matrix/array
 context invokes the AND/OR aggregate exception, so a profile should test both
 contexts instead of applying aggregation to every call that happens to contain
 an Array.
+
+The element typing of that Array aggregate is deliberately unresolved by the
+standard. Section 6.3.7/6.3.8 enumerates scalar Number/Text/Logical and
+Reference/ReferenceList conversions, but does not define an
+Array-to-`NumberSequenceList` conversion. Section 6.15.2/.8 only requires the
+array-context aggregate and the absence of an array result. Consequently the
+specification does not establish whether `AND({TRUE();FALSE()})` includes both
+distinguished Logical elements, filters them as if they came from a reference,
+or reaches the zero-element result after filtering. The first of those choices
+is a reasonable format-owned profile: flatten Array elements in the profile's
+documented order, apply the Logical conversion to each element (including
+distinguished Logical values), and propagate Errors. It remains a profile
+choice; its result must not be presented as an ODF-mandated or Excel-derived
+array rule. Empty/Text Array elements also require an explicit profile because
+their direct sequence conversion is absent.
 
 The standard does not state what `AND` or `OR` returns when a present
 `NumberSequenceList` argument becomes a zero-element sequence after that
@@ -402,10 +456,15 @@ position and explicit expected outcome:
    proves that only Number (and non-distinguished Logical) sequence elements
    participate; a range containing no eligible values exercises the explicitly
    documented empty-sequence identity or Error profile. A referenced Error
-   must propagate. `AND`/`OR` return one Logical aggregate in matrix context.
+   must propagate. Separately, `AND({TRUE();FALSE()})` and an array containing
+   Empty/Text elements exercise the chosen Array-element profile; the standard
+   does not mandate that profile. `AND`/`OR` return one Logical aggregate in
+   matrix context.
 10. `XOR({TRUE();FALSE()})` in matrix context iterates per output position,
-    while the analogous `AND` returns one aggregate Logical. `XOR` and `NOT`
-    given a ReferenceList refuse it at the scalar type boundary.
+    while the analogous `AND` returns one aggregate Logical; this contrast does
+    not by itself specify how distinguished Logical Array elements are typed.
+    `XOR` and `NOT` given a ReferenceList refuse it at the scalar type
+    boundary.
 11. In formula `B1`, `[.A1:.C1]` selects `B1` under the §3.3 vector-specific
     branch; in `A1`, `[.A1:.A3]` selects `A1`; `D1` and `A4` are outside the
     respective spans and return `#N/A`. A two-dimensional range in a position
@@ -414,7 +473,44 @@ position and explicit expected outcome:
 12. `{1}:[.A1]` and `[.A1]~{1}` refuse their Array operands as
     reference-operator type errors; `[.A1]~[.B2]` remains a ReferenceList and
     cannot be converted to an Array.
+13. With formula position `Main.B2`, `[Data.A1:.A3]` selects `Data.A2` and
+    `[Data.A1:.C1]` selects `Data.B1`; changing only the formula sheet does not
+    change the coordinate match.
+14. `[Sheet1.A1:Sheet3.A1]` selects `Sheet2.A1` only when the formula is on
+    `Sheet2` at `A1`; a formula outside the cuboid has no candidate, and a
+    3-by-3 cuboid at an interior formula position fails the exact-one test.
+    No case selects the first sheet merely because it is listed first.
+15. Evaluating a bare `[.A1:.A3]` through a value API preserves a Reference;
+    an explicit scalar/display projection then applies the current position's
+    intersection. Reference operators likewise retain Reference/ReferenceList
+    results until a consumer requests a value.
 
 Implementation review is pending against the frozen evaluator source. This
 document deliberately makes no claim that the current scalar evaluator already
 implements these rules.
+
+## Empty operand profile for the scalar bridge
+
+Section 4.7 distinguishes Empty from Number zero, empty Text, FALSE and Error.
+Section 6.3.2 dereferences a single-cell Reference without defining a generic
+Empty-to-Scalar conversion. Sections 6.4.7–6.4.9 specify comparisons for
+Number, Text and Logical but do not define direct comparisons involving Empty.
+The database-criterion rule in §4.11.8 does not supply general operator semantics.
+
+This evaluator's explicit profile is `Empty = Empty` → TRUE, equality between
+Empty and a typed scalar → FALSE, inequality as the negation of equality, and
+ordered comparison involving Empty → `#VALUE!`. Formula Errors retain the
+existing left-to-right precedence. These Empty cases are implementation
+choices, not claims that the specification mandates these comparison results.
+
+Prefix `+` accepts Any and preserves Empty (§6.4.15); it must not silently
+produce Number zero. Numeric, Logical and Text operands instead convert Empty
+to zero, FALSE or empty Text at the corresponding parameter boundary. Thus a
+blank passed to `ARABIC(Text)` becomes empty Text and yields zero (§6.19.2).
+A blank passed to `DECIMAL(Text; Integer)` becomes empty Text in its first
+parameter; its result follows the established empty-text `#VALUE!` profile,
+because §6.19.10 does not specify that case. For first parameters accepting
+TextOrNumber in the BIN/OCT/HEX conversions, the chosen blank profile is also
+empty Text, preserving the existing empty-input behavior instead of changing
+it to the numeric-zero path. Section 6.19.4 explicitly permits Error or zero
+for an empty binary string.
