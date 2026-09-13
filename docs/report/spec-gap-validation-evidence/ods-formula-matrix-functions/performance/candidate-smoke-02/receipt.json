@@ -1,0 +1,25 @@
+{
+  "scope": "debug validation smoke only; one sample per case is not performance acceptance",
+  "source_basis": "../../candidate-03/source.tar.gz",
+  "build_status": 0,
+  "evaluate_status": 0,
+  "command": [
+    "ods-formula-matrix-functions-performance",
+    "--phase",
+    "evaluate",
+    "--warmups",
+    "0",
+    "--iterations",
+    "1",
+    "--repeat",
+    "1"
+  ],
+  "completed_rows": 33,
+  "binary_sha256": "041882db0776c1224ffeaaf48141b4c30ed873a05958b04f297217ca359257b1",
+  "artifacts": {
+    "harness-source.tar.gz": "937a77ca3916905dc26ea54c2d2a32d3fdabcea1cc235105ea87fe7f16d24b07",
+    "build.log": "83f4870613f243b67a5d50020bfb600ffa82849081fbab3880e926a7f663767d",
+    "evaluate.jsonl": "f61e792ba54fa37e117d088c615a5de3560c43158dd3cdf9d1258d24ef7b79b4",
+    "evaluate.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

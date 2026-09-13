@@ -16,6 +16,10 @@
 //! worksheet. Use [`evaluate`] here for local references and arrays. Both
 //! profiles implement scalar operators and the logical, bitwise, and number
 //! representation function families; neither implements all OpenFormula functions.
+//! This value profile also implements `MDETERM`, `MINVERSE`, `MMULT`, `MUNIT`,
+//! and `TRANSPOSE`. Numeric matrix operations require finite numeric elements;
+//! `TRANSPOSE` preserves element types. `MUNIT` truncates its size toward zero.
+//! Singular inverses and non-finite arithmetic produce formula errors.
 //!
 //! [`Context::new`] defaults to [`Mode::Matrix`]. A bare reference in that mode
 //! remains a first-class [`Value::Reference`] or [`Value::ReferenceList`] without
@@ -30,6 +34,8 @@
 //! references. Formula errors are [`Value::Error`] results. Cancellation, resource
 //! exhaustion, unsupported capabilities, and provider failures are
 //! [`EvaluationFailure`] values and are not caught by formula error handlers.
+//! Nested shape/value probes are limited to 32 active probes, further bounded
+//! by the caller's Depth budget and [`Limits::with_max_stack_entries`].
 //!
 //! # Reusing worksheets and keeping a result
 //!
@@ -111,6 +117,7 @@ const VALUE_CHECK_CHUNK: usize = 4096;
 // consuming operator/function chooses a target type.
 #[allow(dead_code)]
 mod geometry;
+mod matrix;
 mod owned;
 mod references;
 mod scalar;
@@ -1430,6 +1437,13 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
     values: Vec<RuntimeValue<'expr>>,
     frame_reservation: Option<Reservation>,
     value_reservation: Option<Reservation>,
+    /// Saved evaluator contexts for array-typed arguments.  A matrix
+    /// function can occur inside a lazy matrix branch, so replacing the
+    /// active matrix continuation while visiting its argument must be
+    /// reversible.  The entries own the saved continuation and are released
+    /// before this vector's capacity reservation.
+    argument_contexts: Vec<SavedValueContext<'expr, 'position>>,
+    argument_context_reservation: Option<Reservation>,
     matrix: Option<MatrixState<'expr, 'position>>,
     shape_frames: Vec<ShapeFrame<'expr>>,
     shape_values: Vec<Option<Shape>>,
@@ -1447,6 +1461,7 @@ struct ValueEvaluator<'expr, 'scalar, 'exec, 'position, R: ?Sized> {
     condition_cache: Vec<ConditionCacheEntry<'expr>>,
     condition_cache_reservation: Option<Reservation>,
     reference_cells_read: usize,
+    probe_depth: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -1454,7 +1469,23 @@ enum ValueFrame<'a> {
     Visit(super::Node<'a>),
     VisitScalar(super::Node<'a>),
     VisitArgument(super::Node<'a>),
+    /// Visit an Array/ForceArray argument without scalar projection.
+    VisitMatrixArgument(super::Node<'a>),
+    /// Visit TRANSPOSE's array argument without inheriting a caller's
+    /// per-cell projection, while retaining the caller's scalar/matrix mode.
+    VisitTransposeArgument(super::Node<'a>),
+    /// Visit a scalar parameter with the caller's implicit-intersection
+    /// position but without an inherited matrix output projection.  MUNIT
+    /// uses this to consume one `[0,0]` input element rather than invoking a
+    /// separate matrix call for every output element.
+    VisitScalarArgument(super::Node<'a>),
+    /// Restore the context saved by one of the argument-entry frames.
+    RestoreArgumentContext,
     Apply(super::Node<'a>),
+    ApplyMatrix {
+        node: super::Node<'a>,
+        function: MatrixFunction,
+    },
     IfAfterCondition(super::Node<'a>),
     IfErrorAfterValue(super::Node<'a>),
     MatrixStep,
@@ -1464,6 +1495,34 @@ enum ValueFrame<'a> {
         columns: usize,
         cells: usize,
     },
+}
+
+#[derive(Clone, Copy)]
+enum MatrixFunction {
+    Determinant,
+    Inverse,
+    Multiply,
+    Unit,
+    Transpose,
+}
+
+struct SavedValueContext<'expr, 'position> {
+    mode: Mode,
+    position: Position<'position>,
+    projection: Option<(Shape, usize)>,
+    matrix: Option<MatrixState<'expr, 'position>>,
+}
+
+/// A nested value probe may force array evaluation and enter another shape
+/// planner. Keep the suspended planner's vectors with their reservations;
+/// restoring by swapping also drops all probe-owned storage before its tokens.
+struct SavedShapePlanner<'expr> {
+    frames: Vec<ShapeFrame<'expr>>,
+    values: Vec<Option<Shape>>,
+    masks: Vec<ShapeMask>,
+    frame_reservation: Option<Reservation>,
+    value_reservation: Option<Reservation>,
+    mask_reservation: Option<Reservation>,
 }
 
 #[derive(Clone, Copy)]
@@ -1586,6 +1645,14 @@ enum ShapeFrame<'a> {
         condition: super::Node<'a>,
         demand: ShapeDemand,
     },
+    /// Finish planning an array-valued matrix function after its argument
+    /// shapes have been collected.  The determinant is scalar and therefore
+    /// bypasses this frame; the other operations have operation-specific
+    /// shape rules rather than ordinary scalar broadcasting.
+    MatrixExit {
+        function: MatrixFunction,
+        children: usize,
+    },
     Exit {
         node: super::Node<'a>,
         children: usize,
@@ -1647,6 +1714,7 @@ enum ReferenceKindFrame<'a> {
     Unary,
     Infix(super::InfixOperator),
     Function {
+        node: super::Node<'a>,
         name: &'a str,
         count: usize,
     },
@@ -1729,6 +1797,8 @@ where
             values: Vec::new(),
             frame_reservation: None,
             value_reservation: None,
+            argument_contexts: Vec::new(),
+            argument_context_reservation: None,
             matrix: None,
             shape_frames: Vec::new(),
             shape_values: Vec::new(),
@@ -1743,6 +1813,7 @@ where
             condition_cache: Vec::new(),
             condition_cache_reservation: None,
             reference_cells_read: 0,
+            probe_depth: 0,
         }
     }
 
@@ -1778,7 +1849,14 @@ where
                 ValueFrame::Visit(node) => self.visit(node)?,
                 ValueFrame::VisitScalar(node) => self.visit_scalar(node)?,
                 ValueFrame::VisitArgument(node) => self.visit_argument(node)?,
+                ValueFrame::VisitMatrixArgument(node) => self.visit_matrix_argument(node)?,
+                ValueFrame::VisitTransposeArgument(node) => self.visit_transpose_argument(node)?,
+                ValueFrame::VisitScalarArgument(node) => self.visit_scalar_argument(node)?,
+                ValueFrame::RestoreArgumentContext => self.restore_argument_context()?,
                 ValueFrame::Apply(node) => self.apply(node)?,
+                ValueFrame::ApplyMatrix { node, function } => {
+                    self.apply_matrix_function(node, function)?
+                },
                 ValueFrame::IfAfterCondition(node) => self.finish_if(node)?,
                 ValueFrame::IfErrorAfterValue(node) => self.finish_if_error(node)?,
                 ValueFrame::MatrixStep => self.matrix_step()?,
@@ -2167,6 +2245,121 @@ where
         }
     }
 
+    fn visit_matrix_argument(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+        self.enter_argument_context(node, Mode::Matrix)
+    }
+
+    fn visit_transpose_argument(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+        // A lazy matrix branch uses scalar execution to request one output
+        // coordinate. Its Array-typed argument still belongs to the enclosing
+        // matrix calculation; do not intersect the argument expression early.
+        let mode = if self.projection.is_some() {
+            Mode::Matrix
+        } else {
+            self.mode
+        };
+        self.enter_argument_context(node, mode)
+    }
+
+    fn visit_scalar_argument(&mut self, node: super::Node<'expr>) -> EvaluationResult<()> {
+        // MUNIT does not implicitly iterate over its scalar parameter, but
+        // the argument expression still uses the enclosing calculation mode.
+        // Its first-element conversion happens after the expression returns.
+        self.visit_transpose_argument(node)
+    }
+
+    fn matrix_scalar_parameter(
+        &mut self,
+        value: RuntimeValue<'expr>,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        if self.mode == Mode::Scalar && self.projection.is_none() {
+            return self.project_scalar(value);
+        }
+        match value {
+            RuntimeValue::Array(mut array) => {
+                let first = array
+                    .cells
+                    .first_mut()
+                    .ok_or(EvaluationFailure::InvalidExpression(
+                        "empty matrix parameter",
+                    ))?;
+                let first = std::mem::replace(first, RuntimeElement::Empty);
+                self.element_to_runtime(first)
+            },
+            RuntimeValue::Areas(areas) if areas.is_list => Ok(RuntimeValue::Scalar(
+                WorkingValue::Error(ScalarError::Value),
+            )),
+            RuntimeValue::Areas(areas) => {
+                if areas.areas.len() != 1 {
+                    return Err(EvaluationFailure::Unsupported(
+                        super::UnsupportedKind::Reference,
+                    ));
+                }
+                let area = &areas.areas[0];
+                self.scalar.charge_work(1)?;
+                let read = self.read_reference_cell(
+                    area.sheet,
+                    area.rect.row_start,
+                    area.rect.column_start,
+                )?;
+                let first = self.read_to_element(read)?;
+                self.element_to_runtime(first)
+            },
+            other => Ok(other),
+        }
+    }
+
+    fn enter_argument_context(
+        &mut self,
+        node: super::Node<'expr>,
+        mode: Mode,
+    ) -> EvaluationResult<()> {
+        ensure_capacity(
+            &mut self.argument_contexts,
+            &mut self.argument_context_reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value argument contexts",
+        )?;
+        ensure_capacity(
+            &mut self.frames,
+            &mut self.frame_reservation,
+            2,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value argument context frames",
+        )?;
+        let saved = SavedValueContext {
+            mode: self.mode,
+            position: self.position,
+            projection: self.projection,
+            matrix: self.matrix.take(),
+        };
+        self.argument_contexts.push(saved);
+        self.mode = mode;
+        self.projection = None;
+        self.frames.push(ValueFrame::RestoreArgumentContext);
+        self.frames.push(ValueFrame::VisitArgument(node));
+        Ok(())
+    }
+
+    fn restore_argument_context(&mut self) -> EvaluationResult<()> {
+        let saved = self
+            .argument_contexts
+            .pop()
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "matrix argument context is missing",
+            ))?;
+        self.mode = saved.mode;
+        self.position = saved.position;
+        self.projection = saved.projection;
+        self.matrix = saved.matrix;
+        Ok(())
+    }
+
     fn visit_array(
         &mut self,
         node: super::Node<'expr>,
@@ -2253,6 +2446,9 @@ where
 
     fn visit_function(&mut self, node: super::Node<'expr>, name: &str) -> EvaluationResult<()> {
         self.scalar.charge_bytes(name.len())?;
+        if let Some(function) = Self::matrix_function(name) {
+            return self.visit_matrix_function(node, function);
+        }
         if name.eq_ignore_ascii_case("IF") {
             let count = node.child_count();
             if !(1..=3).contains(&count) {
@@ -2302,6 +2498,52 @@ where
                     "function argument is missing",
                 ))?;
             self.push_frame(ValueFrame::VisitArgument(child))?;
+        }
+        Ok(())
+    }
+
+    fn matrix_function(name: &str) -> Option<MatrixFunction> {
+        if !matrix::is_matrix_function(name) {
+            return None;
+        }
+        if name.eq_ignore_ascii_case("MDETERM") {
+            Some(MatrixFunction::Determinant)
+        } else if name.eq_ignore_ascii_case("MINVERSE") {
+            Some(MatrixFunction::Inverse)
+        } else if name.eq_ignore_ascii_case("MMULT") {
+            Some(MatrixFunction::Multiply)
+        } else if name.eq_ignore_ascii_case("MUNIT") {
+            Some(MatrixFunction::Unit)
+        } else if name.eq_ignore_ascii_case("TRANSPOSE") {
+            Some(MatrixFunction::Transpose)
+        } else {
+            None
+        }
+    }
+
+    fn visit_matrix_function(
+        &mut self,
+        node: super::Node<'expr>,
+        function: MatrixFunction,
+    ) -> EvaluationResult<()> {
+        let count = node.child_count();
+        self.scalar
+            .charge_work(u64::try_from(count).unwrap_or(u64::MAX))?;
+        self.push_frame(ValueFrame::ApplyMatrix { node, function })?;
+        for index in (0..count).rev() {
+            let child = node
+                .child(index)
+                .ok_or(EvaluationFailure::InvalidExpression(
+                    "matrix function argument is missing",
+                ))?;
+            let frame = match function {
+                MatrixFunction::Unit => ValueFrame::VisitScalarArgument(child),
+                MatrixFunction::Transpose => ValueFrame::VisitTransposeArgument(child),
+                MatrixFunction::Determinant
+                | MatrixFunction::Inverse
+                | MatrixFunction::Multiply => ValueFrame::VisitMatrixArgument(child),
+            };
+            self.push_frame(frame)?;
         }
         Ok(())
     }
@@ -2702,6 +2944,15 @@ where
             | super::Kind::String
             | super::Kind::Error
             | super::Kind::Missing => Ok(true),
+            // Matrix functions consume their arguments in an explicit
+            // array/scalar context, so a function whose complete subtree is
+            // made only of literals is independent of the outer projected
+            // cell.  MatrixState already retains one RuntimeValue per
+            // selected branch; classify this case here so an array result is
+            // evaluated once and indexed for every subsequent demand.
+            super::Kind::Function { .. } if Self::matrix_function_node(node) => {
+                self.cacheable_matrix_branch(node)
+            },
             super::Kind::Function { name }
                 if name.eq_ignore_ascii_case("AND") || name.eq_ignore_ascii_case("OR") =>
             {
@@ -2724,6 +2975,73 @@ where
             },
             _ => Ok(false),
         }
+    }
+
+    fn matrix_function_node(node: super::Node<'expr>) -> bool {
+        node.function_name()
+            .is_some_and(|name| Self::matrix_function(name).is_some())
+    }
+
+    /// Check that a matrix-function branch has no source-dependent operand.
+    ///
+    /// This is deliberately a small iterative prepass.  MatrixState owns the
+    /// resulting value, so the cache is safe only when every descendant is a
+    /// literal or a deterministic operator/function over literals.  In
+    /// particular, references, names, labels, and automatic intersections
+    /// are rejected instead of caching the first projected cell.  The local
+    /// reservation is declared before the scratch vector so the vector is
+    /// dropped before its budget token on every return path.
+    fn cacheable_matrix_branch(&mut self, root: super::Node<'expr>) -> EvaluationResult<bool> {
+        let mut reservation = None;
+        let mut nodes = Vec::new();
+        ensure_capacity(
+            &mut nodes,
+            &mut reservation,
+            1,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value matrix branch cacheability frames",
+        )?;
+        nodes.push(root);
+        while let Some(node) = nodes.pop() {
+            self.scalar.charge_work(1)?;
+            match node.kind() {
+                super::Kind::Reference(_)
+                | super::Kind::NamedExpression { .. }
+                | super::Kind::AutomaticIntersection
+                | super::Kind::QuotedLabel { .. } => return Ok(false),
+                super::Kind::Number
+                | super::Kind::String
+                | super::Kind::Error
+                | super::Kind::Missing => {},
+                super::Kind::Parenthesized
+                | super::Kind::Prefix(_)
+                | super::Kind::Postfix(_)
+                | super::Kind::Infix(_)
+                | super::Kind::Function { .. }
+                | super::Kind::Array(_)
+                | super::Kind::ArrayRow => {
+                    let count = node.child_count();
+                    ensure_capacity(
+                        &mut nodes,
+                        &mut reservation,
+                        count,
+                        self.limits.scalar.max_stack_entries,
+                        self.execution,
+                        &self.storage_budget,
+                        "formula value matrix branch cacheability frames",
+                    )?;
+                    for index in (0..count).rev() {
+                        let Some(child) = node.child(index) else {
+                            return Ok(false);
+                        };
+                        nodes.push(child);
+                    }
+                },
+            }
+        }
+        Ok(true)
     }
 
     fn cacheable_sequence_operand(
@@ -3314,6 +3632,40 @@ where
                         })?;
                         continue;
                     }
+                    if let super::Kind::Function { name } = node.kind() {
+                        if let Some(function) = Self::matrix_function(name) {
+                            match function {
+                                MatrixFunction::Determinant => {
+                                    self.push_shape_value(Some(Shape::new(1, 1)?))?;
+                                },
+                                MatrixFunction::Unit => {
+                                    let shape = self.matrix_unit_shape_hint(node)?;
+                                    self.push_shape_value(shape)?;
+                                },
+                                MatrixFunction::Inverse
+                                | MatrixFunction::Multiply
+                                | MatrixFunction::Transpose => {
+                                    let children = node.child_count();
+                                    self.push_shape_frame(ShapeFrame::MatrixExit {
+                                        function,
+                                        children,
+                                    })?;
+                                    for index in (0..children).rev() {
+                                        let child = node.child(index).ok_or(
+                                            EvaluationFailure::InvalidExpression(
+                                                "matrix shape argument is missing",
+                                            ),
+                                        )?;
+                                        self.push_shape_frame(ShapeFrame::Enter {
+                                            node: child,
+                                            demand,
+                                        })?;
+                                    }
+                                },
+                            }
+                            continue;
+                        }
+                    }
                     if let super::Kind::Infix(operator) = node.kind() {
                         if matches!(
                             operator,
@@ -3383,6 +3735,10 @@ where
                     let shape = self.reference_operator_shape(node, operator)?;
                     self.push_shape_value(shape)?;
                 },
+                ShapeFrame::MatrixExit { function, children } => {
+                    let shape = self.matrix_shape_from_children(function, children)?;
+                    self.push_shape_value(shape)?;
+                },
                 ShapeFrame::Exit {
                     node,
                     children,
@@ -3430,6 +3786,90 @@ where
             .ok_or(EvaluationFailure::InvalidExpression(
                 "lazy handler condition is missing",
             ))
+    }
+
+    fn matrix_unit_shape_hint(
+        &mut self,
+        node: super::Node<'expr>,
+    ) -> EvaluationResult<Option<Shape>> {
+        if node.child_count() != 1 {
+            return Ok(Some(Shape::new(1, 1)?));
+        }
+        let argument = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+            "MUNIT shape argument is missing",
+        ))?;
+        // The scalar parameter consumes one value.  Probe that value through
+        // the ordinary VM continuation so computed expressions, nested
+        // parentheses, arrays, and provider-backed cells all obey the same
+        // first-element and coercion rules as final evaluation.  The probe
+        // uses the bounded, isolated probe path without constructing a
+        // second evaluator.
+        let value = match self.evaluate_matrix_value(argument) {
+            Ok(value) => self.matrix_scalar_parameter(value)?,
+            Err(EvaluationFailure::Unsupported(_)) => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let RuntimeValue::Scalar(WorkingValue::Number(value)) = value else {
+            return Ok(Some(Shape::new(1, 1)?));
+        };
+        let value = value.trunc();
+        if !value.is_finite() || value <= 0.0 || value >= usize::MAX as f64 {
+            return Ok(Some(Shape::new(1, 1)?));
+        }
+        let size = value as usize;
+        Ok(Shape::new(size, size).ok())
+    }
+
+    fn matrix_shape_from_children(
+        &mut self,
+        function: MatrixFunction,
+        children: usize,
+    ) -> EvaluationResult<Option<Shape>> {
+        // Shapes are pushed in source order and popped in reverse order.
+        let mut first = None;
+        let mut second = None;
+        for index in 0..children {
+            let shape = self.pop_shape_value()?;
+            match index {
+                0 if children == 1 => first = shape,
+                0 => second = shape,
+                1 => first = shape,
+                _ => {},
+            }
+        }
+        match function {
+            MatrixFunction::Inverse => {
+                if children != 1 {
+                    return Ok(Some(Shape::new(1, 1)?));
+                }
+                Ok(match first {
+                    Some(shape) if shape.rows() == shape.columns() => Some(shape),
+                    Some(_) => Some(Shape::new(1, 1)?),
+                    None => None,
+                })
+            },
+            MatrixFunction::Multiply => {
+                if children != 2 {
+                    return Ok(Some(Shape::new(1, 1)?));
+                }
+                Ok(match (first, second) {
+                    (Some(left), Some(right)) if left.columns() == right.rows() => {
+                        Some(Shape::new(left.rows(), right.columns())?)
+                    },
+                    (Some(_), Some(_)) => Some(Shape::new(1, 1)?),
+                    _ => None,
+                })
+            },
+            MatrixFunction::Transpose => {
+                if children != 1 {
+                    return Ok(Some(Shape::new(1, 1)?));
+                }
+                first
+                    .map(|shape| Shape::new(shape.columns(), shape.rows()))
+                    .transpose()
+            },
+            MatrixFunction::Determinant | MatrixFunction::Unit => Ok(Some(Shape::new(1, 1)?)),
+        }
     }
 
     fn push_shape_children(
@@ -3697,6 +4137,31 @@ where
         }
     }
 
+    /// Find a matrix function through a bounded parenthesized wrapper.  A
+    /// reference-valued lazy handler needs the complete runtime result when
+    /// its selected operand is a matrix function: a successful `MINVERSE`
+    /// remains an Array and must be refused by a reference operator, while a
+    /// singular inverse is a scalar formula error that `IFERROR` can catch.
+    /// Keeping this check iterative also avoids introducing an AST-recursive
+    /// probe into the reference planner.
+    fn direct_matrix_function(
+        &mut self,
+        mut node: super::Node<'expr>,
+    ) -> EvaluationResult<Option<MatrixFunction>> {
+        loop {
+            match node.kind() {
+                super::Kind::Parenthesized => {
+                    self.scalar.charge_work(1)?;
+                    node = node.child(0).ok_or(EvaluationFailure::InvalidExpression(
+                        "matrix function parentheses are empty",
+                    ))?;
+                },
+                super::Kind::Function { name } => return Ok(Self::matrix_function(name)),
+                _ => return Ok(None),
+            }
+        }
+    }
+
     fn reference_operand_kind_from_runtime(value: &RuntimeValue<'expr>) -> ReferenceOperandKind {
         match value {
             RuntimeValue::Areas(areas) if areas.is_list => ReferenceOperandKind::ReferenceList,
@@ -3925,7 +4390,7 @@ where
                         self.push_reference_kind_frame(
                             &mut scratch.frames,
                             &mut scratch.frame_reservation,
-                            ReferenceKindFrame::Function { name, count },
+                            ReferenceKindFrame::Function { node, name, count },
                         )?;
                         for index in (0..count).rev() {
                             let child =
@@ -4060,7 +4525,7 @@ where
                         kind,
                     )?;
                 },
-                ReferenceKindFrame::Function { name, count } => {
+                ReferenceKindFrame::Function { node, name, count } => {
                     let mut kind = ReferenceOperandKind::Scalar;
                     for _ in 0..count {
                         let child = self.pop_reference_kind_value(&mut scratch.values)?;
@@ -4085,6 +4550,17 @@ where
                             (ReferenceOperandKind::Unknown, _)
                             | (_, ReferenceOperandKind::Unknown) => ReferenceOperandKind::Unknown,
                             _ => ReferenceOperandKind::Scalar,
+                        };
+                    }
+                    if let Some(function) = Self::matrix_function(name) {
+                        kind = match function {
+                            MatrixFunction::Determinant => ReferenceOperandKind::Scalar,
+                            MatrixFunction::Inverse
+                            | MatrixFunction::Multiply
+                            | MatrixFunction::Unit
+                            | MatrixFunction::Transpose => {
+                                self.reference_kind_matrix_value(node, function)?
+                            },
                         };
                     }
                     self.push_reference_kind_value(
@@ -4390,6 +4866,20 @@ where
                 value_reservation,
             );
         }
+        // Resolve a selected matrix function once in array mode.  Its
+        // runtime result, rather than its declared function family, decides
+        // whether the reference operator can consume it.  This avoids
+        // evaluating a singular inverse once for kind discovery and again for
+        // scalar error handling.
+        if self.direct_matrix_function(node)?.is_some() {
+            let value = self.evaluate_matrix_value(node)?;
+            if value.is_array_like() {
+                return Err(EvaluationFailure::Unsupported(
+                    super::UnsupportedKind::ReferenceOperator,
+                ));
+            }
+            return self.push_reference_runtime_value(value, values, value_reservation);
+        }
         if matches!(
             self.reference_handler_operand_kind(node)?,
             ReferenceOperandKind::Array
@@ -4517,6 +5007,35 @@ where
         let alternative = node.child(1).ok_or(EvaluationFailure::InvalidExpression(
             "reference error-handler alternative is missing",
         ))?;
+        // As in `push_reference_value`, retain the one complete runtime
+        // result for a selected matrix operand.  A successful array is a
+        // typed reference-operator refusal; a scalar formula error reaches
+        // the ordinary IFERROR/IFNA catch decision without a second matrix
+        // evaluation.
+        if self.direct_matrix_function(value)?.is_some() {
+            let value = self.evaluate_matrix_value(value)?;
+            if value.is_array_like() {
+                return Err(EvaluationFailure::Unsupported(
+                    super::UnsupportedKind::ReferenceOperator,
+                ));
+            }
+            let caught = matches!(
+                &value,
+                RuntimeValue::Scalar(WorkingValue::Error(error))
+                    if !name.eq_ignore_ascii_case("IFNA")
+                        || *error == ScalarError::NotAvailable
+            );
+            if caught {
+                return self.push_reference_value(
+                    alternative,
+                    frames,
+                    frame_reservation,
+                    values,
+                    value_reservation,
+                );
+            }
+            return self.push_reference_runtime_value(value, values, value_reservation);
+        }
         if matches!(
             self.reference_handler_operand_kind(value)?,
             ReferenceOperandKind::Array | ReferenceOperandKind::Reference
@@ -4978,10 +5497,14 @@ where
                 ))?;
             break;
         }
+        let _probe_depth_reservation = self.enter_value_probe()?;
+        let saved_shape_planner = self.suspend_shape_planner();
         let saved_frames = std::mem::take(&mut self.frames);
         let saved_values = std::mem::take(&mut self.values);
         let saved_frame_reservation = self.frame_reservation.take();
         let saved_value_reservation = self.value_reservation.take();
+        let saved_argument_contexts = std::mem::take(&mut self.argument_contexts);
+        let saved_argument_context_reservation = self.argument_context_reservation.take();
         let saved_matrix = self.matrix.take();
         let saved_mode = self.mode;
         let saved_position = self.position;
@@ -5014,21 +5537,29 @@ where
         let probe_values = std::mem::take(&mut self.values);
         let probe_frame_reservation = self.frame_reservation.take();
         let probe_value_reservation = self.value_reservation.take();
+        let probe_argument_contexts = std::mem::take(&mut self.argument_contexts);
+        let probe_argument_context_reservation = self.argument_context_reservation.take();
         let probe_matrix = self.matrix.take();
         drop(probe_frames);
         drop(probe_values);
         drop(probe_frame_reservation);
         drop(probe_value_reservation);
+        drop(probe_argument_contexts);
+        drop(probe_argument_context_reservation);
         drop(probe_matrix);
 
+        self.restore_shape_planner(saved_shape_planner);
         self.frames = saved_frames;
         self.values = saved_values;
         self.frame_reservation = saved_frame_reservation;
         self.value_reservation = saved_value_reservation;
+        self.argument_contexts = saved_argument_contexts;
+        self.argument_context_reservation = saved_argument_context_reservation;
         self.matrix = saved_matrix;
         self.mode = saved_mode;
         self.position = saved_position;
         self.projection = saved_projection;
+        self.probe_depth -= 1;
         result
     }
 
@@ -5045,6 +5576,129 @@ where
             )));
         };
         self.evaluate_scalar_at(root, condition_shape, condition_index)
+    }
+
+    /// Evaluate one selected matrix-function node while retaining its result
+    /// kind.  A scalar probe would implicitly intersect a successful inverse,
+    /// transpose, or product and could therefore mistake an Array for a
+    /// scalar formula error in a surrounding reference handler.  This helper
+    /// reuses the evaluator's flat VM stacks and restores the suspended
+    /// continuation on every return.
+    fn reference_kind_matrix_value(
+        &mut self,
+        root: super::Node<'expr>,
+        _function: MatrixFunction,
+    ) -> EvaluationResult<ReferenceOperandKind> {
+        let value = self.evaluate_matrix_value(root)?;
+        let kind = Self::reference_operand_kind_from_runtime(&value);
+        drop(value);
+        Ok(kind)
+    }
+
+    /// A forced-array argument can reenter shape planning from a scalar
+    /// probe. Bound that Rust call-stack use independently of the heap VM
+    /// stacks, and charge the caller's hierarchical Depth budget as well.
+    fn enter_value_probe(&mut self) -> EvaluationResult<Reservation> {
+        const MAX_VALUE_PROBE_DEPTH: usize = 32;
+        let maximum = MAX_VALUE_PROBE_DEPTH.min(self.limits.scalar.max_stack_entries);
+        let observed = self.probe_depth.saturating_add(1);
+        if observed > maximum {
+            return Err(EvaluationFailure::ResourceLimit(self.local_limit(
+                Resource::Depth,
+                u64::try_from(observed).unwrap_or(u64::MAX),
+                maximum,
+            )));
+        }
+        let reservation = self
+            .execution
+            .budget()
+            .reserve(Resource::Depth, 1)
+            .map_err(EvaluationFailure::ResourceLimit)?;
+        self.probe_depth = observed;
+        Ok(reservation)
+    }
+
+    fn suspend_shape_planner(&mut self) -> SavedShapePlanner<'expr> {
+        SavedShapePlanner {
+            frames: std::mem::take(&mut self.shape_frames),
+            values: std::mem::take(&mut self.shape_values),
+            masks: std::mem::take(&mut self.shape_masks),
+            frame_reservation: self.shape_frame_reservation.take(),
+            value_reservation: self.shape_value_reservation.take(),
+            mask_reservation: self.shape_mask_reservation.take(),
+        }
+    }
+
+    fn restore_shape_planner(&mut self, mut saved: SavedShapePlanner<'expr>) {
+        std::mem::swap(&mut self.shape_frames, &mut saved.frames);
+        std::mem::swap(&mut self.shape_values, &mut saved.values);
+        std::mem::swap(&mut self.shape_masks, &mut saved.masks);
+        std::mem::swap(
+            &mut self.shape_frame_reservation,
+            &mut saved.frame_reservation,
+        );
+        std::mem::swap(
+            &mut self.shape_value_reservation,
+            &mut saved.value_reservation,
+        );
+        std::mem::swap(
+            &mut self.shape_mask_reservation,
+            &mut saved.mask_reservation,
+        );
+    }
+
+    fn evaluate_matrix_value(
+        &mut self,
+        root: super::Node<'expr>,
+    ) -> EvaluationResult<RuntimeValue<'expr>> {
+        let _probe_depth_reservation = self.enter_value_probe()?;
+        let saved_shape_planner = self.suspend_shape_planner();
+        let saved_frames = std::mem::take(&mut self.frames);
+        let saved_values = std::mem::take(&mut self.values);
+        let saved_frame_reservation = self.frame_reservation.take();
+        let saved_value_reservation = self.value_reservation.take();
+        let saved_argument_contexts = std::mem::take(&mut self.argument_contexts);
+        let saved_argument_context_reservation = self.argument_context_reservation.take();
+        let saved_matrix = self.matrix.take();
+        let saved_mode = self.mode;
+        let saved_position = self.position;
+        let saved_projection = self.projection;
+
+        self.mode = Mode::Matrix;
+        self.projection = None;
+        let result = self.run_from_without_scalar_demand(root);
+
+        // A failed probe can leave partial values or a nested matrix
+        // continuation. Drop those before returning their matching storage
+        // reservation to the shared budget.
+        let probe_frames = std::mem::take(&mut self.frames);
+        let probe_values = std::mem::take(&mut self.values);
+        let probe_frame_reservation = self.frame_reservation.take();
+        let probe_value_reservation = self.value_reservation.take();
+        let probe_argument_contexts = std::mem::take(&mut self.argument_contexts);
+        let probe_argument_context_reservation = self.argument_context_reservation.take();
+        let probe_matrix = self.matrix.take();
+        drop(probe_frames);
+        drop(probe_values);
+        drop(probe_frame_reservation);
+        drop(probe_value_reservation);
+        drop(probe_argument_contexts);
+        drop(probe_argument_context_reservation);
+        drop(probe_matrix);
+
+        self.restore_shape_planner(saved_shape_planner);
+        self.frames = saved_frames;
+        self.values = saved_values;
+        self.frame_reservation = saved_frame_reservation;
+        self.value_reservation = saved_value_reservation;
+        self.argument_contexts = saved_argument_contexts;
+        self.argument_context_reservation = saved_argument_context_reservation;
+        self.matrix = saved_matrix;
+        self.mode = saved_mode;
+        self.position = saved_position;
+        self.projection = saved_projection;
+        self.probe_depth -= 1;
+        result
     }
 
     fn reference_shape_hint(
@@ -5279,6 +5933,36 @@ where
                 "non-operator reached value apply frame",
             )),
         }
+    }
+
+    fn apply_matrix_function(
+        &mut self,
+        node: super::Node<'expr>,
+        _function: MatrixFunction,
+    ) -> EvaluationResult<()> {
+        let name = node
+            .function_name()
+            .ok_or(EvaluationFailure::InvalidExpression(
+                "matrix apply frame has no function name",
+            ))?;
+        let count = node.child_count();
+        let mut arguments = Vec::new();
+        let mut reservation = None;
+        ensure_capacity(
+            &mut arguments,
+            &mut reservation,
+            count,
+            self.limits.scalar.max_stack_entries,
+            self.execution,
+            &self.storage_budget,
+            "formula value matrix function arguments",
+        )?;
+        for _ in 0..count {
+            arguments.push(self.pop_value()?);
+        }
+        arguments.reverse();
+        let value = self.apply_matrix_values(name, arguments)?;
+        self.push_value(value)
     }
 
     fn apply_function(&mut self, node: super::Node<'expr>, name: &str) -> EvaluationResult<()> {

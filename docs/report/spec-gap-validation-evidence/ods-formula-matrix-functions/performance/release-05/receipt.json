@@ -1,0 +1,18 @@
+{
+  "source_basis": "../../candidate-05/source.tar.gz",
+  "gates_basis": "../../candidate-05/gates.json",
+  "archive_sha256": "0778505a4a67f6ccfcd8e7b13afb1cba86facfcfe0c65ff46bb4d48693835b27",
+  "binary_sha256": "345d84f03adabcdece862e8a7285d100b1e31042c44607f67c5127de9d2784d8",
+  "binary_retained": "/home/zhuhe/code/litchi-array-target/retained/matrix-functions-05",
+  "runs": 99,
+  "failed_runs": 0,
+  "deterministic_mismatches": [],
+  "cpu": 6,
+  "build_command": "TMPDIR=/home/zhuhe/code/litchi-array-tmp CARGO_TARGET_DIR=/home/zhuhe/code/litchi-array-target CARGO_INCREMENTAL=0 cargo build --release --locked --offline --manifest-path docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.toml",
+  "compiler_basis": "../../candidate-05/gates.json#toolchain",
+  "harness_sources": {
+    "Cargo.lock": "a93a232fb624a1cb18ac5c6ce22a86e26fa23c359c0f185ab6b913cd2789630d",
+    "Cargo.toml": "7c9f1e22ab4aabe73aad71b0451ff82d371c0482fb9c8782067616d53e1fea66",
+    "src/main.rs": "3c4451732a1a49b82b21b3e6fd7468906ebf7d412540fb77f5a6c2873007a60f"
+  }
+}

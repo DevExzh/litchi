@@ -2,7 +2,37 @@
 
 The intended implementation covers all five ODF 1.4 Part 4 §6.5 functions:
 `MDETERM`, `MINVERSE`, `MMULT`, `MUNIT`, and `TRANSPOSE` in the bounded value
-evaluator. This family remains in progress.
+evaluator. All five functions are implemented in candidate 06; broader
+OpenFormula coverage and performance acceptance remain open.
+
+## Current result
+
+[Candidate 06](candidate-06/receipt.json) passes 34 focused tests and all five
+[ODS gates](candidate-06/gates.json): all-feature/all-target tests, Clippy with
+warnings denied, documentation, doctests, and formatting. The 458-file source
+closure is unchanged across the checks. The [source archive](candidate-06/source.tar.gz)
+and [gate logs](candidate-06/gate-logs.tar.gz) identify the exact implementation.
+
+The implementation adds iterative argument-context continuations, isolated
+shape-planner state, bounded numerical kernels, and reuse of literal-only
+matrix branches. Nested shape/value probes have a checked Depth ceiling;
+resource and cancellation errors remain distinct from formula errors.
+`MUNIT` uses the first parameter cell in matrix mode, including selected lazy
+branches and offset caller positions. Its shape discovery follows that same
+conversion. `TRANSPOSE` preserves matrix calculation context inside a lazy
+branch while retaining its non-ForceArray signature.
+
+The release harness has independent numeric/shape/error oracles, with full
+validation outside the timed loop. Release measurements are initial absolute
+baselines; they do not close existing-workload regression or end-to-end
+performance requirements.
+
+The [current release report](performance/release-06-analysis.md) retains 99
+successful processes over 33 cases, with zero deterministic result/counter
+changes between the two release windows. Ten cases trigger at least one
+positive latency/RSS review flag; those comparisons are not interleaved and
+remain open for follow-up. Exact per-case results are retained rather than
+reported as a blanket performance pass.
 
 - [Contract](contract.md): local specification sections and context rules.
 - [Implementation profile](implementation-profile.md): explicit choices for
@@ -50,3 +80,25 @@ production regressions. Root corrected a nonexistent test-builder method,
 shadowed helper names, and an unused import before baseline 04. Each retains
 its exact archived source, compiler log, and receipt. All temporary capture
 directories were moved here; no loose source copies remain in scratch.
+
+## Candidate history
+
+- Draft 01 did not compile; the kernel's nested result handling and a nested
+  mutable borrow were corrected.
+- Draft 02 passed 28 of 30 tests. Root fixed shape-planner state reentry. The
+  second failure was a fixture advertising numeric cells it actually supplied
+  as Empty; its rectangular storage was corrected without weakening numeric
+  element rules.
+- Candidate 03 passed 30 tests and all five gates. Draft 04 added bounded
+  probe depth and passed 31 tests. Candidate 05 added context and work-reuse
+  coverage and passed 33 tests plus all five gates. Candidate 06 adds the
+  first-parameter-cell rules described above.
+- The first runtime harness smoke stopped on an incorrect inverse oracle:
+  for the fixture `I + J`, the diagonal of the inverse is `n/(n+1)`, not
+  `2/(n+1)`. The corrected oracle passes all 33 runtime cases. This was a
+  harness defect, not an inverse-kernel defect.
+
+Historical captures retain their exact sources and logs. The current source
+archive and gate receipt, rather than earlier counts, establish current
+validation. Temporary capture directories and loose gate logs were removed
+only after archived contents were verified.

@@ -1,0 +1,39 @@
+{
+  "scope": "debug harness compilation and parsing only; corrected timing path unmeasured",
+  "source_basis": "../../baseline-04/source.tar.gz",
+  "harness_sources": {
+    "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.lock": "a93a232fb624a1cb18ac5c6ce22a86e26fa23c359c0f185ab6b913cd2789630d",
+    "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.toml": "7c9f1e22ab4aabe73aad71b0451ff82d371c0482fb9c8782067616d53e1fea66",
+    "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/src/main.rs": "ecee59481a803d8107e72dc2278a19e3bac36a464b247d9c6a3d02e5330136b1"
+  },
+  "commands": [
+    [
+      "cargo",
+      "build",
+      "--locked",
+      "--offline",
+      "--manifest-path",
+      "docs/report/spec-gap-validation-evidence/ods-formula-matrix-functions/performance/harness/Cargo.toml"
+    ],
+    [
+      "ods-formula-matrix-functions-performance",
+      "--phase",
+      "parse",
+      "--warmups",
+      "0",
+      "--iterations",
+      "1",
+      "--repeat",
+      "1"
+    ]
+  ],
+  "build_status": 0,
+  "parse_status": 0,
+  "rows": 33,
+  "binary_sha256": "7658075521f1d81f8517bb1f332de9e1a5472c443a1b2d52898b27ff9a40189d",
+  "artifacts": {
+    "harness-source.tar.gz": "a483a0bb99a52a3efea5714d32d933d3fcef62e06d6d58b0b34796bf6400fed6",
+    "build.log": "2fb66d45f3f0cb77777028e6327712e91fe6a7a983d263c6eed42dde11cd4d5b",
+    "parse.jsonl": "9f70dba31064355cac6d937e24cd6d5f15cb0461541132a035ec6896a66f9423"
+  }
+}
