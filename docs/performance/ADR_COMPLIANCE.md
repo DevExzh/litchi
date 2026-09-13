@@ -1,5 +1,13 @@
 # Performance optimization ADR-compliance matrix
 
+## 0545: safe scanner experiment remains outside production
+
+[0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) checks the exact 0544 cap predicate using bounded adjacent-pair sums,
+checked total addition and pinned-reader differential tests. All 30 previously
+read ADR/index hashes remain unchanged. No unsafe code, production dependencies,
+validation changes, publication changes or runtime admission were introduced.
+Sparse performance rejects the replacement despite passing correctness checks.
+
 ## 0544: bounded event preflight remains unadmitted
 
 [0544](changes/0544-xlsx-event-preflight-rejected.md) retains a public benchmark example, with no production optimization.

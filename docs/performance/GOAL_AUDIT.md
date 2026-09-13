@@ -1,5 +1,13 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0545: bounded diagnostic progress, broad goal remains active
+
+[0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) rejects a dense-only scanner win using sparse and early-exit evidence
+before another integration campaign. All captures, 18 individual reviews and
+replay checks remain; the owned build/fixture tree is cleaned and the batch
+committed. OLE2/OOXML performance is the active priority. ODF work is deferred
+until that goal completes; iWork remains outside this workstream.
+
 ## 0544: oracle and cap benchmark progress; runtime restored
 
 [0544](changes/0544-xlsx-event-preflight-rejected.md) completes a fresh preflight campaign and direct XML-reader oracle.

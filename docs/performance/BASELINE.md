@@ -1,5 +1,12 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0545: isolated exact-count scan, no workflow baseline change
+
+[0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) records 2,800 samples over seven inputs in frozen ABBA order. Dense
+scanner p50 improves 10.2–44.9%, but sparse XML takes 42.98–44.18x baseline time
+and early cap exits regress 22.61–22.73%. All 18 adverse/drift rows are retained.
+The scalar chunked replacement is rejected; production is unchanged.
+
 ## 0544: residual preflight cost fails valid cap gates
 
 [0544](changes/0544-xlsx-event-preflight-rejected.md) records fresh main/cap ABBA evidence. Planning p50 falls 18.2–20.4%,

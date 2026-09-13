@@ -1,0 +1,602 @@
+{
+  "scope": "Isolated hot scanner only. All raw samples retained; nearest-rank tails, median and arithmetic mean. Two process repeats describe variability, not a formal population confidence interval. No workflow or memory speedup claim.",
+  "rows": [
+    {
+      "fixture": "96",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 297961.0,
+        "mean": 302731.65,
+        "p95": 311402,
+        "p99": 378801
+      },
+      "chunked_ns": {
+        "p50": 168001.0,
+        "mean": 169184.35,
+        "p95": 174011,
+        "p99": 177331
+      },
+      "change_percent": {
+        "p50": -43.61644644768946,
+        "mean": -44.11408585788767,
+        "p95": -44.12014052575128,
+        "p99": -53.18623762872854
+      }
+    },
+    {
+      "fixture": "96",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 304691.0,
+        "mean": 305954.37,
+        "p95": 314031,
+        "p99": 316511
+      },
+      "chunked_ns": {
+        "p50": 168011.0,
+        "mean": 169172.84,
+        "p95": 173961,
+        "p99": 176101
+      },
+      "change_percent": {
+        "p50": -44.858561624728,
+        "mean": -44.70651293524587,
+        "p95": -44.60387668733342,
+        "p99": -44.36180733055092
+      }
+    },
+    {
+      "fixture": "128",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 538192.5,
+        "mean": 540557.76,
+        "p95": 552212,
+        "p99": 555583
+      },
+      "chunked_ns": {
+        "p50": 305916.5,
+        "mean": 307856.07,
+        "p95": 312471,
+        "p99": 316502
+      },
+      "change_percent": {
+        "p50": -43.15853528245005,
+        "mean": -43.04844129885398,
+        "p95": -43.41466683085482,
+        "p99": -43.03245419676268
+      }
+    },
+    {
+      "fixture": "128",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 533622.0,
+        "mean": 534849.04,
+        "p95": 548782,
+        "p99": 550073
+      },
+      "chunked_ns": {
+        "p50": 305931.0,
+        "mean": 307767.17,
+        "p95": 311652,
+        "p99": 312581
+      },
+      "change_percent": {
+        "p50": -42.668967921112696,
+        "mean": -42.45718941554051,
+        "p95": -43.21023648734834,
+        "p99": -43.174633185049984
+      }
+    },
+    {
+      "fixture": "160",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 811663.5,
+        "mean": 815142.31,
+        "p95": 843113,
+        "p99": 853063
+      },
+      "chunked_ns": {
+        "p50": 487212.0,
+        "mean": 487303.76,
+        "p95": 490832,
+        "p99": 491612
+      },
+      "change_percent": {
+        "p50": -39.97364671443277,
+        "mean": -40.21856625256025,
+        "p95": -41.78336711686333,
+        "p99": -42.37096205086846
+      }
+    },
+    {
+      "fixture": "160",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 836433.0,
+        "mean": 837514.6,
+        "p95": 856623,
+        "p99": 873673
+      },
+      "chunked_ns": {
+        "p50": 486897.0,
+        "mean": 487426.96,
+        "p95": 490582,
+        "p99": 491442
+      },
+      "change_percent": {
+        "p50": -41.78888207423667,
+        "mean": -41.80078054758687,
+        "p95": -42.73069950258165,
+        "p99": -43.749892694406256
+      }
+    },
+    {
+      "fixture": "164",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 818378.0,
+        "mean": 821853.84,
+        "p95": 848233,
+        "p99": 863413
+      },
+      "chunked_ns": {
+        "p50": 499447.0,
+        "mean": 498240.01,
+        "p95": 501102,
+        "p99": 501912
+      },
+      "change_percent": {
+        "p50": -38.97111114912669,
+        "mean": -39.376080544929984,
+        "p95": -40.92401498173261,
+        "p99": -41.86883913028875
+      }
+    },
+    {
+      "fixture": "164",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 793388.0,
+        "mean": 796899.75,
+        "p95": 825443,
+        "p99": 842764
+      },
+      "chunked_ns": {
+        "p50": 498007.0,
+        "mean": 498270.4,
+        "p95": 501532,
+        "p99": 502382
+      },
+      "change_percent": {
+        "p50": -37.23033370809743,
+        "mean": -37.4738917912824,
+        "p95": -39.24086823681344,
+        "p99": -40.388768385930106
+      }
+    },
+    {
+      "fixture": "256",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 553737.0,
+        "mean": 554878.02,
+        "p95": 578922,
+        "p99": 586272
+      },
+      "chunked_ns": {
+        "p50": 492792.0,
+        "mean": 492212.48,
+        "p95": 495091,
+        "p99": 495662
+      },
+      "change_percent": {
+        "p50": -11.006127457619774,
+        "mean": -11.293570431930256,
+        "p95": -14.48053451069401,
+        "p99": -15.45528355439113
+      }
+    },
+    {
+      "fixture": "256",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 549442.0,
+        "mean": 555945.73,
+        "p95": 580152,
+        "p99": 652963
+      },
+      "chunked_ns": {
+        "p50": 493152.0,
+        "mean": 492480.58,
+        "p95": 495772,
+        "p99": 496142
+      },
+      "change_percent": {
+        "p50": -10.244939411257237,
+        "mean": -11.415709587336876,
+        "p95": -14.544464209379615,
+        "p99": -24.016827906022243
+      }
+    },
+    {
+      "fixture": "sparse",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 15950.0,
+        "mean": 16266.76,
+        "p95": 16770,
+        "p99": 22811
+      },
+      "chunked_ns": {
+        "p50": 704642.0,
+        "mean": 703694.99,
+        "p95": 707393,
+        "p99": 709052
+      },
+      "change_percent": {
+        "p50": 4317.818181818182,
+        "mean": 4225.968969850173,
+        "p95": 4118.205128205128,
+        "p99": 3008.377537153128
+      }
+    },
+    {
+      "fixture": "sparse",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 16400.0,
+        "mean": 16676.27,
+        "p95": 16790,
+        "p99": 23520
+      },
+      "chunked_ns": {
+        "p50": 704917.5,
+        "mean": 704016.49,
+        "p95": 707872,
+        "p99": 709083
+      },
+      "change_percent": {
+        "p50": 4198.27743902439,
+        "mean": 4121.66641581121,
+        "p95": 4116.033353186421,
+        "p99": 2914.8086734693875
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "repeat": 1,
+      "baseline_ns": {
+        "p50": 582852.5,
+        "mean": 581630.92,
+        "p95": 590432,
+        "p99": 591742
+      },
+      "chunked_ns": {
+        "p50": 715333.0,
+        "mean": 714477.93,
+        "p95": 718273,
+        "p99": 719393
+      },
+      "change_percent": {
+        "p50": 22.729678606508518,
+        "mean": 22.840431179277743,
+        "p95": 21.652112351634067,
+        "p99": 21.572070260349953
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "repeat": 2,
+      "baseline_ns": {
+        "p50": 583592.5,
+        "mean": 581931.52,
+        "p95": 590182,
+        "p99": 594902
+      },
+      "chunked_ns": {
+        "p50": 715517.0,
+        "mean": 714567.23,
+        "p95": 718203,
+        "p99": 718593
+      },
+      "change_percent": {
+        "p50": 22.605585232846547,
+        "mean": 22.79232271178573,
+        "p95": 21.691783212636096,
+        "p99": 20.791827897704152
+      }
+    }
+  ],
+  "drift": [
+    {
+      "fixture": "96",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 2.2586848614416066,
+        "mean": 1.0645467693912947,
+        "p95": 0.8442463439541248,
+        "p99": -16.443990380173233
+      }
+    },
+    {
+      "fixture": "96",
+      "variant": "chunked",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.005952345521742508,
+        "mean": -0.006803229731355831,
+        "p95": -0.028733815678316788,
+        "p99": -0.6936181491109861
+      }
+    },
+    {
+      "fixture": "128",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.8492314552878355,
+        "mean": -1.05607955752961,
+        "p95": -0.6211382584949243,
+        "p99": -0.99175100750023
+      }
+    },
+    {
+      "fixture": "128",
+      "variant": "chunked",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.004739855483437694,
+        "mean": -0.02887713079687826,
+        "p95": -0.26210432328119815,
+        "p99": -1.2388547307757958
+      }
+    },
+    {
+      "fixture": "160",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 3.0516956842336684,
+        "mean": 2.7445870157322583,
+        "p95": 1.6023949340123966,
+        "p99": 2.4159997561727486
+      }
+    },
+    {
+      "fixture": "160",
+      "variant": "chunked",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.06465357996108256,
+        "mean": 0.025281971967539008,
+        "p95": -0.05093392443850098,
+        "p99": -0.03458011602646138
+      }
+    },
+    {
+      "fixture": "164",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -3.0536011476359315,
+        "mean": -3.0363172604997435,
+        "p95": -2.6867617741823335,
+        "p99": -2.3915553738477424
+      }
+    },
+    {
+      "fixture": "164",
+      "variant": "chunked",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.2883188806820369,
+        "mean": 0.006099470012466135,
+        "p95": 0.0858108728362783,
+        "p99": 0.09364191332346117
+      }
+    },
+    {
+      "fixture": "256",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": -0.7756389766260918,
+        "mean": 0.19242247151904923,
+        "p95": 0.2124638552343905,
+        "p99": 11.375436657387695
+      }
+    },
+    {
+      "fixture": "256",
+      "variant": "chunked",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.07305313397945046,
+        "mean": 0.05446834667826028,
+        "p95": 0.13755047051955405,
+        "p99": 0.09684018544895423
+      }
+    },
+    {
+      "fixture": "sparse",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 2.8213166144200663,
+        "mean": 2.517465063725055,
+        "p95": 0.11926058437685683,
+        "p99": 3.1081495769584855
+      }
+    },
+    {
+      "fixture": "sparse",
+      "variant": "chunked",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.039097868137294434,
+        "mean": 0.045687407835592886,
+        "p95": 0.06771342096967281,
+        "p99": 0.004372034773192368
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "variant": "baseline",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.12696179565154786,
+        "mean": 0.051682259258156726,
+        "p95": -0.04234187848897175,
+        "p99": 0.5340165139537056
+      }
+    },
+    {
+      "fixture": "early-reject",
+      "variant": "chunked",
+      "repeat2_vs_repeat1_percent": {
+        "p50": 0.0257222859842976,
+        "mean": 0.01249863659189554,
+        "p95": -0.00974559812215725,
+        "p99": -0.1112048629886564
+      }
+    }
+  ],
+  "reviews": [
+    {
+      "kind": "drift",
+      "fixture": "96",
+      "variant": "baseline",
+      "metric": "p99",
+      "percent": -16.443990380173233,
+      "review": "Repeat variability retained without rerun or sample filtering. Limits precise magnitude and tail claims; does not rescue rejected sparse/early-exit behavior."
+    },
+    {
+      "kind": "drift",
+      "fixture": "256",
+      "variant": "baseline",
+      "metric": "p99",
+      "percent": 11.375436657387695,
+      "review": "Repeat variability retained without rerun or sample filtering. Limits precise magnitude and tail claims; does not rescue rejected sparse/early-exit behavior."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 1,
+      "metric": "p50",
+      "percent": 4317.818181818182,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 1,
+      "metric": "mean",
+      "percent": 4225.968969850173,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 1,
+      "metric": "p95",
+      "percent": 4118.205128205128,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 1,
+      "metric": "p99",
+      "percent": 3008.377537153128,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 2,
+      "metric": "p50",
+      "percent": 4198.27743902439,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 2,
+      "metric": "mean",
+      "percent": 4121.66641581121,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 2,
+      "metric": "p95",
+      "percent": 4116.033353186421,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "sparse",
+      "repeat": 2,
+      "metric": "p99",
+      "percent": 2914.8086734693875,
+      "review": "Full scalar byte traversal loses sparse delimiter skipping; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 1,
+      "metric": "p50",
+      "percent": 22.729678606508518,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 1,
+      "metric": "mean",
+      "percent": 22.840431179277743,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 1,
+      "metric": "p95",
+      "percent": 21.652112351634067,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 1,
+      "metric": "p99",
+      "percent": 21.572070260349953,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 2,
+      "metric": "p50",
+      "percent": 22.605585232846547,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 2,
+      "metric": "mean",
+      "percent": 22.79232271178573,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 2,
+      "metric": "p95",
+      "percent": 21.691783212636096,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    },
+    {
+      "kind": "adverse",
+      "fixture": "early-reject",
+      "repeat": 2,
+      "metric": "p99",
+      "percent": 20.791827897704152,
+      "review": "Scalar prefix traversal regresses versus early delimiter cap exit; universal replacement rejected."
+    }
+  ],
+  "decision": "Reject unconditional chunked replacement; no production change."
+}

@@ -1,5 +1,12 @@
 # Performance program phase report
 
+## 0545: reject scanner replacement before workflow integration
+
+[0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) retains isolated diagnostic evidence, no runtime change. Exact-bound
+and direct-reader assertions pass, as do fmt, two tests, Clippy and release
+build. Dense gains do not offset 42.98–44.18x sparse latency and ~23% early-exit
+regression. No workflow or memory improvement is claimed.
+
 ## 0544: no retained runtime speedup
 
 [0544](changes/0544-xlsx-event-preflight-rejected.md) rejects the two-scan preflight. It passes 1,305 candidate tests and

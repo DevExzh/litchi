@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "/home/zhuhe/litchi-goal-0545-target/scanner/target/release/xlsx-scanner-diagnostic",
+    "chunked",
+    "/home/zhuhe/litchi-goal-0545-target/fixtures/sparse.xml",
+    "docs/performance/results/change-0545/native-chunked-1-sparse.json"
+  ],
+  "cwd": "/home/zhuhe/code/litchi",
+  "started": "2026-09-13T01:02:26.161558+00:00",
+  "freeze_sha256": "770fea53337d068b804a2512dffb98524f4ee57c42f6fac5d72931f54d8357b9",
+  "binary_sha256": "43fc465cc298a18d045fd83cdcedf15b39bccbfb85653a112a536c81971c7b62",
+  "ended": "2026-09-13T01:02:26.241762+00:00",
+  "exit_code": 0,
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

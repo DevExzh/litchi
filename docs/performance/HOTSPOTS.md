@@ -1,5 +1,14 @@
 # Performance hotspot inventory
 
+## 0545: dense scanning gain loses sparse delimiter skipping
+
+[0545](changes/0545-xlsx-scanner-diagnostic-rejected.md) proves exact-bound chunk counting is cheaper for dense diagnostic XML
+but substantially worse for sparse text and early rejection. Generated assembly
+remains scalar. Next investigate exact counting with sparse skipping and cheap
+cap exits; any vectorization hypothesis needs fresh evidence. The coarser bound
+mentioned below was subsequently rejected because primary 128 would fall back.
+OLE2/OOXML remain first; ODF waits until that optimization goal completes.
+
 ## 0544: conservative two-scan admission adds measurable work
 
 [0544](changes/0544-xlsx-event-preflight-rejected.md) avoids the discarded parser prefix with a lexical bound, but its
