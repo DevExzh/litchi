@@ -1,0 +1,40 @@
+--- validated-1ddaf
++++ unvalidated-264be
+@@ -3860,7 +3860,12 @@
+                         (ReferenceOperandKind::ReferenceList, _,)
+                             | (_, ReferenceOperandKind::ReferenceList,)
+                     ) {
+-                        ReferenceOperandKind::Error(ScalarError::Value)
++                        // A list is scalarized by the ordinary infix kernel,
++                        // but explicit formula errors still take that
++                        // kernel's precedence.  Let the scalar probe decide
++                        // the resulting error instead of manufacturing
++                        // #VALUE! here.
++                        ReferenceOperandKind::Unknown
+                     } else if matches!(
+                         (left, right),
+                         (ReferenceOperandKind::Unknown, _)
+@@ -3890,15 +3895,19 @@
+                             | (_, ReferenceOperandKind::Array)
+                             | (ReferenceOperandKind::Reference, _)
+                             | (_, ReferenceOperandKind::Reference) => ReferenceOperandKind::Array,
+-                            (ReferenceOperandKind::ReferenceList, _)
+-                            | (_, ReferenceOperandKind::ReferenceList) => {
+-                                ReferenceOperandKind::Error(ScalarError::Value)
+-                            },
+                             (_, ReferenceOperandKind::Error(error)) => {
+                                 ReferenceOperandKind::Error(error)
+                             },
+                             (ReferenceOperandKind::Error(error), _) => {
+                                 ReferenceOperandKind::Error(error)
++                            },
++                            (ReferenceOperandKind::ReferenceList, _)
++                            | (_, ReferenceOperandKind::ReferenceList) => {
++                                // Ordinary functions scalarize a reference
++                                // list before invoking the scalar kernel.
++                                // Defer the exact result to that kernel so a
++                                // leftmost explicit error remains catchable.
++                                ReferenceOperandKind::Unknown
+                             },
+                             (ReferenceOperandKind::Unknown, _)
+                             | (_, ReferenceOperandKind::Unknown) => ReferenceOperandKind::Unknown,

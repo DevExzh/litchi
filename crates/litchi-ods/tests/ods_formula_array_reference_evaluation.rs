@@ -784,6 +784,7 @@ fn matrix_reference_operator_operands_keep_their_typed_refusal() {
         "IFERROR(XOR(([.A1]~[.B1]);{TRUE()});[.C1:.D1])",
         "IFERROR(XOR({TRUE()};([.A1]~[.B1]));[.C1:.D1])",
         "IFERROR((([.A1]~[.B1]):[.C1]);[.C1:.D1])",
+        "IFERROR(IFNA((#N/A+([.A1]~[.B1]));{1});[.C1:.D1])",
     ] {
         for source in [
             format!("=([.A1]:{operand})"),
@@ -875,6 +876,7 @@ fn reference_operand_error_handlers_use_resolved_reference_errors() {
         "IFERROR(XOR(([.A1]~[.B1])![.A1]);[.C1:.D1])",
         "IFERROR(([.A1]~[.B1]);[.C1:.D1])",
         "IFERROR(-([.A1]~[.B1]);[.C1:.D1])",
+        "IFNA((#N/A+([.A1]~[.B1]));[.C1:.D1])",
     ] {
         let source = format!("=IF({{TRUE()}};([.A1]:{operand});0)");
         let mut resolver = FixtureResolver::new();
