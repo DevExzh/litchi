@@ -1,5 +1,50 @@
 # Non-iWork `docs/GOAL.md` audit
 
+## 0565-0567: the largest remaining OLE2 gap is closed, and an OOXML hypothesis is disproved
+
+[0565](0565-xls-globals-single-pass.md) closes the gap
+[0564](0564-xls-open-read-attribution.md) identified as the biggest measured
+remaining item on the OLE2 priority path. A source-backed XLS open falls from 655
+positional reads and 636 freshness observations to 53 and 34, with each globals
+byte read once instead of the headers being read twice. Change 0564 recorded that
+this conflicted with four tested contracts and, per this goal's rule, stopped.
+This batch made that decision explicitly rather than by side effect: each
+contract is replaced by an enforced invariant, three further consequences are
+written down, and a survey of 104 fixtures establishes that the conservative
+alternative — clamping before any read-ahead — saves 8% of the reads where the
+implemented schedule saves 95%.
+
+The goal's target for this path, work proportional to mandatory metadata plus
+accessed content, is now met for the globals: the scan reads the globals once
+plus a bounded read-ahead of at most one fill, measured at zero bytes on the
+flagship fixture and at most 3,949 across the surveyed corpus.
+[0566](0566-xls-worksheet-window-design.md) designs the same treatment for the
+worksheet scan, the other half of what change 0325 had in scope, and finds it
+easier because the sheet boundary is validated at open.
+
+[0567](0567-ooxml-single-index-per-open.md) **disproves** this goal's hypothesis
+12 inside one library call: detection does not repeat container indexing, because
+the facade builds the package once and hands it on. It also corrects two earlier
+records, one of which had left a follow-up open on a read that turns out not to
+belong to this library at all. The OOXML repeated indexing that does exist is
+across two calls, and the cheapest fix is documentation rather than code.
+
+An important limitation is now quantified rather than assumed. This host's A/A
+noise floor drifts several percent at p50 and over ten percent at p99 with one
+binary against itself, so the 5% review trigger is not comfortably above the
+tail-statistic floor, and the nanosecond-scale semantic selectors carry no
+information in either direction.
+
+Still required by the goal and unchanged by this batch: cold-cache and physical
+device distributions, remote and range-source behaviour, peak RSS and allocation
+accounting, concurrency scaling, real-producer breadth, and cross-platform
+confirmation. The goal's own list names a simulated high-latency range source,
+and both change 0561's conclusion and this batch's owned-source rows point at it
+as where the remaining I/O work pays.
+
+OLE2/OOXML stay first; ODF is deferred until that goal completes and iWork is
+excluded; the broad goal remains active.
+
 ## 0564: the largest remaining OLE2 target, and why it is blocked
 
 [0564](0564-xls-open-read-attribution.md) locates the biggest measured remaining

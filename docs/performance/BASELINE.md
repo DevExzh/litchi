@@ -1,5 +1,13 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0567: OOXML archive-construction counts established
+
+The [0567 packet](results/change-0567/README.md) establishes that one library-level OOXML open builds exactly one `IndexedArchive`, for DOCX, PPTX and XLSX, leaf and facade, under two feature sets. It retains a re-derivation of that result from traces change 0562 already published, plus the resolved stack showing that the repeated 840-byte read those traces contain is the dynamic loader rather than a package member. Per-construction byte counts for the end-of-central-directory record and the central directory are recorded for three fixtures.
+
+## Change 0565: XLS globals read schedule re-established
+
+The [0565 packet](results/change-0565/README.md) re-establishes the source-backed XLS baseline against change 0564's published figures — 655 `pread64` and 636 `statx` per open, 94.66% four-byte reads, identical size histogram, reproduced bit for bit — and adds the post-change counterpart: 53 and 34 per open, four-byte reads down to 4 in a two-open capture. It also records this host's A/A noise floor, which drifts +1.7% to +3.2% at p50 and +11.0% at p99 with one binary against itself at 20 samples, so the 5% review trigger is not comfortably above the tail-statistic floor. A 104-fixture corpus survey of CFB and BIFF geometry is retained with a deterministic generator.
+
 ## Change 0564: XLS open read shape established
 
 The [0564 packet](0564-xls-open-read-attribution.md) retains a full `pread64` trace of one source-backed XLS open child and the `strace -f -c` isolation pair at 1 and 11 samples, plus a summarizer that reports only properties of the retained traces. It establishes 655 `pread64` and 636 `statx` per open, a 94.7% four-byte read share, and 0.5% read contiguity. No timing, resource or cold-cache measurement is added.

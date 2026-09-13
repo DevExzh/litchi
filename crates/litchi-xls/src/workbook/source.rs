@@ -55,6 +55,19 @@ const DEFAULT_TEXT_BYTES: u64 = 128 * 1024 * 1024;
 const DEFAULT_SHEET_COUNT: usize = 4_096;
 const DEFAULT_MATERIALIZE_BYTES: u64 = 128 * 1024 * 1024;
 const MATERIALIZE_CHUNK_BYTES: usize = 64 * 1024;
+/// Workbook globals records whose bytes are fetched exactly rather than in a
+/// window: one read for the header, one for the payload and the next record's
+/// header.
+///
+/// [MS-XLS] 2.1.7.20.1 gives the globals substream as
+/// `GLOBALS = BOF [WriteProtect] [FilePass] [Template] ...`, so a `FilePass`
+/// record is one of the first three. Four records cover that prefix, and the
+/// last one's fetch also buffers the fifth record's header.
+const GLOBALS_EXACT_PROLOGUE_RECORDS: usize = 4;
+/// First window fill after the exact prologue; one CFB sector.
+const GLOBALS_FIRST_WINDOW_BYTES: u64 = 512;
+/// Upper bound the window fill size doubles to.
+const GLOBALS_MAX_WINDOW_BYTES: u64 = 64 * 1024;
 
 /// Limits for one source-backed XLS owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1486,6 +1499,156 @@ fn select_workbook_stream(
     Err(SourceBackedError::WorkbookStreamMissing)
 }
 
+/// Retained buffer for one workbook-globals scan.
+///
+/// The buffer holds Workbook stream bytes `[0, filled)` and is grown only by
+/// reads that start at `filled`, so a byte is read from the source at most
+/// once. `read_stream_range` issues one physical read per contiguous FAT run
+/// and one source-version observation per call.
+struct GlobalsBuffer<'a> {
+    cfb: &'a SharedOleFile,
+    refs: &'a [&'a str],
+    stream_len: u64,
+    max_global_bytes: u64,
+    bytes: Vec<u8>,
+    filled: u64,
+    /// Size of the next window fill, before clamping.
+    window: u64,
+    /// Smallest `lbPlyPos` seen in a `BoundSheet8` payload framed *so far*.
+    min_sheet_start: Option<u64>,
+    /// Cleared permanently once framing contradicts `min_sheet_start`.
+    sheet_clamp_active: bool,
+}
+
+impl<'a> GlobalsBuffer<'a> {
+    fn new(
+        cfb: &'a SharedOleFile,
+        refs: &'a [&'a str],
+        stream_len: u64,
+        max_global_bytes: u64,
+    ) -> Self {
+        Self {
+            cfb,
+            refs,
+            stream_len,
+            max_global_bytes,
+            bytes: Vec::new(),
+            filled: 0,
+            window: GLOBALS_FIRST_WINDOW_BYTES,
+            min_sheet_start: None,
+            sheet_clamp_active: true,
+        }
+    }
+
+    /// Upper bound for one window fill. Never below `need`: every check that
+    /// gates `need` has already run against header bytes resident in the
+    /// buffer, so a fill that stopped short of `need` would not advance and
+    /// the scan would not terminate.
+    fn fill_cap(&mut self, need: u64) -> u64 {
+        if self.sheet_clamp_active
+            && self
+                .min_sheet_start
+                .is_some_and(|sheet_start| need > sheet_start)
+        {
+            // Globals frame past the smallest declared sheet position, so
+            // `lbPlyPos` is corrupt. Drop the clamp for the rest of the scan
+            // rather than re-deriving it; `validate_sheet_offsets` still
+            // reports the inconsistency with its own error.
+            self.sheet_clamp_active = false;
+        }
+        // `max_global_bytes` bounds retained globals, not the four header
+        // bytes that prove a record crosses it: today's order reads that
+        // header and then reports "global bytes" with the record's real end.
+        let mut cap = self.stream_len.min(self.max_global_bytes.max(need));
+        if self.sheet_clamp_active {
+            if let Some(sheet_start) = self.min_sheet_start {
+                cap = cap.min(sheet_start);
+            }
+        }
+        cap.max(need)
+    }
+
+    /// Ensures stream bytes `[0, need)` are resident.
+    ///
+    /// `exact` reads only the missing bytes; otherwise the fill extends to the
+    /// current window, clamped by the stream length, by `max_global_bytes` and
+    /// by the smallest known `BoundSheet8` position.
+    fn ensure(&mut self, need: u64, exact: bool) -> Result<()> {
+        if need <= self.filled {
+            return Ok(());
+        }
+        if need > self.stream_len {
+            // Unreachable: `header_end > stream_len` and `end > stream_len`
+            // are both rejected before the bytes are requested. Reported as
+            // data rather than asserted so a future caller cannot panic here.
+            return Err(SourceBackedError::InvalidData(
+                "BIFF global fill exceeds the Workbook stream".into(),
+            ));
+        }
+        let end = if exact {
+            need
+        } else {
+            let cap = self.fill_cap(need);
+            let end = need.max(self.filled.saturating_add(self.window)).min(cap);
+            self.window = self.window.saturating_mul(2).min(GLOBALS_MAX_WINDOW_BYTES);
+            end
+        };
+        let start =
+            usize::try_from(self.filled).map_err(|_error| SourceBackedError::ResourceLimit {
+                resource: "global address space",
+                observed: self.filled,
+                maximum: usize::MAX as u64,
+            })?;
+        let finish = usize::try_from(end).map_err(|_error| SourceBackedError::ResourceLimit {
+            resource: "global address space",
+            observed: end,
+            maximum: usize::MAX as u64,
+        })?;
+        self.bytes
+            .try_reserve_exact(finish - start)
+            .map_err(|_error| SourceBackedError::Allocation {
+                resource: "workbook globals buffer",
+                requested: finish as u64,
+            })?;
+        self.bytes.resize(finish, 0);
+        self.cfb
+            .read_stream_range(self.refs, self.filled, &mut self.bytes[start..finish])
+            .map_err(SourceBackedError::from)?;
+        self.filled = end;
+        Ok(())
+    }
+
+    /// Folds one framed `BoundSheet8` stream position into the fill clamp.
+    ///
+    /// Sheet substreams start at or after the globals end, so no globals byte
+    /// lives at or after the smallest position. The clamp is the minimum over
+    /// the `BoundSheet8` records framed so far, not over the whole globals:
+    /// [MS-XLS] 2.4.28 imposes no ordering on `lbPlyPos`, so a later record may
+    /// lower it, and fills issued before that record saw only the higher
+    /// bound. A running minimum is still a correct bound on each fill at the
+    /// time it is issued, and establishing the true minimum first would need a
+    /// second pass over the globals. The value only ever lowers the clamp, so
+    /// it cannot invalidate bytes already read; a position at or below `filled`
+    /// instead disables the clamp at the next fill, because read bytes cannot
+    /// be unread. Malformed payloads raise no error here: the semantic pass
+    /// below keeps the existing error order.
+    fn note_sheet_start(&mut self, position: u64) {
+        self.min_sheet_start = Some(match self.min_sheet_start {
+            Some(current) => current.min(position),
+            None => position,
+        });
+    }
+
+    fn header(&self, offset: usize) -> [u8; 4] {
+        [
+            self.bytes[offset],
+            self.bytes[offset + 1],
+            self.bytes[offset + 2],
+            self.bytes[offset + 3],
+        ]
+    }
+}
+
 fn parse_globals(
     cfb: &SharedOleFile,
     path: &[String],
@@ -1495,14 +1658,33 @@ fn parse_globals(
     let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
     let mut offset = 0_u64;
     let mut record_count = 0_usize;
-    let mut cursor = cfb
-        .stream_cursor_at(&refs, 0)
-        .map_err(SourceBackedError::from)?;
+    let mut globals = GlobalsBuffer::new(cfb, &refs, stream_len, limits.max_global_bytes);
 
-    // The first pass reads only BIFF headers.  Besides avoiding payload reads
-    // for encrypted workbooks, this establishes the exact global boundary so
-    // the semantic pass below can issue one bounded logical range read.
+    // One pass frames the globals and retains the bytes the semantic pass
+    // below reads, so no globals byte is read from the source twice.
+    //
+    // The first `GLOBALS_EXACT_PROLOGUE_RECORDS` records are read exactly.
+    // [MS-XLS] 2.1.7.20.1 defines the globals substream as
+    // `GLOBALS = BOF [WriteProtect] [FilePass] [Template] ...`, so a FilePass
+    // record occupies one of the first three positions and an encrypted
+    // workbook is refused with no byte of its payload read. The guarantee
+    // actually extends one record further: the last prologue record's fetch
+    // buffers the header of record four as well, and `ensure` is a no-op for a
+    // header already resident, so a FilePass at index four is also refused
+    // before any fill is issued. A FilePass framed later may have payload
+    // bytes resident in a fill buffer; they are never framed, interpreted or
+    // published, and the refusal is unchanged.
+    //
+    // From the fifth record on, a fill covers records `i..i+k` before the
+    // checks of records `i+1..i+k` run, so a source that fails at a later
+    // offset reports its I/O or `SourceChanged` error before a FilePass or
+    // limit error of an intermediate record. The prologue couples reads the
+    // same way over one record: it fetches record `i`'s payload together with
+    // record `i + 1`'s four-byte header, so a source error located in either
+    // surfaces during record `i`'s iteration. The per-record check order is
+    // unchanged in both phases; only the read coupling is new.
     loop {
+        let exact = record_count < GLOBALS_EXACT_PROLOGUE_RECORDS;
         let header_end = offset.checked_add(4).ok_or_else(|| {
             SourceBackedError::InvalidData("BIFF global header offset overflows".into())
         })?;
@@ -1511,10 +1693,8 @@ fn parse_globals(
                 "truncated BIFF global record header".into(),
             ));
         }
-        let mut header = [0_u8; 4];
-        cursor
-            .read_exact(&mut header)
-            .map_err(SourceBackedError::from)?;
+        globals.ensure(header_end, exact)?;
+        let header = globals.header(offset as usize);
         let kind = u16::from_le_bytes([header[0], header[1]]);
         if kind == FILEPASS {
             return Err(SourceBackedError::EncryptedUnsupported);
@@ -1559,9 +1739,30 @@ fn parse_globals(
                 maximum: limits.max_global_bytes,
             });
         }
-        cursor
-            .skip_forward(payload_len as u64)
-            .map_err(SourceBackedError::from)?;
+        // In the exact prologue the payload fetch also covers the next record's
+        // four-byte header, so a prologue record costs one read rather than
+        // two. The next header is framed at the top of the following
+        // iteration, where a FilePass is refused before any ensure for its own
+        // payload runs, so no FilePass payload byte is ever requested. The
+        // extra four bytes are clamped only by the stream length: today's
+        // order also reads a record's header before checking that record
+        // against `max_global_bytes`. EOF takes no prefetch, so the prologue
+        // never reads past the globals end.
+        let need = if exact && kind != EOF {
+            end.saturating_add(4).min(stream_len)
+        } else {
+            end
+        };
+        globals.ensure(need, exact)?;
+        if kind == BOUND_SHEET && payload_len >= 4 {
+            let payload = header_end as usize;
+            globals.note_sheet_start(u64::from(u32::from_le_bytes([
+                globals.bytes[payload],
+                globals.bytes[payload + 1],
+                globals.bytes[payload + 2],
+                globals.bytes[payload + 3],
+            ])));
+        }
         offset = end;
         if kind == EOF {
             if payload_len != 0 {
@@ -1579,7 +1780,11 @@ fn parse_globals(
             observed: offset,
             maximum: usize::MAX as u64,
         })?;
-    let bytes = read_range(cfb, &refs, 0, global_len)?;
+    // A window fill may reach past the globals end, never past the stream
+    // length, `max_global_bytes` or the smallest known sheet position. Those
+    // bytes are dropped here and are never framed or interpreted.
+    let mut bytes = globals.bytes;
+    bytes.truncate(global_len);
 
     let biff_limits = BiffLimits {
         max_records: limits.max_global_records,
@@ -1851,20 +2056,6 @@ fn validate_sheet_offsets(
         sheets[index].end = upper_bound;
     }
     Ok(())
-}
-
-fn read_range(cfb: &SharedOleFile, path: &[&str], offset: u64, length: usize) -> Result<Vec<u8>> {
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(length)
-        .map_err(|_error| SourceBackedError::Allocation {
-            resource: "source-backed range buffer",
-            requested: length as u64,
-        })?;
-    output.resize(length, 0);
-    cfb.read_stream_range(path, offset, &mut output)
-        .map_err(SourceBackedError::from)?;
-    Ok(output)
 }
 
 struct WorksheetFrame {

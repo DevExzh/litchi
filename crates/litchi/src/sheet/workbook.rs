@@ -2089,12 +2089,50 @@ mod source_xls_path_tests {
         assert!(actual.len() >= 1 + catalog_ranges.len());
         assert_eq!(&actual[1..1 + catalog_ranges.len()], &catalog_ranges);
 
-        let mut expected_globals = Vec::new();
-        for offset in global_offsets {
-            expected_globals.extend(counted_stream_range(&source, &cfb, offset, 4));
-        }
-        expected_globals.extend(counted_stream_range(&source, &cfb, 0, global_end));
-        assert_eq!(&actual[1 + catalog_ranges.len()..], &expected_globals);
+        // The globals reads are asserted by invariant rather than by an exact
+        // schedule. Change 0565 replaced the header-per-record pre-pass and its
+        // bulk re-read with one pass, so pinning the old range list here pinned
+        // an implementation shape rather than the property this test is about,
+        // which is that the probe reuses one catalog.
+        let globals_reads = &actual[1 + catalog_ranges.len()..];
+        assert!(!globals_reads.is_empty());
+        assert!(
+            globals_reads.iter().all(|(_, length)| *length > 0),
+            "a globals read requested no bytes"
+        );
+
+        let covered = |ranges: &[(u64, usize)]| -> std::collections::BTreeSet<u64> {
+            ranges
+                .iter()
+                .flat_map(|(offset, length)| *offset..*offset + *length as u64)
+                .collect()
+        };
+        let read_bytes: usize = globals_reads.iter().map(|(_, length)| *length).sum();
+        let covered_globals = covered(globals_reads);
+        assert_eq!(
+            covered_globals.len(),
+            read_bytes,
+            "a byte was read more than once while framing the globals"
+        );
+
+        // Every byte of the globals is read.
+        let required = covered(&counted_stream_range(&source, &cfb, 0, global_end));
+        assert!(
+            required.is_subset(&covered_globals),
+            "a globals byte was never read"
+        );
+
+        // A fill may reach past the globals end, bounded by one window and by
+        // the stream. `global_offsets` is retained because it establishes the
+        // record framing this bound is expressed in.
+        assert!(!global_offsets.is_empty());
+        let stream_len = workbook_stream.len();
+        let bounded = global_end.saturating_add(65_536).min(stream_len);
+        let permitted = covered(&counted_stream_range(&source, &cfb, 0, bounded));
+        assert!(
+            covered_globals.is_subset(&permitted),
+            "a globals read reached past one window beyond the globals end"
+        );
 
         let adapter = XlsSource::new(owner, Arc::clone(&cfb));
         let shared_count = Arc::strong_count(&cfb);
