@@ -5884,14 +5884,25 @@ impl SourceBackedPackage {
     }
 
     /// Look up one ordinary part without reading its payload.
+    ///
+    /// The lookup reads only the retained catalog and consumes no source
+    /// bytes, so one observation after it proves what a leading and trailing
+    /// pair proved. The missing-Part branch observes before reporting, so a
+    /// changed source still takes precedence over `PartNotFound` — the order
+    /// the leading observation produced, and the order
+    /// `litchi-pptx`'s collision probe and `litchi-docx`'s validation walk
+    /// both depend on when they map `PartNotFound` to a non-error.
     pub fn part(&self, partname: &PackURI) -> Result<PartView<'_>> {
+        let Some(index) = self.part_index(partname) else {
+            self.source.ensure_current()?;
+            return Err(OpcError::PartNotFound(partname.to_string()));
+        };
+        let view = PartView {
+            package: self,
+            index,
+        };
         self.source.ensure_current()?;
-        self.part_index(partname)
-            .map(|index| PartView {
-                package: self,
-                index,
-            })
-            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
+        Ok(view)
     }
 
     /// Capture one XML Part as a provenance-bearing source publication value.
@@ -9977,12 +9988,21 @@ impl SourceBackedPackage {
             },
         };
         loop {
-            self.source.ensure_current()?;
-            match self
-                .cache
-                .enter_with_observer(entry_id, declared_bytes.unwrap_or_default(), observer)
-                .map_err(map_execution_error)?
-            {
+            let access = match self.cache.enter_with_observer(
+                entry_id,
+                declared_bytes.unwrap_or_default(),
+                observer,
+            ) {
+                Ok(access) => access,
+                Err(error) => {
+                    // A changed source still outranks a cache-entry
+                    // cancellation or reservation failure, which is the order
+                    // the removed loop-head observation produced.
+                    self.source.ensure_current()?;
+                    return Err(map_execution_error(error));
+                },
+            };
+            match access {
                 CacheAccess::Hit(bytes) => {
                     if let Err(error) = self.source.ensure_current() {
                         self.cache
@@ -10007,7 +10027,8 @@ impl SourceBackedPackage {
                     }
                     // The loader may have failed; in that case the flight is
                     // removed and this caller retries rather than observing a
-                    // retained error. This also re-checks source freshness.
+                    // retained error. A retry that reaches the loading path
+                    // takes its opening source observation there.
                 },
                 CacheAccess::Loader(flight) => {
                     let unwind_guard = LoadFlightUnwindGuard {
@@ -10063,6 +10084,12 @@ impl SourceBackedPackage {
     {
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let result = (|| {
+            // Opening observation for this cold read. The removed loop-head
+            // observation stood here; the cache entry, the waiter join and the
+            // budget reservations between the two consume no source bytes.
+            // It precedes the catalog lookup so a changed source still
+            // outranks `PartNotFound`.
+            self.source.ensure_current()?;
             self.parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
@@ -11582,12 +11609,6 @@ mod tests {
         fn arm_after_versions(&self, skip_versions: usize) {
             self.skip_versions.store(skip_versions, Ordering::SeqCst);
             self.armed.store(true, Ordering::SeqCst);
-        }
-
-        fn arm_after_cache_enter(&self) {
-            // The part lookup and `read_part` perform three freshness checks
-            // before a hit's post-entry check can run.
-            self.arm_after_versions(3);
         }
     }
 
@@ -14994,7 +15015,9 @@ mod tests {
         )
         .unwrap();
         let target = package.main_document_part().unwrap().partname().clone();
-        source.arm_after_cache_enter();
+        // One observation for the part lookup, then two more inside the
+        // cold load, before the pre-read check this test targets.
+        source.arm_after_versions(3);
         let mut output = Vec::new();
         let error = package
             .write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec())
@@ -15073,7 +15096,9 @@ mod tests {
         .unwrap();
         let first = package.main_document_part().unwrap().data().unwrap();
         assert_eq!(budget.used(Resource::Memory), DOCUMENT.len() as u64);
-        source.arm_after_cache_enter();
+        // The part lookup takes one observation and the warm read takes
+        // one more, which is the hit's post-entry check this test targets.
+        source.arm_after_versions(2);
 
         assert!(matches!(
             package.main_document_part().unwrap().data(),
@@ -15529,7 +15554,9 @@ mod tests {
             context,
         )
         .unwrap();
-        source.arm_after_cache_enter();
+        // One observation for the part lookup, then two more inside the
+        // cold load, before the pre-read check this test targets.
+        source.arm_after_versions(3);
         let mut accounting = OpcOperationAccounting::default();
 
         assert!(matches!(
@@ -17854,6 +17881,93 @@ mod tests {
         assert_eq!(diagnostics.budget_output_bytes_used, 0);
         assert_eq!(diagnostics.budget_output_bytes_limit, None);
         assert_eq!(diagnostics.budget_reservation_failures, 0);
+    }
+
+    #[test]
+    fn a_warm_part_read_observes_the_source_twice() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"warm part read",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let name = PackURI::new("/word/document.xml").unwrap();
+
+        // Fill the cache. This read is cold and is measured separately.
+        package.part(&name).unwrap().data().unwrap();
+
+        let versions_before = source.versions.load(Ordering::SeqCst);
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let hits_before = package.cache_diagnostics().hits;
+        package.part(&name).unwrap().data().unwrap();
+
+        assert!(
+            package.cache_diagnostics().hits > hits_before,
+            "the second read must be a cache hit for this to measure the warm path"
+        );
+        assert_eq!(
+            source.reads.load(Ordering::SeqCst) - reads_before,
+            0,
+            "a warm part read must not read source bytes"
+        );
+        // One observation for the retained-catalog lookup and one for the
+        // hit's publication check, which also invalidates a stale entry.
+        assert_eq!(
+            source.versions.load(Ordering::SeqCst) - versions_before,
+            2,
+            "a warm part read must observe the source exactly twice"
+        );
+    }
+
+    #[test]
+    fn a_cold_part_read_keeps_its_complete_observation_bracket() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"cold part read",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let name = PackURI::new("/word/document.xml").unwrap();
+
+        let versions_before = source.versions.load(Ordering::SeqCst);
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        package.part(&name).unwrap().data().unwrap();
+
+        assert!(
+            source.reads.load(Ordering::SeqCst) > reads_before,
+            "a cold part read must read source bytes"
+        );
+        // The catalog lookup, the cold load's opening observation, and the
+        // three checks that bracket the archive read and its publication.
+        assert_eq!(
+            source.versions.load(Ordering::SeqCst) - versions_before,
+            5,
+            "a cold part read must keep its complete observation bracket"
+        );
+    }
+
+    #[test]
+    fn a_changed_source_outranks_a_missing_part() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"missing part precedence",
+            false,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let absent = PackURI::new("/word/absent.xml").unwrap();
+
+        assert!(
+            matches!(package.part(&absent), Err(OpcError::PartNotFound(_))),
+            "a stable source reports the missing Part"
+        );
+
+        source.revision.fetch_add(1, Ordering::SeqCst);
+
+        assert!(
+            matches!(package.part(&absent), Err(OpcError::SourceChanged { .. })),
+            "a changed source outranks the missing Part, which callers that map \
+             `PartNotFound` to a non-error depend on"
+        );
     }
 
     #[test]
